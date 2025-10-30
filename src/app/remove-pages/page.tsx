@@ -84,17 +84,19 @@ function RemovePagesClient() {
       const out = await PDFDocument.create();
       const copied = await out.copyPages(src, keep);
       copied.forEach((p) => out.addPage(p));
-      const bytes = await out.save();
+     const bytes = await out.save();
+// Convert Uint8Array -> ArrayBuffer slice (TS-friendly)
+const ab = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+const blob = new Blob([ab], { type: "application/pdf" });
 
-      const blob = new Blob([bytes], { type: "application/pdf" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${file.name.replace(/\.pdf$/i, "")}-trimmed.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+const url = URL.createObjectURL(blob);
+const a = document.createElement("a");
+a.href = url;
+a.download = `${file.name.replace(/\.pdf$/i, "")}-trimmed.pdf`;
+document.body.appendChild(a);
+a.click();
+a.remove();
+URL.revokeObjectURL(url);
     } catch (e) {
       console.error(e);
       setError("Failed to generate the new PDF. Try again.");
