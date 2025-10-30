@@ -7,8 +7,8 @@ import { PDFDocument } from "pdf-lib";
 type PageItem = { index: number; thumb?: string; selected: boolean };
 
 /**
- * We render the actual UI in a Client-only component and disable SSR
- * so Next never tries to bundle `pdfjs-dist` on the server (which pulls native `canvas`).
+ * Client-only UI. We lazy-import pdfjs-dist in the browser so Next/Vercel
+ * never tries to bundle native `canvas` on the server.
  */
 function RemovePagesClient() {
   const [file, setFile] = useState<File | null>(null);
@@ -27,9 +27,9 @@ function RemovePagesClient() {
       setLoading(true);
 
       try {
-        // 🔸 Import pdf.js ONLY in the browser at runtime
+        // Import pdf.js ONLY in the browser
         const pdfjsLib = await import("pdfjs-dist");
-        // @ts-ignore set worker from CDN to avoid bundling the worker
+        // @ts-ignore – set worker via CDN to avoid bundling the worker
         pdfjsLib.GlobalWorkerOptions.workerSrc =
           "https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
 
@@ -48,7 +48,11 @@ function RemovePagesClient() {
           canvas.width = viewport.width;
           canvas.height = viewport.height;
           await page.render({ canvasContext: ctx, viewport }).promise;
-          next.push({ index: i - 1, thumb: canvas.toDataURL("image/png"), selected: true });
+          next.push({
+            index: i - 1,
+            thumb: canvas.toDataURL("image/png"),
+            selected: true,
+          });
         }
 
         if (!cancelled) setPages(next);
@@ -84,19 +88,22 @@ function RemovePagesClient() {
       const out = await PDFDocument.create();
       const copied = await out.copyPages(src, keep);
       copied.forEach((p) => out.addPage(p));
-     const bytes = await out.save();
-// Convert Uint8Array -> ArrayBuffer slice (TS-friendly)
-const ab = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-const blob = new Blob([ab], { type: "application/pdf" });
 
-const url = URL.createObjectURL(blob);
-const a = document.createElement("a");
-a.href = url;
-a.download = `${file.name.replace(/\.pdf$/i, "")}-trimmed.pdf`;
-document.body.appendChild(a);
-a.click();
-a.remove();
-URL.revokeObjectURL(url);
+      // ---- produce a Blob in a TS/Vercel-safe way ----
+      const bytes = await out.save(); // Uint8Array (from pdf-lib)
+      // Make a view over the same buffer (no native/node types involved)
+      const view = new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+      const blob = new Blob([view as unknown as BlobPart], { type: "application/pdf" });
+      // ------------------------------------------------
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${file.name.replace(/\.pdf$/i, "")}-trimmed.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
     } catch (e) {
       console.error(e);
       setError("Failed to generate the new PDF. Try again.");
@@ -113,7 +120,8 @@ URL.revokeObjectURL(url);
     <main className="mx-auto max-w-5xl p-6">
       <h1 className="text-3xl font-semibold">Remove Pages</h1>
       <p className="text-sm text-gray-600 mt-1">
-        Upload a PDF, uncheck pages you don’t want, then download. (All processing happens in your browser.)
+        Upload a PDF, uncheck pages you don’t want, then download.
+        (All processing happens in your browser.)
       </p>
 
       <div className="mt-6 rounded-2xl border-2 border-dashed p-8 text-center">
@@ -170,7 +178,9 @@ URL.revokeObjectURL(url);
                     checked={p.selected}
                     onChange={(e) =>
                       setPages((prev) =>
-                        prev.map((x) => (x.index === p.index ? { ...x, selected: e.target.checked } : x))
+                        prev.map((x) =>
+                          x.index === p.index ? { ...x, selected: e.target.checked } : x
+                        )
                       )
                     }
                     aria-label={`Include page ${p.index + 1}`}
