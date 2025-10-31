@@ -67,8 +67,16 @@ export default function Workbench() {
         const copied = await mergedPdf.copyPages(src, src.getPageIndices());
         copied.forEach((p) => mergedPdf.addPage(p));
       }
-      const bytes = await mergedPdf.save();
-      const blob = new Blob([bytes], { type: "application/pdf" });
+      const bytes = await mergedPdf.save(); // Uint8Array
+
+// Create a real ArrayBuffer slice, then a plain Uint8Array view.
+// Casting to ArrayBuffer avoids the SharedArrayBuffer union that upsets TS on Vercel.
+const ab = (bytes.buffer as ArrayBuffer).slice(
+  bytes.byteOffset,
+  bytes.byteOffset + bytes.byteLength
+);
+const view = new Uint8Array(ab);
+const blob = new Blob([view], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
