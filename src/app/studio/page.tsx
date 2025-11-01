@@ -1,5 +1,7 @@
 "use client";
 
+import LogoutButton from "@/components/LogoutButton";
+
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { PDFDocument } from "pdf-lib";
@@ -19,13 +21,13 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-type SourceRef = { url: string; name: string; size: number }; // object URLs from landing or added Files
+type SourceRef = { url: string; name: string; size: number };
 type PageItem = {
   id: string;
-  srcIdx: number;    // which source file
-  pageIdx: number;   // page index inside that source
-  thumb: string;     // data URL for preview
-  keep: boolean;     // selected or not
+  srcIdx: number; // which source file
+  pageIdx: number; // page index inside that source
+  thumb: string; // data URL for preview
+  keep: boolean; // selected or not
 };
 
 /** One sortable thumbnail tile */
@@ -123,7 +125,6 @@ function StudioClient() {
         // Build thumbs for each source in order
         for (let s = 0; s < sources.length; s++) {
           const src = sources[s];
-          // We can pass a URL directly to pdf.js (works for blob: URLs too)
           const pdf = await pdfjsLib.getDocument(src.url).promise;
           for (let p = 1; p <= pdf.numPages; p++) {
             if (cancelled) return;
@@ -260,6 +261,11 @@ function StudioClient() {
 
   return (
     <main className="mx-auto max-w-6xl p-6">
+      {/* Top-right Sign Out */}
+      <div className="flex justify-end mb-4">
+        <LogoutButton />
+      </div>
+
       <header className="flex items-center gap-3">
         <h1 className="text-2xl font-semibold">Studio</h1>
         <span className="text-sm text-gray-600">
