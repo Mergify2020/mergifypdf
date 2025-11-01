@@ -6,30 +6,21 @@ import { sendResetEmail } from "@/lib/email";
 export async function POST(req: Request) {
   try {
     const { email } = await req.json();
-    if (!email || typeof email !== "string") {
-      return NextResponse.json({ ok: false, error: "Email is required" }, { status: 400 });
-    }
 
-    // Always return ok to avoid user enumeration
+    // Always return 200 to avoid user enumeration
     const user = await prisma.user.findUnique({ where: { email } });
 
     if (user) {
-      const token = generateToken(); // your helper (e.g., crypto.randomUUID())
-      await prisma.resetToken.create({
-        data: {
-          token,
-          userId: user.id,
-          expiresAt: new Date(Date.now() + 1000 * 60 * 60), // 1 hour
-        },
-      });
+      // ✅ pass the string userId to the helper
+      const token = await generateToken(user.id);
 
-      // ✅ NEW signature: object param
+      // send email with our helper (object args)
       await sendResetEmail({ to: email, token });
     }
 
     return NextResponse.json({ ok: true });
-  } catch (err) {
-    console.error("request-reset error:", err);
-    return NextResponse.json({ ok: false, error: "Server error" }, { status: 500 });
+  } catch (e) {
+    console.error(e);
+    return NextResponse.json({ ok: false, error: "Unexpected error" }, { status: 500 });
   }
 }
