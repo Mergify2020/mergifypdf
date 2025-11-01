@@ -1,47 +1,49 @@
-// src/lib/email.ts
-import { Resend } from "resend";
+﻿import { Resend } from "resend";
 
-const apiKey = process.env.RESEND_API_KEY;
-const from = process.env.FROM_EMAIL;
-const baseUrl = process.env.NEXTAUTH_URL;
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-if (!apiKey) console.error("RESEND_API_KEY is missing");
-if (!from) console.error("FROM_EMAIL is missing");
-if (!baseUrl) console.error("NEXTAUTH_URL is missing");
-
-export const resend = new Resend(apiKey);
-
-export async function sendPasswordResetEmail(to: string, token: string) {
-  const url = `${baseUrl}/reset-password?token=${encodeURIComponent(token)}`;
+/**
+ * Sends a password reset email.
+ * Exported name MUST be `sendResetEmail` to match your route import.
+ */
+export async function sendResetEmail(opts: { to: string; token: string }) {
+  const baseUrl =
+    process.env.NEXTAUTH_URL?.replace(/\/$/, "") || "https://mergifypdf.com";
+  const resetLink = `${baseUrl}/reset-password?token=${encodeURIComponent(
+    opts.token
+  )}&email=${encodeURIComponent(opts.to)}`;
 
   try {
-    const result = await resend.emails.send({
-      from: from!,
-      to: [to],
+    const from = process.env.FROM_EMAIL || "MergifyPDF <noreply@mergifypdf.com>";
+    const { data, error } = await resend.emails.send({
+      from,
+      to: opts.to,
       subject: "Reset your MergifyPDF password",
-      text: `To reset your password, open: ${url}`,
       html: `
-        <div style="font-family:system-ui,arial,sans-serif;max-width:520px">
-          <h2>Reset your MergifyPDF password</h2>
-          <p>Click the button below to choose a new password.</p>
+        <div style="font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+          <h2>Reset your password</h2>
+          <p>We received a request to reset your password.</p>
           <p>
-            <a href="${url}" style="display:inline-block;padding:10px 16px;border-radius:8px;background:#0ea5a8;color:#fff;text-decoration:none">
-              Approve reset & set a new password
+            <a href="${resetLink}" style="display:inline-block;padding:10px 16px;background:#2563eb;color:#fff;border-radius:8px;text-decoration:none">
+              Reset Password
             </a>
           </p>
-          <p style="color:#666;font-size:12px;margin-top:16px">
-            If you didn’t request this, you can ignore this email.
-          </p>
+          <p>Or copy and paste this link:</p>
+          <p><a href="${resetLink}">${resetLink}</a></p>
+          <p>If you didn’t request this, you can ignore this email.</p>
         </div>
       `,
-      // optional but useful
-      reply_to: from,
+      text: `Reset your password: ${resetLink}`,
     });
 
-    return { ok: true, id: result.data?.id ?? null };
+    if (error) {
+      return { ok: false as const, error: String(error) };
+    }
+    return { ok: true as const, id: data?.id ?? null };
   } catch (err: any) {
-    // This will show up in Vercel → Functions → Runtime Logs
-    console.error("Resend sendPasswordResetEmail error:", err?.message || err);
-    return { ok: false, error: String(err?.message || err) };
+    return { ok: false as const, error: err?.message ?? "Unknown error" };
   }
 }
+
+/** Optional alias if other files call the old name */
+export const sendPasswordResetEmail = sendResetEmail;
