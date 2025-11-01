@@ -1,41 +1,36 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcrypt";
-import { cookies } from "next/headers";
-
-const prisma = new PrismaClient();
+import prisma from "@/lib/prisma";
+import bcrypt from "bcryptjs";
 
 export async function POST(req: Request) {
   try {
-    const { email, password } = await req.json();
-    if (!email || !password) return NextResponse.json({ error: "Bad req" }, { status: 400 });
-
-    // Read the HttpOnly cookie set by reset-verify
-    const jar = cookies();
-    const tokenCookie = jar.get("reset_ok");
-    const token = tokenCookie?.value || "";
-
-    if (!token) return NextResponse.json({ error: "No approval" }, { status: 400 });
-
-    // Validate token row
-    const vt = await prisma.verificationToken.findFirst({
-      where: { identifier: email, token },
-    });
-    if (!vt || vt.expires < new Date()) {
-      return NextResponse.json({ error: "Invalid/expired" }, { status: 400 });
+    const { token, password } = await req.json();
+    if (!token || !password) {
+      return NextResponse.json({ error: "Missing token or password" }, { status: 400 });
     }
 
-    const hash = await bcrypt.hash(password, 12);
-    await prisma.user.update({ where: { email }, data: { password: hash } });
+    // Find valid reset token
+    const rt = await prisma.resetToken.findUnique({
+      where: { token },
+      include: { user: true },
+    });
+    if (!rt || rt.expiresAt < new Date()) {
+      return NextResponse.json({ error: "Invalid or expired token" }, { status: 400 });
+    }
 
-    // Consume token + clear cookie
-    await prisma.verificationToken.delete({ where: { token } });
+    // Update password
+    const hashed = await bcrypt.hash(password, 10);
+    await prisma.user.update({
+      where: { id: rt.userId },
+      data: { password: hashed },
+    });
 
-    const res = NextResponse.json({ ok: true });
-    res.cookies.set("reset_ok", "", { path: "/", maxAge: 0 });
-    return res;
+    // Invalidate token
+    await prisma.resetToken.delete({ where: { token } });
+
+    return NextResponse.json({ ok: true });
   } catch (e) {
-    console.error(e);
+    console.error("reset-confirm error", e);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
