@@ -1,39 +1,42 @@
+// src/app/api/auth/password/reset-request/route.ts
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-import crypto from "crypto";
-import { sendResetEmail } from "@/lib/mail";
-
-const prisma = new PrismaClient();
+import { prisma } from "@/lib/prisma";
+import { sendPasswordResetEmail } from "@/lib/email";
 
 export async function POST(req: Request) {
   try {
     const { email } = await req.json();
-    if (!email) return NextResponse.json({ ok: true }); // don't leak
+
+    if (!email || typeof email !== "string")
+      return NextResponse.json({ ok: false, error: "Email required" }, { status: 400 });
 
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user?.email) return NextResponse.json({ ok: true });
 
-    // create random token row, 30-min expiry
-    const token = crypto.randomBytes(32).toString("hex");
-    const expires = new Date(Date.now() + 30 * 60 * 1000);
-    await prisma.verificationToken.create({
-      data: { identifier: email, token, expires },
-    });
-
-    const base = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
-    // NEW: approval link hits a server endpoint that sets a secure cookie
-    const verifyUrl = `${base}/api/auth/password/reset-verify?token=${token}&email=${encodeURIComponent(email)}`;
-
-    const devMode = process.env.NODE_ENV !== "production" || !process.env.SMTP_HOST;
-    if (devMode) {
-      console.log("DEV approve URL:", verifyUrl);
-      return NextResponse.json({ ok: true, devResetUrl: verifyUrl });
+    // Respond 200 even if user not found (don’t leak which emails exist)
+    if (!user) {
+      return NextResponse.json({ ok: true });
     }
 
-    await sendResetEmail(email, verifyUrl);
+    // Kill any existing tokens for this user
+    await prisma.resetToken.deleteMany({ where: { userId: user.id } });
+
+    const token = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 1000 * 60 * 30); // 30 min
+
+    await prisma.resetToken.create({
+      data: { token, userId: user.id, expiresAt },
+    });
+
+    const sent = await sendPasswordResetEmail(email, token);
+    if (!sent.ok) {
+      // Log for server, generic message for client
+      console.error("Email send failed:", sent.error);
+      return NextResponse.json({ ok: false, error: "Failed to send email" }, { status: 500 });
+    }
+
     return NextResponse.json({ ok: true });
-  } catch (e) {
-    console.error(e);
-    return NextResponse.json({ ok: true });
+  } catch (err: any) {
+    console.error("reset-request error:", err?.message || err);
+    return NextResponse.json({ ok: false, error: "Server error" }, { status: 500 });
   }
 }
