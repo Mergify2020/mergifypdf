@@ -7,16 +7,13 @@ export async function POST(req: Request) {
   try {
     const { email } = await req.json();
 
-    // Always behave the same whether the user exists (don’t leak)
+    // Always reply 200 to avoid user enumeration
     const user = await prisma.user.findUnique({ where: { email } });
     if (user) {
-      // create token row
-      const token = await generateToken(user.id); // returns the raw token string
-      // send email with new helper (object arg)
-      await sendResetEmail({ to: email, token });
+      const token = await generateToken(user.id); // user.id is string (cuid)
+      await sendResetEmail({ to: email, token }); // object form from email.ts
     }
 
-    // Generic success
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error(e);
