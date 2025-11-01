@@ -1,5 +1,4 @@
-// src/app/api/_debug/send-email/route.ts
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
