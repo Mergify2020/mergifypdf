@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
 export async function POST(req: Request) {
@@ -9,7 +9,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing token or password" }, { status: 400 });
     }
 
-    // Find valid reset token
     const rt = await prisma.resetToken.findUnique({
       where: { token },
       include: { user: true },
@@ -18,14 +17,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid or expired token" }, { status: 400 });
     }
 
-    // Update password
     const hashed = await bcrypt.hash(password, 10);
     await prisma.user.update({
       where: { id: rt.userId },
       data: { password: hashed },
     });
 
-    // Invalidate token
     await prisma.resetToken.delete({ where: { token } });
 
     return NextResponse.json({ ok: true });
