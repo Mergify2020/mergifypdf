@@ -2,48 +2,34 @@
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-/**
- * Sends a password reset email.
- * Exported name MUST be `sendResetEmail` to match your route import.
- */
-export async function sendResetEmail(opts: { to: string; token: string }) {
-  const baseUrl =
-    process.env.NEXTAUTH_URL?.replace(/\/$/, "") || "https://mergifypdf.com";
-  const resetLink = `${baseUrl}/reset-password?token=${encodeURIComponent(
-    opts.token
-  )}&email=${encodeURIComponent(opts.to)}`;
+// Call like: sendResetEmail({ to: "user@x.com", token: "..." })
+export async function sendResetEmail({ to, token }: { to: string; token: string }) {
+  const from = process.env.FROM_EMAIL || "MergifyPDF <noreply@mergifypdf.com>";
+  const base =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.NEXTAUTH_URL ||
+    "https://mergifypdf.com";
 
-  try {
-    const from = process.env.FROM_EMAIL || "MergifyPDF <noreply@mergifypdf.com>";
-    const { data, error } = await resend.emails.send({
-      from,
-      to: opts.to,
-      subject: "Reset your MergifyPDF password",
-      html: `
-        <div style="font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
-          <h2>Reset your password</h2>
-          <p>We received a request to reset your password.</p>
-          <p>
-            <a href="${resetLink}" style="display:inline-block;padding:10px 16px;background:#2563eb;color:#fff;border-radius:8px;text-decoration:none">
+  const link = `${base}/reset-password?token=${encodeURIComponent(token)}`;
+
+  const { error } = await resend.emails.send({
+    from,
+    to,
+    subject: "Reset your MergifyPDF password",
+    html: `
+      <div style="font-family:system-ui,Segoe UI,Roboto,Arial">
+        <h2>Reset your password</h2>
+        <p>Click the button below to reset your password:</p>
+        <p><a href="${link}"
+              style="display:inline-block;padding:10px 16px;border-radius:8px;background:#2563eb;color:#fff;text-decoration:none">
               Reset Password
-            </a>
-          </p>
-          <p>Or copy and paste this link:</p>
-          <p><a href="${resetLink}">${resetLink}</a></p>
-          <p>If you didn’t request this, you can ignore this email.</p>
-        </div>
-      `,
-      text: `Reset your password: ${resetLink}`,
-    });
+        </a></p>
+        <p>Or open this link: <br/><a href="${link}">${link}</a></p>
+        <p style="color:#6b7280;font-size:12px">If you didn’t request this, you can ignore this email.</p>
+      </div>
+    `,
+  });
 
-    if (error) {
-      return { ok: false as const, error: String(error) };
-    }
-    return { ok: true as const, id: data?.id ?? null };
-  } catch (err: any) {
-    return { ok: false as const, error: err?.message ?? "Unknown error" };
-  }
+  if (error) return { ok: false as const, error };
+  return { ok: true as const };
 }
-
-/** Optional alias if other files call the old name */
-export const sendPasswordResetEmail = sendResetEmail;

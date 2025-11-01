@@ -7,39 +7,19 @@ export async function POST(req: Request) {
   try {
     const { email } = await req.json();
 
-    if (!email || typeof email !== "string") {
-      return NextResponse.json(
-        { ok: false, error: "Email is required" },
-        { status: 400 }
-      );
-    }
-
-    // Always respond success to avoid user enumeration
+    // Always behave the same whether the user exists (don’t leak)
     const user = await prisma.user.findUnique({ where: { email } });
-
     if (user) {
-      const token = generateToken(); // e.g. crypto.randomUUID() in your helper
-
-      // Store/replace any existing token for this user (optional upsert logic)
-      await prisma.resetToken.create({
-        data: {
-          token,
-          userId: user.id,
-          expiresAt: new Date(Date.now() + 1000 * 60 * 60), // 1 hour
-        },
-      });
-
-      // NEW signature: pass a single object with to + token
+      // create token row
+      const token = await generateToken(user.id); // returns the raw token string
+      // send email with new helper (object arg)
       await sendResetEmail({ to: email, token });
     }
 
-    // Generic OK either way
+    // Generic success
     return NextResponse.json({ ok: true });
-  } catch (err: any) {
-    console.error("reset-request error:", err);
-    return NextResponse.json(
-      { ok: false, error: "Server error" },
-      { status: 500 }
-    );
+  } catch (e) {
+    console.error(e);
+    return NextResponse.json({ ok: false, error: "Unexpected error" }, { status: 500 });
   }
 }
