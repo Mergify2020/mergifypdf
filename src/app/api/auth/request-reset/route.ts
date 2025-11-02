@@ -16,47 +16,49 @@ export async function POST(req: Request) {
       });
     }
 
-    // 1) Look up user
+    // 1) Find the user
     const user = await prisma.user.findUnique({
       where: { email },
       select: { id: true, email: true },
     });
 
     if (!user) {
-      // You asked to show “email not found”
+      // You asked to explicitly say when it’s not registered.
       return NextResponse.json({
         ok: false,
-        code: "NOT_FOUND",
-        message: "Email not found. Please check and try again.",
+        code: "NO_ACCOUNT",
+        message: "We couldn’t find an account with that email.",
       });
     }
 
-    // 2) Create token row (no throttle)
+    // 2) Generate token string
     const token = await generateToken(user.id);
+
+    // 3) Store token row (1-hour expiry)
     await prisma.resetToken.create({
       data: {
         token,
         userId: user.id,
-        expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
       },
     });
 
-    // 3) Send email
-    await sendResetEmail({ to: user.email!, token });
+    // 4) Send the email
+    // Cast to string to satisfy TS if your Prisma model allows null
+    await sendResetEmail({ to: user.email as string, token });
 
     return NextResponse.json({
       ok: true,
       code: "SENT",
-      message:
-        "Reset link sent. Please check your inbox — it can take a few minutes.",
+      message: "Reset link sent. Please check your inbox; delivery can take a few minutes.",
     });
-  } catch (e) {
-    console.error("[request-reset] error:", e);
+  } catch (e: any) {
+    console.error("[request-reset] ERROR:", e);
     return NextResponse.json({
       ok: false,
       code: "ERROR",
       message:
-        "We couldn’t process the reset right now. Please try again in a moment.",
+        "We couldn’t process your request right now. Please try again in a moment.",
     });
   }
 }
