@@ -85,7 +85,7 @@ export async function POST(req: Request) {
     // 5) success response (your wording)
     return ok({
       code: "EMAIL_SENT",
-      message: "Reset link sent. It can take a few minutes to arrive — please check your inbox and spam.",
+      message: "Reset link has been sent. It may take a few minutes to arrive.",
     });
   } catch (e: any) {
     return err("UNEXPECTED", "Something went wrong. Please try again.", {
