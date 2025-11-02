@@ -1,11 +1,11 @@
-﻿// src/lib/email.tsx  — PASTE OVER EVERYTHING
+﻿// src/lib/email.tsx — REPLACE EVERYTHING
 import React from "react";
 import { Resend } from "resend";
 import { ResetPasswordEmail } from "@/emails/ResetPasswordEmail";
 
-type SendArgs = { to: string; token: string; mode?: "react" | "html" };
+type SendArgs = { to: string; token: string };
 
-export async function sendResetEmail({ to, token, mode = "react" }: SendArgs) {
+export async function sendResetEmail({ to, token }: SendArgs) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     console.error("[email] Missing RESEND_API_KEY");
@@ -15,6 +15,7 @@ export async function sendResetEmail({ to, token, mode = "react" }: SendArgs) {
   const resend = new Resend(apiKey);
   const from = process.env.FROM_EMAIL || "MergifyPDF <onboarding@resend.dev>";
 
+  // Build absolute reset URL
   let base =
     process.env.NEXTAUTH_URL ||
     process.env.NEXT_PUBLIC_APP_URL ||
@@ -23,74 +24,52 @@ export async function sendResetEmail({ to, token, mode = "react" }: SendArgs) {
   base = base.replace(/\/+$/, "");
   const url = `${base}/reset-password?token=${encodeURIComponent(token)}`;
 
+  // --- primary: React email ---
   try {
-    // Pick body based on mode
-    const payload =
-      mode === "react"
-        ? {
-            from,
-            to,
-            subject: "Reset your MergifyPDF password",
-            // IMPORTANT: JSX must be valid, no stray comments after the tag
-            react: <ResetPasswordEmail resetUrl={url} />,
-          }
-        : {
-            from,
-            to,
-            subject: "Reset your MergifyPDF password",
-            html: `
-              <div style="font-family: Inter, Arial, sans-serif; line-height:1.6;">
-                <h2 style="margin:0 0 12px;">Reset your MergifyPDF password</h2>
-                <p>Click the button below:</p>
-                <p>
-                  <a href="${url}"
-                    style="display:inline-block;padding:10px 16px;border-radius:10px;text-decoration:none;background:#2563eb;color:#fff;font-weight:600;">
-                    Reset password
-                  </a>
-                </p>
-                <p>If the button doesn’t work, copy this link:</p>
-                <p style="word-break:break-all;color:#374151;">${url}</p>
-              </div>
-            `,
-          };
+    const { data, error } = await resend.emails.send({
+      from,
+      to,
+      subject: "Reset your MergifyPDF password",
+      react: <ResetPasswordEmail resetUrl={url} />,
+    });
 
-    const { data, error } = await resend.emails.send(payload as any);
     if (error) {
-      console.error("[email] Resend error:", error);
-      return { ok: false, error: String(error) };
+      console.error("[email] Resend react error:", error);
+      throw error;
     }
-    console.log("[email] Resend accepted:", { id: data?.id, to, mode });
+    console.log("[email] React send accepted:", { id: data?.id, to });
     return { ok: true, id: data?.id };
-  } catch (e) {
-    console.error("[email] sendResetEmail unexpected error:", e);
-    // last-chance fallback: try the HTML version once if react mode failed
-    if (mode === "react") {
-      try {
-        const { data, error } = await resend.emails.send({
-          from,
-          to,
-          subject: "Reset your MergifyPDF password",
-          html: `
-            <div style="font-family: Inter, Arial, sans-serif; line-height:1.6;">
-              <h2 style="margin:0 0 12px;">Reset your MergifyPDF password</h2>
-              <p>Click the button below:</p>
-              <p>
-                <a href="${url}"
-                  style="display:inline-block;padding:10px 16px;border-radius:10px;text-decoration:none;background:#2563eb;color:#fff;font-weight:600;">
-                  Reset password
-                </a>
-              </p>
-              <p>If the button doesn’t work, copy this link:</p>
-              <p style="word-break:break-all;color:#374151;">${url}</p>
-            </div>
-          `,
-        });
-        if (error) return { ok: false, error: String(error) };
-        return { ok: true, id: data?.id, fallback: true };
-      } catch (e2) {
-        return { ok: false, error: String(e2) };
+  } catch (err) {
+    // --- fallback: raw HTML (no subject suffix) ---
+    try {
+      const { data, error } = await resend.emails.send({
+        from,
+        to,
+        subject: "Reset your MergifyPDF password",
+        html: `
+          <div style="font-family: Inter, Arial, sans-serif; line-height:1.6;">
+            <h2 style="margin:0 0 12px;">Reset your MergifyPDF password</h2>
+            <p>Click the button below:</p>
+            <p>
+              <a href="${url}"
+                 style="display:inline-block;padding:10px 16px;border-radius:10px;text-decoration:none;background:#2563eb;color:#fff;font-weight:600;">
+                Reset password
+              </a>
+            </p>
+            <p>If the button doesn’t work, copy this link:</p>
+            <p style="word-break:break-all;color:#374151;">${url}</p>
+          </div>
+        `,
+      });
+      if (error) {
+        console.error("[email] Resend html error:", error);
+        return { ok: false, error: String(error) };
       }
+      console.log("[email] HTML fallback accepted:", { id: data?.id, to });
+      return { ok: true, id: data?.id, fallback: true };
+    } catch (err2) {
+      console.error("[email] sendResetEmail fatal:", err2);
+      return { ok: false, error: String(err2) };
     }
-    return { ok: false, error: String(e) };
   }
 }
