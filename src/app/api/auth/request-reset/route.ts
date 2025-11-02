@@ -1,98 +1,95 @@
-// TEMP DEBUG + HARDENED INSERT
+// src/app/api/auth/request-reset/route.ts — REPLACE EVERYTHING
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateToken } from "@/lib/tokens";
 import { sendResetEmail } from "@/lib/email";
+import { randomUUID } from "crypto";
+
+// how many times to retry if "token" hits the unique constraint
+const MAX_TOKEN_RETRIES = 3;
+
+type Json = Record<string, any>;
+function ok(json: Json) {
+  return NextResponse.json({ ok: true, ...json });
+}
+function err(code: string, message: string, extra?: Json) {
+  return NextResponse.json({ ok: false, code, message, ...(extra ?? {}) });
+}
 
 export async function POST(req: Request) {
-  const debug: any = { steps: [] };
-
   try {
-    const { email } = await req.json();
-    if (typeof email !== "string" || !email.includes("@")) {
-      return NextResponse.json({
-        ok: false,
-        code: "BAD_EMAIL",
-        message: "Please enter a valid email address.",
-      });
+    const body = await req.json().catch(() => ({}));
+    const email: string | undefined = body?.email;
+    if (!email || !email.includes("@")) {
+      // invalid payload
+      return err("BAD_REQUEST", "Please provide a valid email address.");
     }
 
-    debug.steps.push("lookup-user");
+    // 1) find user
     const user = await prisma.user.findUnique({
       where: { email },
       select: { id: true, email: true },
     });
 
     if (!user) {
-      return NextResponse.json({
-        ok: false,
-        code: "NO_ACCOUNT",
-        message: "We couldn’t find an account with that email.",
-      });
+      // You asked to show this explicitly
+      return err("EMAIL_NOT_FOUND", "Email not registered. Please check the address or sign up.");
     }
 
-    // Generate & insert with small retry loop to avoid rare collisions / DB quirks
-    debug.steps.push("generate-token");
-    let token: string | null = null;
-    let created = false;
-    let lastErr: any = null;
+    // 2) generate a token (string)
+    let token: string = await generateToken(user.id);
 
-    for (let i = 0; i < 3 && !created; i++) {
-      token = await generateToken(user.id);
-      debug[`try_${i + 1}`] = { tokenLen: token.length };
+    // 3) write row to public.ResetToken with required columns
+    //    (id, token, userId, expiresAt, createdAt, updatedAt)
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    const now = new Date();
 
+    let created = null;
+    for (let attempt = 1; attempt <= MAX_TOKEN_RETRIES; attempt++) {
       try {
-        debug.steps.push("create-token-row");
-        await prisma.resetToken.create({
+        created = await prisma.resetToken.create({
           data: {
+            id: randomUUID(), // table requires an id (no default)
             token,
             userId: user.id,
-            // include explicit timestamps in case DB defaults are missing
-            createdAt: new Date(),
-            expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
+            expiresAt,
+            createdAt: now,   // even though the column has CURRENT_TIMESTAMP default, we supply it to be explicit
+            updatedAt: now,
           },
         });
-        created = true;
+        break; // success
       } catch (e: any) {
-        lastErr = {
-          name: e?.name,
-          code: e?.code,
-          meta: e?.meta,
-          message: e?.message,
-        };
-        // P2002 = unique constraint violation in Prisma; regenerate and try again
-        if (e?.code !== "P2002") break;
+        // If unique constraint on token fires, generate a new token and retry
+        const isUnique =
+          e?.code === "P2002" || String(e?.message ?? "").toLowerCase().includes("unique");
+        if (isUnique && attempt < MAX_TOKEN_RETRIES) {
+          token = await generateToken(user.id);
+          continue;
+        }
+        // any other error (or retries exhausted)
+        return err("DB_CREATE_FAILED", "We couldn’t save the reset token.", {
+          debug: { attempt, reason: e?.message ?? String(e) },
+        });
       }
     }
 
-    if (!created) {
-      return NextResponse.json({
-        ok: false,
-        code: "DB_CREATE_FAILED",
-        message: "We couldn’t save the reset token.",
-        debug, // TEMPORARY: helps us see the real cause
-        error: lastErr,
+    // 4) send the email
+    const emailRes = await sendResetEmail({ to: user.email!, token });
+
+    if (!emailRes?.ok) {
+      return err("EMAIL_SEND_FAILED", "We couldn’t send the reset email right now. Please try again in a moment.", {
+        debug: emailRes?.error ?? null,
       });
     }
 
-    debug.steps.push("send-email");
-    await sendResetEmail({ to: user.email as string, token: token! });
-
-    return NextResponse.json({
-      ok: true,
-      code: "SENT",
-      message:
-        "Reset link sent. Please check your inbox; delivery can take a few minutes.",
+    // 5) success response (your wording)
+    return ok({
+      code: "EMAIL_SENT",
+      message: "Reset link sent. It can take a few minutes to arrive — please check your inbox and spam.",
     });
   } catch (e: any) {
-    // TEMP: surface error details to unblock us
-    return NextResponse.json({
-      ok: false,
-      code: "ERROR",
-      message:
-        "We couldn’t process your request right now. Please try again in a moment.",
-      error: { name: e?.name, code: e?.code, meta: e?.meta, message: e?.message },
-      debug,
+    return err("UNEXPECTED", "Something went wrong. Please try again.", {
+      debug: e?.message ?? String(e),
     });
   }
 }
