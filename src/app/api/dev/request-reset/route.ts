@@ -1,44 +1,43 @@
-// src/app/api/dev/request-reset/route.ts  (NEW FILE - paste entire file)
+// src/app/api/dev/request-reset/route.ts  — REPLACE EVERYTHING
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { generateToken } from "@/lib/tokens";
-import { sendResetEmail } from "@/lib/email";
+
+// Node crypto is available in Next.js Route Handlers (node runtime)
+import { randomUUID, randomBytes } from "crypto";
+
+// Small helper to create a strong random token
+function makeToken() {
+  // 36-char uuid + 64-char hex = 100 chars total. Plenty of entropy.
+  return `${randomUUID()}-${randomBytes(32).toString("hex")}`;
+}
 
 export async function GET(req: Request) {
   try {
-    const url = new URL(req.url);
-    const email = url.searchParams.get("email");
-    if (!email) {
-      return NextResponse.json({ ok: false, error: "missing ?email=" }, { status: 400 });
-    }
+    const { searchParams } = new URL(req.url);
+    const email = searchParams.get("email") || "morrisalan2020@gmail.com";
 
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
-      return NextResponse.json({ ok: false, error: "user-not-found" }, { status: 200 });
+      return NextResponse.json({ ok: false, error: "no-user" });
     }
 
-    // create token row (same logic as real route)
-    const token = await generateToken(user.id);
+    // 🔁 Clean up old tokens for this user to avoid unique collisions on `token`
+    await prisma.resetToken.deleteMany({ where: { userId: user.id } });
 
+    // 🎟️ Create a fresh token
+    const token = makeToken();
+
+    // ⏰ 1 hour expiry (adjust to match your schema)
     const created = await prisma.resetToken.create({
       data: {
         token,
         userId: user.id,
-        // 1-hour expiry: adjust if your schema differs
         expiresAt: new Date(Date.now() + 60 * 60 * 1000),
       },
     });
 
-    // send the email using the same helper the real route uses
-    const sent = await sendResetEmail({ to: email, token });
-
-    return NextResponse.json({
-      ok: true,
-      userId: user.id,
-      tokenId: created.id ?? null,
-      sent,
-    });
+    return NextResponse.json({ ok: true, token: created.token, expiresAt: created.expiresAt });
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: String(e) }, { status: 200 });
+    return NextResponse.json({ ok: false, error: String(e) });
   }
 }
