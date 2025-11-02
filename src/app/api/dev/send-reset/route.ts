@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import sendResetEmail from "@/lib/email"; // ✅ default import
+import { sendResetEmail } from "@/lib/email"; // <- named import
 
 export async function GET() {
-  // change this address if you want to try another inbox
   const to = "morrisalan2020@gmail.com";
   const token = "debug-" + Date.now();
 
