@@ -1,55 +1,56 @@
+// src/app/api/dev/request-reset/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateToken } from "@/lib/tokens";
+import { createResetTokenRow } from "@/lib/resetTokenWriter";
 import { sendResetEmail } from "@/lib/email";
-import { createResetTokenFlexible } from "@/lib/resetTokenWriter";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const email = url.searchParams.get("email") || "";
 
-  const result: any = { ok: false, email, steps: [] as string[] };
-
+  const steps: string[] = [];
   try {
-    if (!email.includes("@")) {
-      result.error = "bad-email";
-      return NextResponse.json(result);
-    }
-
-    result.steps.push("lookup-user");
+    steps.push("lookup-user");
     const user = await prisma.user.findUnique({
       where: { email },
       select: { id: true, email: true },
     });
-    result.userFound = !!user;
 
-    if (!user?.id) {
-      result.ok = true;
-      result.reason = "user-not-found";
-      return NextResponse.json(result);
+    if (!user) {
+      return NextResponse.json({ ok: false, email, steps, userFound: false });
     }
+    steps.push("generate-token");
 
-    result.steps.push("generate-token");
     const token = await generateToken(user.id);
-    result.tokenLen = token.length;
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+    steps.push("create-token-row");
 
-    result.steps.push("create-token-row");
-    const createRes = await createResetTokenFlexible(user.id, user.email as string, token);
-    result.createRes = createRes;
-
-    if (!createRes.ok) {
-      result.error = "failed-to-create-reset-token";
-      return NextResponse.json(result);
+    const created = await createResetTokenRow({ token, userId: user.id, expiresAt });
+    if (!created.ok) {
+      return NextResponse.json({
+        ok: false,
+        email,
+        steps,
+        userFound: true,
+        tokenLen: token.length,
+        createRes: created,
+      });
     }
 
-    result.steps.push("send-email");
-    const sendRes = await sendResetEmail({ to: user.email as string, token });
-    result.sendRes = sendRes;
+    steps.push("send-email");
+    const sent = await sendResetEmail({ to: user.email as string, token });
 
-    result.ok = !!sendRes.ok;
-    return NextResponse.json(result);
-  } catch (e: any) {
-    result.error = String(e?.message || e);
-    return NextResponse.json(result);
+    return NextResponse.json({
+      ok: true,
+      email,
+      steps,
+      userFound: true,
+      tokenLen: token.length,
+      createRes: created,
+      sent,
+    });
+  } catch (e) {
+    return NextResponse.json({ ok: false, email, steps, error: String(e) });
   }
 }
