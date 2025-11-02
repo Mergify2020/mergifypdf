@@ -1,47 +1,69 @@
+// src/app/forgot-password/page.tsx
 "use client";
 
-import React, { useState } from "react";
+import { useState } from "react";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState(false);
+  const [status, setStatus] = useState<"idle"|"loading"|"done">("idle");
+  const [message, setMessage] = useState<string | null>(null);
+  const [isError, setIsError] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setBusy(true);
+    setStatus("loading");
+    setMessage(null);
+    setIsError(false);
+
     try {
-      await fetch("/api/auth/request-reset", {
+      const res = await fetch("/api/auth/request-reset", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
-      setDone(true);
+      const data = await res.json();
+
+      setMessage(data?.message ?? "Request processed.");
+      setIsError(!data?.ok);
+    } catch {
+      setMessage("We couldn’t process the reset right now. Please try again.");
+      setIsError(true);
     } finally {
-      setBusy(false);
+      setStatus("done");
     }
   }
 
   return (
-    <main className="mx-auto max-w-sm p-6">
-      <h1 className="text-2xl font-semibold">Forgot password</h1>
-      {done ? (
-        <p className="mt-3 text-sm text-gray-600">If that email exists, we sent a reset link.</p>
-      ) : (
-        <form onSubmit={onSubmit} className="mt-6 space-y-3">
-          <input
-            className="w-full rounded border p-2"
-            type="email"
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-          <button className="w-full rounded bg-blue-600 p-2 text-white disabled:opacity-60" disabled={busy}>
-            {busy ? "Sending…" : "Send reset link"}
-          </button>
-        </form>
+    <div className="max-w-md mx-auto p-6">
+      <h1 className="text-2xl font-semibold mb-4">Forgot your password?</h1>
+      <form onSubmit={onSubmit} className="space-y-4">
+        <input
+          type="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="you@example.com"
+          className="w-full border rounded px-3 py-2"
+        />
+        <button
+          type="submit"
+          disabled={status === "loading"}
+          className="w-full rounded bg-blue-600 text-white py-2 disabled:opacity-60"
+        >
+          {status === "loading" ? "Sending…" : "Send reset link"}
+        </button>
+      </form>
+
+      {message && (
+        <p className={`mt-4 text-sm ${isError ? "text-red-600" : "text-green-700"}`}>
+          {message}
+        </p>
       )}
-    </main>
+      {!isError && status === "done" && (
+        <p className="mt-2 text-xs text-gray-500">
+          Tip: It may take a few minutes to show up. Check spam/junk too.
+        </p>
+      )}
+    </div>
   );
 }

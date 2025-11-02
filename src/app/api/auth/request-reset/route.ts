@@ -1,36 +1,62 @@
+// src/app/api/auth/request-reset/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { generateToken } from "@/lib/tokens";
 import { sendResetEmail } from "@/lib/email";
-import { createFreshResetTokenForUser } from "@/lib/resetTokenWriter";
 
 export async function POST(req: Request) {
   try {
     const { email } = await req.json();
 
-    // Always generic response to avoid enumeration
     if (typeof email !== "string" || !email.includes("@")) {
-      return NextResponse.json({ ok: true });
+      return NextResponse.json({
+        ok: false,
+        code: "BAD_EMAIL",
+        message: "Please enter a valid email address.",
+      });
     }
 
+    // 1) Look up user
     const user = await prisma.user.findUnique({
       where: { email },
       select: { id: true, email: true },
     });
+
     if (!user) {
-      return NextResponse.json({ ok: true });
+      // You asked to show “email not found”
+      return NextResponse.json({
+        ok: false,
+        code: "NOT_FOUND",
+        message: "Email not found. Please check and try again.",
+      });
     }
 
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-    const created = await createFreshResetTokenForUser(user.id, expiresAt);
-    if (!created.ok) {
-      console.error("[request-reset] insert failed:", created.error);
-      return NextResponse.json({ ok: true }); // stay generic
-    }
+    // 2) Create token row (no throttle)
+    const token = await generateToken(user.id);
+    await prisma.resetToken.create({
+      data: {
+        token,
+        userId: user.id,
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
+      },
+    });
 
-    await sendResetEmail({ to: user.email as string, token: created.row.token });
-    return NextResponse.json({ ok: true });
+    // 3) Send email
+    await sendResetEmail({ to: user.email!, token });
+
+    return NextResponse.json({
+      ok: true,
+      code: "SENT",
+      message:
+        "Reset link sent. Please check your inbox — it can take a few minutes.",
+    });
   } catch (e) {
-    console.error("[request-reset] fatal:", e);
-    return NextResponse.json({ ok: true });
+    console.error("[request-reset] error:", e);
+    return NextResponse.json({
+      ok: false,
+      code: "ERROR",
+      message:
+        "We couldn’t process the reset right now. Please try again in a moment.",
+    });
   }
 }
