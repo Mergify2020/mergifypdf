@@ -61,7 +61,7 @@ export default function ForgotPasswordPage() {
       )}
       {!isError && status === "done" && (
         <p className="mt-2 text-xs text-gray-500">
-          Tip: It may take a few minutes to show up. Check spam/junk too.
+          Please check your inbox and spam.
         </p>
       )}
     </div>
