@@ -30,7 +30,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    // Has this user requested recently?
+    // Throttle: has this user requested recently?
     const recent = await prisma.resetToken.findFirst({
       where: {
         userId: user.id,
@@ -45,7 +45,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    // Generate a new token string (helper just returns a string)
+    // Generate a new token string
     const token = await generateToken(user.id);
 
     // Store token row (adjust fields if your schema differs)
@@ -57,8 +57,10 @@ export async function POST(req: Request) {
       },
     });
 
-    // Build/send the email
-    await sendResetEmail({ to: user.email, token });
+    // Build/send the email — GUARD for null
+    if (user.email) {
+      await sendResetEmail({ to: user.email, token });
+    }
 
     return NextResponse.json({ ok: true });
   } catch (e) {
