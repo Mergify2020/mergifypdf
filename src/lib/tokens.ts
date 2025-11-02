@@ -1,37 +1,10 @@
-import crypto from "crypto";
-import { prisma } from "@/lib/prisma";
+// src/lib/tokens.ts — REPLACE EVERYTHING
+import { randomBytes } from "crypto";
 
 /**
- * Create a reset token for a user (string userId).
- * Persists to ResetToken table and returns the raw token string.
+ * Returns a cryptographically-strong 64-char hex token (random, not tied to userId).
+ * Keeps the same signature so imports still work.
  */
-export async function generateToken(userId: string): Promise<string> {
-  const token = crypto.randomBytes(32).toString("hex");
-  const expiresAt = new Date(Date.now() + 1000 * 60 * 60); // 1 hour
-
-  await prisma.resetToken.create({
-    data: {
-      token,
-      userId,     // <- string
-      expiresAt,
-    },
-  });
-
-  return token;
-}
-
-/**
- * Optional: verify and consume a token (if you need it later).
- */
-export async function verifyAndConsumeToken(token: string) {
-  const row = await prisma.resetToken.findUnique({ where: { token } });
-  if (!row) return { ok: false, error: "Invalid token" };
-  if (row.expiresAt < new Date()) {
-    // clean up expired
-    await prisma.resetToken.delete({ where: { token } });
-    return { ok: false, error: "Expired token" };
-  }
-  // consume (delete) the token
-  await prisma.resetToken.delete({ where: { token } });
-  return { ok: true, userId: row.userId };
+export async function generateToken(_userId?: string): Promise<string> {
+  return randomBytes(32).toString("hex"); // 64 hex chars
 }
