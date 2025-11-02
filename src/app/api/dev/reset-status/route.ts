@@ -1,6 +1,3 @@
-# From your project root
-New-Item -ItemType Directory -Force "src\app\api\dev\reset-status" | Out-Null
-@'
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
@@ -15,7 +12,6 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: false, error: "missing email" }, { status: 400 });
     }
 
-    // Look up user
     const user = await prisma.user.findUnique({
       where: { email },
       select: { id: true },
@@ -25,7 +21,6 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: true, exists: false, throttled: false });
     }
 
-    // Most recent reset token
     const last = await prisma.resetToken.findFirst({
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },
@@ -59,4 +54,3 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: "unexpected" }, { status: 500 });
   }
 }
-'@ | Set-Content "src/app/api/dev/reset-status/route.ts"
