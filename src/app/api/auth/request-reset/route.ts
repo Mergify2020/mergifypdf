@@ -1,41 +1,53 @@
+// src/app/api/auth/request-reset/route.ts — REPLACE EVERYTHING
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { generateToken } from "@/lib/tokens";
 import { sendResetEmail } from "@/lib/email";
+import { randomUUID, randomBytes } from "crypto";
 
-// throttle window in seconds (same email)
-const THROTTLE_SECONDS = 60;
+// Strong random token (uuid + 32 bytes hex → ~100 chars)
+function makeToken() {
+  return `${randomUUID()}-${randomBytes(32).toString("hex")}`;
+}
 
 export async function POST(req: Request) {
   try {
     const { email } = await req.json();
-    if (!email) return NextResponse.json({ ok: true }); // no enumeration
+
+    // Always respond 200 to avoid user enumeration
+    if (!email) {
+      return NextResponse.json({ ok: true });
+    }
 
     const user = await prisma.user.findUnique({ where: { email } });
     if (user) {
-      // If a token already exists recently for this user, don't issue another immediately
-      const recent = await prisma.resetToken.findFirst({
-        where: {
+      // Remove any prior tokens for this user to avoid @unique collisions
+      await prisma.resetToken.deleteMany({ where: { userId: user.id } });
+
+      const token = makeToken();
+
+      await prisma.resetToken.create({
+        data: {
+          token,
           userId: user.id,
-          createdAt: {
-            gte: new Date(Date.now() - THROTTLE_SECONDS * 1000),
-          },
+          // 1-hour expiry; adjust if your schema differs
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000),
         },
-        select: { id: true },
       });
 
-      if (!recent) {
-        const token = await generateToken(user.id);
-        // fire-and-forget
-        sendResetEmail({ to: email, token }).catch((e) =>
-          console.error("Reset email error:", e)
-        );
+      // Send the email with your React template
+      const send = await sendResetEmail({ to: email, token });
+
+      // Optional: log send result server-side for debugging
+      if (!send?.ok) {
+        console.error("[request-reset] send failed:", send?.error);
       }
     }
 
+    // Always return ok:true
     return NextResponse.json({ ok: true });
   } catch (e) {
-    console.error("Request-reset error:", e);
-    return NextResponse.json({ ok: false, error: "Unexpected error" }, { status: 500 });
+    console.error("[request-reset] unexpected error:", e);
+    // Still avoid leaking info to client
+    return NextResponse.json({ ok: true });
   }
 }
