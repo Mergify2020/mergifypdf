@@ -26,7 +26,6 @@ export async function GET(req: Request) {
         userId: user.id,
         // 1-hour expiry: adjust if your schema differs
         expiresAt: new Date(Date.now() + 60 * 60 * 1000),
-        used: false,
       },
     });
 
