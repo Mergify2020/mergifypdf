@@ -2,9 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 
 /**
- * Tries Prisma ORM first (3 common shapes), then falls back to dynamic SQL:
- * - Finds a table in public schema whose name includes both "reset" and "token"
- * - Detects available columns and builds an INSERT accordingly.
+ * Tries Prisma ORM first (3 common shapes), then falls back to dynamic SQL
+ * that discovers the actual reset-token table/columns and inserts safely.
  */
 export async function createResetTokenFlexible(
   userId: string,
@@ -37,7 +36,7 @@ export async function createResetTokenFlexible(
     return { ok: true, mode: "orm:email" as const };
   } catch {}
 
-  // ---------- Dynamic SQL fallback ----------
+  // ---------- Dynamic SQL fallback (parameterized) ----------
   // 1) Find a candidate table
   const tables = await prisma.$queryRaw<Array<{ table_name: string }>>(
     Prisma.sql`
@@ -90,17 +89,28 @@ export async function createResetTokenFlexible(
     return { ok: false, error: `table "${table}" lacks a 'token' column` };
   }
 
-  // 4) Construct parameterized SQL with numbered placeholders
-  const colList = pairs.map((p) => `"${p.name}"`).join(", ");
-  const placeholders = pairs.map((_, i) => `$${i + 1}`).join(", ");
-  const values = pairs.map((p) => p.value);
+  // 4) Parameterized insert using Prisma.sql + Prisma.join
+  // identifiers: list of quoted column names
+  const identifiers = Prisma.join(
+    pairs.map((p) => Prisma.raw(`"${p.name}"`))
+  );
+  // placeholders: values bound safely
+  const placeholders = Prisma.join(
+    pairs.map((p) => Prisma.sql`${p.value}`)
+  );
 
   try {
-    await prisma.$executeRawUnsafe(
-      `insert into "${table}" (${colList}) values (${placeholders})`,
-      ...values
+    // Note: quoting the table name with raw is safe since it comes from introspection,
+    // not user input; values are fully parameterized.
+    await prisma.$executeRaw(
+      Prisma.sql`INSERT INTO ${Prisma.raw(`"${table}"`)} (${identifiers}) VALUES (${placeholders})`
     );
-    return { ok: true, mode: `sql:${table}`, usedColumns: pairs.map((p) => p.name) };
+
+    return {
+      ok: true,
+      mode: `sql:${table}`,
+      usedColumns: pairs.map((p) => p.name),
+    };
   } catch (e: any) {
     return {
       ok: false,
