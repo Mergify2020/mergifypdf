@@ -1,7 +1,7 @@
-﻿// src/lib/email.tsx  — REPLACE EVERYTHING
-import React from "react";
+﻿import React from "react"; // keep import to allow future JSX version
 import { Resend } from "resend";
-import { ResetPasswordEmail } from "@/emails/ResetPasswordEmail";
+// NOTE: don't import the React component while we test HTML mode
+// import { ResetPasswordEmail } from "@/emails/ResetPasswordEmail";
 
 type SendArgs = { to: string; token: string };
 
@@ -13,30 +13,38 @@ export async function sendResetEmail({ to, token }: SendArgs) {
 
   const resend = new Resend(process.env.RESEND_API_KEY);
 
-  // Sender: prefer your domain, fall back to Resend onboarding for deliverability while testing
   const from =
     process.env.FROM_EMAIL || "MergifyPDF <onboarding@resend.dev>";
 
-  // -------- Build absolute reset URL --------
-  // Priority: NEXTAUTH_URL → NEXT_PUBLIC_APP_URL → VERCEL_URL → localhost
   let base =
     process.env.NEXTAUTH_URL ||
     process.env.NEXT_PUBLIC_APP_URL ||
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "") ||
     "http://localhost:3000";
 
-  // strip trailing slash
   base = base.replace(/\/+$/, "");
-
   const url = `${base}/reset-password?token=${encodeURIComponent(token)}`;
 
   try {
+    // TEMP: send as simple HTML to isolate the problem
     const { data, error } = await resend.emails.send({
       from,
       to,
-      subject: "Reset your MergifyPDF password",
-      // Use a React element (tsx), fully typed
-      react: <ResetPasswordEmail resetUrl={url} />,
+      subject: "Reset your MergifyPDF password (HTML test)",
+      html: `
+        <div style="font-family: Inter, Arial, sans-serif; line-height:1.6;">
+          <h2 style="margin:0 0 12px;">Reset your MergifyPDF password</h2>
+          <p>Click the button below:</p>
+          <p>
+            <a href="${url}"
+               style="display:inline-block;padding:10px 16px;border-radius:10px;text-decoration:none;background:#2563eb;color:#fff;font-weight:600;">
+              Reset password
+            </a>
+          </p>
+          <p>If the button doesn’t work, copy this link:</p>
+          <p style="word-break:break-all;color:#374151;">${url}</p>
+        </div>
+      `,
     });
 
     if (error) {
