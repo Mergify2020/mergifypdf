@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sendResetEmail } from "@/lib/email";
+import sendResetEmail from "@/lib/email"; // ✅ default import
 
 export async function GET() {
   // change this address if you want to try another inbox
