@@ -37,7 +37,7 @@ export async function sendResetEmail({ to, token, mode = "react" }: SendArgs) {
         : {
             from,
             to,
-            subject: "Reset your MergifyPDF password (HTML)",
+            subject: "Reset your MergifyPDF password",
             html: `
               <div style="font-family: Inter, Arial, sans-serif; line-height:1.6;">
                 <h2 style="margin:0 0 12px;">Reset your MergifyPDF password</h2>
@@ -69,7 +69,7 @@ export async function sendResetEmail({ to, token, mode = "react" }: SendArgs) {
         const { data, error } = await resend.emails.send({
           from,
           to,
-          subject: "Reset your MergifyPDF password (HTML fallback)",
+          subject: "Reset your MergifyPDF password",
           html: `
             <div style="font-family: Inter, Arial, sans-serif; line-height:1.6;">
               <h2 style="margin:0 0 12px;">Reset your MergifyPDF password</h2>
