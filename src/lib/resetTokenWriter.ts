@@ -1,43 +1,39 @@
 // src/lib/resetTokenWriter.ts
 import { prisma } from "@/lib/prisma";
+import crypto from "crypto";
 
 /**
- * Inserts a reset-token row. Retries on rare token collisions.
- * Assumes your Prisma model:
- *
- * model ResetToken {
- *   id        String   @id @default(cuid())
- *   token     String   @unique
- *   userId    String
- *   expiresAt DateTime
- *   createdAt DateTime @default(now())
- * }
+ * Creates a fresh reset-token for a user:
+ * 1) delete old tokens for this user
+ * 2) try insert; if token collision (P2002) regenerate and retry
+ * 3) returns the created row or an error string
  */
-export async function createResetTokenRow(params: {
-  token: string;
-  userId: string;
-  expiresAt: Date;
-}) {
-  const { token, userId, expiresAt } = params;
+export async function createFreshResetTokenForUser(userId: string, expiresAt: Date) {
+  try {
+    // Ensure only one active token per user (works even if no unique on userId)
+    await prisma.resetToken.deleteMany({ where: { userId } });
 
-  let lastErr: unknown = null;
+    // up to 5 attempts in the astronomically unlikely event of collisions
+    for (let i = 0; i < 5; i++) {
+      const token = crypto.randomBytes(32).toString("hex"); // 64-char hex
 
-  for (let i = 0; i < 3; i++) {
-    try {
-      const row = await prisma.resetToken.create({
-        data: { token, userId, expiresAt },
-        select: { id: true, token: true, userId: true, createdAt: true },
-      });
-      return { ok: true as const, row };
-    } catch (e: any) {
-      // P2002 = unique constraint violation (token collision)
-      if (e?.code === "P2002") {
-        lastErr = e;
-        continue; // try again (caller should provide a new token if needed)
+      try {
+        const row = await prisma.resetToken.create({
+          data: { token, userId, expiresAt },
+          select: { id: true, token: true, userId: true, createdAt: true, expiresAt: true },
+        });
+        return { ok: true as const, row };
+      } catch (e: any) {
+        if (e?.code === "P2002") {
+          // token collision – try again with a new token
+          continue;
+        }
+        return { ok: false as const, error: String(e) };
       }
-      return { ok: false as const, error: String(e) };
     }
-  }
 
-  return { ok: false as const, error: String(lastErr ?? "unknown error") };
+    return { ok: false as const, error: "token-collision-after-retries" };
+  } catch (e) {
+    return { ok: false as const, error: String(e) };
+  }
 }
