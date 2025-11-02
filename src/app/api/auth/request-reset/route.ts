@@ -9,7 +9,7 @@ import { sendResetEmail } from "@/lib/email";
  * - If this user has requested a reset within the last 2 minutes,
  *   we silently return ok:true without sending a new email.
  */
-const THROTTLE_MS = 2 * 60 * 1000; // 2 minutes
+const THROTTLE_MS = 30 * 1000; // 30 seconds (temporary for testing)
 
 export async function POST(req: Request) {
   try {
