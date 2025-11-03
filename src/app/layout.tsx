@@ -17,11 +17,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Header */}
         <header className="w-full sticky top-0 z-50 bg-white/90 backdrop-blur border-b">
           <div className="max-w-6xl mx-auto px-4 py-3">
-            <Link href="/" className="inline-flex items-center gap-2">
+            <Link href="/" className="inline-flex items-center gap-2" aria-label="Go to homepage">
+              {/* Use the SVG in /public. Next/Image passes SVG through unmodified (nice and crisp). */}
               <Image
-                src="/logo.png"      // must exist at /public/logo.png
+                src="/logo-wordmark.svg"  // <-- put your Canva SVG in /public as logo-wordmark.svg
                 alt="MergifyPDF"
-                width={140}
+                width={160}
                 height={40}
                 priority
               />
@@ -29,7 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
         </header>
 
-        {/* Page content; padding so it never sits under the header */}
+        {/* Page content */}
         <main className="pt-2">
           <Providers>{children}</Providers>
         </main>
