@@ -32,6 +32,14 @@ export default function LoginPage() {
     router.replace("/studio");
   }
 
+  async function handleGoogleLogin() {
+    try {
+      await signIn("google", { callbackUrl: "/studio" });
+    } catch {
+      setErr("Google sign-in failed. Please try again.");
+    }
+  }
+
   return (
     <main className="mx-auto max-w-sm p-6">
       <h1 className="text-2xl font-semibold">Sign in</h1>
@@ -58,6 +66,7 @@ export default function LoginPage() {
           required
           autoComplete="current-password"
         />
+
         {err && <div className="text-sm text-red-600">{err}</div>}
 
         <button
@@ -72,15 +81,41 @@ export default function LoginPage() {
         </button>
       </form>
 
-      <div className="mt-3 space-y-1 text-center text-xs text-gray-500">
+      {/* Divider */}
+      <div className="my-5 flex items-center gap-2 text-gray-400">
+        <div className="flex-1 h-px bg-gray-200" />
+        <span className="text-xs">or</span>
+        <div className="flex-1 h-px bg-gray-200" />
+      </div>
+
+      {/* Google Sign In */}
+      <button
+        onClick={handleGoogleLogin}
+        className="w-full border rounded py-2 bg-white text-gray-700 font-medium hover:bg-gray-50 flex items-center justify-center gap-2"
+      >
+        <img
+          src="/google.svg"
+          alt="Google"
+          className="w-5 h-5"
+        />
+        Continue with Google
+      </button>
+
+      <div className="mt-4 space-y-1 text-center text-xs text-gray-500">
         <p>
-          <Link className="underline text-[#2A7C7C] hover:text-[#256666]" href="/forgot-password">
+          <Link
+            className="underline text-[#2A7C7C] hover:text-[#256666]"
+            href="/forgot-password"
+          >
             Forgot your password?
           </Link>
         </p>
         <p>
           Don’t have an account?{" "}
-          <Link className="underline text-[#2A7C7C] hover:text-[#256666]" href="/register">
+          <Link
+            className="underline text-[#2A7C7C] hover:text-[#256666]"
+            href="/register"
+          >
             Create one
           </Link>
         </p>
