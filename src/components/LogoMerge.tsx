@@ -1,28 +1,18 @@
+// src/components/LogoMerge.tsx
 "use client";
 
-export default function LogoMerge({ size = 64 }: { size?: number }) {
+export default function LogoMerge({ size = 80 }: { size?: number }) {
   return (
     <div
-      className="relative flex items-center justify-center"
+      className="flex items-center justify-center animate-spin-slow"
       style={{ width: size, height: size }}
       aria-hidden
     >
-      {/* Square 1 – top-left */}
-      <div
-        className="absolute bg-brand rounded-md animate-squareA shadow-sm"
-        style={{
-          width: size * 0.45,
-          height: size * 0.45,
-        }}
-      />
-
-      {/* Square 2 – bottom-right */}
-      <div
-        className="absolute bg-brand/80 rounded-md animate-squareB shadow-sm"
-        style={{
-          width: size * 0.45,
-          height: size * 0.45,
-        }}
+      <img
+        src="/logo2.svg"
+        alt="MergifyPDF logo"
+        className="w-full h-full select-none"
+        draggable={false}
       />
     </div>
   );
