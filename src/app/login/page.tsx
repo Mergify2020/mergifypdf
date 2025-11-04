@@ -91,14 +91,15 @@ export default function LoginPage() {
       {/* Google Sign In */}
       <button
         onClick={handleGoogleLogin}
-        className="w-full border rounded py-2 bg-white text-gray-700 font-medium hover:bg-gray-50 flex items-center justify-center gap-2"
+        className="w-full border border-gray-300 rounded py-2 bg-white text-gray-700 font-medium hover:bg-gray-50 flex items-center justify-center gap-3 shadow-sm transition"
+        aria-label="Continue with Google"
       >
         <img
           src="/google.svg"
-          alt="Google"
+          alt="Google logo"
           className="w-5 h-5"
         />
-        Continue with Google
+        <span>Continue with Google</span>
       </button>
 
       <div className="mt-4 space-y-1 text-center text-xs text-gray-500">
