@@ -8,6 +8,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "MergifyPDF",
   description: "Fast, simple PDF tools — all in your browser.",
+  icons: {
+    icon: "/favicon.svg", // ✅ references your SVG favicon
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -18,6 +21,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="color-scheme" content="light" />
         <meta name="supported-color-schemes" content="light" />
         <meta name="theme-color" content="#ffffff" />
+
+        {/* ✅ Optional fallback if an SVG icon isn’t supported */}
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <link rel="alternate icon" type="image/png" href="/favicon.png" />
       </head>
 
       <body className="min-h-screen bg-white text-gray-900">
