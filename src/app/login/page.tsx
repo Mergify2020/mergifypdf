@@ -5,6 +5,7 @@ import React, { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import LogoMerge from "@/components/LogoMerge";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -24,18 +25,23 @@ export default function LoginPage() {
       password,
     });
 
-    setBusy(false);
     if (res?.error) {
+      setBusy(false); // only stop loading if it failed
       setErr("Invalid email or password.");
       return;
     }
+
+    // keep busy=true so overlay stays until this page unmounts
     router.replace("/studio");
   }
 
   async function handleGoogleLogin() {
     try {
+      setBusy(true);
       await signIn("google", { callbackUrl: "/studio" });
+      // No setBusy(false) here; page will unmount on redirect
     } catch {
+      setBusy(false);
       setErr("Google sign-in failed. Please try again.");
     }
   }
@@ -91,14 +97,12 @@ export default function LoginPage() {
       {/* Google Sign In */}
       <button
         onClick={handleGoogleLogin}
+        disabled={busy}
+        aria-disabled={busy}
         className="w-full border border-gray-300 rounded py-2 bg-white text-gray-700 font-medium hover:bg-gray-50 flex items-center justify-center gap-3 shadow-sm transition"
         aria-label="Continue with Google"
       >
-        <img
-          src="/google.svg"
-          alt="Google logo"
-          className="w-5 h-5"
-        />
+        <img src="/google.svg" alt="Google logo" className="w-5 h-5" />
         <span>Continue with Google</span>
       </button>
 
@@ -121,6 +125,18 @@ export default function LoginPage() {
           </Link>
         </p>
       </div>
+
+      {/* Full-screen loading overlay */}
+      {busy && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-white/90 backdrop-blur">
+          <div className="flex flex-col items-center gap-3">
+            <LogoMerge size={72} />
+            <p className="text-sm text-gray-600">
+              {err ? "Please try again…" : "Signing you in…"}
+            </p>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
