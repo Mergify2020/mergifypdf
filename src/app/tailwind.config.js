@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  darkMode: "class", // 👈 prevents system dark mode from affecting your app
   content: [
     "./src/**/*.{js,ts,jsx,tsx}",
   ],

@@ -13,14 +13,20 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="min-h-screen">
+      <head>
+        {/* ✅ Force light color scheme across browsers */}
+        <meta name="color-scheme" content="light" />
+        <meta name="supported-color-schemes" content="light" />
+        <meta name="theme-color" content="#ffffff" />
+      </head>
+
+      <body className="min-h-screen bg-white text-gray-900">
         {/* Header */}
         <header className="w-full sticky top-0 z-50 bg-white/90 backdrop-blur border-b">
           <div className="max-w-6xl mx-auto px-4 py-3">
             <Link href="/" className="inline-flex items-center gap-2" aria-label="Go to homepage">
-              {/* Use the SVG in /public. Next/Image passes SVG through unmodified (nice and crisp). */}
               <Image
-                src="/logo-wordmark.svg"  // <-- put your Canva SVG in /public as logo-wordmark.svg
+                src="/logo-wordmark.svg"
                 alt="MergifyPDF"
                 width={160}
                 height={40}
