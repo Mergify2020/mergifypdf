@@ -16,9 +16,9 @@ const nextConfig: NextConfig = {
 
   async headers() {
     return [
-      // Explicit favicon routes (App Router will serve /favicon.svg)
+      // Explicit favicon routes (App Router will serve /favicon26.svg)
       {
-        source: "/favicon.svg",
+        source: "/favicon26.svg",
         headers: [
           { key: "Cache-Control", value: "no-store, no-cache, must-revalidate, proxy-revalidate" },
           { key: "Pragma", value: "no-cache" },
@@ -27,7 +27,7 @@ const nextConfig: NextConfig = {
       },
       // If you also keep PNG/ICO fallbacks:
       {
-        source: "/favicon.svg",
+        source: "/favicon26.svg",
         headers: [
           { key: "Cache-Control", value: "no-store, no-cache, must-revalidate, proxy-revalidate" },
           { key: "Pragma", value: "no-cache" },
@@ -35,7 +35,7 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        source: "/favicon.svg",
+        source: "/favicon26.svg",
         headers: [
           { key: "Cache-Control", value: "no-store, no-cache, must-revalidate, proxy-revalidate" },
           { key: "Pragma", value: "no-cache" },
