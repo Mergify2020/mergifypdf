@@ -16,47 +16,18 @@ const nextConfig: NextConfig = {
 
   // ✅ Disable caching for all favicon variants (Safari + iOS)
   async headers() {
+    const noCacheHeaders = [
+      { key: "Cache-Control", value: "no-store, no-cache, must-revalidate, proxy-revalidate" },
+      { key: "Pragma", value: "no-cache" },
+      { key: "Expires", value: "0" },
+    ];
+
     return [
-      {
-        source: "/favicon20-2025.svg",
-        headers: [
-          { key: "Cache-Control", value: "no-store, no-cache, must-revalidate, proxy-revalidate" },
-          { key: "Pragma", value: "no-cache" },
-          { key: "Expires", value: "0" },
-        ],
-      },
-      {
-        source: "/favicon-32-2025.png",
-        headers: [
-          { key: "Cache-Control", value: "no-store, no-cache, must-revalidate, proxy-revalidate" },
-          { key: "Pragma", value: "no-cache" },
-          { key: "Expires", value: "0" },
-        ],
-      },
-      {
-        source: "/favicon-16-2025.png",
-        headers: [
-          { key: "Cache-Control", value: "no-store, no-cache, must-revalidate, proxy-revalidate" },
-          { key: "Pragma", value: "no-cache" },
-          { key: "Expires", value: "0" },
-        ],
-      },
-      {
-        source: "/apple-touch-icon-2025.png",
-        headers: [
-          { key: "Cache-Control", value: "no-store, no-cache, must-revalidate, proxy-revalidate" },
-          { key: "Pragma", value: "no-cache" },
-          { key: "Expires", value: "0" },
-        ],
-      },
-      {
-        source: "/safari-pinned-tab-2025.svg",
-        headers: [
-          { key: "Cache-Control", value: "no-store, no-cache, must-revalidate, proxy-revalidate" },
-          { key: "Pragma", value: "no-cache" },
-          { key: "Expires", value: "0" },
-        ],
-      },
+      { source: "/favicon20-2026.svg", headers: noCacheHeaders },
+      { source: "/favicon-32-2026.png", headers: noCacheHeaders },
+      { source: "/favicon-16-2026.png", headers: noCacheHeaders },
+      { source: "/apple-touch-icon-2026.png", headers: noCacheHeaders },
+      { source: "/safari-pinned-tab-2026.svg", headers: noCacheHeaders },
     ];
   },
 
