@@ -14,20 +14,11 @@ const nextConfig: NextConfig = {
     return config;
   },
 
+  // ✅ Disable caching for all favicon variants (Safari + iOS)
   async headers() {
     return [
-      // Explicit favicon routes (App Router will serve /favicon20.svg)
       {
-        source: "/favicon20.svg",
-        headers: [
-          { key: "Cache-Control", value: "no-store, no-cache, must-revalidate, proxy-revalidate" },
-          { key: "Pragma", value: "no-cache" },
-          { key: "Expires", value: "0" },
-        ],
-      },
-      // If you also keep PNG/ICO fallbacks:
-      {
-        source: "/favicon20.svg",
+        source: "/favicon20-2025.svg",
         headers: [
           { key: "Cache-Control", value: "no-store, no-cache, must-revalidate, proxy-revalidate" },
           { key: "Pragma", value: "no-cache" },
@@ -35,7 +26,31 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        source: "/favicon20.svg",
+        source: "/favicon-32-2025.png",
+        headers: [
+          { key: "Cache-Control", value: "no-store, no-cache, must-revalidate, proxy-revalidate" },
+          { key: "Pragma", value: "no-cache" },
+          { key: "Expires", value: "0" },
+        ],
+      },
+      {
+        source: "/favicon-16-2025.png",
+        headers: [
+          { key: "Cache-Control", value: "no-store, no-cache, must-revalidate, proxy-revalidate" },
+          { key: "Pragma", value: "no-cache" },
+          { key: "Expires", value: "0" },
+        ],
+      },
+      {
+        source: "/apple-touch-icon-2025.png",
+        headers: [
+          { key: "Cache-Control", value: "no-store, no-cache, must-revalidate, proxy-revalidate" },
+          { key: "Pragma", value: "no-cache" },
+          { key: "Expires", value: "0" },
+        ],
+      },
+      {
+        source: "/safari-pinned-tab-2025.svg",
         headers: [
           { key: "Cache-Control", value: "no-store, no-cache, must-revalidate, proxy-revalidate" },
           { key: "Pragma", value: "no-cache" },
