@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   title: "MergifyPDF",
   description: "Fast, simple PDF tools — all in your browser.",
   icons: {
-    icon: "/favicon25.svg", // ✅ references your SVG favicon
+    icon: "/favicon.svg", // ✅ references your SVG favicon
   },
 };
 
@@ -23,8 +23,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="theme-color" content="#ffffff" />
 
         {/* ✅ Optional fallback if an SVG icon isn’t supported */}
-        <link rel="icon" type="image/svg+xml" href="/favicon25.svg" />
-        <link rel="alternate icon" type="image/png" href="/favicon25.png" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <link rel="alternate icon" type="image/png" href="/favicon.svg" />
       </head>
 
       <body className="min-h-screen bg-white text-gray-900">
