@@ -10,12 +10,12 @@ export const metadata: Metadata = {
   description: "Fast, simple PDF tools — all in your browser.",
   icons: {
     icon: [
-      { url: "/favicon20-2025.svg?v=5", type: "image/svg+xml" },
-      { url: "/favicon-32-2025.png?v=5", sizes: "32x32", type: "image/png" },
-      { url: "/favicon-16-2025.png?v=5", sizes: "16x16", type: "image/png" },
+      { url: "/favicon20-2026.svg", type: "image/svg+xml" },
+      { url: "/favicon-32-2026.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon-16-2026.png", sizes: "16x16", type: "image/png" },
     ],
-    apple: [{ url: "/apple-touch-icon-2025.png?v=5", sizes: "180x180" }],
-    other: [{ rel: "mask-icon", url: "/safari-pinned-tab-2025.svg?v=5", color: "#2A7C7C" }],
+    apple: [{ url: "/apple-touch-icon-2026.png", sizes: "180x180" }],
+    other: [{ rel: "mask-icon", url: "/safari-pinned-tab-2026.svg", color: "#2A7C7C" }],
   },
 };
 
@@ -28,12 +28,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="supported-color-schemes" content="light" />
         <meta name="theme-color" content="#ffffff" />
 
-        {/* Explicit links help Safari/iOS honor updates */}
-        <link rel="icon" type="image/svg+xml" href="/favicon20-2025.svg?v=5" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32-2025.png?v=5" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16-2025.png?v=5" />
-        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-2025.png?v=5" />
-        <link rel="mask-icon" href="/safari-pinned-tab-2025.svg?v=5" color="#2A7C7C" />
+        {/* Explicit links (helps stubborn Safari/iOS) */}
+        <link rel="icon" type="image/svg+xml" href="/favicon20-2026.svg" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32-2026.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16-2026.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-2026.png" />
+        <link rel="mask-icon" href="/safari-pinned-tab-2026.svg" color="#2A7C7C" />
       </head>
 
       <body className="min-h-screen bg-white text-gray-900">
