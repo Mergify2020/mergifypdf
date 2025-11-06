@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useSession } from "next-auth/react";
@@ -8,6 +8,7 @@ export default function AccountPage() {
   const { data: session } = useSession();
   const authType = session?.user?.authType ?? "credentials";
   const isOAuth = authType === "oauth";
+  const displayName = session?.user?.name ?? "";
 
   const [email, setEmail] = useState("");
   const [emailBusy, setEmailBusy] = useState(false);
@@ -79,7 +80,22 @@ export default function AccountPage() {
         time you sign in.
       </p>
 
-      <section className="mt-10 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+      <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+        <h2 className="text-lg font-semibold">Profile</h2>
+        <p className="mt-1 text-sm text-gray-600">This is how we recognize you across MergifyPDF.</p>
+        <dl className="mt-4 space-y-3">
+          <div>
+            <dt className="text-sm font-medium text-gray-700">Name</dt>
+            <dd className="text-sm text-gray-800">{displayName || "Not provided"}</dd>
+          </div>
+          <div>
+            <dt className="text-sm font-medium text-gray-700">Email</dt>
+            <dd className="text-sm text-gray-800">{email || "Unknown"}</dd>
+          </div>
+        </dl>
+      </div>
+
+      <section className="mt-8 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold">Change email</h2>
         {isOAuth ? (
           <div className="mt-4 space-y-3">

@@ -60,6 +60,9 @@ const handler = NextAuth({
           : "credentials";
       }
 
+      if (user?.email) token.email = user.email;
+      if (user?.name) token.name = user.name;
+
       return token;
     },
 
@@ -67,6 +70,8 @@ const handler = NextAuth({
       if (session.user) {
         session.user.authType = (token.authType as AuthType | undefined) ?? "credentials";
         session.user.providers = (token.providers as string[] | undefined) ?? [];
+        if (token.email) session.user.email = token.email as string;
+        if (token.name) session.user.name = token.name as string;
       }
       return session;
     },
