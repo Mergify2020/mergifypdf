@@ -98,22 +98,9 @@ export default function AccountPage() {
       <section className="mt-8 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold">Change email</h2>
         {isOAuth ? (
-          <div className="mt-4 space-y-3">
-            <p className="text-sm text-gray-600">
-              Your email is managed by Google and can&apos;t be changed here.
-            </p>
-            <label className="block text-sm font-medium text-gray-700" htmlFor="account-email">
-              Email address
-            </label>
-            <input
-              id="account-email"
-              type="email"
-              value={email}
-              readOnly
-              disabled
-              className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-gray-500"
-            />
-          </div>
+          <p className="mt-2 text-sm text-gray-600">
+            Your account is managed by Google and can&apos;t be changed here.
+          </p>
         ) : (
           <>
             <p className="mt-1 text-sm text-gray-600">

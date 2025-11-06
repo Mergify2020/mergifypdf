@@ -38,7 +38,7 @@ const handler = NextAuth({
   ],
 
   callbacks: {
-    async jwt({ token, account, user }) {
+    async jwt({ token, account, user, profile }) {
       const userId = token.sub ?? user?.id;
       if (!userId) return token;
 
@@ -60,8 +60,11 @@ const handler = NextAuth({
           : "credentials";
       }
 
-      if (user?.email) token.email = user.email;
-      if (user?.name) token.name = user.name;
+      const nextEmail = profile?.email ?? user?.email ?? (token.email as string | undefined);
+      if (nextEmail) token.email = nextEmail;
+
+      const nextName = profile?.name ?? user?.name ?? (token.name as string | undefined);
+      if (nextName) token.name = nextName;
 
       return token;
     },
