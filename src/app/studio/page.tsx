@@ -1,6 +1,6 @@
 "use client";
 
-import LogoutButton from "@/components/LogoutButton";
+import SettingsMenu from "@/components/SettingsMenu";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
@@ -261,9 +261,9 @@ function StudioClient() {
 
   return (
     <main className="mx-auto max-w-6xl p-6">
-      {/* Top-right Sign Out */}
+      {/* Top-right Settings */}
       <div className="flex justify-end mb-4">
-        <LogoutButton />
+        <SettingsMenu />
       </div>
 
       <header className="flex items-center gap-3">
