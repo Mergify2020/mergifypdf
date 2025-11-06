@@ -2,6 +2,7 @@
 import React from "react";
 import { Resend } from "resend";
 import { ResetPasswordEmail } from "@/emails/ResetPasswordEmail";
+import { SignupCodeEmail } from "@/emails/SignupCodeEmail";
 
 type SendArgs = { to: string; token: string };
 
@@ -69,6 +70,62 @@ export async function sendResetEmail({ to, token }: SendArgs) {
       return { ok: true, id: data?.id, fallback: true };
     } catch (err2) {
       console.error("[email] sendResetEmail fatal:", err2);
+      return { ok: false, error: String(err2) };
+    }
+  }
+}
+
+type SignupArgs = { to: string; code: string };
+
+export async function sendSignupCodeEmail({ to, code }: SignupArgs) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.error("[email] Missing RESEND_API_KEY");
+    return { ok: false, error: "Missing RESEND_API_KEY" };
+  }
+
+  const resend = new Resend(apiKey);
+  const from = process.env.FROM_EMAIL || "MergifyPDF <onboarding@resend.dev>";
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from,
+      to,
+      subject: "Verify your MergifyPDF account",
+      react: <SignupCodeEmail code={code} />,
+    });
+
+    if (error) {
+      console.error("[email] Resend signup react error:", error);
+      throw error;
+    }
+    return { ok: true, id: data?.id };
+  } catch (err) {
+    try {
+      const { data, error } = await resend.emails.send({
+        from,
+        to,
+        subject: "Verify your MergifyPDF account",
+        html: `
+          <div style="font-family: Inter, Arial, sans-serif; line-height:1.6;">
+            <h2 style="margin:0 0 12px;">Verify your MergifyPDF account</h2>
+            <p>Use the 6-digit code below to finish creating your account:</p>
+            <p style="display:inline-block;padding:12px 20px;border-radius:10px;background:#2A7C7C;color:#fff;font-size:24px;letter-spacing:6px;font-weight:600;">
+              ${code}
+            </p>
+            <p style="margin-top:18px;color:#4B5563;">
+              This code expires in 10 minutes. If you didn't request it, you can safely ignore this email.
+            </p>
+          </div>
+        `,
+      });
+      if (error) {
+        console.error("[email] Resend signup html error:", error);
+        return { ok: false, error: String(error) };
+      }
+      return { ok: true, id: data?.id, fallback: true };
+    } catch (err2) {
+      console.error("[email] sendSignupCodeEmail fatal:", err2);
       return { ok: false, error: String(err2) };
     }
   }

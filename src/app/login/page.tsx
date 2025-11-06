@@ -27,7 +27,11 @@ export default function LoginPage() {
 
     if (res?.error) {
       setBusy(false); // only stop loading if it failed
-      setErr("Invalid email or password.");
+      if (res.error === "EMAIL_NOT_VERIFIED") {
+        setErr("Please verify your email before signing in. Check your inbox for the 6-digit code.");
+      } else {
+        setErr("Invalid email or password.");
+      }
       return;
     }
 

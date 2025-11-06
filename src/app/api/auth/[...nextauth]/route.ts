@@ -27,6 +27,10 @@ const handler = NextAuth({
         const ok = await bcrypt.compare(creds.password, user.password);
         if (!ok) return null;
 
+        if (!user.emailVerified) {
+          throw new Error("EMAIL_NOT_VERIFIED");
+        }
+
         return { id: user.id, name: user.name ?? null, email: user.email ?? null };
       },
     }),
