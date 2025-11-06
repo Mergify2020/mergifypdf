@@ -5,12 +5,13 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
+type AuthType = "oauth" | "credentials";
+
 const handler = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
 
   providers: [
-    // Credentials (your existing email/password)
     Credentials({
       name: "Credentials",
       credentials: {
@@ -30,12 +31,46 @@ const handler = NextAuth({
       },
     }),
 
-    // 👇 New: Google OAuth
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
   ],
+
+  callbacks: {
+    async jwt({ token, account, user }) {
+      const userId = token.sub ?? user?.id;
+      if (!userId) return token;
+
+      if (account || !token.providers) {
+        const linkedAccounts = await prisma.account.findMany({
+          where: { userId },
+          select: { provider: true },
+        });
+
+        const providerIds = new Set<string>(linkedAccounts.map((entry) => entry.provider));
+        if (account?.provider) providerIds.add(account.provider);
+        if (providerIds.size === 0) providerIds.add("credentials");
+
+        token.providers = Array.from(providerIds);
+        token.authType = (token.providers as string[]).some(
+          (provider) => provider !== "credentials"
+        )
+          ? "oauth"
+          : "credentials";
+      }
+
+      return token;
+    },
+
+    async session({ session, token }) {
+      if (session.user) {
+        session.user.authType = (token.authType as AuthType | undefined) ?? "credentials";
+        session.user.providers = (token.providers as string[] | undefined) ?? [];
+      }
+      return session;
+    },
+  },
 
   pages: { signIn: "/login" },
   secret: process.env.NEXTAUTH_SECRET,
