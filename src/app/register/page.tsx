@@ -40,7 +40,9 @@ export default function RegisterPage() {
 
       setPendingEmail(email);
       setStep("verify");
-      setInfo("We sent a 6-digit code to your email. Enter it below to finish signing up.");
+      setInfo(
+        "We sent a 6-digit code to your email. Enter it below to finish signing up. If you don't see it right away, check your spam or promotions folder."
+      );
       setCode("");
     } catch (error) {
       setErr("Sign up failed. Please try again.");
@@ -150,7 +152,8 @@ export default function RegisterPage() {
       ) : (
         <form onSubmit={onVerify} className="mt-6 space-y-3">
           <p className="text-sm text-gray-600">
-            Enter the 6-digit code we sent to <span className="font-medium">{pendingEmail}</span>.
+            Enter the 6-digit code we sent to <span className="font-medium">{pendingEmail}</span>. If
+            it&apos;s not in your inbox within a minute, look in your spam or promotions folder.
           </p>
           <input
             className="w-full rounded border px-3 py-2 tracking-[6px] text-center text-lg"
