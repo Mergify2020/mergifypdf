@@ -56,24 +56,27 @@ function SortableThumb({
       style={style}
       {...attributes}
       {...listeners}
-      className={`rounded-xl border p-2 ${!item.keep ? "opacity-45" : ""}`}
+      className={`relative rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 focus-within:ring-2 focus-within:ring-brand/30 ${
+        !item.keep ? "opacity-50" : ""
+      }`}
     >
-      <label className="flex items-start gap-2 cursor-pointer select-none">
-        <input
-          type="checkbox"
-          checked={item.keep}
-          onChange={() => toggleKeep(index)}
-          aria-label={`Keep page ${index + 1}`}
-        />
-        <div className="text-xs w-full">
-          <div className="text-gray-700 font-medium mb-1">Page {index + 1}</div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={item.thumb}
-            alt={`Page ${index + 1}`}
-            className="w-full h-auto rounded-md border pointer-events-none"
+      <label className="flex cursor-pointer select-none flex-col gap-3">
+        <div className="flex items-center justify-between text-xs text-gray-500">
+          <span className="text-sm font-semibold text-gray-800">Page {index + 1}</span>
+          <input
+            type="checkbox"
+            checked={item.keep}
+            onChange={() => toggleKeep(index)}
+            aria-label={`Keep page ${index + 1}`}
+            className="h-4 w-4 rounded border-slate-300 text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
           />
         </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={item.thumb}
+          alt={`Page ${index + 1}`}
+          className="pointer-events-none w-full rounded-xl border border-slate-100 bg-slate-50 shadow-sm"
+        />
       </label>
     </li>
   );
@@ -258,71 +261,119 @@ function StudioClient() {
   }
 
   const itemsIds = useMemo(() => pages.map((p) => p.id), [pages]);
+  const keptCount = useMemo(() => pages.filter((p) => p.keep).length, [pages]);
+  const downloadDisabled = busy || keptCount === 0;
 
   return (
-    <main className="mx-auto max-w-6xl p-6">
-      {/* Top-right Settings */}
-      <div className="flex justify-end mb-4">
-        <SettingsMenu />
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#f3fbff,_#ffffff)]">
+      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-10 lg:px-6 lg:py-14">
+        <div className="rounded-3xl border border-slate-100 bg-white/90 p-6 shadow-sm shadow-slate-200/60 backdrop-blur">
+          <div className="flex flex-wrap items-start gap-4">
+            <div className="min-w-[220px] flex-1 space-y-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.4em] text-brand">Workspace</p>
+                <div className="mt-3 flex flex-wrap items-baseline gap-3">
+                  <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Studio</h1>
+                  <span className="text-sm text-gray-500">Curate every page before you merge.</span>
+                </div>
+              </div>
+              <p className="text-sm text-gray-600">
+                Drag thumbnails to reorder them, uncheck a page to skip it, or upload more PDFs to keep building your
+                stack.
+              </p>
+              <div className="flex flex-wrap gap-2 text-sm font-medium text-gray-700">
+                <span className="rounded-full bg-slate-100 px-3 py-1">Files: {sources.length}</span>
+                <span className="rounded-full bg-slate-100 px-3 py-1">Pages: {pages.length}</span>
+                <span className="rounded-full bg-slate-100 px-3 py-1">Selected: {keptCount}</span>
+              </div>
+            </div>
+            <div className="ml-auto shrink-0">
+              <SettingsMenu />
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+            <div className="flex flex-wrap gap-2">
+              <button
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+                onClick={() => selectAll(true)}
+              >
+                Select all
+              </button>
+              <button
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+                onClick={() => selectAll(false)}
+              >
+                Select none
+              </button>
+              <button
+                className="rounded-full bg-brand px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#256b6b] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={handleDownload}
+                disabled={downloadDisabled}
+              >
+                {busy ? 'Building...' : 'Download'}
+              </button>
+              <button
+                className="rounded-full border border-brand/30 bg-brand/5 px-4 py-2 text-sm font-medium text-brand transition hover:bg-brand/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+                onClick={handleAddClick}
+              >
+                Add pages (upload)
+              </button>
+              <input
+                ref={addInputRef}
+                type="file"
+                accept="application/pdf"
+                multiple
+                className="hidden"
+                onChange={handleAddChange}
+              />
+            </div>
+            <p className="text-sm text-gray-600 lg:ml-auto">
+              {pages.length === 0
+                ? 'Start by uploading PDFs from the homepage; they will appear here automatically.'
+                : 'Need more content? Upload another PDF—the current order stays intact.'}
+            </p>
+          </div>
+        </div>
+
+        {error && (
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">
+            {error}
+          </div>
+        )}
+
+        {loading && (
+          <div className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-gray-600 shadow-sm">
+            Rendering previews...
+          </div>
+        )}
+
+        {!loading && pages.length > 0 && (
+          <div className="rounded-3xl border border-slate-100 bg-white/95 p-5 shadow-sm">
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={itemsIds} strategy={rectSortingStrategy}>
+                <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+                  {pages.map((p, i) => (
+                    <SortableThumb key={p.id} item={p} index={i} toggleKeep={toggleKeep} />
+                  ))}
+                </ul>
+              </SortableContext>
+            </DndContext>
+          </div>
+        )}
+
+        {!loading && pages.length === 0 && (
+          <div className="rounded-3xl border border-dashed border-slate-200 bg-white/80 p-12 text-center shadow-sm">
+            <p className="text-base font-semibold text-gray-800">No pages yet</p>
+            <p className="mt-2 text-sm text-gray-500">
+              Go back to the homepage, upload your PDFs, and they will show up here instantly.
+            </p>
+            <p className="mt-6 text-xs uppercase tracking-[0.4em] text-gray-400">Studio ready</p>
+          </div>
+        )}
       </div>
-
-      <header className="flex items-center gap-3">
-        <h1 className="text-2xl font-semibold">Studio</h1>
-        <span className="text-sm text-gray-600">
-          Files: {sources.length} • Pages: {pages.length}
-        </span>
-        <div className="ml-auto flex gap-2">
-          <button className="rounded-lg border px-3 py-1 text-sm" onClick={() => selectAll(true)}>
-            Select all
-          </button>
-          <button className="rounded-lg border px-3 py-1 text-sm" onClick={() => selectAll(false)}>
-            Select none
-          </button>
-          <button
-            className="rounded-lg bg-blue-600 px-4 py-1.5 text-white disabled:opacity-60"
-            onClick={handleDownload}
-            disabled={busy || pages.length === 0 || pages.every((p) => !p.keep)}
-          >
-            {busy ? "Building…" : "Download"}
-          </button>
-          <button className="rounded-lg border px-3 py-1 text-sm" onClick={handleAddClick}>
-            Add pages (upload)
-          </button>
-          <input
-            ref={addInputRef}
-            type="file"
-            accept="application/pdf"
-            multiple
-            className="hidden"
-            onChange={handleAddChange}
-          />
-        </div>
-      </header>
-
-      <p className="text-sm text-gray-600 mt-1">
-        Drag to reorder pages. Uncheck to remove. Use “Add pages” to append more PDFs; then Download.
-      </p>
-
-      {error && <div className="mt-3 text-sm text-red-600">{error}</div>}
-      {loading && <div className="mt-4 text-sm text-gray-600">Rendering previews…</div>}
-
-      {!loading && pages.length > 0 && (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={itemsIds} strategy={rectSortingStrategy}>
-            <ul className="mt-5 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-              {pages.map((p, i) => (
-                <SortableThumb key={p.id} item={p} index={i} toggleKeep={toggleKeep} />
-              ))}
-            </ul>
-          </SortableContext>
-        </DndContext>
-      )}
-
-      {!loading && pages.length === 0 && (
-        <div className="mt-6 rounded-xl border p-6 text-sm text-gray-500">
-          No pages yet. Go to the homepage and upload PDFs.
-        </div>
-      )}
     </main>
   );
 }
