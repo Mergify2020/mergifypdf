@@ -14,7 +14,6 @@ export default function AccountPage() {
   const [emailBusy, setEmailBusy] = useState(false);
   const [emailMessage, setEmailMessage] = useState<string | null>(null);
 
-  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordBusy, setPasswordBusy] = useState(false);
@@ -56,7 +55,6 @@ export default function AccountPage() {
       // TODO: hook up to API endpoint once available
       await new Promise((resolve) => setTimeout(resolve, 400));
       setPasswordMessage("Password updated.");
-      setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
     } catch {
@@ -144,19 +142,6 @@ export default function AccountPage() {
               Choose a strong password that you have not used elsewhere.
             </p>
             <form onSubmit={handlePasswordSubmit} className="mt-4 space-y-4">
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700" htmlFor="account-password-current">
-                  Current password
-                </label>
-                <input
-                  id="account-password-current"
-                  type="password"
-                  value={currentPassword}
-                  onChange={(event) => setCurrentPassword(event.target.value)}
-                  required
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2A7C7C] focus-visible:ring-offset-0"
-                />
-              </div>
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700" htmlFor="account-password-new">
                   New password
