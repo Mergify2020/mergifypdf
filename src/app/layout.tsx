@@ -37,7 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
 
       <body className="min-h-screen bg-white text-gray-900">
-        <header className="w-full sticky top-0 z-50 bg-white/90 backdrop-blur border-b">
+        <header className="w-full sticky top-0 z-50 bg-white/90 backdrop-blur">
           <div className="max-w-6xl mx-auto px-4 py-3">
             <Link href="/" className="inline-flex items-center gap-2" aria-label="Go to homepage">
               <Image src="/logo-wordmark.svg" alt="MergifyPDF" width={160} height={40} priority />
