@@ -85,7 +85,10 @@ export async function sendSignupCodeEmail({ to, code }: SignupArgs) {
   }
 
   const resend = new Resend(apiKey);
-  const from = process.env.FROM_EMAIL || "MergifyPDF <onboarding@resend.dev>";
+  const from =
+    process.env.SIGNUP_FROM_EMAIL ||
+    process.env.FROM_EMAIL ||
+    "MergifyPDF <verify@mergifypdf.com>";
 
   try {
     const { data, error } = await resend.emails.send({
