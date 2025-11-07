@@ -246,7 +246,7 @@ function WorkspaceClient() {
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#f3fbff,_#ffffff)]">
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 pt-10 pb-32 lg:px-6 lg:pt-14">
         <div className="rounded-3xl border border-slate-100 bg-white/90 p-6 shadow-sm shadow-slate-200/60 backdrop-blur">
-          <div className="flex flex-wrap items-start gap-4">
+          <div className="relative flex flex-wrap items-start gap-4">
             <div className="min-w-[220px] flex-1 space-y-4">
               <div className="mt-3 flex flex-wrap items-baseline gap-3">
                 <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Workspace</h1>
@@ -260,7 +260,7 @@ function WorkspaceClient() {
                 <span className="rounded-full bg-slate-100 px-3 py-1">Pages: {pages.length}</span>
               </div>
             </div>
-            <div className="ml-auto self-start">
+            <div className="ml-auto self-start lg:absolute lg:-top-8 lg:right-0">
               <SettingsMenu />
             </div>
           </div>
