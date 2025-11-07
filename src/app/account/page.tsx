@@ -97,7 +97,7 @@ export default function AccountPage() {
         <h2 className="text-lg font-semibold">Change email</h2>
         {isOAuth ? (
           <p className="mt-2 text-sm text-gray-600">
-            Your account is managed by Google and can&apos;t be changed here.
+            Your email address is handled by Google, so you can&apos;t update it from MergifyPDF.
           </p>
         ) : (
           <>
@@ -134,7 +134,7 @@ export default function AccountPage() {
         <h2 className="text-lg font-semibold">Change password</h2>
         {isOAuth ? (
           <p className="mt-2 text-sm text-gray-600">
-            Your account is managed by Google and can&apos;t be changed here.
+            Your password is handled by Google, so you can&apos;t update it from MergifyPDF.
           </p>
         ) : (
           <>

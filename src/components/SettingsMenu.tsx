@@ -80,9 +80,9 @@ export default function SettingsMenu() {
               onClick={handleSignOut}
               disabled={busy}
               aria-disabled={busy}
-              className="mt-1 w-full rounded-md bg-red-500 px-3 py-2 text-sm font-semibold text-white transition hover:bg-red-600 disabled:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-500"
+              className="mt-1 w-full rounded-lg bg-red-500 px-4 py-3 text-base font-semibold text-white transition hover:bg-red-600 disabled:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-500"
             >
-              Sign out
+              Log out
             </button>
           </div>
         </div>
