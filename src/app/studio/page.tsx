@@ -243,29 +243,27 @@ function WorkspaceClient() {
   const downloadDisabled = busy || pages.length === 0;
 
   return (
-    <main className="relative min-h-screen bg-[radial-gradient(circle_at_top,_#f3fbff,_#ffffff)]">
-      <div className="pointer-events-none absolute right-6 top-4 z-20 hidden lg:block">
-        <div className="pointer-events-auto">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#f3fbff,_#ffffff)]">
+      <div className="sticky top-0 z-50 bg-white/80 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 lg:px-6">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.4em] text-brand">Workspace</p>
+            <h1 className="text-2xl font-semibold text-slate-900">Workspace</h1>
+          </div>
           <SettingsMenu />
         </div>
       </div>
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 pt-16 pb-32 lg:px-6 lg:pt-20">
+
+      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 pt-8 pb-32 lg:px-6 lg:pt-12">
         <div className="rounded-3xl border border-slate-100 bg-white/90 p-6 shadow-sm shadow-slate-200/60 backdrop-blur">
           <div className="flex flex-wrap items-start gap-4">
             <div className="min-w-[220px] flex-1 space-y-4">
-              <div className="mt-3 flex flex-wrap items-baseline gap-3">
-                <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Workspace</h1>
-                <span className="text-sm text-gray-500">Curate every page before you merge.</span>
-              </div>
               <p className="text-sm text-gray-600">
                 Drag thumbnails to reorder them, or upload more PDFs to keep building your stack.
               </p>
               <div className="flex flex-wrap gap-2 text-sm font-medium text-gray-700">
                 <span className="rounded-full bg-slate-100 px-3 py-1">Files: {sources.length}</span>
                 <span className="rounded-full bg-slate-100 px-3 py-1">Pages: {pages.length}</span>
-              </div>
-              <div className="block lg:hidden">
-                <SettingsMenu />
               </div>
             </div>
           </div>
