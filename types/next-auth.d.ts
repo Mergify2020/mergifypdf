@@ -5,6 +5,7 @@ declare module "next-auth" {
     user?: DefaultSession["user"] & {
       authType?: "oauth" | "credentials";
       providers?: string[];
+      id?: string;
     };
   }
 }

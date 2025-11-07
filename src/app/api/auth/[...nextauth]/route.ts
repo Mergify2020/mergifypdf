@@ -1,4 +1,4 @@
-import NextAuth from "next-auth";
+import NextAuth, { type NextAuthOptions } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
@@ -7,7 +7,7 @@ import bcrypt from "bcryptjs";
 
 type AuthType = "oauth" | "credentials";
 
-const handler = NextAuth({
+export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
 
@@ -86,6 +86,7 @@ const handler = NextAuth({
         session.user.providers = (token.providers as string[] | undefined) ?? [];
         if (token.email) session.user.email = token.email as string;
         if (token.name) session.user.name = token.name as string;
+        if (token.sub) session.user.id = token.sub;
       }
       return session;
     },
@@ -93,6 +94,8 @@ const handler = NextAuth({
 
   pages: { signIn: "/login" },
   secret: process.env.NEXTAUTH_SECRET,
-});
+};
+
+const handler = NextAuth(authOptions);
 
 export { handler as GET, handler as POST };

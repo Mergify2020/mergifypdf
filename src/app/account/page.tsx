@@ -31,11 +31,20 @@ export default function AccountPage() {
     setEmailMessage(null);
 
     try {
-      // TODO: hook up to API endpoint once available
-      await new Promise((resolve) => setTimeout(resolve, 400));
-      setEmailMessage("Email preferences saved.");
-    } catch {
-      setEmailMessage("Something went wrong. Please try again.");
+      const response = await fetch("/api/account/update-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error ?? "Unable to update email.");
+      }
+      setEmailMessage("Email updated.");
+    } catch (error) {
+      setEmailMessage(
+        error instanceof Error ? error.message : "Something went wrong. Please try again."
+      );
     } finally {
       setEmailBusy(false);
     }
@@ -52,13 +61,22 @@ export default function AccountPage() {
 
     setPasswordBusy(true);
     try {
-      // TODO: hook up to API endpoint once available
-      await new Promise((resolve) => setTimeout(resolve, 400));
+      const response = await fetch("/api/account/update-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newPassword }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error ?? "Unable to update password.");
+      }
       setPasswordMessage("Password updated.");
       setNewPassword("");
       setConfirmPassword("");
-    } catch {
-      setPasswordMessage("Unable to update password. Please try again.");
+    } catch (error) {
+      setPasswordMessage(
+        error instanceof Error ? error.message : "Unable to update password. Please try again."
+      );
     } finally {
       setPasswordBusy(false);
     }
