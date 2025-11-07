@@ -38,7 +38,7 @@ function SortableThumb({
 }: {
   item: PageItem;
   index: number;
-  toggleKeep: (i: number) => void;
+  toggleKeep: (id: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
     id: item.id,
@@ -66,7 +66,7 @@ function SortableThumb({
           <input
             type="checkbox"
             checked={item.keep}
-            onChange={() => toggleKeep(index)}
+            onChange={() => toggleKeep(item.id)}
             aria-label={`Keep page ${index + 1}`}
             className="h-4 w-4 rounded border-slate-300 text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
           />
@@ -197,8 +197,8 @@ function StudioClient() {
   }
 
   /** Toggle select */
-  function toggleKeep(i: number) {
-    setPages((prev) => prev.map((p, idx) => (idx === i ? { ...p, keep: !p.keep } : p)));
+  function toggleKeep(id: string) {
+    setPages((prev) => prev.map((p) => (p.id === id ? { ...p, keep: !p.keep } : p)));
   }
 
   /** Select all / none */
@@ -407,7 +407,7 @@ function StudioClient() {
               : "Select at least one page to enable download."}
           </p>
           <button
-            className="rounded-full bg-brand px-8 py-3 text-base font-semibold text-white shadow-lg shadow-brand/30 transition hover:bg-[#256b6b] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 active:bg-[#1f5d5d] disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-full bg-[#2A7C7C] px-8 py-3 text-base font-semibold text-white shadow-lg shadow-[#1a4d4d]/30 transition hover:bg-[#256b6b] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2A7C7C] focus-visible:ring-offset-2 active:bg-[#1f5d5d] disabled:cursor-not-allowed disabled:bg-[#dfeeee] disabled:text-[#6c8c8c] disabled:shadow-none"
             onClick={handleDownload}
             disabled={downloadDisabled}
           >
