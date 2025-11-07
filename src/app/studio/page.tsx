@@ -27,17 +27,18 @@ type PageItem = {
   srcIdx: number; // which source file
   pageIdx: number; // page index inside that source
   thumb: string; // data URL for preview
-  selected: boolean; // marked for deletion
 };
 
 /** One sortable thumbnail tile */
 function SortableThumb({
   item,
   index,
+  selected,
   toggleSelect,
 }: {
   item: PageItem;
   index: number;
+  selected: boolean;
   toggleSelect: (id: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
@@ -57,7 +58,7 @@ function SortableThumb({
       {...attributes}
       {...listeners}
       className={`relative rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 focus-within:ring-2 focus-within:ring-brand/30 ${
-        item.selected ? "border-brand/40 ring-2 ring-brand/30" : ""
+        selected ? "border-brand/40 ring-2 ring-brand/30" : ""
       }`}
     >
       <label className="flex cursor-pointer select-none flex-col gap-3">
@@ -65,7 +66,7 @@ function SortableThumb({
           <span className="text-sm font-semibold text-gray-800">Page {index + 1}</span>
           <input
             type="checkbox"
-            checked={item.selected}
+            checked={selected}
             onChange={() => toggleSelect(item.id)}
             aria-label={`Select page ${index + 1} for deletion`}
             className="h-4 w-4 rounded border-slate-300 text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
@@ -85,9 +86,11 @@ function SortableThumb({
 function StudioClient() {
   const [sources, setSources] = useState<SourceRef[]>([]);
   const [pages, setPages] = useState<PageItem[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const addInputRef = useRef<HTMLInputElement>(null);
   const renderedSourcesRef = useRef(0);
@@ -113,6 +116,7 @@ function StudioClient() {
   useEffect(() => {
     if (sources.length === 0) {
       setPages([]);
+      setSelectedIds(new Set<string>());
       renderedSourcesRef.current = 0;
       return;
     }
@@ -137,7 +141,7 @@ function StudioClient() {
         for (let s = startIdx; s < sources.length; s++) {
           const src = sources[s];
           const pdf = await pdfjsLib.getDocument(src.url).promise;
-          for (let p = 1; p <= pdf.numPages; p++) {
+        for (let p = 1; p <= pdf.numPages; p++) {
             if (cancelled) return;
             const page = await pdf.getPage(p);
             const viewport = page.getViewport({ scale: 0.25 });
@@ -152,7 +156,6 @@ function StudioClient() {
               srcIdx: s,
               pageIdx: p - 1,
               thumb: canvas.toDataURL("image/png"),
-              selected: false,
             });
           }
         }
@@ -174,6 +177,32 @@ function StudioClient() {
       cancelled = true;
     };
   }, [sources]);
+
+  /** Keep selection set in sync with existing pages */
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      const existing = new Set(pages.map((p) => p.id));
+      const next = new Set<string>();
+      let changed = false;
+      prev.forEach((id) => {
+        if (existing.has(id)) {
+          next.add(id);
+        } else {
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+    if (confirmingDelete && pages.length === 0) {
+      setConfirmingDelete(false);
+    }
+  }, [pages, confirmingDelete]);
+
+  useEffect(() => {
+    if (confirmingDelete && selectedIds.size === 0) {
+      setConfirmingDelete(false);
+    }
+  }, [confirmingDelete, selectedIds]);
 
   /** Add more PDFs (create object URLs and append to sources) */
   function handleAddClick() {
@@ -198,17 +227,42 @@ function StudioClient() {
 
   /** Toggle delete selection */
   function toggleSelect(id: string) {
-    setPages((prev) => prev.map((p) => (p.id === id ? { ...p, selected: !p.selected } : p)));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+    setConfirmingDelete(false);
   }
 
   /** Select all / none */
   function selectAll(v: boolean) {
-    setPages((prev) => prev.map((p) => ({ ...p, selected: v })));
+    if (v) {
+      setSelectedIds(new Set<string>(pages.map((p) => p.id)));
+    } else {
+      setSelectedIds(new Set<string>());
+    }
+    setConfirmingDelete(false);
   }
 
   /** Remove pages that are currently selected */
   function handleDeleteSelected() {
-    setPages((prev) => prev.filter((p) => !p.selected));
+    if (selectedIds.size === 0) return;
+    setConfirmingDelete(true);
+  }
+
+  function confirmDelete() {
+    setPages((prev) => prev.filter((p) => !selectedIds.has(p.id)));
+    setSelectedIds(new Set<string>());
+    setConfirmingDelete(false);
+  }
+
+  function cancelDelete() {
+    setConfirmingDelete(false);
   }
 
   /** Drag end reorders the pages array */
@@ -276,7 +330,7 @@ function StudioClient() {
   }
 
   const itemsIds = useMemo(() => pages.map((p) => p.id), [pages]);
-  const selectedCount = useMemo(() => pages.filter((p) => p.selected).length, [pages]);
+  const selectedCount = selectedIds.size;
   const downloadDisabled = busy || pages.length === 0;
 
   return (
@@ -299,7 +353,7 @@ function StudioClient() {
               <div className="flex flex-wrap gap-2 text-sm font-medium text-gray-700">
                 <span className="rounded-full bg-slate-100 px-3 py-1">Files: {sources.length}</span>
                 <span className="rounded-full bg-slate-100 px-3 py-1">Pages: {pages.length}</span>
-                <span className="rounded-full bg-slate-100 px-3 py-1">Marked: {selectedCount}</span>
+                <span className="rounded-full bg-slate-100 px-3 py-1">Selected: {selectedCount}</span>
               </div>
             </div>
             <div className="ml-auto shrink-0">
@@ -354,6 +408,28 @@ function StudioClient() {
           <p className="text-xs text-gray-500">
             Tip: checkboxes only mark pages for deletion. Downloads always include every page shown in your Studio.
           </p>
+          {confirmingDelete && selectedCount > 0 && (
+            <div className="mt-4 rounded-2xl border border-red-100 bg-red-50 p-4 text-sm text-red-700 shadow-sm">
+              <p>
+                Are you sure you want to delete the selected {selectedCount === 1 ? "file" : "files"}? This cannot be
+                undone.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  className="rounded-full bg-red-500 px-4 py-2 text-white shadow-sm transition hover:bg-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+                  onClick={confirmDelete}
+                >
+                  Yes, delete
+                </button>
+                <button
+                  className="rounded-full border border-red-200 bg-white px-4 py-2 text-red-600 transition hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-200 focus-visible:ring-offset-2"
+                  onClick={cancelDelete}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {error && (
@@ -374,7 +450,13 @@ function StudioClient() {
               <SortableContext items={itemsIds} strategy={rectSortingStrategy}>
                 <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
                   {pages.map((p, i) => (
-                    <SortableThumb key={p.id} item={p} index={i} toggleSelect={toggleSelect} />
+                    <SortableThumb
+                      key={p.id}
+                      item={p}
+                      index={i}
+                      selected={selectedIds.has(p.id)}
+                      toggleSelect={toggleSelect}
+                    />
                   ))}
                 </ul>
               </SortableContext>
