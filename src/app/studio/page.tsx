@@ -2,7 +2,7 @@
 
 import SettingsMenu from "@/components/SettingsMenu";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { PDFDocument } from "pdf-lib";
 import {
@@ -30,14 +30,7 @@ type PageItem = {
 };
 
 /** One sortable thumbnail tile */
-type ThumbProps = {
-  item: PageItem;
-  index: number;
-  selected: boolean;
-  onToggle: () => void;
-};
-
-function SortableThumb({ item, index, selected, onToggle }: ThumbProps) {
+function SortableThumb({ item, index }: { item: PageItem; index: number }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
     id: item.id,
   });
@@ -54,21 +47,10 @@ function SortableThumb({ item, index, selected, onToggle }: ThumbProps) {
       style={style}
       {...attributes}
       {...listeners}
-      className={`relative rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 focus-within:ring-2 focus-within:ring-brand/30 ${
-        selected ? "border-brand/40 ring-2 ring-brand/30" : ""
-      }`}
+      className="relative rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 focus-within:ring-2 focus-within:ring-brand/30"
     >
       <label className="flex cursor-pointer select-none flex-col gap-3">
-        <div className="flex items-center justify-between text-xs text-gray-500">
-          <span className="text-sm font-semibold text-gray-800">Page {index + 1}</span>
-          <input
-            type="checkbox"
-            checked={selected}
-            onChange={onToggle}
-            aria-label={`Select page ${"pageIdx" in item ? item.pageIdx + 1 : index + 1}`}
-            className="h-4 w-4 rounded border-slate-300 text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
-          />
-        </div>
+        <div className="text-sm font-semibold text-gray-800">Page {index + 1}</div>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={item.thumb}
@@ -83,7 +65,6 @@ function SortableThumb({ item, index, selected, onToggle }: ThumbProps) {
 function StudioClient() {
   const [sources, setSources] = useState<SourceRef[]>([]);
   const [pages, setPages] = useState<PageItem[]>([]);
-  const [selected, setSelected] = React.useState<Set<string>>(() => new Set());
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -112,7 +93,6 @@ function StudioClient() {
   useEffect(() => {
     if (sources.length === 0) {
       setPages([]);
-      setSelected(new Set());
       renderedSourcesRef.current = 0;
       return;
     }
@@ -174,14 +154,6 @@ function StudioClient() {
     };
   }, [sources]);
 
-  useEffect(() => {
-    setSelected((prev) => {
-      const existing = new Set(pages.map((p) => p.id));
-      const filtered = [...prev].filter((id) => existing.has(id));
-      return filtered.length === prev.size ? prev : new Set(filtered);
-    });
-  }, [pages]);
-
   /** Add more PDFs (create object URLs and append to sources) */
   function handleAddClick() {
     addInputRef.current?.click();
@@ -201,27 +173,6 @@ function StudioClient() {
       sessionStorage.setItem("mpdf:files", JSON.stringify(merged));
     }
     e.currentTarget.value = "";
-  }
-
-  /** Toggle delete selection */
-  function toggleSelect(id: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function clearSelection() {
-    setSelected(new Set());
-  }
-
-  /** Remove pages that are currently selected */
-  function handleDeleteSelected() {
-    if (selected.size === 0) return;
-    setPages((prev) => prev.filter((p) => !selected.has(p.id)));
-    clearSelection();
   }
 
   /** Drag end reorders the pages array */
@@ -289,7 +240,6 @@ function StudioClient() {
   }
 
   const itemsIds = useMemo(() => pages.map((p) => p.id), [pages]);
-  const selectedCount = useMemo(() => selected.size, [selected]);
   const downloadDisabled = busy || pages.length === 0;
 
   return (
@@ -306,13 +256,11 @@ function StudioClient() {
                 </div>
               </div>
               <p className="text-sm text-gray-600">
-                Drag thumbnails to reorder them. Use the checkboxes to mark pages for deletion, or upload more PDFs to
-                keep building your stack.
+                Drag thumbnails to reorder them, or upload more PDFs to keep building your stack.
               </p>
               <div className="flex flex-wrap gap-2 text-sm font-medium text-gray-700">
                 <span className="rounded-full bg-slate-100 px-3 py-1">Files: {sources.length}</span>
                 <span className="rounded-full bg-slate-100 px-3 py-1">Pages: {pages.length}</span>
-                <span className="rounded-full bg-slate-100 px-3 py-1">Selected: {selectedCount}</span>
               </div>
             </div>
             <div className="ml-auto shrink-0">
@@ -324,13 +272,6 @@ function StudioClient() {
         <div className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
             <div className="flex flex-wrap gap-2">
-              <button
-                className="rounded-full border border-red-100 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-200 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                onClick={handleDeleteSelected}
-                disabled={selectedCount === 0}
-              >
-                Delete selected ({selectedCount})
-              </button>
               <button
                 className="rounded-full border border-brand/30 bg-brand/5 px-4 py-2 text-sm font-medium text-brand transition hover:bg-brand/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
                 onClick={handleAddClick}
@@ -349,12 +290,9 @@ function StudioClient() {
             <p className="text-sm text-gray-600 lg:ml-auto">
               {pages.length === 0
                 ? 'Start by uploading PDFs from the homepage; they will appear here automatically.'
-                : 'Need more content? Upload another PDF—the current order stays intact. Select any extras, then delete them to keep things tidy.'}
+                : 'Need more content? Upload another PDF—the current order stays intact.'}
             </p>
           </div>
-          <p className="text-xs text-gray-500">
-            Tip: checkboxes only mark pages for deletion. Downloads always include every page shown in your Studio.
-          </p>
         </div>
 
         {error && (
@@ -375,13 +313,7 @@ function StudioClient() {
               <SortableContext items={itemsIds} strategy={rectSortingStrategy}>
                 <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
                   {pages.map((p, i) => (
-                    <SortableThumb
-                      key={p.id}
-                      item={p}
-                      index={i}
-                      selected={selected.has(p.id)}
-                      onToggle={() => toggleSelect(p.id)}
-                    />
+                    <SortableThumb key={p.id} item={p} index={i} />
                   ))}
                 </ul>
               </SortableContext>
