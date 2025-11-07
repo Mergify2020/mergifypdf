@@ -260,7 +260,7 @@ function WorkspaceClient() {
                 <span className="rounded-full bg-slate-100 px-3 py-1">Pages: {pages.length}</span>
               </div>
             </div>
-            <div className="ml-auto self-start lg:absolute lg:-top-8 lg:right-0">
+            <div className="ml-auto self-start lg:absolute lg:-top-[72px] lg:right-0">
               <SettingsMenu />
             </div>
           </div>
