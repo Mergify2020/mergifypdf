@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import Providers from "@/components/Providers";
+import SettingsMenu from "@/components/SettingsMenu";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -42,12 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/" className="inline-flex items-center gap-2" aria-label="Go to homepage">
               <Image src="/logo-wordmark.svg" alt="MergifyPDF" width={160} height={40} priority />
             </Link>
-            <Link
-              href="/settings"
-              className="rounded-full border border-slate-200 px-4 py-1.5 text-sm font-medium text-gray-700 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-            >
-              Settings
-            </Link>
+            <SettingsMenu />
           </div>
         </header>
 
