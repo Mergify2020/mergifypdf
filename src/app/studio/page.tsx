@@ -142,9 +142,9 @@ function StudioClient() {
           const src = sources[s];
           const pdf = await pdfjsLib.getDocument(src.url).promise;
         for (let p = 1; p <= pdf.numPages; p++) {
-            if (cancelled) return;
-            const page = await pdf.getPage(p);
-            const viewport = page.getViewport({ scale: 0.25 });
+          if (cancelled) return;
+          const page = await pdf.getPage(p);
+          const viewport = page.getViewport({ scale: 0.25 });
             const canvas = document.createElement("canvas");
             const ctx = canvas.getContext("2d")!;
             canvas.width = viewport.width;
@@ -156,7 +156,6 @@ function StudioClient() {
               srcIdx: s,
               pageIdx: p - 1,
               thumb: canvas.toDataURL("image/png"),
-              selected: false,
             });
           }
         }
