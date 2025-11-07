@@ -37,15 +37,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
 
       <body className="min-h-screen bg-white text-gray-900">
-        <header className="w-full sticky top-0 z-50 bg-white/90 backdrop-blur">
-          <div className="max-w-6xl mx-auto px-4 py-3">
+        <header className="sticky top-0 z-50 w-full border-b border-slate-100 bg-white/95 backdrop-blur">
+          <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 lg:px-6">
             <Link href="/" className="inline-flex items-center gap-2" aria-label="Go to homepage">
               <Image src="/logo-wordmark.svg" alt="MergifyPDF" width={160} height={40} priority />
+            </Link>
+            <Link
+              href="/settings"
+              className="rounded-full border border-slate-200 px-4 py-1.5 text-sm font-medium text-gray-700 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+            >
+              Settings
             </Link>
           </div>
         </header>
 
-        <main className="pt-2">
+        <main className="pt-4">
           <Providers>{children}</Providers>
         </main>
       </body>
