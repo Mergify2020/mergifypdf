@@ -27,18 +27,18 @@ type PageItem = {
   srcIdx: number; // which source file
   pageIdx: number; // page index inside that source
   thumb: string; // data URL for preview
-  keep: boolean; // selected or not
+  selected: boolean; // marked for deletion
 };
 
 /** One sortable thumbnail tile */
 function SortableThumb({
   item,
   index,
-  toggleKeep,
+  toggleSelect,
 }: {
   item: PageItem;
   index: number;
-  toggleKeep: (id: string) => void;
+  toggleSelect: (id: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
     id: item.id,
@@ -57,7 +57,7 @@ function SortableThumb({
       {...attributes}
       {...listeners}
       className={`relative rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 focus-within:ring-2 focus-within:ring-brand/30 ${
-        !item.keep ? "opacity-50" : ""
+        item.selected ? "border-brand/40 ring-2 ring-brand/30" : ""
       }`}
     >
       <label className="flex cursor-pointer select-none flex-col gap-3">
@@ -65,9 +65,9 @@ function SortableThumb({
           <span className="text-sm font-semibold text-gray-800">Page {index + 1}</span>
           <input
             type="checkbox"
-            checked={item.keep}
-            onChange={() => toggleKeep(item.id)}
-            aria-label={`Keep page ${index + 1}`}
+            checked={item.selected}
+            onChange={() => toggleSelect(item.id)}
+            aria-label={`Select page ${index + 1} for deletion`}
             className="h-4 w-4 rounded border-slate-300 text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
           />
         </div>
@@ -152,7 +152,7 @@ function StudioClient() {
               srcIdx: s,
               pageIdx: p - 1,
               thumb: canvas.toDataURL("image/png"),
-              keep: true,
+              selected: false,
             });
           }
         }
@@ -196,22 +196,19 @@ function StudioClient() {
     e.currentTarget.value = "";
   }
 
-  /** Toggle select */
-  function toggleKeep(id: string) {
-    setPages((prev) => prev.map((p) => (p.id === id ? { ...p, keep: !p.keep } : p)));
+  /** Toggle delete selection */
+  function toggleSelect(id: string) {
+    setPages((prev) => prev.map((p) => (p.id === id ? { ...p, selected: !p.selected } : p)));
   }
 
   /** Select all / none */
   function selectAll(v: boolean) {
-    setPages((prev) => prev.map((p) => ({ ...p, keep: v })));
+    setPages((prev) => prev.map((p) => ({ ...p, selected: v })));
   }
 
-  /** Remove pages that are currently unchecked */
+  /** Remove pages that are currently selected */
   function handleDeleteSelected() {
-    setPages((prev) => {
-      const kept = prev.filter((p) => p.keep);
-      return kept.length === prev.length ? prev : kept;
-    });
+    setPages((prev) => prev.filter((p) => !p.selected));
   }
 
   /** Drag end reorders the pages array */
@@ -227,10 +224,8 @@ function StudioClient() {
   /** Build final PDF respecting order + keep flags */
   async function handleDownload() {
     try {
-      if (pages.length === 0) return;
-      const kept = pages.filter((p) => p.keep);
-      if (kept.length === 0) {
-        setError("Select at least one page.");
+      if (pages.length === 0) {
+        setError("Add at least one page first.");
         return;
       }
       setBusy(true);
@@ -238,7 +233,7 @@ function StudioClient() {
 
       // Load each unique source once into a PDFDocument, cache in a map
       const docCache = new Map<number, PDFDocument>();
-      for (const p of kept) {
+      for (const p of pages) {
         if (!docCache.has(p.srcIdx)) {
           const srcUrl = sources[p.srcIdx].url;
           const ab = await (await fetch(srcUrl)).arrayBuffer();
@@ -247,9 +242,9 @@ function StudioClient() {
         }
       }
 
-      // Now copy selected pages in the displayed order
+      // Now copy pages in the displayed order
       const out = await PDFDocument.create();
-      for (const p of kept) {
+      for (const p of pages) {
         const srcDoc = docCache.get(p.srcIdx)!;
         const [copied] = await out.copyPages(srcDoc, [p.pageIdx]);
         out.addPage(copied);
@@ -281,9 +276,8 @@ function StudioClient() {
   }
 
   const itemsIds = useMemo(() => pages.map((p) => p.id), [pages]);
-  const keptCount = useMemo(() => pages.filter((p) => p.keep).length, [pages]);
-  const removableCount = useMemo(() => pages.filter((p) => !p.keep).length, [pages]);
-  const downloadDisabled = busy || keptCount === 0;
+  const selectedCount = useMemo(() => pages.filter((p) => p.selected).length, [pages]);
+  const downloadDisabled = busy || pages.length === 0;
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#f3fbff,_#ffffff)]">
@@ -299,13 +293,13 @@ function StudioClient() {
                 </div>
               </div>
               <p className="text-sm text-gray-600">
-                Drag thumbnails to reorder them, uncheck a page to skip it, or upload more PDFs to keep building your
-                stack.
+                Drag thumbnails to reorder them. Use the checkboxes to mark pages for deletion, or upload more PDFs to
+                keep building your stack.
               </p>
               <div className="flex flex-wrap gap-2 text-sm font-medium text-gray-700">
                 <span className="rounded-full bg-slate-100 px-3 py-1">Files: {sources.length}</span>
                 <span className="rounded-full bg-slate-100 px-3 py-1">Pages: {pages.length}</span>
-                <span className="rounded-full bg-slate-100 px-3 py-1">Selected: {keptCount}</span>
+                <span className="rounded-full bg-slate-100 px-3 py-1">Marked: {selectedCount}</span>
               </div>
             </div>
             <div className="ml-auto shrink-0">
@@ -332,9 +326,9 @@ function StudioClient() {
               <button
                 className="rounded-full border border-red-100 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-200 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={handleDeleteSelected}
-                disabled={removableCount === 0}
+                disabled={selectedCount === 0}
               >
-                Delete selected ({removableCount})
+                Delete selected ({selectedCount})
               </button>
               <button
                 className="rounded-full border border-brand/30 bg-brand/5 px-4 py-2 text-sm font-medium text-brand transition hover:bg-brand/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
@@ -354,11 +348,11 @@ function StudioClient() {
             <p className="text-sm text-gray-600 lg:ml-auto">
               {pages.length === 0
                 ? 'Start by uploading PDFs from the homepage; they will appear here automatically.'
-                : 'Need more content? Upload another PDF—the current order stays intact. Uncheck any extras, then delete them to keep things tidy.'}
+                : 'Need more content? Upload another PDF—the current order stays intact. Select any extras, then delete them to keep things tidy.'}
             </p>
           </div>
           <p className="text-xs text-gray-500">
-            Tip: checkboxes control what goes into your merge. Uncheck the pages you no longer need, then use "Delete selected" to remove them from the Studio entirely.
+            Tip: checkboxes only mark pages for deletion. Downloads always include every page shown in your Studio.
           </p>
         </div>
 
@@ -380,7 +374,7 @@ function StudioClient() {
               <SortableContext items={itemsIds} strategy={rectSortingStrategy}>
                 <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
                   {pages.map((p, i) => (
-                    <SortableThumb key={p.id} item={p} index={i} toggleKeep={toggleKeep} />
+                    <SortableThumb key={p.id} item={p} index={i} toggleSelect={toggleSelect} />
                   ))}
                 </ul>
               </SortableContext>
@@ -402,16 +396,16 @@ function StudioClient() {
       <div className="sticky bottom-0 border-t border-slate-200 bg-white/95 py-4 shadow-[0_-12px_30px_rgba(15,23,42,0.08)] backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 lg:flex-row lg:items-center lg:justify-between lg:px-6">
           <p className="text-sm text-gray-600">
-            {keptCount > 0
-              ? `Ready to download ${keptCount} ${keptCount === 1 ? "page" : "pages"}?`
-              : "Select at least one page to enable download."}
+            {pages.length > 0
+              ? `Ready to download ${pages.length} ${pages.length === 1 ? "page" : "pages"}?`
+              : "Add some pages to enable download."}
           </p>
           <button
             className="rounded-full bg-[#2A7C7C] px-8 py-3 text-base font-semibold text-white shadow-lg shadow-[#1a4d4d]/30 transition hover:bg-[#256b6b] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2A7C7C] focus-visible:ring-offset-2 active:bg-[#1f5d5d] disabled:cursor-not-allowed disabled:bg-[#dfeeee] disabled:text-[#6c8c8c] disabled:shadow-none"
             onClick={handleDownload}
             disabled={downloadDisabled}
           >
-            {busy ? "Building..." : "Download selected pages"}
+            {busy ? "Building..." : "Download pages"}
           </button>
         </div>
       </div>
