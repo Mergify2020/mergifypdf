@@ -194,6 +194,11 @@ function StudioClient() {
     setPages((prev) => prev.map((p) => ({ ...p, keep: v })));
   }
 
+  /** Remove pages that are currently marked as selected */
+  function handleDeleteSelected() {
+    setPages((prev) => prev.filter((p) => !p.keep));
+  }
+
   /** Drag end reorders the pages array */
   function handleDragEnd(e: DragEndEvent) {
     const { active, over } = e;
@@ -266,7 +271,7 @@ function StudioClient() {
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#f3fbff,_#ffffff)]">
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-10 lg:px-6 lg:py-14">
+      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 pt-10 pb-32 lg:px-6 lg:pt-14">
         <div className="rounded-3xl border border-slate-100 bg-white/90 p-6 shadow-sm shadow-slate-200/60 backdrop-blur">
           <div className="flex flex-wrap items-start gap-4">
             <div className="min-w-[220px] flex-1 space-y-4">
@@ -309,11 +314,11 @@ function StudioClient() {
                 Select none
               </button>
               <button
-                className="rounded-full bg-brand px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#256b6b] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-                onClick={handleDownload}
-                disabled={downloadDisabled}
+                className="rounded-full border border-red-100 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-200 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={handleDeleteSelected}
+                disabled={keptCount === 0}
               >
-                {busy ? 'Building...' : 'Download'}
+                Delete selected
               </button>
               <button
                 className="rounded-full border border-brand/30 bg-brand/5 px-4 py-2 text-sm font-medium text-brand transition hover:bg-brand/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
@@ -333,7 +338,7 @@ function StudioClient() {
             <p className="text-sm text-gray-600 lg:ml-auto">
               {pages.length === 0
                 ? 'Start by uploading PDFs from the homepage; they will appear here automatically.'
-                : 'Need more content? Upload another PDF—the current order stays intact.'}
+                : 'Need more content? Upload another PDF—the current order stays intact. Delete any extras to keep things tidy.'}
             </p>
           </div>
         </div>
@@ -373,6 +378,23 @@ function StudioClient() {
             <p className="mt-6 text-xs uppercase tracking-[0.4em] text-gray-400">Studio ready</p>
           </div>
         )}
+      </div>
+
+      <div className="sticky bottom-0 border-t border-slate-200 bg-white/95 py-4 shadow-[0_-12px_30px_rgba(15,23,42,0.08)] backdrop-blur">
+        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 lg:flex-row lg:items-center lg:justify-between lg:px-6">
+          <p className="text-sm text-gray-600">
+            {keptCount > 0
+              ? `Ready to download ${keptCount} ${keptCount === 1 ? "page" : "pages"}?`
+              : "Select at least one page to enable download."}
+          </p>
+          <button
+            className="rounded-full bg-brand px-8 py-3 text-base font-semibold text-white shadow-lg shadow-brand/30 transition hover:bg-[#256b6b] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 active:bg-[#1f5d5d] disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={handleDownload}
+            disabled={downloadDisabled}
+          >
+            {busy ? "Building..." : "Download selected pages"}
+          </button>
+        </div>
       </div>
     </main>
   );
