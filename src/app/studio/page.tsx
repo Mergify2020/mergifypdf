@@ -27,17 +27,18 @@ type PageItem = {
   srcIdx: number; // which source file
   pageIdx: number; // page index inside that source
   thumb: string; // data URL for preview
-  selected: boolean; // marked for deletion
 };
 
 /** One sortable thumbnail tile */
 function SortableThumb({
   item,
   index,
+  selected,
   toggleSelect,
 }: {
   item: PageItem;
   index: number;
+  selected: boolean;
   toggleSelect: (id: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
@@ -57,7 +58,7 @@ function SortableThumb({
       {...attributes}
       {...listeners}
       className={`relative rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 focus-within:ring-2 focus-within:ring-brand/30 ${
-        item.selected ? "border-brand/40 ring-2 ring-brand/30" : ""
+        selected ? "border-brand/40 ring-2 ring-brand/30" : ""
       }`}
     >
       <label className="flex cursor-pointer select-none flex-col gap-3">
@@ -65,7 +66,7 @@ function SortableThumb({
           <span className="text-sm font-semibold text-gray-800">Page {index + 1}</span>
           <input
             type="checkbox"
-            checked={item.selected}
+            checked={selected}
             onChange={() => toggleSelect(item.id)}
             aria-label={`Select page ${index + 1} for deletion`}
             className="h-4 w-4 rounded border-slate-300 text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
@@ -85,6 +86,7 @@ function SortableThumb({
 function StudioClient() {
   const [sources, setSources] = useState<SourceRef[]>([]);
   const [pages, setPages] = useState<PageItem[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -114,6 +116,7 @@ function StudioClient() {
   useEffect(() => {
     if (sources.length === 0) {
       setPages([]);
+      setSelectedIds(new Set());
       renderedSourcesRef.current = 0;
       return;
     }
@@ -177,10 +180,23 @@ function StudioClient() {
   }, [sources]);
 
   useEffect(() => {
-    if (confirmingDelete && pages.every((p) => !p.selected)) {
+    setSelectedIds((prev) => {
+      const existing = new Set(pages.map((p) => p.id));
+      const next = new Set<string>();
+      prev.forEach((id) => {
+        if (existing.has(id)) {
+          next.add(id);
+        }
+      });
+      return next.size === prev.size ? prev : next;
+    });
+  }, [pages]);
+
+  useEffect(() => {
+    if (confirmingDelete && selectedIds.size === 0) {
       setConfirmingDelete(false);
     }
-  }, [pages, confirmingDelete]);
+  }, [confirmingDelete, selectedIds]);
 
   /** Add more PDFs (create object URLs and append to sources) */
   function handleAddClick() {
@@ -205,18 +221,27 @@ function StudioClient() {
 
   /** Toggle delete selection */
   function toggleSelect(id: string) {
-    setPages((prev) => prev.map((p) => (p.id === id ? { ...p, selected: !p.selected } : p)));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
     setConfirmingDelete(false);
   }
 
   /** Remove pages that are currently selected */
   function handleDeleteSelected() {
-    if (!pages.some((p) => p.selected)) return;
+    if (selectedIds.size === 0) return;
     setConfirmingDelete(true);
   }
 
   function confirmDelete() {
-    setPages((prev) => prev.filter((p) => !p.selected));
+    setPages((prev) => prev.filter((p) => !selectedIds.has(p.id)));
+    setSelectedIds(new Set());
     setConfirmingDelete(false);
   }
 
@@ -289,7 +314,7 @@ function StudioClient() {
   }
 
   const itemsIds = useMemo(() => pages.map((p) => p.id), [pages]);
-  const selectedCount = useMemo(() => pages.filter((p) => p.selected).length, [pages]);
+  const selectedCount = useMemo(() => selectedIds.size, [selectedIds]);
   const downloadDisabled = busy || pages.length === 0;
 
   return (
@@ -397,7 +422,13 @@ function StudioClient() {
               <SortableContext items={itemsIds} strategy={rectSortingStrategy}>
                 <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
                   {pages.map((p, i) => (
-                    <SortableThumb key={p.id} item={p} index={i} toggleSelect={toggleSelect} />
+                    <SortableThumb
+                      key={p.id}
+                      item={p}
+                      index={i}
+                      selected={selectedIds.has(p.id)}
+                      toggleSelect={toggleSelect}
+                    />
                   ))}
                 </ul>
               </SortableContext>
