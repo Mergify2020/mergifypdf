@@ -62,7 +62,7 @@ function SortableThumb({ item, index }: { item: PageItem; index: number }) {
   );
 }
 
-function StudioClient() {
+function WorkspaceClient() {
   const [sources, setSources] = useState<SourceRef[]>([]);
   const [pages, setPages] = useState<PageItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -248,12 +248,9 @@ function StudioClient() {
         <div className="rounded-3xl border border-slate-100 bg-white/90 p-6 shadow-sm shadow-slate-200/60 backdrop-blur">
           <div className="flex flex-wrap items-start gap-4">
             <div className="min-w-[220px] flex-1 space-y-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.4em] text-brand">Workspace</p>
-                <div className="mt-3 flex flex-wrap items-baseline gap-3">
-                  <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Studio</h1>
-                  <span className="text-sm text-gray-500">Curate every page before you merge.</span>
-                </div>
+              <div className="mt-3 flex flex-wrap items-baseline gap-3">
+                <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Workspace</h1>
+                <span className="text-sm text-gray-500">Curate every page before you merge.</span>
               </div>
               <p className="text-sm text-gray-600">
                 Drag thumbnails to reorder them, or upload more PDFs to keep building your stack.
@@ -263,7 +260,8 @@ function StudioClient() {
                 <span className="rounded-full bg-slate-100 px-3 py-1">Pages: {pages.length}</span>
               </div>
             </div>
-            <div className="ml-auto shrink-0">
+            <div className="ml-auto flex flex-col items-end gap-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.4em] text-brand">Workspace</p>
               <SettingsMenu />
             </div>
           </div>
@@ -327,7 +325,7 @@ function StudioClient() {
             <p className="mt-2 text-sm text-gray-500">
               Go back to the homepage, upload your PDFs, and they will show up here instantly.
             </p>
-            <p className="mt-6 text-xs uppercase tracking-[0.4em] text-gray-400">Studio ready</p>
+            <p className="mt-6 text-xs uppercase tracking-[0.4em] text-gray-400">Workspace ready</p>
           </div>
         )}
       </div>
@@ -353,4 +351,4 @@ function StudioClient() {
 }
 
 /** Disable SSR because pdfjs/canvas must run in the browser only */
-export default dynamic(() => Promise.resolve(StudioClient), { ssr: false });
+export default dynamic(() => Promise.resolve(WorkspaceClient), { ssr: false });
