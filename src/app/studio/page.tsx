@@ -90,6 +90,7 @@ function StudioClient() {
   const [error, setError] = useState<string | null>(null);
 
   const addInputRef = useRef<HTMLInputElement>(null);
+  const renderedSourcesRef = useRef(0);
 
   // Better drag in grids
   const sensors = useSensors(useSensor(PointerSensor));
@@ -108,15 +109,22 @@ function StudioClient() {
     }
   }, []);
 
-  /** Render thumbnails whenever sources change (or when we add more PDFs) */
+  /** Render thumbnails for any sources that haven't been processed yet */
   useEffect(() => {
-    if (sources.length === 0) return;
+    if (sources.length === 0) {
+      setPages([]);
+      renderedSourcesRef.current = 0;
+      return;
+    }
+
+    if (renderedSourcesRef.current >= sources.length) return;
 
     let cancelled = false;
-    async function renderAll() {
+    async function renderNewSources() {
       setLoading(true);
       setError(null);
       const next: PageItem[] = [];
+      const startIdx = renderedSourcesRef.current;
 
       try {
         // Import pdf.js in the browser only
@@ -125,8 +133,8 @@ function StudioClient() {
         pdfjsLib.GlobalWorkerOptions.workerSrc =
           "https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
 
-        // Build thumbs for each source in order
-        for (let s = 0; s < sources.length; s++) {
+        // Only render thumbnails for sources we haven't seen yet
+        for (let s = startIdx; s < sources.length; s++) {
           const src = sources[s];
           const pdf = await pdfjsLib.getDocument(src.url).promise;
           for (let p = 1; p <= pdf.numPages; p++) {
@@ -148,7 +156,11 @@ function StudioClient() {
             });
           }
         }
-        if (!cancelled) setPages(next);
+
+        if (!cancelled) {
+          setPages((prev) => [...prev, ...next]);
+          renderedSourcesRef.current = sources.length;
+        }
       } catch (e) {
         console.error(e);
         if (!cancelled) setError("Could not render previews (file may be encrypted or corrupted).");
@@ -157,7 +169,7 @@ function StudioClient() {
       }
     }
 
-    renderAll();
+    renderNewSources();
     return () => {
       cancelled = true;
     };
@@ -194,9 +206,12 @@ function StudioClient() {
     setPages((prev) => prev.map((p) => ({ ...p, keep: v })));
   }
 
-  /** Remove pages that are currently marked as selected */
+  /** Remove pages that are currently unchecked */
   function handleDeleteSelected() {
-    setPages((prev) => prev.filter((p) => !p.keep));
+    setPages((prev) => {
+      const kept = prev.filter((p) => p.keep);
+      return kept.length === prev.length ? prev : kept;
+    });
   }
 
   /** Drag end reorders the pages array */
@@ -267,6 +282,7 @@ function StudioClient() {
 
   const itemsIds = useMemo(() => pages.map((p) => p.id), [pages]);
   const keptCount = useMemo(() => pages.filter((p) => p.keep).length, [pages]);
+  const removableCount = useMemo(() => pages.filter((p) => !p.keep).length, [pages]);
   const downloadDisabled = busy || keptCount === 0;
 
   return (
@@ -316,9 +332,9 @@ function StudioClient() {
               <button
                 className="rounded-full border border-red-100 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-200 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={handleDeleteSelected}
-                disabled={keptCount === 0}
+                disabled={removableCount === 0}
               >
-                Delete selected
+                Delete selected ({removableCount})
               </button>
               <button
                 className="rounded-full border border-brand/30 bg-brand/5 px-4 py-2 text-sm font-medium text-brand transition hover:bg-brand/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
@@ -338,9 +354,12 @@ function StudioClient() {
             <p className="text-sm text-gray-600 lg:ml-auto">
               {pages.length === 0
                 ? 'Start by uploading PDFs from the homepage; they will appear here automatically.'
-                : 'Need more content? Upload another PDF—the current order stays intact. Delete any extras to keep things tidy.'}
+                : 'Need more content? Upload another PDF—the current order stays intact. Uncheck any extras, then delete them to keep things tidy.'}
             </p>
           </div>
+          <p className="text-xs text-gray-500">
+            Tip: checkboxes control what goes into your merge. Uncheck the pages you no longer need, then use "Delete selected" to remove them from the Studio entirely.
+          </p>
         </div>
 
         {error && (
