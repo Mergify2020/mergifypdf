@@ -6,8 +6,8 @@ import { useEffect, useState } from "react";
 
 export default function AccountPage() {
   const { data: session } = useSession();
-  const authType = session?.user?.authType ?? "credentials";
-  const isOAuth = authType === "oauth";
+  const providers = session?.user?.providers ?? [];
+  const isOAuth = providers.some((provider) => provider !== "credentials");
   const displayName = session?.user?.name ?? "";
 
   const [email, setEmail] = useState("");

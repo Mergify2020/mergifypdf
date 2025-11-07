@@ -10,7 +10,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (session.user.authType === "oauth") {
+  const providers = session.user.providers ?? [];
+  const isOAuth = providers.some((provider) => provider !== "credentials");
+  if (isOAuth) {
     return NextResponse.json(
       { error: "Password is managed by Google and can't be changed here." },
       { status: 403 }
