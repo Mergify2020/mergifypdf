@@ -244,17 +244,22 @@ function WorkspaceClient() {
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#f3fbff,_#ffffff)]">
-      <div className="sticky top-0 z-50 bg-white/80 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 lg:px-6">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.4em] text-brand">Workspace</p>
-            <h1 className="text-2xl font-semibold text-slate-900">Workspace</h1>
+      <header className="sticky top-0 z-50 border-b border-slate-100 bg-white/95 backdrop-blur">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 lg:px-6">
+          <div className="flex items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo2.svg" alt="MergifyPDF logo" className="h-6 w-auto" />
+            <span className="text-base font-semibold text-slate-900">MergifyPDF</span>
           </div>
           <SettingsMenu />
         </div>
-      </div>
+      </header>
 
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 pt-8 pb-32 lg:px-6 lg:pt-12">
+      <h1 className="mx-auto mt-6 max-w-6xl px-4 text-3xl font-semibold tracking-tight text-slate-900 lg:px-6">
+        Workspace
+      </h1>
+
+      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 pt-4 pb-32 lg:px-6 lg:pt-6">
         <div className="rounded-3xl border border-slate-100 bg-white/90 p-6 shadow-sm shadow-slate-200/60 backdrop-blur">
           <div className="flex flex-wrap items-start gap-4">
             <div className="min-w-[220px] flex-1 space-y-4">
