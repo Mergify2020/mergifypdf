@@ -7,13 +7,14 @@ import { useEffect, useState } from "react";
 export default function AccountPage() {
   const { data: session } = useSession();
   const providers = session?.user?.providers ?? [];
-  const isOAuth = providers.some((provider) => provider !== "credentials");
+  const canChangePassword = providers.length === 0 || providers.includes("credentials");
   const displayName = session?.user?.name ?? "";
 
   const [email, setEmail] = useState("");
   const [emailBusy, setEmailBusy] = useState(false);
   const [emailMessage, setEmailMessage] = useState<string | null>(null);
 
+  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordBusy, setPasswordBusy] = useState(false);
@@ -54,6 +55,10 @@ export default function AccountPage() {
     event.preventDefault();
     setPasswordMessage(null);
 
+    if (!currentPassword) {
+      setPasswordMessage("Enter your current password.");
+      return;
+    }
     if (newPassword !== confirmPassword) {
       setPasswordMessage("Passwords do not match.");
       return;
@@ -64,13 +69,14 @@ export default function AccountPage() {
       const response = await fetch("/api/account/update-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ newPassword }),
+        body: JSON.stringify({ currentPassword, newPassword }),
       });
       const data = await response.json();
       if (!response.ok) {
         throw new Error(data.error ?? "Unable to update password.");
       }
       setPasswordMessage("Password updated.");
+      setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
     } catch (error) {
@@ -142,16 +148,32 @@ export default function AccountPage() {
 
       <section className="mt-8 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold">Change password</h2>
-        {isOAuth ? (
+        {!canChangePassword ? (
           <p className="mt-2 text-sm text-gray-600">
-            Your password is handled by Google, so you can&apos;t update it from MergifyPDF.
+            Your password is handled by your sign-in provider, so you can&apos;t update it from MergifyPDF.
           </p>
         ) : (
           <>
             <p className="mt-1 text-sm text-gray-600">
-              Choose a strong password that you have not used elsewhere.
+              Enter your current password, then choose a new one that you have not used elsewhere.
             </p>
             <form onSubmit={handlePasswordSubmit} className="mt-4 space-y-4">
+              <div className="space-y-2">
+                <label
+                  className="block text-sm font-medium text-gray-700"
+                  htmlFor="account-password-current"
+                >
+                  Current password
+                </label>
+                <input
+                  id="account-password-current"
+                  type="password"
+                  value={currentPassword}
+                  onChange={(event) => setCurrentPassword(event.target.value)}
+                  required
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2A7C7C] focus-visible:ring-offset-0"
+                />
+              </div>
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700" htmlFor="account-password-new">
                   New password

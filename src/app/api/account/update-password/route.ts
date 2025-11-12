@@ -11,15 +11,18 @@ export async function POST(req: Request) {
   }
 
   const providers = session.user.providers ?? [];
-  const isOAuth = providers.some((provider) => provider !== "credentials");
-  if (isOAuth) {
+  const canManagePassword = providers.length === 0 || providers.includes("credentials");
+  if (!canManagePassword) {
     return NextResponse.json(
       { error: "Password is managed by Google and can't be changed here." },
       { status: 403 }
     );
   }
 
-  const { newPassword } = await req.json();
+  const { currentPassword, newPassword } = await req.json();
+  if (!currentPassword || typeof currentPassword !== "string") {
+    return NextResponse.json({ error: "Current password is required." }, { status: 400 });
+  }
   if (!newPassword || typeof newPassword !== "string" || newPassword.length < 8) {
     return NextResponse.json(
       { error: "Password must be at least 8 characters long." },
@@ -30,6 +33,11 @@ export async function POST(req: Request) {
   const user = await prisma.user.findUnique({ where: { id: session.user.id } });
   if (!user?.password) {
     return NextResponse.json({ error: "Unable to update password." }, { status: 400 });
+  }
+
+  const matches = await bcrypt.compare(currentPassword, user.password);
+  if (!matches) {
+    return NextResponse.json({ error: "Current password is incorrect." }, { status: 400 });
   }
 
   const hashed = await bcrypt.hash(newPassword, 10);
