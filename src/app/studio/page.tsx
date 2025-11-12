@@ -13,9 +13,9 @@ import {
 } from "@dnd-kit/core";
 import {
   SortableContext,
-  rectSortingStrategy,
   useSortable,
   arrayMove,
+  verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
@@ -24,11 +24,24 @@ type PageItem = {
   id: string;
   srcIdx: number; // which source file
   pageIdx: number; // page index inside that source
-  thumb: string; // data URL for preview
+  thumb: string; // small preview
+  preview: string; // large preview
 };
+const PREVIEW_SCALE = 0.85;
+const THUMB_MAX_WIDTH = 170;
 
 /** One sortable thumbnail tile */
-function SortableThumb({ item, index }: { item: PageItem; index: number }) {
+function SortableThumb({
+  item,
+  index,
+  selected,
+  onSelect,
+}: {
+  item: PageItem;
+  index: number;
+  selected: boolean;
+  onSelect: () => void;
+}) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
     id: item.id,
   });
@@ -40,22 +53,30 @@ function SortableThumb({ item, index }: { item: PageItem; index: number }) {
   };
 
   return (
-    <li
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      className="relative rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 focus-within:ring-2 focus-within:ring-brand/30"
-    >
-      <label className="flex cursor-pointer select-none flex-col gap-3">
-        <div className="text-sm font-semibold text-gray-800">Page {index + 1}</div>
+    <li ref={setNodeRef} style={style} className="w-full" {...attributes} {...listeners}>
+      <button
+        type="button"
+        onClick={onSelect}
+        className={`flex w-full flex-col items-center gap-3 rounded-2xl border px-3 pb-3 pt-4 text-left shadow-sm transition ${
+          selected
+            ? "border-brand bg-brand/5 ring-2 ring-brand/40"
+            : "border-slate-200 bg-white hover:border-slate-300"
+        }`}
+      >
+        <div
+          className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ${
+            selected ? "bg-brand text-white" : "bg-slate-100 text-slate-700"
+          }`}
+        >
+          {index + 1}
+        </div>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={item.thumb}
           alt={`Page ${index + 1}`}
-          className="pointer-events-none w-full rounded-xl border border-slate-100 bg-slate-50 shadow-sm"
+          className="pointer-events-none w-full rounded-xl border border-slate-100 bg-white shadow-sm"
         />
-      </label>
+      </button>
     </li>
   );
 }
@@ -66,9 +87,12 @@ function WorkspaceClient() {
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activePageId, setActivePageId] = useState<string | null>(null);
 
   const addInputRef = useRef<HTMLInputElement>(null);
   const renderedSourcesRef = useRef(0);
+  const previewContainerRef = useRef<HTMLDivElement>(null);
+  const previewNodeMap = useRef<Map<string, HTMLDivElement>>(new Map());
 
   // Better drag in grids
   const sensors = useSensors(useSensor(PointerSensor));
@@ -118,18 +142,31 @@ function WorkspaceClient() {
         for (let p = 1; p <= pdf.numPages; p++) {
           if (cancelled) return;
           const page = await pdf.getPage(p);
-          const viewport = page.getViewport({ scale: 0.25 });
+          const viewport = page.getViewport({ scale: PREVIEW_SCALE });
             const canvas = document.createElement("canvas");
             const ctx = canvas.getContext("2d")!;
             canvas.width = viewport.width;
             canvas.height = viewport.height;
             await page.render({ canvasContext: ctx, viewport }).promise;
 
+            const previewData = canvas.toDataURL("image/png");
+            let thumbData = previewData;
+            if (canvas.width > THUMB_MAX_WIDTH) {
+              const ratio = THUMB_MAX_WIDTH / canvas.width;
+              const thumbCanvas = document.createElement("canvas");
+              thumbCanvas.width = THUMB_MAX_WIDTH;
+              thumbCanvas.height = canvas.height * ratio;
+              const thumbCtx = thumbCanvas.getContext("2d")!;
+              thumbCtx.drawImage(canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
+              thumbData = thumbCanvas.toDataURL("image/png");
+            }
+
             next.push({
               id: crypto.randomUUID(),
               srcIdx: s,
               pageIdx: p - 1,
-              thumb: canvas.toDataURL("image/png"),
+              thumb: thumbData,
+              preview: previewData,
             });
           }
         }
@@ -152,6 +189,39 @@ function WorkspaceClient() {
     };
   }, [sources]);
 
+  useEffect(() => {
+    if (pages.length === 0) {
+      setActivePageId(null);
+      return;
+    }
+    if (!activePageId || !pages.some((p) => p.id === activePageId)) {
+      setActivePageId(pages[0].id);
+    }
+  }, [pages, activePageId]);
+
+  useEffect(() => {
+    const container = previewContainerRef.current;
+    if (!container || pages.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+        if (visible.length > 0) {
+          const id = visible[0].target.getAttribute("data-page-id");
+          if (id) {
+            setActivePageId((prev) => (prev === id ? prev : id));
+          }
+        }
+      },
+      { root: container, threshold: 0.65 }
+    );
+
+    previewNodeMap.current.forEach((node) => observer.observe(node));
+    return () => observer.disconnect();
+  }, [pages]);
+
   /** Add more PDFs (create object URLs and append to sources) */
   function handleAddClick() {
     addInputRef.current?.click();
@@ -171,6 +241,24 @@ function WorkspaceClient() {
       sessionStorage.setItem("mpdf:files", JSON.stringify(merged));
     }
     e.currentTarget.value = "";
+  }
+
+  function handleSelectPage(id: string) {
+    setActivePageId(id);
+    const node = previewNodeMap.current.get(id);
+    if (node) {
+      node.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
+
+  function registerPreviewRef(id: string) {
+    return (node: HTMLDivElement | null) => {
+      if (node) {
+        previewNodeMap.current.set(id, node);
+      } else {
+        previewNodeMap.current.delete(id);
+      }
+    };
   }
 
   /** Drag end reorders the pages array */
@@ -301,15 +389,80 @@ function WorkspaceClient() {
 
         {!loading && pages.length > 0 && (
           <div className="rounded-3xl border border-slate-100 bg-white/95 p-5 shadow-sm">
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-              <SortableContext items={itemsIds} strategy={rectSortingStrategy}>
-                <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-                  {pages.map((p, i) => (
-                    <SortableThumb key={p.id} item={p} index={i} />
+            <div className="flex flex-col gap-6 lg:flex-row">
+              <div className="flex-1 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/60 shadow-inner">
+                <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">Large preview</p>
+                    <p className="text-xs text-slate-500">Scroll to review every page</p>
+                  </div>
+                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    {pages.length} {pages.length === 1 ? "page" : "pages"}
+                  </span>
+                </div>
+                <div
+                  ref={previewContainerRef}
+                  className="h-[70vh] space-y-8 overflow-y-auto px-5 py-6"
+                >
+                  {pages.map((page, idx) => (
+                    <div
+                      key={page.id}
+                      data-page-id={page.id}
+                      ref={registerPreviewRef(page.id)}
+                      className={`rounded-3xl border bg-white p-4 shadow-sm transition ${
+                        activePageId === page.id
+                          ? "border-brand ring-2 ring-brand/30"
+                          : "border-slate-200"
+                      }`}
+                    >
+                      <div className="mb-3 flex items-center justify-between gap-4 text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-slate-400">
+                        <span>Page {idx + 1}</span>
+                        <span
+                          className="truncate text-right tracking-[0.2em]"
+                          title={sources[page.srcIdx]?.name ?? "Uploaded PDF"}
+                        >
+                          {sources[page.srcIdx]?.name ?? "Uploaded PDF"}
+                        </span>
+                      </div>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={page.preview}
+                        alt={`Page ${idx + 1}`}
+                        className="mx-auto w-full max-w-3xl rounded-2xl border border-slate-100 bg-white shadow"
+                      />
+                    </div>
                   ))}
-                </ul>
-              </SortableContext>
-            </DndContext>
+                </div>
+              </div>
+
+              <div className="lg:w-64">
+                <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+                  <div className="border-b border-slate-200 px-4 py-3">
+                    <p className="text-sm font-semibold text-slate-800">Page order</p>
+                    <p className="text-xs text-slate-500">Tap to focus or drag to reorder</p>
+                  </div>
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <SortableContext items={itemsIds} strategy={verticalListSortingStrategy}>
+                      <ul className="flex max-h-[70vh] flex-col gap-3 overflow-y-auto p-4">
+                        {pages.map((p, i) => (
+                          <SortableThumb
+                            key={p.id}
+                            item={p}
+                            index={i}
+                            selected={p.id === activePageId}
+                            onSelect={() => handleSelectPage(p.id)}
+                          />
+                        ))}
+                      </ul>
+                    </SortableContext>
+                  </DndContext>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
