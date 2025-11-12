@@ -9,15 +9,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const providers = session.user.providers ?? [];
-  const isOAuth = providers.some((provider) => provider !== "credentials");
-  if (isOAuth) {
-    return NextResponse.json(
-      { error: "Email is managed by Google and can't be changed here." },
-      { status: 403 }
-    );
-  }
-
   const { email } = await req.json();
   if (!email || typeof email !== "string") {
     return NextResponse.json({ error: "Email is required." }, { status: 400 });

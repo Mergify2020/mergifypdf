@@ -113,39 +113,31 @@ export default function AccountPage() {
 
       <section className="mt-8 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold">Change email</h2>
-        {isOAuth ? (
-          <p className="mt-2 text-sm text-gray-600">
-            Your email address is handled by Google, so you can&apos;t update it from MergifyPDF.
-          </p>
-        ) : (
-          <>
-            <p className="mt-1 text-sm text-gray-600">
-              We will send confirmations to this email address.
-            </p>
-            <form onSubmit={handleEmailSubmit} className="mt-4 space-y-4">
-              <label className="block text-sm font-medium text-gray-700" htmlFor="account-email">
-                Email address
-              </label>
-              <input
-                id="account-email"
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                required
-                className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2A7C7C] focus-visible:ring-offset-0"
-              />
-              <button
-                type="submit"
-                disabled={emailBusy}
-                aria-disabled={emailBusy}
-                className="rounded-md bg-[#2A7C7C] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#256666] disabled:opacity-60"
-              >
-                {emailBusy ? "Saving..." : "Save email"}
-              </button>
-              {emailMessage && <p className="text-sm text-gray-600">{emailMessage}</p>}
-            </form>
-          </>
-        )}
+        <p className="mt-1 text-sm text-gray-600">
+          We will send confirmations to this email address.
+        </p>
+        <form onSubmit={handleEmailSubmit} className="mt-4 space-y-4">
+          <label className="block text-sm font-medium text-gray-700" htmlFor="account-email">
+            Email address
+          </label>
+          <input
+            id="account-email"
+            type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            required
+            className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2A7C7C] focus-visible:ring-offset-0"
+          />
+          <button
+            type="submit"
+            disabled={emailBusy}
+            aria-disabled={emailBusy}
+            className="rounded-md bg-[#2A7C7C] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#256666] disabled:opacity-60"
+          >
+            {emailBusy ? "Saving..." : "Save email"}
+          </button>
+          {emailMessage && <p className="text-sm text-gray-600">{emailMessage}</p>}
+        </form>
       </section>
 
       <section className="mt-8 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
