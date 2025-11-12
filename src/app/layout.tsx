@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import Providers from "@/components/Providers";
-import SettingsMenu from "@/components/SettingsMenu";
+import WorkspaceSettingsMenu from "@/components/WorkspaceSettingsMenu";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import "./globals.css";
@@ -47,7 +47,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <Link href="/" className="inline-flex items-center gap-2" aria-label="Go to homepage">
               <Image src="/logo-wordmark.svg" alt="MergifyPDF" width={160} height={40} priority />
             </Link>
-            {session?.user ? <SettingsMenu /> : null}
+            {session?.user ? <WorkspaceSettingsMenu /> : null}
           </div>
         </header>
 
