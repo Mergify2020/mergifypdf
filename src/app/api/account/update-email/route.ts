@@ -9,6 +9,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const providers = session.user.providers ?? [];
+  const canManageEmail = providers.length === 0 || providers.includes("credentials");
+  if (!canManageEmail) {
+    const managedByGoogle = providers.includes("google");
+    return NextResponse.json(
+      { error: managedByGoogle ? "Your email is handled by Google." : "Email changes are disabled for your sign-in method." },
+      { status: 403 }
+    );
+  }
+
   const { email } = await req.json();
   if (!email || typeof email !== "string") {
     return NextResponse.json({ error: "Email is required." }, { status: 400 });
