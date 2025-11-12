@@ -27,8 +27,15 @@ type PageItem = {
   thumb: string; // small preview
   preview: string; // large preview
 };
-const PREVIEW_SCALE = 0.85;
-const THUMB_MAX_WIDTH = 170;
+const PREVIEW_BASE_SCALE = 1.35;
+const MAX_DEVICE_PIXEL_RATIO = 2.5;
+const THUMB_MAX_WIDTH = 200;
+const PREVIEW_IMAGE_QUALITY = 0.95;
+
+function getDevicePixelRatio() {
+  if (typeof window === "undefined") return 1;
+  return window.devicePixelRatio ? Math.min(window.devicePixelRatio, MAX_DEVICE_PIXEL_RATIO) : 1;
+}
 
 /** One sortable thumbnail tile */
 function SortableThumb({
@@ -135,30 +142,48 @@ function WorkspaceClient() {
         pdfjsLib.GlobalWorkerOptions.workerSrc =
           "https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
 
+        const pixelRatio = getDevicePixelRatio();
+        const previewScale = PREVIEW_BASE_SCALE;
+
         // Only render thumbnails for sources we haven't seen yet
         for (let s = startIdx; s < sources.length; s++) {
           const src = sources[s];
           const pdf = await pdfjsLib.getDocument(src.url).promise;
-        for (let p = 1; p <= pdf.numPages; p++) {
-          if (cancelled) return;
-          const page = await pdf.getPage(p);
-          const viewport = page.getViewport({ scale: PREVIEW_SCALE });
+          for (let p = 1; p <= pdf.numPages; p++) {
+            if (cancelled) return;
+            const page = await pdf.getPage(p);
+            const viewport = page.getViewport({ scale: previewScale });
             const canvas = document.createElement("canvas");
             const ctx = canvas.getContext("2d")!;
-            canvas.width = viewport.width;
-            canvas.height = viewport.height;
-            await page.render({ canvasContext: ctx, viewport }).promise;
 
-            const previewData = canvas.toDataURL("image/png");
+            const scaledWidth = Math.floor(viewport.width * pixelRatio);
+            const scaledHeight = Math.floor(viewport.height * pixelRatio);
+            canvas.width = scaledWidth;
+            canvas.height = scaledHeight;
+
+            const renderContext = {
+              canvasContext: ctx,
+              viewport,
+              transform: pixelRatio !== 1 ? [pixelRatio, 0, 0, pixelRatio, 0, 0] : undefined,
+            };
+
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = "high";
+            await page.render(renderContext).promise;
+
+            const previewData = canvas.toDataURL("image/png", PREVIEW_IMAGE_QUALITY);
+
             let thumbData = previewData;
-            if (canvas.width > THUMB_MAX_WIDTH) {
-              const ratio = THUMB_MAX_WIDTH / canvas.width;
+            if (scaledWidth > THUMB_MAX_WIDTH) {
+              const ratio = THUMB_MAX_WIDTH / scaledWidth;
               const thumbCanvas = document.createElement("canvas");
               thumbCanvas.width = THUMB_MAX_WIDTH;
-              thumbCanvas.height = canvas.height * ratio;
+              thumbCanvas.height = Math.floor(scaledHeight * ratio);
               const thumbCtx = thumbCanvas.getContext("2d")!;
+              thumbCtx.imageSmoothingEnabled = true;
+              thumbCtx.imageSmoothingQuality = "high";
               thumbCtx.drawImage(canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
-              thumbData = thumbCanvas.toDataURL("image/png");
+              thumbData = thumbCanvas.toDataURL("image/png", PREVIEW_IMAGE_QUALITY);
             }
 
             next.push({
