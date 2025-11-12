@@ -4,6 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import Providers from "@/components/Providers";
 import SettingsMenu from "@/components/SettingsMenu";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/authOptions";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -20,7 +22,9 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const session = await getServerSession(authOptions);
+
   return (
     <html lang="en">
       <head>
@@ -43,12 +47,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/" className="inline-flex items-center gap-2" aria-label="Go to homepage">
               <Image src="/logo-wordmark.svg" alt="MergifyPDF" width={160} height={40} priority />
             </Link>
-            <SettingsMenu />
+            {session?.user ? <SettingsMenu /> : null}
           </div>
         </header>
 
         <main className="pt-4">
-          <Providers>{children}</Providers>
+          <Providers session={session}>{children}</Providers>
         </main>
       </body>
     </html>
