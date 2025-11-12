@@ -81,7 +81,7 @@ function SortableThumb({
         <img
           src={item.thumb}
           alt={`Page ${index + 1}`}
-          className="pointer-events-none w-full rounded-xl border border-slate-100 bg-white shadow-sm"
+          className="pointer-events-none w-full border border-slate-200 bg-white shadow"
         />
       </button>
     </li>
@@ -95,6 +95,7 @@ function WorkspaceClient() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activePageId, setActivePageId] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(1);
 
   const addInputRef = useRef<HTMLInputElement>(null);
   const renderedSourcesRef = useRef(0);
@@ -286,6 +287,24 @@ function WorkspaceClient() {
     };
   }
 
+  function handlePageStep(direction: 1 | -1) {
+    if (pages.length === 0) return;
+    let currentIndex = pages.findIndex((p) => p.id === activePageId);
+    if (currentIndex === -1) currentIndex = 0;
+    const nextIndex = Math.min(
+      pages.length - 1,
+      Math.max(0, currentIndex + direction)
+    );
+    const targetPage = pages[nextIndex];
+    if (targetPage) {
+      handleSelectPage(targetPage.id);
+    }
+  }
+
+  function resetZoom() {
+    setZoom(1);
+  }
+
   /** Drag end reorders the pages array */
   function handleDragEnd(e: DragEndEvent) {
     const { active, over } = e;
@@ -352,6 +371,13 @@ function WorkspaceClient() {
 
   const itemsIds = useMemo(() => pages.map((p) => p.id), [pages]);
   const downloadDisabled = busy || pages.length === 0;
+  const activePageIndex = pages.findIndex((p) => p.id === activePageId);
+  const zoomLabel = `${Math.round(zoom * 100)}%`;
+  const minZoom = 0.6;
+  const maxZoom = 2;
+  const zoomStep = 0.1;
+  const canZoomOut = zoom > minZoom + 0.001;
+  const canZoomIn = zoom < maxZoom - 0.001;
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#f3fbff,_#ffffff)] pt-16">
@@ -450,18 +476,24 @@ function WorkspaceClient() {
                         </span>
                       </div>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={page.preview}
-                        alt={`Page ${idx + 1}`}
-                        className="mx-auto w-full max-w-3xl rounded-2xl border border-slate-100 bg-white shadow"
-                      />
+                      <div
+                        className="mx-auto max-w-3xl border border-slate-300 bg-white shadow-[0_20px_50px_rgba(15,23,42,0.15)]"
+                        style={{ transform: `scale(${zoom})`, transformOrigin: "top center" }}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={page.preview}
+                          alt={`Page ${idx + 1}`}
+                          className="w-full"
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
 
               <div className="lg:w-64">
-                <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div className="rounded-2xl border border-slate-200 bg-white shadow-inner">
                   <div className="border-b border-slate-200 px-4 py-3">
                     <p className="text-sm font-semibold text-slate-800">Page order</p>
                     <p className="text-xs text-slate-500">Tap to focus or drag to reorder</p>
@@ -517,6 +549,105 @@ function WorkspaceClient() {
             {busy ? "Building..." : "Download pages"}
           </button>
         </div>
+
+        {pages.length > 0 && activePageIndex >= 0 && (
+          <div className="pointer-events-none fixed bottom-24 left-6 z-30">
+            <div className="pointer-events-auto flex items-center gap-4 rounded-full bg-[#1b2a3c] px-5 py-3 text-white shadow-xl shadow-black/25">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <span className="text-white/70">Page</span>
+                <div className="flex items-center gap-1 rounded-full bg-white/10 px-3 py-1 text-base font-semibold">
+                  <button
+                    type="button"
+                    aria-label="Previous page"
+                    className="rounded-full p-1 transition hover:bg-white/20 disabled:opacity-40 disabled:hover:bg-transparent"
+                    onClick={() => handlePageStep(-1)}
+                    disabled={activePageIndex === 0}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                      <path d="M14 6l-6 6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                  <span>{activePageIndex + 1}</span>
+                  <span className="text-sm text-white/60">/ {pages.length}</span>
+                  <button
+                    type="button"
+                    aria-label="Next page"
+                    className="rounded-full p-1 transition hover:bg-white/20 disabled:opacity-40 disabled:hover:bg-transparent"
+                    onClick={() => handlePageStep(1)}
+                    disabled={activePageIndex === pages.length - 1}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                      <path d="M10 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  aria-label="Zoom out"
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 text-lg transition hover:bg-white/20 disabled:opacity-40 disabled:hover:bg-transparent"
+                  onClick={() =>
+                    setZoom((z) =>
+                      Math.max(minZoom, Number((z - zoomStep).toFixed(2)))
+                    )
+                  }
+                  disabled={!canZoomOut}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
+                    <path d="M8 11h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    <path d="M20 20l-3-3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                </button>
+                <div className="text-xs font-semibold uppercase tracking-wide text-white/80 w-12 text-center">
+                  {zoomLabel}
+                </div>
+                <button
+                  type="button"
+                  aria-label="Zoom in"
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 text-lg transition hover:bg-white/20 disabled:opacity-40 disabled:hover:bg-transparent"
+                  onClick={() =>
+                    setZoom((z) =>
+                      Math.min(maxZoom, Number((z + zoomStep).toFixed(2)))
+                    )
+                  }
+                  disabled={!canZoomIn}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
+                    <path d="M11 8v6M8 11h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    <path d="M20 20l-3-3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  aria-label="Reset zoom"
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 transition hover:bg-white/20"
+                  onClick={resetZoom}
+                  disabled={Math.abs(zoom - 1) < 0.05}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M9 6h9v9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M5 19l13-13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                </button>
+                <span className="ml-2 flex h-9 w-9 items-center justify-center rounded-full border border-white/20 text-white/70">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M5 12c0-1.1.9-2 2-2h2v-1a2 2 0 114 0v1h1.5a2.5 2.5 0 012.5 2.5v1.2c0 1.32-.74 2.53-1.91 3.15l-2.47 1.3a4 4 0 01-1.81.44H10a4 4 0 01-4-4z"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </main>
   );
