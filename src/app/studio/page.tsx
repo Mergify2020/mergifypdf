@@ -383,45 +383,6 @@ function WorkspaceClient() {
       </h1>
 
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 pt-4 pb-32 lg:px-6 lg:pt-6">
-        <div className="rounded-3xl border border-slate-100 bg-white/90 p-6 shadow-sm shadow-slate-200/60 backdrop-blur">
-          <div className="flex flex-wrap items-start gap-4">
-            <div className="min-w-[220px] flex-1 space-y-4">
-              <p className="text-sm text-gray-600">
-                Drag thumbnails to reorder them, or upload more PDFs to keep building your stack.
-              </p>
-              <div className="flex flex-wrap gap-2 text-sm font-medium text-gray-700">
-                <span className="rounded-full bg-slate-100 px-3 py-1">Files: {sources.length}</span>
-                <span className="rounded-full bg-slate-100 px-3 py-1">Pages: {pages.length}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-sm">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
-            <div className="flex flex-wrap gap-2">
-              <button
-                className="rounded-full border border-brand/30 bg-brand/5 px-4 py-2 text-sm font-medium text-brand transition hover:bg-brand/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-                onClick={handleAddClick}
-              >
-                Add pages (upload)
-              </button>
-              <input
-                ref={addInputRef}
-                type="file"
-                accept="application/pdf"
-                multiple
-                className="hidden"
-                onChange={handleAddChange}
-              />
-            </div>
-            <p className="text-sm text-gray-600 lg:ml-auto">
-              {pages.length === 0
-                ? 'Start by uploading PDFs from the homepage; they will appear here automatically.'
-                : 'Need more content? Upload another PDF—the current order stays intact.'}
-            </p>
-          </div>
-        </div>
 
         {error && (
           <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">
@@ -533,11 +494,27 @@ function WorkspaceClient() {
 
       <div className="sticky bottom-0 border-t border-slate-200 bg-white/95 py-4 shadow-[0_-12px_30px_rgba(15,23,42,0.08)] backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 lg:flex-row lg:items-center lg:justify-between lg:px-6">
-          <p className="text-sm text-gray-600">
-            {pages.length > 0
-              ? `Ready to download ${pages.length} ${pages.length === 1 ? "page" : "pages"}?`
-              : "Add some pages to enable download."}
-          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              className="rounded-full border border-brand/30 bg-brand/5 px-5 py-2 text-sm font-semibold text-brand transition hover:bg-brand/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+              onClick={handleAddClick}
+            >
+              Add pages
+            </button>
+            <input
+              ref={addInputRef}
+              type="file"
+              accept="application/pdf"
+              multiple
+              className="hidden"
+              onChange={handleAddChange}
+            />
+            <p className="text-sm text-gray-600">
+              {pages.length > 0
+                ? `Ready to download ${pages.length} ${pages.length === 1 ? "page" : "pages"}?`
+                : "Add some pages to enable download."}
+            </p>
+          </div>
           <button
             className="rounded-full bg-[#2A7C7C] px-8 py-3 text-base font-semibold text-white shadow-lg shadow-[#1a4d4d]/30 transition hover:bg-[#256b6b] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2A7C7C] focus-visible:ring-offset-2 active:bg-[#1f5d5d] disabled:cursor-not-allowed disabled:bg-[#dfeeee] disabled:text-[#6c8c8c] disabled:shadow-none"
             onClick={handleDownload}
