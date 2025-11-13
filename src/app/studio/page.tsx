@@ -301,9 +301,6 @@ function WorkspaceClient() {
     }
   }
 
-  function resetZoom() {
-    setZoom(1);
-  }
 
   /** Drag end reorders the pages array */
   function handleDragEnd(e: DragEndEvent) {
@@ -621,29 +618,6 @@ function WorkspaceClient() {
                     <path d="M20 20l-3-3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                   </svg>
                 </button>
-                <button
-                  type="button"
-                  aria-label="Reset zoom"
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 transition hover:bg-white/20"
-                  onClick={resetZoom}
-                  disabled={Math.abs(zoom - 1) < 0.05}
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                    <path d="M9 6h9v9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M5 19l13-13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
-                </button>
-                <span className="ml-2 flex h-9 w-9 items-center justify-center rounded-full border border-white/20 text-white/70">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                    <path
-                      d="M5 12c0-1.1.9-2 2-2h2v-1a2 2 0 114 0v1h1.5a2.5 2.5 0 012.5 2.5v1.2c0 1.32-.74 2.53-1.91 3.15l-2.47 1.3a4 4 0 01-1.81.44H10a4 4 0 01-4-4z"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </span>
               </div>
             </div>
           </div>
