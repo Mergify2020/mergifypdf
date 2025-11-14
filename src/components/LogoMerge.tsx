@@ -14,7 +14,7 @@ export default function LogoMerge({ size = 80 }: { size?: number }) {
       aria-hidden
     >
       <img
-        src="/logo2.svg"
+        src="/logo3.svg"
         alt="MergifyPDF logo"
         className="block w-full h-full select-none"
         draggable={false}
