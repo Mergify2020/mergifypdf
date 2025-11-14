@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   description: "Fast, simple PDF tools — all in your browser.",
   icons: {
     icon: [
-      { url: "/logo4.svg", type: "image/svg+xml" },
+      { url: "/favicon2026.svg", type: "image/svg+xml" },
       { url: "/favicon-32-2026.png", sizes: "32x32", type: "image/png" },
       { url: "/favicon-16-2026.png", sizes: "16x16", type: "image/png" },
     ],
@@ -34,7 +34,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <meta name="theme-color" content="#ffffff" />
 
         {/* Explicit links (helps stubborn Safari/iOS) */}
-        <link rel="icon" type="image/svg+xml" href="/logo4.svg" />
+        <link rel="icon" type="image/svg+xml" href="/favicon2026.svg" />
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32-2026.png" />
         <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16-2026.png" />
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-2026.png" />
