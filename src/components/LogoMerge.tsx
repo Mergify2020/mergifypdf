@@ -10,6 +10,7 @@ export default function LogoMerge({ size = 80 }: { size?: number }) {
         width: size,
         height: size,
         animationDuration: "2s", // smooth, slower spin
+        animationDirection: "reverse",
       }}
       aria-hidden
     >
