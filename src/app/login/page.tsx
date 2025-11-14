@@ -1,42 +1,76 @@
 // src/app/login/page.tsx
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import LogoMerge from "@/components/LogoMerge";
 
+const AUTH_ERROR_MESSAGES: Record<string, string> = {
+  CredentialsSignin: "Invalid email or password.",
+  EMAIL_NOT_VERIFIED: "Please verify your email before signing in. Check your inbox for the 6-digit code.",
+  OAuthSignin: "Google sign-in failed. Please try again.",
+  OAuthCallback: "Google sign-in failed. Please try again.",
+  OAuthAccountNotLinked: "This email is already linked to a different sign-in method.",
+  AccessDenied: "Access denied. Try a different account.",
+  Configuration: "Sign-in is temporarily unavailable. Please try again later.",
+  Verification: "Verification link expired. Request a new one.",
+};
+
+function getAuthError(code?: string | null) {
+  if (!code) return null;
+  return AUTH_ERROR_MESSAGES[code] ?? "Unable to sign in. Please try again.";
+}
+
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const queryError = searchParams.get("error");
+
+  useEffect(() => {
+    if (!queryError) return;
+    setErr(getAuthError(queryError));
+    router.replace("/login", { scroll: false });
+  }, [queryError, router]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setErr(null);
 
-    const res = await signIn("credentials", {
-      redirect: false,
-      email,
-      password,
-    });
+    const normalizedEmail = email.trim().toLowerCase();
 
-    if (res?.error) {
-      setBusy(false); // only stop loading if it failed
-      if (res.error === "EMAIL_NOT_VERIFIED") {
-        setErr("Please verify your email before signing in. Check your inbox for the 6-digit code.");
-      } else {
-        setErr("Invalid email or password.");
+    try {
+      const res = await signIn("credentials", {
+        redirect: false,
+        email: normalizedEmail,
+        password,
+        callbackUrl: "/studio",
+      });
+
+      if (res?.error) {
+        setErr(getAuthError(res.error));
+        setBusy(false);
+        return;
       }
-      return;
-    }
 
-    // keep busy=true so overlay stays until this page unmounts
-    router.replace("/studio");
+      if (res?.url) {
+        window.location.assign(res.url);
+        return;
+      }
+
+      window.location.assign("/studio");
+    } catch (error) {
+      console.error(error);
+      setErr("Unable to sign in. Please try again.");
+      setBusy(false);
+    }
   }
 
   async function handleGoogleLogin() {
@@ -63,7 +97,10 @@ export default function LoginPage() {
           type="email"
           placeholder="you@example.com"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            if (err) setErr(null);
+          }}
           required
           autoComplete="email"
         />
@@ -72,7 +109,10 @@ export default function LoginPage() {
           type="password"
           placeholder="••••••••"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={(e) => {
+            setPassword(e.target.value);
+            if (err) setErr(null);
+          }}
           required
           autoComplete="current-password"
         />

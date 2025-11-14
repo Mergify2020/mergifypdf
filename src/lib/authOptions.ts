@@ -21,7 +21,8 @@ export const authOptions: NextAuthOptions = {
       async authorize(creds) {
         if (!creds?.email || !creds?.password) return null;
 
-        const user = await prisma.user.findUnique({ where: { email: creds.email } });
+        const normalizedEmail = creds.email.trim().toLowerCase();
+        const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
         if (!user?.password) return null;
 
         const ok = await bcrypt.compare(creds.password, user.password);
@@ -95,4 +96,3 @@ export const authOptions: NextAuthOptions = {
   pages: { signIn: "/login" },
   secret: process.env.NEXTAUTH_SECRET,
 };
-
