@@ -530,7 +530,6 @@ function WorkspaceClient() {
                 thickness: Math.max(1, stroke.thickness * pageWidth),
                 color: rgb(colorValue.r, colorValue.g, colorValue.b),
                 opacity: 0.4,
-                lineCap: "round",
               });
             }
           });
