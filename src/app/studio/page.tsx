@@ -600,7 +600,22 @@ function WorkspaceClient() {
   const highlightColorEntries = Object.entries(
     HIGHLIGHT_COLORS
   ) as [HighlightColorKey, string][];
-  const highlightActive = highlightMode && !highlightButtonDisabled && !deleteMode;
+  const highlightButtonOn = highlightMode && !highlightButtonDisabled;
+  const highlightTrayVisible = (highlightMode || deleteMode) && !highlightButtonDisabled;
+  const highlightActive = highlightButtonOn && !deleteMode;
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (!highlightActive) {
+      document.body.style.cursor = "";
+      return;
+    }
+    const previous = document.body.style.cursor;
+    document.body.style.cursor = `url(${HIGHLIGHT_CURSOR}) 4 24, crosshair`;
+    return () => {
+      document.body.style.cursor = previous;
+    };
+  }, [highlightActive]);
   const hasAnyHighlights = Object.values(highlights).some((list) => list && list.length > 0);
   const hasUndoHistory = highlightHistory.length > 0;
 
@@ -724,29 +739,15 @@ function WorkspaceClient() {
                       return next;
                     })
                   }
-                  aria-pressed={highlightActive}
+                  aria-pressed={highlightButtonOn}
                   className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition ${
-                    highlightActive
+                    highlightButtonOn
                       ? "border-transparent bg-[#024d7c] text-white shadow-lg shadow-[#012a44]/30"
                       : "border-slate-200 text-slate-700 hover:border-slate-300 disabled:hover:border-slate-200"
                   } disabled:cursor-not-allowed disabled:opacity-50`}
                 >
                   <Highlighter className="h-4 w-4" />
                   Highlight
-                </button>
-                <button
-                  type="button"
-                  onClick={handleToggleDeleteMode}
-                  disabled={!hasAnyHighlights && !deleteMode}
-                  aria-pressed={deleteMode}
-                  className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition ${
-                    deleteMode
-                      ? "border-transparent bg-slate-900 text-white shadow-lg shadow-slate-900/25"
-                      : "border-slate-200 text-slate-700 hover:border-slate-300 disabled:hover:border-slate-200"
-                  } disabled:cursor-not-allowed disabled:opacity-50`}
-                >
-                  <Eraser className="h-4 w-4" />
-                  Select highlights
                 </button>
                 <button
                   type="button"
@@ -770,12 +771,33 @@ function WorkspaceClient() {
             </div>
             <div
               className={`overflow-hidden rounded-2xl border border-slate-100/80 bg-slate-50/80 px-4 transition-all duration-300 ease-out ${
-                highlightActive
+                highlightTrayVisible
                   ? "pointer-events-auto max-h-40 translate-x-0 opacity-100 py-3"
                   : "pointer-events-none max-h-0 -translate-x-4 opacity-0 py-0"
               }`}
             >
               <div className="flex flex-wrap items-center gap-4 text-xs font-semibold text-slate-700">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleToggleDeleteMode}
+                    disabled={!hasAnyHighlights && !deleteMode}
+                    aria-pressed={deleteMode}
+                    className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold transition ${
+                      deleteMode
+                        ? "border-transparent bg-slate-900 text-white shadow-lg shadow-slate-900/25"
+                        : "border-slate-200 text-slate-700 hover:border-slate-300 disabled:hover:border-slate-200"
+                    } disabled:cursor-not-allowed disabled:opacity-50`}
+                  >
+                    <Eraser className="h-3.5 w-3.5" />
+                    Select highlights
+                  </button>
+                  {deleteMode ? (
+                    <span className="text-[0.6rem] font-semibold uppercase tracking-wide text-slate-500">
+                      Tap a highlight to remove it
+                    </span>
+                  ) : null}
+                </div>
                 <div className="flex items-center gap-2">
                   {highlightColorEntries.map(([key, value]) => (
                     <button
