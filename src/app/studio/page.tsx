@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import type { MouseEvent as ReactMouseEvent } from "react";
+import type { CSSProperties, MouseEvent as ReactMouseEvent } from "react";
 import dynamic from "next/dynamic";
-import { PDFDocument, rgb } from "pdf-lib";
-import { Highlighter } from "lucide-react";
+import { PDFDocument, rgb, LineCap } from "pdf-lib";
+import { Highlighter, Minus, Plus, Trash2, Undo2 } from "lucide-react";
 import {
   DndContext,
   PointerSensor,
@@ -29,13 +29,31 @@ type PageItem = {
   thumb: string; // small preview
   preview: string; // large preview
 };
-type HighlightRect = {
+type Point = { x: number; y: number };
+type HighlightStroke = {
   id: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+  points: Point[];
+  color: string;
+  thickness: number;
 };
+type DraftHighlight = {
+  pageId: string;
+  points: Point[];
+  color: string;
+  thickness: number;
+};
+
+const HIGHLIGHT_COLORS = {
+  yellow: "#fff266",
+  green: "#b7ff9a",
+  blue: "#9ad9ff",
+  pink: "#ffc5f1",
+} as const;
+
+type HighlightColorKey = keyof typeof HIGHLIGHT_COLORS;
+
+const HIGHLIGHT_CURSOR =
+  "data:image/svg+xml;utf8,%3Csvg width='32' height='32' viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 24 L24 2 L30 8 L10 28 L3 29 Z' fill='%23024d7c'/%3E%3Crect x='5' y='25' width='10' height='3' fill='%23ffd43b'/%3E%3C/svg%3E";
 const PREVIEW_BASE_SCALE = 1.35;
 const MAX_DEVICE_PIXEL_RATIO = 2.5;
 const THUMB_MAX_WIDTH = 200;
@@ -48,6 +66,22 @@ function getDevicePixelRatio() {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
+}
+
+function hexToRgb(hex: string) {
+  const value = hex.replace("#", "");
+  if (value.length !== 6) return null;
+  const r = parseInt(value.slice(0, 2), 16) / 255;
+  const g = parseInt(value.slice(2, 4), 16) / 255;
+  const b = parseInt(value.slice(4, 6), 16) / 255;
+  if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return null;
+  return { r, g, b };
+}
+
+function pointDistance(a: Point, b: Point) {
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  return Math.sqrt(dx * dx + dy * dy);
 }
 
 /** One sortable thumbnail tile */
@@ -110,19 +144,20 @@ function WorkspaceClient() {
   const [activePageId, setActivePageId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const [highlightMode, setHighlightMode] = useState(false);
-  const [highlights, setHighlights] = useState<Record<string, HighlightRect[]>>({});
-  const [draftHighlight, setDraftHighlight] = useState<{
-    pageId: string;
-    startX: number;
-    startY: number;
-    currentX: number;
-    currentY: number;
-  } | null>(null);
+  const [highlightColor, setHighlightColor] = useState<HighlightColorKey>("yellow");
+  const [highlightThickness, setHighlightThickness] = useState(14);
+  const [highlights, setHighlights] = useState<Record<string, HighlightStroke[]>>({});
+  const [highlightHistory, setHighlightHistory] = useState<
+    { pageId: string; highlightId: string }[]
+  >([]);
+  const [draftHighlight, setDraftHighlight] = useState<DraftHighlight | null>(null);
 
   const addInputRef = useRef<HTMLInputElement>(null);
   const renderedSourcesRef = useRef(0);
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const previewNodeMap = useRef<Map<string, HTMLDivElement>>(new Map());
+  const MIN_HIGHLIGHT_THICKNESS = 6;
+  const MAX_HIGHLIGHT_THICKNESS = 32;
 
   // Better drag in grids
   const sensors = useSensors(useSensor(PointerSensor));
@@ -251,7 +286,7 @@ function WorkspaceClient() {
   useEffect(() => {
     setHighlights((prev) => {
       const allowed = new Set(pages.map((p) => p.id));
-      const next: Record<string, HighlightRect[]> = {};
+      const next: Record<string, HighlightStroke[]> = {};
       allowed.forEach((id) => {
         if (prev[id]) next[id] = prev[id];
       });
@@ -260,6 +295,11 @@ function WorkspaceClient() {
       }
       return next;
     });
+  }, [pages]);
+
+  useEffect(() => {
+    const allowed = new Set(pages.map((p) => p.id));
+    setHighlightHistory((prev) => prev.filter((entry) => allowed.has(entry.pageId)));
   }, [pages]);
 
   useEffect(() => {
@@ -324,43 +364,39 @@ function WorkspaceClient() {
     };
   }
 
-  const finalizeDraftHighlight = useCallback(
-    (cancel = false) => {
-      setDraftHighlight((prev) => {
-        if (!prev) return null;
-        if (!cancel) {
-          const width = Math.abs(prev.currentX - prev.startX);
-          const height = Math.abs(prev.currentY - prev.startY);
-          if (width > 0.01 && height > 0.01) {
-            const x = Math.min(prev.startX, prev.currentX);
-            const y = Math.min(prev.startY, prev.currentY);
-            setHighlights((existing) => {
-              const nextList = existing[prev.pageId] ? [...existing[prev.pageId]] : [];
-              nextList.push({
-                id: crypto.randomUUID(),
-                x,
-                y,
-                width,
-                height,
-              });
-              return { ...existing, [prev.pageId]: nextList };
-            });
-          }
-        }
-        return null;
+  const commitDraftHighlight = useCallback(
+    (stroke: DraftHighlight | null, cancel?: boolean) => {
+      if (!stroke || cancel || stroke.points.length < 2) {
+        return;
+      }
+      const highlightId = crypto.randomUUID();
+      setHighlights((existing) => {
+        const nextList = existing[stroke.pageId] ? [...existing[stroke.pageId]] : [];
+        nextList.push({
+          id: highlightId,
+          points: stroke.points,
+          color: stroke.color,
+          thickness: stroke.thickness,
+        });
+        return { ...existing, [stroke.pageId]: nextList };
       });
+      setHighlightHistory((prev) => [...prev, { pageId: stroke.pageId, highlightId }]);
     },
-    [setHighlights]
+    []
   );
 
   useEffect(() => {
     if (!draftHighlight || typeof window === "undefined") return;
     function handleWindowUp() {
-      finalizeDraftHighlight();
+      setDraftHighlight((current) => {
+        if (!current) return null;
+        commitDraftHighlight(current);
+        return null;
+      });
     }
     window.addEventListener("mouseup", handleWindowUp);
     return () => window.removeEventListener("mouseup", handleWindowUp);
-  }, [draftHighlight, finalizeDraftHighlight]);
+  }, [draftHighlight, commitDraftHighlight]);
 
   useEffect(() => {
     if (!highlightMode) {
@@ -369,13 +405,13 @@ function WorkspaceClient() {
   }, [highlightMode]);
 
   function getPointerPoint(event: ReactMouseEvent<HTMLDivElement>) {
-    const target = event.currentTarget;
-    if (!target) return null;
-    const rect = target.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return null;
-    const x = clamp((event.clientX - rect.left) / rect.width, 0, 1);
-    const y = clamp((event.clientY - rect.top) / rect.height, 0, 1);
-    return { x, y };
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+    return {
+      x: clamp((event.clientX - rect.left) / rect.width, 0, 1),
+      y: clamp((event.clientY - rect.top) / rect.height, 0, 1),
+      rectWidth: rect.width,
+    };
   }
 
   function handleHighlightPointerDown(pageId: string, event: ReactMouseEvent<HTMLDivElement>) {
@@ -384,10 +420,9 @@ function WorkspaceClient() {
     if (!point) return;
     setDraftHighlight({
       pageId,
-      startX: point.x,
-      startY: point.y,
-      currentX: point.x,
-      currentY: point.y,
+      points: [{ x: point.x, y: point.y }],
+      color: HIGHLIGHT_COLORS[highlightColor],
+      thickness: highlightThickness / point.rectWidth,
     });
     event.preventDefault();
   }
@@ -398,31 +433,29 @@ function WorkspaceClient() {
     if (!point) return;
     setDraftHighlight((prev) => {
       if (!prev || prev.pageId !== pageId) return prev;
-      return { ...prev, currentX: point.x, currentY: point.y };
+      const nextPoints = [...prev.points];
+      const last = nextPoints[nextPoints.length - 1];
+      if (!last || pointDistance(last, { x: point.x, y: point.y }) > 0.004) {
+        nextPoints.push({ x: point.x, y: point.y });
+      }
+      return {
+        ...prev,
+        points: nextPoints,
+        thickness: highlightThickness / point.rectWidth,
+      };
     });
     if (draftHighlight?.pageId === pageId) {
       event.preventDefault();
     }
   }
 
-  function handleHighlightPointerUp(
-    pageId: string,
-    event?: ReactMouseEvent<HTMLDivElement>,
-    cancel?: boolean
-  ) {
+  function handleHighlightPointerUp(pageId: string) {
     if (!highlightMode) return;
-    if (!draftHighlight || draftHighlight.pageId !== pageId) return;
-    if (event) {
-      const point = getPointerPoint(event);
-      if (point) {
-        setDraftHighlight((prev) =>
-          prev && prev.pageId === pageId
-            ? { ...prev, currentX: point.x, currentY: point.y }
-            : prev
-        );
-      }
-    }
-    finalizeDraftHighlight(cancel);
+    setDraftHighlight((prev) => {
+      if (!prev || prev.pageId !== pageId) return prev;
+      commitDraftHighlight(prev);
+      return null;
+    });
   }
 
   function handlePageStep(direction: 1 | -1) {
@@ -479,20 +512,27 @@ function WorkspaceClient() {
         const pageHighlights = highlights[p.id] ?? [];
         if (pageHighlights.length > 0) {
           const { width: pageWidth, height: pageHeight } = copied.getSize();
-          pageHighlights.forEach((mark) => {
-            const highlightWidth = mark.width * pageWidth;
-            const highlightHeight = mark.height * pageHeight;
-            const highlightX = mark.x * pageWidth;
-            const highlightY = pageHeight - (mark.y * pageHeight + highlightHeight);
-            copied.drawRectangle({
-              x: highlightX,
-              y: highlightY,
-              width: highlightWidth,
-              height: highlightHeight,
-              color: rgb(1, 1, 0),
-              opacity: 0.28,
-              borderOpacity: 0,
-            });
+          pageHighlights.forEach((stroke) => {
+            const colorValue = hexToRgb(stroke.color);
+            if (!colorValue) return;
+            for (let i = 1; i < stroke.points.length; i++) {
+              const start = stroke.points[i - 1];
+              const end = stroke.points[i];
+              copied.drawLine({
+                start: {
+                  x: start.x * pageWidth,
+                  y: pageHeight - start.y * pageHeight,
+                },
+                end: {
+                  x: end.x * pageWidth,
+                  y: pageHeight - end.y * pageHeight,
+                },
+                thickness: Math.max(1, stroke.thickness * pageWidth),
+                color: rgb(colorValue.r, colorValue.g, colorValue.b),
+                opacity: 0.4,
+                lineCap: LineCap.Round,
+              });
+            }
           });
         }
         out.addPage(copied);
@@ -534,6 +574,42 @@ function WorkspaceClient() {
   const canZoomIn = zoom < maxZoom - 0.001;
   const highlightButtonDisabled = pages.length === 0 || loading;
   const highlightActive = highlightMode && !highlightButtonDisabled;
+  const highlightColorEntries = Object.entries(
+    HIGHLIGHT_COLORS
+  ) as [HighlightColorKey, string][];
+  const hasHighlights =
+    highlightHistory.length > 0 ||
+    Object.values(highlights).some((list) => list && list.length > 0);
+
+  function adjustHighlightThickness(delta: number) {
+    setHighlightThickness((prev) => clamp(prev + delta, MIN_HIGHLIGHT_THICKNESS, MAX_HIGHLIGHT_THICKNESS));
+  }
+
+  function handleUndoHighlight() {
+    setHighlightHistory((prev) => {
+      if (prev.length === 0) return prev;
+      const last = prev[prev.length - 1];
+      setHighlights((map) => {
+        const list = map[last.pageId];
+        if (!list) return map;
+        const filtered = list.filter((stroke) => stroke.id !== last.highlightId);
+        const nextMap = { ...map };
+        if (filtered.length > 0) {
+          nextMap[last.pageId] = filtered;
+        } else {
+          delete nextMap[last.pageId];
+        }
+        return nextMap;
+      });
+      return prev.slice(0, -1);
+    });
+  }
+
+  function handleClearHighlights() {
+    setDraftHighlight(null);
+    setHighlights({});
+    setHighlightHistory([]);
+  }
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#f3fbff,_#ffffff)] pt-16">
@@ -545,7 +621,7 @@ function WorkspaceClient() {
               {highlightActive ? "Highlight mode is active — drag across a page to mark text." : "Choose a tool to start marking up your document."}
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
             <button
               type="button"
               disabled={highlightButtonDisabled}
@@ -560,6 +636,65 @@ function WorkspaceClient() {
               <Highlighter className="h-4 w-4" />
               Highlight
             </button>
+            {highlightActive ? (
+              <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-600">
+                <div className="flex items-center gap-2">
+                  {highlightColorEntries.map(([key, value]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setHighlightColor(key)}
+                      className={`h-7 w-7 rounded-full border transition ${
+                        highlightColor === key
+                          ? "border-[#024d7c] ring-2 ring-[#024d7c]/30"
+                          : "border-white/30 hover:border-slate-300"
+                      }`}
+                      style={{ backgroundColor: value }}
+                      aria-label={`Use ${key} highlighter`}
+                    />
+                  ))}
+                </div>
+                <div className="flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[0.65rem] font-semibold uppercase tracking-wide text-slate-600">
+                  <button
+                    type="button"
+                    onClick={() => adjustHighlightThickness(-2)}
+                    disabled={highlightThickness <= MIN_HIGHLIGHT_THICKNESS}
+                    className="rounded-full p-1 transition hover:bg-white disabled:opacity-40"
+                  >
+                    <Minus className="h-3 w-3" />
+                  </button>
+                  <span>{Math.round(highlightThickness)} px</span>
+                  <button
+                    type="button"
+                    onClick={() => adjustHighlightThickness(2)}
+                    disabled={highlightThickness >= MAX_HIGHLIGHT_THICKNESS}
+                    className="rounded-full p-1 transition hover:bg-white disabled:opacity-40"
+                  >
+                    <Plus className="h-3 w-3" />
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleUndoHighlight}
+                    disabled={!hasHighlights}
+                    className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-wide text-slate-600 transition hover:border-slate-300 disabled:opacity-40"
+                  >
+                    <Undo2 className="h-3 w-3" />
+                    Undo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleClearHighlights}
+                    disabled={!hasHighlights}
+                    className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-wide text-slate-600 transition hover:border-slate-300 disabled:opacity-40"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    Clear
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
@@ -625,51 +760,57 @@ function WorkspaceClient() {
                           style={{ transform: `scale(${zoom})`, transformOrigin: "top center" }}
                         >
                           <div
-                            className={`relative ${highlightActive ? "cursor-crosshair" : ""}`}
+                            className="relative"
+                            style={
+                              highlightActive
+                                ? ({
+                                    cursor: `url(${HIGHLIGHT_CURSOR}) 4 24, crosshair`,
+                                  } as CSSProperties)
+                                : undefined
+                            }
                             onMouseDown={(event) => handleHighlightPointerDown(page.id, event)}
                             onMouseMove={(event) => handleHighlightPointerMove(page.id, event)}
-                            onMouseUp={(event) => handleHighlightPointerUp(page.id, event)}
-                            onMouseLeave={() => handleHighlightPointerUp(page.id, undefined, true)}
+                            onMouseUp={() => handleHighlightPointerUp(page.id)}
                           >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={page.preview} alt={`Page ${idx + 1}`} className="w-full" />
-                            <div className="pointer-events-none absolute inset-0">
-                              {pageHighlights.map((mark) => (
-                                <span
-                                  key={mark.id}
-                                  aria-hidden
-                                  className="absolute rounded-md bg-[#fff3a0]/70 shadow-[0_0_0_1px_rgba(255,255,255,0.6)]"
-                                  style={{
-                                    left: `${mark.x * 100}%`,
-                                    top: `${mark.y * 100}%`,
-                                    width: `${mark.width * 100}%`,
-                                    height: `${mark.height * 100}%`,
-                                  }}
-                                />
-                              ))}
-                              {draftHighlight?.pageId === page.id && (
-                                <span
-                                  aria-hidden
-                                  className="absolute rounded-md border border-dashed border-[#024d7c] bg-[#024d7c]/10"
-                                  style={{
-                                    left: `${Math.min(
-                                      draftHighlight.startX,
-                                      draftHighlight.currentX
-                                    ) * 100}%`,
-                                    top: `${Math.min(
-                                      draftHighlight.startY,
-                                      draftHighlight.currentY
-                                    ) * 100}%`,
-                                    width: `${Math.abs(
-                                      draftHighlight.currentX - draftHighlight.startX
-                                    ) * 100}%`,
-                                    height: `${Math.abs(
-                                      draftHighlight.currentY - draftHighlight.startY
-                                    ) * 100}%`,
-                                  }}
-                                />
+                            <svg
+                              className="pointer-events-none absolute inset-0 h-full w-full"
+                              viewBox="0 0 1000 1000"
+                              preserveAspectRatio="none"
+                            >
+                              {pageHighlights.map((stroke) =>
+                                stroke.points.length > 1 ? (
+                                  <polyline
+                                    key={stroke.id}
+                                    points={stroke.points
+                                      .map((pt) => `${pt.x * 1000},${pt.y * 1000}`)
+                                      .join(" ")}
+                                    fill="none"
+                                    stroke={stroke.color}
+                                    strokeWidth={Math.max(1, stroke.thickness * 1000)}
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeOpacity={0.4}
+                                  />
+                                ) : null
                               )}
-                            </div>
+                              {draftHighlight?.pageId === page.id &&
+                              draftHighlight.points.length > 1 ? (
+                                <polyline
+                                  aria-hidden
+                                  points={draftHighlight.points
+                                    .map((pt) => `${pt.x * 1000},${pt.y * 1000}`)
+                                    .join(" ")}
+                                  fill="none"
+                                  stroke={draftHighlight.color}
+                                  strokeWidth={Math.max(1, draftHighlight.thickness * 1000)}
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeOpacity={0.25}
+                                />
+                              ) : null}
+                            </svg>
                           </div>
                         </div>
                       </div>
