@@ -161,7 +161,7 @@ function WorkspaceClient() {
       try {
         // Import pdf.js in the browser only
         const pdfjsLib = await import("pdfjs-dist");
-        // @ts-ignore
+        // @ts-expect-error - pdfjs types don't expose GlobalWorkerOptions
         pdfjsLib.GlobalWorkerOptions.workerSrc =
           "https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
 
@@ -367,29 +367,37 @@ function WorkspaceClient() {
     }
   }, [highlightMode]);
 
-  function handleHighlightPointerDown(pageId: string, event: ReactMouseEvent<HTMLDivElement>) {
-    if (!highlightMode) return;
-    const rect = event.currentTarget.getBoundingClientRect();
+  function getPointerPoint(event: ReactMouseEvent<HTMLDivElement>) {
+    const target = event.currentTarget;
+    if (!target) return null;
+    const rect = target.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return null;
     const x = clamp((event.clientX - rect.left) / rect.width, 0, 1);
     const y = clamp((event.clientY - rect.top) / rect.height, 0, 1);
+    return { x, y };
+  }
+
+  function handleHighlightPointerDown(pageId: string, event: ReactMouseEvent<HTMLDivElement>) {
+    if (!highlightMode) return;
+    const point = getPointerPoint(event);
+    if (!point) return;
     setDraftHighlight({
       pageId,
-      startX: x,
-      startY: y,
-      currentX: x,
-      currentY: y,
+      startX: point.x,
+      startY: point.y,
+      currentX: point.x,
+      currentY: point.y,
     });
     event.preventDefault();
   }
 
   function handleHighlightPointerMove(pageId: string, event: ReactMouseEvent<HTMLDivElement>) {
     if (!highlightMode) return;
+    const point = getPointerPoint(event);
+    if (!point) return;
     setDraftHighlight((prev) => {
       if (!prev || prev.pageId !== pageId) return prev;
-      const rect = event.currentTarget.getBoundingClientRect();
-      const x = clamp((event.clientX - rect.left) / rect.width, 0, 1);
-      const y = clamp((event.clientY - rect.top) / rect.height, 0, 1);
-      return { ...prev, currentX: x, currentY: y };
+      return { ...prev, currentX: point.x, currentY: point.y };
     });
     if (draftHighlight?.pageId === pageId) {
       event.preventDefault();
@@ -404,7 +412,14 @@ function WorkspaceClient() {
     if (!highlightMode) return;
     if (!draftHighlight || draftHighlight.pageId !== pageId) return;
     if (event) {
-      handleHighlightPointerMove(pageId, event);
+      const point = getPointerPoint(event);
+      if (point) {
+        setDraftHighlight((prev) =>
+          prev && prev.pageId === pageId
+            ? { ...prev, currentX: point.x, currentY: point.y }
+            : prev
+        );
+      }
     }
     finalizeDraftHighlight(cancel);
   }
@@ -613,6 +628,7 @@ function WorkspaceClient() {
                             onMouseDown={(event) => handleHighlightPointerDown(page.id, event)}
                             onMouseMove={(event) => handleHighlightPointerMove(page.id, event)}
                             onMouseUp={(event) => handleHighlightPointerUp(page.id, event)}
+                            onMouseLeave={() => handleHighlightPointerUp(page.id, undefined, true)}
                           >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={page.preview} alt={`Page ${idx + 1}`} className="w-full" />
