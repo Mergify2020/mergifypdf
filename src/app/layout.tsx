@@ -54,6 +54,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <main className="pt-4">
           <Providers session={session}>{children}</Providers>
         </main>
+
+        <footer className="mt-12 border-t border-slate-200 bg-white py-10">
+          <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 text-center text-sm text-gray-600 md:flex-row md:items-center md:justify-between md:text-left">
+            <div>
+              <p className="font-semibold text-gray-900">Contact us</p>
+              <p>Email: <span className="text-gray-400">hello@example.com</span></p>
+              <p>Phone: <span className="text-gray-400">(000) 000-0000</span></p>
+            </div>
+            <p className="text-gray-500">© 2025 MergifyPDF. All rights reserved.</p>
+          </div>
+        </footer>
       </body>
     </html>
   );
