@@ -55,14 +55,46 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <Providers session={session}>{children}</Providers>
         </main>
 
-        <footer className="mt-12 border-t border-slate-200 bg-white py-10">
-          <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 text-center text-sm text-gray-600 md:flex-row md:items-center md:justify-between md:text-left">
+        <footer className="mt-12 bg-[#0a1523] py-12 text-gray-300">
+          <div className="mx-auto grid max-w-6xl gap-8 px-6 sm:grid-cols-2 lg:grid-cols-4">
             <div>
-              <p className="font-semibold text-gray-900">Contact us</p>
-              <p>Email: <span className="text-gray-400">hello@example.com</span></p>
-              <p>Phone: <span className="text-gray-400">(000) 000-0000</span></p>
+              <p className="text-sm uppercase tracking-[0.2em] text-white/60">Company</p>
+              <p className="mt-3 text-base font-semibold text-white">MergifyPDF</p>
+              <p className="mt-2 text-sm text-gray-400">
+                Questions? <span className="text-gray-500">hello@example.com</span>
+              </p>
+              <p className="text-sm text-gray-400">
+                Call us: <span className="text-gray-500">(000) 000-0000</span>
+              </p>
             </div>
-            <p className="text-gray-500">© 2025 MergifyPDF. All rights reserved.</p>
+            <div>
+              <p className="text-sm uppercase tracking-[0.2em] text-white/60">Product</p>
+              <ul className="mt-3 space-y-2 text-sm">
+                <li>Merge PDFs</li>
+                <li>Edit & Highlight</li>
+                <li>Sign Documents</li>
+              </ul>
+            </div>
+            <div>
+              <p className="text-sm uppercase tracking-[0.2em] text-white/60">Resources</p>
+              <ul className="mt-3 space-y-2 text-sm">
+                <li>Pricing</li>
+                <li>Help center</li>
+                <li>Roadmap</li>
+              </ul>
+            </div>
+            <div>
+              <p className="text-sm uppercase tracking-[0.2em] text-white/60">Follow us</p>
+              <ul className="mt-3 space-y-2 text-sm">
+                <li>Twitter</li>
+                <li>LinkedIn</li>
+                <li>Product Hunt</li>
+              </ul>
+            </div>
+          </div>
+          <div className="mx-auto mt-10 flex max-w-6xl flex-col items-center justify-between gap-4 border-t border-white/10 px-6 pt-6 text-xs text-gray-500 sm:flex-row">
+            <p>© 2025 MergifyPDF. All rights reserved.</p>
+            <p>Made with care for modern document workflows.</p>
           </div>
         </footer>
       </body>
