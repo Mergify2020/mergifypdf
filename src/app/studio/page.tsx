@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from "react";
 import dynamic from "next/dynamic";
-import { PDFDocument, rgb, LineCap } from "pdf-lib";
+import { PDFDocument, rgb } from "pdf-lib";
 import { Highlighter, Minus, Plus, Trash2, Undo2 } from "lucide-react";
 import {
   DndContext,
@@ -530,7 +530,7 @@ function WorkspaceClient() {
                 thickness: Math.max(1, stroke.thickness * pageWidth),
                 color: rgb(colorValue.r, colorValue.g, colorValue.b),
                 opacity: 0.4,
-                lineCap: LineCap.Round,
+                lineCap: "round",
               });
             }
           });
