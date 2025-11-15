@@ -58,11 +58,11 @@ export default function UploadCta({ usedToday }: UploadCtaProps) {
       >
         {alreadyUsed ? "Sign up to keep going" : busy ? "Opening..." : "Upload PDF"}
       </button>
-      <p className="text-sm text-gray-500">
-        {alreadyUsed
-          ? "You have used today's free upload. Create an account for unlimited access."
-          : "Your first upload each day is free. No account required."}
-      </p>
+      {alreadyUsed && (
+        <p className="text-sm text-gray-500">
+          You have used today's free upload. Create an account for unlimited access.
+        </p>
+      )}
       {error && <p className="text-sm text-red-600">{error}</p>}
     </div>
   );
