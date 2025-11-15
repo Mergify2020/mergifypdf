@@ -42,21 +42,20 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
 
       <body className="min-h-screen bg-white text-gray-900">
-        <header className="sticky top-0 z-50 w-full border-b border-slate-100 bg-white/95 backdrop-blur">
-          <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 lg:px-6">
-            <Link href="/" className="inline-flex items-center gap-2" aria-label="Go to homepage">
-              <Image src="/logo-wordmark2.svg" alt="MergifyPDF" width={192} height={48} priority />
-            </Link>
-            {session?.user ? <WorkspaceSettingsMenu /> : null}
-          </div>
-        </header>
+        <Providers session={session}>
+          <header className="sticky top-0 z-50 w-full border-b border-slate-100 bg-white/95 backdrop-blur">
+            <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 lg:px-6">
+              <Link href="/" className="inline-flex items-center gap-2" aria-label="Go to homepage">
+                <Image src="/logo-wordmark2.svg" alt="MergifyPDF" width={192} height={48} priority />
+              </Link>
+              {session?.user ? <WorkspaceSettingsMenu /> : null}
+            </div>
+          </header>
 
-        <main className="pt-4">
-          <Providers session={session}>{children}</Providers>
-        </main>
+          <main className="pt-4">{children}</main>
 
-        <footer className="mt-12 bg-[#0a1523] py-12 text-gray-300">
-          <div className="mx-auto grid max-w-6xl gap-8 px-6 sm:grid-cols-2 lg:grid-cols-4">
+          <footer className="mt-12 bg-[#0a1523] py-12 text-gray-300">
+            <div className="mx-auto grid max-w-6xl gap-8 px-6 sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <p className="text-sm uppercase tracking-[0.2em] text-white/60">Company</p>
               <p className="mt-3 text-base font-semibold text-white">MergifyPDF</p>
@@ -92,11 +91,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               </ul>
             </div>
           </div>
-          <div className="mx-auto mt-10 flex max-w-6xl flex-col items-center justify-between gap-4 border-t border-white/10 px-6 pt-6 text-xs text-gray-500 sm:flex-row">
-            <p>© 2025 MergifyPDF. All rights reserved.</p>
-            <p>Made with care for modern document workflows.</p>
-          </div>
-        </footer>
+            <div className="mx-auto mt-10 flex max-w-6xl flex-col items-center justify-between gap-4 border-t border-white/10 px-6 pt-6 text-xs text-gray-500 sm:flex-row">
+              <p>© 2025 MergifyPDF. All rights reserved.</p>
+              <p>Made with care for modern document workflows.</p>
+            </div>
+          </footer>
+        </Providers>
       </body>
     </html>
   );
