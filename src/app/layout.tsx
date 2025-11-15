@@ -45,7 +45,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <header className="sticky top-0 z-50 w-full border-b border-slate-100 bg-white/95 backdrop-blur">
           <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 lg:px-6">
             <Link href="/" className="inline-flex items-center gap-2" aria-label="Go to homepage">
-              <Image src="/logo-wordmark.svg" alt="MergifyPDF" width={160} height={40} priority />
+              <Image src="/logo-wordmark2.svg" alt="MergifyPDF" width={160} height={40} priority />
             </Link>
             {session?.user ? <WorkspaceSettingsMenu /> : null}
           </div>
