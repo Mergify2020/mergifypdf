@@ -61,11 +61,11 @@ export default async function Home() {
         {features.map(({ title, description, icon: Icon }) => (
           <div
             key={title}
-            className="rounded-2xl border border-black/10 bg-white/40 p-6 text-left shadow-[inset_0_0_0_1px_rgba(0,0,0,0.06)]"
+            className="flex h-full flex-col items-center justify-center gap-3 rounded-2xl border border-black/10 bg-white/40 p-6 text-center shadow-[inset_0_0_0_1px_rgba(0,0,0,0.06)] transition-all hover:-translate-y-1 hover:border-[#024d7c]/60 hover:shadow-xl"
           >
-            <Icon className="h-8 w-8 text-[#024d7c]" aria-hidden />
-            <h3 className="mt-4 text-lg font-semibold text-gray-900">{title}</h3>
-            <p className="mt-2 text-sm text-gray-600">{description}</p>
+            <Icon className="h-[2.4rem] w-[2.4rem] text-[#024d7c]" aria-hidden />
+            <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+            <p className="text-sm text-gray-600">{description}</p>
           </div>
         ))}
       </div>
