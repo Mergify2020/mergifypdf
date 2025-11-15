@@ -16,7 +16,7 @@ export function SignupCodeEmail({ code }: Props) {
           display: "inline-block",
           padding: "12px 20px",
           borderRadius: "10px",
-          background: "#2A7C7C",
+          background: "#024d7c",
           color: "#ffffff",
           fontSize: "24px",
           letterSpacing: "6px",

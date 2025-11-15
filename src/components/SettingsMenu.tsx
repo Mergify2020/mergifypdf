@@ -57,7 +57,7 @@ export default function SettingsMenu() {
       <button
         type="button"
         onClick={handleToggle}
-        className="rounded-lg border px-3 py-1 text-sm font-medium hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#2A7C7C]"
+        className="rounded-lg border px-3 py-1 text-sm font-medium hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#024d7c]"
         aria-haspopup="menu"
         aria-expanded={open}
       >
@@ -70,7 +70,7 @@ export default function SettingsMenu() {
             <button
               type="button"
               onClick={handleAccount}
-              className="rounded-md px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#2A7C7C]"
+              className="rounded-md px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#024d7c]"
             >
               Account
             </button>

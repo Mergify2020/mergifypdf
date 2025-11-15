@@ -113,7 +113,7 @@ export async function sendSignupCodeEmail({ to, code }: SignupArgs) {
           <div style="font-family: Inter, Arial, sans-serif; line-height:1.6;">
             <h2 style="margin:0 0 12px;">Verify your MergifyPDF account</h2>
             <p>Use the 6-digit code below to finish creating your account:</p>
-            <p style="display:inline-block;padding:12px 20px;border-radius:10px;background:#2A7C7C;color:#fff;font-size:24px;letter-spacing:6px;font-weight:600;">
+            <p style="display:inline-block;padding:12px 20px;border-radius:10px;background:#024d7c;color:#fff;font-size:24px;letter-spacing:6px;font-weight:600;">
               ${code}
             </p>
             <p style="margin-top:18px;color:#4B5563;">

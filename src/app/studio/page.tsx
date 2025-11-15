@@ -516,7 +516,7 @@ function WorkspaceClient() {
             </p>
           </div>
           <button
-            className="rounded-full bg-[#2A7C7C] px-8 py-3 text-base font-semibold text-white shadow-lg shadow-[#1a4d4d]/30 transition hover:bg-[#256b6b] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2A7C7C] focus-visible:ring-offset-2 active:bg-[#1f5d5d] disabled:cursor-not-allowed disabled:bg-[#dfeeee] disabled:text-[#6c8c8c] disabled:shadow-none"
+            className="rounded-full bg-[#024d7c] px-8 py-3 text-base font-semibold text-white shadow-lg shadow-[#012a44]/30 transition hover:bg-[#013d63] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c] focus-visible:ring-offset-2 active:bg-[#012f4e] disabled:cursor-not-allowed disabled:bg-[#d1e3f2] disabled:text-[#5f7085] disabled:shadow-none"
             onClick={handleDownload}
             disabled={downloadDisabled}
           >

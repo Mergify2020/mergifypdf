@@ -93,7 +93,7 @@ export default function LoginPage() {
 
       <form onSubmit={onSubmit} className="mt-6 space-y-3">
         <input
-          className="w-full rounded border p-2 outline-none focus-visible:ring-2 focus-visible:ring-[#2A7C7C] focus-visible:border-[#2A7C7C]"
+          className="w-full rounded border p-2 outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c] focus-visible:border-[#024d7c]"
           type="email"
           placeholder="you@example.com"
           value={email}
@@ -105,7 +105,7 @@ export default function LoginPage() {
           autoComplete="email"
         />
         <input
-          className="w-full rounded border p-2 outline-none focus-visible:ring-2 focus-visible:ring-[#2A7C7C] focus-visible:border-[#2A7C7C]"
+          className="w-full rounded border p-2 outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c] focus-visible:border-[#024d7c]"
           type="password"
           placeholder="••••••••"
           value={password}
@@ -123,9 +123,9 @@ export default function LoginPage() {
           type="submit"
           disabled={busy}
           aria-disabled={busy}
-          className="w-full rounded bg-[#2A7C7C] text-white py-2 font-medium transition
-                     hover:bg-[#256666] disabled:opacity-60 focus-visible:outline-none
-                     focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#2A7C7C]"
+          className="w-full rounded bg-[#024d7c] text-white py-2 font-medium transition
+                     hover:bg-[#013a60] disabled:opacity-60 focus-visible:outline-none
+                     focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#024d7c]"
         >
           {busy ? "Signing in…" : "Continue"}
         </button>
@@ -153,7 +153,7 @@ export default function LoginPage() {
       <div className="mt-4 space-y-1 text-center text-xs text-gray-500">
         <p>
           <Link
-            className="underline text-[#2A7C7C] hover:text-[#256666]"
+            className="underline text-[#024d7c] hover:text-[#013a60]"
             href="/forgot-password"
           >
             Forgot your password?
@@ -162,7 +162,7 @@ export default function LoginPage() {
         <p>
           Don’t have an account?{" "}
           <Link
-            className="underline text-[#2A7C7C] hover:text-[#256666]"
+            className="underline text-[#024d7c] hover:text-[#013a60]"
             href="/register"
           >
             Create one

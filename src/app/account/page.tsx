@@ -92,7 +92,7 @@ export default function AccountPage() {
   return (
     <main className="mx-auto max-w-2xl px-6 py-12">
       <div className="mb-6 text-sm text-gray-500">
-        <Link className="underline decoration-[#2A7C7C]" href="/studio">
+        <Link className="underline decoration-[#024d7c]" href="/studio">
           Back to Studio
         </Link>
       </div>
@@ -141,13 +141,13 @@ export default function AccountPage() {
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 required
-                className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2A7C7C] focus-visible:ring-offset-0"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c] focus-visible:ring-offset-0"
               />
               <button
                 type="submit"
                 disabled={emailBusy}
                 aria-disabled={emailBusy}
-                className="rounded-md bg-[#2A7C7C] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#256666] disabled:opacity-60"
+                className="rounded-md bg-[#024d7c] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#013a60] disabled:opacity-60"
               >
                 {emailBusy ? "Saving..." : "Save email"}
               </button>
@@ -182,7 +182,7 @@ export default function AccountPage() {
                   onChange={(event) => setNewPassword(event.target.value)}
                   required
                   minLength={8}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2A7C7C] focus-visible:ring-offset-0"
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c] focus-visible:ring-offset-0"
                 />
               </div>
               <div className="space-y-2">
@@ -196,14 +196,14 @@ export default function AccountPage() {
                   onChange={(event) => setConfirmPassword(event.target.value)}
                   required
                   minLength={8}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2A7C7C] focus-visible:ring-offset-0"
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c] focus-visible:ring-offset-0"
                 />
               </div>
               <button
                 type="submit"
                 disabled={passwordBusy}
                 aria-disabled={passwordBusy}
-                className="rounded-md bg-[#2A7C7C] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#256666] disabled:opacity-60"
+                className="rounded-md bg-[#024d7c] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#013a60] disabled:opacity-60"
               >
                 {passwordBusy ? "Saving..." : "Save password"}
               </button>

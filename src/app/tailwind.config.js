@@ -5,7 +5,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        brand: "#2A7C7C", // MergifyPDF brand color
+        brand: "#024d7c", // MergifyPDF brand color
       },
 
       // ✅ Keyframes (merge + spin)

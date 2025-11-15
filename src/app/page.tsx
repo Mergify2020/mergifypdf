@@ -16,7 +16,7 @@ export default async function Home() {
       <UploadCta usedToday={usedToday} />
       <p className="text-sm text-gray-500">
         Already have an account?{" "}
-        <Link className="underline decoration-[#2A7C7C]" href="/login">
+        <Link className="underline decoration-[#024d7c]" href="/login">
           Sign in
         </Link>
         .

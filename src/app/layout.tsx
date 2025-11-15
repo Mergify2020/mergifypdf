@@ -18,7 +18,7 @@ export const metadata: Metadata = {
       { url: "/favicon-16-2080.png", sizes: "16x16", type: "image/png" },
     ],
     apple: [{ url: "/apple-touch-icon-2080.png", sizes: "180x180" }],
-    other: [{ rel: "mask-icon", url: "/safari-pinned-tab-2080.svg", color: "#009DFD" }],
+    other: [{ rel: "mask-icon", url: "/safari-pinned-tab-2080.svg", color: "#024d7c" }],
   },
 };
 
@@ -38,7 +38,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32-2080.png" />
         <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16-2080.png" />
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-2080.png" />
-        <link rel="mask-icon" href="/safari-pinned-tab-2080.svg" color="#009DFD" />
+        <link rel="mask-icon" href="/safari-pinned-tab-2080.svg" color="#024d7c" />
       </head>
 
       <body className="min-h-screen bg-white text-gray-900">

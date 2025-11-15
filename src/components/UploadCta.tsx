@@ -54,7 +54,7 @@ export default function UploadCta({ usedToday }: UploadCtaProps) {
         onClick={handleClick}
         disabled={busy}
         aria-disabled={busy}
-        className="w-full max-w-sm rounded-full bg-[#2A7C7C] px-8 py-4 text-lg font-semibold text-white shadow-lg transition hover:bg-[#256666] disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full max-w-sm rounded-full bg-[#024d7c] px-8 py-4 text-lg font-semibold text-white shadow-lg transition hover:bg-[#013a60] disabled:cursor-not-allowed disabled:opacity-60"
       >
         {alreadyUsed ? "Sign up to keep going" : busy ? "Opening..." : "Upload PDF"}
       </button>
