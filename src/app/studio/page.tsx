@@ -161,11 +161,8 @@ function WorkspaceClient() {
       try {
         // Import pdf.js in the browser only
         const pdfjsLib = (await import("pdfjs-dist")) as typeof import("pdfjs-dist") & {
-          GlobalWorkerOptions?: { workerSrc?: string };
+          GlobalWorkerOptions: { workerSrc: string };
         };
-        if (!pdfjsLib.GlobalWorkerOptions) {
-          pdfjsLib.GlobalWorkerOptions = {};
-        }
         pdfjsLib.GlobalWorkerOptions.workerSrc =
           "https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
 
