@@ -28,9 +28,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en">
       <head>
-        {/* Force light UI */}
-        <meta name="color-scheme" content="light" />
-        <meta name="supported-color-schemes" content="light" />
+        {/* Respect custom theme */}
+        <meta name="color-scheme" content="light dark" />
+        <meta name="supported-color-schemes" content="light dark" />
         <meta name="theme-color" content="#ffffff" />
 
         {/* Explicit links (helps stubborn Safari/iOS) */}
@@ -43,7 +43,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
       <body className="min-h-screen bg-white text-gray-900">
         <header className="sticky top-0 z-50 w-full border-b border-slate-100 bg-white/95 backdrop-blur">
-          <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 lg:px-6">
+          <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 lg:px-6">
             <Link href="/" className="inline-flex items-center gap-2" aria-label="Go to homepage">
               <Image src="/logo-wordmark2.svg" alt="MergifyPDF" width={192} height={48} priority />
             </Link>

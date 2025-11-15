@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useAvatarPreference } from "@/lib/useAvatarPreference";
 
 export default function AccountPage() {
   const { data: session } = useSession();
@@ -21,6 +22,10 @@ export default function AccountPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordBusy, setPasswordBusy] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
+  const { avatar, setAvatar, clearAvatar } = useAvatarPreference();
+  const [avatarMessage, setAvatarMessage] = useState<string | null>(null);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (session?.user?.email) {
@@ -55,6 +60,36 @@ export default function AccountPage() {
     } finally {
       setEmailBusy(false);
     }
+  }
+
+  function handleAvatarClick() {
+    fileInputRef.current?.click();
+  }
+
+  function handleAvatarChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setAvatarBusy(true);
+    setAvatarMessage(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setAvatar(typeof reader.result === "string" ? reader.result : null);
+      setAvatarBusy(false);
+      setAvatarMessage("Profile photo updated.");
+    };
+    reader.onerror = () => {
+      setAvatarBusy(false);
+      setAvatarMessage("Unable to load that image. Try a different file.");
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function handleAvatarReset() {
+    clearAvatar();
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+    setAvatarMessage("Reverted to the default avatar.");
   }
 
   async function handlePasswordSubmit(event: React.FormEvent) {
@@ -116,6 +151,47 @@ export default function AccountPage() {
             <dd className="text-sm text-gray-800">{email || "Unknown"}</dd>
           </div>
         </dl>
+        <div className="mt-4 flex flex-col gap-3 rounded-xl border border-dashed border-gray-200 bg-gray-50/80 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            {avatar ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={avatar} alt="Profile preview" className="h-16 w-16 rounded-full object-cover" />
+            ) : (
+              <div className="h-16 w-16 rounded-full bg-black" aria-hidden="true" />
+            )}
+            <div>
+              <p className="text-sm font-semibold text-gray-800">Profile photo</p>
+              <p className="text-xs text-gray-500">
+                JPG, PNG, or GIF. We’ll crop it into a circle automatically.
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={handleAvatarClick}
+              disabled={avatarBusy}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800 transition hover:bg-white disabled:opacity-50"
+            >
+              {avatarBusy ? "Uploading…" : "Upload photo"}
+            </button>
+            <button
+              type="button"
+              onClick={handleAvatarReset}
+              className="rounded-lg border border-transparent px-3 py-2 text-sm text-gray-600 hover:text-gray-900"
+            >
+              Remove
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleAvatarChange}
+            />
+          </div>
+        </div>
+        {avatarMessage && <p className="mt-2 text-sm text-gray-600">{avatarMessage}</p>}
       </div>
 
       <section className="mt-8 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">

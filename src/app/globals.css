@@ -1,10 +1,19 @@
 @import "tailwindcss";
 
-/* ✅ Always use light mode colors */
+/* ✅ Light theme defaults */
 :root {
   --background: #ffffff;
-  --foreground: #171717;
-  color-scheme: light; /* tells the browser to stay in light mode */
+  --foreground: #0f172a;
+  --card: #ffffff;
+  color-scheme: light;
+}
+
+/* Dark theme driven by SettingsMenu */
+:root[data-theme="dark"] {
+  --background: #050915;
+  --foreground: #f5f7ff;
+  --card: #0b1224;
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -14,19 +23,10 @@
   --font-mono: var(--font-geist-mono);
 }
 
-/* ❌ Remove dark mode overrides */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #ffffff;
-    --foreground: #171717;
-    color-scheme: light;
-  }
-}
-
-/* ✅ Ensure white background and black text everywhere */
 html,
 body {
-  background-color: var(--background) !important;
+  background-color: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  transition: background-color 150ms ease, color 150ms ease;
 }
