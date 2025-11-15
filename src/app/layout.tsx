@@ -13,12 +13,12 @@ export const metadata: Metadata = {
   description: "Fast, simple PDF tools — all in your browser.",
   icons: {
     icon: [
-      { url: "/favicon2050.svg", type: "image/svg+xml" },
-      { url: "/favicon-32-2026.png", sizes: "32x32", type: "image/png" },
-      { url: "/favicon-16-2026.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon2080.svg", type: "image/svg+xml" },
+      { url: "/favicon-32-2080.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon-16-2080.png", sizes: "16x16", type: "image/png" },
     ],
-    apple: [{ url: "/apple-touch-icon-2026.png", sizes: "180x180" }],
-    other: [{ rel: "mask-icon", url: "/safari-pinned-tab-2026.svg", color: "#2A7C7C" }],
+    apple: [{ url: "/apple-touch-icon-2080.png", sizes: "180x180" }],
+    other: [{ rel: "mask-icon", url: "/safari-pinned-tab-2080.svg", color: "#009DFD" }],
   },
 };
 
@@ -34,11 +34,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <meta name="theme-color" content="#ffffff" />
 
         {/* Explicit links (helps stubborn Safari/iOS) */}
-        <link rel="icon" type="image/svg+xml" href="/favicon2050.svg" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32-2026.png" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16-2026.png" />
-        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-2026.png" />
-        <link rel="mask-icon" href="/safari-pinned-tab-2026.svg" color="#2A7C7C" />
+        <link rel="icon" type="image/svg+xml" href="/favicon2080.svg" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32-2080.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16-2080.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-2080.png" />
+        <link rel="mask-icon" href="/safari-pinned-tab-2080.svg" color="#009DFD" />
       </head>
 
       <body className="min-h-screen bg-white text-gray-900">

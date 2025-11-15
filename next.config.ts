@@ -23,11 +23,11 @@ const nextConfig: NextConfig = {
     ];
 
     return [
-      { source: "/favicon2050.svg", headers: noCacheHeaders },
-      { source: "/favicon-32-2026.png", headers: noCacheHeaders },
-      { source: "/favicon-16-2026.png", headers: noCacheHeaders },
-      { source: "/apple-touch-icon-2026.png", headers: noCacheHeaders },
-      { source: "/safari-pinned-tab-2026.svg", headers: noCacheHeaders },
+      { source: "/favicon2080.svg", headers: noCacheHeaders },
+      { source: "/favicon-32-2080.png", headers: noCacheHeaders },
+      { source: "/favicon-16-2080.png", headers: noCacheHeaders },
+      { source: "/apple-touch-icon-2080.png", headers: noCacheHeaders },
+      { source: "/safari-pinned-tab-2080.svg", headers: noCacheHeaders },
     ];
   },
 
