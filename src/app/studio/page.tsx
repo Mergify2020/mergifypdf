@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import dynamic from "next/dynamic";
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, rgb } from "pdf-lib";
+import { Highlighter } from "lucide-react";
 import {
   DndContext,
   PointerSensor,
@@ -27,6 +29,13 @@ type PageItem = {
   thumb: string; // small preview
   preview: string; // large preview
 };
+type HighlightRect = {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
 const PREVIEW_BASE_SCALE = 1.35;
 const MAX_DEVICE_PIXEL_RATIO = 2.5;
 const THUMB_MAX_WIDTH = 200;
@@ -35,6 +44,10 @@ const PREVIEW_IMAGE_QUALITY = 0.95;
 function getDevicePixelRatio() {
   if (typeof window === "undefined") return 1;
   return window.devicePixelRatio ? Math.min(window.devicePixelRatio, MAX_DEVICE_PIXEL_RATIO) : 1;
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
 }
 
 /** One sortable thumbnail tile */
@@ -96,6 +109,15 @@ function WorkspaceClient() {
   const [error, setError] = useState<string | null>(null);
   const [activePageId, setActivePageId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
+  const [highlightMode, setHighlightMode] = useState(false);
+  const [highlights, setHighlights] = useState<Record<string, HighlightRect[]>>({});
+  const [draftHighlight, setDraftHighlight] = useState<{
+    pageId: string;
+    startX: number;
+    startY: number;
+    currentX: number;
+    currentY: number;
+  } | null>(null);
 
   const addInputRef = useRef<HTMLInputElement>(null);
   const renderedSourcesRef = useRef(0);
@@ -226,6 +248,20 @@ function WorkspaceClient() {
   }, [pages, activePageId]);
 
   useEffect(() => {
+    setHighlights((prev) => {
+      const allowed = new Set(pages.map((p) => p.id));
+      const next: Record<string, HighlightRect[]> = {};
+      allowed.forEach((id) => {
+        if (prev[id]) next[id] = prev[id];
+      });
+      if (Object.keys(prev).length === Object.keys(next).length) {
+        return prev;
+      }
+      return next;
+    });
+  }, [pages]);
+
+  useEffect(() => {
     const container = previewContainerRef.current;
     if (!container || pages.length === 0) return;
 
@@ -287,6 +323,92 @@ function WorkspaceClient() {
     };
   }
 
+  const finalizeDraftHighlight = useCallback(
+    (cancel = false) => {
+      setDraftHighlight((prev) => {
+        if (!prev) return null;
+        if (!cancel) {
+          const width = Math.abs(prev.currentX - prev.startX);
+          const height = Math.abs(prev.currentY - prev.startY);
+          if (width > 0.01 && height > 0.01) {
+            const x = Math.min(prev.startX, prev.currentX);
+            const y = Math.min(prev.startY, prev.currentY);
+            setHighlights((existing) => {
+              const nextList = existing[prev.pageId] ? [...existing[prev.pageId]] : [];
+              nextList.push({
+                id: crypto.randomUUID(),
+                x,
+                y,
+                width,
+                height,
+              });
+              return { ...existing, [prev.pageId]: nextList };
+            });
+          }
+        }
+        return null;
+      });
+    },
+    [setHighlights]
+  );
+
+  useEffect(() => {
+    if (!draftHighlight || typeof window === "undefined") return;
+    function handleWindowUp() {
+      finalizeDraftHighlight();
+    }
+    window.addEventListener("mouseup", handleWindowUp);
+    return () => window.removeEventListener("mouseup", handleWindowUp);
+  }, [draftHighlight, finalizeDraftHighlight]);
+
+  useEffect(() => {
+    if (!highlightMode) {
+      setDraftHighlight(null);
+    }
+  }, [highlightMode]);
+
+  function handleHighlightPointerDown(pageId: string, event: ReactMouseEvent<HTMLDivElement>) {
+    if (!highlightMode) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = clamp((event.clientX - rect.left) / rect.width, 0, 1);
+    const y = clamp((event.clientY - rect.top) / rect.height, 0, 1);
+    setDraftHighlight({
+      pageId,
+      startX: x,
+      startY: y,
+      currentX: x,
+      currentY: y,
+    });
+    event.preventDefault();
+  }
+
+  function handleHighlightPointerMove(pageId: string, event: ReactMouseEvent<HTMLDivElement>) {
+    if (!highlightMode) return;
+    setDraftHighlight((prev) => {
+      if (!prev || prev.pageId !== pageId) return prev;
+      const rect = event.currentTarget.getBoundingClientRect();
+      const x = clamp((event.clientX - rect.left) / rect.width, 0, 1);
+      const y = clamp((event.clientY - rect.top) / rect.height, 0, 1);
+      return { ...prev, currentX: x, currentY: y };
+    });
+    if (draftHighlight?.pageId === pageId) {
+      event.preventDefault();
+    }
+  }
+
+  function handleHighlightPointerUp(
+    pageId: string,
+    event?: ReactMouseEvent<HTMLDivElement>,
+    cancel?: boolean
+  ) {
+    if (!highlightMode) return;
+    if (!draftHighlight || draftHighlight.pageId !== pageId) return;
+    if (event) {
+      handleHighlightPointerMove(pageId, event);
+    }
+    finalizeDraftHighlight(cancel);
+  }
+
   function handlePageStep(direction: 1 | -1) {
     if (pages.length === 0) return;
     let currentIndex = pages.findIndex((p) => p.id === activePageId);
@@ -338,6 +460,25 @@ function WorkspaceClient() {
       for (const p of pages) {
         const srcDoc = docCache.get(p.srcIdx)!;
         const [copied] = await out.copyPages(srcDoc, [p.pageIdx]);
+        const pageHighlights = highlights[p.id] ?? [];
+        if (pageHighlights.length > 0) {
+          const { width: pageWidth, height: pageHeight } = copied.getSize();
+          pageHighlights.forEach((mark) => {
+            const highlightWidth = mark.width * pageWidth;
+            const highlightHeight = mark.height * pageHeight;
+            const highlightX = mark.x * pageWidth;
+            const highlightY = pageHeight - (mark.y * pageHeight + highlightHeight);
+            copied.drawRectangle({
+              x: highlightX,
+              y: highlightY,
+              width: highlightWidth,
+              height: highlightHeight,
+              color: rgb(1, 1, 0),
+              opacity: 0.28,
+              borderOpacity: 0,
+            });
+          });
+        }
         out.addPage(copied);
       }
 
@@ -375,10 +516,38 @@ function WorkspaceClient() {
   const zoomStep = 0.1;
   const canZoomOut = zoom > minZoom + 0.001;
   const canZoomIn = zoom < maxZoom - 0.001;
+  const highlightButtonDisabled = pages.length === 0 || loading;
+  const highlightActive = highlightMode && !highlightButtonDisabled;
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#f3fbff,_#ffffff)] pt-16">
-      <h1 className="mx-auto mt-6 max-w-6xl px-4 text-3xl font-semibold tracking-tight text-slate-900 lg:px-6">
+      <div className="mx-auto w-full max-w-6xl px-4 lg:px-6">
+        <div className="mb-4 flex flex-col gap-3 rounded-3xl border border-slate-100 bg-white px-6 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-slate-900">Editing tools</p>
+            <p className="text-xs text-slate-500">
+              {highlightActive ? "Highlight mode is active — drag across a page to mark text." : "Choose a tool to start marking up your document."}
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              disabled={highlightButtonDisabled}
+              onClick={() => setHighlightMode((prev) => !prev)}
+              aria-pressed={highlightActive}
+              className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                highlightActive
+                  ? "border-transparent bg-[#024d7c] text-white shadow-lg shadow-[#012a44]/30"
+                  : "border-slate-200 text-slate-700 hover:border-slate-300 disabled:hover:border-slate-200"
+              } disabled:cursor-not-allowed disabled:opacity-50`}
+            >
+              <Highlighter className="h-4 w-4" />
+              Highlight
+            </button>
+          </div>
+        </div>
+      </div>
+      <h1 className="mx-auto mt-4 max-w-6xl px-4 text-3xl font-semibold tracking-tight text-slate-900 lg:px-6">
         Workspace
       </h1>
 
@@ -413,40 +582,82 @@ function WorkspaceClient() {
                   ref={previewContainerRef}
                   className="h-[70vh] space-y-8 overflow-y-auto px-5 py-6"
                 >
-                  {pages.map((page, idx) => (
-                    <div
-                      key={page.id}
-                      data-page-id={page.id}
-                      ref={registerPreviewRef(page.id)}
-                      className={`rounded-3xl border bg-white p-4 shadow-sm transition ${
-                        activePageId === page.id
-                          ? "border-brand ring-2 ring-brand/30"
-                          : "border-slate-200"
-                      }`}
-                    >
-                      <div className="mb-3 flex items-center justify-between gap-4 text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-slate-400">
-                        <span>Page {idx + 1}</span>
-                        <span
-                          className="truncate text-right tracking-[0.2em]"
-                          title={sources[page.srcIdx]?.name ?? "Uploaded PDF"}
-                        >
-                          {sources[page.srcIdx]?.name ?? "Uploaded PDF"}
-                        </span>
-                      </div>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                  {pages.map((page, idx) => {
+                    const pageHighlights = highlights[page.id] ?? [];
+                    return (
                       <div
-                        className="mx-auto max-w-3xl border border-slate-300 bg-white shadow-[0_20px_50px_rgba(15,23,42,0.15)]"
-                        style={{ transform: `scale(${zoom})`, transformOrigin: "top center" }}
+                        key={page.id}
+                        data-page-id={page.id}
+                        ref={registerPreviewRef(page.id)}
+                        className={`rounded-3xl border bg-white p-4 shadow-sm transition ${
+                          activePageId === page.id
+                            ? "border-brand ring-2 ring-brand/30"
+                            : "border-slate-200"
+                        }`}
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={page.preview}
-                          alt={`Page ${idx + 1}`}
-                          className="w-full"
-                        />
+                        <div className="mb-3 flex items-center justify-between gap-4 text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-slate-400">
+                          <span>Page {idx + 1}</span>
+                          <span
+                            className="truncate text-right tracking-[0.2em]"
+                            title={sources[page.srcIdx]?.name ?? "Uploaded PDF"}
+                          >
+                            {sources[page.srcIdx]?.name ?? "Uploaded PDF"}
+                          </span>
+                        </div>
+                        <div
+                          className="mx-auto max-w-3xl border border-slate-300 bg-white shadow-[0_20px_50px_rgba(15,23,42,0.15)]"
+                          style={{ transform: `scale(${zoom})`, transformOrigin: "top center" }}
+                        >
+                          <div
+                            className={`relative ${highlightActive ? "cursor-crosshair" : ""}`}
+                            onMouseDown={(event) => handleHighlightPointerDown(page.id, event)}
+                            onMouseMove={(event) => handleHighlightPointerMove(page.id, event)}
+                            onMouseUp={(event) => handleHighlightPointerUp(page.id, event)}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={page.preview} alt={`Page ${idx + 1}`} className="w-full" />
+                            <div className="pointer-events-none absolute inset-0">
+                              {pageHighlights.map((mark) => (
+                                <span
+                                  key={mark.id}
+                                  aria-hidden
+                                  className="absolute rounded-md bg-[#fff3a0]/70 shadow-[0_0_0_1px_rgba(255,255,255,0.6)]"
+                                  style={{
+                                    left: `${mark.x * 100}%`,
+                                    top: `${mark.y * 100}%`,
+                                    width: `${mark.width * 100}%`,
+                                    height: `${mark.height * 100}%`,
+                                  }}
+                                />
+                              ))}
+                              {draftHighlight?.pageId === page.id && (
+                                <span
+                                  aria-hidden
+                                  className="absolute rounded-md border border-dashed border-[#024d7c] bg-[#024d7c]/10"
+                                  style={{
+                                    left: `${Math.min(
+                                      draftHighlight.startX,
+                                      draftHighlight.currentX
+                                    ) * 100}%`,
+                                    top: `${Math.min(
+                                      draftHighlight.startY,
+                                      draftHighlight.currentY
+                                    ) * 100}%`,
+                                    width: `${Math.abs(
+                                      draftHighlight.currentX - draftHighlight.startX
+                                    ) * 100}%`,
+                                    height: `${Math.abs(
+                                      draftHighlight.currentY - draftHighlight.startY
+                                    ) * 100}%`,
+                                  }}
+                                />
+                              )}
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
