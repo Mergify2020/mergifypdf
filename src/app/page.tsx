@@ -6,8 +6,8 @@ export default async function Home() {
   const usedToday = await hasUsedToday();
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col items-center gap-6 px-6 py-20 text-center">
-      <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">
+    <div className="mx-auto flex max-w-4xl flex-col items-center gap-6 px-6 py-20 text-center">
+      <h1 className="text-3xl font-semibold tracking-tight sm:text-5xl">
         Merge and edit your documents — all in one place.
       </h1>
       <p className="text-lg text-gray-700">Fast, secure, and works right in your browser.</p>
