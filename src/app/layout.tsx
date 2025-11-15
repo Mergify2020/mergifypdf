@@ -28,9 +28,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en">
       <head>
-        {/* Respect custom theme */}
-        <meta name="color-scheme" content="light dark" />
-        <meta name="supported-color-schemes" content="light dark" />
+        {/* Force light UI */}
+        <meta name="color-scheme" content="light" />
+        <meta name="supported-color-schemes" content="light" />
         <meta name="theme-color" content="#ffffff" />
 
         {/* Explicit links (helps stubborn Safari/iOS) */}

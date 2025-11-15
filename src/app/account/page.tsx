@@ -157,7 +157,8 @@ export default function AccountPage() {
               // eslint-disable-next-line @next/next/no-img-element
               <img src={avatar} alt="Profile preview" className="h-16 w-16 rounded-full object-cover" />
             ) : (
-              <div className="h-16 w-16 rounded-full bg-black" aria-hidden="true" />
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src="/Defaultpfp.svg" alt="Default avatar" className="h-16 w-16 rounded-full" />
             )}
             <div>
               <p className="text-sm font-semibold text-gray-800">Profile photo</p>

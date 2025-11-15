@@ -5,35 +5,12 @@ import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
 
-type ThemeOption = "light" | "dark";
-
 export default function SettingsMenu() {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [theme, setTheme] = useState<ThemeOption>("light");
   const { avatar } = useAvatarPreference();
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const stored = window.localStorage.getItem("mergify-theme");
-    if (stored === "dark" || stored === "light") {
-      setTheme(stored);
-    } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
-      setTheme("dark");
-    }
-  }, []);
-
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    const root = document.documentElement;
-    root.dataset.theme = theme;
-    root.classList.toggle("dark", theme === "dark");
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("mergify-theme", theme);
-    }
-  }, [theme]);
 
   useEffect(() => {
     if (!open) return;
@@ -67,10 +44,6 @@ export default function SettingsMenu() {
     router.push("/account");
   }
 
-  function handleThemeChange(nextTheme: ThemeOption) {
-    setTheme(nextTheme);
-  }
-
   async function handleSignOut() {
     try {
       setBusy(true);
@@ -95,7 +68,8 @@ export default function SettingsMenu() {
           // eslint-disable-next-line @next/next/no-img-element
           <img src={avatar} alt="Your avatar" className="h-9 w-9 rounded-full object-cover" />
         ) : (
-          <span aria-hidden className="inline-block h-9 w-9 rounded-full bg-black" />
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src="/Defaultpfp.svg" alt="Default avatar" className="h-9 w-9 rounded-full" />
         )}
       </button>
 
@@ -107,7 +81,8 @@ export default function SettingsMenu() {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={avatar} alt="Your avatar" className="h-12 w-12 rounded-full object-cover" />
               ) : (
-                <div className="h-12 w-12 rounded-full bg-black/80" aria-hidden="true" />
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src="/Defaultpfp.svg" alt="Default avatar" className="h-12 w-12 rounded-full" />
               )}
               <div>
                 <p className="text-sm font-semibold text-white">mergify user</p>
@@ -137,34 +112,6 @@ export default function SettingsMenu() {
               >
                 Plans &amp; pricing (soon)
               </button>
-            </div>
-
-            <div className="space-y-2 rounded-2xl border border-white/10 p-3">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-wide text-white/60">
-                  Theme
-                </p>
-                <span className="text-xs text-white/60">
-                  {theme === "dark" ? "Night mode" : "Daylight"}
-                </span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {(["light", "dark"] as ThemeOption[]).map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => handleThemeChange(option)}
-                    className={`flex items-center justify-between rounded-xl px-3 py-2 text-sm font-semibold capitalize transition ${
-                      theme === option
-                        ? "bg-white text-[#050915]"
-                        : "bg-white/5 text-white/70 hover:bg-white/10"
-                    }`}
-                  >
-                    {option}
-                    <span aria-hidden>{option === "dark" ? "🌙" : "☀️"}</span>
-                  </button>
-                ))}
-              </div>
             </div>
 
             <div className="border-t border-white/10 pt-3">
