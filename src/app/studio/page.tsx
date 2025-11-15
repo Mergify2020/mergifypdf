@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from "react";
 import dynamic from "next/dynamic";
 import { PDFDocument, rgb } from "pdf-lib";
-import { Highlighter, Minus, Plus, Trash2, Undo2 } from "lucide-react";
+import { Highlighter, Minus, Plus, Trash2, Undo2, Eraser } from "lucide-react";
 import {
   DndContext,
   PointerSensor,
@@ -42,6 +42,10 @@ type DraftHighlight = {
   color: string;
   thickness: number;
 };
+type HighlightHistoryEntry =
+  | { type: "add"; pageId: string; highlight: HighlightStroke }
+  | { type: "delete"; pageId: string; highlight: HighlightStroke }
+  | { type: "clear"; previous: Record<string, HighlightStroke[]> };
 
 const HIGHLIGHT_COLORS = {
   yellow: "#fff266",
@@ -82,6 +86,19 @@ function pointDistance(a: Point, b: Point) {
   const dx = a.x - b.x;
   const dy = a.y - b.y;
   return Math.sqrt(dx * dx + dy * dy);
+}
+
+function cloneStroke(stroke: HighlightStroke): HighlightStroke {
+  return {
+    ...stroke,
+    points: stroke.points.map((pt) => ({ ...pt })),
+  };
+}
+
+function cloneHighlightMap(map: Record<string, HighlightStroke[]>): Record<string, HighlightStroke[]> {
+  return Object.fromEntries(
+    Object.entries(map).map(([pageId, list]) => [pageId, list.map((stroke) => cloneStroke(stroke))])
+  );
 }
 
 /** One sortable thumbnail tile */
@@ -147,10 +164,9 @@ function WorkspaceClient() {
   const [highlightColor, setHighlightColor] = useState<HighlightColorKey>("yellow");
   const [highlightThickness, setHighlightThickness] = useState(14);
   const [highlights, setHighlights] = useState<Record<string, HighlightStroke[]>>({});
-  const [highlightHistory, setHighlightHistory] = useState<
-    { pageId: string; highlightId: string }[]
-  >([]);
+  const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]>([]);
   const [draftHighlight, setDraftHighlight] = useState<DraftHighlight | null>(null);
+  const [deleteMode, setDeleteMode] = useState(false);
 
   const addInputRef = useRef<HTMLInputElement>(null);
   const renderedSourcesRef = useRef(0);
@@ -299,7 +315,9 @@ function WorkspaceClient() {
 
   useEffect(() => {
     const allowed = new Set(pages.map((p) => p.id));
-    setHighlightHistory((prev) => prev.filter((entry) => allowed.has(entry.pageId)));
+    setHighlightHistory((prev) =>
+      prev.filter((entry) => (entry.type === "clear" ? true : allowed.has(entry.pageId)))
+    );
   }, [pages]);
 
   useEffect(() => {
@@ -369,18 +387,18 @@ function WorkspaceClient() {
       if (!stroke || cancel || stroke.points.length < 2) {
         return;
       }
-      const highlightId = crypto.randomUUID();
+      const highlight: HighlightStroke = {
+        id: crypto.randomUUID(),
+        points: stroke.points.map((pt) => ({ ...pt })),
+        color: stroke.color,
+        thickness: stroke.thickness,
+      };
       setHighlights((existing) => {
         const nextList = existing[stroke.pageId] ? [...existing[stroke.pageId]] : [];
-        nextList.push({
-          id: highlightId,
-          points: stroke.points,
-          color: stroke.color,
-          thickness: stroke.thickness,
-        });
+        nextList.push(highlight);
         return { ...existing, [stroke.pageId]: nextList };
       });
-      setHighlightHistory((prev) => [...prev, { pageId: stroke.pageId, highlightId }]);
+      setHighlightHistory((prev) => [...prev, { type: "add", pageId: stroke.pageId, highlight: cloneStroke(highlight) }]);
     },
     []
   );
@@ -404,6 +422,13 @@ function WorkspaceClient() {
     }
   }, [highlightMode]);
 
+  useEffect(() => {
+    if (deleteMode) {
+      setHighlightMode(false);
+      setDraftHighlight(null);
+    }
+  }, [deleteMode]);
+
   function getPointerPoint(event: ReactMouseEvent<HTMLDivElement>) {
     const rect = event.currentTarget.getBoundingClientRect();
     if (!rect.width || !rect.height) return null;
@@ -415,7 +440,7 @@ function WorkspaceClient() {
   }
 
   function handleHighlightPointerDown(pageId: string, event: ReactMouseEvent<HTMLDivElement>) {
-    if (!highlightMode) return;
+    if (!highlightMode || deleteMode) return;
     const point = getPointerPoint(event);
     if (!point) return;
     setDraftHighlight({
@@ -428,7 +453,7 @@ function WorkspaceClient() {
   }
 
   function handleHighlightPointerMove(pageId: string, event: ReactMouseEvent<HTMLDivElement>) {
-    if (!highlightMode) return;
+    if (!highlightMode || deleteMode) return;
     const point = getPointerPoint(event);
     if (!point) return;
     setDraftHighlight((prev) => {
@@ -450,7 +475,7 @@ function WorkspaceClient() {
   }
 
   function handleHighlightPointerUp(pageId: string) {
-    if (!highlightMode) return;
+    if (!highlightMode || deleteMode) return;
     setDraftHighlight((prev) => {
       if (!prev || prev.pageId !== pageId) return prev;
       commitDraftHighlight(prev);
@@ -572,13 +597,18 @@ function WorkspaceClient() {
   const canZoomOut = zoom > minZoom + 0.001;
   const canZoomIn = zoom < maxZoom - 0.001;
   const highlightButtonDisabled = pages.length === 0 || loading;
-  const highlightActive = highlightMode && !highlightButtonDisabled;
   const highlightColorEntries = Object.entries(
     HIGHLIGHT_COLORS
   ) as [HighlightColorKey, string][];
-  const hasHighlights =
-    highlightHistory.length > 0 ||
-    Object.values(highlights).some((list) => list && list.length > 0);
+  const highlightActive = highlightMode && !highlightButtonDisabled && !deleteMode;
+  const hasAnyHighlights = Object.values(highlights).some((list) => list && list.length > 0);
+  const hasUndoHistory = highlightHistory.length > 0;
+
+  useEffect(() => {
+    if (!hasAnyHighlights && deleteMode) {
+      setDeleteMode(false);
+    }
+  }, [hasAnyHighlights, deleteMode]);
 
   function adjustHighlightThickness(delta: number) {
     setHighlightThickness((prev) => clamp(prev + delta, MIN_HIGHLIGHT_THICKNESS, MAX_HIGHLIGHT_THICKNESS));
@@ -589,42 +619,110 @@ function WorkspaceClient() {
       if (prev.length === 0) return prev;
       const last = prev[prev.length - 1];
       setHighlights((map) => {
-        const list = map[last.pageId];
-        if (!list) return map;
-        const filtered = list.filter((stroke) => stroke.id !== last.highlightId);
-        const nextMap = { ...map };
-        if (filtered.length > 0) {
-          nextMap[last.pageId] = filtered;
-        } else {
-          delete nextMap[last.pageId];
+        switch (last.type) {
+          case "add": {
+            const list = map[last.pageId];
+            if (!list) return map;
+            const filtered = list.filter((stroke) => stroke.id !== last.highlight.id);
+            if (filtered.length === list.length) return map;
+            const next = { ...map };
+            if (filtered.length > 0) {
+              next[last.pageId] = filtered;
+            } else {
+              delete next[last.pageId];
+            }
+            return next;
+          }
+          case "delete": {
+            const next = { ...map };
+            const list = next[last.pageId] ? [...next[last.pageId]] : [];
+            list.push(cloneStroke(last.highlight));
+            next[last.pageId] = list;
+            return next;
+          }
+          case "clear":
+            return cloneHighlightMap(last.previous);
+          default:
+            return map;
         }
-        return nextMap;
       });
       return prev.slice(0, -1);
     });
   }
 
   function handleClearHighlights() {
+    if (!hasAnyHighlights) return;
     setDraftHighlight(null);
-    setHighlights({});
-    setHighlightHistory([]);
+    setDeleteMode(false);
+    setHighlights((current) => {
+      const snapshot = cloneHighlightMap(current);
+      setHighlightHistory((prev) => [...prev, { type: "clear", previous: snapshot }]);
+      return {};
+    });
   }
+
+  function handleDeleteHighlight(pageId: string, highlightId: string) {
+    let removed: HighlightStroke | null = null;
+    setHighlights((map) => {
+      const list = map[pageId];
+      if (!list) return map;
+      const index = list.findIndex((stroke) => stroke.id === highlightId);
+      if (index === -1) return map;
+      removed = list[index];
+      const filtered = list.slice(0, index).concat(list.slice(index + 1));
+      const next = { ...map };
+      if (filtered.length > 0) {
+        next[pageId] = filtered;
+      } else {
+        delete next[pageId];
+      }
+      return next;
+    });
+    if (removed) {
+      setHighlightHistory((prev) => [...prev, { type: "delete", pageId, highlight: cloneStroke(removed!) }]);
+    }
+  }
+
+  function handleToggleDeleteMode() {
+    if (!hasAnyHighlights && !deleteMode) return;
+    setDeleteMode((prev) => {
+      const next = !prev;
+      if (next) {
+        setHighlightMode(false);
+        setDraftHighlight(null);
+      }
+      return next;
+    });
+  }
+
+  const toolbarMessage = deleteMode
+    ? "Delete mode is active — click any highlight to remove it."
+    : highlightActive
+      ? "Highlight mode is active — drag across a page to mark text."
+      : hasAnyHighlights
+        ? "Select a highlight to delete, or keep editing."
+        : "Choose a tool to start marking up your document.";
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#f3fbff,_#ffffff)] pt-16">
       <div className="mx-auto w-full max-w-6xl px-4 lg:px-6">
-        <div className="mb-4 flex flex-col gap-3 rounded-3xl border border-slate-100 bg-white px-6 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm font-semibold text-slate-900">Editing tools</p>
-            <p className="text-xs text-slate-500">
-              {highlightActive ? "Highlight mode is active — drag across a page to mark text." : "Choose a tool to start marking up your document."}
-            </p>
-          </div>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+        <div className="mb-6 space-y-4 rounded-3xl border border-slate-100 bg-white px-6 py-6 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-slate-900">Editing tools</p>
+              <p className="text-xs text-slate-500">{toolbarMessage}</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               disabled={highlightButtonDisabled}
-              onClick={() => setHighlightMode((prev) => !prev)}
+              onClick={() =>
+                setHighlightMode((prev) => {
+                  const next = !prev;
+                  if (next) setDeleteMode(false);
+                  return next;
+                })
+              }
               aria-pressed={highlightActive}
               className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition ${
                 highlightActive
@@ -672,28 +770,42 @@ function WorkspaceClient() {
                     <Plus className="h-3 w-3" />
                   </button>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleUndoHighlight}
-                    disabled={!hasHighlights}
-                    className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-wide text-slate-600 transition hover:border-slate-300 disabled:opacity-40"
-                  >
-                    <Undo2 className="h-3 w-3" />
-                    Undo
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleClearHighlights}
-                    disabled={!hasHighlights}
-                    className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-wide text-slate-600 transition hover:border-slate-300 disabled:opacity-40"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                    Clear
-                  </button>
-                </div>
               </div>
             ) : null}
+            <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600">
+              <button
+                type="button"
+                onClick={handleUndoHighlight}
+                disabled={!hasUndoHistory}
+                className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1 uppercase tracking-wide transition hover:border-slate-300 disabled:opacity-40"
+              >
+                <Undo2 className="h-3 w-3" />
+                Undo
+              </button>
+              <button
+                type="button"
+                onClick={handleClearHighlights}
+                disabled={!hasAnyHighlights}
+                className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1 uppercase tracking-wide transition hover:border-slate-300 disabled:opacity-40"
+              >
+                <Trash2 className="h-3 w-3" />
+                Clear
+              </button>
+              <button
+                type="button"
+                onClick={handleToggleDeleteMode}
+                disabled={!hasAnyHighlights && !deleteMode}
+                aria-pressed={deleteMode}
+                className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 uppercase tracking-wide transition ${
+                  deleteMode
+                    ? "border-[#c2410c] bg-[#fee2e2] text-[#7c2d12]"
+                    : "border-slate-200 text-slate-600 hover:border-slate-300"
+                } disabled:opacity-40`}
+              >
+                <Eraser className="h-3 w-3" />
+                {deleteMode ? "Cancel delete" : "Delete"}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -774,7 +886,8 @@ function WorkspaceClient() {
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={page.preview} alt={`Page ${idx + 1}`} className="w-full" />
                             <svg
-                              className="pointer-events-none absolute inset-0 h-full w-full"
+                              className="absolute inset-0 h-full w-full"
+                              style={{ pointerEvents: deleteMode ? "auto" : "none" }}
                               viewBox="0 0 1000 1000"
                               preserveAspectRatio="none"
                             >
@@ -791,6 +904,16 @@ function WorkspaceClient() {
                                     strokeLinecap="round"
                                     strokeLinejoin="round"
                                     strokeOpacity={0.4}
+                                    style={{
+                                      pointerEvents: deleteMode ? "stroke" : "none",
+                                      cursor: deleteMode ? "pointer" : "default",
+                                    }}
+                                    onClick={(event) => {
+                                      if (!deleteMode) return;
+                                      event.preventDefault();
+                                      event.stopPropagation();
+                                      handleDeleteHighlight(page.id, stroke.id);
+                                    }}
                                   />
                                 ) : null
                               )}
