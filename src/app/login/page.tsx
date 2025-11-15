@@ -26,16 +26,15 @@ function getAuthError(code?: string | null) {
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryError = searchParams.get("error");
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [err, setErr] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(() => getAuthError(queryError));
   const [busy, setBusy] = useState(false);
-
-  const queryError = searchParams.get("error");
 
   useEffect(() => {
     if (!queryError) return;
-    setErr(getAuthError(queryError));
     router.replace("/login", { scroll: false });
   }, [queryError, router]);
 

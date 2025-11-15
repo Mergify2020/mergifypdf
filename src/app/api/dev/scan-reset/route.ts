@@ -1,6 +1,18 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
+
+type TableColumn = {
+  column_name: string;
+  data_type: string;
+  is_nullable: "YES" | "NO";
+  column_default: string | null;
+};
+
+type TableDetails = {
+  columns: TableColumn[];
+  rowsCount: number;
+  rows: Record<string, unknown>[];
+};
 
 export async function GET() {
   try {
@@ -20,17 +32,12 @@ export async function GET() {
     );
 
     // 3) fetch columns + a few sample rows for each candidate
-    const details: Record<string, any> = {};
+    const details: Record<string, TableDetails> = {};
     for (const t of candidates) {
       const fq = `"${t.schemaname}"."${t.tablename}"`;
 
       const columns = await prisma.$queryRaw<
-        Array<{
-          column_name: string;
-          data_type: string;
-          is_nullable: "YES" | "NO";
-          column_default: string | null;
-        }>
+        Array<TableColumn>
       >`
         SELECT column_name, data_type, is_nullable, column_default
         FROM information_schema.columns
@@ -39,12 +46,15 @@ export async function GET() {
       `;
 
       // NOTE: identifier (table name) can’t be parameterized safely; this is dev-only
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const rows = await prisma.$queryRawUnsafe(
+      const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
         `SELECT * FROM ${fq} ORDER BY 1 DESC LIMIT 3`
       );
 
-      details[`${t.schemaname}.${t.tablename}`] = { columns, rowsCount: Array.isArray(rows) ? rows.length : 0, rows };
+      details[`${t.schemaname}.${t.tablename}`] = {
+        columns,
+        rowsCount: rows.length,
+        rows,
+      };
     }
 
     return NextResponse.json({
@@ -53,10 +63,19 @@ export async function GET() {
       candidates: Object.keys(details),
       details,
     });
-  } catch (e: any) {
+  } catch (error) {
+    const errInfo =
+      typeof error === "object" && error !== null
+        ? {
+            name: "name" in error ? (error as { name?: string }).name : undefined,
+            code: "code" in error ? (error as { code?: string }).code : undefined,
+            message:
+              "message" in error ? (error as { message?: string }).message : String(error),
+          }
+        : { message: String(error) };
     return NextResponse.json({
       ok: false,
-      error: { name: e?.name, code: e?.code, message: e?.message },
+      error: errInfo,
     });
   }
 }

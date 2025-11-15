@@ -8,18 +8,35 @@ import { randomUUID } from "crypto";
 // how many times to retry if "token" hits the unique constraint
 const MAX_TOKEN_RETRIES = 3;
 
-type Json = Record<string, any>;
+type Json = Record<string, unknown>;
+
 function ok(json: Json) {
   return NextResponse.json({ ok: true, ...json });
 }
+
 function err(code: string, message: string, extra?: Json) {
   return NextResponse.json({ ok: false, code, message, ...(extra ?? {}) });
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+type MaybePrismaError = { code?: string; message?: string };
+function asPrismaError(value: unknown): MaybePrismaError | null {
+  return isRecord(value) ? (value as MaybePrismaError) : null;
+}
+
+function toMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  return typeof error === "string" ? error : String(error);
+}
+
 export async function POST(req: Request) {
   try {
-    const body = await req.json().catch(() => ({}));
-    const email: string | undefined = body?.email;
+    const rawBody: unknown = await req.json().catch(() => null);
+    const email =
+      isRecord(rawBody) && typeof rawBody.email === "string" ? rawBody.email : undefined;
     if (!email || !email.includes("@")) {
       // invalid payload
       return err("BAD_REQUEST", "Please provide a valid email address.");
@@ -44,10 +61,9 @@ export async function POST(req: Request) {
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
     const now = new Date();
 
-    let created = null;
     for (let attempt = 1; attempt <= MAX_TOKEN_RETRIES; attempt++) {
       try {
-        created = await prisma.resetToken.create({
+        await prisma.resetToken.create({
           data: {
             id: randomUUID(), // table requires an id (no default)
             token,
@@ -58,17 +74,19 @@ export async function POST(req: Request) {
           },
         });
         break; // success
-      } catch (e: any) {
+      } catch (error) {
         // If unique constraint on token fires, generate a new token and retry
+        const details = asPrismaError(error);
         const isUnique =
-          e?.code === "P2002" || String(e?.message ?? "").toLowerCase().includes("unique");
+          details?.code === "P2002" ||
+          (details?.message ? details.message.toLowerCase().includes("unique") : false);
         if (isUnique && attempt < MAX_TOKEN_RETRIES) {
           token = await generateToken(user.id);
           continue;
         }
         // any other error (or retries exhausted)
         return err("DB_CREATE_FAILED", "We couldn’t save the reset token.", {
-          debug: { attempt, reason: e?.message ?? String(e) },
+          debug: { attempt, reason: toMessage(error) },
         });
       }
     }
@@ -76,10 +94,14 @@ export async function POST(req: Request) {
     // 4) send the email
     const emailRes = await sendResetEmail({ to: user.email!, token });
 
-    if (!emailRes?.ok) {
-      return err("EMAIL_SEND_FAILED", "We couldn’t send the reset email right now. Please try again in a moment.", {
-        debug: emailRes?.error ?? null,
-      });
+    if (!emailRes.ok) {
+      return err(
+        "EMAIL_SEND_FAILED",
+        "We couldn’t send the reset email right now. Please try again in a moment.",
+        {
+          debug: emailRes.error,
+        }
+      );
     }
 
     // 5) success response (your wording)
@@ -87,9 +109,9 @@ export async function POST(req: Request) {
       code: "EMAIL_SENT",
       message: "Reset link has been sent. It may take a few minutes to arrive.",
     });
-  } catch (e: any) {
+  } catch (error) {
     return err("UNEXPECTED", "Something went wrong. Please try again.", {
-      debug: e?.message ?? String(e),
+      debug: toMessage(error),
     });
   }
 }

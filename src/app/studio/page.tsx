@@ -706,42 +706,83 @@ function WorkspaceClient() {
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#f3fbff,_#ffffff)] pt-16">
       <div className="mx-auto w-full max-w-6xl px-4 lg:px-6">
-        <div className="mb-6 space-y-4 rounded-3xl border border-slate-100 bg-white px-6 py-6 shadow-sm">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-sm font-semibold text-slate-900">Editing tools</p>
-              <p className="text-xs text-slate-500">{toolbarMessage}</p>
+        <div className="mb-6 rounded-3xl border border-slate-100 bg-white px-6 py-6 shadow-sm">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">Editing tools</p>
+                <p className="text-xs text-slate-500">{toolbarMessage}</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  disabled={highlightButtonDisabled}
+                  onClick={() =>
+                    setHighlightMode((prev) => {
+                      const next = !prev;
+                      if (next) setDeleteMode(false);
+                      return next;
+                    })
+                  }
+                  aria-pressed={highlightActive}
+                  className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                    highlightActive
+                      ? "border-transparent bg-[#024d7c] text-white shadow-lg shadow-[#012a44]/30"
+                      : "border-slate-200 text-slate-700 hover:border-slate-300 disabled:hover:border-slate-200"
+                  } disabled:cursor-not-allowed disabled:opacity-50`}
+                >
+                  <Highlighter className="h-4 w-4" />
+                  Highlight
+                </button>
+                <button
+                  type="button"
+                  onClick={handleToggleDeleteMode}
+                  disabled={!hasAnyHighlights && !deleteMode}
+                  aria-pressed={deleteMode}
+                  className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                    deleteMode
+                      ? "border-transparent bg-slate-900 text-white shadow-lg shadow-slate-900/25"
+                      : "border-slate-200 text-slate-700 hover:border-slate-300 disabled:hover:border-slate-200"
+                  } disabled:cursor-not-allowed disabled:opacity-50`}
+                >
+                  <Eraser className="h-4 w-4" />
+                  Select highlights
+                </button>
+                <button
+                  type="button"
+                  onClick={handleUndoHighlight}
+                  disabled={!hasUndoHistory}
+                  className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-wide transition hover:border-slate-300 disabled:opacity-40"
+                >
+                  <Undo2 className="h-4 w-4" />
+                  Undo
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClearHighlights}
+                  disabled={!hasAnyHighlights}
+                  className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-wide transition hover:border-slate-300 disabled:opacity-40"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Clear
+                </button>
+              </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              disabled={highlightButtonDisabled}
-              onClick={() =>
-                setHighlightMode((prev) => {
-                  const next = !prev;
-                  if (next) setDeleteMode(false);
-                  return next;
-                })
-              }
-              aria-pressed={highlightActive}
-              className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition ${
+            <div
+              className={`overflow-hidden rounded-2xl border border-slate-100/80 bg-slate-50/80 px-4 transition-all duration-300 ease-out ${
                 highlightActive
-                  ? "border-transparent bg-[#024d7c] text-white shadow-lg shadow-[#012a44]/30"
-                  : "border-slate-200 text-slate-700 hover:border-slate-300 disabled:hover:border-slate-200"
-              } disabled:cursor-not-allowed disabled:opacity-50`}
+                  ? "pointer-events-auto max-h-40 translate-x-0 opacity-100 py-3"
+                  : "pointer-events-none max-h-0 -translate-x-4 opacity-0 py-0"
+              }`}
             >
-              <Highlighter className="h-4 w-4" />
-              Highlight
-            </button>
-            {highlightActive ? (
-              <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-600">
+              <div className="flex flex-wrap items-center gap-4 text-xs font-semibold text-slate-700">
                 <div className="flex items-center gap-2">
                   {highlightColorEntries.map(([key, value]) => (
                     <button
                       key={key}
                       type="button"
                       onClick={() => setHighlightColor(key)}
-                      className={`h-7 w-7 rounded-full border transition ${
+                      className={`flex h-8 w-8 items-center justify-center rounded-full border transition ${
                         highlightColor === key
                           ? "border-[#024d7c] ring-2 ring-[#024d7c]/30"
                           : "border-white/30 hover:border-slate-300"
@@ -751,68 +792,32 @@ function WorkspaceClient() {
                     />
                   ))}
                 </div>
-                <div className="flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[0.65rem] font-semibold uppercase tracking-wide text-slate-600">
+                <div className="flex items-center gap-2 rounded-full border border-slate-300 bg-white/80 px-3 py-1.5 text-[0.65rem] font-semibold uppercase tracking-wide text-slate-600 shadow-sm">
                   <button
                     type="button"
                     onClick={() => adjustHighlightThickness(-2)}
                     disabled={highlightThickness <= MIN_HIGHLIGHT_THICKNESS}
-                    className="rounded-full p-1 transition hover:bg-white disabled:opacity-40"
+                    className="rounded-full border border-transparent p-1 transition hover:border-slate-200 hover:bg-white disabled:opacity-40"
                   >
-                    <Minus className="h-3 w-3" />
+                    <Minus className="h-3.5 w-3.5" />
                   </button>
                   <span>{Math.round(highlightThickness)} px</span>
                   <button
                     type="button"
                     onClick={() => adjustHighlightThickness(2)}
                     disabled={highlightThickness >= MAX_HIGHLIGHT_THICKNESS}
-                    className="rounded-full p-1 transition hover:bg-white disabled:opacity-40"
+                    className="rounded-full border border-transparent p-1 transition hover:border-slate-200 hover:bg-white disabled:opacity-40"
                   >
-                    <Plus className="h-3 w-3" />
+                    <Plus className="h-3.5 w-3.5" />
                   </button>
                 </div>
               </div>
-            ) : null}
-            <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600">
-              <button
-                type="button"
-                onClick={handleUndoHighlight}
-                disabled={!hasUndoHistory}
-                className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1 uppercase tracking-wide transition hover:border-slate-300 disabled:opacity-40"
-              >
-                <Undo2 className="h-3 w-3" />
-                Undo
-              </button>
-              <button
-                type="button"
-                onClick={handleClearHighlights}
-                disabled={!hasAnyHighlights}
-                className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1 uppercase tracking-wide transition hover:border-slate-300 disabled:opacity-40"
-              >
-                <Trash2 className="h-3 w-3" />
-                Clear
-              </button>
-              <button
-                type="button"
-                onClick={handleToggleDeleteMode}
-                disabled={!hasAnyHighlights && !deleteMode}
-                aria-pressed={deleteMode}
-                className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 uppercase tracking-wide transition ${
-                  deleteMode
-                    ? "border-[#c2410c] bg-[#fee2e2] text-[#7c2d12]"
-                    : "border-slate-200 text-slate-600 hover:border-slate-300"
-                } disabled:opacity-40`}
-              >
-                <Eraser className="h-3 w-3" />
-                {deleteMode ? "Cancel delete" : "Delete"}
-              </button>
             </div>
           </div>
         </div>
-      </div>
-      <h1 className="mx-auto mt-4 max-w-6xl px-4 text-3xl font-semibold tracking-tight text-slate-900 lg:px-6">
-        Workspace
-      </h1>
 
+        <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900">Workspace</h1>
+      </div>
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 pt-4 pb-32 lg:px-6 lg:pt-6">
 
         {error && (

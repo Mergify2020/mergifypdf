@@ -29,7 +29,7 @@ function RemovePagesClient() {
       try {
         // Import pdf.js ONLY in the browser
         const pdfjsLib = await import("pdfjs-dist");
-        // @ts-ignore – set worker via CDN to avoid bundling the worker
+        // @ts-expect-error pdfjs types do not expose GlobalWorkerOptions in this build
         pdfjsLib.GlobalWorkerOptions.workerSrc =
           "https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
 

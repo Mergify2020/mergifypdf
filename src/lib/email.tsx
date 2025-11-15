@@ -6,7 +6,11 @@ import { SignupCodeEmail } from "@/emails/SignupCodeEmail";
 
 type SendArgs = { to: string; token: string };
 
-export async function sendResetEmail({ to, token }: SendArgs) {
+type ResetEmailSuccess = { ok: true; id?: string | null; fallback?: boolean };
+type ResetEmailFailure = { ok: false; error: string };
+export type ResetEmailResult = ResetEmailSuccess | ResetEmailFailure;
+
+export async function sendResetEmail({ to, token }: SendArgs): Promise<ResetEmailResult> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     console.error("[email] Missing RESEND_API_KEY");

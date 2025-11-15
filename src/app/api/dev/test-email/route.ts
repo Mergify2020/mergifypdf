@@ -13,7 +13,8 @@ export async function GET() {
       text: "If you received this, production can send email. 👍",
     });
     return NextResponse.json({ ok: !error, data, error });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }

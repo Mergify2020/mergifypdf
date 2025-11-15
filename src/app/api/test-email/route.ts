@@ -16,11 +16,13 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       ok: result.ok,
-      id: (result as any).id ?? null,
-      error: (result as any).error ?? null,
+      id: result.ok ? result.id ?? null : null,
+      fallback: result.ok ? Boolean(result.fallback) : undefined,
+      error: result.ok ? null : result.error,
     });
-  } catch (e) {
-    console.error(e);
-    return NextResponse.json({ ok: false, error: "Unexpected error" }, { status: 500 });
+  } catch (error) {
+    console.error(error);
+    const message = error instanceof Error ? error.message : "Unexpected error";
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }

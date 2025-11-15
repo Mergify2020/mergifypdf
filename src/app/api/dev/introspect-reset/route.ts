@@ -48,10 +48,19 @@ export async function GET() {
     `;
 
     return NextResponse.json({ ok: true, columns, constraints, indexes });
-  } catch (e: any) {
+  } catch (error) {
+    const errInfo =
+      typeof error === "object" && error !== null
+        ? {
+            name: "name" in error ? (error as { name?: string }).name : undefined,
+            code: "code" in error ? (error as { code?: string }).code : undefined,
+            message:
+              "message" in error ? (error as { message?: string }).message : String(error),
+          }
+        : { message: String(error) };
     return NextResponse.json({
       ok: false,
-      error: { name: e?.name, code: e?.code, message: e?.message },
+      error: errInfo,
     });
   }
 }

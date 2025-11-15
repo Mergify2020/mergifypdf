@@ -23,17 +23,24 @@ export async function createFreshResetTokenForUser(userId: string, expiresAt: Da
           select: { id: true, token: true, userId: true, createdAt: true, expiresAt: true },
         });
         return { ok: true as const, row };
-      } catch (e: any) {
-        if (e?.code === "P2002") {
+      } catch (error) {
+        const isUnique =
+          typeof error === "object" &&
+          error !== null &&
+          "code" in error &&
+          (error as { code?: string }).code === "P2002";
+        if (isUnique) {
           // token collision – try again with a new token
           continue;
         }
-        return { ok: false as const, error: String(e) };
+        const message = error instanceof Error ? error.message : String(error);
+        return { ok: false as const, error: message };
       }
     }
 
     return { ok: false as const, error: "token-collision-after-retries" };
-  } catch (e) {
-    return { ok: false as const, error: String(e) };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { ok: false as const, error: message };
   }
 }

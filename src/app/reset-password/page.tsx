@@ -29,8 +29,9 @@ function ResetPasswordInner() {
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Reset failed");
       setMsg("Password updated! You can now sign in.");
-    } catch (e: any) {
-      setErr(e.message || "Something went wrong");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Something went wrong";
+      setErr(message);
     } finally {
       setBusy(false);
     }
