@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
 
 export default function AccountPage() {
@@ -26,6 +26,14 @@ export default function AccountPage() {
   const [avatarMessage, setAvatarMessage] = useState<string | null>(null);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showCropper, setShowCropper] = useState(false);
+  const [pendingAvatar, setPendingAvatar] = useState<string | null>(null);
+  const [imageMeta, setImageMeta] = useState<{ width: number; height: number } | null>(null);
+  const [baseScale, setBaseScale] = useState(1);
+  const [scale, setScale] = useState(1);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const dragInfoRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
+  const cropCircleSize = 280;
 
   useEffect(() => {
     if (session?.user?.email) {
@@ -69,19 +77,149 @@ export default function AccountPage() {
   function handleAvatarChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
-    setAvatarBusy(true);
     setAvatarMessage(null);
     const reader = new FileReader();
     reader.onload = () => {
-      setAvatar(typeof reader.result === "string" ? reader.result : null);
-      setAvatarBusy(false);
-      setAvatarMessage("Profile photo updated.");
+      if (typeof reader.result === "string") {
+        setPendingAvatar(reader.result);
+        setShowCropper(true);
+      }
     };
     reader.onerror = () => {
-      setAvatarBusy(false);
       setAvatarMessage("Unable to load that image. Try a different file.");
     };
     reader.readAsDataURL(file);
+  }
+
+  useEffect(() => {
+    if (!pendingAvatar) return;
+    const img = new Image();
+    img.src = pendingAvatar;
+    img.onload = () => {
+      setImageMeta({ width: img.width, height: img.height });
+      const minDim = Math.min(img.width, img.height) || 1;
+      const nextBase = cropCircleSize / minDim;
+      setBaseScale(nextBase);
+      setScale(1);
+      setPosition({ x: 0, y: 0 });
+    };
+    img.onerror = () => {
+      setAvatarMessage("Unable to open that image. Try another file.");
+      setPendingAvatar(null);
+      setShowCropper(false);
+    };
+  }, [pendingAvatar]);
+
+  const clampPosition = useCallback(
+    (x: number, y: number, customScale = scale) => {
+      if (!imageMeta) return { x, y };
+      const scaledWidth = imageMeta.width * baseScale * customScale;
+      const scaledHeight = imageMeta.height * baseScale * customScale;
+      const maxX = Math.max(0, (scaledWidth - cropCircleSize) / 2);
+      const maxY = Math.max(0, (scaledHeight - cropCircleSize) / 2);
+      return {
+        x: Math.min(Math.max(x, -maxX), maxX),
+        y: Math.min(Math.max(y, -maxY), maxY),
+      };
+    },
+    [imageMeta, baseScale, scale, cropCircleSize]
+  );
+
+  const handlePointerMove = useCallback(
+    (event: PointerEvent) => {
+      if (!dragInfoRef.current) return;
+      const diffX = event.clientX - dragInfoRef.current.startX;
+      const diffY = event.clientY - dragInfoRef.current.startY;
+      setPosition(clampPosition(dragInfoRef.current.origX + diffX, dragInfoRef.current.origY + diffY));
+    },
+    [clampPosition]
+  );
+
+  const handlePointerUp = useCallback(() => {
+    dragInfoRef.current = null;
+    window.removeEventListener("pointermove", handlePointerMove);
+    window.removeEventListener("pointerup", handlePointerUp);
+  }, [handlePointerMove]);
+
+  function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    event.preventDefault();
+    dragInfoRef.current = {
+      startX: event.clientX,
+      startY: event.clientY,
+      origX: position.x,
+      origY: position.y,
+    };
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+  }
+
+  useEffect(() => {
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, [handlePointerMove, handlePointerUp]);
+
+  function handleScaleChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const next = Number(event.target.value);
+    const nextScale = Number.isNaN(next) ? scale : next;
+    setScale(nextScale);
+    setPosition((prev) => clampPosition(prev.x, prev.y, nextScale));
+  }
+
+  function handleCropCancel() {
+    setShowCropper(false);
+    setPendingAvatar(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }
+
+  function handleCropConfirm() {
+    if (!pendingAvatar || !imageMeta) return;
+    setAvatarBusy(true);
+    const image = new Image();
+    image.src = pendingAvatar;
+    image.onload = () => {
+      const canvasSize = 512;
+      const canvas = document.createElement("canvas");
+      canvas.width = canvasSize;
+      canvas.height = canvasSize;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        setAvatarBusy(false);
+        setAvatarMessage("Could not create a preview. Try again.");
+        return;
+      }
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(canvasSize / 2, canvasSize / 2, canvasSize / 2, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+
+      const previewToOutput = canvasSize / cropCircleSize;
+      ctx.translate(canvasSize / 2, canvasSize / 2);
+      ctx.scale(previewToOutput, previewToOutput);
+      ctx.translate(position.x, position.y);
+      ctx.scale(scale * baseScale, scale * baseScale);
+      ctx.translate(-image.width / 2, -image.height / 2);
+      ctx.drawImage(image, 0, 0);
+      ctx.restore();
+
+      const dataUrl = canvas.toDataURL("image/png");
+      setAvatar(dataUrl);
+      setAvatarBusy(false);
+      setAvatarMessage("Profile photo updated.");
+      setShowCropper(false);
+      setPendingAvatar(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    };
+    image.onerror = () => {
+      setAvatarBusy(false);
+      setAvatarMessage("Unable to process that photo. Try a different file.");
+    };
   }
 
   function handleAvatarReset() {
@@ -284,6 +422,100 @@ export default function AccountPage() {
           </>
         )}
       </section>
+
+      {showCropper && pendingAvatar ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 px-4 py-8">
+          <div className="w-full max-w-2xl rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Adjust your profile photo</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Drag to center the picture inside the circle. Use the slider to zoom.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCropCancel}
+                className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Close photo cropper"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mt-6 flex flex-col items-center gap-5">
+              <div className="relative h-80 w-80">
+                <div
+                  className="absolute inset-0 flex items-center justify-center"
+                  onPointerDown={handlePointerDown}
+                  role="presentation"
+                >
+                  <div className="relative h-64 w-64 overflow-hidden rounded-full bg-slate-900/10">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={pendingAvatar}
+                      alt="Crop preview"
+                      draggable={false}
+                      className="pointer-events-none select-none"
+                      style={{
+                        transform: `translate(${position.x}px, ${position.y}px) scale(${scale * baseScale})`,
+                        transformOrigin: "center",
+                      }}
+                    />
+                    <div
+                      className="pointer-events-none absolute inset-0 rounded-full opacity-70"
+                      style={{
+                        backgroundImage:
+                          "linear-gradient(#ffffff66 1px, transparent 1px), linear-gradient(90deg, #ffffff66 1px, transparent 1px)",
+                        backgroundSize: `${cropCircleSize / 3}px ${cropCircleSize / 3}px`,
+                      }}
+                    />
+                  </div>
+                </div>
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                  <div
+                    className="h-64 w-64 rounded-full ring-2 ring-white/90"
+                    style={{ boxShadow: "0 0 0 9999px rgba(15,23,42,0.75)" }}
+                  />
+                </div>
+              </div>
+
+              <div className="w-full max-w-sm">
+                <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Zoom
+                </label>
+                <input
+                  type="range"
+                  min="1"
+                  max="2.5"
+                  step="0.01"
+                  value={scale}
+                  onChange={handleScaleChange}
+                  className="mt-2 w-full accent-[#024d7c]"
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={handleCropCancel}
+                className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleCropConfirm}
+                disabled={avatarBusy}
+                className="rounded-xl bg-[#024d7c] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#013a60] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {avatarBusy ? "Saving…" : "Save photo"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }
