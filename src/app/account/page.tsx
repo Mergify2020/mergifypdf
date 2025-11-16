@@ -133,14 +133,9 @@ export default function AccountPage() {
       </div>
 
       <h1 className="text-3xl font-semibold tracking-tight">Account settings</h1>
-      <p className="mt-2 text-sm text-gray-600">
-        Update your sign-in email or change your password below. Changes will take effect the next
-        time you sign in.
-      </p>
 
       <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold">Profile</h2>
-        <p className="mt-1 text-sm text-gray-600">This is how we recognize you across MergifyPDF.</p>
         <dl className="mt-4 space-y-3">
           <div>
             <dt className="text-sm font-medium text-gray-700">Name</dt>
