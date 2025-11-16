@@ -2,13 +2,100 @@
 
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
 
 const PREVIEW_STAGE_SIZE = 256; // matches Tailwind h-64
-const CIRCLE_PADDING = 32; // inset-4 on each side
-const CROP_DIAMETER = PREVIEW_STAGE_SIZE - CIRCLE_PADDING;
-const MIN_ZOOM = 0.5;
+const MIN_CROP_SIZE = 56;
+
+type DisplayMeta = {
+  width: number;
+  height: number;
+  offsetX: number;
+  offsetY: number;
+  scale: number;
+};
+
+type CropRect = { x: number; y: number; size: number };
+type Bounds = { left: number; top: number; right: number; bottom: number };
+type CropHandle = "nw" | "ne" | "sw" | "se";
+const HANDLE_POSITIONS: Record<CropHandle, string> = {
+  nw: "-top-2 -left-2",
+  ne: "-top-2 -right-2",
+  sw: "-bottom-2 -left-2",
+  se: "-bottom-2 -right-2",
+};
+
+function computeBounds(meta: DisplayMeta | null): Bounds {
+  if (!meta) {
+    return { left: 0, top: 0, right: PREVIEW_STAGE_SIZE, bottom: PREVIEW_STAGE_SIZE };
+  }
+  return {
+    left: meta.offsetX,
+    top: meta.offsetY,
+    right: meta.offsetX + meta.width,
+    bottom: meta.offsetY + meta.height,
+  };
+}
+
+function clampRectToBounds(rect: CropRect, bounds: Bounds): CropRect {
+  const maxSize = Math.min(bounds.right - bounds.left, bounds.bottom - bounds.top);
+  const size = Math.min(Math.max(rect.size, MIN_CROP_SIZE), maxSize);
+  let x = rect.x;
+  let y = rect.y;
+  if (x < bounds.left) x = bounds.left;
+  if (y < bounds.top) y = bounds.top;
+  if (x + size > bounds.right) x = bounds.right - size;
+  if (y + size > bounds.bottom) y = bounds.bottom - size;
+  return { x, y, size };
+}
+
+function resizeRectByHandle(
+  handle: CropHandle,
+  startRect: CropRect,
+  dx: number,
+  dy: number,
+  bounds: Bounds
+): CropRect {
+  const right = startRect.x + startRect.size;
+  const bottom = startRect.y + startRect.size;
+  let nextRect: CropRect = startRect;
+
+  switch (handle) {
+    case "se": {
+      const newRight = Math.min(bounds.right, right + dx);
+      const newBottom = Math.min(bounds.bottom, bottom + dy);
+      const size = Math.max(MIN_CROP_SIZE, Math.min(newRight - startRect.x, newBottom - startRect.y));
+      nextRect = { x: startRect.x, y: startRect.y, size };
+      break;
+    }
+    case "sw": {
+      const newLeft = Math.max(bounds.left, startRect.x + dx);
+      const newBottom = Math.min(bounds.bottom, bottom + dy);
+      const size = Math.max(MIN_CROP_SIZE, Math.min(right - newLeft, newBottom - startRect.y));
+      nextRect = { x: right - size, y: startRect.y, size };
+      break;
+    }
+    case "ne": {
+      const newTop = Math.max(bounds.top, startRect.y + dy);
+      const newRight = Math.min(bounds.right, right + dx);
+      const size = Math.max(MIN_CROP_SIZE, Math.min(newRight - startRect.x, bottom - newTop));
+      nextRect = { x: startRect.x, y: bottom - size, size };
+      break;
+    }
+    case "nw": {
+      const newLeft = Math.max(bounds.left, startRect.x + dx);
+      const newTop = Math.max(bounds.top, startRect.y + dy);
+      const size = Math.max(MIN_CROP_SIZE, Math.min(right - newLeft, bottom - newTop));
+      nextRect = { x: right - size, y: bottom - size, size };
+      break;
+    }
+    default:
+      return startRect;
+  }
+
+  return clampRectToBounds(nextRect, bounds);
+}
 
 export default function AccountPage() {
   const { data: session } = useSession();
@@ -33,12 +120,8 @@ export default function AccountPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showCropper, setShowCropper] = useState(false);
   const [pendingAvatar, setPendingAvatar] = useState<string | null>(null);
-  const [imageMeta, setImageMeta] = useState<{ width: number; height: number } | null>(null);
-  const [baseScale, setBaseScale] = useState(1);
-  const [scale, setScale] = useState(1);
-  const [zoomBounds, setZoomBounds] = useState({ min: MIN_ZOOM, max: 3 });
-  const [position, setPosition] = useState({ x: 0, y: 0 });
-  const dragInfoRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
+  const [displayMeta, setDisplayMeta] = useState<DisplayMeta | null>(null);
+  const [cropRect, setCropRect] = useState<CropRect | null>(null);
 
   useEffect(() => {
     if (session?.user?.email) {
@@ -101,14 +184,18 @@ export default function AccountPage() {
     const img = new Image();
     img.src = pendingAvatar;
     img.onload = () => {
-      setImageMeta({ width: img.width, height: img.height });
-      const minDim = Math.min(img.width, img.height) || 1;
-      const nextBase = CROP_DIAMETER / minDim;
-      setBaseScale(nextBase);
-      setScale(1);
-      const dynamicMax = Math.max(3, 1 / Math.min(nextBase, 0.999) + 1);
-      setZoomBounds({ min: MIN_ZOOM, max: dynamicMax });
-      setPosition({ x: 0, y: 0 });
+      const scale = Math.min(PREVIEW_STAGE_SIZE / img.width, PREVIEW_STAGE_SIZE / img.height);
+      const width = img.width * scale;
+      const height = img.height * scale;
+      const offsetX = (PREVIEW_STAGE_SIZE - width) / 2;
+      const offsetY = (PREVIEW_STAGE_SIZE - height) / 2;
+      setDisplayMeta({ width, height, offsetX, offsetY, scale });
+      const initialSize = Math.min(width, height) * 0.7;
+      setCropRect({
+        x: offsetX + (width - initialSize) / 2,
+        y: offsetY + (height - initialSize) / 2,
+        size: initialSize,
+      });
     };
     img.onerror = () => {
       setAvatarMessage("Unable to open that image. Try another file.");
@@ -117,74 +204,69 @@ export default function AccountPage() {
     };
   }, [pendingAvatar]);
 
-  const clampPosition = useCallback(
-    (x: number, y: number, customScale = scale) => {
-      if (!imageMeta) return { x, y };
-      const scaledWidth = imageMeta.width * baseScale * customScale;
-      const scaledHeight = imageMeta.height * baseScale * customScale;
-      const maxX = Math.max(0, (scaledWidth - CROP_DIAMETER) / 2);
-      const maxY = Math.max(0, (scaledHeight - CROP_DIAMETER) / 2);
-      return {
-        x: Math.min(Math.max(x, -maxX), maxX),
-        y: Math.min(Math.max(y, -maxY), maxY),
-      };
-    },
-    [imageMeta, baseScale, scale]
-  );
 
-  const handlePointerMove = useCallback(
-    (event: PointerEvent) => {
-      if (!dragInfoRef.current) return;
-      const diffX = event.clientX - dragInfoRef.current.startX;
-      const diffY = event.clientY - dragInfoRef.current.startY;
-      setPosition(clampPosition(dragInfoRef.current.origX + diffX, dragInfoRef.current.origY + diffY));
-    },
-    [clampPosition]
-  );
-
-  const handlePointerUp = useCallback(() => {
-    dragInfoRef.current = null;
-    window.removeEventListener("pointermove", handlePointerMove);
-    window.removeEventListener("pointerup", handlePointerUp);
-  }, [handlePointerMove]);
-
-  function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
+  function startCropMove(event: React.PointerEvent<HTMLDivElement>) {
+    if (!cropRect) return;
     event.preventDefault();
-    dragInfoRef.current = {
-      startX: event.clientX,
-      startY: event.clientY,
-      origX: position.x,
-      origY: position.y,
-    };
-    window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointerup", handlePointerUp);
+    const startPointer = { x: event.clientX, y: event.clientY };
+    const startRect = cropRect;
+    const bounds = computeBounds(displayMeta);
+
+    function onMove(e: PointerEvent) {
+      const dx = e.clientX - startPointer.x;
+      const dy = e.clientY - startPointer.y;
+      const next = clampRectToBounds(
+        { x: startRect.x + dx, y: startRect.y + dy, size: startRect.size },
+        bounds
+      );
+      setCropRect(next);
+    }
+
+    function onUp() {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    }
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
   }
 
-  useEffect(() => {
-    return () => {
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerup", handlePointerUp);
-    };
-  }, [handlePointerMove, handlePointerUp]);
+  function startHandleResize(handle: CropHandle, event: React.PointerEvent<HTMLSpanElement>) {
+    if (!cropRect) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const startPointer = { x: event.clientX, y: event.clientY };
+    const startRect = cropRect;
+    const bounds = computeBounds(displayMeta);
 
-  function handleScaleChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const raw = Number(event.target.value);
-    if (Number.isNaN(raw)) return;
-    const nextScale = Math.min(Math.max(raw, zoomBounds.min), zoomBounds.max);
-    setScale(nextScale);
-    setPosition((prev) => clampPosition(prev.x, prev.y, nextScale));
+    function onMove(e: PointerEvent) {
+      const dx = e.clientX - startPointer.x;
+      const dy = e.clientY - startPointer.y;
+      const next = resizeRectByHandle(handle, startRect, dx, dy, bounds);
+      setCropRect(next);
+    }
+
+    function onUp() {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    }
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
   }
 
   function handleCropCancel() {
     setShowCropper(false);
     setPendingAvatar(null);
+    setDisplayMeta(null);
+    setCropRect(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
   }
 
   function handleCropConfirm() {
-    if (!pendingAvatar || !imageMeta) return;
+    if (!pendingAvatar || !displayMeta || !cropRect) return;
     setAvatarBusy(true);
     const image = new Image();
     image.src = pendingAvatar;
@@ -205,13 +287,11 @@ export default function AccountPage() {
       ctx.closePath();
       ctx.clip();
 
-      const scaleFactor = canvasSize / CROP_DIAMETER;
-      ctx.translate(canvasSize / 2, canvasSize / 2);
-      ctx.scale(scaleFactor, scaleFactor);
-      ctx.translate(position.x, position.y);
-      ctx.scale(scale * baseScale, scale * baseScale);
-      ctx.translate(-image.width / 2, -image.height / 2);
-      ctx.drawImage(image, 0, 0);
+      const cropX = (cropRect.x - displayMeta.offsetX) / displayMeta.scale;
+      const cropY = (cropRect.y - displayMeta.offsetY) / displayMeta.scale;
+      const cropSize = cropRect.size / displayMeta.scale;
+
+      ctx.drawImage(image, cropX, cropY, cropSize, cropSize, 0, 0, canvasSize, canvasSize);
       ctx.restore();
 
       const dataUrl = canvas.toDataURL("image/png");
@@ -220,6 +300,8 @@ export default function AccountPage() {
       setAvatarMessage("Profile photo updated.");
       setShowCropper(false);
       setPendingAvatar(null);
+      setDisplayMeta(null);
+      setCropRect(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -435,7 +517,7 @@ export default function AccountPage() {
               <div>
                 <h3 className="text-lg font-semibold text-slate-900">Adjust your profile photo</h3>
                 <p className="mt-1 text-sm text-slate-500">
-                  Drag to center the picture inside the circle. Use the slider to zoom.
+                  Drag the square to position your photo. Pull any corner to resize.
                 </p>
               </div>
               <button
@@ -450,52 +532,46 @@ export default function AccountPage() {
 
             <div className="mt-6 flex flex-col items-center gap-5">
               <div className="relative flex h-80 w-80 items-center justify-center">
-                <div
-                  className="relative h-64 w-64 cursor-grab overflow-hidden rounded-3xl bg-white shadow-inner shadow-slate-400/30"
-                  onPointerDown={handlePointerDown}
-                  role="presentation"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={pendingAvatar}
-                    alt="Crop preview"
-                    draggable={false}
-                    className="pointer-events-none absolute left-1/2 top-1/2 select-none"
-                    style={{
-                      transform: `translate(-50%, -50%) translate(${position.x}px, ${position.y}px) scale(${scale * baseScale})`,
-                      transformOrigin: "center",
-                    }}
-                  />
-                  <div
-                    className="pointer-events-none absolute inset-4 rounded-full border border-slate-800/40"
-                    style={{
-                      boxShadow: "0 0 0 999px rgba(15,23,42,0.6)",
-                    }}
-                  />
-                  <div
-                    className="pointer-events-none absolute inset-4 rounded-full"
-                    style={{
-                      backgroundImage:
-                        "linear-gradient(#dbeafe 1px, transparent 1px), linear-gradient(90deg, #dbeafe 1px, transparent 1px)",
-                      backgroundSize: `${CROP_DIAMETER / 3}px ${CROP_DIAMETER / 3}px`,
-                    }}
-                  />
+                <div className="relative h-64 w-64 overflow-hidden rounded-3xl bg-slate-900/5 shadow-inner shadow-slate-950/10">
+                  {pendingAvatar && displayMeta ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={pendingAvatar}
+                      alt="Crop preview"
+                      draggable={false}
+                      className="pointer-events-none absolute select-none"
+                      style={{
+                        width: displayMeta.width,
+                        height: displayMeta.height,
+                        left: displayMeta.offsetX,
+                        top: displayMeta.offsetY,
+                      }}
+                    />
+                  ) : (
+                    <div className="h-full w-full animate-pulse bg-slate-200" />
+                  )}
+                  {cropRect ? (
+                    <div
+                      role="presentation"
+                      onPointerDown={startCropMove}
+                      className="absolute cursor-move border-2 border-white/90 shadow-[0_0_0_9999px_rgba(15,23,42,0.45)]"
+                      style={{
+                        left: cropRect.x,
+                        top: cropRect.y,
+                        width: cropRect.size,
+                        height: cropRect.size,
+                      }}
+                    >
+                      {(["nw", "ne", "sw", "se"] as CropHandle[]).map((handle) => (
+                        <span
+                          key={handle}
+                          onPointerDown={(event) => startHandleResize(handle, event)}
+                          className={`absolute h-3.5 w-3.5 rounded-full border border-slate-200 bg-white shadow ${HANDLE_POSITIONS[handle]}`}
+                        />
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
-              </div>
-
-              <div className="w-full max-w-sm">
-                <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Zoom
-                </label>
-                <input
-                  type="range"
-                  min={zoomBounds.min}
-                  max={zoomBounds.max}
-                  step="0.01"
-                  value={scale}
-                  onChange={handleScaleChange}
-                  className="mt-2 w-full accent-[#024d7c]"
-                />
               </div>
             </div>
 
