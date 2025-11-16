@@ -4,6 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 
 const STORAGE_KEY = "mergify-avatar";
 
+type Listener = (value: string | null) => void;
+const listeners = new Set<Listener>();
+
 export function useAvatarPreference() {
   const [avatar, setAvatarState] = useState<string | null>(() => {
     if (typeof window === "undefined") return null;
@@ -28,7 +31,16 @@ export function useAvatarPreference() {
     } else {
       window.localStorage.removeItem(STORAGE_KEY);
     }
+    listeners.forEach((listener) => listener(value));
     setAvatarState(value);
+  }, []);
+
+  useEffect(() => {
+    const handler: Listener = (value) => setAvatarState(value);
+    listeners.add(handler);
+    return () => {
+      listeners.delete(handler);
+    };
   }, []);
 
   const clearAvatar = useCallback(() => {

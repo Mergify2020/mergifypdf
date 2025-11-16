@@ -182,6 +182,7 @@ export default function AccountPage() {
     image.src = pendingAvatar;
     image.onload = () => {
       const canvasSize = 512;
+      const circleRadius = canvasSize / 2;
       const canvas = document.createElement("canvas");
       canvas.width = canvasSize;
       canvas.height = canvasSize;
@@ -192,12 +193,14 @@ export default function AccountPage() {
         return;
       }
       ctx.save();
+      const effectiveRadius = (cropCircleSize - 32) / 2;
+      const scaleFactor = canvasSize / cropCircleSize;
       ctx.beginPath();
-      ctx.arc(canvasSize / 2, canvasSize / 2, canvasSize / 2, 0, Math.PI * 2);
+      ctx.arc(circleRadius, circleRadius, effectiveRadius * scaleFactor, 0, Math.PI * 2);
       ctx.closePath();
       ctx.clip();
 
-      const previewToOutput = canvasSize / cropCircleSize;
+      const previewToOutput = canvasSize / (cropCircleSize - 32);
       ctx.translate(canvasSize / 2, canvasSize / 2);
       ctx.scale(previewToOutput, previewToOutput);
       ctx.translate(position.x, position.y);
