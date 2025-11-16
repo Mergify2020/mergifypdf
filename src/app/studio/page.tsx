@@ -1003,8 +1003,25 @@ function WorkspaceClient() {
           <div className="rounded-3xl border border-dashed border-slate-200 bg-white/80 p-12 text-center shadow-sm">
             <p className="text-base font-semibold text-gray-800">No pages yet</p>
             <p className="mt-2 text-sm text-gray-500">
-              Go back to the homepage, upload your PDFs, and they will show up here instantly.
+              Bring your PDFs into the workspace — we&apos;ll show a live preview as soon as they finish uploading.
             </p>
+            <button
+              type="button"
+              onClick={handleAddClick}
+              className="mx-auto mt-6 inline-flex items-center gap-2 rounded-full bg-[#024d7c] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-[#012a44]/20 transition hover:bg-[#013d63] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#024d7c]"
+            >
+              Upload PDFs
+              <svg
+                className="h-4 w-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M12 5v14" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M5 12h14" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
             <p className="mt-6 text-xs uppercase tracking-[0.4em] text-gray-400">Workspace ready</p>
           </div>
         )}
@@ -1016,6 +1033,7 @@ function WorkspaceClient() {
             <button
               className="rounded-full border border-brand/30 bg-brand/5 px-5 py-2 text-sm font-semibold text-brand transition hover:bg-brand/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
               onClick={handleAddClick}
+              disabled={pages.length === 0}
             >
               Add pages
             </button>
