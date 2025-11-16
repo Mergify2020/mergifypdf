@@ -78,16 +78,6 @@ export const authOptions: NextAuthOptions = {
       const nextName = profile?.name ?? user?.name ?? (token.name as string | undefined);
       if (nextName) token.name = nextName;
 
-      if (user?.image) {
-        token.image = user.image;
-      } else if (!token.image) {
-        const record = await prisma.user.findUnique({
-          where: { id: userId },
-          select: { image: true },
-        });
-        token.image = record?.image ?? null;
-      }
-
       return token;
     },
 
@@ -97,17 +87,7 @@ export const authOptions: NextAuthOptions = {
         session.user.providers = (token.providers as string[] | undefined) ?? [];
         if (token.email) session.user.email = token.email as string;
         if (token.name) session.user.name = token.name as string;
-        if (token.sub) {
-          session.user.id = token.sub;
-          if (!token.image) {
-            const record = await prisma.user.findUnique({
-              where: { id: token.sub },
-              select: { image: true },
-            });
-            token.image = record?.image ?? null;
-          }
-          session.user.image = (token.image as string | null | undefined) ?? null;
-        }
+        if (token.sub) session.user.id = token.sub;
       }
       return session;
     },

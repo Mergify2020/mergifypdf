@@ -64,3 +64,17 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ success: true });
 }
+
+export async function GET() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { image: true },
+  });
+
+  return NextResponse.json({ success: true, image: user?.image ?? null });
+}

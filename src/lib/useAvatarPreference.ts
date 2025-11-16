@@ -3,64 +3,73 @@
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
 
 const avatarState = new Map<string, string | null>();
-const subscribers = new Map<string, Set<() => void>>();
+const listeners = new Map<string, Set<() => void>>();
+const fetchInFlight = new Set<string>();
 
-function ensureKey(key: string, initial?: string | null) {
-  if (!avatarState.has(key)) {
-    avatarState.set(key, initial ?? null);
-  } else if (initial && !avatarState.get(key)) {
-    avatarState.set(key, initial);
-  }
+function emit(key: string, value: string | null) {
+  avatarState.set(key, value);
+  const set = listeners.get(key);
+  set?.forEach((listener) => listener());
 }
 
-function subscribe(key: string, callback: () => void) {
-  let set = subscribers.get(key);
+function subscribe(key: string, listener: () => void) {
+  let set = listeners.get(key);
   if (!set) {
     set = new Set();
-    subscribers.set(key, set);
+    listeners.set(key, set);
   }
-  set.add(callback);
+  set.add(listener);
   return () => {
-    set?.delete(callback);
+    set?.delete(listener);
     if (set && set.size === 0) {
-      subscribers.delete(key);
+      listeners.delete(key);
     }
   };
 }
 
-function getSnapshot(key: string, initial?: string | null) {
-  ensureKey(key, initial);
-  return avatarState.get(key) ?? null;
+async function hydrateFromServer(key: string) {
+  if (fetchInFlight.has(key)) return;
+  fetchInFlight.add(key);
+  try {
+    const res = await fetch("/api/account/update-email", {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
+    if (!res.ok) return;
+    const data = (await res.json()) as { image?: string | null };
+    emit(key, data.image ?? null);
+  } catch {
+    // ignore network errors
+  } finally {
+    fetchInFlight.delete(key);
+  }
 }
 
-function updateStore(key: string, value: string | null) {
-  avatarState.set(key, value);
-  const set = subscribers.get(key);
-  set?.forEach((cb) => cb());
-}
-
-export function useAvatarPreference(profileId?: string | null, initialImage?: string | null) {
+export function useAvatarPreference(profileId?: string | null) {
   const storeKey = useMemo(() => profileId ?? "anonymous", [profileId]);
 
   useEffect(() => {
-    ensureKey(storeKey, initialImage);
-  }, [storeKey, initialImage]);
+    if (profileId && !avatarState.has(storeKey)) {
+      void hydrateFromServer(storeKey);
+    }
+  }, [storeKey, profileId]);
 
   const avatar = useSyncExternalStore(
     (callback) => subscribe(storeKey, callback),
-    () => getSnapshot(storeKey, initialImage),
-    () => initialImage ?? null
+    () => avatarState.get(storeKey) ?? null,
+    () => null
   );
 
   const setAvatar = useCallback(
     (value: string | null) => {
-      updateStore(storeKey, value);
+      emit(storeKey, value);
     },
     [storeKey]
   );
 
   const clearAvatar = useCallback(() => {
-    updateStore(storeKey, null);
+    emit(storeKey, null);
   }, [storeKey]);
 
   return { avatar, setAvatar, clearAvatar };

@@ -15,7 +15,6 @@ declare module "next-auth/jwt" {
   interface JWT {
     authType?: "oauth" | "credentials";
     providers?: string[];
-    image?: string | null;
   }
 }
 
