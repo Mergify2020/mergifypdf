@@ -444,38 +444,37 @@ export default function AccountPage() {
             </div>
 
             <div className="mt-6 flex flex-col items-center gap-5">
-              <div className="relative h-80 w-80">
+              <div className="relative h-80 w-80 flex items-center justify-center">
                 <div
-                  className="absolute inset-0 flex items-center justify-center"
+                  className="relative h-64 w-64 cursor-grab overflow-hidden rounded-full bg-white shadow-inner"
                   onPointerDown={handlePointerDown}
                   role="presentation"
                 >
-                  <div className="relative h-64 w-64 overflow-hidden rounded-full bg-slate-900/10">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={pendingAvatar}
-                      alt="Crop preview"
-                      draggable={false}
-                      className="pointer-events-none select-none"
-                      style={{
-                        transform: `translate(${position.x}px, ${position.y}px) scale(${scale * baseScale})`,
-                        transformOrigin: "center",
-                      }}
-                    />
-                    <div
-                      className="pointer-events-none absolute inset-0 rounded-full opacity-70"
-                      style={{
-                        backgroundImage:
-                          "linear-gradient(#ffffff66 1px, transparent 1px), linear-gradient(90deg, #ffffff66 1px, transparent 1px)",
-                        backgroundSize: `${cropCircleSize / 3}px ${cropCircleSize / 3}px`,
-                      }}
-                    />
-                  </div>
-                </div>
-                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={pendingAvatar}
+                    alt="Crop preview"
+                    draggable={false}
+                    className="pointer-events-none absolute left-1/2 top-1/2 select-none"
+                    style={{
+                      transform: `translate(-50%, -50%) translate(${position.x}px, ${position.y}px) scale(${scale * baseScale})`,
+                      transformOrigin: "center",
+                    }}
+                  />
                   <div
-                    className="h-64 w-64 rounded-full ring-2 ring-white/90"
-                    style={{ boxShadow: "0 0 0 9999px rgba(15,23,42,0.75)" }}
+                    className="pointer-events-none absolute inset-0 rounded-full"
+                    style={{
+                      backgroundImage:
+                        "linear-gradient(#dbeafe 1px, transparent 1px), linear-gradient(90deg, #dbeafe 1px, transparent 1px)",
+                      backgroundSize: `${cropCircleSize / 3}px ${cropCircleSize / 3}px`,
+                    }}
+                  />
+                  <div
+                    className="pointer-events-none absolute inset-0 rounded-full"
+                    style={{
+                      background:
+                        "radial-gradient(circle at center, rgba(0,0,0,0) 62%, rgba(15,23,42,0.55) 63%)",
+                    }}
                   />
                 </div>
               </div>
