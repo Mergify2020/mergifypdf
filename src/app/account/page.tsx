@@ -33,7 +33,9 @@ export default function AccountPage() {
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const dragInfoRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
-  const cropCircleSize = 280;
+const PREVIEW_STAGE_SIZE = 256; // matches Tailwind h-64
+const CIRCLE_PADDING = 32; // inset-4 on each side
+const CROP_DIAMETER = PREVIEW_STAGE_SIZE - CIRCLE_PADDING;
 
   useEffect(() => {
     if (session?.user?.email) {
@@ -98,7 +100,7 @@ export default function AccountPage() {
     img.onload = () => {
       setImageMeta({ width: img.width, height: img.height });
       const minDim = Math.min(img.width, img.height) || 1;
-      const nextBase = cropCircleSize / minDim;
+      const nextBase = CROP_DIAMETER / minDim;
       setBaseScale(nextBase);
       setScale(1);
       setPosition({ x: 0, y: 0 });
@@ -108,21 +110,21 @@ export default function AccountPage() {
       setPendingAvatar(null);
       setShowCropper(false);
     };
-  }, [pendingAvatar]);
+  }, [pendingAvatar, CROP_DIAMETER]);
 
   const clampPosition = useCallback(
     (x: number, y: number, customScale = scale) => {
       if (!imageMeta) return { x, y };
       const scaledWidth = imageMeta.width * baseScale * customScale;
       const scaledHeight = imageMeta.height * baseScale * customScale;
-      const maxX = Math.max(0, (scaledWidth - cropCircleSize) / 2);
-      const maxY = Math.max(0, (scaledHeight - cropCircleSize) / 2);
+      const maxX = Math.max(0, (scaledWidth - CROP_DIAMETER) / 2);
+      const maxY = Math.max(0, (scaledHeight - CROP_DIAMETER) / 2);
       return {
         x: Math.min(Math.max(x, -maxX), maxX),
         y: Math.min(Math.max(y, -maxY), maxY),
       };
     },
-    [imageMeta, baseScale, scale, cropCircleSize]
+    [imageMeta, baseScale, scale, CROP_DIAMETER]
   );
 
   const handlePointerMove = useCallback(
@@ -182,7 +184,6 @@ export default function AccountPage() {
     image.src = pendingAvatar;
     image.onload = () => {
       const canvasSize = 512;
-      const circleRadius = canvasSize / 2;
       const canvas = document.createElement("canvas");
       canvas.width = canvasSize;
       canvas.height = canvasSize;
@@ -193,16 +194,14 @@ export default function AccountPage() {
         return;
       }
       ctx.save();
-      const effectiveRadius = (cropCircleSize - 32) / 2;
-      const scaleFactor = canvasSize / cropCircleSize;
       ctx.beginPath();
-      ctx.arc(circleRadius, circleRadius, effectiveRadius * scaleFactor, 0, Math.PI * 2);
+      ctx.arc(canvasSize / 2, canvasSize / 2, canvasSize / 2, 0, Math.PI * 2);
       ctx.closePath();
       ctx.clip();
 
-      const previewToOutput = canvasSize / (cropCircleSize - 32);
+      const scaleFactor = canvasSize / CROP_DIAMETER;
       ctx.translate(canvasSize / 2, canvasSize / 2);
-      ctx.scale(previewToOutput, previewToOutput);
+      ctx.scale(scaleFactor, scaleFactor);
       ctx.translate(position.x, position.y);
       ctx.scale(scale * baseScale, scale * baseScale);
       ctx.translate(-image.width / 2, -image.height / 2);
@@ -298,9 +297,6 @@ export default function AccountPage() {
             )}
             <div>
               <p className="text-sm font-semibold text-gray-800">Profile photo</p>
-              <p className="text-xs text-gray-500">
-                JPG, PNG, or GIF. We’ll crop it into a circle automatically.
-              </p>
             </div>
           </div>
           <div className="flex gap-3">
@@ -466,14 +462,16 @@ export default function AccountPage() {
                   />
                   <div
                     className="pointer-events-none absolute inset-4 rounded-full border border-slate-800/40"
-                    style={{ boxShadow: "0 0 0 999px rgba(15,23,42,0.6)" }}
+                    style={{
+                      boxShadow: "0 0 0 999px rgba(15,23,42,0.6)",
+                    }}
                   />
                   <div
                     className="pointer-events-none absolute inset-4 rounded-full"
                     style={{
                       backgroundImage:
                         "linear-gradient(#dbeafe 1px, transparent 1px), linear-gradient(90deg, #dbeafe 1px, transparent 1px)",
-                      backgroundSize: `${(cropCircleSize - 32) / 3}px ${(cropCircleSize - 32) / 3}px`,
+                      backgroundSize: `${CROP_DIAMETER / 3}px ${CROP_DIAMETER / 3}px`,
                     }}
                   />
                 </div>
