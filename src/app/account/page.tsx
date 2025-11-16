@@ -115,7 +115,8 @@ export default function AccountPage() {
   const [passwordBusy, setPasswordBusy] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
   const avatarKey = session?.user?.email ?? session?.user?.id ?? null;
-  const { avatar, setAvatar, clearAvatar } = useAvatarPreference(avatarKey);
+  const initialAvatar = session?.user?.image ?? null;
+  const { avatar, setAvatar, clearAvatar } = useAvatarPreference(avatarKey, initialAvatar);
   const [avatarMessage, setAvatarMessage] = useState<string | null>(null);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -271,7 +272,8 @@ export default function AccountPage() {
     setAvatarBusy(true);
     const image = new Image();
     image.src = pendingAvatar;
-    image.onload = () => {
+    image.onload = async () => {
+      try {
       const canvasSize = 512;
       const canvas = document.createElement("canvas");
       canvas.width = canvasSize;
@@ -296,6 +298,15 @@ export default function AccountPage() {
       ctx.restore();
 
       const dataUrl = canvas.toDataURL("image/png");
+      const response = await fetch("/api/account/update-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: dataUrl }),
+      });
+      if (!response.ok) {
+        throw new Error("Unable to save photo. Please try again.");
+      }
+
       setAvatar(dataUrl);
       setAvatarBusy(false);
       setAvatarMessage("Profile photo updated.");
@@ -306,6 +317,12 @@ export default function AccountPage() {
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
+      } catch (error) {
+        setAvatarBusy(false);
+        setAvatarMessage(
+          error instanceof Error ? error.message : "Unable to update your avatar right now."
+        );
+      }
     };
     image.onerror = () => {
       setAvatarBusy(false);
@@ -313,12 +330,29 @@ export default function AccountPage() {
     };
   }
 
-  function handleAvatarReset() {
-    clearAvatar();
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
+  async function handleAvatarReset() {
+    try {
+      setAvatarBusy(true);
+      const response = await fetch("/api/account/update-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: "" }),
+      });
+      if (!response.ok) {
+        throw new Error("Unable to remove avatar.");
+      }
+      clearAvatar();
+      setAvatarMessage("Reverted to the default avatar.");
+    } catch (error) {
+      setAvatarMessage(
+        error instanceof Error ? error.message : "Unable to update your avatar right now."
+      );
+    } finally {
+      setAvatarBusy(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
-    setAvatarMessage("Reverted to the default avatar.");
   }
 
   async function handlePasswordSubmit(event: React.FormEvent) {

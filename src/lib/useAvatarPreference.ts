@@ -1,70 +1,67 @@
 "use client";
 
-import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
 
-const STORAGE_PREFIX = "mergify-avatar";
+const avatarState = new Map<string, string | null>();
+const subscribers = new Map<string, Set<() => void>>();
 
-type Subscriber = () => void;
-const subscribers = new Map<string, Set<Subscriber>>();
-
-function storageKeyFor(profileId?: string | null) {
-  return profileId ? `${STORAGE_PREFIX}:${profileId}` : STORAGE_PREFIX;
+function ensureKey(key: string, initial?: string | null) {
+  if (!avatarState.has(key)) {
+    avatarState.set(key, initial ?? null);
+  } else if (initial && !avatarState.get(key)) {
+    avatarState.set(key, initial);
+  }
 }
 
-function subscribeKey(key: string, callback: Subscriber) {
-  if (typeof window === "undefined") return () => {};
+function subscribe(key: string, callback: () => void) {
   let set = subscribers.get(key);
   if (!set) {
     set = new Set();
     subscribers.set(key, set);
   }
   set.add(callback);
-
-  function handleStorage(event: StorageEvent) {
-    if (!event.key || event.key === key) {
-      callback();
-    }
-  }
-
-  window.addEventListener("storage", handleStorage);
   return () => {
     set?.delete(callback);
-    window.removeEventListener("storage", handleStorage);
     if (set && set.size === 0) {
       subscribers.delete(key);
     }
   };
 }
 
-function getSnapshotForKey(key: string) {
-  if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(key);
+function getSnapshot(key: string, initial?: string | null) {
+  ensureKey(key, initial);
+  return avatarState.get(key) ?? null;
 }
 
-export function useAvatarPreference(profileId?: string | null) {
-  const storageKey = useMemo(() => storageKeyFor(profileId), [profileId]);
+function updateStore(key: string, value: string | null) {
+  avatarState.set(key, value);
+  const set = subscribers.get(key);
+  set?.forEach((cb) => cb());
+}
+
+export function useAvatarPreference(profileId?: string | null, initialImage?: string | null) {
+  const storeKey = useMemo(() => profileId ?? "anonymous", [profileId]);
+
+  useEffect(() => {
+    ensureKey(storeKey, initialImage);
+  }, [storeKey, initialImage]);
 
   const avatar = useSyncExternalStore(
-    (callback) => subscribeKey(storageKey, callback),
-    () => getSnapshotForKey(storageKey),
-    () => null
+    (callback) => subscribe(storeKey, callback),
+    () => getSnapshot(storeKey, initialImage),
+    () => initialImage ?? null
   );
 
-  const persist = useCallback(
+  const setAvatar = useCallback(
     (value: string | null) => {
-      if (typeof window === "undefined") return;
-      if (value) {
-        window.localStorage.setItem(storageKey, value);
-      } else {
-        window.localStorage.removeItem(storageKey);
-      }
-      const set = subscribers.get(storageKey);
-      set?.forEach((listener) => listener());
+      updateStore(storeKey, value);
     },
-    [storageKey]
+    [storeKey]
   );
 
-  const clearAvatar = useCallback(() => persist(null), [persist]);
+  const clearAvatar = useCallback(() => {
+    updateStore(storeKey, null);
+  }, [storeKey]);
 
-  return { avatar, setAvatar: persist, clearAvatar };
+  return { avatar, setAvatar, clearAvatar };
 }
