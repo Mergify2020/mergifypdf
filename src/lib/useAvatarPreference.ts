@@ -1,51 +1,70 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
 
-const STORAGE_KEY = "mergify-avatar";
+const STORAGE_PREFIX = "mergify-avatar";
 
-type Listener = (value: string | null) => void;
-const listeners = new Set<Listener>();
+type Subscriber = () => void;
+const subscribers = new Map<string, Set<Subscriber>>();
 
-export function useAvatarPreference() {
-  const [avatar, setAvatarState] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    return window.localStorage.getItem(STORAGE_KEY);
-  });
+function storageKeyFor(profileId?: string | null) {
+  return profileId ? `${STORAGE_PREFIX}:${profileId}` : STORAGE_PREFIX;
+}
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    function handleStorage(event: StorageEvent) {
-      if (event.key === STORAGE_KEY) {
-        setAvatarState(event.newValue);
+function subscribeKey(key: string, callback: Subscriber) {
+  if (typeof window === "undefined") return () => {};
+  let set = subscribers.get(key);
+  if (!set) {
+    set = new Set();
+    subscribers.set(key, set);
+  }
+  set.add(callback);
+
+  function handleStorage(event: StorageEvent) {
+    if (!event.key || event.key === key) {
+      callback();
+    }
+  }
+
+  window.addEventListener("storage", handleStorage);
+  return () => {
+    set?.delete(callback);
+    window.removeEventListener("storage", handleStorage);
+    if (set && set.size === 0) {
+      subscribers.delete(key);
+    }
+  };
+}
+
+function getSnapshotForKey(key: string) {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(key);
+}
+
+export function useAvatarPreference(profileId?: string | null) {
+  const storageKey = useMemo(() => storageKeyFor(profileId), [profileId]);
+
+  const avatar = useSyncExternalStore(
+    (callback) => subscribeKey(storageKey, callback),
+    () => getSnapshotForKey(storageKey),
+    () => null
+  );
+
+  const persist = useCallback(
+    (value: string | null) => {
+      if (typeof window === "undefined") return;
+      if (value) {
+        window.localStorage.setItem(storageKey, value);
+      } else {
+        window.localStorage.removeItem(storageKey);
       }
-    }
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
-  }, []);
+      const set = subscribers.get(storageKey);
+      set?.forEach((listener) => listener());
+    },
+    [storageKey]
+  );
 
-  const persist = useCallback((value: string | null) => {
-    if (typeof window === "undefined") return;
-    if (value) {
-      window.localStorage.setItem(STORAGE_KEY, value);
-    } else {
-      window.localStorage.removeItem(STORAGE_KEY);
-    }
-    listeners.forEach((listener) => listener(value));
-    setAvatarState(value);
-  }, []);
-
-  useEffect(() => {
-    const handler: Listener = (value) => setAvatarState(value);
-    listeners.add(handler);
-    return () => {
-      listeners.delete(handler);
-    };
-  }, []);
-
-  const clearAvatar = useCallback(() => {
-    persist(null);
-  }, [persist]);
+  const clearAvatar = useCallback(() => persist(null), [persist]);
 
   return { avatar, setAvatar: persist, clearAvatar };
 }
