@@ -78,6 +78,8 @@ export const authOptions: NextAuthOptions = {
       const nextName = profile?.name ?? user?.name ?? (token.name as string | undefined);
       if (nextName) token.name = nextName;
 
+      delete (token as Record<string, unknown>).picture;
+      delete (token as Record<string, unknown>).image;
       return token;
     },
 
@@ -88,6 +90,7 @@ export const authOptions: NextAuthOptions = {
         if (token.email) session.user.email = token.email as string;
         if (token.name) session.user.name = token.name as string;
         if (token.sub) session.user.id = token.sub;
+        if (session.user) session.user.image = null;
       }
       return session;
     },

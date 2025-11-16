@@ -12,8 +12,7 @@ export default function SettingsMenu() {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const avatarKey = session?.user?.email ?? session?.user?.id ?? null;
-  const initialAvatar = session?.user?.image ?? null;
-  const { avatar } = useAvatarPreference(avatarKey, initialAvatar);
+  const { avatar } = useAvatarPreference(avatarKey);
 
   useEffect(() => {
     if (!open) return;

@@ -115,8 +115,7 @@ export default function AccountPage() {
   const [passwordBusy, setPasswordBusy] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
   const avatarKey = session?.user?.email ?? session?.user?.id ?? null;
-  const initialAvatar = session?.user?.image ?? null;
-  const { avatar, setAvatar, clearAvatar } = useAvatarPreference(avatarKey, initialAvatar);
+  const { avatar, setAvatar, clearAvatar } = useAvatarPreference(avatarKey);
   const [avatarMessage, setAvatarMessage] = useState<string | null>(null);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
