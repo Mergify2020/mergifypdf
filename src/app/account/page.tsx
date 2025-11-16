@@ -444,9 +444,9 @@ export default function AccountPage() {
             </div>
 
             <div className="mt-6 flex flex-col items-center gap-5">
-              <div className="relative h-80 w-80 flex items-center justify-center">
+              <div className="relative flex h-80 w-80 items-center justify-center">
                 <div
-                  className="relative h-64 w-64 cursor-grab overflow-hidden rounded-full bg-white shadow-inner"
+                  className="relative h-64 w-64 cursor-grab overflow-hidden rounded-3xl bg-white shadow-inner shadow-slate-400/30"
                   onPointerDown={handlePointerDown}
                   role="presentation"
                 >
@@ -462,18 +462,15 @@ export default function AccountPage() {
                     }}
                   />
                   <div
-                    className="pointer-events-none absolute inset-0 rounded-full"
+                    className="pointer-events-none absolute inset-4 rounded-full border border-slate-800/40"
+                    style={{ boxShadow: "0 0 0 999px rgba(15,23,42,0.6)" }}
+                  />
+                  <div
+                    className="pointer-events-none absolute inset-4 rounded-full"
                     style={{
                       backgroundImage:
                         "linear-gradient(#dbeafe 1px, transparent 1px), linear-gradient(90deg, #dbeafe 1px, transparent 1px)",
-                      backgroundSize: `${cropCircleSize / 3}px ${cropCircleSize / 3}px`,
-                    }}
-                  />
-                  <div
-                    className="pointer-events-none absolute inset-0 rounded-full"
-                    style={{
-                      background:
-                        "radial-gradient(circle at center, rgba(0,0,0,0) 62%, rgba(15,23,42,0.55) 63%)",
+                      backgroundSize: `${(cropCircleSize - 32) / 3}px ${(cropCircleSize - 32) / 3}px`,
                     }}
                   />
                 </div>
