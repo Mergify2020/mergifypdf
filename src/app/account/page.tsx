@@ -31,11 +31,13 @@ export default function AccountPage() {
   const [imageMeta, setImageMeta] = useState<{ width: number; height: number } | null>(null);
   const [baseScale, setBaseScale] = useState(1);
   const [scale, setScale] = useState(1);
+  const [zoomBounds, setZoomBounds] = useState({ min: MIN_ZOOM, max: 3 });
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const dragInfoRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
 const PREVIEW_STAGE_SIZE = 256; // matches Tailwind h-64
 const CIRCLE_PADDING = 32; // inset-4 on each side
 const CROP_DIAMETER = PREVIEW_STAGE_SIZE - CIRCLE_PADDING;
+const MIN_ZOOM = 0.5;
 
   useEffect(() => {
     if (session?.user?.email) {
@@ -103,6 +105,8 @@ const CROP_DIAMETER = PREVIEW_STAGE_SIZE - CIRCLE_PADDING;
       const nextBase = CROP_DIAMETER / minDim;
       setBaseScale(nextBase);
       setScale(1);
+      const dynamicMax = Math.max(3, 1 / Math.min(nextBase, 0.999) + 1);
+      setZoomBounds({ min: MIN_ZOOM, max: dynamicMax });
       setPosition({ x: 0, y: 0 });
     };
     img.onerror = () => {
@@ -163,8 +167,9 @@ const CROP_DIAMETER = PREVIEW_STAGE_SIZE - CIRCLE_PADDING;
   }, [handlePointerMove, handlePointerUp]);
 
   function handleScaleChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const next = Number(event.target.value);
-    const nextScale = Number.isNaN(next) ? scale : next;
+    const raw = Number(event.target.value);
+    if (Number.isNaN(raw)) return;
+    const nextScale = Math.min(Math.max(raw, zoomBounds.min), zoomBounds.max);
     setScale(nextScale);
     setPosition((prev) => clampPosition(prev.x, prev.y, nextScale));
   }
@@ -483,8 +488,8 @@ const CROP_DIAMETER = PREVIEW_STAGE_SIZE - CIRCLE_PADDING;
                 </label>
                 <input
                   type="range"
-                  min="1"
-                  max="2.5"
+                  min={zoomBounds.min}
+                  max={zoomBounds.max}
                   step="0.01"
                   value={scale}
                   onChange={handleScaleChange}
