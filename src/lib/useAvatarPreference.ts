@@ -46,8 +46,13 @@ async function hydrateFromServer(key: string) {
   }
 }
 
-export function useAvatarPreference(profileId?: string | null) {
+export function useAvatarPreference(profileId?: string | null, initialImage?: string | null) {
   const storeKey = useMemo(() => profileId ?? "anonymous", [profileId]);
+  useMemo(() => {
+    if (initialImage !== undefined && !avatarState.has(storeKey)) {
+      avatarState.set(storeKey, initialImage);
+    }
+  }, [storeKey, initialImage]);
 
   useEffect(() => {
     if (profileId && !avatarState.has(storeKey)) {
@@ -58,7 +63,7 @@ export function useAvatarPreference(profileId?: string | null) {
   const avatar = useSyncExternalStore(
     (callback) => subscribe(storeKey, callback),
     () => avatarState.get(storeKey) ?? null,
-    () => null
+    () => initialImage ?? null
   );
 
   const setAvatar = useCallback(
