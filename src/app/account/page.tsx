@@ -5,6 +5,11 @@ import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
 
+const PREVIEW_STAGE_SIZE = 256; // matches Tailwind h-64
+const CIRCLE_PADDING = 32; // inset-4 on each side
+const CROP_DIAMETER = PREVIEW_STAGE_SIZE - CIRCLE_PADDING;
+const MIN_ZOOM = 0.5;
+
 export default function AccountPage() {
   const { data: session } = useSession();
   const providers = session?.user?.providers ?? [];
@@ -34,10 +39,6 @@ export default function AccountPage() {
   const [zoomBounds, setZoomBounds] = useState({ min: MIN_ZOOM, max: 3 });
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const dragInfoRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
-const PREVIEW_STAGE_SIZE = 256; // matches Tailwind h-64
-const CIRCLE_PADDING = 32; // inset-4 on each side
-const CROP_DIAMETER = PREVIEW_STAGE_SIZE - CIRCLE_PADDING;
-const MIN_ZOOM = 0.5;
 
   useEffect(() => {
     if (session?.user?.email) {
@@ -114,7 +115,7 @@ const MIN_ZOOM = 0.5;
       setPendingAvatar(null);
       setShowCropper(false);
     };
-  }, [pendingAvatar, CROP_DIAMETER]);
+  }, [pendingAvatar]);
 
   const clampPosition = useCallback(
     (x: number, y: number, customScale = scale) => {
@@ -128,7 +129,7 @@ const MIN_ZOOM = 0.5;
         y: Math.min(Math.max(y, -maxY), maxY),
       };
     },
-    [imageMeta, baseScale, scale, CROP_DIAMETER]
+    [imageMeta, baseScale, scale]
   );
 
   const handlePointerMove = useCallback(
