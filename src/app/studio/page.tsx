@@ -131,25 +131,24 @@ function SortableThumb({
     <li ref={setNodeRef} style={style} className="w-full" {...attributes} {...listeners}>
       <button
         type="button"
+        aria-label={`Focus page ${index + 1}`}
         onClick={onSelect}
-        className={`flex w-full flex-col items-center gap-3 rounded-2xl border px-3 pb-3 pt-4 text-left shadow-sm transition ${
-          selected
-            ? "border-brand bg-brand/5 ring-2 ring-brand/40"
-            : "border-slate-200 bg-white hover:border-slate-300"
+        className={`group relative block w-full overflow-hidden rounded-2xl bg-white/95 shadow-sm ring-1 transition ${
+          selected ? "ring-brand shadow-brand/30" : "ring-slate-200 hover:ring-brand/40 hover:shadow-md"
         }`}
       >
-        <div
-          className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ${
-            selected ? "bg-brand text-white" : "bg-slate-100 text-slate-700"
+        <span
+          className={`pointer-events-none absolute left-3 top-3 inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold text-white ${
+            selected ? "bg-brand" : "bg-slate-900/70"
           }`}
         >
           {index + 1}
-        </div>
+        </span>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={item.thumb}
           alt={`Page ${index + 1}`}
-          className="pointer-events-none w-full border border-slate-200 bg-white shadow"
+          className="pointer-events-none block w-full bg-white object-contain"
         />
       </button>
     </li>
@@ -946,12 +945,11 @@ function WorkspaceClient() {
         )}
 
         {!loading && pages.length > 0 && (
-          <div className="rounded-3xl border border-slate-100 bg-white/95 p-5 shadow-sm">
-            <div className="flex flex-col gap-6 lg:flex-row">
-              <div className="flex-1 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/60 shadow-inner">
-                <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_240px]">
+            <div className="rounded-2xl bg-white/95 p-5 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+                <div className="flex flex-wrap items-end justify-between gap-3 pb-3">
                   <div>
-                    <p className="text-sm font-semibold text-slate-800">Large preview</p>
+                    <p className="text-sm font-semibold text-slate-900">Large preview</p>
                     <p className="text-xs text-slate-500">Scroll to review every page</p>
                   </div>
                   <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -960,7 +958,7 @@ function WorkspaceClient() {
                 </div>
                 <div
                   ref={previewContainerRef}
-                  className="h-[70vh] space-y-8 overflow-y-auto px-5 py-6"
+                  className="h-[70vh] space-y-6 overflow-y-auto"
                 >
                   {pages.map((page, idx) => {
                     const pageHighlights = highlights[page.id] ?? [];
@@ -969,13 +967,11 @@ function WorkspaceClient() {
                         key={page.id}
                         data-page-id={page.id}
                         ref={registerPreviewRef(page.id)}
-                        className={`rounded-3xl border bg-white p-4 shadow-sm transition ${
-                          activePageId === page.id
-                            ? "border-brand ring-2 ring-brand/30"
-                            : "border-slate-200"
+                        className={`rounded-2xl bg-white/95 p-4 shadow-sm ring-1 transition ${
+                          activePageId === page.id ? "ring-brand shadow-brand/25" : "ring-slate-100"
                         }`}
                       >
-                        <div className="mb-3 flex items-center justify-between gap-4 text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-slate-400">
+                        <div className="mb-2 flex items-center justify-between gap-4 text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-slate-500">
                           <span>Page {idx + 1}</span>
                           <span
                             className="truncate text-right tracking-[0.2em]"
@@ -985,7 +981,7 @@ function WorkspaceClient() {
                           </span>
                         </div>
                         <div
-                          className="mx-auto max-w-3xl border border-slate-300 bg-white shadow-[0_20px_50px_rgba(15,23,42,0.15)]"
+                          className="mx-auto max-w-3xl overflow-hidden rounded-[1.25rem] bg-white shadow-[0_20px_50px_rgba(15,23,42,0.12)]"
                           style={{ transform: `scale(${zoom})`, transformOrigin: "top center" }}
                         >
                         <div
@@ -1062,32 +1058,31 @@ function WorkspaceClient() {
                 </div>
               </div>
 
-              <div className="lg:w-64">
-                <div className="rounded-2xl border border-slate-200 bg-white shadow-inner">
-                  <div className="border-b border-slate-200 px-4 py-3">
-                    <p className="text-sm font-semibold text-slate-800">Page order</p>
-                    <p className="text-xs text-slate-500">Tap to focus or drag to reorder</p>
-                  </div>
-                  <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={handleDragEnd}
-                  >
-                    <SortableContext items={itemsIds} strategy={verticalListSortingStrategy}>
-                      <ul className="flex max-h-[70vh] flex-col gap-3 overflow-y-auto p-4">
-                        {pages.map((p, i) => (
-                          <SortableThumb
-                            key={p.id}
-                            item={p}
-                            index={i}
-                            selected={p.id === activePageId}
-                            onSelect={() => handleSelectPage(p.id)}
-                          />
-                        ))}
-                      </ul>
-                    </SortableContext>
-                  </DndContext>
+            <div className="lg:w-[240px]">
+              <div className="flex h-full flex-col rounded-2xl bg-slate-50/80 p-4 ring-1 ring-slate-200/80">
+                <div className="flex flex-col gap-1">
+                  <p className="text-sm font-semibold text-slate-800">Page order</p>
+                  <p className="text-xs text-slate-500">Tap to focus or drag to reorder</p>
                 </div>
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext items={itemsIds} strategy={verticalListSortingStrategy}>
+                    <ul className="mt-4 flex max-h-[70vh] flex-col gap-3 overflow-y-auto pr-1">
+                      {pages.map((p, i) => (
+                        <SortableThumb
+                          key={p.id}
+                          item={p}
+                          index={i}
+                          selected={p.id === activePageId}
+                          onSelect={() => handleSelectPage(p.id)}
+                        />
+                      ))}
+                    </ul>
+                  </SortableContext>
+                </DndContext>
               </div>
             </div>
           </div>
