@@ -10,6 +10,7 @@ import LogoMerge from "@/components/LogoMerge";
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
   CredentialsSignin: "Invalid email or password.",
   EMAIL_NOT_VERIFIED: "Please verify your email before signing in. Check your inbox for the 6-digit code.",
+  OAUTH_ONLY: "This account now uses Google sign-in. Continue with Google instead.",
   OAuthSignin: "Google sign-in failed. Please try again.",
   OAuthCallback: "Google sign-in failed. Please try again.",
   OAuthAccountNotLinked: "This email is already linked to a different sign-in method.",

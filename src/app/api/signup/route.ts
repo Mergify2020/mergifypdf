@@ -6,16 +6,27 @@ import { issueSignupVerificationCode } from "@/lib/signupVerification";
 export async function POST(req: Request) {
   try {
     const { email, password, name } = await req.json();
+    const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
 
-    if (!email || !password) {
+    if (!normalizedEmail || !password) {
       return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
     }
 
     const hashed = await bcrypt.hash(password, 10);
 
-    const existing = await prisma.user.findUnique({ where: { email } });
+    const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
     let userId: string;
     if (existing) {
+      const linkedOauthCount = await prisma.account.count({
+        where: { userId: existing.id },
+      });
+      if (linkedOauthCount > 0) {
+        return NextResponse.json(
+          { error: "This email is linked to Google. Please continue with Google sign-in." },
+          { status: 409 }
+        );
+      }
+
       if (existing.password && existing.emailVerified) {
         return NextResponse.json({ error: "Email already in use" }, { status: 409 });
       }
@@ -33,7 +44,7 @@ export async function POST(req: Request) {
     } else {
       const created = await prisma.user.create({
         data: {
-          email,
+          email: normalizedEmail,
           name: name ?? null,
           password: hashed,
         },

@@ -25,6 +25,13 @@ export const authOptions: NextAuthOptions = {
         const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
         if (!user?.password) return null;
 
+        const oauthLinks = await prisma.account.count({
+          where: { userId: user.id, provider: { not: "credentials" } },
+        });
+        if (oauthLinks > 0) {
+          throw new Error("OAUTH_ONLY");
+        }
+
         const ok = await bcrypt.compare(creds.password, user.password);
         if (!ok) return null;
 
@@ -46,6 +53,8 @@ export const authOptions: NextAuthOptions = {
           response_type: "code",
         },
       },
+      /** If an email already exists (credentials) let Google link to it again */
+      allowDangerousEmailAccountLinking: true,
     }),
   ],
 
