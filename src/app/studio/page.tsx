@@ -21,7 +21,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-type SourceRef = { url: string; name: string; size: number };
+type SourceRef = { storageId: string; url: string; name: string; size: number };
 type PageItem = {
   id: string;
   srcIdx: number; // which source file
@@ -66,6 +66,64 @@ const PREVIEW_BASE_SCALE = 1.85;
 const MAX_DEVICE_PIXEL_RATIO = 3.5;
 const THUMB_MAX_WIDTH = 200;
 const PREVIEW_IMAGE_QUALITY = 0.95;
+const WORKSPACE_SESSION_KEY = "mpdf:files";
+const WORKSPACE_DB_NAME = "mpdf-file-store";
+const WORKSPACE_DB_STORE = "files";
+
+type StoredSourceMeta = { id: string; name?: string; size?: number };
+type FileStoreEntry = { blob: Blob; name?: string; size?: number; updatedAt: number };
+
+let fileStorePromise: Promise<IDBDatabase> | null = null;
+
+function getFileStore(): Promise<IDBDatabase> {
+  if (typeof window === "undefined" || !("indexedDB" in window)) {
+    return Promise.reject(new Error("IndexedDB is unavailable"));
+  }
+  if (!fileStorePromise) {
+    fileStorePromise = new Promise((resolve, reject) => {
+      const request = indexedDB.open(WORKSPACE_DB_NAME, 1);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(WORKSPACE_DB_STORE)) {
+          db.createObjectStore(WORKSPACE_DB_STORE);
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error ?? new Error("IndexedDB open failed"));
+    });
+  }
+  return fileStorePromise;
+}
+
+async function storeFileBlob(id: string, file: Blob, name: string, size: number) {
+  const db = await getFileStore();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(WORKSPACE_DB_STORE, "readwrite");
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error ?? new Error("IndexedDB write failed"));
+    tx.objectStore(WORKSPACE_DB_STORE).put({ blob: file, name, size, updatedAt: Date.now() }, id);
+  });
+}
+
+async function readFileBlob(id: string): Promise<FileStoreEntry | null> {
+  const db = await getFileStore();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(WORKSPACE_DB_STORE, "readonly");
+    const request = tx.objectStore(WORKSPACE_DB_STORE).get(id);
+    request.onsuccess = () => resolve(request.result ?? null);
+    request.onerror = () => reject(request.error ?? new Error("IndexedDB read failed"));
+  });
+}
+
+function persistSourceMetadata(list: SourceRef[]) {
+  if (typeof window === "undefined") return;
+  if (list.length === 0) {
+    sessionStorage.removeItem(WORKSPACE_SESSION_KEY);
+    return;
+  }
+  const payload = list.map(({ storageId, name, size }) => ({ id: storageId, name, size }));
+  sessionStorage.setItem(WORKSPACE_SESSION_KEY, JSON.stringify(payload));
+}
 
 function getDevicePixelRatio() {
   if (typeof window === "undefined") return 1;
@@ -177,6 +235,8 @@ function WorkspaceClient() {
   const renderedSourcesRef = useRef(0);
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const previewNodeMap = useRef<Map<string, HTMLDivElement>>(new Map());
+  const hasHydratedSources = useRef(false);
+  const objectUrlCacheRef = useRef<Map<string, string>>(new Map());
   const MIN_HIGHLIGHT_THICKNESS = 6;
   const MAX_HIGHLIGHT_THICKNESS = 32;
   const MIN_PENCIL_THICKNESS = 1;
@@ -185,18 +245,94 @@ function WorkspaceClient() {
   // Better drag in grids
   const sensors = useSensors(useSensor(PointerSensor));
 
-  /** Read files from landing page (sessionStorage "mpdf:files") on first load */
+  /** Rehydrate any stored PDFs from IndexedDB so refreshes survive deployments */
   useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem("mpdf:files");
-      if (!raw) return;
-      const initial: SourceRef[] = JSON.parse(raw);
-      if (Array.isArray(initial) && initial.length > 0) {
-        setSources(initial);
+    if (typeof window === "undefined") return;
+    let cancelled = false;
+
+    async function hydrateFromStorage() {
+      const raw = sessionStorage.getItem(WORKSPACE_SESSION_KEY);
+      if (!raw) {
+        hasHydratedSources.current = true;
+        return;
       }
-    } catch {
-      // ignore
+
+      try {
+        const parsed = JSON.parse(raw) as StoredSourceMeta[];
+        if (!Array.isArray(parsed)) {
+          sessionStorage.removeItem(WORKSPACE_SESSION_KEY);
+          hasHydratedSources.current = true;
+          return;
+        }
+
+        const restored: SourceRef[] = [];
+        for (const entry of parsed) {
+          if (!entry || typeof entry !== "object") continue;
+          const id = (entry as StoredSourceMeta).id ?? (entry as { storageId?: string }).storageId;
+          if (!id) continue;
+          try {
+            const stored = await readFileBlob(id);
+            const blobRecord = stored?.blob instanceof Blob ? stored.blob : null;
+            if (!blobRecord) continue;
+            const objectUrl = URL.createObjectURL(blobRecord);
+            restored.push({
+              storageId: id,
+              url: objectUrl,
+              name: entry.name ?? stored?.name ?? "Document.pdf",
+              size: entry.size ?? stored?.size ?? blobRecord.size ?? 0,
+            });
+          } catch (err) {
+            console.error("Failed to restore stored PDF", err);
+          }
+        }
+
+        if (!cancelled) {
+          if (restored.length > 0) {
+            setSources((prev) => (prev.length > 0 ? prev : restored));
+          } else {
+            sessionStorage.removeItem(WORKSPACE_SESSION_KEY);
+            setError("We couldn't restore your previous workspace. Please re-upload your PDFs.");
+          }
+        }
+      } catch (err) {
+        console.error("Failed to parse stored workspace", err);
+        sessionStorage.removeItem(WORKSPACE_SESSION_KEY);
+      } finally {
+        if (!cancelled) {
+          hasHydratedSources.current = true;
+        }
+      }
     }
+
+    hydrateFromStorage();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /** Persist source metadata whenever it changes (after hydration) */
+  useEffect(() => {
+    if (!hasHydratedSources.current || typeof window === "undefined") return;
+    persistSourceMetadata(sources);
+  }, [sources]);
+
+  /** Revoke object URLs we no longer need to avoid memory leaks */
+  useEffect(() => {
+    const previous = objectUrlCacheRef.current;
+    const next = new Map<string, string>();
+    sources.forEach((source) => {
+      next.set(source.storageId, source.url);
+      previous.delete(source.storageId);
+    });
+    previous.forEach((url) => URL.revokeObjectURL(url));
+    objectUrlCacheRef.current = next;
+  }, [sources]);
+
+  useEffect(() => {
+    return () => {
+      objectUrlCacheRef.current.forEach((url) => URL.revokeObjectURL(url));
+      objectUrlCacheRef.current.clear();
+    };
   }, []);
 
   /** Render thumbnails for any sources that haven't been processed yet */
@@ -354,20 +490,49 @@ function WorkspaceClient() {
   function handleAddClick() {
     addInputRef.current?.click();
   }
-  function handleAddChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleAddChange(e: React.ChangeEvent<HTMLInputElement>) {
     const list = e.target.files ? Array.from(e.target.files) : [];
-    const newRefs: SourceRef[] = list
-      .filter((f) => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf"))
-      .map((f) => ({
-        url: URL.createObjectURL(f),
-        name: f.name,
-        size: f.size,
-      }));
-    if (newRefs.length) {
-      const merged = [...sources, ...newRefs];
-      setSources(merged);
-      sessionStorage.setItem("mpdf:files", JSON.stringify(merged));
+    if (!list.length) {
+      e.currentTarget.value = "";
+      return;
     }
+
+    if (!hasHydratedSources.current) {
+      hasHydratedSources.current = true;
+    }
+
+    const accepted = list.filter(
+      (f) => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf")
+    );
+    const created: SourceRef[] = [];
+    let hadPersistError = false;
+
+    for (const file of accepted) {
+      const storageId = crypto.randomUUID();
+      const objectUrl = URL.createObjectURL(file);
+      try {
+        await storeFileBlob(storageId, file, file.name, file.size);
+        created.push({
+          storageId,
+          url: objectUrl,
+          name: file.name,
+          size: file.size,
+        });
+      } catch (err) {
+        console.error("Failed to persist PDF locally", err);
+        URL.revokeObjectURL(objectUrl);
+        setError("Unable to store that PDF locally. Please allow storage access and try again.");
+        hadPersistError = true;
+      }
+    }
+
+    if (created.length) {
+      if (!hadPersistError) {
+        setError(null);
+      }
+      setSources((prev) => [...prev, ...created]);
+    }
+
     e.currentTarget.value = "";
   }
 
