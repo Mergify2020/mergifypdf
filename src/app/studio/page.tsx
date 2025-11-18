@@ -930,7 +930,7 @@ function WorkspaceClient() {
 
         <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900">Workspace</h1>
       </div>
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 pt-4 pb-32 lg:px-6 lg:pt-6">
+      <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-6 px-4 pt-4 pb-32 lg:px-6 lg:pt-6">
 
         {error && (
           <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">
@@ -945,7 +945,7 @@ function WorkspaceClient() {
         )}
 
         {!loading && pages.length > 0 && (
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_240px]">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_260px]">
             <div>
               <div
                 ref={previewContainerRef}
@@ -958,7 +958,7 @@ function WorkspaceClient() {
                       key={page.id}
                       data-page-id={page.id}
                       ref={registerPreviewRef(page.id)}
-                      className="mx-auto max-w-3xl"
+                      className="mx-auto w-full max-w-[1200px]"
                     >
                       <div
                         className={`relative bg-white shadow-[0_12px_30px_rgba(15,23,42,0.18)] ${activePageId === page.id ? "ring-2 ring-brand/50 shadow-brand/30" : ""}`}
