@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from "react";
 import dynamic from "next/dynamic";
 import { PDFDocument, rgb } from "pdf-lib";
-import { Highlighter, Minus, Plus, Trash2, Undo2, Eraser } from "lucide-react";
+import { Highlighter, Minus, Plus, Trash2, Undo2, Eraser, Pencil } from "lucide-react";
 import {
   DndContext,
   PointerSensor,
@@ -30,13 +30,16 @@ type PageItem = {
   preview: string; // large preview
 };
 type Point = { x: number; y: number };
+type DrawingTool = "highlight" | "pencil";
 type HighlightStroke = {
   id: string;
+  tool: DrawingTool;
   points: Point[];
   color: string;
   thickness: number;
 };
 type DraftHighlight = {
+  tool: DrawingTool;
   pageId: string;
   points: Point[];
   color: string;
@@ -53,6 +56,7 @@ const HIGHLIGHT_COLORS = {
   blue: "#9ad9ff",
   pink: "#ffc5f1",
 } as const;
+const PENCIL_COLOR = "#111827";
 
 type HighlightColorKey = keyof typeof HIGHLIGHT_COLORS;
 
@@ -163,6 +167,8 @@ function WorkspaceClient() {
   const [highlightMode, setHighlightMode] = useState(false);
   const [highlightColor, setHighlightColor] = useState<HighlightColorKey>("yellow");
   const [highlightThickness, setHighlightThickness] = useState(14);
+  const [pencilMode, setPencilMode] = useState(false);
+  const [pencilThickness, setPencilThickness] = useState(4);
   const [highlights, setHighlights] = useState<Record<string, HighlightStroke[]>>({});
   const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]>([]);
   const [draftHighlight, setDraftHighlight] = useState<DraftHighlight | null>(null);
@@ -174,6 +180,8 @@ function WorkspaceClient() {
   const previewNodeMap = useRef<Map<string, HTMLDivElement>>(new Map());
   const MIN_HIGHLIGHT_THICKNESS = 6;
   const MAX_HIGHLIGHT_THICKNESS = 32;
+  const MIN_PENCIL_THICKNESS = 1;
+  const MAX_PENCIL_THICKNESS = 10;
 
   // Better drag in grids
   const sensors = useSensors(useSensor(PointerSensor));
@@ -389,6 +397,7 @@ function WorkspaceClient() {
       }
       const highlight: HighlightStroke = {
         id: crypto.randomUUID(),
+        tool: stroke.tool,
         points: stroke.points.map((pt) => ({ ...pt })),
         color: stroke.color,
         thickness: stroke.thickness,
@@ -417,14 +426,15 @@ function WorkspaceClient() {
   }, [draftHighlight, commitDraftHighlight]);
 
   useEffect(() => {
-    if (!highlightMode) {
+    if (!highlightMode && !pencilMode) {
       setDraftHighlight(null);
     }
-  }, [highlightMode]);
+  }, [highlightMode, pencilMode]);
 
   useEffect(() => {
     if (deleteMode) {
       setHighlightMode(false);
+      setPencilMode(false);
       setDraftHighlight(null);
     }
   }, [deleteMode]);
@@ -439,21 +449,31 @@ function WorkspaceClient() {
     };
   }
 
-  function handleHighlightPointerDown(pageId: string, event: ReactMouseEvent<HTMLDivElement>) {
-    if (!highlightMode || deleteMode) return;
+  function getActiveTool(): DrawingTool | null {
+    if (highlightMode) return "highlight";
+    if (pencilMode) return "pencil";
+    return null;
+  }
+
+  function handleMarkupPointerDown(pageId: string, event: ReactMouseEvent<HTMLDivElement>) {
+    if (deleteMode) return;
+    const tool = getActiveTool();
+    if (!tool) return;
     const point = getPointerPoint(event);
     if (!point) return;
+    const baseThickness = tool === "highlight" ? highlightThickness : pencilThickness;
     setDraftHighlight({
+      tool,
       pageId,
       points: [{ x: point.x, y: point.y }],
-      color: HIGHLIGHT_COLORS[highlightColor],
-      thickness: highlightThickness / point.rectWidth,
+      color: tool === "highlight" ? HIGHLIGHT_COLORS[highlightColor] : PENCIL_COLOR,
+      thickness: baseThickness / point.rectWidth,
     });
     event.preventDefault();
   }
 
-  function handleHighlightPointerMove(pageId: string, event: ReactMouseEvent<HTMLDivElement>) {
-    if (!highlightMode || deleteMode) return;
+  function handleMarkupPointerMove(pageId: string, event: ReactMouseEvent<HTMLDivElement>) {
+    if (deleteMode) return;
     const point = getPointerPoint(event);
     if (!point) return;
     setDraftHighlight((prev) => {
@@ -466,7 +486,8 @@ function WorkspaceClient() {
       return {
         ...prev,
         points: nextPoints,
-        thickness: highlightThickness / point.rectWidth,
+        thickness:
+          (prev.tool === "highlight" ? highlightThickness : pencilThickness) / point.rectWidth,
       };
     });
     if (draftHighlight?.pageId === pageId) {
@@ -474,8 +495,8 @@ function WorkspaceClient() {
     }
   }
 
-  function handleHighlightPointerUp(pageId: string) {
-    if (!highlightMode || deleteMode) return;
+  function handleMarkupPointerUp(pageId: string) {
+    if (deleteMode) return;
     setDraftHighlight((prev) => {
       if (!prev || prev.pageId !== pageId) return prev;
       commitDraftHighlight(prev);
@@ -543,6 +564,7 @@ function WorkspaceClient() {
             for (let i = 1; i < stroke.points.length; i++) {
               const start = stroke.points[i - 1];
               const end = stroke.points[i];
+              const opacity = stroke.tool === "pencil" ? 0.9 : 0.4;
               copied.drawLine({
                 start: {
                   x: start.x * pageWidth,
@@ -554,7 +576,7 @@ function WorkspaceClient() {
                 },
                 thickness: Math.max(1, stroke.thickness * pageWidth),
                 color: rgb(colorValue.r, colorValue.g, colorValue.b),
-                opacity: 0.4,
+                opacity,
               });
             }
           });
@@ -601,23 +623,36 @@ function WorkspaceClient() {
     HIGHLIGHT_COLORS
   ) as [HighlightColorKey, string][];
   const highlightButtonOn = highlightMode && !highlightButtonDisabled;
-  const highlightTrayVisible = (highlightMode || deleteMode) && !highlightButtonDisabled;
+  const pencilButtonOn = pencilMode && !highlightButtonDisabled;
+  const highlightTrayVisible = (highlightMode || pencilMode || deleteMode) && !highlightButtonDisabled;
   const highlightActive = highlightButtonOn && !deleteMode;
+  const pencilActive = pencilButtonOn && !deleteMode;
+  const activeDrawingTool: DrawingTool | null = highlightActive ? "highlight" : pencilActive ? "pencil" : null;
 
   useEffect(() => {
     if (typeof document === "undefined") return;
-    if (!highlightActive) {
+    if (!activeDrawingTool) {
       document.body.style.cursor = "";
       return;
     }
     const previous = document.body.style.cursor;
-    document.body.style.cursor = `url(${HIGHLIGHT_CURSOR}) 4 24, crosshair`;
+    document.body.style.cursor =
+      activeDrawingTool === "highlight" ? `url(${HIGHLIGHT_CURSOR}) 4 24, crosshair` : "crosshair";
     return () => {
       document.body.style.cursor = previous;
     };
-  }, [highlightActive]);
+  }, [activeDrawingTool]);
   const hasAnyHighlights = Object.values(highlights).some((list) => list && list.length > 0);
   const hasUndoHistory = highlightHistory.length > 0;
+  const toolbarMessage = deleteMode
+    ? "Delete mode is active — click any highlight or pencil mark to remove it."
+    : activeDrawingTool === "highlight"
+      ? "Highlight mode is active — drag across a page to mark text."
+      : activeDrawingTool === "pencil"
+        ? "Pencil mode is active — draw anywhere to write notes."
+        : hasAnyHighlights
+          ? "Select a highlight or pencil mark to delete, or keep editing."
+          : "Choose a tool to start marking up your document.";
 
   useEffect(() => {
     if (!hasAnyHighlights && deleteMode) {
@@ -627,6 +662,10 @@ function WorkspaceClient() {
 
   function adjustHighlightThickness(delta: number) {
     setHighlightThickness((prev) => clamp(prev + delta, MIN_HIGHLIGHT_THICKNESS, MAX_HIGHLIGHT_THICKNESS));
+  }
+
+  function adjustPencilThickness(delta: number) {
+    setPencilThickness((prev) => clamp(prev + delta, MIN_PENCIL_THICKNESS, MAX_PENCIL_THICKNESS));
   }
 
   function handleUndoHighlight() {
@@ -676,12 +715,12 @@ function WorkspaceClient() {
     });
   }
 
-  function handleDeleteHighlight(pageId: string, highlightId: string) {
+  function handleDeleteStroke(pageId: string, strokeId: string) {
     let removed: HighlightStroke | null = null;
     setHighlights((map) => {
       const list = map[pageId];
       if (!list) return map;
-      const index = list.findIndex((stroke) => stroke.id === highlightId);
+      const index = list.findIndex((stroke) => stroke.id === strokeId);
       if (index === -1) return map;
       removed = list[index];
       const filtered = list.slice(0, index).concat(list.slice(index + 1));
@@ -704,19 +743,12 @@ function WorkspaceClient() {
       const next = !prev;
       if (next) {
         setHighlightMode(false);
+        setPencilMode(false);
         setDraftHighlight(null);
       }
       return next;
     });
   }
-
-  const toolbarMessage = deleteMode
-    ? "Delete mode is active — click any highlight to remove it."
-    : highlightActive
-      ? "Highlight mode is active — drag across a page to mark text."
-      : hasAnyHighlights
-        ? "Select a highlight to delete, or keep editing."
-        : "Choose a tool to start marking up your document.";
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#f3fbff,_#ffffff)] pt-16">
@@ -735,7 +767,10 @@ function WorkspaceClient() {
                   onClick={() =>
                     setHighlightMode((prev) => {
                       const next = !prev;
-                      if (next) setDeleteMode(false);
+                      if (next) {
+                        setDeleteMode(false);
+                        setPencilMode(false);
+                      }
                       return next;
                     })
                   }
@@ -748,6 +783,29 @@ function WorkspaceClient() {
                 >
                   <Highlighter className="h-4 w-4" />
                   Highlight
+                </button>
+                <button
+                  type="button"
+                  disabled={highlightButtonDisabled}
+                  onClick={() =>
+                    setPencilMode((prev) => {
+                      const next = !prev;
+                      if (next) {
+                        setDeleteMode(false);
+                        setHighlightMode(false);
+                      }
+                      return next;
+                    })
+                  }
+                  aria-pressed={pencilButtonOn}
+                  className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                    pencilButtonOn
+                      ? "border-transparent bg-slate-900 text-white shadow-lg shadow-slate-900/30"
+                      : "border-slate-200 text-slate-700 hover:border-slate-300 disabled:hover:border-slate-200"
+                  } disabled:cursor-not-allowed disabled:opacity-50`}
+                >
+                  <Pencil className="h-4 w-4" />
+                  Pencil
                 </button>
                 <button
                   type="button"
@@ -790,49 +848,82 @@ function WorkspaceClient() {
                     } disabled:cursor-not-allowed disabled:opacity-50`}
                   >
                     <Eraser className="h-3.5 w-3.5" />
-                    Select highlights
+                    Select markups
                   </button>
                   {deleteMode ? (
                     <span className="text-[0.6rem] font-semibold uppercase tracking-wide text-slate-500">
-                      Tap a highlight to remove it
+                      Tap a highlight or pencil mark to remove it
                     </span>
                   ) : null}
                 </div>
-                <div className="flex items-center gap-2">
-                  {highlightColorEntries.map(([key, value]) => (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => setHighlightColor(key)}
-                      className={`flex h-8 w-8 items-center justify-center rounded-full border transition ${
-                        highlightColor === key
-                          ? "border-[#024d7c] ring-2 ring-[#024d7c]/30"
-                          : "border-white/30 hover:border-slate-300"
-                      }`}
-                      style={{ backgroundColor: value }}
-                      aria-label={`Use ${key} highlighter`}
-                    />
-                  ))}
-                </div>
-                <div className="flex items-center gap-2 rounded-full border border-slate-300 bg-white/80 px-3 py-1.5 text-[0.65rem] font-semibold uppercase tracking-wide text-slate-600 shadow-sm">
-                  <button
-                    type="button"
-                    onClick={() => adjustHighlightThickness(-2)}
-                    disabled={highlightThickness <= MIN_HIGHLIGHT_THICKNESS}
-                    className="rounded-full border border-transparent p-1 transition hover:border-slate-200 hover:bg-white disabled:opacity-40"
-                  >
-                    <Minus className="h-3.5 w-3.5" />
-                  </button>
-                  <span>{Math.round(highlightThickness)} px</span>
-                  <button
-                    type="button"
-                    onClick={() => adjustHighlightThickness(2)}
-                    disabled={highlightThickness >= MAX_HIGHLIGHT_THICKNESS}
-                    className="rounded-full border border-transparent p-1 transition hover:border-slate-200 hover:bg-white disabled:opacity-40"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                  </button>
-                </div>
+                {highlightActive ? (
+                  <>
+                    <div className="flex items-center gap-2">
+                      {highlightColorEntries.map(([key, value]) => (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => setHighlightColor(key)}
+                          className={`flex h-8 w-8 items-center justify-center rounded-full border transition ${
+                            highlightColor === key
+                              ? "border-[#024d7c] ring-2 ring-[#024d7c]/30"
+                              : "border-white/30 hover:border-slate-300"
+                          }`}
+                          style={{ backgroundColor: value }}
+                          aria-label={`Use ${key} highlighter`}
+                        />
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-2 rounded-full border border-slate-300 bg-white/80 px-3 py-1.5 text-[0.65rem] font-semibold uppercase tracking-wide text-slate-600 shadow-sm">
+                      <button
+                        type="button"
+                        onClick={() => adjustHighlightThickness(-2)}
+                        disabled={highlightThickness <= MIN_HIGHLIGHT_THICKNESS}
+                        className="rounded-full border border-transparent p-1 transition hover:border-slate-200 hover:bg-white disabled:opacity-40"
+                      >
+                        <Minus className="h-3.5 w-3.5" />
+                      </button>
+                      <span>{Math.round(highlightThickness)} px</span>
+                      <button
+                        type="button"
+                        onClick={() => adjustHighlightThickness(2)}
+                        disabled={highlightThickness >= MAX_HIGHLIGHT_THICKNESS}
+                        className="rounded-full border border-transparent p-1 transition hover:border-slate-200 hover:bg-white disabled:opacity-40"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </>
+                ) : null}
+                {pencilActive ? (
+                  <>
+                    <div className="flex items-center gap-2 rounded-full border border-slate-300 bg-white/80 px-3 py-1.5 text-[0.65rem] font-semibold uppercase tracking-wide text-slate-600 shadow-sm">
+                      <span className="text-[0.6rem] font-semibold uppercase tracking-wide text-slate-500">
+                        Streak
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => adjustPencilThickness(-1)}
+                        disabled={pencilThickness <= MIN_PENCIL_THICKNESS}
+                        className="rounded-full border border-transparent p-1 transition hover:border-slate-200 hover:bg-white disabled:opacity-40"
+                      >
+                        <Minus className="h-3.5 w-3.5" />
+                      </button>
+                      <span>{Math.round(pencilThickness)} px</span>
+                      <button
+                        type="button"
+                        onClick={() => adjustPencilThickness(1)}
+                        disabled={pencilThickness >= MAX_PENCIL_THICKNESS}
+                        className="rounded-full border border-transparent p-1 transition hover:border-slate-200 hover:bg-white disabled:opacity-40"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    <span className="text-[0.6rem] font-semibold uppercase tracking-wide text-slate-500">
+                      Ink color: black
+                    </span>
+                  </>
+                ) : null}
               </div>
             </div>
           </div>
@@ -897,19 +988,22 @@ function WorkspaceClient() {
                           className="mx-auto max-w-3xl border border-slate-300 bg-white shadow-[0_20px_50px_rgba(15,23,42,0.15)]"
                           style={{ transform: `scale(${zoom})`, transformOrigin: "top center" }}
                         >
-                          <div
-                            className="relative"
-                            style={
-                              highlightActive
-                                ? ({
-                                    cursor: `url(${HIGHLIGHT_CURSOR}) 4 24, crosshair`,
-                                  } as CSSProperties)
-                                : undefined
-                            }
-                            onMouseDown={(event) => handleHighlightPointerDown(page.id, event)}
-                            onMouseMove={(event) => handleHighlightPointerMove(page.id, event)}
-                            onMouseUp={() => handleHighlightPointerUp(page.id)}
-                          >
+                        <div
+                          className="relative"
+                          style={
+                            activeDrawingTool
+                              ? ({
+                                  cursor:
+                                    activeDrawingTool === "highlight"
+                                      ? `url(${HIGHLIGHT_CURSOR}) 4 24, crosshair`
+                                      : "crosshair",
+                                } as CSSProperties)
+                              : undefined
+                          }
+                          onMouseDown={(event) => handleMarkupPointerDown(page.id, event)}
+                          onMouseMove={(event) => handleMarkupPointerMove(page.id, event)}
+                          onMouseUp={() => handleMarkupPointerUp(page.id)}
+                        >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={page.preview} alt={`Page ${idx + 1}`} className="w-full" />
                             <svg
@@ -930,7 +1024,7 @@ function WorkspaceClient() {
                                     strokeWidth={Math.max(1, stroke.thickness * 1000)}
                                     strokeLinecap="round"
                                     strokeLinejoin="round"
-                                    strokeOpacity={0.4}
+                                    strokeOpacity={stroke.tool === "pencil" ? 0.85 : 0.4}
                                     style={{
                                       pointerEvents: deleteMode ? "stroke" : "none",
                                       cursor: deleteMode ? "pointer" : "default",
@@ -939,7 +1033,7 @@ function WorkspaceClient() {
                                       if (!deleteMode) return;
                                       event.preventDefault();
                                       event.stopPropagation();
-                                      handleDeleteHighlight(page.id, stroke.id);
+                                      handleDeleteStroke(page.id, stroke.id);
                                     }}
                                   />
                                 ) : null
@@ -956,7 +1050,7 @@ function WorkspaceClient() {
                                   strokeWidth={Math.max(1, draftHighlight.thickness * 1000)}
                                   strokeLinecap="round"
                                   strokeLinejoin="round"
-                                  strokeOpacity={0.25}
+                                  strokeOpacity={draftHighlight.tool === "pencil" ? 0.7 : 0.25}
                                 />
                               ) : null}
                             </svg>
