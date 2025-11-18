@@ -21,7 +21,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-type SourceRef = { storageId: string; url: string; name: string; size: number };
+type SourceRef = { storageId: string; url: string; name: string; size: number; updatedAt: number };
 type PageItem = {
   id: string;
   srcIdx: number; // which source file
@@ -71,7 +71,7 @@ const WORKSPACE_DB_NAME = "mpdf-file-store";
 const WORKSPACE_DB_STORE = "files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
 
-type StoredSourceMeta = { id: string; name?: string; size?: number };
+type StoredSourceMeta = { id: string; name?: string; size?: number; updatedAt?: number };
 type FileStoreEntry = { blob: Blob; name?: string; size?: number; updatedAt: number };
 
 let fileStorePromise: Promise<IDBDatabase> | null = null;
@@ -143,7 +143,12 @@ function persistSourceMetadata(list: SourceRef[]) {
     storage.removeItem(WORKSPACE_SESSION_KEY);
     return;
   }
-  const payload = list.map(({ storageId, name, size }) => ({ id: storageId, name, size }));
+  const payload = list.map(({ storageId, name, size, updatedAt }) => ({
+    id: storageId,
+    name,
+    size,
+    updatedAt,
+  }));
   try {
     storage.setItem(WORKSPACE_SESSION_KEY, JSON.stringify(payload));
   } catch (err) {
@@ -325,6 +330,7 @@ function WorkspaceClient() {
               url: objectUrl,
               name: entry.name ?? stored?.name ?? "Document.pdf",
               size: entry.size ?? stored?.size ?? blobRecord.size ?? 0,
+              updatedAt: entry.updatedAt ?? stored?.updatedAt ?? Date.now(),
             });
           } catch (err) {
             console.error("Failed to restore stored PDF", err);
@@ -595,6 +601,7 @@ function WorkspaceClient() {
           url: objectUrl,
           name: file.name,
           size: file.size,
+          updatedAt: Date.now(),
         });
       } catch (err) {
         console.error("Failed to persist PDF locally", err);

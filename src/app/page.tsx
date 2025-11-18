@@ -7,16 +7,12 @@ import { authOptions } from "@/lib/authOptions";
 import {
   ArrowUpRight,
   CalendarDays,
-  CheckCircle2,
   FileOutput,
   FilePlus,
-  FileSignature,
-  FolderKanban,
   Highlighter,
   Layers,
   ListOrdered,
   PenLine,
-  Sparkles,
 } from "lucide-react";
 
 const features = [
@@ -73,24 +69,6 @@ const curatedProjects = [
     subtitle: "MergifyPDF Studio • 8 pages",
     status: "Draft",
     updated: "Tuesday • 10:41 AM",
-  },
-];
-
-const templateBlocks = [
-  {
-    label: "Audit Room",
-    description: "Collect binders, reorder statements, archive supporting docs.",
-    accent: "from-[#1f80ff]/60 via-[#1f49ff]/50 to-transparent",
-  },
-  {
-    label: "Signature Suite",
-    description: "Invite clients, capture initials, unlock ready-to-send packets.",
-    accent: "from-[#34d399]/60 via-[#059669]/50 to-transparent",
-  },
-  {
-    label: "Board Review",
-    description: "Bundle decks, swap pages, and export pristine PDFs in minutes.",
-    accent: "from-[#fda4af]/60 via-[#fb7185]/50 to-transparent",
   },
 ];
 
@@ -161,6 +139,13 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
                 Start a new project
                 <ArrowUpRight className="ml-2 h-5 w-5" />
               </Link>
+              <Link
+                href="/pricing"
+                className="inline-flex items-center justify-center rounded-full border border-white/40 px-8 py-3 text-sm font-semibold text-white/90 transition hover:border-white hover:bg-white/10"
+              >
+                Upgrade to Premium
+                <ArrowUpRight className="ml-2 h-4 w-4" />
+              </Link>
             </div>
           </div>
         </div>
@@ -190,16 +175,12 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
                 >
                   <div>
                     <p className="text-lg font-semibold">{project.title}</p>
-                    <p className="text-sm text-white/60">{project.subtitle}</p>
+                    <p className="text-sm text-white/60">Last edited {project.updated}</p>
                   </div>
                   <div className="flex flex-wrap gap-3 text-sm">
                     <span className="inline-flex items-center gap-1 rounded-full border border-white/20 px-3 py-1 text-white/80">
                       <CalendarDays className="h-4 w-4" />
                       {project.updated}
-                    </span>
-                    <span className="inline-flex items-center gap-1 rounded-full border border-white/20 px-3 py-1 text-white/80">
-                      <Sparkles className="h-4 w-4" />
-                      {project.status}
                     </span>
                     <Link
                       href="/studio"
@@ -215,55 +196,20 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
           </div>
 
           <div className="space-y-4">
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
-              <p className="text-sm uppercase tracking-[0.4em] text-white/60">Trusted tools</p>
-              <h3 className="mt-2 text-xl font-semibold">Signature-ready</h3>
-              <p className="mt-1 text-sm text-white/70">
-                One tap to add initials, drop company stamps, or share a review link.
+            <div className="rounded-3xl border border-dashed border-white/20 bg-white/5 p-6 text-white/80">
+              <p className="text-sm uppercase tracking-[0.4em] text-white/60">
+                Team Hub workspace
               </p>
-              <div className="mt-4 flex gap-3 text-sm">
-                <span className="inline-flex items-center gap-2 rounded-full border border-white/20 px-3 py-1">
-                  <FileSignature className="h-4 w-4" /> Sign
-                </span>
-                <span className="inline-flex items-center gap-2 rounded-full border border-white/20 px-3 py-1">
-                  <CheckCircle2 className="h-4 w-4" /> Approve
-                </span>
-              </div>
-            </div>
-
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
-              <p className="text-sm uppercase tracking-[0.4em] text-white/60">Team Hubs</p>
-              <h3 className="mt-2 text-xl font-semibold">Shared spaces</h3>
-              <p className="mt-1 text-sm text-white/70">
-                Keep audit packets, board decks, and compliance letters inside curated stacks.
+              <h3 className="mt-2 text-xl font-semibold text-white">Coming soon</h3>
+              <p className="mt-1 text-sm">
+                Invite collaborators, organize shared stacks, and stay perfectly in sync. We&apos;re
+                polishing the experience—stay tuned.
               </p>
-              <Link
-                href="/studio"
-                className="mt-4 inline-flex items-center text-sm font-semibold text-white/80 transition hover:text-white"
-              >
-                View spaces
-                <ArrowUpRight className="ml-2 h-4 w-4" />
-              </Link>
             </div>
           </div>
         </section>
 
-        <section className="grid gap-4 pb-12 lg:grid-cols-3">
-          {templateBlocks.map((block) => (
-            <div
-              key={block.label}
-              className={`rounded-3xl border border-white/10 bg-gradient-to-br ${block.accent} p-6 shadow-lg shadow-black/30`}
-            >
-              <p className="text-sm uppercase tracking-[0.4em] text-white/70">{block.label}</p>
-              <p className="mt-2 text-lg text-white">{block.description}</p>
-              <div className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-white/90">
-                <FolderKanban className="h-4 w-4" />
-                Launch
-                <ArrowUpRight className="h-4 w-4" />
-              </div>
-            </div>
-          ))}
-        </section>
+        <section className="pb-12" />
       </div>
     </div>
   );

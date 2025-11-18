@@ -4,23 +4,27 @@ import Link from "next/link";
 import { ArrowUpRight, Clock } from "lucide-react";
 import { useEffect, useState } from "react";
 
-type StoredSourceMeta = { id: string; name?: string; size?: number };
-
-type ResumeSnapshot = {
-  documentLabel: string;
-  docCount: number;
-  totalSizeLabel: string;
-};
+type StoredSourceMeta = { id: string; name?: string; size?: number; updatedAt?: number };
+type ResumeSnapshot = { fileName: string; lastEditedLabel: string };
 
 const WORKSPACE_META_KEY = "mpdf:files";
 
-function formatSize(bytes: number) {
-  if (!Number.isFinite(bytes) || bytes <= 0) return "0 MB";
-  const mb = bytes / (1024 * 1024);
-  if (mb >= 1024) {
-    return `${(mb / 1024).toFixed(1)} GB`;
-  }
-  return `${mb.toFixed(1)} MB`;
+function formatLastEdited(timestamp: number) {
+  if (!Number.isFinite(timestamp)) return "moments ago";
+  const diff = Date.now() - timestamp;
+  const minutes = Math.floor(diff / (1000 * 60));
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days} day${days === 1 ? "" : "s"} ago`;
+  return new Date(timestamp).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 export default function ProjectsWorkspaceShelf() {
@@ -32,13 +36,11 @@ export default function ProjectsWorkspaceShelf() {
       if (!raw) return;
       const parsed = JSON.parse(raw) as StoredSourceMeta[];
       if (!Array.isArray(parsed) || parsed.length === 0) return;
-      const totalSize = parsed.reduce((sum, entry) => sum + (entry?.size ?? 0), 0);
-      const primaryName = parsed[0]?.name ?? "Imported PDF";
+      const [primary] = [...parsed].sort((a, b) => (b?.updatedAt ?? 0) - (a?.updatedAt ?? 0));
+      if (!primary) return;
       setSnapshot({
-        documentLabel:
-          parsed.length === 1 ? primaryName : `${primaryName} +${parsed.length - 1}`,
-        docCount: parsed.length,
-        totalSizeLabel: formatSize(totalSize),
+        fileName: primary.name ?? "Imported PDF",
+        lastEditedLabel: formatLastEdited(primary.updatedAt ?? Date.now()),
       });
     } catch (err) {
       console.error("Failed to parse saved workspace metadata", err);
@@ -69,38 +71,27 @@ export default function ProjectsWorkspaceShelf() {
   }
 
   return (
-    <div className="rounded-3xl border border-white/15 bg-gradient-to-r from-white/10 to-transparent p-6 text-white shadow-2xl shadow-black/10 backdrop-blur">
-      <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-sm uppercase tracking-[0.4em] text-white/60">Resume</p>
-          <h2 className="mt-1 text-2xl font-semibold">{snapshot.documentLabel}</h2>
-          <div className="mt-4 flex flex-wrap gap-6 text-sm text-white/80">
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 opacity-80" />
-              <span>
-                {snapshot.docCount} document{snapshot.docCount === 1 ? "" : "s"} •{" "}
-                {snapshot.totalSizeLabel}
-              </span>
+    <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 text-white shadow-[0_30px_80px_rgba(0,0,0,0.35)] backdrop-blur">
+      <div className="flex flex-col gap-4">
+        <p className="text-sm uppercase tracking-[0.4em] text-white/60">Resume project</p>
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-2xl font-semibold">{snapshot.fileName}</h2>
+            <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-white/20 px-3 py-1 text-sm text-white/80">
+              <Clock className="h-4 w-4" />
+              Last edited {snapshot.lastEditedLabel}
             </div>
-            <span className="rounded-full border border-white/25 px-3 py-1 text-xs uppercase tracking-[0.3em] text-white/70">
-              Last session ready
-            </span>
           </div>
-        </div>
-        <div className="flex flex-col gap-2">
           <Link
             href="/studio"
-            className="inline-flex items-center justify-center rounded-full bg-white px-8 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-black/15 transition hover:-translate-y-0.5"
+            className="inline-flex items-center justify-center rounded-full bg-white px-7 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-black/20 transition hover:-translate-y-0.5"
           >
-            Resume editing
+            Resume / Open
             <ArrowUpRight className="ml-2 h-4 w-4" />
           </Link>
-          <span className="text-xs uppercase tracking-[0.4em] text-white/60">
-            Auto-saved locally
-          </span>
         </div>
+        <p className="text-xs uppercase tracking-[0.4em] text-white/60">Auto-saved locally</p>
       </div>
     </div>
   );
 }
-
