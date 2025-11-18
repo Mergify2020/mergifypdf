@@ -151,41 +151,16 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
             <div>
               <p className="text-sm uppercase tracking-[0.4em] text-white/60">Projects</p>
               <h1 className="mt-2 text-4xl font-semibold tracking-tight">Welcome back, {shortName}.</h1>
-              <p className="mt-3 max-w-2xl text-base text-white/70">
-                Curate client-ready packets, reopen unfinished canvases, and launch new workspaces without losing momentum. Every merge, highlight, and signature is already waiting for you.
-              </p>
+              <p className="mt-3 max-w-2xl text-base text-white/70" />
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               <Link
                 href="/studio"
-                className="inline-flex items-center justify-center rounded-full bg-white px-8 py-3 text-sm font-semibold text-slate-900 shadow-xl shadow-black/20 transition hover:-translate-y-0.5"
+                className="inline-flex items-center justify-center rounded-full bg-white px-10 py-3 text-base font-semibold text-slate-900 shadow-xl shadow-black/20 transition hover:-translate-y-0.5"
               >
-                New workspace
-                <ArrowUpRight className="ml-2 h-4 w-4" />
+                Start a new project
+                <ArrowUpRight className="ml-2 h-5 w-5" />
               </Link>
-              <Link
-                href="/studio"
-                className="inline-flex items-center justify-center rounded-full border border-white/40 px-8 py-3 text-sm font-semibold text-white/90 transition hover:border-white hover:bg-white/10"
-              >
-                Upload PDFs
-              </Link>
-            </div>
-          </div>
-          <div className="mt-8 grid gap-4 sm:grid-cols-3">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="text-xs uppercase tracking-[0.4em] text-white/60">Active canvases</p>
-              <p className="mt-2 text-2xl font-semibold">4</p>
-              <p className="text-xs text-white/60">Updated in the last 24 hours</p>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="text-xs uppercase tracking-[0.4em] text-white/60">Highlights synced</p>
-              <p className="mt-2 text-2xl font-semibold">128</p>
-              <p className="text-xs text-white/60">Preserved across sessions</p>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="text-xs uppercase tracking-[0.4em] text-white/60">Ready to send</p>
-              <p className="mt-2 text-2xl font-semibold">9</p>
-              <p className="text-xs text-white/60">Packets approved today</p>
             </div>
           </div>
         </div>
