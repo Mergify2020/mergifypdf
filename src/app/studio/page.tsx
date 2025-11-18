@@ -62,8 +62,8 @@ type HighlightColorKey = keyof typeof HIGHLIGHT_COLORS;
 
 const HIGHLIGHT_CURSOR =
   "data:image/svg+xml;utf8,%3Csvg width='32' height='32' viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 24 L24 2 L30 8 L10 28 L3 29 Z' fill='%23024d7c'/%3E%3Crect x='5' y='25' width='10' height='3' fill='%23ffd43b'/%3E%3C/svg%3E";
-const PREVIEW_BASE_SCALE = 1.35;
-const MAX_DEVICE_PIXEL_RATIO = 2.5;
+const PREVIEW_BASE_SCALE = 1.85;
+const MAX_DEVICE_PIXEL_RATIO = 3.5;
 const THUMB_MAX_WIDTH = 200;
 const PREVIEW_IMAGE_QUALITY = 0.95;
 
@@ -930,7 +930,7 @@ function WorkspaceClient() {
 
         <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900">Workspace</h1>
       </div>
-      <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-6 px-4 pt-4 pb-32 lg:px-6 lg:pt-6">
+      <div className="mx-auto flex w-full max-w-[1700px] flex-col gap-6 px-4 pt-4 pb-32 lg:px-10 lg:pt-6">
 
         {error && (
           <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">
@@ -945,11 +945,11 @@ function WorkspaceClient() {
         )}
 
         {!loading && pages.length > 0 && (
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_260px]">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
             <div>
               <div
                 ref={previewContainerRef}
-                className="h-[70vh] space-y-8 overflow-y-auto pr-2"
+                className="h-[70vh] space-y-8 overflow-y-auto pr-4"
               >
                 {pages.map((page, idx) => {
                   const pageHighlights = highlights[page.id] ?? [];
@@ -958,7 +958,7 @@ function WorkspaceClient() {
                       key={page.id}
                       data-page-id={page.id}
                       ref={registerPreviewRef(page.id)}
-                      className="mx-auto w-full max-w-[1200px]"
+                      className="mx-auto w-full max-w-[1500px]"
                     >
                       <div
                         className={`relative bg-white shadow-[0_12px_30px_rgba(15,23,42,0.18)] ${activePageId === page.id ? "ring-2 ring-brand/50 shadow-brand/30" : ""}`}
