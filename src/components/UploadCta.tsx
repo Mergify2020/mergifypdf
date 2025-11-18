@@ -29,7 +29,7 @@ export default function UploadCta({ usedToday }: UploadCtaProps) {
       });
 
       if (res.ok) {
-        router.push("/studio");
+        router.push("/");
         return;
       }
 

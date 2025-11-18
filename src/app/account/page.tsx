@@ -389,7 +389,7 @@ export default function AccountPage() {
   return (
     <main className="mx-auto max-w-2xl px-6 py-12">
       <div className="mb-6 text-sm text-gray-500">
-        <Link className="underline decoration-[#024d7c]" href="/studio">
+        <Link className="underline decoration-[#024d7c]" href="/">
           Back to Studio
         </Link>
       </div>

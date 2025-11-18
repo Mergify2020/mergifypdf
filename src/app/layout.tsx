@@ -46,7 +46,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <header className="sticky top-0 z-50 w-full border-b border-slate-100 bg-white/95 backdrop-blur">
             <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 lg:px-6">
               <Link
-                href={session?.user ? "/studio" : "/"}
+                href={session?.user ? "/" : "/"}
                 className="inline-flex items-center gap-2"
                 aria-label={session?.user ? "Back to workspace" : "Go to homepage"}
               >

@@ -51,7 +51,7 @@ export default function LoginPage() {
         redirect: false,
         email: normalizedEmail,
         password,
-        callbackUrl: "/studio",
+        callbackUrl: "/",
       });
 
       if (res?.error) {
@@ -65,7 +65,7 @@ export default function LoginPage() {
         return;
       }
 
-      window.location.assign("/studio");
+      window.location.assign("/");
     } catch (error) {
       console.error(error);
       setErr("Unable to sign in. Please try again.");
@@ -76,7 +76,7 @@ export default function LoginPage() {
   async function handleGoogleLogin() {
     try {
       setBusy(true);
-      await signIn("google", { callbackUrl: "/studio" });
+      await signIn("google", { callbackUrl: "/" });
       // No setBusy(false) here; page will unmount on redirect
     } catch {
       setBusy(false);

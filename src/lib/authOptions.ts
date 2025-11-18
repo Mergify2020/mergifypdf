@@ -6,10 +6,28 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
 type AuthType = "oauth" | "credentials";
+const cookieDomain = process.env.NEXTAUTH_COOKIE_DOMAIN ?? undefined;
+const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
-  session: { strategy: "jwt" },
+  session: { strategy: "jwt", maxAge: SESSION_MAX_AGE, updateAge: 60 * 60 },
+  jwt: { maxAge: SESSION_MAX_AGE },
+  cookies: {
+    sessionToken: {
+      name:
+        process.env.NODE_ENV === "production"
+          ? "__Secure-mergifypdf.session-token"
+          : "mergifypdf.session-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+        domain: cookieDomain,
+      },
+    },
+  },
 
   providers: [
     Credentials({

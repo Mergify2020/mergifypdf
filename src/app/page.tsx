@@ -1,7 +1,23 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import UploadCta from "@/components/UploadCta";
 import { hasUsedToday } from "@/lib/quota";
-import { FileOutput, FilePlus, Highlighter, Layers, ListOrdered, PenLine } from "lucide-react";
+import ProjectsWorkspaceShelf from "@/components/ProjectsWorkspaceShelf";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/authOptions";
+import {
+  ArrowUpRight,
+  CalendarDays,
+  CheckCircle2,
+  FileOutput,
+  FilePlus,
+  FileSignature,
+  FolderKanban,
+  Highlighter,
+  Layers,
+  ListOrdered,
+  PenLine,
+  Sparkles,
+} from "lucide-react";
 
 const features = [
   {
@@ -36,9 +52,59 @@ const features = [
   },
 ] as const;
 
-export default async function Home() {
-  const usedToday = await hasUsedToday();
+const curatedProjects = [
+  {
+    id: "client-audit",
+    title: "Client Audit Packet",
+    subtitle: "Golden Rain Masonry • 36 pages",
+    status: "In review",
+    updated: "Today • 9:24 AM",
+  },
+  {
+    id: "vendor-lux",
+    title: "Vendor Renewal Agreement",
+    subtitle: "Pinnacol Assurance • 12 pages",
+    status: "Awaiting signature",
+    updated: "Yesterday • 4:08 PM",
+  },
+  {
+    id: "compliance-deck",
+    title: "Compliance Addendum",
+    subtitle: "MergifyPDF Studio • 8 pages",
+    status: "Draft",
+    updated: "Tuesday • 10:41 AM",
+  },
+];
 
+const templateBlocks = [
+  {
+    label: "Audit Room",
+    description: "Collect binders, reorder statements, archive supporting docs.",
+    accent: "from-[#1f80ff]/60 via-[#1f49ff]/50 to-transparent",
+  },
+  {
+    label: "Signature Suite",
+    description: "Invite clients, capture initials, unlock ready-to-send packets.",
+    accent: "from-[#34d399]/60 via-[#059669]/50 to-transparent",
+  },
+  {
+    label: "Board Review",
+    description: "Bundle decks, swap pages, and export pristine PDFs in minutes.",
+    accent: "from-[#fda4af]/60 via-[#fb7185]/50 to-transparent",
+  },
+];
+
+export default async function Home() {
+  const session = await getServerSession(authOptions);
+  if (session?.user) {
+    return <ProjectsDashboard displayName={session.user.name ?? session.user.email ?? "Guest"} />;
+  }
+
+  const usedToday = await hasUsedToday();
+  return <MarketingLanding usedToday={usedToday} />;
+}
+
+function MarketingLanding({ usedToday }: { usedToday: boolean }) {
   return (
     <div className="mx-auto flex max-w-4xl flex-col items-center gap-6 px-6 py-20 text-center">
       <h1 className="text-3xl font-semibold tracking-tight sm:text-5xl leading-tight">
@@ -68,6 +134,161 @@ export default async function Home() {
             <p className="text-sm text-gray-600">{description}</p>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function ProjectsDashboard({ displayName }: { displayName: string }) {
+  const shortName = displayName.split(" ")[0] ?? "Guest";
+
+  return (
+    <div className="relative min-h-screen bg-[#040b17] text-white">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,#12336f_0%,transparent_45%),radial-gradient(circle_at_bottom,#04233f_0%,transparent_35%)] opacity-80" />
+      <div className="relative mx-auto flex max-w-6xl flex-col gap-8 px-6 py-10">
+        <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-8 shadow-[0_40px_120px_rgba(2,10,22,0.65)] backdrop-blur">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-sm uppercase tracking-[0.4em] text-white/60">Projects</p>
+              <h1 className="mt-2 text-4xl font-semibold tracking-tight">Welcome back, {shortName}.</h1>
+              <p className="mt-3 max-w-2xl text-base text-white/70">
+                Curate client-ready packets, reopen unfinished canvases, and launch new workspaces without losing momentum. Every merge, highlight, and signature is already waiting for you.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Link
+                href="/studio"
+                className="inline-flex items-center justify-center rounded-full bg-white px-8 py-3 text-sm font-semibold text-slate-900 shadow-xl shadow-black/20 transition hover:-translate-y-0.5"
+              >
+                New workspace
+                <ArrowUpRight className="ml-2 h-4 w-4" />
+              </Link>
+              <Link
+                href="/studio"
+                className="inline-flex items-center justify-center rounded-full border border-white/40 px-8 py-3 text-sm font-semibold text-white/90 transition hover:border-white hover:bg-white/10"
+              >
+                Upload PDFs
+              </Link>
+            </div>
+          </div>
+          <div className="mt-8 grid gap-4 sm:grid-cols-3">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <p className="text-xs uppercase tracking-[0.4em] text-white/60">Active canvases</p>
+              <p className="mt-2 text-2xl font-semibold">4</p>
+              <p className="text-xs text-white/60">Updated in the last 24 hours</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <p className="text-xs uppercase tracking-[0.4em] text-white/60">Highlights synced</p>
+              <p className="mt-2 text-2xl font-semibold">128</p>
+              <p className="text-xs text-white/60">Preserved across sessions</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <p className="text-xs uppercase tracking-[0.4em] text-white/60">Ready to send</p>
+              <p className="mt-2 text-2xl font-semibold">9</p>
+              <p className="text-xs text-white/60">Packets approved today</p>
+            </div>
+          </div>
+        </div>
+
+        <ProjectsWorkspaceShelf />
+
+        <section className="grid gap-5 lg:grid-cols-[2fr,1fr]">
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm uppercase tracking-[0.4em] text-white/60">Recent projects</p>
+                <h2 className="text-2xl font-semibold">Continue where you paused</h2>
+              </div>
+              <Link
+                href="/studio"
+                className="inline-flex items-center text-sm font-semibold text-white/70 transition hover:text-white"
+              >
+                View all
+                <ArrowUpRight className="ml-2 h-4 w-4" />
+              </Link>
+            </div>
+            <div className="mt-5 divide-y divide-white/10">
+              {curatedProjects.map((project) => (
+                <div
+                  key={project.id}
+                  className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 md:flex-row md:items-center md:justify-between"
+                >
+                  <div>
+                    <p className="text-lg font-semibold">{project.title}</p>
+                    <p className="text-sm text-white/60">{project.subtitle}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-3 text-sm">
+                    <span className="inline-flex items-center gap-1 rounded-full border border-white/20 px-3 py-1 text-white/80">
+                      <CalendarDays className="h-4 w-4" />
+                      {project.updated}
+                    </span>
+                    <span className="inline-flex items-center gap-1 rounded-full border border-white/20 px-3 py-1 text-white/80">
+                      <Sparkles className="h-4 w-4" />
+                      {project.status}
+                    </span>
+                    <Link
+                      href="/studio"
+                      className="inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-1 text-white transition hover:bg-white/20"
+                    >
+                      Open
+                      <ArrowUpRight className="h-4 w-4" />
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+              <p className="text-sm uppercase tracking-[0.4em] text-white/60">Trusted tools</p>
+              <h3 className="mt-2 text-xl font-semibold">Signature-ready</h3>
+              <p className="mt-1 text-sm text-white/70">
+                One tap to add initials, drop company stamps, or share a review link.
+              </p>
+              <div className="mt-4 flex gap-3 text-sm">
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/20 px-3 py-1">
+                  <FileSignature className="h-4 w-4" /> Sign
+                </span>
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/20 px-3 py-1">
+                  <CheckCircle2 className="h-4 w-4" /> Approve
+                </span>
+              </div>
+            </div>
+
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+              <p className="text-sm uppercase tracking-[0.4em] text-white/60">Team Hubs</p>
+              <h3 className="mt-2 text-xl font-semibold">Shared spaces</h3>
+              <p className="mt-1 text-sm text-white/70">
+                Keep audit packets, board decks, and compliance letters inside curated stacks.
+              </p>
+              <Link
+                href="/studio"
+                className="mt-4 inline-flex items-center text-sm font-semibold text-white/80 transition hover:text-white"
+              >
+                View spaces
+                <ArrowUpRight className="ml-2 h-4 w-4" />
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-4 pb-12 lg:grid-cols-3">
+          {templateBlocks.map((block) => (
+            <div
+              key={block.label}
+              className={`rounded-3xl border border-white/10 bg-gradient-to-br ${block.accent} p-6 shadow-lg shadow-black/30`}
+            >
+              <p className="text-sm uppercase tracking-[0.4em] text-white/70">{block.label}</p>
+              <p className="mt-2 text-lg text-white">{block.description}</p>
+              <div className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-white/90">
+                <FolderKanban className="h-4 w-4" />
+                Launch
+                <ArrowUpRight className="h-4 w-4" />
+              </div>
+            </div>
+          ))}
+        </section>
       </div>
     </div>
   );

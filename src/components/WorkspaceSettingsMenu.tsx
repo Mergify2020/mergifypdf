@@ -3,14 +3,15 @@
 import { usePathname } from "next/navigation";
 import SettingsMenu from "./SettingsMenu";
 
-const STUDIO_PREFIX = "/studio";
+const ALLOWED_PREFIXES = ["/studio", "/"];
 
 export default function WorkspaceSettingsMenu() {
   const pathname = usePathname();
-  const showMenu = pathname?.startsWith(STUDIO_PREFIX);
+  const showMenu = pathname
+    ? ALLOWED_PREFIXES.some((prefix) => (prefix === "/" ? pathname === "/" : pathname.startsWith(prefix)))
+    : false;
 
   if (!showMenu) return null;
 
   return <SettingsMenu />;
 }
-
