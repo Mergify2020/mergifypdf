@@ -1036,6 +1036,7 @@ function WorkspaceClient() {
                   );
                 })}
               </div>
+            </div>
 
             <div className="lg:w-[240px]">
               <div className="flex h-full flex-col rounded-2xl bg-slate-50/80 p-4 ring-1 ring-slate-200/80">
