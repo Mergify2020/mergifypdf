@@ -946,46 +946,26 @@ function WorkspaceClient() {
 
         {!loading && pages.length > 0 && (
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_240px]">
-            <div className="rounded-2xl bg-white/95 p-5 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
-                <div className="flex flex-wrap items-end justify-between gap-3 pb-3">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">Large preview</p>
-                    <p className="text-xs text-slate-500">Scroll to review every page</p>
-                  </div>
-                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    {pages.length} {pages.length === 1 ? "page" : "pages"}
-                  </span>
-                </div>
-                <div
-                  ref={previewContainerRef}
-                  className="h-[70vh] space-y-6 overflow-y-auto"
-                >
-                  {pages.map((page, idx) => {
-                    const pageHighlights = highlights[page.id] ?? [];
-                    return (
+            <div>
+              <div
+                ref={previewContainerRef}
+                className="h-[70vh] space-y-8 overflow-y-auto pr-2"
+              >
+                {pages.map((page, idx) => {
+                  const pageHighlights = highlights[page.id] ?? [];
+                  return (
+                    <div
+                      key={page.id}
+                      data-page-id={page.id}
+                      ref={registerPreviewRef(page.id)}
+                      className="mx-auto max-w-3xl"
+                    >
                       <div
-                        key={page.id}
-                        data-page-id={page.id}
-                        ref={registerPreviewRef(page.id)}
-                        className={`rounded-2xl bg-white/95 p-4 shadow-sm ring-1 transition ${
-                          activePageId === page.id ? "ring-brand shadow-brand/25" : "ring-slate-100"
-                        }`}
+                        className={`relative bg-white shadow-[0_12px_30px_rgba(15,23,42,0.18)] ${activePageId === page.id ? "ring-2 ring-brand/50 shadow-brand/30" : ""}`}
+                        style={{ transform: `scale(${zoom})`, transformOrigin: "top center" }}
                       >
-                        <div className="mb-2 flex items-center justify-between gap-4 text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-slate-500">
-                          <span>Page {idx + 1}</span>
-                          <span
-                            className="truncate text-right tracking-[0.2em]"
-                            title={sources[page.srcIdx]?.name ?? "Uploaded PDF"}
-                          >
-                            {sources[page.srcIdx]?.name ?? "Uploaded PDF"}
-                          </span>
-                        </div>
                         <div
-                          className="mx-auto max-w-3xl overflow-hidden rounded-[1.25rem] bg-white shadow-[0_20px_50px_rgba(15,23,42,0.12)]"
-                          style={{ transform: `scale(${zoom})`, transformOrigin: "top center" }}
-                        >
-                        <div
-                          className="relative"
+                          className="relative rounded-none"
                           style={
                             activeDrawingTool
                               ? ({
@@ -1000,62 +980,61 @@ function WorkspaceClient() {
                           onMouseMove={(event) => handleMarkupPointerMove(page.id, event)}
                           onMouseUp={() => handleMarkupPointerUp(page.id)}
                         >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={page.preview} alt={`Page ${idx + 1}`} className="w-full" />
-                            <svg
-                              className="absolute inset-0 h-full w-full"
-                              style={{ pointerEvents: deleteMode ? "auto" : "none" }}
-                              viewBox="0 0 1000 1000"
-                              preserveAspectRatio="none"
-                            >
-                              {pageHighlights.map((stroke) =>
-                                stroke.points.length > 1 ? (
-                                  <polyline
-                                    key={stroke.id}
-                                    points={stroke.points
-                                      .map((pt) => `${pt.x * 1000},${pt.y * 1000}`)
-                                      .join(" ")}
-                                    fill="none"
-                                    stroke={stroke.color}
-                                    strokeWidth={Math.max(1, stroke.thickness * 1000)}
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeOpacity={stroke.tool === "pencil" ? 0.85 : 0.4}
-                                    style={{
-                                      pointerEvents: deleteMode ? "stroke" : "none",
-                                      cursor: deleteMode ? "pointer" : "default",
-                                    }}
-                                    onClick={(event) => {
-                                      if (!deleteMode) return;
-                                      event.preventDefault();
-                                      event.stopPropagation();
-                                      handleDeleteStroke(page.id, stroke.id);
-                                    }}
-                                  />
-                                ) : null
-                              )}
-                              {draftHighlight?.pageId === page.id &&
-                              draftHighlight.points.length > 1 ? (
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={page.preview} alt={`Page ${idx + 1}`} className="w-full rounded-none" />
+                          <svg
+                            className="absolute inset-0 h-full w-full"
+                            style={{ pointerEvents: deleteMode ? "auto" : "none" }}
+                            viewBox="0 0 1000 1000"
+                            preserveAspectRatio="none"
+                          >
+                            {pageHighlights.map((stroke) =>
+                              stroke.points.length > 1 ? (
                                 <polyline
-                                  aria-hidden
-                                  points={draftHighlight.points
+                                  key={stroke.id}
+                                  points={stroke.points
                                     .map((pt) => `${pt.x * 1000},${pt.y * 1000}`)
                                     .join(" ")}
                                   fill="none"
-                                  stroke={draftHighlight.color}
-                                  strokeWidth={Math.max(1, draftHighlight.thickness * 1000)}
+                                  stroke={stroke.color}
+                                  strokeWidth={Math.max(1, stroke.thickness * 1000)}
                                   strokeLinecap="round"
                                   strokeLinejoin="round"
-                                  strokeOpacity={draftHighlight.tool === "pencil" ? 0.7 : 0.25}
+                                  strokeOpacity={stroke.tool === "pencil" ? 0.85 : 0.4}
+                                  style={{
+                                    pointerEvents: deleteMode ? "stroke" : "none",
+                                    cursor: deleteMode ? "pointer" : "default",
+                                  }}
+                                  onClick={(event) => {
+                                    if (!deleteMode) return;
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    handleDeleteStroke(page.id, stroke.id);
+                                  }}
                                 />
-                              ) : null}
-                            </svg>
-                          </div>
+                              ) : null
+                            )}
+                            {draftHighlight?.pageId === page.id &&
+                            draftHighlight.points.length > 1 ? (
+                              <polyline
+                                aria-hidden
+                                points={draftHighlight.points
+                                  .map((pt) => `${pt.x * 1000},${pt.y * 1000}`)
+                                  .join(" ")}
+                                fill="none"
+                                stroke={draftHighlight.color}
+                                strokeWidth={Math.max(1, draftHighlight.thickness * 1000)}
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeOpacity={draftHighlight.tool === "pencil" ? 0.7 : 0.25}
+                              />
+                            ) : null}
+                          </svg>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
+                    </div>
+                  );
+                })}
               </div>
 
             <div className="lg:w-[240px]">
