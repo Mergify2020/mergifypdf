@@ -516,8 +516,16 @@ function WorkspaceClient() {
   }, [pages, activePageId]);
 
   useEffect(() => {
+    if (pages.length === 0) {
+      if (sources.length === 0) {
+        setHighlights({});
+        setHighlightHistory([]);
+      }
+      return;
+    }
+
+    const allowed = new Set(pages.map((p) => p.id));
     setHighlights((prev) => {
-      const allowed = new Set(pages.map((p) => p.id));
       const next: Record<string, HighlightStroke[]> = {};
       allowed.forEach((id) => {
         if (prev[id]) next[id] = prev[id];
@@ -527,14 +535,11 @@ function WorkspaceClient() {
       }
       return next;
     });
-  }, [pages]);
 
-  useEffect(() => {
-    const allowed = new Set(pages.map((p) => p.id));
     setHighlightHistory((prev) =>
       prev.filter((entry) => (entry.type === "clear" ? true : allowed.has(entry.pageId)))
     );
-  }, [pages]);
+  }, [pages, sources.length]);
 
   useEffect(() => {
     const container = previewContainerRef.current;
@@ -865,6 +870,22 @@ function WorkspaceClient() {
   const highlightActive = highlightButtonOn && !deleteMode;
   const pencilActive = pencilButtonOn && !deleteMode;
   const activeDrawingTool: DrawingTool | null = highlightActive ? "highlight" : pencilActive ? "pencil" : null;
+  const highlightCount = useMemo(
+    () => Object.values(highlights).reduce((sum, list) => sum + list.length, 0),
+    [highlights]
+  );
+  const hasWorkspaceData = pages.length > 0 || highlightCount > 0 || !!draftHighlight;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!hasWorkspaceData) return;
+    const handler = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [hasWorkspaceData]);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
