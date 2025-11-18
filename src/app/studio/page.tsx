@@ -69,6 +69,7 @@ const PREVIEW_IMAGE_QUALITY = 0.95;
 const WORKSPACE_SESSION_KEY = "mpdf:files";
 const WORKSPACE_DB_NAME = "mpdf-file-store";
 const WORKSPACE_DB_STORE = "files";
+const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
 
 type StoredSourceMeta = { id: string; name?: string; size?: number };
 type FileStoreEntry = { blob: Blob; name?: string; size?: number; updatedAt: number };
@@ -115,14 +116,43 @@ async function readFileBlob(id: string): Promise<FileStoreEntry | null> {
   });
 }
 
+function getLocalStorage(): Storage | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage;
+  } catch (err) {
+    console.error("LocalStorage unavailable", err);
+    return null;
+  }
+}
+
+function getSessionStorage(): Storage | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.sessionStorage;
+  } catch (err) {
+    console.error("SessionStorage unavailable", err);
+    return null;
+  }
+}
+
 function persistSourceMetadata(list: SourceRef[]) {
-  if (typeof window === "undefined") return;
+  const storage = getLocalStorage();
+  if (!storage) return;
   if (list.length === 0) {
-    sessionStorage.removeItem(WORKSPACE_SESSION_KEY);
+    storage.removeItem(WORKSPACE_SESSION_KEY);
     return;
   }
   const payload = list.map(({ storageId, name, size }) => ({ id: storageId, name, size }));
-  sessionStorage.setItem(WORKSPACE_SESSION_KEY, JSON.stringify(payload));
+  try {
+    storage.setItem(WORKSPACE_SESSION_KEY, JSON.stringify(payload));
+  } catch (err) {
+    console.error("Failed to persist workspace metadata", err);
+  }
+}
+
+function buildPageId(sourceId: string, pageIdx: number) {
+  return `${sourceId}::${pageIdx}`;
 }
 
 function getDevicePixelRatio() {
@@ -237,6 +267,7 @@ function WorkspaceClient() {
   const previewNodeMap = useRef<Map<string, HTMLDivElement>>(new Map());
   const hasHydratedSources = useRef(false);
   const objectUrlCacheRef = useRef<Map<string, string>>(new Map());
+  const hasHydratedHighlights = useRef(false);
   const MIN_HIGHLIGHT_THICKNESS = 6;
   const MAX_HIGHLIGHT_THICKNESS = 32;
   const MIN_PENCIL_THICKNESS = 1;
@@ -251,7 +282,21 @@ function WorkspaceClient() {
     let cancelled = false;
 
     async function hydrateFromStorage() {
-      const raw = sessionStorage.getItem(WORKSPACE_SESSION_KEY);
+      const local = getLocalStorage();
+      const session = getSessionStorage();
+      let raw: string | null = null;
+      if (local) raw = local.getItem(WORKSPACE_SESSION_KEY);
+      if (!raw && session) {
+        raw = session.getItem(WORKSPACE_SESSION_KEY);
+        if (raw && local) {
+          try {
+            local.setItem(WORKSPACE_SESSION_KEY, raw);
+          } catch {
+            // ignore
+          }
+        }
+        session?.removeItem(WORKSPACE_SESSION_KEY);
+      }
       if (!raw) {
         hasHydratedSources.current = true;
         return;
@@ -260,7 +305,7 @@ function WorkspaceClient() {
       try {
         const parsed = JSON.parse(raw) as StoredSourceMeta[];
         if (!Array.isArray(parsed)) {
-          sessionStorage.removeItem(WORKSPACE_SESSION_KEY);
+          local?.removeItem(WORKSPACE_SESSION_KEY);
           hasHydratedSources.current = true;
           return;
         }
@@ -290,13 +335,13 @@ function WorkspaceClient() {
           if (restored.length > 0) {
             setSources((prev) => (prev.length > 0 ? prev : restored));
           } else {
-            sessionStorage.removeItem(WORKSPACE_SESSION_KEY);
+            local?.removeItem(WORKSPACE_SESSION_KEY);
             setError("We couldn't restore your previous workspace. Please re-upload your PDFs.");
           }
         }
       } catch (err) {
         console.error("Failed to parse stored workspace", err);
-        sessionStorage.removeItem(WORKSPACE_SESSION_KEY);
+        local?.removeItem(WORKSPACE_SESSION_KEY);
       } finally {
         if (!cancelled) {
           hasHydratedSources.current = true;
@@ -334,6 +379,33 @@ function WorkspaceClient() {
       objectUrlCacheRef.current.clear();
     };
   }, []);
+
+  /** Restore highlight strokes across reloads */
+  useEffect(() => {
+    if (typeof window === "undefined" || hasHydratedHighlights.current) return;
+    hasHydratedHighlights.current = true;
+    try {
+      const raw = getLocalStorage()?.getItem(WORKSPACE_HIGHLIGHTS_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") {
+        setHighlights(parsed as Record<string, HighlightStroke[]>);
+      }
+    } catch (err) {
+      console.error("Failed to restore highlights", err);
+      getLocalStorage()?.removeItem(WORKSPACE_HIGHLIGHTS_KEY);
+    }
+  }, []);
+
+  /** Persist highlights so edits survive reloads */
+  useEffect(() => {
+    if (typeof window === "undefined" || !hasHydratedHighlights.current) return;
+    try {
+      getLocalStorage()?.setItem(WORKSPACE_HIGHLIGHTS_KEY, JSON.stringify(highlights));
+    } catch (err) {
+      console.error("Failed to persist highlights", err);
+    }
+  }, [highlights]);
 
   /** Render thumbnails for any sources that haven't been processed yet */
   useEffect(() => {
@@ -404,8 +476,9 @@ function WorkspaceClient() {
               thumbData = thumbCanvas.toDataURL("image/png", PREVIEW_IMAGE_QUALITY);
             }
 
+            const pageId = buildPageId(src.storageId, p - 1);
             next.push({
-              id: crypto.randomUUID(),
+              id: pageId,
               srcIdx: s,
               pageIdx: p - 1,
               thumb: thumbData,
