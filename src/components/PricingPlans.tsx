@@ -47,7 +47,7 @@ const tiers = [
 
 export default function PricingPlans() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#020610] via-[#060f1e] to-[#020610] px-6 py-12 text-slate-900">
+    <div className="min-h-screen bg-gradient-to-b from-[#080f1c] via-[#0c1526] to-[#070d18] px-6 py-12 text-slate-900">
       <div className="mx-auto max-w-5xl space-y-10">
         <div className="rounded-[46px] border border-white/15 bg-gradient-to-br from-white/10 via-white/5 to-white/0 p-10 text-center text-white shadow-[0_80px_180px_rgba(0,0,0,0.6)] backdrop-blur-xl">
           <h1 className="text-3xl font-semibold tracking-tight">Choose the workspace that fits you.</h1>
@@ -107,7 +107,7 @@ export default function PricingPlans() {
                   { feature: "Unlimited uploads", core: true, team: true, scale: true },
                   { feature: "Team folders", core: false, team: true, scale: true },
                   { feature: "Member controls", core: false, team: false, scale: true },
-                  { feature: "Add teammates", core: "–", team: "Up to 3", scale: "Unlimited" },
+                  { feature: "Add teammates", core: false, team: "Up to 3", scale: "Unlimited" },
                   { feature: "Billing", core: "Single", team: "Team", scale: "Per seat" },
                 ].map((row) => (
                   <tr key={row.feature} className="border-white/10">
@@ -128,10 +128,18 @@ export default function PricingPlans() {
 
 function renderValue(value: boolean | string) {
   if (typeof value === "string") {
-    return value;
+    return <span className="block text-center">{value}</span>;
   }
   if (value) {
-    return <Check className="h-4 w-4 text-emerald-300" strokeWidth={2} />;
+    return (
+      <span className="flex justify-center">
+        <Check className="h-4 w-4 text-emerald-300" strokeWidth={2} />
+      </span>
+    );
   }
-  return <X className="h-4 w-4 text-rose-300" strokeWidth={2} />;
+  return (
+    <span className="flex justify-center">
+      <X className="h-4 w-4 text-rose-300" strokeWidth={2} />
+    </span>
+  );
 }
