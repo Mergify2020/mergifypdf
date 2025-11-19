@@ -188,7 +188,7 @@ export default function RegisterPage() {
 
       <div className="mt-4 text-sm">
         <a className="underline" href="/login">
-          Already have an account? Sign in
+          Already have an account? Log in
         </a>
       </div>
     </main>

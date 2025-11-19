@@ -78,6 +78,14 @@ export default async function Home() {
 function MarketingLanding({ usedToday }: { usedToday: boolean }) {
   return (
     <div className="mx-auto flex max-w-4xl flex-col items-center gap-6 px-6 py-20 text-center">
+      <div className="flex w-full justify-end">
+        <Link
+          href="/login"
+          className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 shadow-sm shadow-slate-200 transition hover:-translate-y-0.5 hover:border-slate-300"
+        >
+          Log in
+        </Link>
+      </div>
       <h1 className="text-3xl font-semibold tracking-tight sm:text-5xl leading-tight">
         <span className="block">Merge and edit your documents</span>
         <span className="block">all in one place</span>
@@ -90,10 +98,25 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
       <p className="text-sm text-gray-500">
         Already have an account?{" "}
         <Link className="underline decoration-[#024d7c]" href="/login">
-          Sign in
+          Log in
         </Link>
         .
       </p>
+      <div className="mt-4 w-full rounded-3xl border border-black/10 bg-gradient-to-r from-[#0f172a] via-[#1d2d52] to-[#0f172a] p-6 text-left text-white shadow-[0_30px_80px_rgba(15,23,42,0.3)] sm:flex sm:items-center sm:justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-[0.4em] text-white/60">Upgrade</p>
+          <h2 className="mt-2 text-2xl font-semibold">Unlock unlimited documents</h2>
+          <p className="mt-1 text-sm text-white/70">
+            Faster processing, team workspaces, and premium support when you subscribe.
+          </p>
+        </div>
+        <Link
+          href="/account?view=pricing"
+          className="mt-4 inline-flex items-center justify-center rounded-full bg-white px-5 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-black/20 transition hover:opacity-90 sm:mt-0"
+        >
+          View pricing
+        </Link>
+      </div>
       <div className="mt-12 grid w-full gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {features.map(({ title, description, icon: Icon }) => (
           <div

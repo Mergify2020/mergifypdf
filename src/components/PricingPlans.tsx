@@ -87,14 +87,14 @@ const faqs = [
 export default function PricingPlans() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#050915] via-[#081327] to-[#05060c] px-6 py-12 text-slate-900">
-      <div className="mx-auto max-w-5xl space-y-10">
+      <div className="mx-auto max-w-6xl space-y-10 px-2">
         <div className="text-center text-white">
           <h1 className="text-4xl font-semibold tracking-tight text-white drop-shadow-[0_10px_45px_rgba(0,0,0,0.35)]">
             Choose the workspace built for your workflow.
           </h1>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid gap-8 lg:grid-cols-3">
           {tiers.map((tier) => (
             <div
               key={tier.name}
@@ -178,13 +178,13 @@ export default function PricingPlans() {
           </div>
         </div>
 
-        <div className="rounded-[46px] border border-white/15 bg-gradient-to-br from-white/10 via-white/5 to-white/0 p-8 text-white shadow-[0_70px_160px_rgba(0,0,0,0.5)] backdrop-blur-xl">
+        <div className="rounded-[46px] border border-white/15 bg-gradient-to-br from-[#192236] via-[#131c2e] to-[#0c1422] p-8 text-white shadow-[0_70px_160px_rgba(0,0,0,0.45)] backdrop-blur-xl">
           <p className="mb-8 text-center text-3xl font-semibold tracking-tight">Frequently asked questions</p>
           <div className="grid gap-6 text-left md:grid-cols-2">
             {faqs.map((faq) => (
               <div
                 key={faq.question}
-                className="rounded-3xl border border-white/15 bg-gradient-to-b from-white/15 to-white/5 p-6 text-white/90 shadow-[0_25px_70px_rgba(0,0,0,0.35)]"
+                className="rounded-3xl border border-white/15 bg-gradient-to-b from-[#202c40]/60 to-[#131c2c]/60 p-6 text-white/90 shadow-[0_25px_60px_rgba(0,0,0,0.3)]"
               >
                 <h3 className="text-base font-semibold text-white">{faq.question}</h3>
                 <p className="mt-3 text-sm text-white/70">{faq.answer}</p>

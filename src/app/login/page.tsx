@@ -9,11 +9,11 @@ import LogoMerge from "@/components/LogoMerge";
 
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
   CredentialsSignin: "Invalid email or password.",
-  EMAIL_NOT_VERIFIED: "Please verify your email before signing in. Check your inbox for the 6-digit code.",
-  OAUTH_ONLY: "This account now uses Google sign-in. Continue with Google instead.",
-  OAuthSignin: "Google sign-in failed. Please try again.",
-  OAuthCallback: "Google sign-in failed. Please try again.",
-  OAuthAccountNotLinked: "This email is already linked to a different sign-in method.",
+  EMAIL_NOT_VERIFIED: "Please verify your email before logging in. Check your inbox for the 6-digit code.",
+  OAUTH_ONLY: "This account now uses Google login. Continue with Google instead.",
+  OAuthSignin: "Google login failed. Please try again.",
+  OAuthCallback: "Google login failed. Please try again.",
+  OAuthAccountNotLinked: "This email is already linked to a different login method.",
   AccessDenied: "Access denied. Try a different account.",
   Configuration: "Sign-in is temporarily unavailable. Please try again later.",
   Verification: "Verification link expired. Request a new one.",
@@ -21,7 +21,7 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
 
 function getAuthError(code?: string | null) {
   if (!code) return null;
-  return AUTH_ERROR_MESSAGES[code] ?? "Unable to sign in. Please try again.";
+  return AUTH_ERROR_MESSAGES[code] ?? "Unable to log in. Please try again.";
 }
 
 export default function LoginPage() {
@@ -68,7 +68,7 @@ export default function LoginPage() {
       window.location.assign("/");
     } catch (error) {
       console.error(error);
-      setErr("Unable to sign in. Please try again.");
+      setErr("Unable to log in. Please try again.");
       setBusy(false);
     }
   }
@@ -86,7 +86,7 @@ export default function LoginPage() {
 
   return (
     <main className="mx-auto max-w-sm p-6">
-      <h1 className="text-2xl font-semibold">Sign in</h1>
+      <h1 className="text-2xl font-semibold">Log in</h1>
       <p className="mt-1 text-sm text-gray-600">
         Use the account you created, or reset your password below.
       </p>
