@@ -80,7 +80,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
   return (
     <div className="bg-gradient-to-b from-[#f3f8ff] via-white to-white">
       <div className="mx-auto flex max-w-6xl flex-col gap-16 px-6 py-20">
-        <div className="grid gap-12 lg:grid-cols-[1.05fr,0.95fr] lg:items-center">
+        <div className="grid gap-12 lg:grid-cols-[1fr,1fr] lg:items-center">
           <div className="space-y-6 text-center lg:text-left">
             <h1 className="text-3xl font-semibold leading-tight tracking-tight sm:text-5xl">
               <span className="block">Merge and edit your documents</span>
@@ -111,27 +111,16 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
               ))}
             </div>
           </div>
-          <div className="relative">
-            <div className="pointer-events-none absolute -top-4 -right-6 h-64 w-64 rounded-full bg-sky-200/40 blur-[120px]" />
-            <div className="relative overflow-hidden rounded-[40px] border border-white/50 bg-white shadow-[0_50px_140px_rgba(8,23,53,0.2)]">
-              <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/80 px-6 py-3">
-                <span className="h-3 w-3 rounded-full bg-rose-300" />
-                <span className="h-3 w-3 rounded-full bg-amber-300" />
-                <span className="h-3 w-3 rounded-full bg-emerald-300" />
-              </div>
-              <div className="bg-slate-950/5 p-4">
-                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                  <Image
-                    src="/product-hero.jpeg"
-                    alt="Preview of the MergifyPDF editor"
-                    width={900}
-                    height={700}
-                    className="h-full w-full object-cover"
-                    priority
-                  />
-                </div>
-              </div>
-            </div>
+          <div className="relative flex items-center justify-center">
+            <div className="pointer-events-none absolute -bottom-6 -right-6 h-72 w-72 rounded-full bg-indigo-100/60 blur-[140px]" />
+            <Image
+              src="/visual-hero2.jpeg"
+              alt="Preview of the MergifyPDF editor"
+              width={900}
+              height={700}
+              className="relative w-full max-w-xl rounded-[32px] object-cover shadow-[0_40px_120px_rgba(9,20,45,0.25)]"
+              priority
+            />
           </div>
         </div>
 
