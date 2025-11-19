@@ -75,26 +75,25 @@ export default function ProjectsWorkspaceShelf() {
   }
 
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-6 text-slate-900 shadow-[0_25px_70px_rgba(15,23,42,0.08)]">
-      <div className="flex flex-col gap-4">
-        <p className="text-2xl font-semibold text-slate-900">Continue your last project</p>
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="text-2xl font-semibold">{snapshot.fileName}</h2>
-            <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1 text-sm text-slate-600">
-              <Clock className="h-4 w-4" />
-              Last edited {snapshot.lastEditedLabel}
-            </div>
+    <div className="rounded-[46px] border border-white/50 bg-white p-8 text-slate-900 shadow-[0_40px_120px_rgba(15,23,42,0.12)]">
+      <div className="flex flex-col gap-6">
+        <p className="text-sm uppercase tracking-[0.5em] text-[#7b8ca8]">Continue your last project</p>
+        <div className="flex flex-col gap-1">
+          <p className="text-3xl font-semibold tracking-tight text-slate-900">{snapshot.fileName}</p>
+          <div className="inline-flex items-center gap-2 rounded-full border border-slate-100 bg-slate-50 px-4 py-1 text-sm text-slate-500">
+            <Clock className="h-4 w-4" />
+            Last edited {snapshot.lastEditedLabel}
           </div>
+        </div>
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <Link
             href="/studio"
-            className="inline-flex items-center justify-center rounded-full bg-[#024d7c] px-7 py-3 text-sm font-semibold text-white shadow-lg shadow-[#012a44]/30 transition hover:-translate-y-0.5"
+            className="inline-flex items-center justify-center rounded-full bg-[#024d7c] px-8 py-4 text-sm font-semibold text-white shadow-[0_20px_40px_rgba(2,77,124,0.35)] transition hover:-translate-y-0.5"
           >
             Resume / Open
             <ArrowUpRight className="ml-2 h-4 w-4" />
           </Link>
         </div>
-        
       </div>
     </div>
   );

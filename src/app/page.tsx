@@ -115,7 +115,7 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-white via-[#f4f7fb] to-white text-slate-900">
       <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-10">
-        <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-[0_35px_80px_rgba(15,23,42,0.12)]">
+        <div className="rounded-[46px] border border-white/60 bg-white/95 p-10 shadow-[0_45px_120px_rgba(15,23,42,0.1)] backdrop-blur">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h1 className="text-4xl font-semibold tracking-tight text-slate-900">
@@ -138,7 +138,7 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
         <ProjectsWorkspaceShelf />
 
         <section className="grid gap-5 lg:grid-cols-[2fr,1fr]">
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_25px_70px_rgba(15,23,42,0.08)]">
+          <div className="rounded-[36px] border border-white/60 bg-white/95 p-8 shadow-[0_40px_120px_rgba(15,23,42,0.08)] backdrop-blur">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-2xl font-semibold text-slate-900">Your projects</h2>
@@ -222,7 +222,7 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
           </div>
 
           <div className="space-y-4">
-            <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-6 text-slate-500 shadow-[0_25px_60px_rgba(15,23,42,0.08)]">
+            <div className="rounded-[36px] border border-dashed border-slate-200 bg-white/95 p-6 text-slate-500 shadow-[0_25px_60px_rgba(15,23,42,0.08)]">
               <p className="text-sm uppercase tracking-[0.4em] text-slate-400">Team Hub workspace</p>
               <h3 className="mt-2 text-xl font-semibold text-slate-900">Coming soon</h3>
               <p className="mt-1 text-sm">
