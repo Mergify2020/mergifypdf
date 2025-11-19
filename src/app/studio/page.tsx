@@ -34,6 +34,8 @@ type PageItem = {
   thumb: string; // small preview
   preview: string; // large preview
   rotation: number;
+  width: number;
+  height: number;
 };
 type Point = { x: number; y: number };
 type DrawingTool = "highlight" | "pencil";
@@ -217,6 +219,55 @@ function cloneHighlightMap(map: Record<string, HighlightStroke[]>): Record<strin
   );
 }
 
+function createThumbnailDataUrl(canvas: HTMLCanvasElement) {
+  if (canvas.width <= THUMB_MAX_WIDTH) {
+    return canvas.toDataURL("image/png", PREVIEW_IMAGE_QUALITY);
+  }
+  const ratio = THUMB_MAX_WIDTH / canvas.width;
+  const thumbCanvas = document.createElement("canvas");
+  thumbCanvas.width = THUMB_MAX_WIDTH;
+  thumbCanvas.height = Math.floor(canvas.height * ratio);
+  const thumbCtx = thumbCanvas.getContext("2d")!;
+  thumbCtx.imageSmoothingEnabled = true;
+  thumbCtx.imageSmoothingQuality = "high";
+  thumbCtx.drawImage(canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
+  return thumbCanvas.toDataURL("image/png", PREVIEW_IMAGE_QUALITY);
+}
+
+async function loadImageFromDataUrl(dataUrl: string) {
+  const image = new Image();
+  const promise = new Promise<HTMLImageElement>((resolve, reject) => {
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Failed to load image"));
+  });
+  image.src = dataUrl;
+  return promise;
+}
+
+async function rotatePreviewClockwise(previewDataUrl: string) {
+  const image = await loadImageFromDataUrl(previewDataUrl);
+  const canvas = document.createElement("canvas");
+  canvas.width = image.height;
+  canvas.height = image.width;
+  const ctx = canvas.getContext("2d")!;
+  ctx.translate(canvas.width / 2, canvas.height / 2);
+  ctx.rotate(Math.PI / 2);
+  ctx.drawImage(image, -image.width / 2, -image.height / 2);
+  return {
+    preview: canvas.toDataURL("image/png", PREVIEW_IMAGE_QUALITY),
+    thumb: createThumbnailDataUrl(canvas),
+    width: canvas.width,
+    height: canvas.height,
+  };
+}
+
+function rotatePointClockwise(point: Point): Point {
+  return {
+    x: 1 - point.y,
+    y: point.x,
+  };
+}
+
 /** One sortable thumbnail tile */
 function SortableThumb({
   item,
@@ -261,7 +312,6 @@ function SortableThumb({
           src={item.thumb}
           alt={`Page ${index + 1}`}
           className="pointer-events-none block w-full bg-white object-contain transition"
-          style={{ transform: `rotate(${item.rotation}deg)` }}
         />
       </button>
     </li>
@@ -273,11 +323,13 @@ function SortableOrganizeTile({
   index,
   onRotate,
   onDelete,
+  rotating = false,
 }: {
   item: PageItem;
   index: number;
   onRotate: () => void;
   onDelete: () => void;
+  rotating?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
     id: item.id,
@@ -300,10 +352,9 @@ function SortableOrganizeTile({
       <div className="relative flex flex-1 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_8px_18px_rgba(15,23,42,0.12)]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={item.thumb}
+          src={item.preview}
           alt={`Page ${index + 1}`}
           className="max-h-full w-full object-contain"
-          style={{ transform: `rotate(${rotation}deg)` }}
         />
       </div>
       <div className="flex items-center justify-end gap-2 px-2 pb-2">
@@ -315,9 +366,17 @@ function SortableOrganizeTile({
             event.stopPropagation();
             onRotate();
           }}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={rotating}
         >
-          <RotateCcw className="h-4 w-4" />
+          {rotating ? (
+            <svg className="h-4 w-4 animate-spin text-slate-500" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+              <path className="opacity-75" d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+            </svg>
+          ) : (
+            <RotateCcw className="h-4 w-4" />
+          )}
         </button>
         <button
           type="button"
@@ -362,6 +421,7 @@ function WorkspaceClient() {
   const [projectNameDraft, setProjectNameDraft] = useState("Untitled Project");
   const [projectNameError, setProjectNameError] = useState<string | null>(null);
   const [organizeMode, setOrganizeMode] = useState(false);
+  const [rotatingPages, setRotatingPages] = useState<Record<string, boolean>>({});
 
   const addInputRef = useRef<HTMLInputElement>(null);
   const renderedSourcesRef = useRef(0);
@@ -584,19 +644,7 @@ function WorkspaceClient() {
             await page.render(renderContext).promise;
 
             const previewData = canvas.toDataURL("image/png", PREVIEW_IMAGE_QUALITY);
-
-            let thumbData = previewData;
-            if (scaledWidth > THUMB_MAX_WIDTH) {
-              const ratio = THUMB_MAX_WIDTH / scaledWidth;
-              const thumbCanvas = document.createElement("canvas");
-              thumbCanvas.width = THUMB_MAX_WIDTH;
-              thumbCanvas.height = Math.floor(scaledHeight * ratio);
-              const thumbCtx = thumbCanvas.getContext("2d")!;
-              thumbCtx.imageSmoothingEnabled = true;
-              thumbCtx.imageSmoothingQuality = "high";
-              thumbCtx.drawImage(canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
-              thumbData = thumbCanvas.toDataURL("image/png", PREVIEW_IMAGE_QUALITY);
-            }
+            const thumbData = createThumbnailDataUrl(canvas);
 
             const pageId = buildPageId(src.storageId, p - 1);
             next.push({
@@ -606,6 +654,8 @@ function WorkspaceClient() {
               thumb: thumbData,
               preview: previewData,
               rotation: 0,
+              width: scaledWidth,
+              height: scaledHeight,
             });
           }
         }
@@ -1044,12 +1094,52 @@ function WorkspaceClient() {
     setProjectNameError(null);
   }
 
-  function handleRotatePage(pageId: string) {
-    setPages((prev) =>
-      prev.map((page) =>
-        page.id === pageId ? { ...page, rotation: (page.rotation + 90) % 360 } : page
-      )
-    );
+  async function handleRotatePage(pageId: string) {
+    if (typeof window === "undefined") return;
+    if (rotatingPages[pageId]) return;
+    const target = pages.find((page) => page.id === pageId);
+    if (!target) return;
+    setRotatingPages((prev) => ({ ...prev, [pageId]: true }));
+    try {
+      const rotated = await rotatePreviewClockwise(target.preview);
+      const nextRotation = (target.rotation + 90) % 360;
+      setPages((prev) =>
+        prev.map((page) =>
+          page.id === pageId
+            ? {
+                ...page,
+                rotation: nextRotation,
+                preview: rotated.preview,
+                thumb: rotated.thumb,
+                width: rotated.width,
+                height: rotated.height,
+              }
+            : page
+        )
+      );
+      setHighlights((prev) => {
+        const pageHighlights = prev[pageId];
+        if (!pageHighlights) return prev;
+        return {
+          ...prev,
+          [pageId]: pageHighlights.map((stroke) => ({
+            ...stroke,
+            points: stroke.points.map((pt) => rotatePointClockwise(pt)),
+          })),
+        };
+      });
+      setDraftHighlight((prev) => (prev?.pageId === pageId ? null : prev));
+      setHighlightHistory([]);
+    } catch (err) {
+      console.error("Failed to rotate page", err);
+      setError("Could not rotate that page. Please try again.");
+    } finally {
+      setRotatingPages((prev) => {
+        const next = { ...prev };
+        delete next[pageId];
+        return next;
+      });
+    }
   }
 
   function handleDeletePage(pageId: string) {
@@ -1514,8 +1604,9 @@ function WorkspaceClient() {
                       key={page.id}
                       item={page}
                       index={idx}
-                      onRotate={() => handleRotatePage(page.id)}
+                      onRotate={() => void handleRotatePage(page.id)}
                       onDelete={() => handleDeletePage(page.id)}
+                      rotating={!!rotatingPages[page.id]}
                     />
                   ))}
                 </div>
