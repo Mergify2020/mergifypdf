@@ -20,6 +20,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { PROJECT_NAME_STORAGE_KEY, projectNameToFile, sanitizeProjectName } from "@/lib/projectName";
 
 type SourceRef = { storageId: string; url: string; name: string; size: number; updatedAt: number };
 type PageItem = {
@@ -265,6 +266,7 @@ function WorkspaceClient() {
   const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]>([]);
   const [draftHighlight, setDraftHighlight] = useState<DraftHighlight | null>(null);
   const [deleteMode, setDeleteMode] = useState(false);
+  const [projectName, setProjectName] = useState("Untitled Project");
 
   const addInputRef = useRef<HTMLInputElement>(null);
   const renderedSourcesRef = useRef(0);
@@ -280,6 +282,19 @@ function WorkspaceClient() {
 
   // Better drag in grids
   const sensors = useSensors(useSensor(PointerSensor));
+
+  /** Rehydrate stored project name */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const stored = window.localStorage?.getItem(PROJECT_NAME_STORAGE_KEY);
+      if (stored) {
+        setProjectName(sanitizeProjectName(stored));
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   /** Rehydrate any stored PDFs from IndexedDB so refreshes survive deployments */
   useEffect(() => {
@@ -845,7 +860,7 @@ function WorkspaceClient() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `MergifyPDF-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.pdf`;
+      a.download = projectNameToFile(projectName);
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -1194,7 +1209,7 @@ function WorkspaceClient() {
           </div>
         </div>
 
-        <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900">Workspace</h1>
+        <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900">{projectName}</h1>
       </div>
       <div className="mx-auto flex w-full max-w-[1700px] flex-col gap-6 px-4 pt-4 pb-32 lg:px-10 lg:pt-6">
 

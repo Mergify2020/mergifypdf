@@ -2,18 +2,10 @@ import Link from "next/link";
 import UploadCta from "@/components/UploadCta";
 import { hasUsedToday } from "@/lib/quota";
 import ProjectsWorkspaceShelf from "@/components/ProjectsWorkspaceShelf";
+import StartProjectButton from "@/components/StartProjectButton";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
-import {
-  ArrowUpRight,
-  CalendarDays,
-  FileOutput,
-  FilePlus,
-  Highlighter,
-  Layers,
-  ListOrdered,
-  PenLine,
-} from "lucide-react";
+import { ArrowUpRight, CalendarDays, FileOutput, FilePlus, Highlighter, Layers, ListOrdered, PenLine } from "lucide-react";
 
 const features = [
   {
@@ -132,13 +124,7 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
               <p className="mt-3 max-w-2xl text-base text-white/70" />
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
-              <Link
-                href="/studio"
-                className="inline-flex items-center justify-center rounded-full bg-white px-10 py-3 text-base font-semibold text-slate-900 shadow-xl shadow-black/20 transition hover:-translate-y-0.5"
-              >
-                Start a new project
-                <ArrowUpRight className="ml-2 h-5 w-5" />
-              </Link>
+              <StartProjectButton />
               <Link
                 href="/pricing"
                 className="inline-flex items-center justify-center rounded-full border border-white/40 px-8 py-3 text-sm font-semibold text-white/90 transition hover:border-white hover:bg-white/10"

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowUpRight, Clock } from "lucide-react";
 import { useEffect, useState } from "react";
+import { PROJECT_NAME_STORAGE_KEY, sanitizeProjectName } from "@/lib/projectName";
 
 type StoredSourceMeta = { id: string; name?: string; size?: number; updatedAt?: number };
 type ResumeSnapshot = { fileName: string; lastEditedLabel: string };
@@ -38,8 +39,11 @@ export default function ProjectsWorkspaceShelf() {
       if (!Array.isArray(parsed) || parsed.length === 0) return;
       const [primary] = [...parsed].sort((a, b) => (b?.updatedAt ?? 0) - (a?.updatedAt ?? 0));
       if (!primary) return;
+      const storedProjectName = sanitizeProjectName(
+        window.localStorage?.getItem(PROJECT_NAME_STORAGE_KEY) ?? primary.name
+      );
       setSnapshot({
-        fileName: primary.name ?? "Imported PDF",
+        fileName: storedProjectName,
         lastEditedLabel: formatLastEdited(primary.updatedAt ?? Date.now()),
       });
     } catch (err) {
