@@ -6,6 +6,7 @@ import Providers from "@/components/Providers";
 import WorkspaceSettingsMenu from "@/components/WorkspaceSettingsMenu";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
+import { headers } from "next/headers";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -24,6 +25,8 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
+  const pathname = headers().get("x-pathname") ?? "/";
+  const showLoginButton = !session?.user && pathname !== "/login";
 
   return (
     <html lang="en">
@@ -54,14 +57,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               </Link>
               {session?.user ? (
                 <WorkspaceSettingsMenu />
-              ) : (
+              ) : showLoginButton ? (
                 <Link
                   href="/login"
                   className="inline-flex items-center rounded-full bg-[#024d7c] px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#013a60]"
                 >
                   Log in
                 </Link>
-              )}
+              ) : null}
             </div>
           </header>
 
