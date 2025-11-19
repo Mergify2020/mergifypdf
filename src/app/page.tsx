@@ -7,7 +7,6 @@ import ProjectsList from "@/components/ProjectsList";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { ArrowUpRight, FileOutput, FilePlus, Highlighter, Layers, ListOrdered, PenLine } from "lucide-react";
-import LogoMerge from "@/components/LogoMerge";
 
 const features = [
   {
@@ -79,11 +78,7 @@ export default async function Home() {
 function MarketingLanding({ usedToday }: { usedToday: boolean }) {
   return (
     <div className="mx-auto flex max-w-4xl flex-col items-center gap-6 px-6 py-20 text-center">
-      <div className="flex w-full items-center justify-between">
-        <div className="flex items-center gap-2 text-slate-900">
-          <LogoMerge size={32} />
-          <span className="text-base font-semibold">MergifyPDF</span>
-        </div>
+      <div className="flex w-full justify-end">
         <Link
           href="/login"
           className="inline-flex items-center rounded-full bg-[#024d7c] px-4 py-2 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(2,77,124,0.35)] transition hover:-translate-y-0.5 hover:bg-[#013a60]"
@@ -107,14 +102,11 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
         </Link>
         .
       </p>
-      <div className="mt-4 w-full rounded-3xl border border-slate-200 bg-white p-6 text-center text-slate-900 shadow-[0_25px_70px_rgba(15,23,42,0.08)]">
-        <h2 className="text-2xl font-semibold">Unlock unlimited documents</h2>
-        <p className="mt-2 text-sm text-slate-600">
-          Faster processing, shared workspaces, and premium support when you subscribe.
-        </p>
+      <div className="mt-4 text-center text-slate-900">
+        <h2 className="text-2xl font-semibold">Unlock unlimited uploads and team workspaces.</h2>
         <Link
           href="/account?view=pricing"
-          className="mt-6 inline-flex items-center justify-center rounded-full bg-gradient-to-r from-[#0ea5e9] via-[#2563eb] to-[#4c1d95] px-10 py-3.5 text-base font-semibold text-white shadow-[0_20px_45px_rgba(37,99,235,0.4)] transition hover:-translate-y-0.5"
+          className="mx-auto mt-6 inline-flex w-full max-w-xl items-center justify-center rounded-full bg-gradient-to-r from-[#0ea5e9] via-[#2563eb] to-[#4c1d95] px-12 py-5 text-xl font-semibold text-white shadow-[0_25px_60px_rgba(37,99,235,0.35)] transition hover:-translate-y-1"
         >
           View pricing
         </Link>
