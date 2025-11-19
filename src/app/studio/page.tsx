@@ -1607,13 +1607,14 @@ function WorkspaceClient() {
 
       {showDelayOverlay ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-white/70 backdrop-blur">
-          <div className="flex flex-col items-center gap-4 rounded-[32px] bg-white p-8 text-center text-slate-900 shadow-[0_35px_90px_rgba(9,14,35,0.25)]">
-            <div className="flex flex-col items-center gap-2">
-              <img src="/logo-wordmark2.svg" alt="MergifyPDF" className="h-10 w-auto" />
-              <p className="text-base font-semibold">Preparing your download… ({downloadCountdown}s)</p>
-            </div>
-            <div className="text-4xl font-semibold text-[#024d7c]">
-              {downloadCountdown > 0 ? downloadCountdown : 0}
+          <div className="flex w-full max-w-md flex-col items-center gap-5 rounded-[32px] bg-white p-8 text-center text-slate-900 shadow-[0_35px_90px_rgba(9,14,35,0.25)]">
+            <img src="/logo-wordmark2.svg" alt="MergifyPDF" className="h-10 w-auto" />
+            <p className="text-lg font-semibold">Preparing your download…</p>
+            <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100">
+              <div
+                className="h-full w-full rounded-full bg-gradient-to-r from-[#0ea5e9] via-[#2563eb] to-[#4c1d95]"
+                style={{ animation: "mpdf-progress 3s linear forwards" }}
+              />
             </div>
             <p className="text-sm text-slate-500">
               Create a free account to remove this delay and get another free upload.
@@ -1621,6 +1622,16 @@ function WorkspaceClient() {
           </div>
         </div>
       ) : null}
+      <style jsx global>{`
+        @keyframes mpdf-progress {
+          from {
+            transform: translateX(-100%);
+          }
+          to {
+            transform: translateX(0);
+          }
+        }
+      `}</style>
     </main>
   );
 }
