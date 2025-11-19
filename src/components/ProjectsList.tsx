@@ -112,7 +112,11 @@ export default function ProjectsList({ initialProjects }: Props) {
             )}
           </div>
         </div>
-        <div className="mt-5 divide-y divide-slate-100">
+        <div
+          className={`mt-5 divide-slate-100 overflow-hidden transition-[max-height] duration-500 ${
+            showAll ? "max-h-[2000px]" : "max-h-[560px]"
+          } divide-y`}
+        >
           {visibleProjects.map((project) => {
             const isSelected = selected.has(project.id);
             return (
