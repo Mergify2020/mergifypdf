@@ -2,7 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useSession } from "next-auth/react";
 import { PROJECT_NAME_STORAGE_KEY, sanitizeProjectName } from "@/lib/projectName";
+import { addRecentProject } from "@/lib/recentProjects";
 
 const WORKSPACE_META_KEY = "mpdf:files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
@@ -66,6 +68,7 @@ async function resetWorkspaceStorage() {
 
 export default function StartProjectButton({ className }: Props) {
   const router = useRouter();
+  const { data: session } = useSession();
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -95,6 +98,8 @@ export default function StartProjectButton({ className }: Props) {
     }
     setBusy(true);
     await resetWorkspaceStorage();
+    const ownerId = session?.user?.id ?? session?.user?.email ?? null;
+    addRecentProject(ownerId, clean);
     setBusy(false);
     setOpen(false);
     router.push("/studio");

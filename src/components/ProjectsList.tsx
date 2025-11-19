@@ -1,9 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight, Check } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { sanitizeProjectName } from "@/lib/projectName";
+import {
+  RECENT_PROJECTS_EVENT,
+  RecentProjectEntry,
+  loadRecentProjects,
+  saveRecentProjects,
+} from "@/lib/recentProjects";
 
 type ProjectItem = {
   id: string;
@@ -11,19 +18,76 @@ type ProjectItem = {
   subtitle: string;
   status: string;
   updated: string;
+  updatedAt?: number;
+  persisted?: boolean;
 };
 
 type Props = {
   initialProjects: ProjectItem[];
 };
 
+function formatUpdatedLabel(timestamp?: number) {
+  if (!timestamp) return "moments ago";
+  const target = new Date(timestamp);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  let dayLabel: string;
+  if (target.toDateString() === today.toDateString()) {
+    dayLabel = "Today";
+  } else if (target.toDateString() === yesterday.toDateString()) {
+    dayLabel = "Yesterday";
+  } else {
+    dayLabel = target.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  }
+  const timeLabel = target.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  return `${dayLabel} • ${timeLabel}`;
+}
+
+function convertStoredEntry(entry: RecentProjectEntry): ProjectItem {
+  return {
+    id: entry.id,
+    title: entry.title,
+    subtitle: "Workspace project",
+    status: "In progress",
+    updatedAt: entry.updatedAt,
+    updated: formatUpdatedLabel(entry.updatedAt),
+    persisted: true,
+  };
+}
+
 export default function ProjectsList({ initialProjects }: Props) {
+  const { data: session } = useSession();
+  const ownerId = useMemo(() => session?.user?.id ?? session?.user?.email ?? null, [session?.user?.id, session?.user?.email]);
   const [projects, setProjects] = useState<ProjectItem[]>(initialProjects);
   const [renaming, setRenaming] = useState<{ id: string; value: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [storageReady, setStorageReady] = useState(false);
+
+  const baseProjects = useMemo(() => initialProjects.filter((project) => !project.persisted), [initialProjects]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !ownerId) return;
+    const syncFromStorage = () => {
+      const stored = loadRecentProjects(ownerId)
+        .slice()
+        .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
+        .map(convertStoredEntry);
+      setProjects((prev) => {
+        const nonPersisted = prev.filter((project) => !project.persisted);
+        const fallback = nonPersisted.length ? nonPersisted : baseProjects;
+        return [...stored, ...fallback];
+      });
+      setStorageReady(true);
+    };
+    syncFromStorage();
+    const eventKey = `${RECENT_PROJECTS_EVENT}:${ownerId}`;
+    window.addEventListener(eventKey, syncFromStorage);
+    return () => window.removeEventListener(eventKey, syncFromStorage);
+  }, [baseProjects, ownerId]);
 
   function openRename(project: ProjectItem) {
     setRenaming({ id: project.id, value: project.title });
@@ -35,6 +99,18 @@ export default function ProjectsList({ initialProjects }: Props) {
     setError(null);
   }
 
+  function persistStoredProjects(nextProjects: ProjectItem[]) {
+    if (!storageReady || !ownerId) return;
+    const payload = nextProjects
+      .filter((project) => project.persisted)
+      .map<RecentProjectEntry>((project) => ({
+        id: project.id,
+        title: project.title,
+        updatedAt: project.updatedAt ?? Date.now(),
+      }));
+    saveRecentProjects(ownerId, payload);
+  }
+
   function handleRenameSave() {
     if (!renaming) return;
     const clean = sanitizeProjectName(renaming.value);
@@ -42,7 +118,24 @@ export default function ProjectsList({ initialProjects }: Props) {
       setError("Please enter a name.");
       return;
     }
-    setProjects((prev) => prev.map((project) => (project.id === renaming.id ? { ...project, title: clean } : project)));
+    const renameId = renaming.id;
+    setProjects((prev) => {
+      const next = prev.map((project) => {
+        if (project.id !== renameId) return project;
+        if (project.persisted) {
+          const updatedAt = Date.now();
+          return {
+            ...project,
+            title: clean,
+            updatedAt,
+            updated: formatUpdatedLabel(updatedAt),
+          };
+        }
+        return { ...project, title: clean };
+      });
+      persistStoredProjects(next);
+      return next;
+    });
     closeRename();
   }
 
@@ -50,9 +143,7 @@ export default function ProjectsList({ initialProjects }: Props) {
 
   function toggleSelectMode() {
     setSelectionMode((prev) => {
-      if (prev) {
-        setSelected(new Set());
-      }
+      if (prev) setSelected(new Set());
       return !prev;
     });
   }
@@ -71,7 +162,11 @@ export default function ProjectsList({ initialProjects }: Props) {
 
   function handleDeleteSelected() {
     if (selected.size === 0) return;
-    setProjects((prev) => prev.filter((project) => !selected.has(project.id)));
+    setProjects((prev) => {
+      const next = prev.filter((project) => !selected.has(project.id));
+      persistStoredProjects(next);
+      return next;
+    });
     setSelected(new Set());
     setSelectionMode(false);
   }
@@ -118,69 +213,69 @@ export default function ProjectsList({ initialProjects }: Props) {
             {visibleProjects.map((project) => {
               const isSelected = selected.has(project.id);
               return (
-            <div
-              key={project.id}
-              className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 md:flex-row md:items-center md:justify-between"
-            >
-              <div className="flex items-center gap-3">
-                {selectionMode ? (
-                  <button
-                    type="button"
-                    onClick={() => toggleSelectProject(project.id)}
-                    className={`flex h-6 w-6 items-center justify-center rounded-full border ${
-                      isSelected ? "border-[#024d7c] bg-[#024d7c]" : "border-slate-300 bg-white"
-                    }`}
-                  >
-                    {isSelected ? <Check className="h-4 w-4 text-white" /> : null}
-                  </button>
-                ) : null}
-                <p className="text-lg font-semibold text-slate-900">{project.title}</p>
-                <button
-                  type="button"
-                  onClick={() => openRename(project)}
-                  className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
+                <div
+                  key={project.id}
+                  className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 md:flex-row md:items-center md:justify-between"
                 >
-                  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
-                    <path d="M12 20h9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                    <path
-                      d="M16.5 3.5a2.121 2.121 0 013 3L7 19.5 3 21l1.5-4L16.5 3.5z"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  Edit
-                </button>
-                <p className="text-sm text-slate-500">Last edited {project.updated}</p>
-              </div>
-              <div className="flex flex-wrap gap-3 text-sm">
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1 text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
-                >
-                  Download
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
-                    <path
-                      d="M12 5v10m0 0l-4-4m4 4l4-4"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <path d="M5 19h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
-                </button>
-                <Link
-                  href="/studio"
-                  className="inline-flex items-center gap-1 rounded-full bg-[#024d7c] px-3 py-1 text-white transition hover:bg-[#013a60]"
-                >
-                  Open
-                  <ArrowUpRight className="h-4 w-4" />
-                </Link>
-              </div>
-            </div>
-          );
+                  <div className="flex items-center gap-3">
+                    {selectionMode ? (
+                      <button
+                        type="button"
+                        onClick={() => toggleSelectProject(project.id)}
+                        className={`flex h-6 w-6 items-center justify-center rounded-full border ${
+                          isSelected ? "border-[#024d7c] bg-[#024d7c]" : "border-slate-300 bg-white"
+                        }`}
+                      >
+                        {isSelected ? <Check className="h-4 w-4 text-white" /> : null}
+                      </button>
+                    ) : null}
+                    <p className="text-lg font-semibold text-slate-900">{project.title}</p>
+                    <button
+                      type="button"
+                      onClick={() => openRename(project)}
+                      className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
+                    >
+                      <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 20h9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                        <path
+                          d="M16.5 3.5a2.121 2.121 0 013 3L7 19.5 3 21l1.5-4L16.5 3.5z"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                      Edit
+                    </button>
+                    <p className="text-sm text-slate-500">Last edited {project.updated}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-3 text-sm">
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1 text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
+                    >
+                      Download
+                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
+                        <path
+                          d="M12 5v10m0 0l-4-4m4 4l4-4"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path d="M5 19h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                      </svg>
+                    </button>
+                    <Link
+                      href="/studio"
+                      className="inline-flex items-center gap-1 rounded-full bg-[#024d7c] px-3 py-1 text-white transition hover:bg-[#013a60]"
+                    >
+                      Open
+                      <ArrowUpRight className="h-4 w-4" />
+                    </Link>
+                  </div>
+                </div>
+              );
             })}
           </div>
         </div>
