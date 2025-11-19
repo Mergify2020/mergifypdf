@@ -47,7 +47,6 @@ export default function ProjectsList({ initialProjects }: Props) {
   }
 
   const visibleProjects = showAll ? projects : projects.slice(0, 5);
-  const hasHiddenProjects = projects.length > 5;
 
   function toggleSelectMode() {
     setSelectionMode((prev) => {
@@ -100,26 +99,25 @@ export default function ProjectsList({ initialProjects }: Props) {
                 Delete
               </button>
             )}
-            {hasHiddenProjects && (
-              <button
-                type="button"
-                onClick={() => setShowAll((prev) => !prev)}
-                className="inline-flex items-center rounded-full border border-slate-200 px-4 py-2 font-semibold text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
-              >
-                {showAll ? "Collapse" : "View all"}
-                <ArrowUpRight className="ml-2 h-4 w-4" />
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setShowAll((prev) => !prev)}
+              className="inline-flex items-center rounded-full border border-slate-200 px-4 py-2 font-semibold text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
+            >
+              {showAll ? "Collapse" : "View all"}
+              <ArrowUpRight className="ml-2 h-4 w-4" />
+            </button>
           </div>
         </div>
         <div
-          className={`mt-5 divide-slate-100 overflow-hidden transition-[max-height] duration-500 ${
-            showAll ? "max-h-[2000px]" : "max-h-[560px]"
-          } divide-y`}
+          className={`mt-5 overflow-hidden transition-[max-height] duration-500 ${
+            showAll ? "max-h-[2400px]" : "max-h-[520px]"
+          }`}
         >
-          {visibleProjects.map((project) => {
-            const isSelected = selected.has(project.id);
-            return (
+          <div className="divide-y divide-slate-100">
+            {visibleProjects.map((project) => {
+              const isSelected = selected.has(project.id);
+              return (
             <div
               key={project.id}
               className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 md:flex-row md:items-center md:justify-between"
@@ -183,7 +181,8 @@ export default function ProjectsList({ initialProjects }: Props) {
               </div>
             </div>
           );
-          })}
+            })}
+          </div>
         </div>
       </div>
 
