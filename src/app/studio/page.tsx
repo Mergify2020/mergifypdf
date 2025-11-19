@@ -289,43 +289,47 @@ function SortableOrganizeTile({
     cursor: "grab",
   };
 
+  const rotation = item.rotation ?? 0;
+
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className="flex h-full flex-col rounded-3xl border border-slate-200 bg-white/90 p-4 shadow-sm"
-      {...attributes}
-      {...listeners}
-    >
-      <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
+    <div ref={setNodeRef} style={style} className="flex h-full flex-col gap-3" {...attributes} {...listeners}>
+      <div className="flex items-center justify-between px-2 text-xs font-semibold text-slate-500">
         <span className="text-slate-900">Page {index + 1}</span>
-        <span>{item.rotation}°</span>
+        <span>{rotation}°</span>
       </div>
-      <div className="mt-3 flex flex-1 items-center justify-center overflow-hidden rounded-2xl bg-slate-50">
+      <div className="relative flex flex-1 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_8px_18px_rgba(15,23,42,0.12)]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={item.thumb}
           alt={`Page ${index + 1}`}
           className="max-h-full w-full object-contain"
-          style={{ transform: `rotate(${item.rotation}deg)` }}
+          style={{ transform: `rotate(${rotation}deg)` }}
         />
       </div>
-      <div className="mt-3 flex flex-col gap-2 text-sm">
+      <div className="flex items-center justify-end gap-2 px-2 pb-2">
         <button
           type="button"
-          onClick={onRotate}
-          className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 px-4 py-2 font-medium text-slate-700 transition hover:border-slate-400"
+          aria-label="Rotate page"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            onRotate();
+          }}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
         >
           <RotateCcw className="h-4 w-4" />
-          Rotate
         </button>
         <button
           type="button"
-          onClick={onDelete}
-          className="inline-flex items-center justify-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-4 py-2 font-medium text-rose-600 transition hover:border-rose-400"
+          aria-label="Delete page"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            onDelete();
+          }}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-600 transition hover:border-rose-400 hover:text-rose-700"
         >
           <Trash2 className="h-4 w-4" />
-          Delete
         </button>
       </div>
     </div>
@@ -1260,6 +1264,14 @@ function WorkspaceClient() {
                 </button>
                 <button
                   type="button"
+                  onClick={() => setOrganizeMode(true)}
+                  disabled={pages.length === 0 || organizeMode}
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Manage pages
+                </button>
+                <button
+                  type="button"
                   disabled={highlightButtonDisabled}
                   onClick={() =>
                     setPencilMode((prev) => {
@@ -1485,7 +1497,7 @@ function WorkspaceClient() {
           <div className="rounded-[40px] border border-slate-200 bg-white/80 p-6 shadow-sm">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-xl font-semibold text-slate-900">Organize pages</h2>
+                <h2 className="text-xl font-semibold text-slate-900">Manage pages</h2>
                 <p className="text-sm text-slate-500">Drag to reorder. Rotate or delete any page.</p>
               </div>
               <button
@@ -1493,7 +1505,7 @@ function WorkspaceClient() {
                 onClick={() => setOrganizeMode(false)}
                 className="rounded-full bg-[#024d7c] px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-[#012a44]/30 transition hover:-translate-y-0.5"
               >
-                Done organizing
+                Done managing
               </button>
             </div>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -1674,14 +1686,6 @@ function WorkspaceClient() {
               disabled={pages.length === 0}
             >
               Add pages
-            </button>
-            <button
-              className="rounded-full border border-slate-300 bg-white/70 px-5 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
-              type="button"
-              onClick={() => setOrganizeMode(true)}
-              disabled={pages.length === 0 || organizeMode}
-            >
-              Organize pages
             </button>
             <input
               ref={addInputRef}
