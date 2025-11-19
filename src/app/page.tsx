@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import UploadCta from "@/components/UploadCta";
 import { hasUsedToday } from "@/lib/quota";
 import ProjectsWorkspaceShelf from "@/components/ProjectsWorkspaceShelf";
@@ -77,36 +78,77 @@ export default async function Home() {
 
 function MarketingLanding({ usedToday }: { usedToday: boolean }) {
   return (
-    <div className="mx-auto flex max-w-4xl flex-col items-center gap-6 px-6 py-20 text-center">
-      <h1 className="text-3xl font-semibold tracking-tight sm:text-5xl leading-tight">
-        <span className="block">Merge and edit your documents</span>
-        <span className="block">all in one place</span>
-      </h1>
-      <p className="text-lg text-gray-700">Fast, secure, and works right in your browser.</p>
-      <p className="text-lg text-gray-600">
-        One free upload each day. Sign up for unlimited merges and faster processing.
-      </p>
-      <UploadCta usedToday={usedToday} />
-      <div className="mt-4 text-center text-slate-900">
-        <h2 className="text-2xl font-semibold">Unlock unlimited uploads and team workspaces.</h2>
-        <Link
-          href="/account?view=pricing"
-          className="mx-auto mt-6 inline-flex w-full max-w-xl items-center justify-center rounded-full bg-gradient-to-r from-[#0ea5e9] via-[#2563eb] to-[#4c1d95] px-12 py-5 text-xl font-semibold text-white shadow-[0_25px_60px_rgba(37,99,235,0.35)] transition hover:-translate-y-1"
-        >
-          View pricing
-        </Link>
-      </div>
-      <div className="mt-12 grid w-full gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {features.map(({ title, description, icon: Icon }) => (
-          <div
-            key={title}
-            className="flex h-full flex-col items-center justify-center gap-3 rounded-2xl border border-black/10 bg-white/40 p-6 text-center shadow-[inset_0_0_0_1px_rgba(0,0,0,0.06)] transition-all hover:-translate-y-1 hover:border-[#024d7c]/60 hover:shadow-xl"
-          >
-            <Icon className="h-[2.4rem] w-[2.4rem] text-[#024d7c]" aria-hidden />
-            <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-            <p className="text-sm text-gray-600">{description}</p>
+    <div className="bg-gradient-to-b from-[#f3f8ff] via-white to-white">
+      <div className="mx-auto flex max-w-6xl flex-col gap-16 px-6 py-20">
+        <div className="grid gap-12 lg:grid-cols-[1.05fr,0.95fr] lg:items-center">
+          <div className="space-y-6 text-center lg:text-left">
+            <h1 className="text-3xl font-semibold leading-tight tracking-tight sm:text-5xl">
+              <span className="block">Merge and edit your documents</span>
+              <span className="block">all in one place</span>
+            </h1>
+            <p className="text-lg text-gray-700">Fast, secure, and works right in your browser.</p>
+            <p className="text-lg text-gray-600">
+              One free upload every day. Upgrade for unlimited merges and faster processing.
+            </p>
+            <div className="mt-8 flex w-full flex-col gap-4 sm:flex-row sm:items-center sm:justify-start">
+              <UploadCta usedToday={usedToday} variant="hero" className="w-full sm:w-auto" />
+              <Link
+                href="/account?view=pricing"
+                className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-10 py-4 text-base font-semibold text-[#024d7c] shadow-sm transition hover:-translate-y-0.5"
+              >
+                Pricing
+              </Link>
+            </div>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-sm text-slate-600 lg:justify-start">
+              {["No signup required", "Fast & secure", "Works in your browser"].map((badge) => (
+                <span
+                  key={badge}
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-4 py-1.5 text-slate-700 shadow-sm"
+                >
+                  <span className="h-2 w-2 rounded-full bg-[#024d7c]" />
+                  {badge}
+                </span>
+              ))}
+            </div>
           </div>
-        ))}
+          <div className="relative">
+            <div className="pointer-events-none absolute -top-4 -right-6 h-64 w-64 rounded-full bg-sky-200/40 blur-[120px]" />
+            <div className="relative overflow-hidden rounded-[40px] border border-white/50 bg-white shadow-[0_50px_140px_rgba(8,23,53,0.2)]">
+              <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/80 px-6 py-3">
+                <span className="h-3 w-3 rounded-full bg-rose-300" />
+                <span className="h-3 w-3 rounded-full bg-amber-300" />
+                <span className="h-3 w-3 rounded-full bg-emerald-300" />
+              </div>
+              <div className="bg-slate-950/5 p-4">
+                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                  <Image
+                    src="/product-hero.jpeg"
+                    alt="Preview of the MergifyPDF editor"
+                    width={900}
+                    height={700}
+                    className="h-full w-full object-cover"
+                    priority
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="h-px w-full bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
+
+        <div className="grid w-full gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {features.map(({ title, description, icon: Icon }) => (
+            <div
+              key={title}
+              className="flex h-full flex-col items-center justify-center gap-3 rounded-2xl border border-black/10 bg-white/70 p-6 text-center shadow-[inset_0_0_0_1px_rgba(0,0,0,0.06)] transition-all hover:-translate-y-1 hover:border-[#024d7c]/60 hover:shadow-xl"
+            >
+              <Icon className="h-[2.4rem] w-[2.4rem] text-[#024d7c]" aria-hidden />
+              <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+              <p className="text-sm text-gray-600">{description}</p>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
