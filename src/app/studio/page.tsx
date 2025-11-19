@@ -269,8 +269,7 @@ function WorkspaceClient() {
   const { data: authSession } = useSession();
   const router = useRouter();
   const [showDownloadGate, setShowDownloadGate] = useState(false);
-  const [showDelayOverlay, setShowDelayOverlay] = useState(false);
-  const [downloadCountdown, setDownloadCountdown] = useState(3);
+  const [showDelayOverlay, setShowDelayOverlay] = useState<"intro" | "progress" | null>(null);
   const [sources, setSources] = useState<SourceRef[]>([]);
   const [pages, setPages] = useState<PageItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -935,8 +934,7 @@ function WorkspaceClient() {
 
   function handleDownloadGateBypass() {
     setShowDownloadGate(false);
-    setDownloadCountdown(3);
-    setShowDelayOverlay(true);
+    setShowDelayOverlay("intro");
   }
 
   const itemsIds = useMemo(() => pages.map((p) => p.id), [pages]);
@@ -966,19 +964,17 @@ function WorkspaceClient() {
 
   useEffect(() => {
     if (!showDelayOverlay) return;
-    setDownloadCountdown(3);
-    const interval = window.setInterval(() => {
-      setDownloadCountdown((prev) => {
-        if (prev <= 1) {
-          window.clearInterval(interval);
-          setShowDelayOverlay(false);
-          handleDownload(true);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => window.clearInterval(interval);
+    if (showDelayOverlay === "intro") {
+      const timer = window.setTimeout(() => setShowDelayOverlay("progress"), 1000);
+      return () => window.clearTimeout(timer);
+    }
+    if (showDelayOverlay === "progress") {
+      const timer = window.setTimeout(() => {
+        setShowDelayOverlay(null);
+        handleDownload(true);
+      }, 3000);
+      return () => window.clearTimeout(timer);
+    }
   }, [showDelayOverlay]);
 
   useEffect(() => {
@@ -1610,12 +1606,14 @@ function WorkspaceClient() {
           <div className="flex w-full max-w-md flex-col items-center gap-5 rounded-[32px] bg-white p-8 text-center text-slate-900 shadow-[0_35px_90px_rgba(9,14,35,0.25)]">
             <img src="/logo-wordmark2.svg" alt="MergifyPDF" className="h-10 w-auto" />
             <p className="text-lg font-semibold">Preparing your download…</p>
-            <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100">
-              <div
-                className="h-full w-full rounded-full bg-gradient-to-r from-[#0ea5e9] via-[#2563eb] to-[#4c1d95]"
-                style={{ animation: "mpdf-progress 3s linear forwards" }}
-              />
-            </div>
+            {showDelayOverlay === "progress" ? (
+              <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full w-full rounded-full bg-gradient-to-r from-[#0ea5e9] via-[#2563eb] to-[#4c1d95]"
+                  style={{ animation: "mpdf-progress 3s linear forwards" }}
+                />
+              </div>
+            ) : null}
             <p className="text-sm text-slate-500">
               Create a free account to remove this delay and get another free upload.
             </p>
