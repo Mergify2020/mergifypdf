@@ -1672,9 +1672,9 @@ function WorkspaceClient() {
                               preserveAspectRatio="none"
                             >
                               {pageHighlights.map((stroke) =>
-                              stroke.points.length > 1 ? (
-                                <polyline
-                                  key={stroke.id}
+                                stroke.points.length > 1 ? (
+                                  <polyline
+                                    key={stroke.id}
                                   points={stroke.points
                                     .map((pt) => `${pt.x * 1000},${pt.y * 1000}`)
                                     .join(" ")}
