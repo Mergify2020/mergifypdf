@@ -18,7 +18,7 @@ export default function UploadCta({ usedToday, variant = "default", className }:
 
   async function handleClick() {
     if (alreadyUsed) {
-      router.push("/register");
+      router.push("/account?view=pricing");
       return;
     }
 
