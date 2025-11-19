@@ -891,7 +891,6 @@ function WorkspaceClient() {
                 color: rgb(colorValue.r, colorValue.g, colorValue.b),
                 opacity,
                 lineCap: LineCapStyle.Round,
-                lineJoin: LineJoinStyle.Round,
               });
             }
           });
