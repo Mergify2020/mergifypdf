@@ -23,6 +23,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { PROJECT_NAME_STORAGE_KEY, projectNameToFile, sanitizeProjectName } from "@/lib/projectName";
+import { PENDING_UPLOAD_STORAGE_KEY } from "@/lib/pendingUpload";
 
 type SourceRef = { storageId: string; url: string; name: string; size: number; updatedAt: number };
 type PageItem = {
