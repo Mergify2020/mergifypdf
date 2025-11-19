@@ -87,13 +87,6 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
         One free upload each day. Sign up for unlimited merges and faster processing.
       </p>
       <UploadCta usedToday={usedToday} />
-      <p className="text-sm text-gray-500">
-        Already have an account?{" "}
-        <Link className="underline decoration-[#024d7c]" href="/login">
-          Log in
-        </Link>
-        .
-      </p>
       <div className="mt-4 text-center text-slate-900">
         <h2 className="text-2xl font-semibold">Unlock unlimited uploads and team workspaces.</h2>
         <Link
