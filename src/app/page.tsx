@@ -125,13 +125,6 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               <StartProjectButton />
-              <Link
-                href="/pricing"
-                className="inline-flex items-center justify-center rounded-full border border-slate-200 px-8 py-3 text-sm font-semibold text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
-              >
-                Upgrade to Premium
-                <ArrowUpRight className="ml-2 h-4 w-4" />
-              </Link>
             </div>
           </div>
         </div>
@@ -144,11 +137,17 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
           <div className="space-y-4">
             <div className="rounded-[36px] border border-dashed border-slate-200 bg-white/95 p-6 text-slate-500 shadow-[0_25px_60px_rgba(15,23,42,0.08)]">
               <p className="text-sm uppercase tracking-[0.4em] text-slate-400">Team Hub workspace</p>
-              <h3 className="mt-2 text-xl font-semibold text-slate-900">Coming soon</h3>
+              <h3 className="mt-2 text-xl font-semibold text-slate-900">Upgrade to Premium</h3>
               <p className="mt-1 text-sm">
-                Invite collaborators, organize shared stacks, and stay perfectly in sync. We&apos;re
-                polishing the experience—stay tuned.
+                Unlock the Team Hub to invite collaborators, organize shared stacks, and stay perfectly in sync.
               </p>
+              <Link
+                href="/pricing"
+                className="mt-4 inline-flex items-center justify-center rounded-full bg-gradient-to-r from-[#f97316] to-[#fb7185] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-[#f97316]/30 transition hover:opacity-90"
+              >
+                Upgrade to Premium
+                <ArrowUpRight className="ml-2 h-4 w-4" />
+              </Link>
             </div>
           </div>
         </section>
