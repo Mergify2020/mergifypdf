@@ -4,11 +4,13 @@ import { Check, X } from "lucide-react";
 
 const tiers = [
   {
-    name: "Mergify Core",
+    name: "Mergify Personal",
     price: "$6.99",
-    detail: "One User / Billed Monthly",
+    detail: "Per user / month",
     accent: "from-[#FFB480] to-[#FF8A4E]",
+    overlay: "from-orange-300/30 to-transparent",
     button: "bg-[#FF8A4E]",
+    description: "For individuals, freelancers, students, small solos.",
     features: [
       "Unlimited PDF uploads",
       "Unlimited edits + merges",
@@ -18,13 +20,16 @@ const tiers = [
     ],
   },
   {
-    name: "Mergify Team Workspace",
+    name: "Mergify Team",
     price: "$12.99",
-    detail: "Up to 3 Users / Billed Monthly",
+    detail: "Up to 3 users",
     accent: "from-[#A9C7FF] via-[#7BA8F4] to-[#4D74C8]",
+    overlay: "from-sky-200/25 to-transparent",
     button: "bg-[#4D74C8]",
+    badge: "Most Popular",
+    description: "For small teams, offices, construction crews, etc.",
     features: [
-      "Everything in Core",
+      "Everything in Personal",
       "Shared team workspace",
       "Team projects & folders",
       "Activity log",
@@ -32,16 +37,37 @@ const tiers = [
     ],
   },
   {
-    name: "Mergify Scale",
+    name: "Mergify Business",
     price: "+$4",
-    detail: "Each Additional User / Monthly",
+    detail: "Per extra user",
     accent: "from-[#38D0A5] to-[#23B58A]",
+    overlay: "from-emerald-200/30 to-transparent",
     button: "bg-[#23B58A]",
+    description: "For growing teams and organizations.",
     features: [
-      "Everything in Team Workspace",
+      "Everything in Team",
       "Add unlimited extra teammates",
       "Perfect for growing businesses",
     ],
+  },
+];
+
+const faqs = [
+  {
+    question: "Can I upgrade anytime?",
+    answer: "Yes — your workspace scales instantly when you change plans.",
+  },
+  {
+    question: "How does seat billing work?",
+    answer: "Team covers up to 3 users. Business adds $4 per extra user each month.",
+  },
+  {
+    question: "Is MergifyPDF secure?",
+    answer: "All uploads are encrypted in transit and processed privately.",
+  },
+  {
+    question: "Do I need a credit card right now?",
+    answer: "Not until paid upgrades are enabled inside your account.",
   },
 ];
 
@@ -57,18 +83,29 @@ export default function PricingPlans() {
           {tiers.map((tier) => (
             <div
               key={tier.name}
-              className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-white p-6 shadow-[0_50px_140px_rgba(0,0,0,0.35)]"
+              className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-white px-7 py-10 shadow-[0_8px_30px_rgba(0,0,0,0.15)]"
             >
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/5 via-white/0 to-transparent" />
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/15 via-white/0 to-transparent" />
               <div className="relative z-10 flex h-full flex-col">
-                <div className={`rounded-3xl bg-gradient-to-br ${tier.accent} p-5 text-white shadow-inner`}>
-                  <h2 className="text-3xl font-semibold">{tier.name}</h2>
-                  <div className="mt-4">
-                    <p className="text-4xl font-semibold">{tier.price}</p>
-                    <p className="mt-1 text-sm opacity-80">{tier.detail}</p>
+                <div className={`relative overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-br ${tier.accent} p-6 text-white shadow-inner`}>
+                  <div className="relative z-10">
+                    {tier.badge ? (
+                      <span className="mb-4 inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white/80">
+                        {tier.badge}
+                      </span>
+                    ) : null}
+                    <div className={tier.badge ? "" : "pt-2"}>
+                      <h2 className="text-3xl font-semibold leading-tight">{tier.name}</h2>
+                      <div className="mt-6">
+                      <p className="text-5xl font-semibold text-white">{tier.price}</p>
+                      <p className="mt-2 text-sm opacity-90">{tier.detail}</p>
+                      <p className="mt-3 text-sm text-white/70">{tier.description}</p>
+                      </div>
+                    </div>
                   </div>
+                  <div className={`pointer-events-none absolute inset-0 bg-gradient-to-b ${tier.overlay}`} />
                 </div>
-                <ul className="mt-6 flex-1 space-y-3 text-sm text-slate-600">
+                <ul className="mt-8 flex-1 space-y-4 text-sm text-slate-600">
                   {tier.features.map((feature) => (
                     <li key={feature} className="flex items-center gap-2">
                       <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100">
@@ -81,7 +118,7 @@ export default function PricingPlans() {
                 <button
                   type="button"
                   disabled
-                  className={`pointer-events-none mt-8 w-full rounded-full px-4 py-3 text-sm font-semibold text-white shadow-md shadow-black/10 ${tier.button}`}
+                  className={`pointer-events-none mt-10 w-full rounded-full px-4 py-2.5 text-sm font-medium text-white shadow-[0_4px_24px_rgba(0,0,0,0.08)] ${tier.button}`}
                 >
                   Upgrade
                 </button>
@@ -92,34 +129,46 @@ export default function PricingPlans() {
 
         <div className="mt-10 rounded-[40px] border border-white/15 bg-white/5 p-6 text-sm text-white shadow-[0_50px_150px_rgba(0,0,0,0.35)] backdrop-blur">
           <p className="mb-6 text-center text-3xl font-semibold tracking-tight text-white">Compare plans</p>
-          <div className="overflow-hidden rounded-2xl border border-white/20">
-            <table className="w-full divide-y divide-white/10 text-sm text-white">
-              <thead className="bg-white/10 text-xs uppercase tracking-[0.4em] text-white/70">
+          <div className="overflow-hidden rounded-3xl border border-white/10">
+            <table className="w-full text-sm text-white">
+              <thead className="bg-white/10 text-sm uppercase tracking-[0.4em] text-white">
                 <tr>
-                  <th className="p-4 text-left font-semibold">Feature</th>
-                  <th className="p-4 text-center font-semibold">Core</th>
-                  <th className="p-4 text-center font-semibold">Team Workspace</th>
-                  <th className="p-4 text-center font-semibold">Scale</th>
+                  <th className="px-5 py-4 text-left font-semibold">Feature</th>
+                  <th className="px-5 py-4 text-center text-base font-semibold tracking-normal">Personal</th>
+                  <th className="px-5 py-4 text-center text-base font-semibold tracking-normal">Team</th>
+                  <th className="px-5 py-4 text-center text-base font-semibold tracking-normal">Business</th>
                 </tr>
               </thead>
               <tbody className="text-white/80">
                 {[
-                  { feature: "Unlimited uploads", core: true, team: true, scale: true },
-                  { feature: "Team folders", core: false, team: true, scale: true },
-                  { feature: "Member controls", core: false, team: false, scale: true },
-                  { feature: "Add teammates", core: false, team: "Up to 3", scale: "Unlimited" },
-                  { feature: "Billing", core: "Single", team: "Team", scale: "Per seat" },
+                  { feature: "Unlimited uploads", personal: true, team: true, business: true },
+                  { feature: "Team folders", personal: false, team: true, business: true },
+                  { feature: "Member controls", personal: false, team: false, business: true },
+                  { feature: "Add teammates", personal: false, team: "Up to 3", business: "Unlimited" },
+                  { feature: "Billing", personal: "Per user", team: "Team", business: "Per seat" },
                 ].map((row) => (
-                  <tr key={row.feature} className="border-white/10">
-                    <td className="p-4 text-white/60">{row.feature}</td>
-                    <td className="p-4 text-center">{renderValue(row.core)}</td>
-                    <td className="p-4 text-center">{renderValue(row.team)}</td>
-                    <td className="p-4 text-center">{renderValue(row.scale)}</td>
+                  <tr key={row.feature} className="border-b border-white/5 last:border-0">
+                    <td className="px-5 py-5 text-white/70">{row.feature}</td>
+                    <td className="px-5 py-5 text-center">{renderValue(row.personal)}</td>
+                    <td className="px-5 py-5 text-center">{renderValue(row.team)}</td>
+                    <td className="px-5 py-5 text-center">{renderValue(row.business)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          <div className="mt-12 grid gap-6 text-left md:grid-cols-2">
+            {faqs.map((faq) => (
+              <div key={faq.question} className="rounded-2xl border border-white/10 bg-white/5 p-5 text-white/80">
+                <h3 className="text-base font-semibold text-white">{faq.question}</h3>
+                <p className="mt-2 text-sm text-white/70">{faq.answer}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-16 border-t border-white/5 pt-8 text-center text-sm text-white/60">
+          Need a custom plan? Contact support and we will tailor a workspace for your team.
         </div>
       </div>
     </div>
