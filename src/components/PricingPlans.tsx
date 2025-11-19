@@ -89,13 +89,9 @@ export default function PricingPlans() {
     <div className="min-h-screen bg-gradient-to-b from-[#050915] via-[#081327] to-[#05060c] px-6 py-12 text-slate-900">
       <div className="mx-auto max-w-5xl space-y-10">
         <div className="text-center text-white">
-          <p className="text-sm uppercase tracking-[0.6em] text-white/60">Premium workspaces</p>
-          <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white drop-shadow-[0_10px_45px_rgba(0,0,0,0.35)]">
+          <h1 className="text-4xl font-semibold tracking-tight text-white drop-shadow-[0_10px_45px_rgba(0,0,0,0.35)]">
             Choose the workspace built for your workflow.
           </h1>
-          <p className="mt-3 text-base text-white/80">
-            Flexible plans for individuals, teams, and growing organizations—upgrade when you are ready.
-          </p>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-3">
@@ -182,13 +178,16 @@ export default function PricingPlans() {
           </div>
         </div>
 
-        <div className="rounded-[40px] border border-white/15 bg-white/5 p-6 text-sm text-white shadow-[0_50px_150px_rgba(0,0,0,0.35)] backdrop-blur">
-          <p className="mb-6 text-center text-3xl font-semibold tracking-tight text-white">Frequently asked questions</p>
+        <div className="rounded-[46px] border border-white/15 bg-gradient-to-br from-white/10 via-white/5 to-white/0 p-8 text-white shadow-[0_70px_160px_rgba(0,0,0,0.5)] backdrop-blur-xl">
+          <p className="mb-8 text-center text-3xl font-semibold tracking-tight">Frequently asked questions</p>
           <div className="grid gap-6 text-left md:grid-cols-2">
             {faqs.map((faq) => (
-              <div key={faq.question} className="rounded-2xl border border-white/10 bg-white/5 p-5 text-white/80">
-                <h3 className="text-lg font-semibold text-white">{faq.question}</h3>
-                <p className="mt-2 text-sm text-white/70">{faq.answer}</p>
+              <div
+                key={faq.question}
+                className="rounded-3xl border border-white/15 bg-gradient-to-b from-white/15 to-white/5 p-6 text-white/90 shadow-[0_25px_70px_rgba(0,0,0,0.35)]"
+              >
+                <h3 className="text-base font-semibold text-white">{faq.question}</h3>
+                <p className="mt-3 text-sm text-white/70">{faq.answer}</p>
               </div>
             ))}
           </div>
