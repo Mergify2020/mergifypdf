@@ -5,8 +5,8 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from "react";
 import dynamic from "next/dynamic";
-import { PDFDocument, rgb, LineCapStyle, LineJoinStyle } from "pdf-lib";
-import { Highlighter, Minus, Plus, Trash2, Undo2, Eraser, Pencil } from "lucide-react";
+import { PDFDocument, rgb, LineCapStyle, LineJoinStyle, degrees } from "pdf-lib";
+import { Highlighter, Minus, Plus, Trash2, Undo2, Eraser, Pencil, RotateCcw } from "lucide-react";
 import {
   DndContext,
   PointerSensor,
@@ -20,6 +20,7 @@ import {
   useSortable,
   arrayMove,
   verticalListSortingStrategy,
+  rectSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { PROJECT_NAME_STORAGE_KEY, projectNameToFile, sanitizeProjectName } from "@/lib/projectName";
@@ -32,6 +33,7 @@ type PageItem = {
   pageIdx: number; // page index inside that source
   thumb: string; // small preview
   preview: string; // large preview
+  rotation: number;
 };
 type Point = { x: number; y: number };
 type DrawingTool = "highlight" | "pencil";
@@ -258,10 +260,75 @@ function SortableThumb({
         <img
           src={item.thumb}
           alt={`Page ${index + 1}`}
-          className="pointer-events-none block w-full bg-white object-contain"
+          className="pointer-events-none block w-full bg-white object-contain transition"
+          style={{ transform: `rotate(${item.rotation}deg)` }}
         />
       </button>
     </li>
+  );
+}
+
+function SortableOrganizeTile({
+  item,
+  index,
+  onRotate,
+  onDelete,
+}: {
+  item: PageItem;
+  index: number;
+  onRotate: () => void;
+  onDelete: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
+    id: item.id,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    cursor: "grab",
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex h-full flex-col rounded-3xl border border-slate-200 bg-white/90 p-4 shadow-sm"
+      {...attributes}
+      {...listeners}
+    >
+      <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
+        <span className="text-slate-900">Page {index + 1}</span>
+        <span>{item.rotation}°</span>
+      </div>
+      <div className="mt-3 flex flex-1 items-center justify-center overflow-hidden rounded-2xl bg-slate-50">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={item.thumb}
+          alt={`Page ${index + 1}`}
+          className="max-h-full w-full object-contain"
+          style={{ transform: `rotate(${item.rotation}deg)` }}
+        />
+      </div>
+      <div className="mt-3 flex flex-col gap-2 text-sm">
+        <button
+          type="button"
+          onClick={onRotate}
+          className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 px-4 py-2 font-medium text-slate-700 transition hover:border-slate-400"
+        >
+          <RotateCcw className="h-4 w-4" />
+          Rotate
+        </button>
+        <button
+          type="button"
+          onClick={onDelete}
+          className="inline-flex items-center justify-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-4 py-2 font-medium text-rose-600 transition hover:border-rose-400"
+        >
+          <Trash2 className="h-4 w-4" />
+          Delete
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -290,6 +357,7 @@ function WorkspaceClient() {
   const [projectNameEditing, setProjectNameEditing] = useState(false);
   const [projectNameDraft, setProjectNameDraft] = useState("Untitled Project");
   const [projectNameError, setProjectNameError] = useState<string | null>(null);
+  const [organizeMode, setOrganizeMode] = useState(false);
 
   const addInputRef = useRef<HTMLInputElement>(null);
   const renderedSourcesRef = useRef(0);
@@ -533,6 +601,7 @@ function WorkspaceClient() {
               pageIdx: p - 1,
               thumb: thumbData,
               preview: previewData,
+              rotation: 0,
             });
           }
         }
@@ -558,6 +627,7 @@ function WorkspaceClient() {
   useEffect(() => {
     if (pages.length === 0) {
       setActivePageId(null);
+      setOrganizeMode(false);
       return;
     }
     if (!activePageId || !pages.some((p) => p.id === activePageId)) {
@@ -877,6 +947,7 @@ function WorkspaceClient() {
       for (const p of pages) {
         const srcDoc = docCache.get(p.srcIdx)!;
         const [copied] = await out.copyPages(srcDoc, [p.pageIdx]);
+        copied.setRotation(degrees(p.rotation ?? 0));
         const pageHighlights = highlights[p.id] ?? [];
         if (pageHighlights.length > 0) {
           const { width: pageWidth, height: pageHeight } = copied.getSize();
@@ -967,6 +1038,18 @@ function WorkspaceClient() {
     setProjectNameDraft(projectName);
     setProjectNameEditing(false);
     setProjectNameError(null);
+  }
+
+  function handleRotatePage(pageId: string) {
+    setPages((prev) =>
+      prev.map((page) =>
+        page.id === pageId ? { ...page, rotation: (page.rotation + 90) % 360 } : page
+      )
+    );
+  }
+
+  function handleDeletePage(pageId: string) {
+    setPages((prev) => prev.filter((page) => page.id !== pageId));
   }
 
   const itemsIds = useMemo(() => pages.map((p) => p.id), [pages]);
@@ -1398,7 +1481,40 @@ function WorkspaceClient() {
           </div>
         )}
 
-        {!loading && pages.length > 0 && (
+        {organizeMode && !loading && pages.length > 0 && (
+          <div className="rounded-[40px] border border-slate-200 bg-white/80 p-6 shadow-sm">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-slate-900">Organize pages</h2>
+                <p className="text-sm text-slate-500">Drag to reorder. Rotate or delete any page.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOrganizeMode(false)}
+                className="rounded-full bg-[#024d7c] px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-[#012a44]/30 transition hover:-translate-y-0.5"
+              >
+                Done organizing
+              </button>
+            </div>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={itemsIds} strategy={rectSortingStrategy}>
+                <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {pages.map((page, idx) => (
+                    <SortableOrganizeTile
+                      key={page.id}
+                      item={page}
+                      index={idx}
+                      onRotate={() => handleRotatePage(page.id)}
+                      onDelete={() => handleDeletePage(page.id)}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          </div>
+        )}
+
+        {!organizeMode && !loading && pages.length > 0 && (
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
             <div>
               <div
@@ -1558,6 +1674,14 @@ function WorkspaceClient() {
               disabled={pages.length === 0}
             >
               Add pages
+            </button>
+            <button
+              className="rounded-full border border-slate-300 bg-white/70 px-5 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+              type="button"
+              onClick={() => setOrganizeMode(true)}
+              disabled={pages.length === 0 || organizeMode}
+            >
+              Organize pages
             </button>
             <input
               ref={addInputRef}
