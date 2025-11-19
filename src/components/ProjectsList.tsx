@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Check } from "lucide-react";
 import { sanitizeProjectName } from "@/lib/projectName";
 
 type ProjectItem = {
@@ -21,6 +21,9 @@ export default function ProjectsList({ initialProjects }: Props) {
   const [projects, setProjects] = useState<ProjectItem[]>(initialProjects);
   const [renaming, setRenaming] = useState<{ id: string; value: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   function openRename(project: ProjectItem) {
     setRenaming({ id: project.id, value: project.title });
@@ -43,26 +46,92 @@ export default function ProjectsList({ initialProjects }: Props) {
     closeRename();
   }
 
+  const visibleProjects = showAll ? projects : projects.slice(0, 5);
+  const hasHiddenProjects = projects.length > 5;
+
+  function toggleSelectMode() {
+    setSelectionMode((prev) => {
+      if (prev) {
+        setSelected(new Set());
+      }
+      return !prev;
+    });
+  }
+
+  function toggleSelectProject(projectId: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(projectId)) {
+        next.delete(projectId);
+      } else {
+        next.add(projectId);
+      }
+      return next;
+    });
+  }
+
+  function handleDeleteSelected() {
+    if (selected.size === 0) return;
+    setProjects((prev) => prev.filter((project) => !selected.has(project.id)));
+    setSelected(new Set());
+    setSelectionMode(false);
+  }
+
   return (
     <>
       <div className="rounded-[36px] border border-white/60 bg-white/95 p-8 shadow-[0_40px_120px_rgba(15,23,42,0.08)] backdrop-blur">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <h2 className="text-2xl font-semibold text-slate-900">Your projects</h2>
-          <Link
-            href="/studio"
-            className="inline-flex items-center text-sm font-semibold text-slate-600 transition hover:text-slate-900"
-          >
-            View all
-            <ArrowUpRight className="ml-2 h-4 w-4" />
-          </Link>
+          <div className="flex items-center gap-3 text-sm">
+            <button
+              type="button"
+              onClick={toggleSelectMode}
+              className="rounded-full border border-slate-200 px-4 py-2 font-medium text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
+            >
+              {selectionMode ? "Cancel" : "Select"}
+            </button>
+            {selectionMode && (
+              <button
+                type="button"
+                onClick={handleDeleteSelected}
+                disabled={selected.size === 0}
+                className="rounded-full border border-rose-200 px-4 py-2 font-semibold text-rose-600 transition hover:border-rose-400 hover:text-rose-700 disabled:border-slate-200 disabled:text-slate-400"
+              >
+                Delete
+              </button>
+            )}
+            {hasHiddenProjects && (
+              <button
+                type="button"
+                onClick={() => setShowAll((prev) => !prev)}
+                className="inline-flex items-center rounded-full border border-slate-200 px-4 py-2 font-semibold text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
+              >
+                {showAll ? "Collapse" : "View all"}
+                <ArrowUpRight className="ml-2 h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
         <div className="mt-5 divide-y divide-slate-100">
-          {projects.map((project) => (
+          {visibleProjects.map((project) => {
+            const isSelected = selected.has(project.id);
+            return (
             <div
               key={project.id}
               className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 md:flex-row md:items-center md:justify-between"
             >
               <div className="flex items-center gap-3">
+                {selectionMode ? (
+                  <button
+                    type="button"
+                    onClick={() => toggleSelectProject(project.id)}
+                    className={`flex h-6 w-6 items-center justify-center rounded-full border ${
+                      isSelected ? "border-[#024d7c] bg-[#024d7c]" : "border-slate-300 bg-white"
+                    }`}
+                  >
+                    {isSelected ? <Check className="h-4 w-4 text-white" /> : null}
+                  </button>
+                ) : null}
                 <p className="text-lg font-semibold text-slate-900">{project.title}</p>
                 <button
                   type="button"
@@ -109,7 +178,8 @@ export default function ProjectsList({ initialProjects }: Props) {
                 </Link>
               </div>
             </div>
-          ))}
+          );
+          })}
         </div>
       </div>
 
