@@ -86,12 +86,14 @@ const faqs = [
 
 export default function PricingPlans() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#080f1c] via-[#0c1526] to-[#070d18] px-6 py-12 text-slate-900">
+    <div className="min-h-screen bg-gradient-to-b from-[#050915] via-[#081327] to-[#05060c] px-6 py-12 text-slate-900">
       <div className="mx-auto max-w-5xl space-y-10">
-        <div className="rounded-[46px] border border-white/15 bg-gradient-to-br from-white/20 via-white/10 to-white/0 p-12 text-center text-white shadow-[0_80px_200px_rgba(0,0,0,0.65)] backdrop-blur-xl">
+        <div className="text-center text-white">
           <p className="text-sm uppercase tracking-[0.6em] text-white/60">Premium workspaces</p>
-          <h1 className="mt-4 text-4xl font-semibold tracking-tight text-white">Choose the workspace built for your workflow.</h1>
-          <p className="mt-4 text-base text-white/80">
+          <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white drop-shadow-[0_10px_45px_rgba(0,0,0,0.35)]">
+            Choose the workspace built for your workflow.
+          </h1>
+          <p className="mt-3 text-base text-white/80">
             Flexible plans for individuals, teams, and growing organizations—upgrade when you are ready.
           </p>
         </div>
@@ -124,14 +126,17 @@ export default function PricingPlans() {
                   <div className={`pointer-events-none absolute inset-0 bg-gradient-to-b ${tier.overlay}`} />
                 </div>
                 <ul className="mt-8 flex-1 space-y-4 text-sm text-slate-600">
-                  {tier.features.map((feature) => (
-                    <li key={feature} className="flex items-center gap-2">
-                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100">
-                        <div className="h-1 w-3 rounded-full bg-slate-400" />
-                      </span>
-                      {feature}
-                    </li>
-                  ))}
+                  {tier.features.map((feature) => {
+                    const isBold = feature === "Everything in Personal";
+                    return (
+                      <li key={feature} className="flex items-center gap-2">
+                        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100">
+                          <div className="h-1 w-3 rounded-full bg-slate-400" />
+                        </span>
+                        <span className={isBold ? "font-semibold text-slate-800" : undefined}>{feature}</span>
+                      </li>
+                    );
+                  })}
                 </ul>
                 <button
                   type="button"
