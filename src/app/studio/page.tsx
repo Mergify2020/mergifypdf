@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from "react";
 import dynamic from "next/dynamic";
 import { PDFDocument, rgb } from "pdf-lib";
@@ -250,6 +252,10 @@ function SortableThumb({
 }
 
 function WorkspaceClient() {
+  const { data: authSession } = useSession();
+  const router = useRouter();
+  const [showDownloadGate, setShowDownloadGate] = useState(false);
+  const [downloadCountdown, setDownloadCountdown] = useState(3);
   const [sources, setSources] = useState<SourceRef[]>([]);
   const [pages, setPages] = useState<PageItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -794,7 +800,11 @@ function WorkspaceClient() {
   }
 
   /** Build final PDF respecting order + keep flags */
-  async function handleDownload() {
+  async function handleDownload(forceBypass = false) {
+    if (!forceBypass && !authSession?.user) {
+      setShowDownloadGate(true);
+      return;
+    }
     try {
       if (pages.length === 0) {
         setError("Add at least one page first.");
@@ -871,6 +881,48 @@ function WorkspaceClient() {
     } finally {
       setBusy(false);
     }
+  }
+
+  function handleDownloadGateSignUp() {
+    setShowDownloadGate(false);
+    router.push("/register");
+  }
+
+  function handleDownloadGateUpgrade() {
+    setShowDownloadGate(false);
+    router.push("/account?view=pricing");
+  }
+
+  function handleDownloadGateBypass() {
+    setDownloadCountdown(3);
+    setShowDownloadGate(false);
+    const overlay = document.createElement("div");
+    overlay.className =
+      "fixed inset-0 z-50 flex flex-col items-center justify-center bg-white/80 backdrop-blur-md text-slate-900";
+    overlay.innerHTML = `
+      <div class="flex flex-col items-center gap-4 rounded-3xl bg-white p-8 shadow-2xl shadow-[#0b1521]/20 text-center">
+        <div class="flex items-center gap-3 text-[#024d7c]">
+          <span class="h-3 w-3 rounded-full bg-[#024d7c]"></span>
+          <span class="text-xs font-semibold tracking-[0.4em] uppercase text-slate-500">Preparing your download…</span>
+        </div>
+        <div class="text-4xl font-semibold" id="mpdf-download-countdown">3</div>
+        <p class="text-sm text-slate-500 max-w-sm">
+          Create a free account to remove this delay and get another free upload.
+        </p>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    let timer = 3;
+    const countdownInterval = window.setInterval(() => {
+      timer -= 1;
+      const counter = overlay.querySelector("#mpdf-download-countdown");
+      if (counter) counter.textContent = String(Math.max(timer, 0));
+      if (timer <= 0) {
+        clearInterval(countdownInterval);
+        overlay.remove();
+        handleDownload(true);
+      }
+    }, 1000);
   }
 
   const itemsIds = useMemo(() => pages.map((p) => p.id), [pages]);
@@ -1403,7 +1455,7 @@ function WorkspaceClient() {
           </div>
           <button
             className="rounded-full bg-[#024d7c] px-8 py-3 text-base font-semibold text-white shadow-lg shadow-[#012a44]/30 transition hover:bg-[#013d63] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c] focus-visible:ring-offset-2 active:bg-[#012f4e] disabled:cursor-not-allowed disabled:bg-[#d1e3f2] disabled:text-[#5f7085] disabled:shadow-none"
-            onClick={handleDownload}
+            onClick={() => handleDownload()}
             disabled={downloadDisabled}
           >
             {busy ? "Building..." : "Download pages"}
@@ -1486,6 +1538,41 @@ function WorkspaceClient() {
           </div>
         )}
       </div>
+      {showDownloadGate ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowDownloadGate(false)} />
+          <div className="relative z-10 w-full max-w-xl rounded-[32px] bg-white p-8 text-slate-900 shadow-[0_40px_120px_rgba(5,10,30,0.45)]">
+            <h2 className="text-2xl font-semibold">Save your work & get another free upload</h2>
+            <p className="mt-3 text-sm text-slate-600">
+              Your PDF is ready. Create a free account to save this project and unlock one more free upload, or upgrade
+              to Pro for unlimited uploads.
+            </p>
+            <div className="mt-6 flex flex-col gap-3">
+              <button
+                type="button"
+                onClick={handleDownloadGateSignUp}
+                className="inline-flex w-full items-center justify-center rounded-full bg-[#024d7c] px-5 py-3 text-base font-semibold text-white shadow-lg shadow-[#012a44]/30 transition hover:-translate-y-0.5"
+              >
+                Sign up free – Save your projects + 1 more free upload
+              </button>
+              <button
+                type="button"
+                onClick={handleDownloadGateUpgrade}
+                className="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-base font-semibold text-[#024d7c] shadow-sm transition hover:-translate-y-0.5"
+              >
+                Upgrade to Pro – Unlimited uploads & faster processing
+              </button>
+              <button
+                type="button"
+                onClick={handleDownloadGateBypass}
+                className="text-center text-sm font-semibold text-slate-500 underline-offset-4 hover:underline"
+              >
+                Not now (just download this one)
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

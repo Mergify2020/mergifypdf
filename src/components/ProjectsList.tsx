@@ -58,7 +58,10 @@ function convertStoredEntry(entry: RecentProjectEntry): ProjectItem {
 
 export default function ProjectsList({ initialProjects }: Props) {
   const { data: session } = useSession();
-  const ownerId = useMemo(() => session?.user?.id ?? session?.user?.email ?? null, [session?.user?.id, session?.user?.email]);
+  const ownerId = useMemo(
+    () => session?.user?.id ?? session?.user?.email ?? null,
+    [session?.user?.id, session?.user?.email]
+  );
   const [projects, setProjects] = useState<ProjectItem[]>(initialProjects);
   const [renaming, setRenaming] = useState<{ id: string; value: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -70,7 +73,7 @@ export default function ProjectsList({ initialProjects }: Props) {
   const baseProjects = useMemo(() => initialProjects.filter((project) => !project.persisted), [initialProjects]);
 
   useEffect(() => {
-    if (typeof window === "undefined" || !ownerId) return;
+    if (typeof window === "undefined") return;
     const syncFromStorage = () => {
       const stored = loadRecentProjects(ownerId)
         .slice()
@@ -84,7 +87,7 @@ export default function ProjectsList({ initialProjects }: Props) {
       setStorageReady(true);
     };
     syncFromStorage();
-    const eventKey = `${RECENT_PROJECTS_EVENT}:${ownerId}`;
+    const eventKey = `${RECENT_PROJECTS_EVENT}:${ownerId ?? "anon"}`;
     window.addEventListener(eventKey, syncFromStorage);
     return () => window.removeEventListener(eventKey, syncFromStorage);
   }, [baseProjects, ownerId]);
