@@ -105,7 +105,7 @@ export default function PricingPlans() {
                 <div className={`relative overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-br ${tier.accent} p-6 text-white shadow-inner`}>
                   <div className="relative z-10">
                     {tier.badge ? (
-                      <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/40 bg-white/20 px-4 py-1 text-xs font-semibold uppercase tracking-wide text-white shadow-[0_4px_24px_rgba(0,0,0,0.15)]">
+                      <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/40 bg-[#0f172a]/60 px-4 py-1 text-xs font-semibold uppercase tracking-wide text-white shadow-[0_4px_24px_rgba(0,0,0,0.25)]">
                         <span className="h-2 w-2 rounded-full bg-white" />
                         {tier.badge}
                       </span>
