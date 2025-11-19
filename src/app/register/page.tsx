@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 
 type Step = "form" | "verify";
 
@@ -114,41 +115,68 @@ export default function RegisterPage() {
       <p className="text-sm text-gray-600 mt-1">Use email and a password.</p>
 
       {step === "form" ? (
-        <form onSubmit={onSubmit} className="mt-6 space-y-3">
-          <input
-            className="w-full rounded border px-3 py-2"
-            type="text"
-            placeholder="Name (optional)"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <input
-            className="w-full rounded border px-3 py-2"
-            type="email"
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-          <input
-            className="w-full rounded border px-3 py-2"
-            type="password"
-            placeholder="Create a password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={8}
-          />
-          {err && <div className="text-sm text-red-600">{err}</div>}
-          {info && <div className="text-sm text-green-600">{info}</div>}
+        <>
+          <form onSubmit={onSubmit} className="mt-6 space-y-3">
+            <input
+              className="w-full rounded border px-3 py-2"
+              type="text"
+              placeholder="Name (optional)"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <input
+              className="w-full rounded border px-3 py-2"
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+            <input
+              className="w-full rounded border px-3 py-2"
+              type="password"
+              placeholder="Create a password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={8}
+            />
+            {err && <div className="text-sm text-red-600">{err}</div>}
+            {info && <div className="text-sm text-green-600">{info}</div>}
+            <button
+              className="w-full rounded bg-blue-600 px-4 py-2 text-white disabled:opacity-60"
+              type="submit"
+              disabled={busy}
+            >
+              {busy ? "Creating…" : "Create account"}
+            </button>
+          </form>
+
+          <div className="my-5 flex items-center gap-2 text-gray-400">
+            <div className="flex-1 h-px bg-gray-200" />
+            <span className="text-xs uppercase">or</span>
+            <div className="flex-1 h-px bg-gray-200" />
+          </div>
+
           <button
-            className="rounded bg-blue-600 px-4 py-2 text-white disabled:opacity-60"
-            type="submit"
+            type="button"
+            onClick={async () => {
+              try {
+                setBusy(true);
+                await signIn("google", { callbackUrl: "/" });
+              } catch {
+                setBusy(false);
+                setErr("Google login failed. Please try again.");
+              }
+            }}
             disabled={busy}
+            aria-disabled={busy}
+            className="flex w-full items-center justify-center gap-3 rounded border border-gray-300 bg-white py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:opacity-60"
           >
-            {busy ? "Creating…" : "Create account"}
+            <img src="/google.svg" alt="Google logo" className="h-5 w-5" />
+            <span>Log in with Google</span>
           </button>
-        </form>
+        </>
       ) : (
         <form onSubmit={onVerify} className="mt-6 space-y-3">
           <p className="text-sm text-gray-600">
