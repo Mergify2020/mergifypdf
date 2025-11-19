@@ -1385,8 +1385,7 @@ function WorkspaceClient() {
                                 strokeWidth={Math.max(1, draftHighlight.thickness * 1000)}
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
-                strokeOpacity={draftHighlight.tool === "pencil" ? 1 : 0.25}
-                strokeLinecap="round"
+                                strokeOpacity={draftHighlight.tool === "pencil" ? 1 : 0.25}
                               />
                             ) : null}
                           </svg>
