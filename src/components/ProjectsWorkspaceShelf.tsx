@@ -64,7 +64,7 @@ export default function ProjectsWorkspaceShelf() {
           </div>
           <Link
             href="/studio"
-            className="inline-flex items-center justify-center rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/30 transition hover:-translate-y-0.5"
+            className="inline-flex items-center justify-center rounded-full bg-[#024d7c] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-[#012a44]/30 transition hover:-translate-y-0.5"
           >
             Launch workspace
             <ArrowUpRight className="ml-2 h-4 w-4" />
@@ -88,7 +88,7 @@ export default function ProjectsWorkspaceShelf() {
           </div>
           <Link
             href="/studio"
-            className="inline-flex items-center justify-center rounded-full bg-slate-900 px-7 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/30 transition hover:-translate-y-0.5"
+            className="inline-flex items-center justify-center rounded-full bg-[#024d7c] px-7 py-3 text-sm font-semibold text-white shadow-lg shadow-[#012a44]/30 transition hover:-translate-y-0.5"
           >
             Resume / Open
             <ArrowUpRight className="ml-2 h-4 w-4" />

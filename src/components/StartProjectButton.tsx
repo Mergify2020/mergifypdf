@@ -105,7 +105,7 @@ export default function StartProjectButton({ className }: Props) {
       <button
         type="button"
         onClick={launchModal}
-        className={`inline-flex items-center justify-center rounded-full bg-white px-10 py-3 text-base font-semibold text-slate-900 shadow-xl shadow-black/20 transition hover:-translate-y-0.5 ${
+        className={`inline-flex items-center justify-center rounded-full bg-[#024d7c] px-10 py-3 text-base font-semibold text-white shadow-xl shadow-[#012a44]/30 transition hover:-translate-y-0.5 ${
           className ?? ""
         }`}
       >

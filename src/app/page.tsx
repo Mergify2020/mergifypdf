@@ -170,7 +170,7 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
                     </span>
                     <Link
                       href="/studio"
-                      className="inline-flex items-center gap-1 rounded-full bg-slate-900 px-3 py-1 text-white transition hover:bg-slate-700"
+                      className="inline-flex items-center gap-1 rounded-full bg-[#024d7c] px-3 py-1 text-white transition hover:bg-[#013a60]"
                     >
                       Open
                       <ArrowUpRight className="h-4 w-4" />
