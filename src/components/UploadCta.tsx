@@ -64,7 +64,7 @@ export default function UploadCta({ usedToday, variant = "default", className }:
   return (
     <div className={containerClass}>
       <button type="button" onClick={handleClick} disabled={busy} aria-disabled={busy} className={buttonClass}>
-        {alreadyUsed ? "Upgrade to keep going" : busy ? "Opening..." : "Upload Documents"}
+        {alreadyUsed ? "Upgrade to keep going" : busy ? "Opening..." : "Upload a document"}
       </button>
       {error && <p className="text-sm text-red-600">{error}</p>}
     </div>

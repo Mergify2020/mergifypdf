@@ -83,8 +83,8 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
         <div className="grid gap-12 lg:grid-cols-[1fr,1fr] lg:items-center">
           <div className="space-y-6 text-center lg:text-left">
             <h1 className="text-3xl font-semibold leading-tight tracking-tight sm:text-5xl">
-              <span className="block">Merge and edit your documents</span>
-              <span className="block">all in one place</span>
+              <span className="block">Merge, edit, and sign your PDFs</span>
+              <span className="block">— all in your browser.</span>
             </h1>
             <p className="text-lg text-gray-700">Fast, secure, and works right in your browser.</p>
             <p className="text-lg text-gray-600">
@@ -100,7 +100,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
               </Link>
             </div>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-sm text-slate-600 lg:justify-start">
-              {["No signup required", "Fast & secure", "Works in your browser"].map((badge) => (
+              {["Fast & secure", "No signup required", "Works in your browser"].map((badge) => (
                 <span
                   key={badge}
                   className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-4 py-1.5 text-slate-700 shadow-sm"
@@ -110,8 +110,9 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
                 </span>
               ))}
             </div>
+            <p className="text-sm text-slate-500">Loved by freelancers, students, and small businesses.</p>
           </div>
-          <div className="relative flex items-center justify-center">
+          <div className="relative mt-12 flex items-center justify-center lg:mt-4">
             <div className="pointer-events-none absolute -bottom-6 -right-6 h-72 w-72 rounded-full bg-indigo-100/60 blur-[140px]" />
             <Image
               src="/visual-hero2.jpeg"
@@ -124,9 +125,9 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
           </div>
         </div>
 
-        <div className="h-px w-full bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
+        <div className="mt-16 h-px w-full bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
 
-        <div className="grid w-full gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid w-full gap-5 pb-12 sm:grid-cols-2 lg:grid-cols-3">
           {features.map(({ title, description, icon: Icon }) => (
             <div
               key={title}
