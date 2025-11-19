@@ -8,6 +8,7 @@ import ProjectsList from "@/components/ProjectsList";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import {
+  ArrowUpRight,
   FileArchive,
   FileOutput,
   FilePlus,
