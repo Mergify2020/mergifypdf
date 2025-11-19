@@ -52,7 +52,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               >
                 <Image src="/logo-wordmark2.svg" alt="MergifyPDF" width={192} height={48} priority />
               </Link>
-              {session?.user ? <WorkspaceSettingsMenu /> : null}
+              {session?.user ? (
+                <WorkspaceSettingsMenu />
+              ) : (
+                <Link
+                  href="/login"
+                  className="inline-flex items-center rounded-full bg-[#024d7c] px-4 py-2 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(2,77,124,0.35)] transition hover:-translate-y-0.5 hover:bg-[#013a60]"
+                >
+                  Log in
+                </Link>
+              )}
             </div>
           </header>
 

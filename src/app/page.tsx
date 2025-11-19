@@ -77,21 +77,7 @@ export default async function Home() {
 
 function MarketingLanding({ usedToday }: { usedToday: boolean }) {
   return (
-    <div className="min-h-screen bg-white">
-      <header className="w-full border-b border-slate-100 bg-white/90 px-6 py-4">
-        <div className="mx-auto flex max-w-5xl items-center justify-between">
-          <Link href="/" className="text-xl font-semibold text-slate-900">
-            MergifyPDF
-          </Link>
-          <Link
-            href="/login"
-            className="inline-flex items-center rounded-full bg-[#024d7c] px-4 py-2 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(2,77,124,0.35)] transition hover:-translate-y-0.5 hover:bg-[#013a60]"
-          >
-            Log in
-          </Link>
-        </div>
-      </header>
-      <div className="mx-auto flex max-w-4xl flex-col items-center gap-6 px-6 py-16 text-center">
+    <div className="mx-auto flex max-w-4xl flex-col items-center gap-6 px-6 py-20 text-center">
       <h1 className="text-3xl font-semibold tracking-tight sm:text-5xl leading-tight">
         <span className="block">Merge and edit your documents</span>
         <span className="block">all in one place</span>
@@ -129,7 +115,6 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
           </div>
         ))}
       </div>
-    </div>
     </div>
   );
 }
