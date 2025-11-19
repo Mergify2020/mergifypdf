@@ -48,7 +48,7 @@ export default function SettingsMenu() {
 
   function handlePricing() {
     setOpen(false);
-    router.push("/pricing");
+    router.push("/account?view=pricing");
   }
 
   async function handleSignOut() {
