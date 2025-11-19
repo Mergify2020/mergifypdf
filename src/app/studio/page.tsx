@@ -1234,11 +1234,15 @@ function WorkspaceClient() {
         <div className="mb-6 rounded-3xl border border-slate-100 bg-white px-6 py-6 shadow-sm">
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <p className="text-sm font-semibold text-slate-900">Editing tools</p>
-                <p className="text-xs text-slate-500">{toolbarMessage}</p>
-              </div>
               <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setOrganizeMode(true)}
+                  disabled={pages.length === 0 || organizeMode}
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Manage pages
+                </button>
                 <button
                   type="button"
                   disabled={highlightButtonDisabled}
@@ -1264,14 +1268,6 @@ function WorkspaceClient() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setOrganizeMode(true)}
-                  disabled={pages.length === 0 || organizeMode}
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Manage pages
-                </button>
-                <button
-                  type="button"
                   disabled={highlightButtonDisabled}
                   onClick={() =>
                     setPencilMode((prev) => {
@@ -1293,6 +1289,8 @@ function WorkspaceClient() {
                   <Pencil className="h-4 w-4" />
                   Pencil
                 </button>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={handleUndoHighlight}
@@ -1415,7 +1413,7 @@ function WorkspaceClient() {
           </div>
         </div>
 
-        <div className="mt-6 w-full rounded-[32px] border border-slate-200 bg-white/80 px-5 py-4 shadow-sm">
+        <div className="mt-6 w-full rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 shadow-sm">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-col gap-1">
               <p className="text-xs font-semibold uppercase tracking-[0.4em] text-slate-400">Project name</p>
@@ -1430,7 +1428,7 @@ function WorkspaceClient() {
                   placeholder="Name your project"
                 />
               ) : (
-                <h1 className="text-3xl font-semibold tracking-tight text-slate-900">{projectName}</h1>
+                <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{projectName}</h1>
               )}
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -1459,9 +1457,10 @@ function WorkspaceClient() {
                     setProjectNameError(null);
                     setProjectNameEditing(true);
                   }}
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
+                  className="inline-flex items-center justify-center rounded-full border border-slate-200 p-3 text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
+                  aria-label="Edit project name"
                 >
-                  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
                     <path d="M12 20h9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                     <path
                       d="M16.5 3.5a2.121 2.121 0 013 3L7 19.5 3 21l1.5-4L16.5 3.5z"
@@ -1471,7 +1470,6 @@ function WorkspaceClient() {
                       strokeLinejoin="round"
                     />
                   </svg>
-                  Edit name
                 </button>
               )}
             </div>
