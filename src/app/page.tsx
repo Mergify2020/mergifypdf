@@ -7,7 +7,17 @@ import StartProjectButton from "@/components/StartProjectButton";
 import ProjectsList from "@/components/ProjectsList";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
-import { ArrowUpRight, FileOutput, FilePlus, Highlighter, Layers, ListOrdered, PenLine } from "lucide-react";
+import {
+  FileArchive,
+  FileOutput,
+  FilePlus,
+  Highlighter,
+  Layers,
+  ListOrdered,
+  PenLine,
+  RotateCcw,
+  ScissorsSquare,
+} from "lucide-react";
 
 const features = [
   {
@@ -43,17 +53,17 @@ const features = [
   {
     title: "Compress PDF",
     description: "Reduce file size while keeping everything clear and readable.",
-    icon: ArrowUpRight,
+    icon: FileArchive,
   },
   {
     title: "Rotate Pages",
     description: "Quickly rotate any page to the correct orientation.",
-    icon: ArrowUpRight,
+    icon: RotateCcw,
   },
   {
     title: "PDF Splitter",
     description: "Split one PDF into multiple smaller files in seconds.",
-    icon: ArrowUpRight,
+    icon: ScissorsSquare,
   },
 ] as const;
 
@@ -154,7 +164,9 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
             </div>
           ))}
         </div>
-        <p className="pb-16 text-center text-sm text-slate-500">More tools added regularly to simplify your workflow.</p>
+        <p className="pb-16 text-center text-base font-semibold text-slate-600">
+          More tools added regularly to simplify your workflow.
+        </p>
       </div>
     </div>
   );
