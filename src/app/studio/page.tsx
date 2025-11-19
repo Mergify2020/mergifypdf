@@ -299,6 +299,13 @@ function SortableThumb({
         className={`group relative block w-full overflow-hidden rounded-2xl bg-white/95 shadow-sm ring-1 transition ${
           selected ? "ring-brand shadow-brand/30" : "ring-slate-200 hover:ring-brand/40 hover:shadow-md"
         }`}
+        style={
+          item.width && item.height
+            ? ({
+                aspectRatio: `${item.width} / ${item.height}`,
+              } as CSSProperties)
+            : undefined
+        }
       >
         <span
           className={`pointer-events-none absolute left-3 top-3 inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold text-white ${
@@ -311,7 +318,8 @@ function SortableThumb({
         <img
           src={item.thumb}
           alt={`Page ${index + 1}`}
-          className="pointer-events-none block w-full bg-white object-contain transition"
+          className="pointer-events-none block h-full w-full rounded-[22px] bg-white object-contain transition"
+          draggable={false}
         />
       </button>
     </li>
@@ -347,14 +355,24 @@ function SortableOrganizeTile({
     <div ref={setNodeRef} style={style} className="flex h-full flex-col gap-3" {...attributes} {...listeners}>
       <div className="flex items-center justify-between px-2 text-xs font-semibold text-slate-500">
         <span className="text-slate-900">Page {index + 1}</span>
-        <span>{rotation}°</span>
+        <span>{rotation}</span>
       </div>
-      <div className="relative flex flex-1 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_8px_18px_rgba(15,23,42,0.12)]">
+      <div
+        className="relative flex flex-1 items-center justify-center overflow-hidden rounded-[36px] border border-slate-200 bg-white shadow-[0_8px_18px_rgba(15,23,42,0.12)]"
+        style={
+          item.width && item.height
+            ? ({
+                aspectRatio: `${item.width} / ${item.height}`,
+              } as CSSProperties)
+            : undefined
+        }
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={item.preview}
           alt={`Page ${index + 1}`}
-          className="max-h-full w-full object-contain"
+          className="h-full w-full rounded-[36px] object-contain"
+          draggable={false}
         />
       </div>
       <div className="flex items-center justify-end gap-2 px-2 pb-2">
@@ -1212,16 +1230,6 @@ function WorkspaceClient() {
   }, [activeDrawingTool]);
   const hasAnyHighlights = Object.values(highlights).some((list) => list && list.length > 0);
   const hasUndoHistory = highlightHistory.length > 0;
-  const toolbarMessage = deleteMode
-    ? "Delete mode is active — click any highlight or pencil mark to remove it."
-    : activeDrawingTool === "highlight"
-      ? "Highlight mode is active — drag across a page to mark text."
-      : activeDrawingTool === "pencil"
-        ? "Pencil mode is active — draw anywhere to write notes."
-        : hasAnyHighlights
-          ? "Select a highlight or pencil mark to delete, or keep editing."
-          : "Choose a tool to start marking up your document.";
-
   useEffect(() => {
     if (!hasAnyHighlights && deleteMode) {
       setDeleteMode(false);
@@ -1632,27 +1640,34 @@ function WorkspaceClient() {
                       className="mx-auto w-full max-w-[1500px]"
                     >
                       <div
-                        className={`relative bg-white shadow-[0_12px_30px_rgba(15,23,42,0.18)] ${activePageId === page.id ? "ring-2 ring-brand/50 shadow-brand/30" : ""}`}
+                        className={`relative overflow-hidden rounded-[36px] bg-white shadow-[0_12px_30px_rgba(15,23,42,0.18)] ${
+                          activePageId === page.id ? "ring-2 ring-brand/50 shadow-brand/30" : ""
+                        }`}
                         style={{ transform: `scale(${zoom})`, transformOrigin: "top center" }}
                       >
                         <div
-                          className="relative rounded-none"
-                          style={
-                            activeDrawingTool
-                              ? ({
-                                  cursor:
-                                    activeDrawingTool === "highlight"
-                                      ? `url(${HIGHLIGHT_CURSOR}) 4 24, crosshair`
-                                      : "crosshair",
-                                } as CSSProperties)
-                              : undefined
-                          }
+                          className="relative rounded-none bg-white"
+                          style={{
+                            aspectRatio:
+                              page.width && page.height ? `${page.width} / ${page.height}` : undefined,
+                            cursor:
+                              activeDrawingTool === "highlight"
+                                ? (`url(${HIGHLIGHT_CURSOR}) 4 24, crosshair` as CSSProperties["cursor"])
+                                : activeDrawingTool === "pencil"
+                                ? ("crosshair" as CSSProperties["cursor"])
+                                : undefined,
+                          }}
                           onMouseDown={(event) => handleMarkupPointerDown(page.id, event)}
                           onMouseMove={(event) => handleMarkupPointerMove(page.id, event)}
                           onMouseUp={() => handleMarkupPointerUp(page.id)}
                         >
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={page.preview} alt={`Page ${idx + 1}`} className="w-full rounded-none" />
+                          <img
+                            src={page.preview}
+                            alt={`Page ${idx + 1}`}
+                            className="h-full w-full rounded-none object-contain"
+                            draggable={false}
+                          />
                           <svg
                             className="absolute inset-0 h-full w-full"
                             style={{ pointerEvents: deleteMode ? "auto" : "none" }}
