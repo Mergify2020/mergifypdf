@@ -16,29 +16,44 @@ const features = [
     icon: Layers,
   },
   {
-    title: "Edit & Highlight",
-    description: "Add highlights, notes, drawings, and text.",
+    title: "Edit & Annotate",
+    description: "Add highlights, drawings, comments, shapes, and text.",
     icon: Highlighter,
   },
   {
     title: "Sign Documents",
-    description: "Draw, upload, or type your signature.",
+    description: "Draw, upload, or type your signature instantly.",
     icon: PenLine,
   },
   {
     title: "Reorder Pages",
-    description: "Drag and drop pages to arrange your document.",
+    description: "Drag and drop pages into the perfect order.",
     icon: ListOrdered,
   },
   {
     title: "Add or Remove Pages",
-    description: "Insert new pages or delete pages instantly.",
+    description: "Insert new pages or delete unwanted ones.",
     icon: FilePlus,
   },
   {
     title: "Extract Pages",
-    description: "Select certain pages and export them into a new PDF.",
+    description: "Select specific pages and export them into a new PDF.",
     icon: FileOutput,
+  },
+  {
+    title: "Compress PDF",
+    description: "Reduce file size while keeping everything clear and readable.",
+    icon: ArrowUpRight,
+  },
+  {
+    title: "Rotate Pages",
+    description: "Quickly rotate any page to the correct orientation.",
+    icon: ArrowUpRight,
+  },
+  {
+    title: "PDF Splitter",
+    description: "Split one PDF into multiple smaller files in seconds.",
+    icon: ArrowUpRight,
   },
 ] as const;
 
@@ -127,7 +142,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
 
         <div className="mt-20 h-px w-full bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
 
-        <div className="grid w-full gap-5 pb-16 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid w-full gap-5 pb-8 sm:grid-cols-2 lg:grid-cols-3">
           {features.map(({ title, description, icon: Icon }) => (
             <div
               key={title}
@@ -139,6 +154,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
             </div>
           ))}
         </div>
+        <p className="pb-16 text-center text-sm text-slate-500">More tools added regularly to simplify your workflow.</p>
       </div>
     </div>
   );
