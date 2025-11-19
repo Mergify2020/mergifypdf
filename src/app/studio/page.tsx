@@ -877,7 +877,7 @@ function WorkspaceClient() {
             for (let i = 1; i < stroke.points.length; i++) {
               const start = stroke.points[i - 1];
               const end = stroke.points[i];
-              const opacity = stroke.tool === "pencil" ? 1 : 0.4;
+                const opacity = stroke.tool === "pencil" ? 1 : 0.25;
               copied.drawLine({
                 start: {
                   x: start.x * pageWidth,
@@ -1360,6 +1360,7 @@ function WorkspaceClient() {
                                   stroke={stroke.color}
                                   strokeWidth={Math.max(1, stroke.thickness * 1000)}
                                   strokeLinecap="round"
+                                  strokeOpacity={stroke.tool === "pencil" ? 1 : 0.25}
                                   style={{
                                     pointerEvents: deleteMode ? "stroke" : "none",
                                     cursor: deleteMode ? "pointer" : "default",
