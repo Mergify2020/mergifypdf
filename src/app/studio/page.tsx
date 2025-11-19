@@ -1671,7 +1671,7 @@ function WorkspaceClient() {
                               viewBox="0 0 1000 1000"
                               preserveAspectRatio="none"
                             >
-                            {pageHighlights.map((stroke) =>
+                              {pageHighlights.map((stroke) =>
                               stroke.points.length > 1 ? (
                                 <polyline
                                   key={stroke.id}
