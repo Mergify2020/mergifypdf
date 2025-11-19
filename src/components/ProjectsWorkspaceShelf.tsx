@@ -77,7 +77,7 @@ export default function ProjectsWorkspaceShelf() {
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-6 text-slate-900 shadow-[0_25px_70px_rgba(15,23,42,0.08)]">
       <div className="flex flex-col gap-4">
-        <p className="text-sm uppercase tracking-[0.4em] text-slate-500">Continue your last project</p>
+        <p className="text-2xl font-semibold text-slate-900">Continue your last project</p>
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="text-2xl font-semibold">{snapshot.fileName}</h2>

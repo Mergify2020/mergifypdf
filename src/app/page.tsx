@@ -118,8 +118,7 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
         <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-[0_35px_80px_rgba(15,23,42,0.12)]">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-sm uppercase tracking-[0.4em] text-slate-500">Projects</p>
-              <h1 className="mt-2 text-4xl font-semibold tracking-tight text-slate-900">
+              <h1 className="text-4xl font-semibold tracking-tight text-slate-900">
                 Welcome back, {shortName}.
               </h1>
             </div>
