@@ -113,21 +113,21 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
   const shortName = displayName.split(" ")[0] ?? "Guest";
 
   return (
-    <div className="relative min-h-screen bg-[#040b17] text-white">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,#12336f_0%,transparent_45%),radial-gradient(circle_at_bottom,#04233f_0%,transparent_35%)] opacity-80" />
-      <div className="relative mx-auto flex max-w-6xl flex-col gap-8 px-6 py-10">
-        <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-8 shadow-[0_40px_120px_rgba(2,10,22,0.65)] backdrop-blur">
+    <div className="min-h-screen bg-gradient-to-b from-white via-[#f4f7fb] to-white text-slate-900">
+      <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-10">
+        <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-[0_35px_80px_rgba(15,23,42,0.12)]">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-sm uppercase tracking-[0.4em] text-white/60">Projects</p>
-              <h1 className="mt-2 text-4xl font-semibold tracking-tight">Welcome back, {shortName}.</h1>
-              <p className="mt-3 max-w-2xl text-base text-white/70" />
+              <p className="text-sm uppercase tracking-[0.4em] text-slate-500">Projects</p>
+              <h1 className="mt-2 text-4xl font-semibold tracking-tight text-slate-900">
+                Welcome back, {shortName}.
+              </h1>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               <StartProjectButton />
               <Link
                 href="/pricing"
-                className="inline-flex items-center justify-center rounded-full border border-white/40 px-8 py-3 text-sm font-semibold text-white/90 transition hover:border-white hover:bg-white/10"
+                className="inline-flex items-center justify-center rounded-full border border-slate-200 px-8 py-3 text-sm font-semibold text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
               >
                 Upgrade to Premium
                 <ArrowUpRight className="ml-2 h-4 w-4" />
@@ -139,38 +139,38 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
         <ProjectsWorkspaceShelf />
 
         <section className="grid gap-5 lg:grid-cols-[2fr,1fr]">
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_25px_70px_rgba(15,23,42,0.08)]">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm uppercase tracking-[0.4em] text-white/60">Recent projects</p>
-                <h2 className="text-2xl font-semibold">Continue where you paused</h2>
+                <p className="text-sm uppercase tracking-[0.4em] text-slate-500">Recent projects</p>
+                <h2 className="text-2xl font-semibold text-slate-900">Continue where you paused</h2>
               </div>
               <Link
                 href="/studio"
-                className="inline-flex items-center text-sm font-semibold text-white/70 transition hover:text-white"
+                className="inline-flex items-center text-sm font-semibold text-slate-600 transition hover:text-slate-900"
               >
                 View all
                 <ArrowUpRight className="ml-2 h-4 w-4" />
               </Link>
             </div>
-            <div className="mt-5 divide-y divide-white/10">
+            <div className="mt-5 divide-y divide-slate-100">
               {curatedProjects.map((project) => (
                 <div
                   key={project.id}
                   className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 md:flex-row md:items-center md:justify-between"
                 >
                   <div>
-                    <p className="text-lg font-semibold">{project.title}</p>
-                    <p className="text-sm text-white/60">Last edited {project.updated}</p>
+                    <p className="text-lg font-semibold text-slate-900">{project.title}</p>
+                    <p className="text-sm text-slate-500">Last edited {project.updated}</p>
                   </div>
                   <div className="flex flex-wrap gap-3 text-sm">
-                    <span className="inline-flex items-center gap-1 rounded-full border border-white/20 px-3 py-1 text-white/80">
+                    <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1 text-slate-600">
                       <CalendarDays className="h-4 w-4" />
                       {project.updated}
                     </span>
                     <Link
                       href="/studio"
-                      className="inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-1 text-white transition hover:bg-white/20"
+                      className="inline-flex items-center gap-1 rounded-full bg-slate-900 px-3 py-1 text-white transition hover:bg-slate-700"
                     >
                       Open
                       <ArrowUpRight className="h-4 w-4" />
@@ -182,11 +182,9 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
           </div>
 
           <div className="space-y-4">
-            <div className="rounded-3xl border border-dashed border-white/20 bg-white/5 p-6 text-white/80">
-              <p className="text-sm uppercase tracking-[0.4em] text-white/60">
-                Team Hub workspace
-              </p>
-              <h3 className="mt-2 text-xl font-semibold text-white">Coming soon</h3>
+            <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-6 text-slate-500 shadow-[0_25px_60px_rgba(15,23,42,0.08)]">
+              <p className="text-sm uppercase tracking-[0.4em] text-slate-400">Team Hub workspace</p>
+              <h3 className="mt-2 text-xl font-semibold text-slate-900">Coming soon</h3>
               <p className="mt-1 text-sm">
                 Invite collaborators, organize shared stacks, and stay perfectly in sync. We&apos;re
                 polishing the experience—stay tuned.

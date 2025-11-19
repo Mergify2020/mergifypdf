@@ -53,18 +53,18 @@ export default function ProjectsWorkspaceShelf() {
 
   if (!snapshot) {
     return (
-      <div className="rounded-3xl border border-white/15 bg-white/5 p-6 text-white shadow-2xl shadow-black/10 backdrop-blur">
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 text-slate-900 shadow-[0_25px_70px_rgba(15,23,42,0.08)]">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-sm uppercase tracking-[0.4em] text-white/60">Workspace</p>
+            <p className="text-sm uppercase tracking-[0.4em] text-slate-500">Workspace</p>
             <h2 className="mt-1 text-2xl font-semibold">You&apos;re all caught up</h2>
-            <p className="mt-1 text-sm text-white/70">
+            <p className="mt-1 text-sm text-slate-500">
               Start a new canvas and we&apos;ll remember where you left off next time.
             </p>
           </div>
           <Link
             href="/studio"
-            className="inline-flex items-center justify-center rounded-full bg-white px-6 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-black/20 transition hover:-translate-y-0.5"
+            className="inline-flex items-center justify-center rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/30 transition hover:-translate-y-0.5"
           >
             Launch workspace
             <ArrowUpRight className="ml-2 h-4 w-4" />
@@ -75,26 +75,26 @@ export default function ProjectsWorkspaceShelf() {
   }
 
   return (
-    <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 text-white shadow-[0_30px_80px_rgba(0,0,0,0.35)] backdrop-blur">
+    <div className="rounded-3xl border border-slate-200 bg-white p-6 text-slate-900 shadow-[0_25px_70px_rgba(15,23,42,0.08)]">
       <div className="flex flex-col gap-4">
-        <p className="text-sm uppercase tracking-[0.4em] text-white/60">Resume project</p>
+        <p className="text-sm uppercase tracking-[0.4em] text-slate-500">Resume project</p>
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="text-2xl font-semibold">{snapshot.fileName}</h2>
-            <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-white/20 px-3 py-1 text-sm text-white/80">
+            <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1 text-sm text-slate-600">
               <Clock className="h-4 w-4" />
               Last edited {snapshot.lastEditedLabel}
             </div>
           </div>
           <Link
             href="/studio"
-            className="inline-flex items-center justify-center rounded-full bg-white px-7 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-black/20 transition hover:-translate-y-0.5"
+            className="inline-flex items-center justify-center rounded-full bg-slate-900 px-7 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/30 transition hover:-translate-y-0.5"
           >
             Resume / Open
             <ArrowUpRight className="ml-2 h-4 w-4" />
           </Link>
         </div>
-        <p className="text-xs uppercase tracking-[0.4em] text-white/60">Auto-saved locally</p>
+        <p className="text-xs uppercase tracking-[0.4em] text-slate-500">Auto-saved locally</p>
       </div>
     </div>
   );

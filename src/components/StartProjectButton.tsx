@@ -117,11 +117,11 @@ export default function StartProjectButton({ className }: Props) {
       </button>
 
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={closeModal} />
-          <div className="relative z-10 w-full max-w-md rounded-3xl border border-white/20 bg-[#0b1424] p-6 text-white shadow-[0_30px_80px_rgba(0,0,0,0.6)]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={closeModal} />
+          <div className="relative z-10 w-full max-w-md rounded-3xl bg-white p-6 text-slate-900 shadow-[0_35px_70px_rgba(15,23,42,0.35)]">
             <h2 className="text-2xl font-semibold">Name your project</h2>
-            <p className="mt-1 text-sm text-white/70">
+            <p className="mt-1 text-sm text-slate-500">
               We&apos;ll prep a fresh workspace with this name front and center.
             </p>
             <input
@@ -132,15 +132,15 @@ export default function StartProjectButton({ className }: Props) {
                 setValue(event.target.value);
                 if (error) setError(null);
               }}
-              className="mt-5 w-full rounded-2xl border border-white/20 bg-white/5 px-4 py-3 text-base text-white outline-none focus:border-white/70"
+              className="mt-5 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-base text-slate-900 outline-none focus:border-slate-400"
               placeholder="e.g. Pinnacol Audit Packet"
             />
-            {error ? <p className="mt-2 text-sm text-rose-300">{error}</p> : null}
+            {error ? <p className="mt-2 text-sm text-rose-500">{error}</p> : null}
             <div className="mt-6 flex justify-end gap-3 text-sm">
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded-full border border-white/30 px-4 py-2 text-white/80 transition hover:border-white hover:text-white"
+                className="rounded-full border border-slate-200 px-4 py-2 text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
                 disabled={busy}
               >
                 Cancel
@@ -148,7 +148,7 @@ export default function StartProjectButton({ className }: Props) {
               <button
                 type="button"
                 onClick={handleStart}
-                className="rounded-full bg-white px-5 py-2 font-semibold text-slate-900 shadow-lg shadow-black/20 transition hover:-translate-y-0.5 disabled:opacity-60"
+                className="rounded-full bg-[#024d7c] px-5 py-2 font-semibold text-white shadow-lg shadow-[#012a44]/30 transition hover:-translate-y-0.5 disabled:opacity-60"
                 disabled={busy}
               >
                 {busy ? "Preparing…" : "Start project"}
