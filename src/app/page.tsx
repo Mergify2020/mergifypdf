@@ -79,18 +79,18 @@ export default async function Home() {
 function MarketingLanding({ usedToday }: { usedToday: boolean }) {
   return (
     <div className="bg-gradient-to-b from-[#f3f8ff] via-white to-white">
-      <div className="mx-auto flex max-w-6xl flex-col gap-16 px-6 py-20">
+      <div className="mx-auto flex max-w-6xl flex-col items-center gap-16 px-6 py-20 text-center">
         <div className="grid gap-12 lg:grid-cols-[1fr,1fr] lg:items-center">
-          <div className="space-y-6 text-center lg:text-left">
+          <div className="space-y-6">
             <h1 className="text-3xl font-semibold leading-tight tracking-tight sm:text-5xl">
               <span className="block">Merge, edit, and sign your PDFs</span>
               <span className="block">— all in your browser.</span>
             </h1>
-            <p className="text-lg text-gray-700">Fast, secure, and works right in your browser.</p>
+            <p className="text-lg text-gray-700">A better, simpler way to work with your documents.</p>
             <p className="text-lg text-gray-600">
               One free upload every day. Upgrade for unlimited merges and faster processing.
             </p>
-            <div className="mt-8 flex w-full flex-col gap-4 sm:flex-row sm:items-center sm:justify-start">
+            <div className="mt-8 flex w-full flex-col items-center gap-4 sm:flex-row sm:justify-center">
               <UploadCta usedToday={usedToday} variant="hero" className="w-full sm:w-auto" />
               <Link
                 href="/account?view=pricing"
@@ -99,8 +99,8 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
                 Pricing
               </Link>
             </div>
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-sm text-slate-600 lg:justify-start">
-              {["Fast & secure", "No signup required", "Works in your browser"].map((badge) => (
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-sm text-slate-600">
+              {["Blazing fast", "Privacy-first", "1 free upload per day"].map((badge) => (
                 <span
                   key={badge}
                   className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-4 py-1.5 text-slate-700 shadow-sm"
@@ -112,7 +112,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
             </div>
             <p className="text-sm text-slate-500">Loved by freelancers, students, and small businesses.</p>
           </div>
-          <div className="relative mt-12 flex items-center justify-center lg:mt-4">
+          <div className="relative mt-12 flex items-center justify-center lg:mt-12">
             <div className="pointer-events-none absolute -bottom-6 -right-6 h-72 w-72 rounded-full bg-indigo-100/60 blur-[140px]" />
             <Image
               src="/visual-hero2.jpeg"
@@ -125,9 +125,9 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
           </div>
         </div>
 
-        <div className="mt-16 h-px w-full bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
+        <div className="mt-20 h-px w-full bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
 
-        <div className="grid w-full gap-5 pb-12 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid w-full gap-5 pb-16 sm:grid-cols-2 lg:grid-cols-3">
           {features.map(({ title, description, icon: Icon }) => (
             <div
               key={title}
