@@ -78,6 +78,7 @@ const WORKSPACE_SESSION_KEY = "mpdf:files";
 const WORKSPACE_DB_NAME = "mpdf-file-store";
 const WORKSPACE_DB_STORE = "files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
+const DEFAULT_ASPECT_RATIO = 792 / 612; // fallback letter portrait
 
 type StoredSourceMeta = { id: string; name?: string; size?: number; updatedAt?: number };
 type FileStoreEntry = { blob: Blob; name?: string; size?: number; updatedAt: number };
@@ -268,6 +269,13 @@ function rotatePointClockwise(point: Point): Point {
   };
 }
 
+function getAspectPadding(width?: number, height?: number) {
+  if (!width || !height || width === 0) {
+    return `${DEFAULT_ASPECT_RATIO * 100}%`;
+  }
+  return `${(height / width) * 100}%`;
+}
+
 /** One sortable thumbnail tile */
 function SortableThumb({
   item,
@@ -296,31 +304,31 @@ function SortableThumb({
         type="button"
         aria-label={`Focus page ${index + 1}`}
         onClick={onSelect}
-        className={`group relative block w-full overflow-hidden rounded-2xl bg-white/95 shadow-sm ring-1 transition ${
+        className={`group block w-full rounded-2xl bg-white/95 shadow-sm ring-1 transition ${
           selected ? "ring-brand shadow-brand/30" : "ring-slate-200 hover:ring-brand/40 hover:shadow-md"
         }`}
-        style={
-          item.width && item.height
-            ? ({
-                aspectRatio: `${item.width} / ${item.height}`,
-              } as CSSProperties)
-            : undefined
-        }
       >
-        <span
-          className={`pointer-events-none absolute left-3 top-3 inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold text-white ${
-            selected ? "bg-brand" : "bg-slate-900/70"
-          }`}
-        >
-          {index + 1}
-        </span>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={item.thumb}
-          alt={`Page ${index + 1}`}
-          className="pointer-events-none block h-full w-full rounded-[22px] bg-white object-contain transition"
-          draggable={false}
-        />
+        <div className="flex items-center justify-between px-3 pt-3 text-xs font-semibold text-slate-500">
+          <span className="text-slate-900">Page {index + 1}</span>
+          <span
+            className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-[0.65rem] font-semibold text-white ${
+              selected ? "bg-brand" : "bg-slate-900/70"
+            }`}
+          >
+            {index + 1}
+          </span>
+        </div>
+        <div className="relative mt-3 w-full" style={{ paddingBottom: getAspectPadding(item.width, item.height) }}>
+          <div className="absolute inset-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={item.thumb}
+              alt={`Page ${index + 1}`}
+              className="h-full w-full object-contain"
+              draggable={false}
+            />
+          </div>
+        </div>
       </button>
     </li>
   );
@@ -349,33 +357,23 @@ function SortableOrganizeTile({
     cursor: "grab",
   };
 
-  const rotation = item.rotation ?? 0;
-
   return (
     <div ref={setNodeRef} style={style} className="flex h-full flex-col gap-3" {...attributes} {...listeners}>
-      <div className="flex items-center justify-between px-2 text-xs font-semibold text-slate-500">
+      <div className="px-2 text-xs font-semibold text-slate-500">
         <span className="text-slate-900">Page {index + 1}</span>
-        <span>{rotation}</span>
       </div>
-      <div
-        className="relative flex flex-1 items-center justify-center overflow-hidden rounded-[36px] border border-slate-200 bg-white shadow-[0_8px_18px_rgba(15,23,42,0.12)]"
-        style={
-          item.width && item.height
-            ? ({
-                aspectRatio: `${item.width} / ${item.height}`,
-              } as CSSProperties)
-            : undefined
-        }
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={item.preview}
-          alt={`Page ${index + 1}`}
-          className="h-full w-full rounded-[36px] object-contain"
-          draggable={false}
-        />
+      <div className="relative w-full" style={{ paddingBottom: getAspectPadding(item.width, item.height) }}>
+        <div className="absolute inset-0 flex items-center justify-center overflow-hidden border border-slate-200 bg-white shadow-[0_8px_18px_rgba(15,23,42,0.12)]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={item.preview}
+            alt={`Page ${index + 1}`}
+            className="h-full w-full object-contain"
+            draggable={false}
+          />
+        </div>
       </div>
-      <div className="flex items-center justify-end gap-2 px-2 pb-2">
+      <div className="flex items-center justify-center gap-3 px-2 pb-2">
         <button
           type="button"
           aria-label="Rotate page"
@@ -1640,40 +1638,39 @@ function WorkspaceClient() {
                       className="mx-auto w-full max-w-[1500px]"
                     >
                       <div
-                        className={`relative overflow-hidden rounded-[36px] bg-white shadow-[0_12px_30px_rgba(15,23,42,0.18)] ${
+                        className={`relative bg-white shadow-[0_12px_30px_rgba(15,23,42,0.18)] ${
                           activePageId === page.id ? "ring-2 ring-brand/50 shadow-brand/30" : ""
                         }`}
                         style={{ transform: `scale(${zoom})`, transformOrigin: "top center" }}
                       >
-                        <div
-                          className="relative rounded-none bg-white"
-                          style={{
-                            aspectRatio:
-                              page.width && page.height ? `${page.width} / ${page.height}` : undefined,
-                            cursor:
-                              activeDrawingTool === "highlight"
-                                ? (`url(${HIGHLIGHT_CURSOR}) 4 24, crosshair` as CSSProperties["cursor"])
-                                : activeDrawingTool === "pencil"
-                                ? ("crosshair" as CSSProperties["cursor"])
-                                : undefined,
-                          }}
-                          onMouseDown={(event) => handleMarkupPointerDown(page.id, event)}
-                          onMouseMove={(event) => handleMarkupPointerMove(page.id, event)}
-                          onMouseUp={() => handleMarkupPointerUp(page.id)}
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={page.preview}
-                            alt={`Page ${idx + 1}`}
-                            className="h-full w-full rounded-none object-contain"
-                            draggable={false}
-                          />
-                          <svg
-                            className="absolute inset-0 h-full w-full"
-                            style={{ pointerEvents: deleteMode ? "auto" : "none" }}
-                            viewBox="0 0 1000 1000"
-                            preserveAspectRatio="none"
+                        <div className="relative w-full" style={{ paddingBottom: getAspectPadding(page.width, page.height) }}>
+                          <div
+                            className="absolute inset-0 bg-white"
+                            style={{
+                              cursor:
+                                activeDrawingTool === "highlight"
+                                  ? (`url(${HIGHLIGHT_CURSOR}) 4 24, crosshair` as CSSProperties["cursor"])
+                                  : activeDrawingTool === "pencil"
+                                  ? ("crosshair" as CSSProperties["cursor"])
+                                  : undefined,
+                            }}
+                            onMouseDown={(event) => handleMarkupPointerDown(page.id, event)}
+                            onMouseMove={(event) => handleMarkupPointerMove(page.id, event)}
+                            onMouseUp={() => handleMarkupPointerUp(page.id)}
                           >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={page.preview}
+                              alt={`Page ${idx + 1}`}
+                              className="h-full w-full object-contain"
+                              draggable={false}
+                            />
+                            <svg
+                              className="absolute inset-0 h-full w-full"
+                              style={{ pointerEvents: deleteMode ? "auto" : "none" }}
+                              viewBox="0 0 1000 1000"
+                              preserveAspectRatio="none"
+                            >
                             {pageHighlights.map((stroke) =>
                               stroke.points.length > 1 ? (
                                 <polyline
