@@ -78,10 +78,11 @@ export default async function Home() {
 function MarketingLanding({ usedToday }: { usedToday: boolean }) {
   return (
     <div className="mx-auto flex max-w-4xl flex-col items-center gap-6 px-6 py-20 text-center">
-      <div className="flex w-full justify-end">
+      <div className="flex w-full items-center justify-between">
+        <div className="text-left text-sm font-semibold text-slate-800">MergifyPDF</div>
         <Link
           href="/login"
-          className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 shadow-sm shadow-slate-200 transition hover:-translate-y-0.5 hover:border-slate-300"
+          className="inline-flex items-center rounded-full bg-[#024d7c] px-4 py-2 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(2,77,124,0.35)] transition hover:-translate-y-0.5 hover:bg-[#013a60]"
         >
           Log in
         </Link>
@@ -102,17 +103,14 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
         </Link>
         .
       </p>
-      <div className="mt-4 w-full rounded-3xl border border-black/10 bg-gradient-to-r from-[#0f172a] via-[#1d2d52] to-[#0f172a] p-6 text-left text-white shadow-[0_30px_80px_rgba(15,23,42,0.3)] sm:flex sm:items-center sm:justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-[0.4em] text-white/60">Upgrade</p>
-          <h2 className="mt-2 text-2xl font-semibold">Unlock unlimited documents</h2>
-          <p className="mt-1 text-sm text-white/70">
-            Faster processing, team workspaces, and premium support when you subscribe.
-          </p>
-        </div>
+      <div className="mt-4 w-full rounded-3xl border border-blue-100 bg-white p-6 text-center text-slate-900 shadow-[0_30px_80px_rgba(2,77,124,0.12)]">
+        <h2 className="text-2xl font-semibold">Unlock unlimited documents</h2>
+        <p className="mt-2 text-sm text-slate-600">
+          Faster processing, shared workspaces, and premium support when you subscribe.
+        </p>
         <Link
           href="/account?view=pricing"
-          className="mt-4 inline-flex items-center justify-center rounded-full bg-white px-5 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-black/20 transition hover:opacity-90 sm:mt-0"
+          className="mt-6 inline-flex items-center justify-center rounded-full bg-[#024d7c] px-8 py-3 text-base font-semibold text-white shadow-[0_20px_45px_rgba(2,77,124,0.35)] transition hover:-translate-y-0.5 hover:bg-[#013a60]"
         >
           View pricing
         </Link>

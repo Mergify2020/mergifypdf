@@ -56,13 +56,8 @@ export default function UploadCta({ usedToday }: UploadCtaProps) {
         aria-disabled={busy}
         className="w-full max-w-xl rounded-full bg-[#024d7c] px-12 py-5 text-2xl font-semibold text-white shadow-2xl transition hover:-translate-y-1 hover:bg-[#013a60] hover:shadow-[0_20px_35px_rgba(2,77,124,0.35)] disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {alreadyUsed ? "Sign up to keep going" : busy ? "Opening..." : "Upload Documents"}
+        {alreadyUsed ? "Upgrade to keep going" : busy ? "Opening..." : "Upload Documents"}
       </button>
-      {alreadyUsed && (
-        <p className="text-sm text-gray-500">
-          You have used today&apos;s free upload. Create an account for unlimited access.
-        </p>
-      )}
       {error && <p className="text-sm text-red-600">{error}</p>}
     </div>
   );
