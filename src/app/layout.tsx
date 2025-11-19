@@ -25,7 +25,8 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
-  const pathname = headers().get("x-pathname") ?? "/";
+  const headersList = await headers();
+  const pathname = headersList.get("x-pathname") ?? "/";
   const showLoginButton = !session?.user && pathname !== "/login";
 
   return (
