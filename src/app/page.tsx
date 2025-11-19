@@ -142,8 +142,7 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_25px_70px_rgba(15,23,42,0.08)]">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm uppercase tracking-[0.4em] text-slate-500">Recent projects</p>
-                <h2 className="text-2xl font-semibold text-slate-900">Continue where you paused</h2>
+                <h2 className="text-2xl font-semibold text-slate-900">Your projects</h2>
               </div>
               <Link
                 href="/studio"
