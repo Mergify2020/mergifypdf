@@ -64,11 +64,6 @@ const faqs = [
       "The Team plan includes up to 3 users. If your team grows, the Business plan adds extra seats for $4 per user per month.",
   },
   {
-    question: "Is MergifyPDF secure?",
-    answer:
-      "Absolutely. All uploads are encrypted in transit, processed privately, and never stored longer than necessary.",
-  },
-  {
     question: "Do I need a credit card to get started?",
     answer:
       "No. Every account includes 1 free upload per day without payment. A credit card is only required if you choose to upgrade for unlimited usage.",
@@ -93,8 +88,12 @@ export default function PricingPlans() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#080f1c] via-[#0c1526] to-[#070d18] px-6 py-12 text-slate-900">
       <div className="mx-auto max-w-5xl space-y-10">
-        <div className="rounded-[46px] border border-white/15 bg-gradient-to-br from-white/10 via-white/5 to-white/0 p-10 text-center text-white shadow-[0_80px_180px_rgba(0,0,0,0.6)] backdrop-blur-xl">
-          <h1 className="text-3xl font-semibold tracking-tight">Choose the workspace that fits you.</h1>
+        <div className="rounded-[46px] border border-white/15 bg-gradient-to-br from-white/20 via-white/10 to-white/0 p-12 text-center text-white shadow-[0_80px_200px_rgba(0,0,0,0.65)] backdrop-blur-xl">
+          <p className="text-sm uppercase tracking-[0.6em] text-white/60">Premium workspaces</p>
+          <h1 className="mt-4 text-4xl font-semibold tracking-tight text-white">Choose the workspace built for your workflow.</h1>
+          <p className="mt-4 text-base text-white/80">
+            Flexible plans for individuals, teams, and growing organizations—upgrade when you are ready.
+          </p>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-3">
@@ -108,7 +107,8 @@ export default function PricingPlans() {
                 <div className={`relative overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-br ${tier.accent} p-6 text-white shadow-inner`}>
                   <div className="relative z-10">
                     {tier.badge ? (
-                      <span className="mb-4 inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white/80">
+                      <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/40 bg-white/20 px-4 py-1 text-xs font-semibold uppercase tracking-wide text-white shadow-[0_4px_24px_rgba(0,0,0,0.15)]">
+                        <span className="h-2 w-2 rounded-full bg-white" />
                         {tier.badge}
                       </span>
                     ) : null}
