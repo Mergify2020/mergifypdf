@@ -21,8 +21,8 @@ const tiers = [
     name: "Mergify Team Workspace",
     price: "$12.99",
     detail: "Up to 3 Users / Billed Monthly",
-    accent: "from-[#5A6F87] to-[#3E536A]",
-    button: "bg-[#3E536A]",
+    accent: "from-[#A9C7FF] via-[#7BA8F4] to-[#4D74C8]",
+    button: "bg-[#4D74C8]",
     features: [
       "Everything in Core",
       "Shared team workspace",
@@ -91,15 +91,15 @@ export default function PricingPlans() {
         </div>
 
         <div className="mt-10 rounded-[40px] border border-white/15 bg-white/5 p-6 text-sm text-white shadow-[0_50px_150px_rgba(0,0,0,0.35)] backdrop-blur">
-          <p className="mb-4 text-xs font-semibold uppercase tracking-[0.5em] text-white/60">Compare plans</p>
+          <p className="mb-6 text-center text-3xl font-semibold tracking-tight text-white">Compare plans</p>
           <div className="overflow-hidden rounded-2xl border border-white/20">
-            <table className="w-full divide-y divide-white/10 text-left text-sm">
+            <table className="w-full divide-y divide-white/10 text-sm text-white">
               <thead className="bg-white/10 text-xs uppercase tracking-[0.4em] text-white/70">
                 <tr>
-                  <th className="p-4 font-semibold">Feature</th>
-                  <th className="p-4 font-semibold">Core</th>
-                  <th className="p-4 font-semibold">Team Workspace</th>
-                  <th className="p-4 font-semibold">Scale</th>
+                  <th className="p-4 text-left font-semibold">Feature</th>
+                  <th className="p-4 text-center font-semibold">Core</th>
+                  <th className="p-4 text-center font-semibold">Team Workspace</th>
+                  <th className="p-4 text-center font-semibold">Scale</th>
                 </tr>
               </thead>
               <tbody className="text-white/80">
@@ -112,9 +112,9 @@ export default function PricingPlans() {
                 ].map((row) => (
                   <tr key={row.feature} className="border-white/10">
                     <td className="p-4 text-white/60">{row.feature}</td>
-                    <td className="p-4">{renderValue(row.core)}</td>
-                    <td className="p-4">{renderValue(row.team)}</td>
-                    <td className="p-4">{renderValue(row.scale)}</td>
+                    <td className="p-4 text-center">{renderValue(row.core)}</td>
+                    <td className="p-4 text-center">{renderValue(row.team)}</td>
+                    <td className="p-4 text-center">{renderValue(row.scale)}</td>
                   </tr>
                 ))}
               </tbody>
