@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from "react";
 import dynamic from "next/dynamic";
-import { PDFDocument, rgb } from "pdf-lib";
+import { PDFDocument, rgb, LineCapStyle, LineJoinStyle } from "pdf-lib";
 import { Highlighter, Minus, Plus, Trash2, Undo2, Eraser, Pencil } from "lucide-react";
 import {
   DndContext,
@@ -877,7 +877,7 @@ function WorkspaceClient() {
             for (let i = 1; i < stroke.points.length; i++) {
               const start = stroke.points[i - 1];
               const end = stroke.points[i];
-              const opacity = stroke.tool === "pencil" ? 0.9 : 0.4;
+              const opacity = stroke.tool === "pencil" ? 1 : 0.4;
               copied.drawLine({
                 start: {
                   x: start.x * pageWidth,
@@ -890,6 +890,8 @@ function WorkspaceClient() {
                 thickness: Math.max(1, stroke.thickness * pageWidth),
                 color: rgb(colorValue.r, colorValue.g, colorValue.b),
                 opacity,
+                lineCap: LineCapStyle.Round,
+                lineJoin: LineJoinStyle.Round,
               });
             }
           });
@@ -1360,7 +1362,8 @@ function WorkspaceClient() {
                                   strokeWidth={Math.max(1, stroke.thickness * 1000)}
                                   strokeLinecap="round"
                                   strokeLinejoin="round"
-                                  strokeOpacity={stroke.tool === "pencil" ? 0.85 : 0.4}
+                              strokeOpacity={stroke.tool === "pencil" ? 1 : 0.4}
+                              strokeLinecap="round"
                                   style={{
                                     pointerEvents: deleteMode ? "stroke" : "none",
                                     cursor: deleteMode ? "pointer" : "default",
@@ -1386,7 +1389,8 @@ function WorkspaceClient() {
                                 strokeWidth={Math.max(1, draftHighlight.thickness * 1000)}
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
-                                strokeOpacity={draftHighlight.tool === "pencil" ? 0.7 : 0.25}
+                strokeOpacity={draftHighlight.tool === "pencil" ? 1 : 0.25}
+                strokeLinecap="round"
                               />
                             ) : null}
                           </svg>
