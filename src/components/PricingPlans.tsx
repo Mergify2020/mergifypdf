@@ -52,14 +52,8 @@ export default function PricingPlans() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-white via-[#f4f7fb] to-white px-6 py-12 text-slate-900">
       <div className="mx-auto max-w-5xl space-y-10">
-        <div className="rounded-[44px] border border-white/70 bg-white/95 p-10 shadow-[0_50px_150px_rgba(15,23,42,0.12)] backdrop-blur">
-          <p className="text-sm uppercase tracking-[0.5em] text-[#7b8ca8]">Plans &amp; pricing</p>
-          <h1 className="mt-4 text-4xl font-semibold tracking-tight text-slate-900">
-            Pick the workspace that fits your team.
-          </h1>
-          <p className="mt-3 max-w-3xl text-base text-slate-500">
-            Billing is not live yet—review the tiers below and stay tuned for in-app upgrades.
-          </p>
+        <div className="rounded-[44px] border border-white/70 bg-white/95 p-10 text-center shadow-[0_50px_150px_rgba(15,23,42,0.12)] backdrop-blur">
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Choose the workspace that fits you.</h1>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-3">
@@ -96,14 +90,6 @@ export default function PricingPlans() {
               </button>
             </div>
           ))}
-        </div>
-
-        <div className="rounded-[38px] border border-dashed border-slate-200 bg-white/95 p-6 text-center text-sm text-slate-500 shadow-[0_30px_80px_rgba(15,23,42,0.08)]">
-          Need something custom? {" "}
-          <Link href="mailto:hello@mergifypdf.com" className="font-semibold text-[#024d7c]">
-            Contact us
-          </Link>{" "}
-          for enterprise onboarding.
         </div>
       </div>
     </div>
