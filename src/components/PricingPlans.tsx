@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { Check, X } from "lucide-react";
 
 const tiers = [
   {
@@ -50,9 +50,9 @@ const tiers = [
 
 export default function PricingPlans() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#020a17] via-[#0f1f3b] to-[#07101e] px-6 py-12 text-slate-900">
+    <div className="min-h-screen bg-gradient-to-b from-[#020610] via-[#060f1e] to-[#020610] px-6 py-12 text-slate-900">
       <div className="mx-auto max-w-5xl space-y-10">
-        <div className="rounded-[44px] border border-white/10 bg-white/[0.04] p-10 text-center text-white shadow-[0_60px_160px_rgba(3,10,30,0.35)] backdrop-blur">
+        <div className="rounded-[46px] border border-white/15 bg-gradient-to-br from-white/10 via-white/5 to-white/0 p-10 text-center text-white shadow-[0_80px_180px_rgba(0,0,0,0.6)] backdrop-blur-xl">
           <h1 className="text-3xl font-semibold tracking-tight">Choose the workspace that fits you.</h1>
         </div>
 
@@ -60,7 +60,7 @@ export default function PricingPlans() {
           {tiers.map((tier) => (
             <div
               key={tier.name}
-              className="rounded-[30px] border border-white/[0.15] bg-white p-6 shadow-[0_50px_140px_rgba(0,0,0,0.4)]"
+              className="rounded-[36px] border border-white/[0.2] bg-white p-6 shadow-[0_60px_150px_rgba(0,0,0,0.45)]"
             >
               <div
                 className={`rounded-3xl bg-gradient-to-br ${tier.accent} p-4 text-white shadow-inner`}
@@ -76,7 +76,9 @@ export default function PricingPlans() {
               <ul className="mt-6 space-y-3 text-sm text-slate-600">
                 {tier.features.map((feature) => (
                   <li key={feature} className="flex items-center gap-2">
-                    <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100">
+                      <div className="h-1 w-3 rounded-full bg-slate-400" />
+                    </span>
                     {feature}
                   </li>
                 ))}
@@ -84,7 +86,7 @@ export default function PricingPlans() {
               <button
                 type="button"
                 disabled
-                className={`pointer-events-none mt-8 w-full rounded-full px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-black/10 ${tier.button}`}
+                className={`pointer-events-none mt-8 w-full rounded-full px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-black/15 ${tier.button}`}
               >
                 Upgrade
               </button>
@@ -92,48 +94,32 @@ export default function PricingPlans() {
           ))}
         </div>
 
-        <div className="rounded-[36px] border border-white/[0.1] bg-white/10 p-6 text-sm text-white shadow-[0_40px_120px_rgba(0,0,0,0.35)] backdrop-blur">
+        <div className="rounded-[40px] border border-white/15 bg-white/5 p-6 text-sm text-white shadow-[0_50px_150px_rgba(0,0,0,0.35)] backdrop-blur">
           <div className="overflow-hidden rounded-2xl border border-white/20">
             <table className="w-full divide-y divide-white/10 text-left text-sm">
-              <thead className="bg-white/5 text-xs uppercase tracking-[0.4em] text-white/70">
+              <thead className="bg-white/10 text-xs uppercase tracking-[0.4em] text-white/70">
                 <tr>
-                  <th className="p-3">Feature</th>
-                  <th className="p-3">Core</th>
-                  <th className="p-3">Team Workspace</th>
-                  <th className="p-3">Scale</th>
+                  <th className="p-4 font-semibold">Feature</th>
+                  <th className="p-4 font-semibold">Core</th>
+                  <th className="p-4 font-semibold">Team Workspace</th>
+                  <th className="p-4 font-semibold">Scale</th>
                 </tr>
               </thead>
-              <tbody className="text-white/90">
-                <tr>
-                  <td className="p-3 text-white/70">Unlimited uploads</td>
-                  <td className="p-3">✅</td>
-                  <td className="p-3">✅</td>
-                  <td className="p-3">✅</td>
-                </tr>
-                <tr>
-                  <td className="p-3 text-white/70">Team folders</td>
-                  <td className="p-3">❌</td>
-                  <td className="p-3">✅</td>
-                  <td className="p-3">✅</td>
-                </tr>
-                <tr>
-                  <td className="p-3 text-white/70">Member controls</td>
-                  <td className="p-3">❌</td>
-                  <td className="p-3">❌</td>
-                  <td className="p-3">✅</td>
-                </tr>
-                <tr>
-                  <td className="p-3 text-white/70">Add teammates</td>
-                  <td className="p-3">❌</td>
-                  <td className="p-3">Up to 3</td>
-                  <td className="p-3">Unlimited</td>
-                </tr>
-                <tr>
-                  <td className="p-3 text-white/70">Billing</td>
-                  <td className="p-3">Single</td>
-                  <td className="p-3">Team</td>
-                  <td className="p-3">Per seat</td>
-                </tr>
+              <tbody className="text-white/80">
+                {[
+                  { feature: "Unlimited uploads", core: true, team: true, scale: true },
+                  { feature: "Team folders", core: false, team: true, scale: true },
+                  { feature: "Member controls", core: false, team: false, scale: true },
+                  { feature: "Add teammates", core: "–", team: "Up to 3", scale: "Unlimited" },
+                  { feature: "Billing", core: "Single", team: "Team", scale: "Per seat" },
+                ].map((row) => (
+                  <tr key={row.feature} className="border-white/10">
+                    <td className="p-4 text-white/60">{row.feature}</td>
+                    <td className="p-4">{renderValue(row.core)}</td>
+                    <td className="p-4">{renderValue(row.team)}</td>
+                    <td className="p-4">{renderValue(row.scale)}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -141,4 +127,14 @@ export default function PricingPlans() {
       </div>
     </div>
   );
+}
+
+function renderValue(value: boolean | string) {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (value) {
+    return <Check className="h-4 w-4 text-emerald-300" strokeWidth={2} />;
+  }
+  return <X className="h-4 w-4 text-rose-300" strokeWidth={2} />;
 }
