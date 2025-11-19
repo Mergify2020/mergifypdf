@@ -1360,8 +1360,6 @@ function WorkspaceClient() {
                                   stroke={stroke.color}
                                   strokeWidth={Math.max(1, stroke.thickness * 1000)}
                                   strokeLinecap="round"
-                                  strokeLinejoin="round"
-                              strokeOpacity={stroke.tool === "pencil" ? 1 : 0.4}
                               strokeLinecap="round"
                                   style={{
                                     pointerEvents: deleteMode ? "stroke" : "none",
