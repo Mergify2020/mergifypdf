@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useEffect, useRef, useState } from "react";
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
+import PricingPlans from "@/components/PricingPlans";
 
 const PREVIEW_STAGE_SIZE = 256; // matches Tailwind h-64
 const MIN_CROP_SIZE = 56;
@@ -98,6 +100,11 @@ function resizeRectByHandle(
 }
 
 export default function AccountPage() {
+  const searchParams = useSearchParams();
+  const view = searchParams.get("view");
+  if (view === "pricing") {
+    return <PricingPlans />;
+  }
   const { data: session } = useSession();
   const providers = session?.user?.providers ?? [];
   const hasCredentialsAccess = providers.length === 0 || providers.includes("credentials");

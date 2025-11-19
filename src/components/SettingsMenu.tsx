@@ -46,6 +46,11 @@ export default function SettingsMenu() {
     router.push("/account");
   }
 
+  function handlePricing() {
+    setOpen(false);
+    router.push("/pricing");
+  }
+
   async function handleSignOut() {
     try {
       setBusy(true);
@@ -113,10 +118,10 @@ export default function SettingsMenu() {
               </button>
               <button
                 type="button"
-                disabled
-                className="rounded-lg px-3 py-2 text-left font-medium text-slate-400"
+                onClick={handlePricing}
+                className="rounded-lg px-3 py-2 text-left font-medium text-slate-800 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#024d7c]"
               >
-                Plans &amp; pricing (soon)
+                Plans &amp; pricing
               </button>
             </div>
 
