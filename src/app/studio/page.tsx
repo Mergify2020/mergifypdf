@@ -159,6 +159,19 @@ function persistSourceMetadata(list: SourceRef[]) {
   }
 }
 
+function dataURLToBlob(dataUrl: string): Blob {
+  const [header, data] = dataUrl.split(",");
+  const mimeMatch = header?.match(/:(.*?);/);
+  const mime = mimeMatch ? mimeMatch[1] : "application/pdf";
+  const binary = atob(data);
+  const len = binary.length;
+  const u8 = new Uint8Array(len);
+  for (let i = 0; i < len; i += 1) {
+    u8[i] = binary.charCodeAt(i);
+  }
+  return new Blob([u8], { type: mime });
+}
+
 function buildPageId(sourceId: string, pageIdx: number) {
   return `${sourceId}::${pageIdx}`;
 }
@@ -255,6 +268,7 @@ function WorkspaceClient() {
   const { data: authSession } = useSession();
   const router = useRouter();
   const [showDownloadGate, setShowDownloadGate] = useState(false);
+  const [showDelayOverlay, setShowDelayOverlay] = useState(false);
   const [downloadCountdown, setDownloadCountdown] = useState(3);
   const [sources, setSources] = useState<SourceRef[]>([]);
   const [pages, setPages] = useState<PageItem[]>([]);
@@ -591,14 +605,31 @@ function WorkspaceClient() {
     return () => observer.disconnect();
   }, [pages]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const storage = getLocalStorage();
+    if (!storage) return;
+    const pending = storage.getItem(PENDING_UPLOAD_STORAGE_KEY);
+    if (!pending) return;
+    storage.removeItem(PENDING_UPLOAD_STORAGE_KEY);
+    try {
+      const parsed = JSON.parse(pending);
+      if (!parsed?.data || !parsed?.name) return;
+      const blob = dataURLToBlob(parsed.data as string);
+      const file = new File([blob], parsed.name as string, { type: blob.type ?? "application/pdf" });
+      processSelectedFiles([file]);
+    } catch (err) {
+      console.error("Failed to import pending upload", err);
+    }
+  }, []);
+
   /** Add more PDFs (create object URLs and append to sources) */
   function handleAddClick() {
     addInputRef.current?.click();
   }
-  async function handleAddChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const list = e.target.files ? Array.from(e.target.files) : [];
+
+  async function processSelectedFiles(list: File[]) {
     if (!list.length) {
-      e.currentTarget.value = "";
       return;
     }
 
@@ -638,7 +669,15 @@ function WorkspaceClient() {
       }
       setSources((prev) => [...prev, ...created]);
     }
+  }
 
+  async function handleAddChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const list = e.target.files ? Array.from(e.target.files) : [];
+    if (!list.length) {
+      e.currentTarget.value = "";
+      return;
+    }
+    await processSelectedFiles(list);
     e.currentTarget.value = "";
   }
 
@@ -894,35 +933,9 @@ function WorkspaceClient() {
   }
 
   function handleDownloadGateBypass() {
-    setDownloadCountdown(3);
     setShowDownloadGate(false);
-    const overlay = document.createElement("div");
-    overlay.className =
-      "fixed inset-0 z-50 flex flex-col items-center justify-center bg-white/80 backdrop-blur-md text-slate-900";
-    overlay.innerHTML = `
-      <div class="flex flex-col items-center gap-4 rounded-3xl bg-white p-8 shadow-2xl shadow-[#0b1521]/20 text-center">
-        <div class="flex items-center gap-3 text-[#024d7c]">
-          <span class="h-3 w-3 rounded-full bg-[#024d7c]"></span>
-          <span class="text-xs font-semibold tracking-[0.4em] uppercase text-slate-500">Preparing your download…</span>
-        </div>
-        <div class="text-4xl font-semibold" id="mpdf-download-countdown">3</div>
-        <p class="text-sm text-slate-500 max-w-sm">
-          Create a free account to remove this delay and get another free upload.
-        </p>
-      </div>
-    `;
-    document.body.appendChild(overlay);
-    let timer = 3;
-    const countdownInterval = window.setInterval(() => {
-      timer -= 1;
-      const counter = overlay.querySelector("#mpdf-download-countdown");
-      if (counter) counter.textContent = String(Math.max(timer, 0));
-      if (timer <= 0) {
-        clearInterval(countdownInterval);
-        overlay.remove();
-        handleDownload(true);
-      }
-    }, 1000);
+    setDownloadCountdown(3);
+    setShowDelayOverlay(true);
   }
 
   const itemsIds = useMemo(() => pages.map((p) => p.id), [pages]);
@@ -949,6 +962,23 @@ function WorkspaceClient() {
     [highlights]
   );
   const hasWorkspaceData = pages.length > 0 || highlightCount > 0 || !!draftHighlight;
+
+  useEffect(() => {
+    if (!showDelayOverlay) return;
+    setDownloadCountdown(3);
+    const interval = window.setInterval(() => {
+      setDownloadCountdown((prev) => {
+        if (prev <= 1) {
+          window.clearInterval(interval);
+          setShowDelayOverlay(false);
+          handleDownload(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(interval);
+  }, [showDelayOverlay]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1570,6 +1600,23 @@ function WorkspaceClient() {
                 Not now (just download this one)
               </button>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showDelayOverlay ? (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-white/70 backdrop-blur">
+          <div className="flex flex-col items-center gap-4 rounded-[32px] bg-white p-8 text-center text-slate-900 shadow-[0_35px_90px_rgba(9,14,35,0.25)]">
+            <div className="flex flex-col items-center gap-2">
+              <img src="/logo-wordmark2.svg" alt="MergifyPDF" className="h-10 w-auto" />
+              <p className="text-base font-semibold">Preparing your download… ({downloadCountdown}s)</p>
+            </div>
+            <div className="text-4xl font-semibold text-[#024d7c]">
+              {downloadCountdown > 0 ? downloadCountdown : 0}
+            </div>
+            <p className="text-sm text-slate-500">
+              Create a free account to remove this delay and get another free upload.
+            </p>
           </div>
         </div>
       ) : null}

@@ -1,7 +1,8 @@
 ﻿"use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { PENDING_UPLOAD_STORAGE_KEY } from "@/lib/pendingUpload";
 
 type UploadCtaProps = {
   usedToday: boolean;
@@ -11,6 +12,7 @@ type UploadCtaProps = {
 
 export default function UploadCta({ usedToday, variant = "default", className }: UploadCtaProps) {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [alreadyUsed, setAlreadyUsed] = useState(usedToday);
   const [error, setError] = useState<string | null>(null);
@@ -25,29 +27,57 @@ export default function UploadCta({ usedToday, variant = "default", className }:
     try {
       setBusy(true);
       setError(null);
-
       const res = await fetch("/api/quota", {
         method: "POST",
         cache: "no-store",
       });
 
-      if (res.ok) {
-        router.push("/");
-        return;
-      }
-
       if (res.status === 403) {
         setAlreadyUsed(true);
         setBusy(false);
-        router.push("/register");
+        router.push("/account?view=pricing");
         return;
       }
-
-      throw new Error("quota_request_failed");
-    } catch {
-      setError("Something went wrong. Please try again.");
+    } catch (err) {
+      console.error("Quota check failed", err);
+      // continue and allow upload for now
+    } finally {
       setBusy(false);
     }
+
+    fileInputRef.current?.click();
+  }
+
+  function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.currentTarget.value = "";
+    if (!file) {
+      setBusy(false);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        if (typeof window !== "undefined") {
+          window.localStorage?.setItem(
+            PENDING_UPLOAD_STORAGE_KEY,
+            JSON.stringify({ name: file.name, data: reader.result })
+          );
+        }
+        router.push("/studio");
+      } catch (err) {
+        console.error("Failed to stage upload", err);
+        setError("Unable to prepare that file. Please try a smaller PDF.");
+      } finally {
+        setBusy(false);
+      }
+    };
+    reader.onerror = () => {
+      setError("Unable to read that file. Please try again.");
+      setBusy(false);
+    };
+    reader.readAsDataURL(file);
   }
 
   const containerClass = [
@@ -66,6 +96,13 @@ export default function UploadCta({ usedToday, variant = "default", className }:
       <button type="button" onClick={handleClick} disabled={busy} aria-disabled={busy} className={buttonClass}>
         {alreadyUsed ? "Upgrade to keep going" : busy ? "Opening..." : "Upload a document"}
       </button>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="application/pdf"
+        className="hidden"
+        onChange={handleFileChange}
+      />
       {error && <p className="text-sm text-red-600">{error}</p>}
     </div>
   );
