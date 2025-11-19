@@ -54,20 +54,38 @@ const tiers = [
 
 const faqs = [
   {
-    question: "Can I upgrade anytime?",
-    answer: "Yes — your workspace scales instantly when you change plans.",
+    question: "Can I upgrade at any time?",
+    answer:
+      "Yes. You can move between Personal, Team, or Business plans whenever you want. Your workspace updates instantly when you upgrade.",
   },
   {
-    question: "How does seat billing work?",
-    answer: "Team covers up to 3 users. Business adds $4 per extra user each month.",
+    question: "How does seat-based billing work?",
+    answer:
+      "The Team plan includes up to 3 users. If your team grows, the Business plan adds extra seats for $4 per user per month.",
   },
   {
     question: "Is MergifyPDF secure?",
-    answer: "All uploads are encrypted in transit and processed privately.",
+    answer:
+      "Absolutely. All uploads are encrypted in transit, processed privately, and never stored longer than necessary.",
   },
   {
-    question: "Do I need a credit card right now?",
-    answer: "Not until paid upgrades are enabled inside your account.",
+    question: "Do I need a credit card to get started?",
+    answer:
+      "No. Every account includes 1 free upload per day without payment. A credit card is only required if you choose to upgrade for unlimited usage.",
+  },
+  {
+    question: "Can I add or remove teammates at any time?",
+    answer: "Yes. Your seat count updates instantly, and your billing adjusts on your next cycle.",
+  },
+  {
+    question: "Can I switch back to the free plan later?",
+    answer:
+      "Yes. If you cancel, you keep your paid features until your current billing period ends. After that, your account returns to the free tier with 1 upload per day.",
+  },
+  {
+    question: "Do you offer refunds?",
+    answer:
+      "We don't provide refunds for partial billing cycles. If you cancel, you'll keep full access until the end of your paid period.",
   },
 ];
 
@@ -157,19 +175,20 @@ export default function PricingPlans() {
               </tbody>
             </table>
           </div>
-          <div className="mt-12 grid gap-6 text-left md:grid-cols-2">
+        </div>
+
+        <div className="rounded-[40px] border border-white/15 bg-white/5 p-6 text-sm text-white shadow-[0_50px_150px_rgba(0,0,0,0.35)] backdrop-blur">
+          <p className="mb-6 text-center text-3xl font-semibold tracking-tight text-white">Frequently asked questions</p>
+          <div className="grid gap-6 text-left md:grid-cols-2">
             {faqs.map((faq) => (
               <div key={faq.question} className="rounded-2xl border border-white/10 bg-white/5 p-5 text-white/80">
-                <h3 className="text-base font-semibold text-white">{faq.question}</h3>
+                <h3 className="text-lg font-semibold text-white">{faq.question}</h3>
                 <p className="mt-2 text-sm text-white/70">{faq.answer}</p>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="mt-16 border-t border-white/5 pt-8 text-center text-sm text-white/60">
-          Need a custom plan? Contact support and we will tailor a workspace for your team.
-        </div>
       </div>
     </div>
   );
