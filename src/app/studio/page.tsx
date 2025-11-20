@@ -337,8 +337,14 @@ function SortableOrganizeTile({
   const rotationDegrees = normalizeRotation(item.rotation);
 
   return (
-    <div ref={setNodeRef} style={style} className="flex h-full flex-col items-center" {...attributes} {...listeners}>
-      <div className="flex w-full flex-col items-center gap-1">
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex h-full w-full flex-col items-center"
+      {...attributes}
+      {...listeners}
+    >
+      <div className="flex w-full max-w-[260px] flex-col items-center rounded-3xl bg-white p-4 shadow-[0_25px_80px_rgba(15,23,42,0.15)] ring-1 ring-slate-200">
         <div className="relative flex w-full justify-center">
           <div
             className="flex items-center justify-center overflow-visible"
@@ -370,33 +376,33 @@ function SortableOrganizeTile({
             </div>
           </div>
         </div>
-        <div className="mt-1 text-lg font-semibold text-slate-800">{index + 1}</div>
-      </div>
-      <div className="mt-2 flex items-center justify-center gap-3">
-        <button
-          type="button"
-          aria-label="Rotate page"
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={(event) => {
-            event.stopPropagation();
-            onRotate();
-          }}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#9cc7ff] bg-[#e8f1ff] text-slate-700 shadow-[0_12px_35px_rgba(24,87,191,0.25)] transition hover:-translate-y-0.5"
-        >
-          <RotateCcw className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          aria-label="Delete page"
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={(event) => {
-            event.stopPropagation();
-            onDelete();
-          }}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-600 transition hover:border-rose-400 hover:text-rose-700"
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
+        <div className="mt-2 text-lg font-semibold text-slate-800">{index + 1}</div>
+        <div className="mt-3 flex items-center justify-center gap-3">
+          <button
+            type="button"
+            aria-label="Rotate page"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              onRotate();
+            }}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#9cc7ff] bg-[#e8f1ff] text-slate-700 shadow-[0_12px_35px_rgba(24,87,191,0.25)] transition hover:-translate-y-0.5"
+          >
+            <RotateCcw className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            aria-label="Delete page"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              onDelete();
+            }}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-600 transition hover:border-rose-400 hover:text-rose-700"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </div>
   );
