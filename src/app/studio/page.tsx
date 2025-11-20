@@ -347,14 +347,14 @@ function SortableOrganizeTile({
         <div className="absolute inset-0 flex items-center justify-center overflow-hidden group">
           <div className="h-full w-full transition-transform duration-200 ease-out group-hover:scale-[1.02] group-hover:-translate-y-1">
             <div
-              className="h-full w-full"
+              className="h-full w-full bg-white border border-[rgba(148,163,184,0.5)] shadow-[0_6px_20px_rgba(15,23,42,0.18),_0_18px_45px_rgba(15,23,42,0.22)] group-hover:shadow-[0_6px_20px_rgba(15,23,42,0.21),_0_18px_45px_rgba(15,23,42,0.25)] transition-shadow duration-200 ease-out"
               style={{ transform: `rotate(${rotationDegrees}deg) scale(${scaleFix})`, transformOrigin: "center" }}
             >
             {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                 src={item.preview}
                 alt={`Page ${index + 1}`}
-                className="h-full w-full object-contain select-none shadow-[0_4px_12px_rgba(0,0,0,0.08),_0_12px_28px_rgba(0,0,0,0.12)] transition-shadow duration-200 ease-out"
+                className="h-full w-full object-contain select-none"
                 draggable={false}
               />
           </div>
@@ -1359,7 +1359,7 @@ function WorkspaceClient() {
   }
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#f3fbff,_#ffffff)] pt-16">
+    <main className="min-h-screen bg-[#f3f6fb] pt-16">
       <div className="mx-auto w-full max-w-6xl px-4 lg:px-6">
         <div className="mb-6 flex flex-col gap-4 rounded-3xl border border-slate-100 bg-white px-6 py-4 shadow-sm">
           <div className="flex flex-col gap-2">
