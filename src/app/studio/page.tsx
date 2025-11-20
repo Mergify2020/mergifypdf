@@ -279,6 +279,11 @@ function getAspectPadding(width?: number, height?: number) {
   return `${(height / width) * 100}%`;
 }
 
+function normalizeRotation(rotation?: number) {
+  const value = rotation ?? 0;
+  return ((value % 360) + 360) % 360;
+}
+
 /** One sortable thumbnail tile */
 function SortableThumb({
   item,
@@ -359,6 +364,7 @@ function SortableOrganizeTile({
     transition,
     cursor: "grab",
   };
+  const rotationDegrees = normalizeRotation(item.rotation);
 
   return (
     <div ref={setNodeRef} style={style} className="flex h-full flex-col gap-3" {...attributes} {...listeners}>
@@ -378,7 +384,14 @@ function SortableOrganizeTile({
           <img
             src={item.preview}
             alt={`Page ${index + 1}`}
-            className="max-h-full max-w-full object-contain rounded-none"
+            className="rounded-none object-contain"
+            style={{
+              height: "100%",
+              width: "auto",
+              maxWidth: "none",
+              transform: `rotate(${rotationDegrees}deg)`,
+              transition: "transform 0.2s ease",
+            }}
             draggable={false}
           />
         </div>
