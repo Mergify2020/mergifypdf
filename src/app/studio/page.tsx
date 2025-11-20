@@ -373,30 +373,32 @@ function SortableOrganizeTile({
         <span className="text-[0.68rem] font-semibold uppercase tracking-wide text-slate-500">
           Page {index + 1}
         </span>
-        <button
-          type="button"
-          aria-label="Rotate page"
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={(event) => {
-            event.stopPropagation();
-            onRotate();
-          }}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
-        >
-          <RotateCcw className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          aria-label="Delete page"
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={(event) => {
-            event.stopPropagation();
-            onDelete();
-          }}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-600 transition hover:border-rose-400 hover:text-rose-700"
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
+        <div className="flex items-center justify-center gap-3">
+          <button
+            type="button"
+            aria-label="Rotate page"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              onRotate();
+            }}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
+          >
+            <RotateCcw className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            aria-label="Delete page"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              onDelete();
+            }}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-600 transition hover:border-rose-400 hover:text-rose-700"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -1629,7 +1631,7 @@ function WorkspaceClient() {
         )}
 
         {organizeMode && !loading && pages.length > 0 && (
-          <div className="rounded-[40px] border border-[#d8e8ff] bg-[radial-gradient(circle_at_top,_#f4faff,_#e3f2ff_50%,_#cee6ff)] p-6 shadow-[0_35px_80px_rgba(124,160,210,0.35)]">
+          <div className="rounded-[40px] border border-slate-200 bg-white p-6 shadow-[0_25px_80px_rgba(15,23,42,0.15)]">
             <div className="flex flex-col gap-3 text-slate-700 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-xl font-semibold">Manage pages</h2>
@@ -1643,10 +1645,10 @@ function WorkspaceClient() {
                 Done managing
               </button>
             </div>
-            <div className="mx-auto mt-6 w-full max-w-5xl">
+            <div className="mx-auto mt-6 w-full max-w-6xl">
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={itemsIds} strategy={rectSortingStrategy}>
-                  <div className="grid grid-cols-1 justify-items-center gap-14 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid grid-cols-1 justify-items-center gap-x-16 gap-y-20 sm:grid-cols-2 lg:grid-cols-3">
                     {pages.map((page, idx) => (
                       <SortableOrganizeTile
                         key={page.id}
