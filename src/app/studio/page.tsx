@@ -1759,7 +1759,7 @@ function WorkspaceClient() {
             {busy ? "Building..." : "Download pages"}
           </button>
         </div>
-      )
+      )}
 
         {pages.length > 0 && activePageIndex >= 0 && (
           <div className="pointer-events-none fixed bottom-24 left-6 z-30">
