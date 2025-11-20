@@ -368,8 +368,8 @@ function SortableOrganizeTile({
 
   return (
     <div ref={setNodeRef} style={style} className="flex h-full flex-col gap-3" {...attributes} {...listeners}>
-      <div className="px-2 text-xs font-semibold text-slate-500">
-        <span className="text-slate-900">Page {index + 1}</span>
+      <div className="px-2 text-xs font-semibold text-slate-300">
+        <span className="text-white/90">Page {index + 1}</span>
       </div>
       <div className="relative w-full">
         <div
@@ -1691,11 +1691,11 @@ function WorkspaceClient() {
         )}
 
         {organizeMode && !loading && pages.length > 0 && (
-          <div className="rounded-[40px] border border-slate-200 bg-white/80 p-6 shadow-sm">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="rounded-[40px] border border-[#13274f] bg-[#050f1f] p-6 shadow-[0_35px_80px_rgba(5,10,20,0.55)]">
+            <div className="flex flex-col gap-3 text-white sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-xl font-semibold text-slate-900">Manage pages</h2>
-                <p className="text-sm text-slate-500">Drag to reorder. Rotate or delete any page.</p>
+                <h2 className="text-xl font-semibold">Manage pages</h2>
+                <p className="text-sm text-slate-300">Drag to reorder. Rotate or delete any page.</p>
               </div>
               <button
                 type="button"
@@ -1736,10 +1736,10 @@ function WorkspaceClient() {
             </div>
 
             <div className="lg:w-[240px]">
-              <div className="flex h-full flex-col rounded-2xl bg-slate-50/80 p-4 ring-1 ring-slate-200/80">
+              <div className="flex h-full flex-col rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
                 <div className="flex flex-col gap-1">
-                  <p className="text-sm font-semibold text-slate-800">Page order</p>
-                  <p className="text-xs text-slate-500">Tap to focus or drag to reorder</p>
+                  <p className="text-sm font-semibold text-white">Page order</p>
+                  <p className="text-xs text-slate-300">Tap to focus or drag to reorder</p>
                 </div>
                 <DndContext
                   sensors={sensors}
