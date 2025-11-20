@@ -1761,7 +1761,7 @@ function WorkspaceClient() {
         </div>
       )}
 
-        {pages.length > 0 && activePageIndex >= 0 && (
+        }{pages.length > 0 && activePageIndex >= 0 && (
           <div className="pointer-events-none fixed bottom-24 left-6 z-30">
             <div className="pointer-events-auto flex items-center gap-4 rounded-full bg-[#1b2a3c] px-5 py-3 text-white shadow-xl shadow-black/25">
               <div className="flex items-center gap-2 text-sm font-medium">
