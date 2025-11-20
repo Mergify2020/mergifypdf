@@ -347,7 +347,7 @@ function SortableOrganizeTile({
         <div className="absolute inset-0 flex items-center justify-center overflow-hidden group">
           <div className={`h-full w-full transition-transform duration-200 ease-out ${isDragging ? '' : 'group-hover:scale-[1.02] group-hover:-translate-y-1'}`}>
             <div
-              className={`h-full w-full bg-white border border-[rgba(148,163,184,0.5)] ${isDragging ? 'shadow-[0_8px_26px_rgba(15,23,42,0.24),_0_24px_60px_rgba(15,23,42,0.30)]' : 'shadow-[0_6px_20px_rgba(15,23,42,0.18),_0_18px_45px_rgba(15,23,42,0.22)] group-hover:outline group-hover:outline-[rgba(37,99,235,0.35)] group-hover:outline-1 group-hover:outline-offset-2 group-hover:shadow-[0_6px_20px_rgba(15,23,42,0.21),_0_18px_45px_rgba(15,23,42,0.25)]'} transition-shadow duration-200 ease-out`
+              className={`h-full w-full bg-white border border-[rgba(148,163,184,0.5)] ${isDragging ? 'shadow-[0_8px_26px_rgba(15,23,42,0.24),_0_24px_60px_rgba(15,23,42,0.30)]' : 'shadow-[0_6px_20px_rgba(15,23,42,0.18),_0_18px_45px_rgba(15,23,42,0.22)] group-hover:outline group-hover:outline-[rgba(37,99,235,0.35)] group-hover:outline-1 group-hover:outline-offset-2 group-hover:shadow-[0_6px_20px_rgba(15,23,42,0.21),_0_18px_45px_rgba(15,23,42,0.25)]'} transition-shadow duration-200 ease-out`}
               style={{ transform: `rotate(${rotationDegrees}deg) scale(${scaleFix})`, transformOrigin: "center" }}
             >
             {/* eslint-disable-next-line @next/next/no-img-element */}
