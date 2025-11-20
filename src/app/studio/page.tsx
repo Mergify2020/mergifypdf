@@ -270,6 +270,9 @@ function SortableThumb({
     cursor: "grab",
   };
   const rotationDegrees = normalizeRotation(item.rotation);
+  const isQuarterTurn = rotationDegrees % 180 !== 0;
+  const ratio = item.width && item.height ? item.width / item.height : 1;
+  const scaleFix = isQuarterTurn ? Math.min(ratio, 1 / ratio) : 1;
 
   return (
     <li ref={setNodeRef} style={style} className="w-full" {...attributes} {...listeners}>
@@ -292,10 +295,10 @@ function SortableThumb({
           </span>
         </div>
         <div className="relative mt-3 w-full" style={{ paddingBottom: getAspectPadding(item.width, item.height) }}>
-          <div className="absolute inset-0 flex items-center justify-center">
+          <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
             <div
               className="flex h-full w-full items-center justify-center"
-              style={{ transform: `rotate(${rotationDegrees}deg)`, transformOrigin: "center" }}
+              style={{ transform: `rotate(${rotationDegrees}deg) scale(${scaleFix})`, transformOrigin: "center" }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -333,15 +336,18 @@ function SortableOrganizeTile({
     cursor: "grab",
   };
   const rotationDegrees = normalizeRotation(item.rotation);
+  const isQuarterTurn = rotationDegrees % 180 !== 0;
+  const ratio = item.width && item.height ? item.width / item.height : 1;
+  const scaleFix = isQuarterTurn ? Math.min(ratio, 1 / ratio) : 1;
 
   return (
     <div ref={setNodeRef} style={style} className="w-full" {...attributes} {...listeners}>
       {/* Page preview (no rounded corners) */}
       <div className="relative w-full" style={{ paddingBottom: getAspectPadding(item.width, item.height) }}>
-        <div className="absolute inset-0 flex items-center justify-center">
+        <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
           <div
             className="h-full w-full"
-            style={{ transform: `rotate(${rotationDegrees}deg)`, transformOrigin: "center" }}
+            style={{ transform: `rotate(${rotationDegrees}deg) scale(${scaleFix})`, transformOrigin: "center" }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
@@ -840,7 +846,7 @@ function WorkspaceClient() {
           style={{ transform: `scale(${zoom})`, transformOrigin: "top center" }}
         >
           <div className="relative w-full" style={{ paddingBottom: getAspectPadding(page.width, page.height) }}>
-            <div className="absolute inset-0 flex items-center justify-center">
+            <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
               <div
                 className="absolute inset-0 bg-white"
                 style={{
