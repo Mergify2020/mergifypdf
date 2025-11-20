@@ -353,10 +353,10 @@ function SortableOrganizeTile({
           </div>
         </div>
           </div>
-      {/* Controls base (rounded) */}
-      <div className="mt-2 rounded-xl bg-white shadow-[0_6px_20px_rgba(15,23,42,0.12)] ring-1 ring-slate-200 px-3 py-2">
+      {/* Controls: page number + two circular buttons (no grouped background) */}
+      <div className="mt-2">
         <div className="text-center text-sm font-semibold text-slate-800">Page {index + 1}</div>
-        <div className="mt-2 flex items-center justify-center gap-2">
+        <div className="mt-2 flex items-center justify-center gap-3">
           <button
             type="button"
             aria-label="Rotate page"
