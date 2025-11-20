@@ -337,66 +337,66 @@ function SortableOrganizeTile({
   const rotationDegrees = normalizeRotation(item.rotation);
 
   return (
-    <div ref={setNodeRef} style={style} className="flex h-full flex-col gap-3" {...attributes} {...listeners}>
-      <div className="relative flex w-full justify-center">
-        <div
-          className="flex items-center justify-center overflow-visible"
-          style={{
-            height: `${ORGANIZER_CARD_SIZE}px`,
-            width: `${ORGANIZER_CARD_SIZE}px`,
-            padding: `${ORGANIZER_CARD_PADDING * 1.5}px`,
-          }}
-        >
+    <div ref={setNodeRef} style={style} className="flex h-full flex-col gap-4" {...attributes} {...listeners}>
+      <div className="flex w-full flex-col items-center gap-2">
+        <div className="relative flex w-full justify-center">
           <div
-            className="flex h-full w-full items-center justify-center"
+            className="flex items-center justify-center overflow-visible"
             style={{
-              transform: `rotate(${rotationDegrees}deg)`,
-              transformOrigin: "center",
+              height: `${ORGANIZER_CARD_SIZE}px`,
+              width: `${ORGANIZER_CARD_SIZE}px`,
+              padding: `${ORGANIZER_CARD_PADDING * 1.5}px`,
             }}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={item.preview}
-              alt={`Page ${index + 1}`}
-              className="h-full rounded-none object-contain"
+            <div
+              className="flex h-full w-full items-center justify-center"
               style={{
-                width: "auto",
-                maxWidth: "none",
-                filter: "drop-shadow(0px 28px 60px rgba(15,23,42,0.25))",
+                transform: `rotate(${rotationDegrees}deg)`,
+                transformOrigin: "center",
               }}
-              draggable={false}
-            />
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={item.preview}
+                alt={`Page ${index + 1}`}
+                className="h-full rounded-none object-contain"
+                style={{
+                  width: "auto",
+                  maxWidth: "none",
+                  filter: "drop-shadow(0px 28px 60px rgba(15,23,42,0.25))",
+                }}
+                draggable={false}
+              />
+            </div>
           </div>
         </div>
-      </div>
-      <div className="flex flex-col items-center gap-1 px-2 pb-8">
         <div className="text-lg font-semibold text-slate-800">{index + 1}</div>
-        <div className="flex items-center justify-center gap-3">
-          <button
-            type="button"
-            aria-label="Rotate page"
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={(event) => {
-              event.stopPropagation();
-              onRotate();
-            }}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#9cc7ff] bg-[#e8f1ff] text-slate-700 shadow-[0_12px_35px_rgba(24,87,191,0.25)] transition hover:-translate-y-0.5"
-          >
-            <RotateCcw className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            aria-label="Delete page"
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={(event) => {
-              event.stopPropagation();
-              onDelete();
-            }}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-600 transition hover:border-rose-400 hover:text-rose-700"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        </div>
+      </div>
+      <div className="flex items-center justify-center gap-3 px-2 pb-6">
+        <button
+          type="button"
+          aria-label="Rotate page"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            onRotate();
+          }}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#9cc7ff] bg-[#e8f1ff] text-slate-700 shadow-[0_12px_35px_rgba(24,87,191,0.25)] transition hover:-translate-y-0.5"
+        >
+          <RotateCcw className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          aria-label="Delete page"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            onDelete();
+          }}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-600 transition hover:border-rose-400 hover:text-rose-700"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
       </div>
     </div>
   );
