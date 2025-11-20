@@ -260,7 +260,7 @@ function SortableThumb({
   selected: boolean;
   onSelect: () => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
   });
 
@@ -326,7 +326,7 @@ function SortableOrganizeTile({
   onRotate: () => void;
   onDelete: () => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
   });
 
@@ -343,11 +343,11 @@ function SortableOrganizeTile({
   return (
     <div ref={setNodeRef} style={style} className="w-full" {...attributes} {...listeners}>
       {/* Page preview (no rounded corners) */}
-      <div className="relative w-full" style={{ paddingBottom: getAspectPadding(item.width, item.height) }}>
+      <div className="relative w-full h-[360px] sm:h-[380px] lg:h-[420px]">
         <div className="absolute inset-0 flex items-center justify-center overflow-hidden group">
-          <div className="h-full w-full transition-transform duration-200 ease-out group-hover:scale-[1.02] group-hover:-translate-y-1">
+          <div className={`h-full w-full transition-transform duration-200 ease-out ${isDragging ? '' : 'group-hover:scale-[1.02] group-hover:-translate-y-1'}`}>
             <div
-              className="h-full w-full bg-white border border-[rgba(148,163,184,0.5)] shadow-[0_6px_20px_rgba(15,23,42,0.18),_0_18px_45px_rgba(15,23,42,0.22)] group-hover:shadow-[0_6px_20px_rgba(15,23,42,0.21),_0_18px_45px_rgba(15,23,42,0.25)] transition-shadow duration-200 ease-out"
+              className={`h-full w-full bg-white border border-[rgba(148,163,184,0.5)] ${isDragging ? 'shadow-[0_8px_26px_rgba(15,23,42,0.24),_0_24px_60px_rgba(15,23,42,0.30)]' : 'shadow-[0_6px_20px_rgba(15,23,42,0.18),_0_18px_45px_rgba(15,23,42,0.22)] group-hover:outline group-hover:outline-[rgba(37,99,235,0.35)] group-hover:outline-1 group-hover:outline-offset-2 group-hover:shadow-[0_6px_20px_rgba(15,23,42,0.21),_0_18px_45px_rgba(15,23,42,0.25)]'} transition-shadow duration-200 ease-out`
               style={{ transform: `rotate(${rotationDegrees}deg) scale(${scaleFix})`, transformOrigin: "center" }}
             >
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -362,7 +362,7 @@ function SortableOrganizeTile({
       </div>
     </div>
       {/* Controls: page number + two circular buttons (no grouped background) */}
-      <div className="mt-2">
+      <div className="mt-1">
         <div className="text-center text-sm font-semibold text-slate-800">Page {index + 1}</div>
         <div className="mt-2 flex items-center justify-center gap-3">
           <button
@@ -1726,6 +1726,7 @@ function WorkspaceClient() {
         )}
       </div>
 
+      {!organizeMode && (
       <div className="sticky bottom-0 border-t border-slate-200 bg-white/95 py-4 shadow-[0_-12px_30px_rgba(15,23,42,0.08)] backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 lg:flex-row lg:items-center lg:justify-between lg:px-6">
           <div className="flex flex-wrap items-center gap-3">
@@ -1758,6 +1759,7 @@ function WorkspaceClient() {
             {busy ? "Building..." : "Download pages"}
           </button>
         </div>
+      )
 
         {pages.length > 0 && activePageIndex >= 0 && (
           <div className="pointer-events-none fixed bottom-24 left-6 z-30">
