@@ -336,7 +336,7 @@ function SortableOrganizeTile({
 
   return (
     <div ref={setNodeRef} style={style} className="w-full" {...attributes} {...listeners}>
-      <div className="w-full max-w-[240px] rounded-2xl bg-white shadow-[0_18px_60px_rgba(15,23,42,0.15)] ring-1 ring-slate-200 overflow-hidden">
+      <div className="w-full rounded-2xl bg-white shadow-[0_18px_60px_rgba(15,23,42,0.15)] ring-1 ring-slate-200 overflow-hidden">
         {/* Thumbnail */}
         <div className="relative w-full" style={{ paddingBottom: getAspectPadding(item.width, item.height) }}>
           <div className="absolute inset-0 flex items-center justify-center bg-white">
@@ -366,7 +366,7 @@ function SortableOrganizeTile({
                 event.stopPropagation();
                 onRotate();
               }}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#9cc7ff] bg-[#e8f1ff] text-slate-700 shadow-[0_8px_24px_rgba(24,87,191,0.25)] transition hover:-translate-y-0.5"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#9cc7ff] bg-[#e8f1ff] text-slate-700 shadow-[0_8px_24px_rgba(24,87,191,0.25)] transition hover:-translate-y-0.5"
             >
               <RotateCcw className="h-4 w-4" />
             </button>
@@ -378,7 +378,7 @@ function SortableOrganizeTile({
                 event.stopPropagation();
                 onDelete();
               }}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-600 transition hover:border-rose-400 hover:text-rose-700"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-600 transition hover:border-rose-400 hover:text-rose-700"
             >
               <Trash2 className="h-4 w-4" />
             </button>
@@ -1617,7 +1617,7 @@ function WorkspaceClient() {
         )}
 
         {organizeMode && !loading && pages.length > 0 && (
-          <div className="rounded-[40px] border border-slate-200 bg-white p-6 shadow-[0_25px_80px_rgba(15,23,42,0.15)] max-w-[1080px] mx-auto">
+          <div className="w-full">
             <div className="flex flex-col gap-3 text-slate-700 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-xl font-semibold">Manage pages</h2>
@@ -1631,10 +1631,10 @@ function WorkspaceClient() {
                 Done managing
               </button>
             </div>
-            <div className="mx-auto mt-6 w-full px-6">
+            <div className="mt-6">
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={itemsIds} strategy={rectSortingStrategy}>
-                  <div className="grid grid-cols-1 justify-items-center gap-x-32 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     {pages.map((page, idx) => (
                       <SortableOrganizeTile
                         key={page.id}
