@@ -1675,43 +1675,42 @@ function WorkspaceClient() {
                                 stroke.points.length > 1 ? (
                                   <polyline
                                     key={stroke.id}
-                                  points={stroke.points
+                                    points={stroke.points
+                                      .map((pt) => `${pt.x * 1000},${pt.y * 1000}`)
+                                      .join(" ")}
+                                    fill="none"
+                                    stroke={stroke.color}
+                                    strokeWidth={Math.max(1, stroke.thickness * 1000)}
+                                    strokeLinecap="round"
+                                    strokeOpacity={stroke.tool === "pencil" ? 1 : 0.25}
+                                    style={{
+                                      pointerEvents: deleteMode ? "stroke" : "none",
+                                      cursor: deleteMode ? "pointer" : "default",
+                                    }}
+                                    onClick={(event) => {
+                                      if (!deleteMode) return;
+                                      event.preventDefault();
+                                      event.stopPropagation();
+                                      handleDeleteStroke(page.id, stroke.id);
+                                    }}
+                                  />
+                                ) : null
+                              )}
+                              {draftHighlight?.pageId === page.id && draftHighlight.points.length > 1 ? (
+                                <polyline
+                                  aria-hidden
+                                  points={draftHighlight.points
                                     .map((pt) => `${pt.x * 1000},${pt.y * 1000}`)
                                     .join(" ")}
                                   fill="none"
-                                  stroke={stroke.color}
-                                  strokeWidth={Math.max(1, stroke.thickness * 1000)}
+                                  stroke={draftHighlight.color}
+                                  strokeWidth={Math.max(1, draftHighlight.thickness * 1000)}
                                   strokeLinecap="round"
-                                  strokeOpacity={stroke.tool === "pencil" ? 1 : 0.25}
-                                  style={{
-                                    pointerEvents: deleteMode ? "stroke" : "none",
-                                    cursor: deleteMode ? "pointer" : "default",
-                                  }}
-                                  onClick={(event) => {
-                                    if (!deleteMode) return;
-                                    event.preventDefault();
-                                    event.stopPropagation();
-                                    handleDeleteStroke(page.id, stroke.id);
-                                  }}
+                                  strokeLinejoin="round"
+                                  strokeOpacity={draftHighlight.tool === "pencil" ? 1 : 0.25}
                                 />
-                              ) : null
-                            )}
-                            {draftHighlight?.pageId === page.id &&
-                            draftHighlight.points.length > 1 ? (
-                              <polyline
-                                aria-hidden
-                                points={draftHighlight.points
-                                  .map((pt) => `${pt.x * 1000},${pt.y * 1000}`)
-                                  .join(" ")}
-                                fill="none"
-                                stroke={draftHighlight.color}
-                                strokeWidth={Math.max(1, draftHighlight.thickness * 1000)}
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeOpacity={draftHighlight.tool === "pencil" ? 1 : 0.25}
-                              />
-                            ) : null}
-                          </svg>
+                              ) : null}
+                            </svg>
                         </div>
                       </div>
                     </div>
