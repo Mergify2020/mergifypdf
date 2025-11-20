@@ -376,8 +376,8 @@ function SortableOrganizeTile({
             </div>
           </div>
         </div>
-        <div className="mt-2 text-lg font-semibold text-slate-800">{index + 1}</div>
-        <div className="mt-3 flex items-center justify-center gap-3">
+        <div className="mt-1 text-lg font-semibold text-slate-800">{index + 1}</div>
+        <div className="mt-2 flex items-center justify-center gap-3">
           <button
             type="button"
             aria-label="Rotate page"
