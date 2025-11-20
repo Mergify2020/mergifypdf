@@ -1368,7 +1368,71 @@ function WorkspaceClient() {
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#f3fbff,_#ffffff)] pt-16">
       <div className="mx-auto w-full max-w-6xl px-4 lg:px-6">
-        <div className="mb-6 rounded-3xl border border-slate-100 bg-white px-6 py-6 shadow-sm">
+        <div className="mb-6 flex flex-col gap-4 rounded-3xl border border-slate-100 bg-white px-6 py-4 shadow-sm">
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.4em] text-slate-400">Project name</p>
+                {projectNameEditing ? (
+                  <input
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-lg font-semibold text-slate-900 outline-none focus:border-slate-400 sm:w-auto"
+                    value={projectNameDraft}
+                    onChange={(event) => {
+                      setProjectNameDraft(event.target.value);
+                      if (projectNameError) setProjectNameError(null);
+                    }}
+                    placeholder="Name your project"
+                  />
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{projectName}</h1>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProjectNameDraft(projectName);
+                        setProjectNameError(null);
+                        setProjectNameEditing(true);
+                      }}
+                      className="inline-flex items-center justify-center rounded-full border border-slate-200 p-2 text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
+                      aria-label="Edit project name"
+                    >
+                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 20h9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                        <path
+                          d="M16.5 3.5a2.121 2.121 0 013 3L7 19.5 3 21l1.5-4L16.5 3.5z"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                {projectNameEditing ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleProjectNameSave}
+                      className="rounded-full bg-[#024d7c] px-4 py-1.5 text-sm font-semibold text-white shadow-lg shadow-[#012a44]/30 transition hover:-translate-y-0.5"
+                    >
+                      Save name
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleProjectNameCancel}
+                      className="rounded-full border border-slate-200 px-4 py-1.5 text-sm font-semibold text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : null}
+              </div>
+            </div>
+            {projectNameError ? <p className="text-sm text-rose-500">{projectNameError}</p> : null}
+          </div>
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex flex-wrap items-center gap-2">
@@ -1550,69 +1614,6 @@ function WorkspaceClient() {
           </div>
         </div>
 
-        <div className="mt-6 w-full rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 shadow-sm">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-col gap-1">
-              <p className="text-xs font-semibold uppercase tracking-[0.4em] text-slate-400">Project name</p>
-              {projectNameEditing ? (
-                <input
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-lg font-semibold text-slate-900 outline-none focus:border-slate-400"
-                  value={projectNameDraft}
-                  onChange={(event) => {
-                    setProjectNameDraft(event.target.value);
-                    if (projectNameError) setProjectNameError(null);
-                  }}
-                  placeholder="Name your project"
-                />
-              ) : (
-                <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{projectName}</h1>
-              )}
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              {projectNameEditing ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={handleProjectNameSave}
-                    className="rounded-full bg-[#024d7c] px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-[#012a44]/30 transition hover:-translate-y-0.5"
-                  >
-                    Save name
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleProjectNameCancel}
-                    className="rounded-full border border-slate-200 px-5 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
-                  >
-                    Cancel
-                  </button>
-                </>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setProjectNameDraft(projectName);
-                    setProjectNameError(null);
-                    setProjectNameEditing(true);
-                  }}
-                  className="inline-flex items-center justify-center rounded-full border border-slate-200 p-3 text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
-                  aria-label="Edit project name"
-                >
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
-                    <path d="M12 20h9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                    <path
-                      d="M16.5 3.5a2.121 2.121 0 013 3L7 19.5 3 21l1.5-4L16.5 3.5z"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </button>
-              )}
-            </div>
-          </div>
-          {projectNameError ? <p className="mt-3 text-sm text-rose-500">{projectNameError}</p> : null}
-        </div>
       </div>
       <div className="mx-auto flex w-full max-w-[1700px] flex-col gap-6 px-4 pt-4 pb-32 lg:px-10 lg:pt-6">
 
