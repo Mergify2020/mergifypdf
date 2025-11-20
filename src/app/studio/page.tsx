@@ -354,7 +354,7 @@ function SortableOrganizeTile({
                           <img
                 src={item.preview}
                 alt={`Page ${index + 1}`}
-                className="h-full w-full object-contain select-none shadow-[0_4px_10px_rgba(15,23,42,0.08),_0_18px_45px_rgba(15,23,42,0.12)] group-hover:shadow-[0_10px_35px_rgba(15,23,42,0.18)] transition-shadow duration-200 ease-out"
+                className="h-full w-full object-contain select-none shadow-[0_4px_12px_rgba(0,0,0,0.08),_0_12px_28px_rgba(0,0,0,0.12)] transition-shadow duration-200 ease-out"
                 draggable={false}
               />
           </div>
