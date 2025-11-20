@@ -334,6 +334,7 @@ function SortableOrganizeTile({
     transition,
     cursor: "grab",
   };
+  const rotationDegrees = normalizeRotation(item.rotation);
 
   return (
     <div ref={setNodeRef} style={style} className="flex h-full flex-col gap-3" {...attributes} {...listeners}>
