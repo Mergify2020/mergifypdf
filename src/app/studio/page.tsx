@@ -336,53 +336,51 @@ function SortableOrganizeTile({
 
   return (
     <div ref={setNodeRef} style={style} className="w-full" {...attributes} {...listeners}>
-      <div className="w-full rounded-2xl bg-white shadow-[0_18px_60px_rgba(15,23,42,0.15)] ring-1 ring-slate-200 overflow-hidden">
-        {/* Thumbnail */}
-        <div className="relative w-full" style={{ paddingBottom: getAspectPadding(item.width, item.height) }}>
-          <div className="absolute inset-0 flex items-center justify-center bg-white">
-            <div
-              className="h-full w-full"
-              style={{ transform: `rotate(${rotationDegrees}deg)`, transformOrigin: "center" }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={item.preview}
-                alt={`Page ${index + 1}`}
-                className="h-full w-full object-contain select-none"
-                draggable={false}
-              />
-            </div>
+      {/* Page preview (no rounded corners) */}
+      <div className="relative w-full" style={{ paddingBottom: getAspectPadding(item.width, item.height) }}>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div
+            className="h-full w-full"
+            style={{ transform: `rotate(${rotationDegrees}deg)`, transformOrigin: "center" }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={item.preview}
+              alt={`Page ${index + 1}`}
+              className="h-full w-full object-contain select-none"
+              draggable={false}
+            />
           </div>
         </div>
-        {/* Meta + actions */}
-        <div className="px-3 pt-2 pb-3">
-          <div className="text-center text-sm font-semibold text-slate-800">Page {index + 1}</div>
-          <div className="mt-2 flex items-center justify-center gap-2">
-            <button
-              type="button"
-              aria-label="Rotate page"
-              onPointerDown={(event) => event.stopPropagation()}
-              onClick={(event) => {
-                event.stopPropagation();
-                onRotate();
-              }}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#9cc7ff] bg-[#e8f1ff] text-slate-700 shadow-[0_8px_24px_rgba(24,87,191,0.25)] transition hover:-translate-y-0.5"
-            >
-              <RotateCcw className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              aria-label="Delete page"
-              onPointerDown={(event) => event.stopPropagation()}
-              onClick={(event) => {
-                event.stopPropagation();
-                onDelete();
-              }}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-600 transition hover:border-rose-400 hover:text-rose-700"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
           </div>
+      {/* Controls base (rounded) */}
+      <div className="mt-3 rounded-2xl bg-white shadow-[0_18px_60px_rgba(15,23,42,0.15)] ring-1 ring-slate-200 px-3 pt-2 pb-3">
+        <div className="text-center text-sm font-semibold text-slate-800">Page {index + 1}</div>
+        <div className="mt-2 flex items-center justify-center gap-2">
+          <button
+            type="button"
+            aria-label="Rotate page"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              onRotate();
+            }}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#9cc7ff] bg-[#e8f1ff] text-slate-700 shadow-[0_8px_24px_rgba(24,87,191,0.25)] transition hover:-translate-y-0.5"
+          >
+            <RotateCcw className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            aria-label="Delete page"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              onDelete();
+            }}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-600 transition hover:border-rose-400 hover:text-rose-700"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
         </div>
       </div>
     </div>
