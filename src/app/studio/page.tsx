@@ -80,6 +80,7 @@ const WORKSPACE_DB_STORE = "files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
 const DEFAULT_ASPECT_RATIO = 792 / 612; // fallback letter portrait
 const ORGANIZER_CARD_HEIGHT = 420; // px height for organizer cards
+const ORGANIZER_CARD_PADDING = 24; // inner padding to keep thumbnails off the border
 
 type StoredSourceMeta = { id: string; name?: string; size?: number; updatedAt?: number };
 type FileStoreEntry = { blob: Blob; name?: string; size?: number; updatedAt: number };
@@ -365,11 +366,16 @@ function SortableOrganizeTile({
       </div>
       <div className="relative w-full">
         <div
-          className="flex w-full items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_8px_18px_rgba(15,23,42,0.12)]"
-          style={{ height: `${ORGANIZER_CARD_HEIGHT}px` }}
+          className="flex w-full items-center justify-center overflow-hidden rounded-[18px] border border-slate-200 bg-white shadow-[0_8px_18px_rgba(15,23,42,0.12)]"
+          style={{ height: `${ORGANIZER_CARD_HEIGHT}px`, padding: `${ORGANIZER_CARD_PADDING}px` }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={item.preview} alt={`Page ${index + 1}`} className="h-full w-full object-contain" draggable={false} />
+          <img
+            src={item.preview}
+            alt={`Page ${index + 1}`}
+            className="max-h-full max-w-full object-contain"
+            draggable={false}
+          />
         </div>
       </div>
       <div className="flex items-center justify-center gap-3 px-2 pb-2">
