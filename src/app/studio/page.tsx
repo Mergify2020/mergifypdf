@@ -341,13 +341,14 @@ function SortableOrganizeTile({
       <div className="px-2 text-xs font-semibold text-slate-300">
         <span className="text-white/90">Page {index + 1}</span>
       </div>
-      <div className="relative w-full">
+      <div className="relative flex w-full justify-center">
         <div
-          className="flex w-full items-center justify-center overflow-visible"
+          className="flex items-center justify-center overflow-visible rounded-[22px] bg-[rgb(9,13,26)] shadow-[0_25px_80px_rgba(0,0,0,0.55)]"
           style={{
             height: `${ORGANIZER_CARD_SIZE}px`,
             width: `${ORGANIZER_CARD_SIZE}px`,
             padding: `${ORGANIZER_CARD_PADDING}px`,
+            border: "1px solid rgba(255,255,255,0.1)",
           }}
         >
           <div
@@ -1628,7 +1629,7 @@ function WorkspaceClient() {
         )}
 
         {organizeMode && !loading && pages.length > 0 && (
-          <div className="rounded-[40px] border border-[#13274f] bg-[#050f1f] p-6 shadow-[0_35px_80px_rgba(5,10,20,0.55)]">
+          <div className="rounded-[40px] border border-[#13274f] bg-[radial-gradient(circle_at_top,_#0f172a,_#111827_45%,_#1f2933)] p-6 shadow-[0_35px_80px_rgba(5,10,20,0.55)]">
             <div className="flex flex-col gap-3 text-white sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-xl font-semibold">Manage pages</h2>
