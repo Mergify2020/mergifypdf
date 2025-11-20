@@ -79,9 +79,8 @@ const WORKSPACE_DB_NAME = "mpdf-file-store";
 const WORKSPACE_DB_STORE = "files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
 const DEFAULT_ASPECT_RATIO = 792 / 612; // fallback letter portrait
-const ORGANIZER_CARD_HEIGHT = 420; // px height for organizer cards
+const ORGANIZER_CARD_SIZE = 420; // px height/width for organizer cards
 const ORGANIZER_CARD_PADDING = 24; // inner padding to keep thumbnails off the border
-const ORGANIZER_CARD_RADIUS = 12;
 
 type StoredSourceMeta = { id: string; name?: string; size?: number; updatedAt?: number };
 type FileStoreEntry = { blob: Blob; name?: string; size?: number; updatedAt: number };
@@ -238,45 +237,16 @@ function createThumbnailDataUrl(canvas: HTMLCanvasElement) {
   return thumbCanvas.toDataURL("image/png", PREVIEW_IMAGE_QUALITY);
 }
 
-async function loadImageFromDataUrl(dataUrl: string) {
-  const image = new Image();
-  const promise = new Promise<HTMLImageElement>((resolve, reject) => {
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error("Failed to load image"));
-  });
-  image.src = dataUrl;
-  return promise;
-}
-
-async function rotatePreviewClockwise(previewDataUrl: string) {
-  const image = await loadImageFromDataUrl(previewDataUrl);
-  const canvas = document.createElement("canvas");
-  canvas.width = image.height;
-  canvas.height = image.width;
-  const ctx = canvas.getContext("2d")!;
-  ctx.translate(canvas.width / 2, canvas.height / 2);
-  ctx.rotate(Math.PI / 2);
-  ctx.drawImage(image, -image.width / 2, -image.height / 2);
-  return {
-    preview: canvas.toDataURL("image/png", PREVIEW_IMAGE_QUALITY),
-    thumb: createThumbnailDataUrl(canvas),
-    width: canvas.width,
-    height: canvas.height,
-  };
-}
-
-function rotatePointClockwise(point: Point): Point {
-  return {
-    x: 1 - point.y,
-    y: point.x,
-  };
-}
-
 function getAspectPadding(width?: number, height?: number) {
   if (!width || !height || width === 0) {
     return `${DEFAULT_ASPECT_RATIO * 100}%`;
   }
   return `${(height / width) * 100}%`;
+}
+
+function normalizeRotation(rotation?: number) {
+  const value = rotation ?? 0;
+  return ((value % 360) + 360) % 360;
 }
 
 
@@ -301,6 +271,7 @@ function SortableThumb({
     transition,
     cursor: "grab",
   };
+  const rotationDegrees = normalizeRotation(item.rotation);
 
   return (
     <li ref={setNodeRef} style={style} className="w-full" {...attributes} {...listeners}>
@@ -323,14 +294,19 @@ function SortableThumb({
           </span>
         </div>
         <div className="relative mt-3 w-full" style={{ paddingBottom: getAspectPadding(item.width, item.height) }}>
-          <div className="absolute inset-0">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={item.thumb}
-              alt={`Page ${index + 1}`}
-              className="h-full w-full object-contain"
-              draggable={false}
-            />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div
+              className="flex h-full w-full items-center justify-center"
+              style={{ transform: `rotate(${rotationDegrees}deg)`, transformOrigin: "center" }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={item.thumb}
+                alt={`Page ${index + 1}`}
+                className="h-full w-full object-contain"
+                draggable={false}
+              />
+            </div>
           </div>
         </div>
       </button>
@@ -343,13 +319,11 @@ function SortableOrganizeTile({
   index,
   onRotate,
   onDelete,
-  rotating = false,
 }: {
   item: PageItem;
   index: number;
   onRotate: () => void;
   onDelete: () => void;
-  rotating?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
     id: item.id,
@@ -368,23 +342,32 @@ function SortableOrganizeTile({
       </div>
       <div className="relative w-full">
         <div
-          className="flex w-full items-center justify-center overflow-hidden"
+          className="flex w-full items-center justify-center overflow-visible"
           style={{
-            height: `${ORGANIZER_CARD_HEIGHT}px`,
+            height: `${ORGANIZER_CARD_SIZE}px`,
+            width: `${ORGANIZER_CARD_SIZE}px`,
             padding: `${ORGANIZER_CARD_PADDING}px`,
           }}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={item.preview}
-            alt={`Page ${index + 1}`}
-            className="h-full rounded-none object-contain"
+          <div
+            className="flex h-full w-full items-center justify-center"
             style={{
-              width: "auto",
-              maxWidth: "none",
+              transform: `rotate(${rotationDegrees}deg)`,
+              transformOrigin: "center",
             }}
-            draggable={false}
-          />
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={item.preview}
+              alt={`Page ${index + 1}`}
+              className="h-full rounded-none object-contain"
+              style={{
+                width: "auto",
+                maxWidth: "none",
+              }}
+              draggable={false}
+            />
+          </div>
         </div>
       </div>
       <div className="flex items-center justify-center gap-3 px-2 pb-2">
@@ -396,17 +379,9 @@ function SortableOrganizeTile({
             event.stopPropagation();
             onRotate();
           }}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={rotating}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
         >
-          {rotating ? (
-            <svg className="h-4 w-4 animate-spin text-slate-500" viewBox="0 0 24 24" fill="none">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-              <path className="opacity-75" d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-            </svg>
-          ) : (
-            <RotateCcw className="h-4 w-4" />
-          )}
+          <RotateCcw className="h-4 w-4" />
         </button>
         <button
           type="button"
@@ -451,7 +426,6 @@ function WorkspaceClient() {
   const [projectNameDraft, setProjectNameDraft] = useState("Untitled Project");
   const [projectNameError, setProjectNameError] = useState<string | null>(null);
   const [organizeMode, setOrganizeMode] = useState(false);
-  const [rotatingPages, setRotatingPages] = useState<Record<string, boolean>>({});
 
   const addInputRef = useRef<HTMLInputElement>(null);
   const renderedSourcesRef = useRef(0);
@@ -864,6 +838,7 @@ function WorkspaceClient() {
 
   const renderPreviewPage = (page: PageItem, idx: number) => {
     const pageHighlights = highlights[page.id] ?? [];
+    const rotationDegrees = normalizeRotation(page.rotation);
     return (
       <div
         key={page.id}
@@ -878,64 +853,68 @@ function WorkspaceClient() {
           style={{ transform: `scale(${zoom})`, transformOrigin: "top center" }}
         >
           <div className="relative w-full" style={{ paddingBottom: getAspectPadding(page.width, page.height) }}>
-            <div
-              className="absolute inset-0 bg-white"
-              style={{
-                cursor:
-                  activeDrawingTool === "highlight"
-                    ? (`url(${HIGHLIGHT_CURSOR}) 4 24, crosshair` as CSSProperties["cursor"])
-                    : activeDrawingTool === "pencil"
-                    ? ("crosshair" as CSSProperties["cursor"])
-                    : undefined,
-              }}
-              onMouseDown={(event) => handleMarkupPointerDown(page.id, event)}
-              onMouseMove={(event) => handleMarkupPointerMove(page.id, event)}
-              onMouseUp={() => handleMarkupPointerUp(page.id)}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={page.preview} alt={`Page ${idx + 1}`} className="h-full w-full object-contain" draggable={false} />
-              <svg
-                className="absolute inset-0 h-full w-full"
-                style={{ pointerEvents: deleteMode ? "auto" : "none" }}
-                viewBox="0 0 1000 1000"
-                preserveAspectRatio="none"
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div
+                className="absolute inset-0 bg-white"
+                style={{
+                  transform: `rotate(${rotationDegrees}deg)`,
+                  transformOrigin: "center",
+                  cursor:
+                    activeDrawingTool === "highlight"
+                      ? (`url(${HIGHLIGHT_CURSOR}) 4 24, crosshair` as CSSProperties["cursor"])
+                      : activeDrawingTool === "pencil"
+                      ? ("crosshair" as CSSProperties["cursor"])
+                      : undefined,
+                }}
+                onMouseDown={(event) => handleMarkupPointerDown(page.id, event)}
+                onMouseMove={(event) => handleMarkupPointerMove(page.id, event)}
+                onMouseUp={() => handleMarkupPointerUp(page.id)}
               >
-                {pageHighlights.map((stroke) =>
-                  stroke.points.length > 1 ? (
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={page.preview} alt={`Page ${idx + 1}`} className="h-full w-full object-contain" draggable={false} />
+                <svg
+                  className="absolute inset-0 h-full w-full"
+                  style={{ pointerEvents: deleteMode ? "auto" : "none" }}
+                  viewBox="0 0 1000 1000"
+                  preserveAspectRatio="none"
+                >
+                  {pageHighlights.map((stroke) =>
+                    stroke.points.length > 1 ? (
+                      <polyline
+                        key={stroke.id}
+                        points={stroke.points.map((pt) => `${pt.x * 1000},${pt.y * 1000}`).join(" ")}
+                        fill="none"
+                        stroke={stroke.color}
+                        strokeWidth={Math.max(1, stroke.thickness * 1000)}
+                        strokeLinecap="round"
+                        strokeOpacity={stroke.tool === "pencil" ? 1 : 0.25}
+                        style={{
+                          pointerEvents: deleteMode ? "stroke" : "none",
+                          cursor: deleteMode ? "pointer" : "default",
+                        }}
+                        onClick={(event) => {
+                          if (!deleteMode) return;
+                          event.preventDefault();
+                          event.stopPropagation();
+                          handleDeleteStroke(page.id, stroke.id);
+                        }}
+                      />
+                    ) : null
+                  )}
+                  {draftHighlight?.pageId === page.id && draftHighlight.points.length > 1 ? (
                     <polyline
-                      key={stroke.id}
-                      points={stroke.points.map((pt) => `${pt.x * 1000},${pt.y * 1000}`).join(" ")}
+                      aria-hidden
+                      points={draftHighlight.points.map((pt) => `${pt.x * 1000},${pt.y * 1000}`).join(" ")}
                       fill="none"
-                      stroke={stroke.color}
-                      strokeWidth={Math.max(1, stroke.thickness * 1000)}
+                      stroke={draftHighlight.color}
+                      strokeWidth={Math.max(1, draftHighlight.thickness * 1000)}
                       strokeLinecap="round"
-                      strokeOpacity={stroke.tool === "pencil" ? 1 : 0.25}
-                      style={{
-                        pointerEvents: deleteMode ? "stroke" : "none",
-                        cursor: deleteMode ? "pointer" : "default",
-                      }}
-                      onClick={(event) => {
-                        if (!deleteMode) return;
-                        event.preventDefault();
-                        event.stopPropagation();
-                        handleDeleteStroke(page.id, stroke.id);
-                      }}
+                      strokeLinejoin="round"
+                      strokeOpacity={draftHighlight.tool === "pencil" ? 1 : 0.25}
                     />
-                  ) : null
-                )}
-                {draftHighlight?.pageId === page.id && draftHighlight.points.length > 1 ? (
-                  <polyline
-                    aria-hidden
-                    points={draftHighlight.points.map((pt) => `${pt.x * 1000},${pt.y * 1000}`).join(" ")}
-                    fill="none"
-                    stroke={draftHighlight.color}
-                    strokeWidth={Math.max(1, draftHighlight.thickness * 1000)}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeOpacity={draftHighlight.tool === "pencil" ? 1 : 0.25}
-                  />
-                ) : null}
-              </svg>
+                  ) : null}
+                </svg>
+              </div>
             </div>
           </div>
         </div>
@@ -1205,52 +1184,17 @@ function WorkspaceClient() {
     setProjectNameError(null);
   }
 
-  async function handleRotatePage(pageId: string) {
-    if (typeof window === "undefined") return;
-    if (rotatingPages[pageId]) return;
-    const target = pages.find((page) => page.id === pageId);
-    if (!target) return;
-    setRotatingPages((prev) => ({ ...prev, [pageId]: true }));
-    try {
-      const rotated = await rotatePreviewClockwise(target.preview);
-      const nextRotation = (target.rotation + 90) % 360;
-      setPages((prev) =>
-        prev.map((page) =>
-          page.id === pageId
-            ? {
-                ...page,
-                rotation: nextRotation,
-                preview: rotated.preview,
-                thumb: rotated.thumb,
-                width: rotated.width,
-                height: rotated.height,
-              }
-            : page
-        )
-      );
-      setHighlights((prev) => {
-        const pageHighlights = prev[pageId];
-        if (!pageHighlights) return prev;
-        return {
-          ...prev,
-          [pageId]: pageHighlights.map((stroke) => ({
-            ...stroke,
-            points: stroke.points.map((pt) => rotatePointClockwise(pt)),
-          })),
-        };
-      });
-      setDraftHighlight((prev) => (prev?.pageId === pageId ? null : prev));
-      setHighlightHistory([]);
-    } catch (err) {
-      console.error("Failed to rotate page", err);
-      setError("Could not rotate that page. Please try again.");
-    } finally {
-      setRotatingPages((prev) => {
-        const next = { ...prev };
-        delete next[pageId];
-        return next;
-      });
-    }
+  function handleRotatePage(pageId: string) {
+    setPages((prev) =>
+      prev.map((page) =>
+        page.id === pageId
+          ? {
+              ...page,
+              rotation: normalizeRotation((page.rotation ?? 0) + 90),
+            }
+          : page
+      )
+    );
   }
 
   function handleDeletePage(pageId: string) {
@@ -1699,15 +1643,14 @@ function WorkspaceClient() {
             </div>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={itemsIds} strategy={rectSortingStrategy}>
-                <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <div className="mt-6 grid gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                   {pages.map((page, idx) => (
                     <SortableOrganizeTile
                       key={page.id}
                       item={page}
                       index={idx}
-                      onRotate={() => void handleRotatePage(page.id)}
+                      onRotate={() => handleRotatePage(page.id)}
                       onDelete={() => handleDeletePage(page.id)}
-                      rotating={!!rotatingPages[page.id]}
                     />
                   ))}
                 </div>
