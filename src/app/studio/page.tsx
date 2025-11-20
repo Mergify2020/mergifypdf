@@ -343,12 +343,11 @@ function SortableOrganizeTile({
       </div>
       <div className="relative flex w-full justify-center">
         <div
-          className="flex items-center justify-center overflow-visible rounded-[22px] bg-[rgb(9,13,26)] shadow-[0_25px_80px_rgba(0,0,0,0.55)]"
+          className="flex items-center justify-center overflow-visible"
           style={{
             height: `${ORGANIZER_CARD_SIZE}px`,
             width: `${ORGANIZER_CARD_SIZE}px`,
             padding: `${ORGANIZER_CARD_PADDING}px`,
-            border: "1px solid rgba(255,255,255,0.1)",
           }}
         >
           <div
@@ -366,6 +365,7 @@ function SortableOrganizeTile({
               style={{
                 width: "auto",
                 maxWidth: "none",
+                boxShadow: "0 25px 60px rgba(0,0,0,0.35)",
               }}
               draggable={false}
             />
@@ -1629,7 +1629,7 @@ function WorkspaceClient() {
         )}
 
         {organizeMode && !loading && pages.length > 0 && (
-          <div className="rounded-[40px] border border-[#13274f] bg-[radial-gradient(circle_at_top,_#0f172a,_#111827_45%,_#1f2933)] p-6 shadow-[0_35px_80px_rgba(5,10,20,0.55)]">
+          <div className="rounded-[40px] border border-[#cde7ff] bg-[radial-gradient(circle_at_top,_#e2f2ff,_#c7e4ff_50%,_#b6dafe)] p-6 shadow-[0_35px_80px_rgba(125,169,211,0.45)]">
             <div className="flex flex-col gap-3 text-white sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-xl font-semibold">Manage pages</h2>
@@ -1643,21 +1643,23 @@ function WorkspaceClient() {
                 Done managing
               </button>
             </div>
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-              <SortableContext items={itemsIds} strategy={rectSortingStrategy}>
-                <div className="mt-6 grid grid-cols-1 justify-items-center gap-8 sm:grid-cols-2 lg:grid-cols-3">
-                  {pages.map((page, idx) => (
-                    <SortableOrganizeTile
-                      key={page.id}
-                      item={page}
-                      index={idx}
-                      onRotate={() => handleRotatePage(page.id)}
-                      onDelete={() => handleDeletePage(page.id)}
-                    />
-                  ))}
-                </div>
-              </SortableContext>
-            </DndContext>
+            <div className="mx-auto mt-6 w-full max-w-5xl">
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={itemsIds} strategy={rectSortingStrategy}>
+                  <div className="grid grid-cols-1 justify-items-center gap-14 sm:grid-cols-2 lg:grid-cols-3">
+                    {pages.map((page, idx) => (
+                      <SortableOrganizeTile
+                        key={page.id}
+                        item={page}
+                        index={idx}
+                        onRotate={() => handleRotatePage(page.id)}
+                        onDelete={() => handleDeletePage(page.id)}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            </div>
           </div>
         )}
 
