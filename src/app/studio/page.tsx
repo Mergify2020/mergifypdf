@@ -1782,7 +1782,7 @@ function WorkspaceClient() {
         <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 lg:flex-row lg:items-center lg:justify-between lg:px-6">
           <div className="flex flex-wrap items-center gap-3">
             <button
-              className="rounded-full border border-brand/30 bg-brand/5 px-5 py-2 text-sm font-semibold text-brand transition hover:bg-brand/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+              className="rounded-full border border-brand/30 bg-brand/5 px-7 py-3 text-base font-semibold text-brand transition hover:bg-brand/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
               onClick={handleAddClick}
               disabled={pages.length === 0}
             >
