@@ -1645,10 +1645,10 @@ function WorkspaceClient() {
                 Done managing
               </button>
             </div>
-            <div className="mx-auto mt-6 w-full max-w-6xl">
+            <div className="mx-auto mt-6 w-full max-w-4xl px-2 sm:px-4">
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={itemsIds} strategy={rectSortingStrategy}>
-                  <div className="grid grid-cols-1 justify-items-center gap-x-16 gap-y-20 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid grid-cols-1 justify-items-center gap-x-24 gap-y-24 sm:grid-cols-2 lg:grid-cols-3">
                     {pages.map((page, idx) => (
                       <SortableOrganizeTile
                         key={page.id}
