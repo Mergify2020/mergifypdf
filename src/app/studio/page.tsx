@@ -338,9 +338,6 @@ function SortableOrganizeTile({
 
   return (
     <div ref={setNodeRef} style={style} className="flex h-full flex-col gap-3" {...attributes} {...listeners}>
-      <div className="px-2 text-xs font-semibold text-slate-300">
-        <span className="text-white/90">Page {index + 1}</span>
-      </div>
       <div className="relative flex w-full justify-center">
         <div
           className="flex items-center justify-center overflow-visible"
@@ -372,7 +369,10 @@ function SortableOrganizeTile({
           </div>
         </div>
       </div>
-      <div className="flex items-center justify-center gap-3 px-2 pb-2">
+      <div className="flex flex-col items-center gap-2 px-2 pb-2">
+        <span className="text-[0.68rem] font-semibold uppercase tracking-wide text-slate-500">
+          Page {index + 1}
+        </span>
         <button
           type="button"
           aria-label="Rotate page"
@@ -1629,8 +1629,8 @@ function WorkspaceClient() {
         )}
 
         {organizeMode && !loading && pages.length > 0 && (
-          <div className="rounded-[40px] border border-[#cde7ff] bg-[radial-gradient(circle_at_top,_#e2f2ff,_#c7e4ff_50%,_#b6dafe)] p-6 shadow-[0_35px_80px_rgba(125,169,211,0.45)]">
-            <div className="flex flex-col gap-3 text-white sm:flex-row sm:items-center sm:justify-between">
+          <div className="rounded-[40px] border border-[#d8e8ff] bg-[radial-gradient(circle_at_top,_#f4faff,_#e3f2ff_50%,_#cee6ff)] p-6 shadow-[0_35px_80px_rgba(124,160,210,0.35)]">
+            <div className="flex flex-col gap-3 text-slate-700 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-xl font-semibold">Manage pages</h2>
                 <p className="text-sm text-slate-300">Drag to reorder. Rotate or delete any page.</p>
