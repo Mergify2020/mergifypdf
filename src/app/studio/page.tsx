@@ -344,17 +344,17 @@ function SortableOrganizeTile({
             style={{ transform: `rotate(${rotationDegrees}deg)`, transformOrigin: "center" }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={item.preview}
-              alt={`Page ${index + 1}`}
-              className="h-full w-full object-contain select-none"
-              draggable={false}
-            />
+                          <img
+                src={item.preview}
+                alt={`Page ${index + 1}`}
+                className="h-full w-full object-contain select-none shadow-[0_4px_18px_rgba(0,0,0,0.08)]"
+                draggable={false}
+              />
           </div>
         </div>
           </div>
       {/* Controls base (rounded) */}
-      <div className="mt-3 rounded-2xl bg-white shadow-[0_18px_60px_rgba(15,23,42,0.15)] ring-1 ring-slate-200 px-3 pt-2 pb-3">
+      <div className="mt-2 rounded-xl bg-white shadow-[0_6px_20px_rgba(15,23,42,0.12)] ring-1 ring-slate-200 px-3 py-2">
         <div className="text-center text-sm font-semibold text-slate-800">Page {index + 1}</div>
         <div className="mt-2 flex items-center justify-center gap-2">
           <button
@@ -365,7 +365,7 @@ function SortableOrganizeTile({
               event.stopPropagation();
               onRotate();
             }}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#9cc7ff] bg-[#e8f1ff] text-slate-700 shadow-[0_8px_24px_rgba(24,87,191,0.25)] transition hover:-translate-y-0.5"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-slate-700 shadow-[0_4px_14px_rgba(15,23,42,0.15)] transition hover:-translate-y-0.5"
           >
             <RotateCcw className="h-4 w-4" />
           </button>
@@ -377,7 +377,7 @@ function SortableOrganizeTile({
               event.stopPropagation();
               onDelete();
             }}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-600 transition hover:border-rose-400 hover:text-rose-700"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-rose-600 shadow-[0_4px_14px_rgba(15,23,42,0.15)] transition hover:-translate-y-0.5"
           >
             <Trash2 className="h-4 w-4" />
           </button>
