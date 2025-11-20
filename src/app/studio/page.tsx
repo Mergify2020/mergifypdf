@@ -358,8 +358,9 @@ function SortableOrganizeTile({
                 draggable={false}
               />
           </div>
-        </div>
           </div>
+      </div>
+    </div>
       {/* Controls: page number + two circular buttons (no grouped background) */}
       <div className="mt-2">
         <div className="text-center text-sm font-semibold text-slate-800">Page {index + 1}</div>
