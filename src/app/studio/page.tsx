@@ -79,8 +79,8 @@ const WORKSPACE_DB_NAME = "mpdf-file-store";
 const WORKSPACE_DB_STORE = "files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
 const DEFAULT_ASPECT_RATIO = 792 / 612; // fallback letter portrait
-const ORGANIZER_CARD_SIZE = 432; // px height/width for organizer cards (20% larger)
-const ORGANIZER_CARD_PADDING = 38; // inner padding to keep thumbnails off the border
+const ORGANIZER_CARD_SIZE = 450;
+const ORGANIZER_CARD_PADDING = 34;
 
 type StoredSourceMeta = { id: string; name?: string; size?: number; updatedAt?: number };
 type FileStoreEntry = { blob: Blob; name?: string; size?: number; updatedAt: number };
@@ -369,8 +369,8 @@ function SortableOrganizeTile({
           </div>
         </div>
       </div>
-      <div className="flex flex-col items-center gap-2 px-2 pb-2">
-        <span className="text-[0.68rem] font-semibold uppercase tracking-wide text-slate-500">
+      <div className="flex flex-col items-center gap-1 px-2 pb-1">
+        <span className="text-[0.65rem] font-semibold uppercase tracking-wide text-slate-700">
           Page {index + 1}
         </span>
         <div className="flex items-center justify-center gap-3">
@@ -382,7 +382,7 @@ function SortableOrganizeTile({
               event.stopPropagation();
               onRotate();
             }}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#9cc7ff] bg-[#e8f1ff] text-slate-700 shadow-[0_12px_35px_rgba(24,87,191,0.25)] transition hover:-translate-y-0.5"
           >
             <RotateCcw className="h-4 w-4" />
           </button>
@@ -1648,7 +1648,7 @@ function WorkspaceClient() {
             <div className="mx-auto mt-6 w-full px-6">
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={itemsIds} strategy={rectSortingStrategy}>
-                  <div className="grid grid-cols-1 justify-items-center gap-x-32 gap-y-11 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid grid-cols-1 justify-items-center gap-x-32 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
                     {pages.map((page, idx) => (
                       <SortableOrganizeTile
                         key={page.id}
