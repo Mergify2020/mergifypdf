@@ -848,6 +848,87 @@ function WorkspaceClient() {
     };
   }
 
+  const renderPreviewPage = (page: PageItem, idx: number) => {
+    const pageHighlights = highlights[page.id] ?? [];
+    return (
+      <div
+        key={page.id}
+        data-page-id={page.id}
+        ref={registerPreviewRef(page.id)}
+        className="mx-auto w-full max-w-[1500px]"
+      >
+        <div
+          className={`relative bg-white shadow-[0_12px_30px_rgba(15,23,42,0.18)] ${
+            activePageId === page.id ? "ring-2 ring-brand/50 shadow-brand/30" : ""
+          }`}
+          style={{ transform: `scale(${zoom})`, transformOrigin: "top center" }}
+        >
+          <div className="relative w-full" style={{ paddingBottom: getAspectPadding(page.width, page.height) }}>
+            <div
+              className="absolute inset-0 bg-white"
+              style={{
+                cursor:
+                  activeDrawingTool === "highlight"
+                    ? (`url(${HIGHLIGHT_CURSOR}) 4 24, crosshair` as CSSProperties["cursor"])
+                    : activeDrawingTool === "pencil"
+                    ? ("crosshair" as CSSProperties["cursor"])
+                    : undefined,
+              }}
+              onMouseDown={(event) => handleMarkupPointerDown(page.id, event)}
+              onMouseMove={(event) => handleMarkupPointerMove(page.id, event)}
+              onMouseUp={() => handleMarkupPointerUp(page.id)}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={page.preview} alt={`Page ${idx + 1}`} className="h-full w-full object-contain" draggable={false} />
+              <svg
+                className="absolute inset-0 h-full w-full"
+                style={{ pointerEvents: deleteMode ? "auto" : "none" }}
+                viewBox="0 0 1000 1000"
+                preserveAspectRatio="none"
+              >
+                {pageHighlights.map((stroke) =>
+                  stroke.points.length > 1 ? (
+                    <polyline
+                      key={stroke.id}
+                      points={stroke.points.map((pt) => `${pt.x * 1000},${pt.y * 1000}`).join(" ")}
+                      fill="none"
+                      stroke={stroke.color}
+                      strokeWidth={Math.max(1, stroke.thickness * 1000)}
+                      strokeLinecap="round"
+                      strokeOpacity={stroke.tool === "pencil" ? 1 : 0.25}
+                      style={{
+                        pointerEvents: deleteMode ? "stroke" : "none",
+                        cursor: deleteMode ? "pointer" : "default",
+                      }}
+                      onClick={(event) => {
+                        if (!deleteMode) return;
+                        event.preventDefault();
+                        event.stopPropagation();
+                        handleDeleteStroke(page.id, stroke.id);
+                      }}
+                    />
+                  ) : null
+                )}
+                {draftHighlight?.pageId === page.id && draftHighlight.points.length > 1 ? (
+                  <polyline
+                    aria-hidden
+                    points={draftHighlight.points.map((pt) => `${pt.x * 1000},${pt.y * 1000}`).join(" ")}
+                    fill="none"
+                    stroke={draftHighlight.color}
+                    strokeWidth={Math.max(1, draftHighlight.thickness * 1000)}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeOpacity={draftHighlight.tool === "pencil" ? 1 : 0.25}
+                  />
+                ) : null}
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const commitDraftHighlight = useCallback(
     (stroke: DraftHighlight | null, cancel?: boolean) => {
       if (!stroke || cancel || stroke.points.length < 2) {
@@ -1628,94 +1709,7 @@ function WorkspaceClient() {
                 ref={previewContainerRef}
                 className="h-[70vh] space-y-8 overflow-y-auto pr-4"
               >
-                {pages.map((page, idx) => {
-                  const pageHighlights = highlights[page.id] ?? [];
-                  return (
-                    <div
-                      key={page.id}
-                      data-page-id={page.id}
-                      ref={registerPreviewRef(page.id)}
-                      className="mx-auto w-full max-w-[1500px]"
-                    >
-                      <div
-                        className={`relative bg-white shadow-[0_12px_30px_rgba(15,23,42,0.18)] ${
-                          activePageId === page.id ? "ring-2 ring-brand/50 shadow-brand/30" : ""
-                        }`}
-                        style={{ transform: `scale(${zoom})`, transformOrigin: "top center" }}
-                      >
-                        <div className="relative w-full" style={{ paddingBottom: getAspectPadding(page.width, page.height) }}>
-                          <div
-                            className="absolute inset-0 bg-white"
-                            style={{
-                              cursor:
-                                activeDrawingTool === "highlight"
-                                  ? (`url(${HIGHLIGHT_CURSOR}) 4 24, crosshair` as CSSProperties["cursor"])
-                                  : activeDrawingTool === "pencil"
-                                  ? ("crosshair" as CSSProperties["cursor"])
-                                  : undefined,
-                            }}
-                            onMouseDown={(event) => handleMarkupPointerDown(page.id, event)}
-                            onMouseMove={(event) => handleMarkupPointerMove(page.id, event)}
-                            onMouseUp={() => handleMarkupPointerUp(page.id)}
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={page.preview}
-                              alt={`Page ${idx + 1}`}
-                              className="h-full w-full object-contain"
-                              draggable={false}
-                            />
-                            <svg
-                              className="absolute inset-0 h-full w-full"
-                              style={{ pointerEvents: deleteMode ? "auto" : "none" }}
-                              viewBox="0 0 1000 1000"
-                              preserveAspectRatio="none"
-                            >
-                              {pageHighlights.map((stroke) =>
-                                stroke.points.length > 1 ? (
-                                  <polyline
-                                    key={stroke.id}
-                                    points={stroke.points
-                                      .map((pt) => `${pt.x * 1000},${pt.y * 1000}`)
-                                      .join(" ")}
-                                    fill="none"
-                                    stroke={stroke.color}
-                                    strokeWidth={Math.max(1, stroke.thickness * 1000)}
-                                    strokeLinecap="round"
-                                    strokeOpacity={stroke.tool === "pencil" ? 1 : 0.25}
-                                    style={{
-                                      pointerEvents: deleteMode ? "stroke" : "none",
-                                      cursor: deleteMode ? "pointer" : "default",
-                                    }}
-                                    onClick={(event) => {
-                                      if (!deleteMode) return;
-                                      event.preventDefault();
-                                      event.stopPropagation();
-                                      handleDeleteStroke(page.id, stroke.id);
-                                    }}
-                                  />
-                                ) : null
-                              )}
-                              {draftHighlight?.pageId === page.id && draftHighlight.points.length > 1 ? (
-                                <polyline
-                                  aria-hidden
-                                  points={draftHighlight.points
-                                    .map((pt) => `${pt.x * 1000},${pt.y * 1000}`)
-                                    .join(" ")}
-                                  fill="none"
-                                  stroke={draftHighlight.color}
-                                  strokeWidth={Math.max(1, draftHighlight.thickness * 1000)}
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeOpacity={draftHighlight.tool === "pencil" ? 1 : 0.25}
-                                />
-                              ) : null}
-                            </svg>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                {pages.map(renderPreviewPage)}
               </div>
             </div>
 
