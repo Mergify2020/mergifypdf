@@ -344,7 +344,7 @@ function SortableOrganizeTile({
           style={{
             height: `${ORGANIZER_CARD_SIZE}px`,
             width: `${ORGANIZER_CARD_SIZE}px`,
-            padding: `${ORGANIZER_CARD_PADDING}px`,
+            padding: `${ORGANIZER_CARD_PADDING * 1.5}px`,
           }}
         >
           <div
@@ -362,7 +362,7 @@ function SortableOrganizeTile({
               style={{
                 width: "auto",
                 maxWidth: "none",
-                boxShadow: "0 25px 60px rgba(0,0,0,0.35)",
+                filter: "drop-shadow(0px 28px 60px rgba(15,23,42,0.25))",
               }}
               draggable={false}
             />
@@ -1645,10 +1645,10 @@ function WorkspaceClient() {
                 Done managing
               </button>
             </div>
-            <div className="mx-auto mt-6 w-full max-w-5xl px-6">
+            <div className="mx-auto mt-6 w-full px-4 sm:px-8">
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={itemsIds} strategy={rectSortingStrategy}>
-                  <div className="grid grid-cols-1 justify-items-center gap-x-28 gap-y-28 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid grid-cols-1 justify-items-center gap-x-32 gap-y-28 sm:grid-cols-2 lg:grid-cols-3">
                     {pages.map((page, idx) => (
                       <SortableOrganizeTile
                         key={page.id}
