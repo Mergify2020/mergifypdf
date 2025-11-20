@@ -369,7 +369,7 @@ function SortableOrganizeTile({
           </div>
         </div>
       </div>
-      <div className="flex flex-col items-center gap-2 px-2 pb-2">
+      <div className="flex flex-col items-center gap-1 px-2 pb-1">
         <div className="font-semibold text-slate-800">{index + 1}</div>
         <div className="flex items-center justify-center gap-3">
           <button
