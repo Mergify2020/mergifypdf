@@ -337,42 +337,40 @@ function SortableOrganizeTile({
   const rotationDegrees = normalizeRotation(item.rotation);
 
   return (
-    <div ref={setNodeRef} style={style} className="flex h-full flex-col gap-4" {...attributes} {...listeners}>
-      <div className="flex w-full flex-col items-center gap-2">
-        <div className="relative flex w-full justify-center">
+    <div ref={setNodeRef} style={style} className="flex h-full flex-col items-center gap-2" {...attributes} {...listeners}>
+      <div className="relative flex w-full justify-center">
+        <div
+          className="flex items-center justify-center overflow-visible"
+          style={{
+            height: `${ORGANIZER_CARD_SIZE}px`,
+            width: `${ORGANIZER_CARD_SIZE}px`,
+            padding: `${ORGANIZER_CARD_PADDING * 1.5}px`,
+          }}
+        >
           <div
-            className="flex items-center justify-center overflow-visible"
+            className="flex h-full w-full items-center justify-center"
             style={{
-              height: `${ORGANIZER_CARD_SIZE}px`,
-              width: `${ORGANIZER_CARD_SIZE}px`,
-              padding: `${ORGANIZER_CARD_PADDING * 1.5}px`,
+              transform: `rotate(${rotationDegrees}deg)`,
+              transformOrigin: "center",
             }}
           >
-            <div
-              className="flex h-full w-full items-center justify-center"
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={item.preview}
+              alt={`Page ${index + 1}`}
+              className="h-full rounded-none object-contain"
               style={{
-                transform: `rotate(${rotationDegrees}deg)`,
-                transformOrigin: "center",
+                width: "auto",
+                maxWidth: "none",
+                filter: "drop-shadow(0px 28px 60px rgba(15,23,42,0.25))",
               }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={item.preview}
-                alt={`Page ${index + 1}`}
-                className="h-full rounded-none object-contain"
-                style={{
-                  width: "auto",
-                  maxWidth: "none",
-                  filter: "drop-shadow(0px 28px 60px rgba(15,23,42,0.25))",
-                }}
-                draggable={false}
-              />
-            </div>
+              draggable={false}
+            />
           </div>
         </div>
-        <div className="text-lg font-semibold text-slate-800">{index + 1}</div>
       </div>
-      <div className="flex items-center justify-center gap-3 px-2 pb-6">
+      <div className="text-lg font-semibold text-slate-800">{index + 1}</div>
+      <div className="flex items-center justify-center gap-3">
         <button
           type="button"
           aria-label="Rotate page"
