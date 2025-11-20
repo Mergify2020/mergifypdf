@@ -1631,7 +1631,7 @@ function WorkspaceClient() {
         )}
 
         {organizeMode && !loading && pages.length > 0 && (
-          <div className="rounded-[40px] border border-slate-200 bg-white p-6 shadow-[0_25px_80px_rgba(15,23,42,0.15)] max-w-[1200px] mx-auto">
+          <div className="rounded-[40px] border border-slate-200 bg-white p-6 shadow-[0_25px_80px_rgba(15,23,42,0.15)] max-w-[1080px] mx-auto">
             <div className="flex flex-col gap-3 text-slate-700 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-xl font-semibold">Manage pages</h2>
