@@ -295,7 +295,7 @@ function SortableThumb({
           </span>
         </div>
         <div className="relative mt-3 w-full" style={{ paddingBottom: getAspectPadding(item.width, item.height) }}>
-          <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
+          <div className="absolute inset-0 flex items-center justify-center overflow-hidden group">
             <div
               className="flex h-full w-full items-center justify-center"
               style={{ transform: `rotate(${rotationDegrees}deg) scale(${scaleFix})`, transformOrigin: "center" }}
@@ -344,16 +344,17 @@ function SortableOrganizeTile({
     <div ref={setNodeRef} style={style} className="w-full" {...attributes} {...listeners}>
       {/* Page preview (no rounded corners) */}
       <div className="relative w-full" style={{ paddingBottom: getAspectPadding(item.width, item.height) }}>
-        <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
-          <div
-            className="h-full w-full"
-            style={{ transform: `rotate(${rotationDegrees}deg) scale(${scaleFix})`, transformOrigin: "center" }}
-          >
+        <div className="absolute inset-0 flex items-center justify-center overflow-hidden group">
+          <div className="h-full w-full transition-transform duration-200 ease-out group-hover:scale-[1.02] group-hover:-translate-y-1">
+            <div
+              className="h-full w-full"
+              style={{ transform: `rotate(${rotationDegrees}deg) scale(${scaleFix})`, transformOrigin: "center" }}
+            >
             {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                 src={item.preview}
                 alt={`Page ${index + 1}`}
-                className="h-full w-full object-contain select-none shadow-[0_4px_18px_rgba(0,0,0,0.08)]"
+                className="h-full w-full object-contain select-none shadow-[0_4px_10px_rgba(15,23,42,0.08),_0_18px_45px_rgba(15,23,42,0.12)] group-hover:shadow-[0_10px_35px_rgba(15,23,42,0.18)] transition-shadow duration-200 ease-out"
                 draggable={false}
               />
           </div>
@@ -846,7 +847,7 @@ function WorkspaceClient() {
           style={{ transform: `scale(${zoom})`, transformOrigin: "top center" }}
         >
           <div className="relative w-full" style={{ paddingBottom: getAspectPadding(page.width, page.height) }}>
-            <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
+            <div className="absolute inset-0 flex items-center justify-center overflow-hidden group">
               <div
                 className="absolute inset-0 bg-white"
                 style={{
