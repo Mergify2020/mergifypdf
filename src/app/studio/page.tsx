@@ -344,7 +344,7 @@ function SortableOrganizeTile({
       {...attributes}
       {...listeners}
     >
-      <div className="flex w-full max-w-[260px] flex-col items-center rounded-3xl bg-white p-4 shadow-[0_25px_80px_rgba(15,23,42,0.15)] ring-1 ring-slate-200">
+      <div className="flex w-full max-w-[260px] flex-col items-center gap-2 rounded-3xl bg-white px-4 py-3 shadow-[0_25px_80px_rgba(15,23,42,0.15)] ring-1 ring-slate-200">
         <div className="relative flex w-full justify-center">
           <div
             className="flex items-center justify-center overflow-visible"
@@ -376,8 +376,8 @@ function SortableOrganizeTile({
             </div>
           </div>
         </div>
-        <div className="mt-1 text-lg font-semibold text-slate-800">{index + 1}</div>
-        <div className="mt-2 flex items-center justify-center gap-3">
+        <div className="text-lg font-semibold text-slate-800">{index + 1}</div>
+        <div className="mt-1 flex items-center justify-center gap-3">
           <button
             type="button"
             aria-label="Rotate page"
