@@ -79,8 +79,8 @@ const WORKSPACE_DB_NAME = "mpdf-file-store";
 const WORKSPACE_DB_STORE = "files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
 const DEFAULT_ASPECT_RATIO = 792 / 612; // fallback letter portrait
-const ORGANIZER_CARD_SIZE = 360; // px height/width for organizer cards
-const ORGANIZER_CARD_PADDING = 32; // inner padding to keep thumbnails off the border
+const ORGANIZER_CARD_SIZE = 432; // px height/width for organizer cards (20% larger)
+const ORGANIZER_CARD_PADDING = 38; // inner padding to keep thumbnails off the border
 
 type StoredSourceMeta = { id: string; name?: string; size?: number; updatedAt?: number };
 type FileStoreEntry = { blob: Blob; name?: string; size?: number; updatedAt: number };
@@ -1645,10 +1645,10 @@ function WorkspaceClient() {
                 Done managing
               </button>
             </div>
-            <div className="mx-auto mt-6 w-full px-8">
+            <div className="mx-auto mt-6 w-full px-6">
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={itemsIds} strategy={rectSortingStrategy}>
-                  <div className="grid grid-cols-1 justify-items-center gap-x-32 gap-y-28 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid grid-cols-1 justify-items-center gap-x-32 gap-y-11 sm:grid-cols-2 lg:grid-cols-3">
                     {pages.map((page, idx) => (
                       <SortableOrganizeTile
                         key={page.id}
