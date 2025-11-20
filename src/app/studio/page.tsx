@@ -79,7 +79,6 @@ const WORKSPACE_DB_NAME = "mpdf-file-store";
 const WORKSPACE_DB_STORE = "files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
 const DEFAULT_ASPECT_RATIO = 792 / 612; // fallback letter portrait
-const MANAGE_TILE_PADDING = DEFAULT_ASPECT_RATIO * 1.15; // extra room for landscape previews
 
 type StoredSourceMeta = { id: string; name?: string; size?: number; updatedAt?: number };
 type FileStoreEntry = { blob: Blob; name?: string; size?: number; updatedAt: number };
@@ -277,10 +276,6 @@ function getAspectPadding(width?: number, height?: number) {
   return `${(height / width) * 100}%`;
 }
 
-function getManageTilePadding() {
-  return `${MANAGE_TILE_PADDING * 100}%`;
-}
-
 /** One sortable thumbnail tile */
 function SortableThumb({
   item,
@@ -367,7 +362,7 @@ function SortableOrganizeTile({
       <div className="px-2 text-xs font-semibold text-slate-500">
         <span className="text-slate-900">Page {index + 1}</span>
       </div>
-      <div className="relative w-full" style={{ paddingBottom: getManageTilePadding() }}>
+      <div className="relative w-full" style={{ paddingBottom: getAspectPadding(item.width, item.height) }}>
         <div className="absolute inset-0 flex items-center justify-center overflow-hidden border border-slate-200 bg-white shadow-[0_8px_18px_rgba(15,23,42,0.12)]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
