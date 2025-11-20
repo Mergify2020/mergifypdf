@@ -373,10 +373,9 @@ function SortableOrganizeTile({
       </div>
       <div className="relative w-full">
         <div
-          className="flex w-full items-center justify-center overflow-hidden border border-slate-200 bg-white shadow-[0_8px_18px_rgba(15,23,42,0.12)]"
+          className="flex w-full items-center justify-center overflow-hidden"
           style={{
             height: `${ORGANIZER_CARD_HEIGHT}px`,
-            borderRadius: `${ORGANIZER_CARD_RADIUS}px`,
             padding: `${ORGANIZER_CARD_PADDING}px`,
           }}
         >
