@@ -348,12 +348,14 @@ function SortableOrganizeTile({
   onRotate,
   onDelete,
   rotating = false,
+  rotationPreviewId,
 }: {
   item: PageItem;
   index: number;
   onRotate: () => void;
   onDelete: () => void;
   rotating?: boolean;
+  rotationPreviewId?: string | null;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
     id: item.id,
@@ -365,6 +367,7 @@ function SortableOrganizeTile({
     cursor: "grab",
   };
   const rotationDegrees = normalizeRotation(item.rotation);
+  const { rotationPreviewId } = props;
 
   return (
     <div ref={setNodeRef} style={style} className="flex h-full flex-col gap-3" {...attributes} {...listeners}>
@@ -377,6 +380,7 @@ function SortableOrganizeTile({
           style={{
             height: `${ORGANIZER_CARD_HEIGHT}px`,
             padding: `${ORGANIZER_CARD_PADDING}px`,
+            perspective: "1200px",
           }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -389,7 +393,7 @@ function SortableOrganizeTile({
               width: "auto",
               maxWidth: "none",
               transform: `rotate(${rotationDegrees}deg)`,
-              transition: "transform 0.2s ease",
+              transition: "transform 0.25s ease",
             }}
             draggable={false}
           />
@@ -460,6 +464,7 @@ function WorkspaceClient() {
   const [projectNameError, setProjectNameError] = useState<string | null>(null);
   const [organizeMode, setOrganizeMode] = useState(false);
   const [rotatingPages, setRotatingPages] = useState<Record<string, boolean>>({});
+  const [selectedRotationPage, setSelectedRotationPage] = useState<string | null>(null);
 
   const addInputRef = useRef<HTMLInputElement>(null);
   const renderedSourcesRef = useRef(0);
