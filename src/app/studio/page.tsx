@@ -1715,7 +1715,7 @@ function WorkspaceClient() {
                       </div>
                     </div>
                   );
-                })}
+                )}
               </div>
             </div>
 
