@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from "react";
 import dynamic from "next/dynamic";
 import { PDFDocument, rgb, LineCapStyle, LineJoinStyle, degrees } from "pdf-lib";
+import { AnimatePresence, motion } from "framer-motion";
 import { Highlighter, Minus, Plus, Trash2, Undo2, Eraser, Pencil, RotateCcw } from "lucide-react";
 import {
   DndContext,
@@ -79,6 +80,20 @@ const WORKSPACE_DB_NAME = "mpdf-file-store";
 const WORKSPACE_DB_STORE = "files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
 const DEFAULT_ASPECT_RATIO = 792 / 612; // fallback letter portrait
+const SOFT_EASE: [number, number, number, number] = [0.4, 0, 0.2, 1];
+const VIEW_TRANSITION = { duration: 0.2, ease: SOFT_EASE };
+const GRID_VARIANTS = {
+  hidden: { opacity: 0, scale: 0.97 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    transition: { duration: 0.2, ease: SOFT_EASE, staggerChildren: 0.05, delayChildren: 0.02 },
+  },
+};
+const TILE_VARIANTS = {
+  hidden: { opacity: 0, y: 10 },
+  visible: { opacity: 1, y: 0 },
+};
 
 type StoredSourceMeta = { id: string; name?: string; size?: number; updatedAt?: number };
 type FileStoreEntry = { blob: Blob; name?: string; size?: number; updatedAt: number };
@@ -320,11 +335,13 @@ function SortableOrganizeTile({
   index,
   onRotate,
   onDelete,
+  animateIn,
 }: {
   item: PageItem;
   index: number;
   onRotate: () => void;
   onDelete: () => void;
+  animateIn?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
@@ -341,26 +358,44 @@ function SortableOrganizeTile({
   const scaleFix = isQuarterTurn ? Math.min(ratio, 1 / ratio) : 1;
 
   return (
-    <div ref={setNodeRef} style={style} className="w-full" {...attributes} {...listeners}>
+    <motion.div
+      ref={setNodeRef}
+      style={style}
+      className="w-full"
+      variants={TILE_VARIANTS}
+      initial={animateIn ? "hidden" : false}
+      animate={animateIn ? "visible" : false}
+      transition={{ duration: 0.2, ease: SOFT_EASE }}
+      {...attributes}
+      {...listeners}
+    >
       {/* Page preview (no rounded corners) */}
       <div className="relative w-full h-[360px] sm:h-[380px] lg:h-[420px]">
         <div className="absolute inset-0 flex items-center justify-center overflow-hidden group">
-          <div className={`h-full w-full transition-transform duration-200 ease-out ${isDragging ? '' : 'group-hover:scale-[1.02] group-hover:-translate-y-1'}`}>
+          <div
+            className={`h-full w-full transition-transform duration-200 ease-out ${
+              isDragging ? "" : "group-hover:scale-[1.02] group-hover:-translate-y-1"
+            }`}
+          >
             <div
-              className={`h-full w-full bg-white border border-[rgba(148,163,184,0.5)] ${isDragging ? 'shadow-[0_8px_26px_rgba(15,23,42,0.24),_0_24px_60px_rgba(15,23,42,0.30)]' : 'shadow-[0_6px_20px_rgba(15,23,42,0.18),_0_18px_45px_rgba(15,23,42,0.22)] group-hover:outline group-hover:outline-[rgba(37,99,235,0.35)] group-hover:outline-1 group-hover:outline-offset-2 group-hover:shadow-[0_6px_20px_rgba(15,23,42,0.21),_0_18px_45px_rgba(15,23,42,0.25)]'} transition-shadow duration-200 ease-out`}
+              className={`h-full w-full bg-white border border-[rgba(148,163,184,0.5)] ${
+                isDragging
+                  ? "shadow-[0_8px_26px_rgba(15,23,42,0.24),_0_24px_60px_rgba(15,23,42,0.30)]"
+                  : "shadow-[0_6px_20px_rgba(15,23,42,0.18),_0_18px_45px_rgba(15,23,42,0.22)] group-hover:outline group-hover:outline-[rgba(37,99,235,0.35)] group-hover:outline-1 group-hover:outline-offset-2 group-hover:shadow-[0_6px_20px_rgba(15,23,42,0.21),_0_18px_45px_rgba(15,23,42,0.25)]"
+              } transition-shadow duration-200 ease-out`}
               style={{ transform: `rotate(${rotationDegrees}deg) scale(${scaleFix})`, transformOrigin: "center" }}
             >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
                 src={item.preview}
                 alt={`Page ${index + 1}`}
                 className="h-full w-full object-contain select-none"
                 draggable={false}
               />
+            </div>
           </div>
-          </div>
+        </div>
       </div>
-    </div>
       {/* Controls: page number + two circular buttons (no grouped background) */}
       <div className="mt-1">
         <div className="text-center text-sm font-semibold text-slate-800">Page {index + 1}</div>
@@ -391,7 +426,7 @@ function SortableOrganizeTile({
           </button>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -1622,81 +1657,105 @@ function WorkspaceClient() {
           </div>
         )}
 
-        {organizeMode && !loading && pages.length > 0 && (
-          <div className="w-full">
-            <div className="flex flex-col gap-3 text-slate-700 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-xl font-semibold">Manage pages</h2>
-                <p className="text-sm text-slate-300">Drag to reorder. Rotate or delete any page.</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setOrganizeMode(false)}
-                className="rounded-full bg-[#024d7c] px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-[#012a44]/30 transition hover:-translate-y-0.5"
-              >
-                Done managing
-              </button>
-            </div>
-            <div className="mt-6">
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                <SortableContext items={itemsIds} strategy={rectSortingStrategy}>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {pages.map((page, idx) => (
-                      <SortableOrganizeTile
-                        key={page.id}
-                        item={page}
-                        index={idx}
-                        onRotate={() => handleRotatePage(page.id)}
-                        onDelete={() => handleDeletePage(page.id)}
-                      />
-                    ))}
-                  </div>
-                </SortableContext>
-              </DndContext>
-            </div>
-          </div>
-        )}
-
-        {!organizeMode && !loading && pages.length > 0 && (
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
-            <div>
-              <div
-                ref={previewContainerRef}
-                className="h-[70vh] space-y-8 overflow-y-auto pr-4"
-              >
-                {pages.map(renderPreviewPage)}
-              </div>
-            </div>
-
-            <div className="lg:w-[240px]">
-              <div className="flex h-full flex-col rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
-                <div className="flex flex-col gap-1">
-                  <p className="text-sm font-semibold text-white">Page order</p>
-                  <p className="text-xs text-slate-300">Tap to focus or drag to reorder</p>
+        <AnimatePresence mode="wait">
+          {organizeMode && !loading && pages.length > 0 ? (
+            <motion.div
+              key="manage-view"
+              initial={{ opacity: 0, scale: 0.97 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.97 }}
+              transition={VIEW_TRANSITION}
+              className="w-full"
+            >
+              <div className="flex flex-col gap-3 text-slate-700 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold">Manage pages</h2>
+                  <p className="text-sm text-slate-300">Drag to reorder. Rotate or delete any page.</p>
                 </div>
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={handleDragEnd}
+                <button
+                  type="button"
+                  onClick={() => setOrganizeMode(false)}
+                  className="rounded-full bg-[#024d7c] px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-[#012a44]/30 transition hover:-translate-y-0.5"
                 >
-                  <SortableContext items={itemsIds} strategy={verticalListSortingStrategy}>
-                    <ul className="mt-4 flex max-h-[70vh] flex-col gap-3 overflow-y-auto pr-1">
-                      {pages.map((p, i) => (
-                        <SortableThumb
-                          key={p.id}
-                          item={p}
-                          index={i}
-                          selected={p.id === activePageId}
-                          onSelect={() => handleSelectPage(p.id)}
+                  Done managing
+                </button>
+              </div>
+              <div className="mt-6">
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                  <SortableContext items={itemsIds} strategy={rectSortingStrategy}>
+                    <motion.div
+                      className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                      variants={GRID_VARIANTS}
+                      initial="hidden"
+                      animate="visible"
+                      exit="hidden"
+                      transition={VIEW_TRANSITION}
+                    >
+                      {pages.map((page, idx) => (
+                        <SortableOrganizeTile
+                          key={page.id}
+                          item={page}
+                          index={idx}
+                          onRotate={() => handleRotatePage(page.id)}
+                          onDelete={() => handleDeletePage(page.id)}
+                          animateIn={organizeMode}
                         />
                       ))}
-                    </ul>
+                    </motion.div>
                   </SortableContext>
                 </DndContext>
               </div>
-            </div>
-          </div>
-        )}
+            </motion.div>
+          ) : null}
+
+          {!organizeMode && !loading && pages.length > 0 ? (
+            <motion.div
+              key="preview-view"
+              initial={{ opacity: 0.95, scale: 0.97 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.97 }}
+              transition={VIEW_TRANSITION}
+              className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]"
+            >
+              <div>
+                <div
+                  ref={previewContainerRef}
+                  className="h-[70vh] space-y-8 overflow-y-auto pr-4"
+                >
+                  {pages.map(renderPreviewPage)}
+                </div>
+              </div>
+
+              <div className="lg:w-[240px]">
+                <div className="flex h-full flex-col rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
+                  <div className="flex flex-col gap-1">
+                    <p className="text-sm font-semibold text-white">Page order</p>
+                    <p className="text-xs text-slate-300">Tap to focus or drag to reorder</p>
+                  </div>
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <SortableContext items={itemsIds} strategy={verticalListSortingStrategy}>
+                      <ul className="mt-4 flex max-h-[70vh] flex-col gap-3 overflow-y-auto pr-1">
+                        {pages.map((p, i) => (
+                          <SortableThumb
+                            key={p.id}
+                            item={p}
+                            index={i}
+                            selected={p.id === activePageId}
+                            onSelect={() => handleSelectPage(p.id)}
+                          />
+                        ))}
+                      </ul>
+                    </SortableContext>
+                  </DndContext>
+                </div>
+              </div>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
 
         {!loading && pages.length === 0 && (
           <div className="rounded-3xl border border-dashed border-slate-200 bg-white/80 p-12 text-center shadow-sm">
