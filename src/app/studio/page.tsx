@@ -464,6 +464,11 @@ function WorkspaceClient() {
   const renderedSourcesRef = useRef(0);
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const previewNodeMap = useRef<Map<string, HTMLDivElement>>(new Map());
+  const pageCanvasMap = useRef<Map<string, HTMLCanvasElement>>(new Map());
+  const renderedScaleRef = useRef<Map<string, number>>(new Map());
+  const renderTimeoutRef = useRef<number | null>(null);
+  const pdfDocCacheRef = useRef<Map<number, Promise<any>>>(new Map());
+  const pdfjsRef = useRef<typeof import("pdfjs-dist") | null>(null);
   const hasHydratedSources = useRef(false);
   const objectUrlCacheRef = useRef<Map<string, string>>(new Map());
   const hasHydratedHighlights = useRef(false);
@@ -753,6 +758,11 @@ function WorkspaceClient() {
   }, [pages, sources.length]);
 
   useEffect(() => {
+    pdfDocCacheRef.current.clear();
+    renderedScaleRef.current.clear();
+  }, [sources]);
+
+  useEffect(() => {
     const container = previewContainerRef.current;
     if (!container || pages.length === 0) return;
 
@@ -869,6 +879,16 @@ function WorkspaceClient() {
     };
   }
 
+  function registerCanvasRef(id: string) {
+    return (node: HTMLCanvasElement | null) => {
+      if (node) {
+        pageCanvasMap.current.set(id, node);
+      } else {
+        pageCanvasMap.current.delete(id);
+      }
+    };
+  }
+
   const renderPreviewPage = (page: PageItem, idx: number) => {
     const pageHighlights = highlights[page.id] ?? [];
     const rotationDegrees = normalizeRotation(page.rotation);
@@ -909,8 +929,11 @@ function WorkspaceClient() {
               onMouseMove={(event) => handleMarkupPointerMove(page.id, event)}
               onMouseUp={() => handleMarkupPointerUp(page.id)}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={page.preview} alt={`Page ${idx + 1}`} className="h-full w-full object-contain" draggable={false} />
+              <canvas
+                ref={registerCanvasRef(page.id)}
+                className="h-full w-full"
+                style={{ width: "100%", height: "100%" }}
+              />
               <svg
                 className="absolute inset-0 h-full w-full"
                 style={{ pointerEvents: deleteMode ? "auto" : "none" }}
@@ -1017,6 +1040,29 @@ function WorkspaceClient() {
     if (highlightMode) return "highlight";
     if (pencilMode) return "pencil";
     return null;
+  }
+
+  async function getPdfJs() {
+    if (pdfjsRef.current) return pdfjsRef.current;
+    const pdfjsLib = (await import("pdfjs-dist")) as typeof import("pdfjs-dist") & {
+      GlobalWorkerOptions: { workerSrc: string };
+    };
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+    pdfjsRef.current = pdfjsLib;
+    return pdfjsLib;
+  }
+
+  async function getPdfDocument(srcIdx: number) {
+    if (pdfDocCacheRef.current.has(srcIdx)) {
+      return pdfDocCacheRef.current.get(srcIdx)!;
+    }
+    const loader = (async () => {
+      const pdfjsLib = await getPdfJs();
+      const doc = await pdfjsLib.getDocument(sources[srcIdx].url).promise;
+      return doc;
+    })();
+    pdfDocCacheRef.current.set(srcIdx, loader);
+    return loader;
   }
 
   const itemsIds = useMemo(() => pages.map((p) => p.id), [pages]);
@@ -1339,6 +1385,63 @@ function WorkspaceClient() {
   useEffect(() => {
     computeFitZoom();
   }, [computeFitZoom, pages.length, activePageIndex]);
+
+  useEffect(() => {
+    const existingIds = new Set(pages.map((p) => p.id));
+    Array.from(renderedScaleRef.current.keys()).forEach((id) => {
+      if (!existingIds.has(id)) {
+        renderedScaleRef.current.delete(id);
+      }
+    });
+  }, [pages]);
+
+  useEffect(() => {
+    if (renderTimeoutRef.current) {
+      window.clearTimeout(renderTimeoutRef.current);
+    }
+    if (pages.length === 0) return;
+    let cancelled = false;
+    renderTimeoutRef.current = window.setTimeout(async () => {
+      try {
+        await getPdfJs();
+        for (const page of pages) {
+          if (cancelled) return;
+          const canvas = pageCanvasMap.current.get(page.id);
+          if (!canvas) continue;
+          const currentScale = renderedScaleRef.current.get(page.id);
+          if (currentScale && Math.abs(currentScale - zoom) < 0.001) continue;
+          const pdfDoc = await getPdfDocument(page.srcIdx);
+          if (!pdfDoc) continue;
+          const pdfPage = await pdfDoc.getPage(page.pageIdx + 1);
+          const viewport = pdfPage.getViewport({ scale: zoom });
+          const ctx = canvas.getContext("2d");
+          if (!ctx) continue;
+          const deviceScale = getDevicePixelRatio();
+          canvas.style.width = `${viewport.width}px`;
+          canvas.style.height = `${viewport.height}px`;
+          canvas.width = Math.floor(viewport.width * deviceScale);
+          canvas.height = Math.floor(viewport.height * deviceScale);
+          ctx.setTransform(deviceScale, 0, 0, deviceScale, 0, 0);
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = "high";
+          await pdfPage.render({
+            canvasContext: ctx,
+            viewport,
+            transform: deviceScale !== 1 ? [deviceScale, 0, 0, deviceScale, 0, 0] : undefined,
+          }).promise;
+          renderedScaleRef.current.set(page.id, zoom);
+        }
+      } catch (err) {
+        console.error("Render failed", err);
+      }
+    }, 120);
+    return () => {
+      cancelled = true;
+      if (renderTimeoutRef.current) {
+        window.clearTimeout(renderTimeoutRef.current);
+      }
+    };
+  }, [zoom, pages, sources, getPdfDocument]);
 
   useEffect(() => {
     if (!showDelayOverlay) return;
