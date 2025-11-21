@@ -292,56 +292,51 @@ function SortableThumb({
 
   return (
     <li ref={setNodeRef} style={style} className="w-full" {...attributes}>
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={onSelect}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            onSelect();
-          }
-        }}
-        className={`group relative w-full rounded-2xl bg-white/95 shadow-sm transition ${
-          selected ? "border-2 border-black shadow-brand/30" : "border border-slate-200 hover:border-brand/50 hover:shadow-md"
-        }`}
-      >
-        <div className="flex items-center justify-between px-3 pt-3 text-xs font-semibold text-slate-500">
-          <span className="text-slate-900">Page {index + 1}</span>
-          <span
-            className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-[0.65rem] font-semibold text-white ${
-              selected ? "bg-brand" : "bg-slate-900/70"
-            }`}
-          >
-            {index + 1}
-          </span>
-        </div>
-        <button
-          type="button"
-          aria-label="Drag page"
-          className="absolute right-2 top-2 rounded-full p-1 text-slate-500 transition hover:bg-slate-100 active:cursor-grabbing"
-          {...listeners}
-          onClick={(event) => event.stopPropagation()}
+      <div className="flex w-full flex-col items-center gap-1">
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={onSelect}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              onSelect();
+            }
+          }}
+          className={`group relative w-full overflow-hidden bg-white transition shadow-sm ${
+            selected ? "border-2 border-black shadow-brand/30" : "border border-slate-200 hover:border-brand/50 hover:shadow-md"
+          }`}
         >
-          <svg width="14" height="16" viewBox="0 0 24 24" fill="none">
-            <path d="M10 4h-2v2h2V4Zm6 0h-2v2h2V4Zm-6 6h-2v2h2v-2Zm6 0h-2v2h2v-2Zm-6 6h-2v2h2v-2Zm6 0h-2v2h2v-2Z" stroke="currentColor" strokeWidth="1.5" />
-          </svg>
-        </button>
-        <div className="relative mt-3 w-full" style={{ paddingBottom: getAspectPadding(item.width, item.height) }}>
-          <div className="absolute inset-0 flex items-center justify-center overflow-hidden group">
-            <div
-              className="flex h-full w-full items-center justify-center"
-              style={{ transform: `rotate(${rotationDegrees}deg) scale(${scaleFix})`, transformOrigin: "center" }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={item.thumb}
-                alt={`Page ${index + 1}`}
-                className="h-full w-full object-contain"
-                draggable={false}
-              />
+          <button
+            type="button"
+            aria-label="Drag page"
+            className="absolute right-2 top-2 rounded-full p-1 text-slate-500 transition hover:bg-slate-100 active:cursor-grabbing"
+            {...listeners}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <svg width="14" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M10 4h-2v2h2V4Zm6 0h-2v2h2V4Zm-6 6h-2v2h2v-2Zm6 0h-2v2h2v-2Zm-6 6h-2v2h2v-2Zm6 0h-2v2h2v-2Z" stroke="currentColor" strokeWidth="1.5" />
+            </svg>
+          </button>
+          <div className="relative w-full" style={{ paddingBottom: getAspectPadding(item.width, item.height) }}>
+            <div className="absolute inset-0 flex items-center justify-center overflow-hidden group">
+              <div
+                className="flex h-full w-full items-center justify-center"
+                style={{ transform: `rotate(${rotationDegrees}deg) scale(${scaleFix})`, transformOrigin: "center" }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={item.thumb}
+                  alt={`Page ${index + 1}`}
+                  className="h-full w-full object-contain"
+                  draggable={false}
+                />
+              </div>
             </div>
           </div>
+        </div>
+        <div className={`text-center text-xs ${selected ? "font-semibold text-slate-800" : "text-slate-500"}`}>
+          Page {index + 1}
         </div>
       </div>
     </li>
