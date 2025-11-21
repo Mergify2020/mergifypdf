@@ -1540,10 +1540,10 @@ useEffect(() => {
   }
 
   return (
-    <main className="flex min-h-screen flex-col bg-[#f3f6fb] pt-16">
-      <div className="mx-auto flex w-full max-w-[1700px] flex-1 flex-col gap-6 px-4 pb-10 pt-4 lg:px-10 lg:pt-6">
+    <main className="flex min-h-screen flex-col bg-[#f3f6fb] pt-6">
+      <div className="mx-auto flex w-full max-w-[1700px] flex-1 flex-col gap-6 px-4 pb-10 pt-2 lg:px-10 lg:pt-4">
         <div className="mx-auto w-full max-w-6xl">
-          <div className="mb-6 overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
+          <div className="mb-4 overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
             <div className="flex h-[58px] items-center justify-between border-b border-slate-200/70 bg-white px-5 sm:px-7">
               <div className="flex flex-1 flex-col gap-1">
                 <span className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-slate-400">
@@ -1887,32 +1887,34 @@ useEffect(() => {
                     className="editor-shell mx-auto flex h-full min-h-0 w-full max-w-[1280px] flex-col gap-6 px-4 lg:flex-row lg:items-start lg:gap-6 lg:px-6"
                   >
                     <div className="viewer flex-1 min-h-0">
-                      {maxScrollX > 0 ? (
-                        <div className="mb-2 px-4">
-                          <input
-                            type="range"
-                            min={0}
-                            max={maxScrollX}
-                            value={scrollX}
-                            onChange={(e) => {
-                              const el = viewerScrollRef.current;
-                              if (!el) return;
-                              const next = Number(e.target.value);
-                              el.scrollLeft = next;
-                              setScrollX(next);
-                            }}
-                            className="horizontal-slider w-full"
-                          />
-                        </div>
-                      ) : null}
-                      <div
-                        ref={viewerScrollRef}
-                        className="viewer-shell viewer-scroll mx-auto flex h-full w-full max-w-[1000px] flex-col items-start justify-start overflow-auto px-4 pt-5"
-                      >
-                        <div className="flex w-full flex-col items-center gap-8">
-                          {activePageIndex >= 0 && pages[activePageIndex]
-                            ? renderPreviewPage(pages[activePageIndex], activePageIndex)
-                            : null}
+                      <div className="flex h-full min-h-0 flex-col">
+                        {maxScrollX > 0 ? (
+                          <div className="mb-2 px-4">
+                            <input
+                              type="range"
+                              min={0}
+                              max={maxScrollX}
+                              value={scrollX}
+                              onChange={(e) => {
+                                const el = viewerScrollRef.current;
+                                if (!el) return;
+                                const next = Number(e.target.value);
+                                el.scrollLeft = next;
+                                setScrollX(next);
+                              }}
+                              className="horizontal-slider w-full"
+                            />
+                          </div>
+                        ) : null}
+                        <div
+                          ref={viewerScrollRef}
+                          className="viewer-shell viewer-scroll mx-auto flex flex-1 min-h-0 w-full max-w-[1000px] flex-col items-start justify-start overflow-auto px-4 pt-5"
+                        >
+                          <div className="flex w-full flex-col items-center gap-8">
+                            {activePageIndex >= 0 && pages[activePageIndex]
+                              ? renderPreviewPage(pages[activePageIndex], activePageIndex)
+                              : null}
+                          </div>
                         </div>
                       </div>
                     </div>
