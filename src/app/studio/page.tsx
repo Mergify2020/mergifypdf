@@ -1887,7 +1887,7 @@ useEffect(() => {
                   >
                     <div className="viewer flex-1 min-h-0">
                       {maxScrollX > 0 ? (
-                        <div className="mb-2 flex items-center px-4">
+                        <div className="mb-2 px-4">
                           <input
                             type="range"
                             min={0}
@@ -1900,7 +1900,7 @@ useEffect(() => {
                               el.scrollLeft = next;
                               setScrollX(next);
                             }}
-                            className="h-2 w-full cursor-pointer accent-slate-900"
+                            className="horizontal-slider w-full"
                           />
                         </div>
                       ) : null}
@@ -2106,12 +2106,35 @@ useEffect(() => {
         </div>
       ) : null}
       <style jsx global>{`
-        .viewer-scroll {
-          overflow: auto;
-          scrollbar-width: none;
+        .horizontal-slider {
+          -webkit-appearance: none;
+          appearance: none;
+          height: 4px;
+          border-radius: 9999px;
+          background-color: #e5e7eb;
+          cursor: pointer;
         }
-        .viewer-scroll::-webkit-scrollbar {
-          display: none;
+        .horizontal-slider::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 12px;
+          height: 12px;
+          border-radius: 9999px;
+          background-color: #111827;
+          border: none;
+          margin-top: -4px;
+        }
+        .horizontal-slider::-moz-range-thumb {
+          width: 12px;
+          height: 12px;
+          border-radius: 9999px;
+          background-color: #111827;
+          border: none;
+        }
+        .horizontal-slider::-moz-range-track {
+          height: 4px;
+          border-radius: 9999px;
+          background-color: #e5e7eb;
         }
         @keyframes mpdf-progress {
           from {
