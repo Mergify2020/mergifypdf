@@ -1832,9 +1832,9 @@ useEffect(() => {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.97 }}
               transition={VIEW_TRANSITION}
-              className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]"
+              className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-6"
             >
-              <div className="mx-auto w-full max-w-[960px]">
+              <div className="viewer grow mx-auto w-full max-w-[960px]">
                 <div
                   ref={previewContainerRef}
                   className="viewer-shell flex h-[70vh] flex-col items-center justify-start overflow-auto px-4 pt-5"
@@ -1845,7 +1845,7 @@ useEffect(() => {
                 </div>
               </div>
 
-              <div className="lg:w-[240px]">
+              <aside className="sidebar w-full shrink-0 lg:w-[240px]">
                 <div className="flex h-full flex-col rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
                   <div className="flex flex-col gap-1">
                     <p className="text-sm font-semibold text-white">Page order</p>
@@ -1871,7 +1871,7 @@ useEffect(() => {
                     </SortableContext>
                   </DndContext>
                 </div>
-              </div>
+              </aside>
             </motion.div>
           ) : null}
         </AnimatePresence>
