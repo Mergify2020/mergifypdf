@@ -441,7 +441,8 @@ function WorkspaceClient() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activePageId, setActivePageId] = useState<string | null>(null);
-  const [zoom, setZoom] = useState(1);
+  const [zoomMultiplier, setZoomMultiplier] = useState(1);
+  const [fitZoom, setFitZoom] = useState(1);
   const [highlightMode, setHighlightMode] = useState(false);
   const [highlightColor, setHighlightColor] = useState<HighlightColorKey>("yellow");
   const [highlightThickness, setHighlightThickness] = useState(14);
@@ -869,82 +870,87 @@ function WorkspaceClient() {
   const renderPreviewPage = (page: PageItem, idx: number) => {
     const pageHighlights = highlights[page.id] ?? [];
     const rotationDegrees = normalizeRotation(page.rotation);
+    const naturalWidth = page.width || 612;
+    const naturalHeight = page.height || naturalWidth * DEFAULT_ASPECT_RATIO;
+    const rotated = rotationDegrees % 180 !== 0;
+    const baseWidth = rotated ? naturalHeight : naturalWidth;
+    const baseHeight = rotated ? naturalWidth : naturalHeight;
+    const displayWidth = baseWidth * zoom;
+    const displayHeight = baseHeight * zoom;
     return (
       <div
         key={page.id}
         data-page-id={page.id}
         ref={registerPreviewRef(page.id)}
-        className="mx-auto w-full max-w-[1500px]"
+        className="mx-auto w-fit"
       >
         <div
           className={`relative bg-white shadow-[0_12px_30px_rgba(15,23,42,0.18)] ${
             activePageId === page.id ? "ring-2 ring-brand/50 shadow-brand/30" : ""
           }`}
-          style={{ transform: `scale(${zoom})`, transformOrigin: "top center" }}
+          style={{ width: displayWidth, height: displayHeight }}
         >
-          <div className="relative w-full" style={{ paddingBottom: getAspectPadding(page.width, page.height) }}>
-            <div className="absolute inset-0 flex items-center justify-center overflow-hidden group">
-              <div
-                className="absolute inset-0 bg-white"
-                style={{
-                  transform: `rotate(${rotationDegrees}deg)`,
-                  transformOrigin: "center",
-                  cursor:
-                    activeDrawingTool === "highlight"
-                      ? (`url(${HIGHLIGHT_CURSOR}) 4 24, crosshair` as CSSProperties["cursor"])
-                      : activeDrawingTool === "pencil"
-                      ? ("crosshair" as CSSProperties["cursor"])
-                      : undefined,
-                }}
-                onMouseDown={(event) => handleMarkupPointerDown(page.id, event)}
-                onMouseMove={(event) => handleMarkupPointerMove(page.id, event)}
-                onMouseUp={() => handleMarkupPointerUp(page.id)}
+          <div className="absolute inset-0 flex items-center justify-center overflow-hidden group">
+            <div
+              className="absolute inset-0 bg-white"
+              style={{
+                transform: `rotate(${rotationDegrees}deg)`,
+                transformOrigin: "center",
+                cursor:
+                  activeDrawingTool === "highlight"
+                    ? (`url(${HIGHLIGHT_CURSOR}) 4 24, crosshair` as CSSProperties["cursor"])
+                    : activeDrawingTool === "pencil"
+                    ? ("crosshair" as CSSProperties["cursor"])
+                    : undefined,
+              }}
+              onMouseDown={(event) => handleMarkupPointerDown(page.id, event)}
+              onMouseMove={(event) => handleMarkupPointerMove(page.id, event)}
+              onMouseUp={() => handleMarkupPointerUp(page.id)}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={page.preview} alt={`Page ${idx + 1}`} className="h-full w-full object-contain" draggable={false} />
+              <svg
+                className="absolute inset-0 h-full w-full"
+                style={{ pointerEvents: deleteMode ? "auto" : "none" }}
+                viewBox="0 0 1000 1000"
+                preserveAspectRatio="none"
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={page.preview} alt={`Page ${idx + 1}`} className="h-full w-full object-contain" draggable={false} />
-                <svg
-                  className="absolute inset-0 h-full w-full"
-                  style={{ pointerEvents: deleteMode ? "auto" : "none" }}
-                  viewBox="0 0 1000 1000"
-                  preserveAspectRatio="none"
-                >
-                  {pageHighlights.map((stroke) =>
-                    stroke.points.length > 1 ? (
-                      <polyline
-                        key={stroke.id}
-                        points={stroke.points.map((pt) => `${pt.x * 1000},${pt.y * 1000}`).join(" ")}
-                        fill="none"
-                        stroke={stroke.color}
-                        strokeWidth={Math.max(1, stroke.thickness * 1000)}
-                        strokeLinecap="round"
-                        strokeOpacity={stroke.tool === "pencil" ? 1 : 0.25}
-                        style={{
-                          pointerEvents: deleteMode ? "stroke" : "none",
-                          cursor: deleteMode ? "pointer" : "default",
-                        }}
-                        onClick={(event) => {
-                          if (!deleteMode) return;
-                          event.preventDefault();
-                          event.stopPropagation();
-                          handleDeleteStroke(page.id, stroke.id);
-                        }}
-                      />
-                    ) : null
-                  )}
-                  {draftHighlight?.pageId === page.id && draftHighlight.points.length > 1 ? (
+                {pageHighlights.map((stroke) =>
+                  stroke.points.length > 1 ? (
                     <polyline
-                      aria-hidden
-                      points={draftHighlight.points.map((pt) => `${pt.x * 1000},${pt.y * 1000}`).join(" ")}
+                      key={stroke.id}
+                      points={stroke.points.map((pt) => `${pt.x * 1000},${pt.y * 1000}`).join(" ")}
                       fill="none"
-                      stroke={draftHighlight.color}
-                      strokeWidth={Math.max(1, draftHighlight.thickness * 1000)}
+                      stroke={stroke.color}
+                      strokeWidth={Math.max(1, stroke.thickness * 1000)}
                       strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeOpacity={draftHighlight.tool === "pencil" ? 1 : 0.25}
+                      strokeOpacity={stroke.tool === "pencil" ? 1 : 0.25}
+                      style={{
+                        pointerEvents: deleteMode ? "stroke" : "none",
+                        cursor: deleteMode ? "pointer" : "default",
+                      }}
+                      onClick={(event) => {
+                        if (!deleteMode) return;
+                        event.preventDefault();
+                        event.stopPropagation();
+                        handleDeleteStroke(page.id, stroke.id);
+                      }}
                     />
-                  ) : null}
-                </svg>
-              </div>
+                  ) : null
+                )}
+                {draftHighlight?.pageId === page.id && draftHighlight.points.length > 1 ? (
+                  <polyline
+                    aria-hidden
+                    points={draftHighlight.points.map((pt) => `${pt.x * 1000},${pt.y * 1000}`).join(" ")}
+                    fill="none"
+                    stroke={draftHighlight.color}
+                    strokeWidth={Math.max(1, draftHighlight.thickness * 1000)}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeOpacity={draftHighlight.tool === "pencil" ? 1 : 0.25}
+                  />
+                ) : null}
+              </svg>
             </div>
           </div>
         </div>
@@ -1234,12 +1240,13 @@ function WorkspaceClient() {
   const itemsIds = useMemo(() => pages.map((p) => p.id), [pages]);
   const downloadDisabled = busy || pages.length === 0;
   const activePageIndex = pages.findIndex((p) => p.id === activePageId);
-  const zoomLabel = `${Math.round(zoom * 100)}%`;
-  const minZoom = 0.6;
-  const maxZoom = 2;
-  const zoomStep = 0.1;
-  const canZoomOut = zoom > minZoom + 0.001;
-  const canZoomIn = zoom < maxZoom - 0.001;
+  const zoom = fitZoom * zoomMultiplier;
+  const zoomLabel = `${Math.round(zoomMultiplier * 100)}%`;
+  const minZoomMultiplier = 0.5;
+  const maxZoomMultiplier = 2;
+  const zoomStep = 0.25;
+  const canZoomOut = zoomMultiplier > minZoomMultiplier + 0.001;
+  const canZoomIn = zoomMultiplier < maxZoomMultiplier - 0.001;
   const highlightButtonDisabled = pages.length === 0 || loading;
   const highlightColorEntries = Object.entries(
     HIGHLIGHT_COLORS
@@ -1255,6 +1262,37 @@ function WorkspaceClient() {
     [highlights]
   );
   const hasWorkspaceData = pages.length > 0 || highlightCount > 0 || !!draftHighlight;
+
+  const computeFitZoom = useCallback(() => {
+    const container = previewContainerRef.current;
+    if (!container || pages.length === 0) return;
+    const targetPage = pages[activePageIndex >= 0 ? activePageIndex : 0];
+    const naturalWidth = targetPage?.width || 612;
+    const naturalHeight = targetPage?.height || naturalWidth * DEFAULT_ASPECT_RATIO;
+    const rotation = normalizeRotation(targetPage?.rotation ?? 0);
+    const rotated = rotation % 180 !== 0;
+    const baseWidth = rotated ? naturalHeight : naturalWidth;
+    const baseHeight = rotated ? naturalWidth : naturalHeight;
+    const availableWidth = Math.max(container.clientWidth - 32, 200);
+    const availableHeight = Math.max(container.clientHeight - 32, 200);
+    const fit = Math.max(
+      0.2,
+      Math.min(availableWidth / baseWidth, availableHeight / baseHeight)
+    );
+    setFitZoom((prev) => (Math.abs(prev - fit) > 0.001 ? fit : prev));
+  }, [activePageIndex, pages]);
+
+  useEffect(() => {
+    computeFitZoom();
+  }, [computeFitZoom, pages.length]);
+
+  useEffect(() => {
+    function handleResize() {
+      computeFitZoom();
+    }
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [computeFitZoom]);
 
   useEffect(() => {
     if (!showDelayOverlay) return;
@@ -1741,7 +1779,7 @@ function WorkspaceClient() {
               <div>
                 <div
                   ref={previewContainerRef}
-                  className="h-[70vh] space-y-8 overflow-y-auto pr-4"
+                  className="h-[70vh] space-y-8 overflow-auto pr-4"
                 >
                   {pages.map(renderPreviewPage)}
                 </div>
@@ -1843,7 +1881,7 @@ function WorkspaceClient() {
                   aria-label="Zoom out"
                   className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
                   onClick={() =>
-                    setZoom((z) => Math.max(minZoom, Number((z - zoomStep).toFixed(2))))
+                    setZoomMultiplier((z) => Math.max(minZoomMultiplier, Number((z - zoomStep).toFixed(2))))
                   }
                   disabled={!canZoomOut}
                 >
@@ -1858,7 +1896,7 @@ function WorkspaceClient() {
                   aria-label="Zoom in"
                   className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
                   onClick={() =>
-                    setZoom((z) => Math.min(maxZoom, Number((z + zoomStep).toFixed(2))))
+                    setZoomMultiplier((z) => Math.min(maxZoomMultiplier, Number((z + zoomStep).toFixed(2))))
                   }
                   disabled={!canZoomIn}
                 >
