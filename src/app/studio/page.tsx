@@ -81,6 +81,7 @@ const WORKSPACE_DB_STORE = "files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
 const DEFAULT_ASPECT_RATIO = 792 / 612; // fallback letter portrait
 const SOFT_EASE: [number, number, number, number] = [0.4, 0, 0.2, 1];
+const ZOOM_LEVELS = [0.5, 0.75, 1, 1.5, 2, 3];
 const VIEW_TRANSITION = { duration: 0.2, ease: SOFT_EASE };
 const GRID_VARIANTS = {
   hidden: { opacity: 0, scale: 0.97 },
@@ -443,6 +444,7 @@ function WorkspaceClient() {
   const [activePageId, setActivePageId] = useState<string | null>(null);
   const [zoomMultiplier, setZoomMultiplier] = useState(1);
   const [fitZoom, setFitZoom] = useState(1);
+  const scrollRatioRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const [highlightMode, setHighlightMode] = useState(false);
   const [highlightColor, setHighlightColor] = useState<HighlightColorKey>("yellow");
   const [highlightThickness, setHighlightThickness] = useState(14);
@@ -994,12 +996,6 @@ function WorkspaceClient() {
   }, [draftHighlight, commitDraftHighlight]);
 
   useEffect(() => {
-    if (!highlightMode && !pencilMode) {
-      setDraftHighlight(null);
-    }
-  }, [highlightMode, pencilMode]);
-
-  useEffect(() => {
     if (deleteMode) {
       setHighlightMode(false);
       setPencilMode(false);
@@ -1022,6 +1018,109 @@ function WorkspaceClient() {
     if (pencilMode) return "pencil";
     return null;
   }
+
+  const itemsIds = useMemo(() => pages.map((p) => p.id), [pages]);
+  const downloadDisabled = busy || pages.length === 0;
+  const activePageIndex = pages.findIndex((p) => p.id === activePageId);
+  const zoom = fitZoom * zoomMultiplier;
+  const zoomLabel = `${Math.round(zoomMultiplier * 100)}%`;
+  const minZoomMultiplier = ZOOM_LEVELS[0];
+  const maxZoomMultiplier = ZOOM_LEVELS[ZOOM_LEVELS.length - 1];
+  const canZoomOut = zoomMultiplier > minZoomMultiplier + 0.001;
+  const canZoomIn = zoomMultiplier < maxZoomMultiplier - 0.001;
+  const highlightButtonDisabled = pages.length === 0 || loading;
+  const highlightColorEntries = Object.entries(
+    HIGHLIGHT_COLORS
+  ) as [HighlightColorKey, string][];
+  const highlightButtonOn = highlightMode && !highlightButtonDisabled;
+  const pencilButtonOn = pencilMode && !highlightButtonDisabled;
+  const highlightTrayVisible = (highlightMode || pencilMode || deleteMode) && !highlightButtonDisabled;
+  const highlightActive = highlightButtonOn && !deleteMode;
+  const pencilActive = pencilButtonOn && !deleteMode;
+  const activeDrawingTool: DrawingTool | null = highlightActive ? "highlight" : pencilActive ? "pencil" : null;
+  const highlightCount = useMemo(
+    () => Object.values(highlights).reduce((sum, list) => sum + list.length, 0),
+    [highlights]
+  );
+  const hasWorkspaceData = pages.length > 0 || highlightCount > 0 || !!draftHighlight;
+
+  const computeFitZoom = useCallback(() => {
+    const container = previewContainerRef.current;
+    if (!container || pages.length === 0) return;
+    const targetIndex = activePageIndex >= 0 ? activePageIndex : 0;
+    const targetPage = pages[targetIndex];
+    const naturalWidth = targetPage?.width || 612;
+    const naturalHeight = targetPage?.height || naturalWidth * DEFAULT_ASPECT_RATIO;
+    const rotation = normalizeRotation(targetPage?.rotation ?? 0);
+    const rotated = rotation % 180 !== 0;
+    const baseWidth = rotated ? naturalHeight : naturalWidth;
+    const baseHeight = rotated ? naturalWidth : naturalHeight;
+    const availableWidth = Math.max(container.clientWidth - 32, 200);
+    const availableHeight = Math.max(container.clientHeight - 32, 200);
+    const fit = Math.max(0.2, Math.min(availableWidth / baseWidth, availableHeight / baseHeight));
+    setFitZoom((prev) => (Math.abs(prev - fit) > 0.001 ? fit : prev));
+  }, [activePageIndex, pages]);
+
+  useEffect(() => {
+    function handleResize() {
+      computeFitZoom();
+    }
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [computeFitZoom]);
+
+  const getNearestZoomLevel = useCallback((value: number) => {
+    let nearest = ZOOM_LEVELS[0];
+    let minDiff = Math.abs(value - nearest);
+    ZOOM_LEVELS.forEach((level) => {
+      const diff = Math.abs(value - level);
+      if (diff < minDiff) {
+        minDiff = diff;
+        nearest = level;
+      }
+    });
+    return nearest;
+  }, []);
+
+  const setZoomWithScrollPreserved = useCallback(
+    (next: number) => {
+      const container = previewContainerRef.current;
+      if (container) {
+        scrollRatioRef.current = {
+          x: container.scrollLeft / Math.max(1, container.scrollWidth - container.clientWidth),
+          y: container.scrollTop / Math.max(1, container.scrollHeight - container.clientHeight),
+        };
+      }
+      setZoomMultiplier(next);
+    },
+    []
+  );
+
+  const handleZoomDirection = useCallback(
+    (direction: "in" | "out") => {
+      const currentIndex = getNearestZoomLevel(zoomMultiplier);
+      const idx = ZOOM_LEVELS.findIndex((level) => level === currentIndex);
+      const nextIdx =
+        direction === "in" ? Math.min(ZOOM_LEVELS.length - 1, idx + 1) : Math.max(0, idx - 1);
+      const nextLevel = ZOOM_LEVELS[nextIdx];
+      if (nextLevel !== currentIndex) {
+        setZoomWithScrollPreserved(nextLevel);
+      }
+    },
+    [getNearestZoomLevel, setZoomWithScrollPreserved, zoomMultiplier]
+  );
+
+  useEffect(() => {
+    const container = previewContainerRef.current;
+    if (!container) return;
+    const { x, y } = scrollRatioRef.current;
+    requestAnimationFrame(() => {
+      const maxX = Math.max(0, container.scrollWidth - container.clientWidth);
+      const maxY = Math.max(0, container.scrollHeight - container.clientHeight);
+      container.scrollLeft = maxX * x;
+      container.scrollTop = maxY * y;
+    });
+  }, [zoomMultiplier, fitZoom]);
 
   function handleMarkupPointerDown(pageId: string, event: ReactMouseEvent<HTMLDivElement>) {
     if (deleteMode) return;
@@ -1237,62 +1336,9 @@ function WorkspaceClient() {
     setPages((prev) => prev.filter((page) => page.id !== pageId));
   }
 
-  const itemsIds = useMemo(() => pages.map((p) => p.id), [pages]);
-  const downloadDisabled = busy || pages.length === 0;
-  const activePageIndex = pages.findIndex((p) => p.id === activePageId);
-  const zoom = fitZoom * zoomMultiplier;
-  const zoomLabel = `${Math.round(zoomMultiplier * 100)}%`;
-  const minZoomMultiplier = 0.5;
-  const maxZoomMultiplier = 2;
-  const zoomStep = 0.25;
-  const canZoomOut = zoomMultiplier > minZoomMultiplier + 0.001;
-  const canZoomIn = zoomMultiplier < maxZoomMultiplier - 0.001;
-  const highlightButtonDisabled = pages.length === 0 || loading;
-  const highlightColorEntries = Object.entries(
-    HIGHLIGHT_COLORS
-  ) as [HighlightColorKey, string][];
-  const highlightButtonOn = highlightMode && !highlightButtonDisabled;
-  const pencilButtonOn = pencilMode && !highlightButtonDisabled;
-  const highlightTrayVisible = (highlightMode || pencilMode || deleteMode) && !highlightButtonDisabled;
-  const highlightActive = highlightButtonOn && !deleteMode;
-  const pencilActive = pencilButtonOn && !deleteMode;
-  const activeDrawingTool: DrawingTool | null = highlightActive ? "highlight" : pencilActive ? "pencil" : null;
-  const highlightCount = useMemo(
-    () => Object.values(highlights).reduce((sum, list) => sum + list.length, 0),
-    [highlights]
-  );
-  const hasWorkspaceData = pages.length > 0 || highlightCount > 0 || !!draftHighlight;
-
-  const computeFitZoom = useCallback(() => {
-    const container = previewContainerRef.current;
-    if (!container || pages.length === 0) return;
-    const targetPage = pages[activePageIndex >= 0 ? activePageIndex : 0];
-    const naturalWidth = targetPage?.width || 612;
-    const naturalHeight = targetPage?.height || naturalWidth * DEFAULT_ASPECT_RATIO;
-    const rotation = normalizeRotation(targetPage?.rotation ?? 0);
-    const rotated = rotation % 180 !== 0;
-    const baseWidth = rotated ? naturalHeight : naturalWidth;
-    const baseHeight = rotated ? naturalWidth : naturalHeight;
-    const availableWidth = Math.max(container.clientWidth - 32, 200);
-    const availableHeight = Math.max(container.clientHeight - 32, 200);
-    const fit = Math.max(
-      0.2,
-      Math.min(availableWidth / baseWidth, availableHeight / baseHeight)
-    );
-    setFitZoom((prev) => (Math.abs(prev - fit) > 0.001 ? fit : prev));
-  }, [activePageIndex, pages]);
-
   useEffect(() => {
     computeFitZoom();
-  }, [computeFitZoom, pages.length]);
-
-  useEffect(() => {
-    function handleResize() {
-      computeFitZoom();
-    }
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, [computeFitZoom]);
+  }, [computeFitZoom, pages.length, activePageIndex]);
 
   useEffect(() => {
     if (!showDelayOverlay) return;
@@ -1320,7 +1366,7 @@ function WorkspaceClient() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [hasWorkspaceData]);
 
-  useEffect(() => {
+useEffect(() => {
     if (typeof document === "undefined") return;
     if (!activeDrawingTool) {
       document.body.style.cursor = "";
@@ -1333,6 +1379,11 @@ function WorkspaceClient() {
       document.body.style.cursor = previous;
     };
   }, [activeDrawingTool]);
+  useEffect(() => {
+    if (!highlightMode && !pencilMode) {
+      setDraftHighlight(null);
+    }
+  }, [highlightMode, pencilMode]);
   const hasAnyHighlights = Object.values(highlights).some((list) => list && list.length > 0);
   const hasUndoHistory = highlightHistory.length > 0;
   useEffect(() => {
@@ -1779,7 +1830,7 @@ function WorkspaceClient() {
               <div>
                 <div
                   ref={previewContainerRef}
-                  className="h-[70vh] space-y-8 overflow-auto pr-4"
+                  className="flex h-[70vh] flex-col items-center gap-8 overflow-auto px-4 pt-4"
                 >
                   {pages.map(renderPreviewPage)}
                 </div>
@@ -1876,30 +1927,26 @@ function WorkspaceClient() {
             </div>
             <div className="flex items-center justify-center">
               <div className="flex items-center gap-3 rounded-full border border-slate-200 bg-white px-4 py-2 shadow-sm">
-                <button
-                  type="button"
-                  aria-label="Zoom out"
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
-                  onClick={() =>
-                    setZoomMultiplier((z) => Math.max(minZoomMultiplier, Number((z - zoomStep).toFixed(2))))
-                  }
-                  disabled={!canZoomOut}
-                >
+              <button
+                type="button"
+                aria-label="Zoom out"
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
+                onClick={() => handleZoomDirection("out")}
+                disabled={!canZoomOut}
+              >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                     <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
                     <path d="M8 11h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                   </svg>
                 </button>
-                <div className="min-w-[64px] text-center text-sm font-semibold text-slate-800">{zoomLabel}</div>
-                <button
-                  type="button"
-                  aria-label="Zoom in"
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
-                  onClick={() =>
-                    setZoomMultiplier((z) => Math.min(maxZoomMultiplier, Number((z + zoomStep).toFixed(2))))
-                  }
-                  disabled={!canZoomIn}
-                >
+              <div className="min-w-[64px] text-center text-sm font-semibold text-slate-800">{zoomLabel}</div>
+              <button
+                type="button"
+                aria-label="Zoom in"
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
+                onClick={() => handleZoomDirection("in")}
+                disabled={!canZoomIn}
+              >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                     <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
                     <path d="M11 8v6M8 11h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
