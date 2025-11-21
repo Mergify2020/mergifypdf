@@ -306,18 +306,8 @@ function SortableThumb({
           className={`group relative w-full overflow-hidden bg-white transition shadow-sm ${
             selected ? "border-2 border-black shadow-brand/30" : "border border-slate-200 hover:border-brand/50 hover:shadow-md"
           }`}
+          {...listeners}
         >
-          <button
-            type="button"
-            aria-label="Drag page"
-            className="absolute right-2 top-2 rounded-full p-1 text-slate-500 transition hover:bg-slate-100 active:cursor-grabbing"
-            {...listeners}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <svg width="14" height="16" viewBox="0 0 24 24" fill="none">
-              <path d="M10 4h-2v2h2V4Zm6 0h-2v2h2V4Zm-6 6h-2v2h2v-2Zm6 0h-2v2h2v-2Zm-6 6h-2v2h2v-2Zm6 0h-2v2h2v-2Z" stroke="currentColor" strokeWidth="1.5" />
-            </svg>
-          </button>
           <div className="relative w-full" style={{ paddingBottom: getAspectPadding(item.width, item.height) }}>
             <div className="absolute inset-0 flex items-center justify-center overflow-hidden group">
               <div
@@ -335,7 +325,7 @@ function SortableThumb({
             </div>
           </div>
         </div>
-        <div className={`text-center text-xs ${selected ? "font-semibold text-slate-800" : "text-slate-500"}`}>
+        <div className={`mt-1 text-center text-xs ${selected ? "font-semibold text-slate-800" : "text-slate-500"}`}>
           Page {index + 1}
         </div>
       </div>
@@ -489,7 +479,7 @@ function WorkspaceClient() {
   const MAX_PENCIL_THICKNESS = 10;
 
   // Better drag in grids
-  const sensors = useSensors(useSensor(PointerSensor));
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   /** Rehydrate stored project name */
   useEffect(() => {
