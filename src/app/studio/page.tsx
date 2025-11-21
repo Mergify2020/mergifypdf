@@ -448,6 +448,8 @@ function WorkspaceClient() {
   const [shouldCenterOnChange, setShouldCenterOnChange] = useState(false);
   const [zoomPercent, setZoomPercent] = useState(100);
   const [baseScale, setBaseScale] = useState(1);
+  const [scrollX, setScrollX] = useState(0);
+  const [maxScrollX, setMaxScrollX] = useState(0);
   const scrollRatioRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const [highlightMode, setHighlightMode] = useState(false);
   const [highlightColor, setHighlightColor] = useState<HighlightColorKey>("yellow");
@@ -1125,6 +1127,29 @@ function WorkspaceClient() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, [computeBaseScale]);
+
+  useEffect(() => {
+    const el = previewContainerRef.current;
+    if (!el) return;
+
+    const sync = () => {
+      const max = Math.max(el.scrollWidth - el.clientWidth, 0);
+      setMaxScrollX(max);
+      setScrollX(el.scrollLeft);
+    };
+
+    const handleScroll = () => {
+      setScrollX(el.scrollLeft);
+    };
+
+    sync();
+    el.addEventListener("scroll", handleScroll);
+    window.addEventListener("resize", sync);
+    return () => {
+      el.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", sync);
+    };
+  }, [zoomPercent, baseScale, activePageIndex]);
 
   const setZoomWithScrollPreserved = useCallback(
     (nextPercent: number) => {
@@ -1859,6 +1884,25 @@ useEffect(() => {
               className="editor-shell mx-auto flex max-w-[1280px] flex-col gap-6 px-4 lg:flex-row lg:items-start lg:gap-6 lg:px-6"
             >
               <div className="viewer flex-1">
+                {maxScrollX > 0 ? (
+                  <div className="mb-2 flex items-center gap-2 px-4">
+                    <span className="text-xs font-medium text-slate-500">Horizontal</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={maxScrollX}
+                      value={scrollX}
+                      onChange={(e) => {
+                        const el = previewContainerRef.current;
+                        if (!el) return;
+                        const next = Number(e.target.value);
+                        el.scrollLeft = next;
+                        setScrollX(next);
+                      }}
+                      className="w-full accent-slate-900"
+                    />
+                  </div>
+                ) : null}
                 <div
                   ref={previewContainerRef}
                   className="viewer-shell flex h-[calc(100vh-220px)] w-full max-w-[1000px] flex-col items-start justify-start overflow-auto px-4 pt-5"
