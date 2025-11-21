@@ -910,13 +910,19 @@ function WorkspaceClient() {
           }`}
           style={{
             width: baseWidth * baseScale,
-            height: baseHeight * baseScale,
-            transform: `scale(${zoomMultiplier})`,
-            transformOrigin: "top center",
+            height: baseHeight * baseScale * zoomMultiplier,
           }}
           onClick={() => handleSelectPage(idx)}
         >
-          <div className="absolute inset-0 flex items-center justify-center overflow-hidden group">
+          <div
+            className="absolute inset-0 flex items-center justify-center overflow-visible"
+            style={{
+              width: baseWidth * baseScale,
+              height: baseHeight * baseScale,
+              transform: `scale(${zoomMultiplier})`,
+              transformOrigin: "top center",
+            }}
+          >
             <div
               className="absolute inset-0 bg-white"
               style={{
@@ -943,9 +949,9 @@ function WorkspaceClient() {
               <svg
                 className="absolute inset-0 h-full w-full"
                 style={{ pointerEvents: deleteMode ? "auto" : "none" }}
-                  viewBox="0 0 1000 1000"
-                  preserveAspectRatio="none"
-                >
+                viewBox="0 0 1000 1000"
+                preserveAspectRatio="none"
+              >
                 {pageHighlights.map((stroke) =>
                   stroke.points.length > 1 ? (
                     <polyline
@@ -1884,12 +1890,14 @@ useEffect(() => {
               <div className="viewer flex-1">
                 <div
                   ref={previewContainerRef}
-          className="viewer-shell flex h-[calc(100vh-220px)] w-full max-w-[1000px] flex-col items-start justify-start overflow-auto px-4 pt-5"
-        >
-          <div className="flex w-full flex-col items-center gap-8">
-            {pages.map(renderPreviewPage)}
-          </div>
-        </div>
+                  className="viewer-shell flex h-[calc(100vh-220px)] w-full max-w-[1000px] flex-col items-start justify-start overflow-auto px-4 pt-5"
+                >
+                  <div className="flex w-full flex-col items-center gap-8">
+                    {activePageIndex >= 0 && pages[activePageIndex]
+                      ? renderPreviewPage(pages[activePageIndex], activePageIndex)
+                      : null}
+                  </div>
+                </div>
               </div>
 
               <aside className="sidebar w-full lg:w-[260px] lg:shrink-0">
