@@ -283,7 +283,7 @@ function SortableThumb({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    cursor: "grab",
+    cursor: "default",
   };
   const rotationDegrees = normalizeRotation(item.rotation);
   const isQuarterTurn = rotationDegrees % 180 !== 0;
@@ -291,13 +291,19 @@ function SortableThumb({
   const scaleFix = isQuarterTurn ? Math.min(ratio, 1 / ratio) : 1;
 
   return (
-    <li ref={setNodeRef} style={style} className="w-full" {...attributes} {...listeners}>
-      <button
-        type="button"
-        aria-label={`Focus page ${index + 1}`}
+    <li ref={setNodeRef} style={style} className="w-full" {...attributes}>
+      <div
+        role="button"
+        tabIndex={0}
         onClick={onSelect}
-        className={`group block w-full rounded-2xl bg-white/95 shadow-sm ring-1 transition ${
-          selected ? "ring-brand shadow-brand/30" : "ring-slate-200 hover:ring-brand/40 hover:shadow-md"
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onSelect();
+          }
+        }}
+        className={`group relative w-full rounded-2xl bg-white/95 shadow-sm transition ${
+          selected ? "border-2 border-black shadow-brand/30" : "border border-slate-200 hover:border-brand/50 hover:shadow-md"
         }`}
       >
         <div className="flex items-center justify-between px-3 pt-3 text-xs font-semibold text-slate-500">
@@ -310,6 +316,17 @@ function SortableThumb({
             {index + 1}
           </span>
         </div>
+        <button
+          type="button"
+          aria-label="Drag page"
+          className="absolute right-2 top-2 rounded-full p-1 text-slate-500 transition hover:bg-slate-100 active:cursor-grabbing"
+          {...listeners}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <svg width="14" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M10 4h-2v2h2V4Zm6 0h-2v2h2V4Zm-6 6h-2v2h2v-2Zm6 0h-2v2h2v-2Zm-6 6h-2v2h2v-2Zm6 0h-2v2h2v-2Z" stroke="currentColor" strokeWidth="1.5" />
+          </svg>
+        </button>
         <div className="relative mt-3 w-full" style={{ paddingBottom: getAspectPadding(item.width, item.height) }}>
           <div className="absolute inset-0 flex items-center justify-center overflow-hidden group">
             <div
@@ -326,7 +343,7 @@ function SortableThumb({
             </div>
           </div>
         </div>
-      </button>
+      </div>
     </li>
   );
 }
@@ -443,6 +460,7 @@ function WorkspaceClient() {
   const [error, setError] = useState<string | null>(null);
   const [activePageId, setActivePageId] = useState<string | null>(null);
   const [activePageIndexState, setActivePageIndex] = useState(0);
+  const [shouldCenterOnChange, setShouldCenterOnChange] = useState(false);
   const [zoomMultiplier, setZoomMultiplier] = useState(1);
   const [baseScale, setBaseScale] = useState(1);
   const scrollRatioRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -864,6 +882,7 @@ function WorkspaceClient() {
 
   function handleSelectPage(index: number) {
     setActivePageIndex(index);
+    setShouldCenterOnChange(true);
     const page = pages[index];
     if (page) {
       setActivePageId(page.id);
@@ -903,8 +922,8 @@ function WorkspaceClient() {
         className="mx-auto w-fit"
       >
         <div
-          className={`relative bg-white shadow-[0_12px_30px_rgba(15,23,42,0.18)] ${
-            idx === activePageIndex ? "ring-2 ring-brand/50 shadow-brand/30" : ""
+          className={`relative bg-white shadow-[0_12px_30px_rgba(15,23,42,0.18)] border transition ${
+            idx === activePageIndex ? "border-2 border-black shadow-brand/30" : "border border-slate-200"
           }`}
           style={{ width: displayWidth, height: displayHeight }}
           onClick={() => handleSelectPage(idx)}
@@ -1085,19 +1104,29 @@ function WorkspaceClient() {
   }, [activePageIndex, pages]);
 
   useEffect(() => {
+    if (!shouldCenterOnChange) return;
     const container = previewContainerRef.current;
     const target = activePageIndex >= 0 ? pageRefs.current[activePageIndex] : null;
     if (!container || !target) return;
-    const targetTop = target.offsetTop - container.offsetTop;
-    const targetLeft = target.offsetLeft - container.offsetLeft;
-    const scrollTop = targetTop + target.offsetHeight / 2 - container.clientHeight / 2;
-    const scrollLeft = targetLeft + target.offsetWidth / 2 - container.clientWidth / 2;
+    const targetRect = target.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    const scrollTop =
+      container.scrollTop +
+      (targetRect.top - containerRect.top) +
+      targetRect.height / 2 -
+      container.clientHeight / 2;
+    const scrollLeft =
+      container.scrollLeft +
+      (targetRect.left - containerRect.left) +
+      targetRect.width / 2 -
+      container.clientWidth / 2;
     container.scrollTo({
       top: Math.max(0, scrollTop),
       left: Math.max(0, scrollLeft),
       behavior: "smooth",
     });
-  }, [activePageIndex, zoomMultiplier, baseScale]);
+    setShouldCenterOnChange(false);
+  }, [activePageIndex, zoomMultiplier, baseScale, shouldCenterOnChange]);
 
   useEffect(() => {
     function handleResize() {
