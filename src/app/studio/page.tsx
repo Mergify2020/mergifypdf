@@ -446,7 +446,7 @@ function WorkspaceClient() {
   const [activePageId, setActivePageId] = useState<string | null>(null);
   const [activePageIndexState, setActivePageIndex] = useState(0);
   const [shouldCenterOnChange, setShouldCenterOnChange] = useState(false);
-  const [zoomMultiplier, setZoomMultiplier] = useState(1);
+  const [zoomPercent, setZoomPercent] = useState(100);
   const [baseScale, setBaseScale] = useState(1);
   const scrollRatioRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const [highlightMode, setHighlightMode] = useState(false);
@@ -1058,11 +1058,8 @@ function WorkspaceClient() {
   const itemsIds = useMemo(() => pages.map((p) => p.id), [pages]);
   const downloadDisabled = busy || pages.length === 0;
   const activePageIndex = activePageIndexState >= 0 && activePageIndexState < pages.length ? activePageIndexState : -1;
-  const zoomLabel = `${Math.round(zoomMultiplier * 100)}%`;
-  const minZoomMultiplier = ZOOM_LEVELS[0];
-  const maxZoomMultiplier = ZOOM_LEVELS[ZOOM_LEVELS.length - 1];
-  const canZoomOut = zoomMultiplier > minZoomMultiplier + 0.001;
-  const canZoomIn = zoomMultiplier < maxZoomMultiplier - 0.001;
+  const zoomMultiplier = clamp(zoomPercent / 100, 1, 3);
+  const zoomLabel = `${Math.round(zoomPercent)}%`;
   const highlightButtonDisabled = pages.length === 0 || loading;
   const highlightColorEntries = Object.entries(
     HIGHLIGHT_COLORS
@@ -1129,21 +1126,9 @@ function WorkspaceClient() {
     return () => window.removeEventListener("resize", handleResize);
   }, [computeBaseScale]);
 
-  const getNearestZoomLevel = useCallback((value: number) => {
-    let nearest = ZOOM_LEVELS[0];
-    let minDiff = Math.abs(value - nearest);
-    ZOOM_LEVELS.forEach((level) => {
-      const diff = Math.abs(value - level);
-      if (diff < minDiff) {
-        minDiff = diff;
-        nearest = level;
-      }
-    });
-    return nearest;
-  }, []);
-
   const setZoomWithScrollPreserved = useCallback(
-    (next: number) => {
+    (nextPercent: number) => {
+      const clamped = clamp(nextPercent, 100, 300);
       const container = previewContainerRef.current;
       if (container) {
         scrollRatioRef.current = {
@@ -1151,23 +1136,9 @@ function WorkspaceClient() {
           y: container.scrollTop / Math.max(1, container.scrollHeight - container.clientHeight),
         };
       }
-      setZoomMultiplier(next);
+      setZoomPercent(clamped);
     },
     []
-  );
-
-  const handleZoomDirection = useCallback(
-    (direction: "in" | "out") => {
-      const currentIndex = getNearestZoomLevel(zoomMultiplier);
-      const idx = ZOOM_LEVELS.findIndex((level) => level === currentIndex);
-      const nextIdx =
-        direction === "in" ? Math.min(ZOOM_LEVELS.length - 1, idx + 1) : Math.max(0, idx - 1);
-      const nextLevel = ZOOM_LEVELS[nextIdx];
-      if (nextLevel !== currentIndex) {
-        setZoomWithScrollPreserved(nextLevel);
-      }
-    },
-    [getNearestZoomLevel, setZoomWithScrollPreserved, zoomMultiplier]
   );
 
   useEffect(() => {
@@ -1180,7 +1151,7 @@ function WorkspaceClient() {
       container.scrollLeft = maxX * x;
       container.scrollTop = maxY * y;
     });
-  }, [zoomMultiplier, baseScale]);
+  }, [zoomPercent, baseScale]);
 
   function handleMarkupPointerDown(pageId: string, event: ReactMouseEvent<HTMLDivElement>) {
     if (deleteMode) return;
@@ -1989,33 +1960,19 @@ useEffect(() => {
                 </svg>
               </button>
             </div>
-            <div className="flex items-center justify-center">
+            <div className="flex flex-1 items-center justify-center">
               <div className="flex items-center gap-3 rounded-full border border-slate-200 bg-white px-4 py-2 shadow-sm">
-                <button
-                  type="button"
-                  aria-label="Zoom out"
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
-                  onClick={() => handleZoomDirection("out")}
-                  disabled={!canZoomOut}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                    <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
-                    <path d="M8 11h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
-                </button>
-                <div className="min-w-[64px] text-center text-sm font-semibold text-slate-800">{zoomLabel}</div>
-                <button
-                  type="button"
-                  aria-label="Zoom in"
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
-                  onClick={() => handleZoomDirection("in")}
-                  disabled={!canZoomIn}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                    <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
-                    <path d="M11 8v6M8 11h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
-                </button>
+                <span className="text-xs font-medium text-slate-500">Zoom</span>
+                <input
+                  type="range"
+                  min={100}
+                  max={300}
+                  step={25}
+                  value={zoomPercent}
+                  onChange={(e) => setZoomWithScrollPreserved(Number(e.target.value))}
+                  className="w-40 accent-slate-900"
+                />
+                <span className="min-w-[48px] text-sm font-semibold text-slate-800 text-right">{zoomLabel}</span>
               </div>
             </div>
             <div className="flex items-center gap-3">
