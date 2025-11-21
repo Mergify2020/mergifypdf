@@ -80,8 +80,9 @@ const WORKSPACE_DB_NAME = "mpdf-file-store";
 const WORKSPACE_DB_STORE = "files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
 const DEFAULT_ASPECT_RATIO = 792 / 612; // fallback letter portrait
+const BASE_WIDTH = 900; // base rendered width for 100% zoom
 const SOFT_EASE: [number, number, number, number] = [0.4, 0, 0.2, 1];
-const ZOOM_LEVELS = [0.5, 0.75, 1, 1.5, 2, 3];
+const ZOOM_LEVELS = [0.75, 1, 1.5, 2, 3];
 const VIEW_TRANSITION = { duration: 0.2, ease: SOFT_EASE };
 const GRID_VARIANTS = {
   hidden: { opacity: 0, scale: 0.97 },
@@ -443,7 +444,7 @@ function WorkspaceClient() {
   const [error, setError] = useState<string | null>(null);
   const [activePageId, setActivePageId] = useState<string | null>(null);
   const [zoomMultiplier, setZoomMultiplier] = useState(1);
-  const [fitZoom, setFitZoom] = useState(1);
+  const [baseScale, setBaseScale] = useState(1);
   const scrollRatioRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const [highlightMode, setHighlightMode] = useState(false);
   const [highlightColor, setHighlightColor] = useState<HighlightColorKey>("yellow");
@@ -1068,7 +1069,7 @@ function WorkspaceClient() {
   const itemsIds = useMemo(() => pages.map((p) => p.id), [pages]);
   const downloadDisabled = busy || pages.length === 0;
   const activePageIndex = pages.findIndex((p) => p.id === activePageId);
-  const zoom = fitZoom * zoomMultiplier;
+  const zoom = baseScale * zoomMultiplier;
   const zoomLabel = `${Math.round(zoomMultiplier * 100)}%`;
   const minZoomMultiplier = ZOOM_LEVELS[0];
   const maxZoomMultiplier = ZOOM_LEVELS[ZOOM_LEVELS.length - 1];
@@ -1090,9 +1091,8 @@ function WorkspaceClient() {
   );
   const hasWorkspaceData = pages.length > 0 || highlightCount > 0 || !!draftHighlight;
 
-  const computeFitZoom = useCallback(() => {
-    const container = previewContainerRef.current;
-    if (!container || pages.length === 0) return;
+  const computeBaseScale = useCallback(() => {
+    if (pages.length === 0) return;
     const targetIndex = activePageIndex >= 0 ? activePageIndex : 0;
     const targetPage = pages[targetIndex];
     const naturalWidth = targetPage?.width || 612;
@@ -1100,20 +1100,17 @@ function WorkspaceClient() {
     const rotation = normalizeRotation(targetPage?.rotation ?? 0);
     const rotated = rotation % 180 !== 0;
     const baseWidth = rotated ? naturalHeight : naturalWidth;
-    const baseHeight = rotated ? naturalWidth : naturalHeight;
-    const availableWidth = Math.max(container.clientWidth - 32, 200);
-    const availableHeight = Math.max(container.clientHeight - 32, 200);
-    const fit = Math.max(0.2, Math.min(availableWidth / baseWidth, availableHeight / baseHeight));
-    setFitZoom((prev) => (Math.abs(prev - fit) > 0.001 ? fit : prev));
+    const nextBase = Math.max(0.2, BASE_WIDTH / baseWidth);
+    setBaseScale((prev) => (Math.abs(prev - nextBase) > 0.001 ? nextBase : prev));
   }, [activePageIndex, pages]);
 
   useEffect(() => {
     function handleResize() {
-      computeFitZoom();
+      computeBaseScale();
     }
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [computeFitZoom]);
+  }, [computeBaseScale]);
 
   const getNearestZoomLevel = useCallback((value: number) => {
     let nearest = ZOOM_LEVELS[0];
@@ -1166,7 +1163,7 @@ function WorkspaceClient() {
       container.scrollLeft = maxX * x;
       container.scrollTop = maxY * y;
     });
-  }, [zoomMultiplier, fitZoom]);
+  }, [zoomMultiplier, baseScale]);
 
   function handleMarkupPointerDown(pageId: string, event: ReactMouseEvent<HTMLDivElement>) {
     if (deleteMode) return;
@@ -1383,8 +1380,8 @@ function WorkspaceClient() {
   }
 
   useEffect(() => {
-    computeFitZoom();
-  }, [computeFitZoom, pages.length, activePageIndex]);
+    computeBaseScale();
+  }, [computeBaseScale, pages.length, activePageIndex]);
 
   useEffect(() => {
     const existingIds = new Set(pages.map((p) => p.id));
@@ -1930,12 +1927,14 @@ useEffect(() => {
               transition={VIEW_TRANSITION}
               className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]"
             >
-              <div>
+              <div className="mx-auto w-full max-w-[960px]">
                 <div
                   ref={previewContainerRef}
-                  className="flex h-[70vh] flex-col items-center gap-8 overflow-auto px-4 pt-4"
+                  className="viewer-shell flex h-[70vh] flex-col items-start justify-start overflow-auto px-4 pt-4"
                 >
-                  {pages.map(renderPreviewPage)}
+                  <div className="flex w-full flex-col items-center gap-8">
+                    {pages.map(renderPreviewPage)}
+                  </div>
                 </div>
               </div>
 
@@ -2030,26 +2029,26 @@ useEffect(() => {
             </div>
             <div className="flex items-center justify-center">
               <div className="flex items-center gap-3 rounded-full border border-slate-200 bg-white px-4 py-2 shadow-sm">
-              <button
-                type="button"
-                aria-label="Zoom out"
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
-                onClick={() => handleZoomDirection("out")}
-                disabled={!canZoomOut}
-              >
+                <button
+                  type="button"
+                  aria-label="Zoom out"
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
+                  onClick={() => handleZoomDirection("out")}
+                  disabled={!canZoomOut}
+                >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                     <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
                     <path d="M8 11h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                   </svg>
                 </button>
-              <div className="min-w-[64px] text-center text-sm font-semibold text-slate-800">{zoomLabel}</div>
-              <button
-                type="button"
-                aria-label="Zoom in"
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
-                onClick={() => handleZoomDirection("in")}
-                disabled={!canZoomIn}
-              >
+                <div className="min-w-[64px] text-center text-sm font-semibold text-slate-800">{zoomLabel}</div>
+                <button
+                  type="button"
+                  aria-label="Zoom in"
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
+                  onClick={() => handleZoomDirection("in")}
+                  disabled={!canZoomIn}
+                >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                     <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
                     <path d="M11 8v6M8 11h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
