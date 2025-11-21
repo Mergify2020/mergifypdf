@@ -911,18 +911,16 @@ function WorkspaceClient() {
             idx === activePageIndex ? "border-2 border-black shadow-brand/30" : "border border-slate-200"
           }`}
           style={{
-            width: baseWidth * baseScale,
-            height: baseHeight * baseScale * zoomMultiplier,
+            width: baseWidth * baseScale * zoomMultiplier,
+            aspectRatio: `${baseWidth} / ${baseHeight}`,
           }}
           onClick={() => handleSelectPage(idx)}
         >
           <div
             className="absolute inset-0 flex items-center justify-center overflow-visible"
             style={{
-              width: baseWidth * baseScale,
-              height: baseHeight * baseScale,
-              transform: `scale(${zoomMultiplier})`,
-              transformOrigin: "top center",
+              width: "100%",
+              height: "100%",
             }}
           >
             <div
