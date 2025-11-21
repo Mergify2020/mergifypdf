@@ -448,6 +448,8 @@ function WorkspaceClient() {
   const [shouldCenterOnChange, setShouldCenterOnChange] = useState(false);
   const [zoomPercent, setZoomPercent] = useState(100);
   const [baseScale, setBaseScale] = useState(1);
+  const [scrollX, setScrollX] = useState(0);
+  const [maxScrollX, setMaxScrollX] = useState(0);
   const scrollRatioRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const [highlightMode, setHighlightMode] = useState(false);
   const [highlightColor, setHighlightColor] = useState<HighlightColorKey>("yellow");
@@ -1125,6 +1127,29 @@ function WorkspaceClient() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, [computeBaseScale]);
+
+  useEffect(() => {
+    const el = viewerScrollRef.current;
+    if (!el) return;
+
+    const update = () => {
+      const max = Math.max(el.scrollWidth - el.clientWidth, 0);
+      setMaxScrollX(max);
+      setScrollX(el.scrollLeft);
+    };
+
+    const handleScroll = () => {
+      setScrollX(el.scrollLeft);
+    };
+
+    update();
+    el.addEventListener("scroll", handleScroll);
+    window.addEventListener("resize", update);
+    return () => {
+      el.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", update);
+    };
+  }, [zoomPercent, baseScale, activePageIndex]);
 
   const setZoomWithScrollPreserved = useCallback(
     (nextPercent: number) => {
@@ -1861,9 +1886,27 @@ useEffect(() => {
                     className="editor-shell mx-auto flex h-full min-h-0 w-full max-w-[1280px] flex-col gap-6 px-4 lg:flex-row lg:items-start lg:gap-6 lg:px-6"
                   >
                     <div className="viewer flex-1 min-h-0">
+                      {maxScrollX > 0 ? (
+                        <div className="mb-2 flex items-center px-4">
+                          <input
+                            type="range"
+                            min={0}
+                            max={maxScrollX}
+                            value={scrollX}
+                            onChange={(e) => {
+                              const el = viewerScrollRef.current;
+                              if (!el) return;
+                              const next = Number(e.target.value);
+                              el.scrollLeft = next;
+                              setScrollX(next);
+                            }}
+                            className="h-2 w-full cursor-pointer accent-slate-900"
+                          />
+                        </div>
+                      ) : null}
                       <div
                         ref={viewerScrollRef}
-                        className="viewer-shell mx-auto flex h-full w-full max-w-[1000px] flex-col items-start justify-start overflow-auto px-4 pt-5"
+                        className="viewer-shell viewer-scroll mx-auto flex h-full w-full max-w-[1000px] flex-col items-start justify-start overflow-auto px-4 pt-5"
                       >
                         <div className="flex w-full flex-col items-center gap-8">
                           {activePageIndex >= 0 && pages[activePageIndex]
@@ -2063,6 +2106,13 @@ useEffect(() => {
         </div>
       ) : null}
       <style jsx global>{`
+        .viewer-scroll {
+          overflow: auto;
+          scrollbar-width: none;
+        }
+        .viewer-scroll::-webkit-scrollbar {
+          display: none;
+        }
         @keyframes mpdf-progress {
           from {
             transform: translateX(-100%);
