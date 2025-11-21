@@ -80,9 +80,8 @@ const WORKSPACE_DB_NAME = "mpdf-file-store";
 const WORKSPACE_DB_STORE = "files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
 const DEFAULT_ASPECT_RATIO = 792 / 612; // fallback letter portrait
-const BASE_WIDTH = 900; // base rendered width for 100% zoom
 const SOFT_EASE: [number, number, number, number] = [0.4, 0, 0.2, 1];
-const ZOOM_LEVELS = [0.75, 1, 1.5, 2, 3];
+const ZOOM_LEVELS = [0.5, 0.75, 1, 1.5, 2, 3];
 const VIEW_TRANSITION = { duration: 0.2, ease: SOFT_EASE };
 const GRID_VARIANTS = {
   hidden: { opacity: 0, scale: 0.97 },
@@ -1053,7 +1052,8 @@ function WorkspaceClient() {
   const hasWorkspaceData = pages.length > 0 || highlightCount > 0 || !!draftHighlight;
 
   const computeBaseScale = useCallback(() => {
-    if (pages.length === 0) return;
+    const container = previewContainerRef.current;
+    if (!container || pages.length === 0) return;
     const targetIndex = activePageIndex >= 0 ? activePageIndex : 0;
     const targetPage = pages[targetIndex];
     const naturalWidth = targetPage?.width || 612;
@@ -1061,8 +1061,11 @@ function WorkspaceClient() {
     const rotation = normalizeRotation(targetPage?.rotation ?? 0);
     const rotated = rotation % 180 !== 0;
     const baseWidth = rotated ? naturalHeight : naturalWidth;
-    const nextBase = Math.max(0.2, BASE_WIDTH / baseWidth);
-    setBaseScale((prev) => (Math.abs(prev - nextBase) > 0.001 ? nextBase : prev));
+    const baseHeight = rotated ? naturalWidth : naturalHeight;
+    const availableWidth = Math.max(container.clientWidth - 32, 200);
+    const availableHeight = Math.max(container.clientHeight - 32, 200);
+    const fitScale = Math.max(0.2, Math.min(availableWidth / baseWidth, availableHeight / baseHeight));
+    setBaseScale((prev) => (Math.abs(prev - fitScale) > 0.001 ? fitScale : prev));
   }, [activePageIndex, pages]);
 
   useEffect(() => {
@@ -1834,7 +1837,7 @@ useEffect(() => {
               <div className="mx-auto w-full max-w-[960px]">
                 <div
                   ref={previewContainerRef}
-                  className="viewer-shell flex h-[70vh] flex-col items-start justify-start overflow-auto px-4 pt-4"
+                  className="viewer-shell flex h-[70vh] flex-col items-center justify-start overflow-auto px-4 pt-5"
                 >
                   <div className="flex w-full flex-col items-center gap-8">
                     {pages.map(renderPreviewPage)}
