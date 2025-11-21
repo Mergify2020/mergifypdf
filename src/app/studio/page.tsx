@@ -1135,7 +1135,8 @@ function WorkspaceClient() {
     const update = () => {
       const max = Math.max(el.scrollWidth - el.clientWidth, 0);
       setMaxScrollX(max);
-      setScrollX(el.scrollLeft);
+      el.scrollLeft = 0;
+      setScrollX(0);
     };
 
     const handleScroll = () => {
