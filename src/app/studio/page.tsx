@@ -897,8 +897,6 @@ function WorkspaceClient() {
     const rotated = rotationDegrees % 180 !== 0;
     const baseWidth = rotated ? naturalHeight : naturalWidth;
     const baseHeight = rotated ? naturalWidth : naturalHeight;
-    const displayWidth = baseWidth * zoom;
-    const displayHeight = baseHeight * zoom;
     return (
       <div
         key={page.id}
@@ -910,7 +908,12 @@ function WorkspaceClient() {
           className={`relative bg-white shadow-[0_12px_30px_rgba(15,23,42,0.18)] border transition ${
             idx === activePageIndex ? "border-2 border-black shadow-brand/30" : "border border-slate-200"
           }`}
-          style={{ width: displayWidth, height: displayHeight }}
+          style={{
+            width: baseWidth * baseScale,
+            height: baseHeight * baseScale,
+            transform: `scale(${zoomMultiplier})`,
+            transformOrigin: "top center",
+          }}
           onClick={() => handleSelectPage(idx)}
         >
           <div className="absolute inset-0 flex items-center justify-center overflow-hidden group">
@@ -1049,7 +1052,6 @@ function WorkspaceClient() {
   const itemsIds = useMemo(() => pages.map((p) => p.id), [pages]);
   const downloadDisabled = busy || pages.length === 0;
   const activePageIndex = activePageIndexState >= 0 && activePageIndexState < pages.length ? activePageIndexState : -1;
-  const zoom = baseScale * zoomMultiplier;
   const zoomLabel = `${Math.round(zoomMultiplier * 100)}%`;
   const minZoomMultiplier = ZOOM_LEVELS[0];
   const maxZoomMultiplier = ZOOM_LEVELS[ZOOM_LEVELS.length - 1];
@@ -1882,12 +1884,12 @@ useEffect(() => {
               <div className="viewer flex-1">
                 <div
                   ref={previewContainerRef}
-                  className="viewer-shell flex h-[70vh] flex-col items-center justify-start overflow-auto px-4 pt-5"
-                >
-                  <div className="flex w-full flex-col items-center gap-8">
-                    {pages.map(renderPreviewPage)}
-                  </div>
-                </div>
+          className="viewer-shell flex h-[calc(100vh-220px)] w-full max-w-[1000px] flex-col items-start justify-start overflow-auto px-4 pt-5"
+        >
+          <div className="flex w-full flex-col items-center gap-8">
+            {pages.map(renderPreviewPage)}
+          </div>
+        </div>
               </div>
 
               <aside className="sidebar w-full lg:w-[260px] lg:shrink-0">
