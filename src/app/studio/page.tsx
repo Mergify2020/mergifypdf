@@ -442,6 +442,7 @@ function WorkspaceClient() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activePageId, setActivePageId] = useState<string | null>(null);
+  const [activePageIndexState, setActivePageIndex] = useState(0);
   const [zoomMultiplier, setZoomMultiplier] = useState(1);
   const [baseScale, setBaseScale] = useState(1);
   const scrollRatioRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -463,6 +464,8 @@ function WorkspaceClient() {
   const addInputRef = useRef<HTMLInputElement>(null);
   const renderedSourcesRef = useRef(0);
   const previewContainerRef = useRef<HTMLDivElement>(null);
+  const viewerScrollRef = previewContainerRef;
+  const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
   const previewNodeMap = useRef<Map<string, HTMLDivElement>>(new Map());
   const hasHydratedSources = useRef(false);
   const objectUrlCacheRef = useRef<Map<string, string>>(new Map());
@@ -719,12 +722,20 @@ function WorkspaceClient() {
     if (pages.length === 0) {
       setActivePageId(null);
       setOrganizeMode(false);
+      setActivePageIndex(0);
       return;
     }
-    if (!activePageId || !pages.some((p) => p.id === activePageId)) {
+    const hasValidId = activePageId && pages.some((p) => p.id === activePageId);
+    if (!hasValidId) {
       setActivePageId(pages[0].id);
+      setActivePageIndex(0);
+      return;
     }
-  }, [pages, activePageId]);
+    const idx = pages.findIndex((p) => p.id === activePageId);
+    if (idx !== -1 && idx !== activePageIndexState) {
+      setActivePageIndex(idx);
+    }
+  }, [pages, activePageId, activePageIndexState]);
 
   useEffect(() => {
     if (pages.length === 0) {
@@ -851,16 +862,20 @@ function WorkspaceClient() {
     e.currentTarget.value = "";
   }
 
-  function handleSelectPage(id: string) {
-    setActivePageId(id);
-    const node = previewNodeMap.current.get(id);
-    if (node) {
-      node.scrollIntoView({ behavior: "smooth", block: "start" });
+  function handleSelectPage(index: number) {
+    setActivePageIndex(index);
+    const page = pages[index];
+    if (page) {
+      setActivePageId(page.id);
     }
   }
 
   function registerPreviewRef(id: string) {
     return (node: HTMLDivElement | null) => {
+      const index = pages.findIndex((p) => p.id === id);
+      if (index >= 0) {
+        pageRefs.current[index] = node;
+      }
       if (node) {
         previewNodeMap.current.set(id, node);
       } else {
@@ -889,9 +904,10 @@ function WorkspaceClient() {
       >
         <div
           className={`relative bg-white shadow-[0_12px_30px_rgba(15,23,42,0.18)] ${
-            activePageId === page.id ? "ring-2 ring-brand/50 shadow-brand/30" : ""
+            idx === activePageIndex ? "ring-2 ring-brand/50 shadow-brand/30" : ""
           }`}
           style={{ width: displayWidth, height: displayHeight }}
+          onClick={() => handleSelectPage(idx)}
         >
           <div className="absolute inset-0 flex items-center justify-center overflow-hidden group">
             <div
@@ -920,9 +936,9 @@ function WorkspaceClient() {
               <svg
                 className="absolute inset-0 h-full w-full"
                 style={{ pointerEvents: deleteMode ? "auto" : "none" }}
-                viewBox="0 0 1000 1000"
-                preserveAspectRatio="none"
-              >
+                  viewBox="0 0 1000 1000"
+                  preserveAspectRatio="none"
+                >
                 {pageHighlights.map((stroke) =>
                   stroke.points.length > 1 ? (
                     <polyline
@@ -1028,7 +1044,7 @@ function WorkspaceClient() {
 
   const itemsIds = useMemo(() => pages.map((p) => p.id), [pages]);
   const downloadDisabled = busy || pages.length === 0;
-  const activePageIndex = pages.findIndex((p) => p.id === activePageId);
+  const activePageIndex = activePageIndexState >= 0 && activePageIndexState < pages.length ? activePageIndexState : -1;
   const zoom = baseScale * zoomMultiplier;
   const zoomLabel = `${Math.round(zoomMultiplier * 100)}%`;
   const minZoomMultiplier = ZOOM_LEVELS[0];
@@ -1067,6 +1083,21 @@ function WorkspaceClient() {
     const fitScale = Math.max(0.2, Math.min(availableWidth / baseWidth, availableHeight / baseHeight));
     setBaseScale((prev) => (Math.abs(prev - fitScale) > 0.001 ? fitScale : prev));
   }, [activePageIndex, pages]);
+
+  useEffect(() => {
+    const container = previewContainerRef.current;
+    const target = activePageIndex >= 0 ? pageRefs.current[activePageIndex] : null;
+    if (!container || !target) return;
+    const targetTop = target.offsetTop - container.offsetTop;
+    const targetLeft = target.offsetLeft - container.offsetLeft;
+    const scrollTop = targetTop + target.offsetHeight / 2 - container.clientHeight / 2;
+    const scrollLeft = targetLeft + target.offsetWidth / 2 - container.clientWidth / 2;
+    container.scrollTo({
+      top: Math.max(0, scrollTop),
+      left: Math.max(0, scrollLeft),
+      behavior: "smooth",
+    });
+  }, [activePageIndex, zoomMultiplier, baseScale]);
 
   useEffect(() => {
     function handleResize() {
@@ -1188,7 +1219,7 @@ function WorkspaceClient() {
     );
     const targetPage = pages[nextIndex];
     if (targetPage) {
-      handleSelectPage(targetPage.id);
+      handleSelectPage(nextIndex);
     }
   }
 
@@ -1864,7 +1895,7 @@ useEffect(() => {
                             item={p}
                             index={i}
                             selected={p.id === activePageId}
-                            onSelect={() => handleSelectPage(p.id)}
+                            onSelect={() => handleSelectPage(i)}
                           />
                         ))}
                       </ul>
