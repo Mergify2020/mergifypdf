@@ -1539,113 +1539,63 @@ useEffect(() => {
 
   return (
     <main className="flex h-screen min-h-screen flex-col bg-[#f3f6fb] pt-6">
-      <div className="mx-auto flex w-full max-w-[1700px] flex-1 min-h-0 flex-col gap-6 overflow-hidden px-4 pb-10 pt-2 lg:px-10 lg:pt-4">
+      <div className="mx-auto flex w-full max-w-[1700px] flex-1 min-h-0 flex-col gap-4 overflow-hidden px-4 pb-8 pt-2 lg:px-10 lg:pt-3">
         <div className="mx-auto w-full max-w-6xl">
-          <div className="mb-4 overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
-            <div className="flex h-[58px] items-center justify-between border-b border-slate-200/70 bg-white px-5 sm:px-7">
-              <div className="flex flex-1 flex-col gap-1">
-                <span className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-slate-400">
-                  Project name
-                </span>
-                <div className="flex flex-wrap items-center gap-3">
-                  <div className="relative w-full sm:w-[380px]">
-                    {projectNameEditing ? (
-                      <input
-                        className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 pr-11 text-lg font-semibold text-slate-900 shadow-inner outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200/70"
-                        value={projectNameDraft}
-                        onChange={(event) => {
-                          setProjectNameDraft(event.target.value);
-                          if (projectNameError) setProjectNameError(null);
-                        }}
-                        placeholder="Name your project"
-                      />
-                    ) : (
-                      <input
-                        className="h-12 w-full cursor-text rounded-2xl border border-slate-200 bg-white px-4 pr-11 text-lg font-semibold text-slate-900 shadow-inner outline-none transition hover:border-slate-300 focus:border-slate-400 focus:ring-2 focus:ring-slate-200/70"
-                        value={projectName}
-                        readOnly
-                        aria-readonly="true"
-                        onClick={() => {
-                          setProjectNameDraft(projectName);
-                          setProjectNameError(null);
-                          setProjectNameEditing(true);
-                        }}
-                      />
-                    )}
-                    <button
-                      type="button"
+          <div className="mb-2 overflow-hidden rounded-2xl border border-slate-200/80 bg-white/95 shadow-sm backdrop-blur">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:gap-4 sm:px-5">
+              <div className="flex flex-1 flex-wrap items-center gap-3">
+                <div className="relative w-full max-w-[360px]">
+                  {projectNameEditing ? (
+                    <input
+                      className="h-10 w-full rounded-xl border border-slate-200 bg-white px-4 pr-10 text-base font-semibold text-slate-900 shadow-inner outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200/70"
+                      value={projectNameDraft}
+                      onChange={(event) => {
+                        setProjectNameDraft(event.target.value);
+                        if (projectNameError) setProjectNameError(null);
+                      }}
+                      placeholder="Name your project"
+                    />
+                  ) : (
+                    <input
+                      className="h-10 w-full cursor-text rounded-xl border border-slate-200 bg-white px-4 pr-10 text-base font-semibold text-slate-900 shadow-inner outline-none transition hover:border-slate-300 focus:border-slate-400 focus:ring-2 focus:ring-slate-200/70"
+                      value={projectName}
+                      readOnly
+                      aria-readonly="true"
                       onClick={() => {
                         setProjectNameDraft(projectName);
                         setProjectNameError(null);
                         setProjectNameEditing(true);
                       }}
-                      className="absolute right-2.5 top-1/2 flex -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white p-2 text-slate-500 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
-                      aria-label="Edit project name"
-                    >
-                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
-                        <path d="M12 20h9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                        <path
-                          d="M16.5 3.5a2.121 2.121 0 013 3L7 19.5 3 21l1.5-4L16.5 3.5z"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    </button>
-                  </div>
-                  {projectNameEditing ? (
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={handleProjectNameSave}
-                        className="rounded-full bg-[#024d7c] px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-[#012a44]/25 transition hover:-translate-y-0.5"
-                      >
-                        Save name
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleProjectNameCancel}
-                        className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  ) : null}
+                    />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProjectNameDraft(projectName);
+                      setProjectNameError(null);
+                      setProjectNameEditing(true);
+                    }}
+                    className="absolute right-2.5 top-1/2 flex -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white p-2 text-slate-500 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
+                    aria-label="Edit project name"
+                  >
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
+                      <path d="M12 20h9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                      <path
+                        d="M16.5 3.5a2.121 2.121 0 013 3L7 19.5 3 21l1.5-4L16.5 3.5z"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
                 </div>
-              </div>
-              <div className="flex flex-wrap items-center gap-2 pl-4">
-                <button
-                  type="button"
-                  onClick={handleUndoHighlight}
-                  disabled={!hasUndoHistory}
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <Undo2 className="h-4 w-4" />
-                  Undo
-                </button>
-                <button
-                  type="button"
-                  onClick={handleClearHighlights}
-                  disabled={!hasAnyHighlights}
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Clear
-                </button>
-              </div>
-            </div>
-            {projectNameError ? (
-              <div className="px-5 pb-3 pt-2 text-sm text-rose-500 sm:px-7">{projectNameError}</div>
-            ) : null}
-            <div className="flex h-[64px] items-center border-b border-slate-200/70 bg-[#fafafa] px-5 sm:px-7">
-              <div className="flex flex-wrap items-center gap-4">
                 <motion.button
                   type="button"
                   onClick={() => setOrganizeMode(true)}
                   disabled={pages.length === 0 || organizeMode}
                   aria-pressed={organizeMode}
-                  className={`relative inline-flex items-center gap-2 rounded-full border px-6 py-3 text-sm font-semibold transition ${
+                  className={`relative inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition ${
                     organizeMode
                       ? "border-transparent bg-[#024d7c] text-white shadow-sm shadow-[#012a44]/25"
                       : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50 disabled:hover:bg-white"
@@ -1669,7 +1619,7 @@ useEffect(() => {
                     })
                   }
                   aria-pressed={highlightButtonOn}
-                  className={`relative inline-flex items-center gap-2 rounded-full border px-6 py-3 text-sm font-semibold transition ${
+                  className={`relative inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition ${
                     highlightButtonOn
                       ? "border-transparent bg-[#024d7c] text-white shadow-sm shadow-[#012a44]/25"
                       : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50 disabled:hover:bg-white"
@@ -1694,7 +1644,7 @@ useEffect(() => {
                     })
                   }
                   aria-pressed={pencilButtonOn}
-                  className={`relative inline-flex items-center gap-2 rounded-full border px-6 py-3 text-sm font-semibold transition ${
+                  className={`relative inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition ${
                     pencilButtonOn
                       ? "border-transparent bg-slate-900 text-white shadow-sm shadow-slate-900/25"
                       : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50 disabled:hover:bg-white"
@@ -1706,9 +1656,32 @@ useEffect(() => {
                   Pencil
                 </motion.button>
               </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleUndoHighlight}
+                  disabled={!hasUndoHistory}
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Undo2 className="h-4 w-4" />
+                  Undo
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClearHighlights}
+                  disabled={!hasAnyHighlights}
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Clear
+                </button>
+              </div>
             </div>
+            {projectNameError ? (
+              <div className="px-5 pb-3 text-sm text-rose-500 sm:px-6">{projectNameError}</div>
+            ) : null}
             <div
-              className={`border-t border-slate-100/80 bg-slate-50/80 px-5 transition-all duration-300 ease-out sm:px-7 ${
+              className={`border-t border-slate-100/80 bg-slate-50/80 px-5 transition-all duration-300 ease-out sm:px-6 ${
                 highlightTrayVisible
                   ? "pointer-events-auto max-h-40 translate-x-0 opacity-100 py-3"
                   : "pointer-events-none max-h-0 -translate-x-4 opacity-0 py-0"
