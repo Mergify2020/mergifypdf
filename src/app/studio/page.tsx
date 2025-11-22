@@ -479,9 +479,9 @@ function WorkspaceClient() {
   const MAX_HIGHLIGHT_THICKNESS = 32;
   const MIN_PENCIL_THICKNESS = 1;
   const MAX_PENCIL_THICKNESS = 10;
-  const VIEWER_PADDING_X = 12;
-  const VIEWER_PADDING_TOP = 8;
-  const VIEWER_PADDING_BOTTOM = 24;
+  const VIEWER_PADDING_X = 60;
+  const VIEWER_PADDING_TOP = 40;
+  const VIEWER_PADDING_BOTTOM = 120;
 
   // Better drag in grids
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
