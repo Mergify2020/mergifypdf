@@ -1538,8 +1538,8 @@ useEffect(() => {
   }
 
   return (
-    <main className="flex min-h-screen flex-col bg-[#f3f6fb] pt-6">
-      <div className="mx-auto flex w-full max-w-[1700px] flex-1 flex-col gap-6 px-4 pb-10 pt-2 lg:px-10 lg:pt-4">
+    <main className="flex h-screen min-h-screen flex-col bg-[#f3f6fb] pt-6">
+      <div className="mx-auto flex w-full max-w-[1700px] flex-1 min-h-0 flex-col gap-6 px-4 pb-10 pt-2 lg:px-10 lg:pt-4">
         <div className="mx-auto w-full max-w-6xl">
           <div className="mb-4 overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
             <div className="flex h-[58px] items-center justify-between border-b border-slate-200/70 bg-white px-5 sm:px-7">
@@ -1810,7 +1810,7 @@ useEffect(() => {
         </div>
 
         <div className="flex-1 min-h-0">
-          <div className="flex h-full flex-col gap-6">
+          <div className="flex h-full min-h-0 flex-col gap-6">
             {error && (
               <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">
                 {error}
@@ -1882,7 +1882,7 @@ useEffect(() => {
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.97 }}
                     transition={VIEW_TRANSITION}
-                    className="editor-shell mx-auto flex h-full min-h-0 w-full max-w-[1280px] flex-col gap-6 px-4 lg:flex-row lg:items-start lg:gap-6 lg:px-6"
+                    className="editor-shell mx-auto flex h-full min-h-0 w-full max-w-[1280px] flex-1 flex-col gap-6 px-4 lg:flex-row lg:items-start lg:gap-6 lg:px-6"
                   >
                     <div className="viewer flex-1 min-h-0">
                       <div className="flex h-full min-h-0 flex-col">
