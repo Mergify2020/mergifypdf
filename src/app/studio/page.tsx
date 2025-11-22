@@ -907,8 +907,8 @@ function WorkspaceClient() {
         className="mx-auto w-fit"
       >
         <div
-          className={`relative bg-white shadow-[0_12px_30px_rgba(15,23,42,0.18)] border transition ${
-            idx === activePageIndex ? "border-2 border-black shadow-brand/30" : "border border-slate-200"
+          className={`relative bg-white shadow-[0_12px_30px_rgba(15,23,42,0.18)] transition ${
+            idx === activePageIndex ? "shadow-brand/30" : ""
           }`}
           style={{
             width: baseWidth * baseScale * zoomMultiplier,
@@ -2135,6 +2135,21 @@ useEffect(() => {
         .horizontal-slider::-moz-range-track {
           height: 4px;
           border-radius: 9999px;
+          background-color: #e5e7eb;
+        }
+        .viewer-scroll {
+          overflow: auto;
+          scrollbar-width: auto;
+        }
+        .viewer-scroll::-webkit-scrollbar {
+          width: 12px;
+          height: 12px;
+        }
+        .viewer-scroll::-webkit-scrollbar-thumb {
+          background-color: #94a3b8;
+          border-radius: 9999px;
+        }
+        .viewer-scroll::-webkit-scrollbar-track {
           background-color: #e5e7eb;
         }
         @keyframes mpdf-progress {
