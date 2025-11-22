@@ -479,6 +479,9 @@ function WorkspaceClient() {
   const MAX_HIGHLIGHT_THICKNESS = 32;
   const MIN_PENCIL_THICKNESS = 1;
   const MAX_PENCIL_THICKNESS = 10;
+  const VIEWER_PADDING_X = 12;
+  const VIEWER_PADDING_TOP = 8;
+  const VIEWER_PADDING_BOTTOM = 24;
 
   // Better drag in grids
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
@@ -1087,8 +1090,11 @@ function WorkspaceClient() {
     const rotated = rotation % 180 !== 0;
     const baseWidth = rotated ? naturalHeight : naturalWidth;
     const baseHeight = rotated ? naturalWidth : naturalHeight;
-    const availableWidth = Math.max(container.clientWidth - 32, 200);
-    const availableHeight = Math.max(container.clientHeight - 96, 200);
+    const availableWidth = Math.max(container.clientWidth - VIEWER_PADDING_X * 2, 200);
+    const availableHeight = Math.max(
+      container.clientHeight - (VIEWER_PADDING_TOP + VIEWER_PADDING_BOTTOM),
+      200
+    );
     const fitScale = Math.max(0.2, Math.min(availableWidth / baseWidth, availableHeight / baseHeight));
     setBaseScale((prev) => (Math.abs(prev - fitScale) > 0.001 ? fitScale : prev));
   }, [activePageIndex, pages]);
@@ -1945,7 +1951,10 @@ useEffect(() => {
                         ) : null}
                         <div
                           ref={viewerScrollRef}
-                          className="viewer-shell viewer-scroll mx-auto flex flex-1 min-h-0 w-full max-w-[1000px] flex-col items-start justify-start overflow-auto px-4 pt-5 pb-10"
+                          className="viewer-shell viewer-scroll mx-auto flex flex-1 min-h-0 w-full max-w-[1000px] flex-col items-start justify-start overflow-auto"
+                          style={{
+                            padding: `${VIEWER_PADDING_TOP}px ${VIEWER_PADDING_X}px ${VIEWER_PADDING_BOTTOM}px`,
+                          }}
                         >
                           <div className="flex w-full flex-col items-center gap-8">
                             {activePageIndex >= 0 && pages[activePageIndex]
