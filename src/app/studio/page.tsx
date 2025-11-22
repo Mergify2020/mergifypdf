@@ -1879,7 +1879,7 @@ useEffect(() => {
                         ) : null}
                         <div
                           ref={viewerScrollRef}
-                          className="viewer-shell viewer-scroll mx-auto flex flex-1 min-h-0 w-full max-w-[1000px] flex-col items-start justify-start overflow-auto px-4 pt-5"
+                          className="viewer-shell viewer-scroll mx-auto flex flex-1 min-h-0 w-full max-w-[1000px] flex-col items-start justify-start overflow-auto px-4 pt-5 pb-28"
                         >
                           <div className="flex w-full flex-col items-center gap-8">
                             {activePageIndex >= 0 && pages[activePageIndex]
