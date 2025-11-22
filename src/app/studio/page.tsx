@@ -1088,7 +1088,7 @@ function WorkspaceClient() {
     const baseWidth = rotated ? naturalHeight : naturalWidth;
     const baseHeight = rotated ? naturalWidth : naturalHeight;
     const availableWidth = Math.max(container.clientWidth - 32, 200);
-    const availableHeight = Math.max(container.clientHeight - 32, 200);
+    const availableHeight = Math.max(container.clientHeight - 96, 200);
     const fitScale = Math.max(0.2, Math.min(availableWidth / baseWidth, availableHeight / baseHeight));
     setBaseScale((prev) => (Math.abs(prev - fitScale) > 0.001 ? fitScale : prev));
   }, [activePageIndex, pages]);
