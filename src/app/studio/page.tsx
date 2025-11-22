@@ -1556,16 +1556,16 @@ useEffect(() => {
   }
 
   return (
-    <main className="flex h-screen min-h-screen flex-col bg-[#f3f6fb] pt-6">
-      <div className="mx-auto flex w-full max-w-[1700px] flex-1 min-h-0 flex-col gap-4 overflow-hidden px-4 pb-8 pt-2 lg:px-10 lg:pt-3">
-        <div className="sticky top-0 z-50 w-full bg-white">
-          <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 lg:px-6">
-            <Link href="/" className="inline-flex items-center gap-2" aria-label="Back to workspace">
-              <Image src="/logo-wordmark2.svg" alt="MergifyPDF" width={160} height={40} priority />
-            </Link>
-            {authSession?.user ? <WorkspaceSettingsMenu /> : <HeaderLoginButton />}
-          </div>
-          <div className="mx-auto w-full max-w-6xl px-4 lg:px-6">
+    <main className="flex min-h-screen flex-col bg-[#f3f6fb]">
+      <header className="sticky top-0 z-40 border-b border-slate-100 bg-[#f3f6fb]/90 backdrop-blur">
+        <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 lg:px-6">
+          <Link href="/" className="inline-flex items-center gap-2" aria-label="Back to workspace">
+            <Image src="/logo-wordmark2.svg" alt="MergifyPDF" width={160} height={40} priority />
+          </Link>
+          {authSession?.user ? <WorkspaceSettingsMenu /> : <HeaderLoginButton />}
+        </div>
+        <div className="mx-auto w-full max-w-[1700px] px-4 pb-3 lg:px-10">
+          <div className="mx-auto w-full max-w-6xl">
             <div className="overflow-hidden rounded-2xl bg-white/95 backdrop-blur">
               <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:gap-4 sm:px-5">
                 <div className="flex flex-1 flex-wrap items-center gap-3">
@@ -1873,8 +1873,9 @@ useEffect(() => {
             </div>
           </div>
         </div>
+      </header>
 
-        <div className="flex-1 min-h-0 overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-hidden">
           <div className="flex h-full min-h-0 flex-col gap-6 overflow-hidden">
             {error && (
               <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">
@@ -2045,7 +2046,6 @@ useEffect(() => {
             </div>
           </div>
         </div>
-      </div>
       {showDownloadGate ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowDownloadGate(false)} />
