@@ -296,41 +296,34 @@ function SortableThumb({
 
   return (
     <li ref={setNodeRef} style={style} className="w-full" {...attributes}>
-      <div className="flex w-full flex-col items-center gap-1">
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={onSelect}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              event.preventDefault();
-              onSelect();
-            }
-          }}
-          className={`group relative w-full overflow-hidden bg-white transition shadow-sm ${
-            selected ? "border-2 border-black shadow-brand/30" : "border border-slate-200 hover:border-brand/50 hover:shadow-md"
-          }`}
-          {...listeners}
-        >
-          <div className="relative w-full" style={{ paddingBottom: getAspectPadding(item.width, item.height) }}>
-            <div className="absolute inset-0 flex items-center justify-center overflow-hidden group">
-              <div
-                className="flex h-full w-full items-center justify-center"
-                style={{ transform: `rotate(${rotationDegrees}deg) scale(${scaleFix})`, transformOrigin: "center" }}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={item.thumb}
-                  alt={`Page ${index + 1}`}
-                  className="h-full w-full object-contain"
-                  draggable={false}
-                />
-              </div>
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onSelect}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onSelect();
+          }
+        }}
+        className={`group relative mb-4 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-all duration-150 hover:-translate-y-[1px] hover:shadow-md cursor-pointer ${
+          selected ? "border-[#0052ff] ring-2 ring-[#0052ff33]" : ""
+        }`}
+        {...listeners}
+      >
+        <span className="absolute left-2 top-2 rounded-full bg-white/90 px-2 py-0.5 text-[11px] font-medium text-slate-700 shadow-sm">
+          Page {index + 1}
+        </span>
+        <div className="relative w-full" style={{ paddingBottom: getAspectPadding(item.width, item.height) }}>
+          <div className="absolute inset-0 flex items-center justify-center overflow-hidden group">
+            <div
+              className="flex h-full w-full items-center justify-center"
+              style={{ transform: `rotate(${rotationDegrees}deg) scale(${scaleFix})`, transformOrigin: "center" }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={item.thumb} alt={`Page ${index + 1}`} className="block h-full w-full object-contain" draggable={false} />
             </div>
           </div>
-        </div>
-        <div className={`mt-1 text-center text-xs ${selected ? "font-semibold text-slate-800" : "text-slate-500"}`}>
-          Page {index + 1}
         </div>
       </div>
     </li>
@@ -486,6 +479,10 @@ function WorkspaceClient() {
   const VIEWER_PADDING_X = 60;
   const VIEWER_PADDING_TOP = 40;
   const VIEWER_PADDING_BOTTOM = 120;
+  const pillBase = "rounded-full px-4 py-2 text-sm font-medium transition-all duration-150 ease-out";
+  const pillActive = "bg-[#0052ff] text-white shadow-sm shadow-[#0f172a33] scale-100";
+  const pillInactive =
+    "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:border-slate-300 hover:text-slate-800";
 
   // Better drag in grids
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
@@ -911,7 +908,7 @@ function WorkspaceClient() {
         key={page.id}
         data-page-id={page.id}
         ref={registerPreviewRef(page.id)}
-        className="mx-auto w-fit"
+        className="mx-auto w-fit opacity-0 scale-[0.98] animate-[page-enter_0.15s_ease-out_forwards]"
       >
         <div
           className={`relative bg-white shadow-[0_12px_30px_rgba(15,23,42,0.18)] transition ${
@@ -1557,7 +1554,7 @@ useEffect(() => {
 
   return (
     <main className="flex min-h-screen flex-col bg-[#f3f6fb]">
-      <header className="sticky top-0 z-40 border-b border-slate-100 bg-white/90 backdrop-blur">
+      <header className="sticky top-0 z-40 border-b border-slate-100 bg-white/90 backdrop-blur shadow-[0_1px_4px_rgba(15,23,42,0.06)]">
         <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 lg:px-6">
           <Link href="/" className="inline-flex items-center gap-2" aria-label="Back to workspace">
             <Image src="/logo-wordmark2.svg" alt="MergifyPDF" width={160} height={40} priority />
@@ -1566,7 +1563,7 @@ useEffect(() => {
         </div>
         <div className="mx-auto w-full max-w-[1700px] px-4 pb-3 lg:px-10">
           <div className="mx-auto w-full max-w-6xl px-4 lg:px-6">
-            <div className="mt-1 flex flex-col gap-2">
+            <div className="mt-2 flex flex-col gap-2">
               <div className="flex flex-wrap items-center justify-between gap-3 px-0 py-2 sm:gap-4">
                 <div className="flex flex-1 flex-wrap items-center gap-3">
                   <div className="relative w-full max-w-[320px]">
@@ -1621,11 +1618,7 @@ useEffect(() => {
                       onClick={() => setOrganizeMode(true)}
                       disabled={pages.length === 0 || organizeMode}
                       aria-pressed={organizeMode}
-                      className={`relative inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold transition ${
-                        organizeMode
-                          ? "border-transparent bg-[#024d7c] text-white shadow-sm shadow-[#012a44]/25"
-                          : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50 disabled:hover:bg-white"
-                      } disabled:cursor-not-allowed disabled:opacity-50`}
+                      className={`${pillBase} ${organizeMode ? pillActive : pillInactive} hover:scale-[1.03] relative inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50`}
                       animate={{ scale: organizeMode ? 1.04 : 1, opacity: organizeMode ? 1 : 0.94 }}
                       transition={VIEW_TRANSITION}
                     >
@@ -1645,11 +1638,7 @@ useEffect(() => {
                         })
                       }
                       aria-pressed={highlightButtonOn}
-                      className={`relative inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold transition ${
-                        highlightButtonOn
-                          ? "border-transparent bg-[#024d7c] text-white shadow-sm shadow-[#012a44]/25"
-                          : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50 disabled:hover:bg-white"
-                      } disabled:cursor-not-allowed disabled:opacity-50`}
+                      className={`${pillBase} ${highlightButtonOn ? pillActive : pillInactive} hover:scale-[1.03] relative inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50`}
                       animate={{ scale: highlightButtonOn ? 1.04 : 1, opacity: highlightButtonOn ? 1 : 0.94 }}
                       transition={VIEW_TRANSITION}
                     >
@@ -1670,11 +1659,7 @@ useEffect(() => {
                         })
                       }
                       aria-pressed={pencilButtonOn}
-                      className={`relative inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold transition ${
-                        pencilButtonOn
-                          ? "border-transparent bg-slate-900 text-white shadow-sm shadow-slate-900/25"
-                          : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50 disabled:hover:bg-white"
-                      } disabled:cursor-not-allowed disabled:opacity-50`}
+                      className={`${pillBase} ${pencilButtonOn ? pillActive : pillInactive} hover:scale-[1.03] relative inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50`}
                       animate={{ scale: pencilButtonOn ? 1.04 : 1, opacity: pencilButtonOn ? 1 : 0.94 }}
                       transition={VIEW_TRANSITION}
                     >
@@ -1729,8 +1714,8 @@ useEffect(() => {
                       </svg>
                     </button>
                   </div>
-                  <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 shadow-sm">
-                    <span className="text-[0.7rem] font-medium text-slate-500">Zoom</span>
+                <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 shadow-sm">
+                  <span className="text-[0.7rem] font-medium text-slate-500">Zoom</span>
                     <input
                       type="range"
                       min={100}
@@ -2149,6 +2134,16 @@ useEffect(() => {
         }
         body.studio-page > header {
           display: none !important;
+        }
+        @keyframes page-enter {
+          from {
+            opacity: 0;
+            transform: scale(0.98);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
         }
         @keyframes mpdf-progress {
           from {
