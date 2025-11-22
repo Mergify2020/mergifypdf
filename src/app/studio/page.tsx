@@ -5,6 +5,8 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from "react";
 import dynamic from "next/dynamic";
+import Image from "next/image";
+import Link from "next/link";
 import { PDFDocument, rgb, LineCapStyle, LineJoinStyle, degrees } from "pdf-lib";
 import { AnimatePresence, motion } from "framer-motion";
 import { Highlighter, Minus, Plus, Trash2, Undo2, Eraser, Pencil, RotateCcw } from "lucide-react";
@@ -24,6 +26,8 @@ import {
   rectSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import WorkspaceSettingsMenu from "@/components/WorkspaceSettingsMenu";
+import HeaderLoginButton from "@/components/HeaderLoginButton";
 import { PROJECT_NAME_STORAGE_KEY, projectNameToFile, sanitizeProjectName } from "@/lib/projectName";
 import { PENDING_UPLOAD_STORAGE_KEY } from "@/lib/pendingUpload";
 
@@ -1453,6 +1457,14 @@ useEffect(() => {
     }
   }, [hasAnyHighlights, deleteMode]);
 
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.body.classList.add("studio-page");
+    return () => {
+      document.body.classList.remove("studio-page");
+    };
+  }, []);
+
   function adjustHighlightThickness(delta: number) {
     setHighlightThickness((prev) => clamp(prev + delta, MIN_HIGHLIGHT_THICKNESS, MAX_HIGHLIGHT_THICKNESS));
   }
@@ -1546,12 +1558,19 @@ useEffect(() => {
   return (
     <main className="flex h-screen min-h-screen flex-col bg-[#f3f6fb] pt-6">
       <div className="mx-auto flex w-full max-w-[1700px] flex-1 min-h-0 flex-col gap-4 overflow-hidden px-4 pb-8 pt-2 lg:px-10 lg:pt-3">
-        <div className="mx-auto w-full max-w-6xl">
-          <div className="mb-2 overflow-hidden rounded-2xl border border-slate-200/80 bg-white/95 shadow-sm backdrop-blur">
-            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:gap-4 sm:px-5">
-              <div className="flex flex-1 flex-wrap items-center gap-3">
-                <div className="relative w-full max-w-[320px]">
-                  {projectNameEditing ? (
+        <div className="sticky top-0 z-50 w-full bg-white">
+          <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 lg:px-6">
+            <Link href="/" className="inline-flex items-center gap-2" aria-label="Back to workspace">
+              <Image src="/logo-wordmark2.svg" alt="MergifyPDF" width={160} height={40} priority />
+            </Link>
+            {authSession?.user ? <WorkspaceSettingsMenu /> : <HeaderLoginButton />}
+          </div>
+          <div className="mx-auto w-full max-w-6xl px-0">
+            <div className="overflow-hidden rounded-2xl bg-white/95 backdrop-blur">
+              <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:gap-4 sm:px-5">
+                <div className="flex flex-1 flex-wrap items-center gap-3">
+                  <div className="relative w-full max-w-[320px]">
+                    {projectNameEditing ? (
                     <input
                       className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 pr-9 text-sm font-semibold text-slate-900 shadow-inner outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200/70"
                       value={projectNameDraft}
@@ -2126,6 +2145,9 @@ useEffect(() => {
         }
         .viewer-scroll::-webkit-scrollbar-track {
           background-color: #e5e7eb;
+        }
+        body.studio-page > header {
+          display: none !important;
         }
         @keyframes mpdf-progress {
           from {
