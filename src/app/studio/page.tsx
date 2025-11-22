@@ -1544,10 +1544,10 @@ useEffect(() => {
           <div className="mb-2 overflow-hidden rounded-2xl border border-slate-200/80 bg-white/95 shadow-sm backdrop-blur">
             <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:gap-4 sm:px-5">
               <div className="flex flex-1 flex-wrap items-center gap-3">
-                <div className="relative w-full max-w-[360px]">
+                <div className="relative w-full max-w-[320px]">
                   {projectNameEditing ? (
                     <input
-                      className="h-10 w-full rounded-xl border border-slate-200 bg-white px-4 pr-10 text-base font-semibold text-slate-900 shadow-inner outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200/70"
+                      className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 pr-9 text-sm font-semibold text-slate-900 shadow-inner outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200/70"
                       value={projectNameDraft}
                       onChange={(event) => {
                         setProjectNameDraft(event.target.value);
@@ -1557,7 +1557,7 @@ useEffect(() => {
                     />
                   ) : (
                     <input
-                      className="h-10 w-full cursor-text rounded-xl border border-slate-200 bg-white px-4 pr-10 text-base font-semibold text-slate-900 shadow-inner outline-none transition hover:border-slate-300 focus:border-slate-400 focus:ring-2 focus:ring-slate-200/70"
+                      className="h-9 w-full cursor-text rounded-lg border border-slate-200 bg-white px-3 pr-9 text-sm font-semibold text-slate-900 shadow-inner outline-none transition hover:border-slate-300 focus:border-slate-400 focus:ring-2 focus:ring-slate-200/70"
                       value={projectName}
                       readOnly
                       aria-readonly="true"
@@ -1575,10 +1575,10 @@ useEffect(() => {
                       setProjectNameError(null);
                       setProjectNameEditing(true);
                     }}
-                    className="absolute right-2.5 top-1/2 flex -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white p-2 text-slate-500 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
+                    className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white p-1.5 text-slate-500 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
                     aria-label="Edit project name"
                   >
-                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
+                    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
                       <path d="M12 20h9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                       <path
                         d="M16.5 3.5a2.121 2.121 0 013 3L7 19.5 3 21l1.5-4L16.5 3.5z"
@@ -1590,91 +1590,157 @@ useEffect(() => {
                     </svg>
                   </button>
                 </div>
-                <motion.button
-                  type="button"
-                  onClick={() => setOrganizeMode(true)}
-                  disabled={pages.length === 0 || organizeMode}
-                  aria-pressed={organizeMode}
-                  className={`relative inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition ${
-                    organizeMode
-                      ? "border-transparent bg-[#024d7c] text-white shadow-sm shadow-[#012a44]/25"
-                      : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50 disabled:hover:bg-white"
-                  } disabled:cursor-not-allowed disabled:opacity-50`}
-                  animate={{ scale: organizeMode ? 1.04 : 1, opacity: organizeMode ? 1 : 0.94 }}
-                  transition={VIEW_TRANSITION}
-                >
-                  Manage pages
-                </motion.button>
-                <motion.button
-                  type="button"
-                  disabled={highlightButtonDisabled}
-                  onClick={() =>
-                    setHighlightMode((prev) => {
-                      const next = !prev;
-                      if (next) {
-                        setDeleteMode(false);
-                        setPencilMode(false);
-                      }
-                      return next;
-                    })
-                  }
-                  aria-pressed={highlightButtonOn}
-                  className={`relative inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition ${
-                    highlightButtonOn
-                      ? "border-transparent bg-[#024d7c] text-white shadow-sm shadow-[#012a44]/25"
-                      : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50 disabled:hover:bg-white"
-                  } disabled:cursor-not-allowed disabled:opacity-50`}
-                  animate={{ scale: highlightButtonOn ? 1.04 : 1, opacity: highlightButtonOn ? 1 : 0.94 }}
-                  transition={VIEW_TRANSITION}
-                >
-                  <Highlighter className="h-4 w-4" />
-                  Highlight
-                </motion.button>
-                <motion.button
-                  type="button"
-                  disabled={highlightButtonDisabled}
-                  onClick={() =>
-                    setPencilMode((prev) => {
-                      const next = !prev;
-                      if (next) {
-                        setDeleteMode(false);
-                        setHighlightMode(false);
-                      }
-                      return next;
-                    })
-                  }
-                  aria-pressed={pencilButtonOn}
-                  className={`relative inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition ${
-                    pencilButtonOn
-                      ? "border-transparent bg-slate-900 text-white shadow-sm shadow-slate-900/25"
-                      : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50 disabled:hover:bg-white"
-                  } disabled:cursor-not-allowed disabled:opacity-50`}
-                  animate={{ scale: pencilButtonOn ? 1.04 : 1, opacity: pencilButtonOn ? 1 : 0.94 }}
-                  transition={VIEW_TRANSITION}
-                >
-                  <Pencil className="h-4 w-4" />
-                  Pencil
-                </motion.button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <motion.button
+                    type="button"
+                    onClick={() => setOrganizeMode(true)}
+                    disabled={pages.length === 0 || organizeMode}
+                    aria-pressed={organizeMode}
+                    className={`relative inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold transition ${
+                      organizeMode
+                        ? "border-transparent bg-[#024d7c] text-white shadow-sm shadow-[#012a44]/25"
+                        : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50 disabled:hover:bg-white"
+                    } disabled:cursor-not-allowed disabled:opacity-50`}
+                    animate={{ scale: organizeMode ? 1.04 : 1, opacity: organizeMode ? 1 : 0.94 }}
+                    transition={VIEW_TRANSITION}
+                  >
+                    Manage pages
+                  </motion.button>
+                  <motion.button
+                    type="button"
+                    disabled={highlightButtonDisabled}
+                    onClick={() =>
+                      setHighlightMode((prev) => {
+                        const next = !prev;
+                        if (next) {
+                          setDeleteMode(false);
+                          setPencilMode(false);
+                        }
+                        return next;
+                      })
+                    }
+                    aria-pressed={highlightButtonOn}
+                    className={`relative inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold transition ${
+                      highlightButtonOn
+                        ? "border-transparent bg-[#024d7c] text-white shadow-sm shadow-[#012a44]/25"
+                        : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50 disabled:hover:bg-white"
+                    } disabled:cursor-not-allowed disabled:opacity-50`}
+                    animate={{ scale: highlightButtonOn ? 1.04 : 1, opacity: highlightButtonOn ? 1 : 0.94 }}
+                    transition={VIEW_TRANSITION}
+                  >
+                    <Highlighter className="h-4 w-4" />
+                    Highlight
+                  </motion.button>
+                  <motion.button
+                    type="button"
+                    disabled={highlightButtonDisabled}
+                    onClick={() =>
+                      setPencilMode((prev) => {
+                        const next = !prev;
+                        if (next) {
+                          setDeleteMode(false);
+                          setHighlightMode(false);
+                        }
+                        return next;
+                      })
+                    }
+                    aria-pressed={pencilButtonOn}
+                    className={`relative inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold transition ${
+                      pencilButtonOn
+                        ? "border-transparent bg-slate-900 text-white shadow-sm shadow-slate-900/25"
+                        : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50 disabled:hover:bg-white"
+                    } disabled:cursor-not-allowed disabled:opacity-50`}
+                    animate={{ scale: pencilButtonOn ? 1.04 : 1, opacity: pencilButtonOn ? 1 : 0.94 }}
+                    transition={VIEW_TRANSITION}
+                  >
+                    <Pencil className="h-4 w-4" />
+                    Pencil
+                  </motion.button>
+                  <button
+                    type="button"
+                    onClick={handleUndoHighlight}
+                    disabled={!hasUndoHistory}
+                    className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 py-2 text-[0.7rem] font-semibold uppercase tracking-wide text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <Undo2 className="h-4 w-4" />
+                    Undo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleClearHighlights}
+                    disabled={!hasAnyHighlights}
+                    className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 py-2 text-[0.7rem] font-semibold uppercase tracking-wide text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Clear
+                  </button>
+                </div>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleUndoHighlight}
-                  disabled={!hasUndoHistory}
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <Undo2 className="h-4 w-4" />
-                  Undo
-                </button>
-                <button
-                  type="button"
-                  onClick={handleClearHighlights}
-                  disabled={!hasAnyHighlights}
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Clear
-                </button>
+              <div className="flex flex-wrap items-center justify-end gap-3">
+                <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 shadow-sm">
+                  <button
+                    type="button"
+                    aria-label="Previous page"
+                    className="rounded-full border border-slate-200 bg-white p-1.5 text-slate-600 transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-40"
+                    onClick={() => handlePageStep(-1)}
+                    disabled={activePageIndex <= 0}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                      <path d="M14 6l-6 6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                  <div className="text-xs font-semibold text-slate-700">
+                    Page {activePageIndex >= 0 ? activePageIndex + 1 : 0} / {pages.length || 0}
+                  </div>
+                  <button
+                    type="button"
+                    aria-label="Next page"
+                    className="rounded-full border border-slate-200 bg-white p-1.5 text-slate-600 transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-40"
+                    onClick={() => handlePageStep(1)}
+                    disabled={activePageIndex === pages.length - 1 || pages.length === 0}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                      <path d="M10 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                </div>
+                <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 shadow-sm">
+                  <span className="text-[0.7rem] font-medium text-slate-500">Zoom</span>
+                  <input
+                    type="range"
+                    min={100}
+                    max={300}
+                    step={25}
+                    value={zoomPercent}
+                    onChange={(e) => setZoomWithScrollPreserved(Number(e.target.value))}
+                    className="horizontal-slider w-28"
+                  />
+                  <span className="min-w-[44px] text-xs font-semibold text-slate-800 text-right">{zoomLabel}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    className="rounded-full border border-brand/30 bg-brand/5 px-4 py-2 text-sm font-semibold text-brand transition hover:bg-brand/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={handleAddClick}
+                    disabled={pages.length === 0}
+                  >
+                    Add pages
+                  </button>
+                  <input
+                    ref={addInputRef}
+                    type="file"
+                    accept="application/pdf"
+                    multiple
+                    className="hidden"
+                    onChange={handleAddChange}
+                  />
+                  <button
+                    className="rounded-full bg-[#024d7c] px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-[#012a44]/30 transition hover:bg-[#013d63] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c] focus-visible:ring-offset-2 active:bg-[#012f4e] disabled:cursor-not-allowed disabled:bg-[#d1e3f2] disabled:text-[#5f7085] disabled:shadow-none"
+                    onClick={() => handleDownload()}
+                    disabled={downloadDisabled}
+                  >
+                    {busy ? "Building..." : "Download pages"}
+                  </button>
+                </div>
               </div>
             </div>
             {projectNameError ? (
@@ -1879,7 +1945,7 @@ useEffect(() => {
                         ) : null}
                         <div
                           ref={viewerScrollRef}
-                          className="viewer-shell viewer-scroll mx-auto flex flex-1 min-h-0 w-full max-w-[1000px] flex-col items-start justify-start overflow-auto px-4 pt-5 pb-28"
+                          className="viewer-shell viewer-scroll mx-auto flex flex-1 min-h-0 w-full max-w-[1000px] flex-col items-start justify-start overflow-auto px-4 pt-5 pb-10"
                         >
                           <div className="flex w-full flex-col items-center gap-8">
                             {activePageIndex >= 0 && pages[activePageIndex]
@@ -1950,79 +2016,6 @@ useEffect(() => {
             </div>
           </div>
         </div>
-
-        {!organizeMode && (
-          <div className="sticky bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur">
-            <div className="mx-auto flex h-[64px] max-w-6xl items-center justify-between gap-4 px-4 lg:px-6">
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  aria-label="Previous page"
-                  className="rounded-full border border-slate-200 bg-white p-2 text-slate-600 transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-40"
-                  onClick={() => handlePageStep(-1)}
-                  disabled={activePageIndex <= 0}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                    <path d="M14 6l-6 6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-                <div className="text-sm font-semibold text-slate-700">
-                  Page {activePageIndex >= 0 ? activePageIndex + 1 : 0} / {pages.length || 0}
-                </div>
-                <button
-                  type="button"
-                  aria-label="Next page"
-                  className="rounded-full border border-slate-200 bg-white p-2 text-slate-600 transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-40"
-                  onClick={() => handlePageStep(1)}
-                  disabled={activePageIndex === pages.length - 1 || pages.length === 0}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                    <path d="M10 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-              </div>
-              <div className="flex flex-1 items-center justify-center">
-                <div className="flex items-center gap-3 rounded-full border border-slate-200 bg-white px-4 py-2 shadow-sm">
-                  <span className="text-xs font-medium text-slate-500">Zoom</span>
-                  <input
-                    type="range"
-                    min={100}
-                    max={300}
-                    step={25}
-                    value={zoomPercent}
-                    onChange={(e) => setZoomWithScrollPreserved(Number(e.target.value))}
-                    className="w-40 accent-slate-900"
-                  />
-                  <span className="min-w-[48px] text-sm font-semibold text-slate-800 text-right">{zoomLabel}</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <button
-                  className="rounded-full border border-brand/30 bg-brand/5 px-6 py-3 text-sm font-semibold text-brand transition hover:bg-brand/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  onClick={handleAddClick}
-                  disabled={pages.length === 0}
-                >
-                  Add pages
-                </button>
-                <input
-                  ref={addInputRef}
-                  type="file"
-                  accept="application/pdf"
-                  multiple
-                  className="hidden"
-                  onChange={handleAddChange}
-                />
-                <button
-                  className="rounded-full bg-[#024d7c] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-[#012a44]/30 transition hover:bg-[#013d63] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c] focus-visible:ring-offset-2 active:bg-[#012f4e] disabled:cursor-not-allowed disabled:bg-[#d1e3f2] disabled:text-[#5f7085] disabled:shadow-none"
-                  onClick={() => handleDownload()}
-                  disabled={downloadDisabled}
-                >
-                  {busy ? "Building..." : "Download pages"}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
       {showDownloadGate ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
