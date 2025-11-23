@@ -1075,6 +1075,7 @@ function WorkspaceClient() {
                       suppressContentEditableWarning
                       onFocus={() => setFocusedTextId(annotation.id)}
                       onClick={() => setFocusedTextId(annotation.id)}
+                      dir="ltr"
                       className={`min-w-[60px] inline-block px-1 py-0.5 text-[12px] text-slate-900 rounded transition whitespace-pre-wrap break-words text-left ${
                         focusedTextId === annotation.id || isDraggingThis
                           ? `border ${isDraggingThis ? "border-dashed border-slate-400" : "border-slate-400"} shadow-sm`
@@ -1098,6 +1099,7 @@ function WorkspaceClient() {
                         height: "100%",
                         direction: "ltr",
                         textAlign: "left",
+                        unicodeBidi: "plaintext",
                         backgroundColor: "transparent",
                         fontWeight: textBold ? 700 : 500,
                         fontStyle: textItalic ? "italic" : "normal",
