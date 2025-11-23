@@ -1109,15 +1109,6 @@ function WorkspaceClient() {
                             });
                             setFocusedTextId(annotation.id);
                           }}
-                          onMouseUp={(event) => {
-                            event.stopPropagation();
-                            setDraggingText(null);
-                          }}
-                          onMouseLeave={() => {
-                            setDraggingText((current) =>
-                              current && current.id === annotation.id ? null : current
-                            );
-                          }}
                         >
                           <Move className="h-4 w-4" />
                         </button>
