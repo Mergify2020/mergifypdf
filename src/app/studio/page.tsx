@@ -491,6 +491,12 @@ function WorkspaceClient() {
     offsetY: number;
   } | null>(null);
   const textDragCleanupRef = useRef<(() => void) | null>(null);
+  const [rotatingText, setRotatingText] = useState<{
+    pageId: string;
+    id: string;
+    pointerId: number;
+  } | null>(null);
+  const textRotateCleanupRef = useRef<(() => void) | null>(null);
   const [resizingText, setResizingText] = useState<{
     pageId: string;
     id: string;
@@ -511,6 +517,7 @@ function WorkspaceClient() {
   const [focusedTextId, setFocusedTextId] = useState<string | null>(null);
   const focusedTextIdRef = useRef<string | null>(null);
   const textNodeRefs = useRef<Map<string, HTMLTextAreaElement>>(new Map());
+  const textAnnotationRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   function resolveStandardFont(family: TextFont, bold: boolean, italic: boolean): StandardFonts {
     const variant = bold && italic ? "boldItalic" : bold ? "bold" : italic ? "italic" : "normal";
@@ -1232,20 +1239,28 @@ function WorkspaceClient() {
               {pageTexts.map((annotation) => {
                 const annotationWidth = annotation.width ?? 0.14;
                 const annotationHeight = annotation.height ?? 0.06;
-                const rotation = annotation.rotation ?? 0;
                 const isDraggingThis = draggingText?.id === annotation.id;
                 const isResizingThis = resizingText?.id === annotation.id;
+                const isRotatingThis = rotatingText?.id === annotation.id;
+                const rotation = annotation.rotation ?? 0;
                 const displayFontSize = textSize * zoomMultiplier;
                 return (
                 <div
                   key={annotation.id}
-                  className="absolute"
+                  ref={registerTextAnnotationNode(annotation.id)}
+                    className={`absolute transition-transform duration-150 ${
+                    isRotatingThis ? "scale-[1.02] drop-shadow-[0_4px_18px_rgba(2,77,124,0.25)]" : ""
+                  }`}
                   data-text-annotation
                   style={{
                     left: `${annotation.x * 100}%`,
                     top: `${annotation.y * 100}%`,
                     width: `${annotationWidth * 100}%`,
                     height: `${annotationHeight * 100}%`,
+                    transform: `rotate(${rotation}deg)`,
+                    transformOrigin: "center",
+                    willChange: isRotatingThis ? "transform" : undefined,
+                    transitionDuration: isRotatingThis ? "60ms" : undefined,
                   }}
                   onClick={(event) => {
                     event.stopPropagation();
@@ -1257,6 +1272,14 @@ function WorkspaceClient() {
                   }}
                 >
                   <div className="relative h-full w-full">
+                    {isRotatingThis ? (
+                      <div
+                        className="absolute -top-8 left-1/2 rounded-full bg-slate-900/85 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm"
+                        style={{ transform: `translate(-50%, 0) rotate(${-rotation}deg)` }}
+                      >
+                        {Math.round(rotation)}°
+                      </div>
+                    ) : null}
                     <textarea
                       value={annotation.text}
                       onChange={(event) =>
@@ -1290,8 +1313,6 @@ function WorkspaceClient() {
                         fontStyle: textItalic ? "italic" : "normal",
                         fontFamily: textFont,
                         fontSize: `${displayFontSize}px`,
-                        transform: `rotate(${rotation}deg)`,
-                        transformOrigin: "center",
                       }}
                     />
                     {focusedTextId === annotation.id ? (
@@ -1309,12 +1330,9 @@ function WorkspaceClient() {
                         <button
                           type="button"
                           className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 bg-white/80 text-slate-700 shadow-sm transition hover:bg-white active:translate-y-[1px]"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            updateTextAnnotation(page.id, annotation.id, (item) => ({
-                              ...item,
-                              rotation: ((item.rotation ?? 0) + 15) % 360,
-                            }));
+                          onPointerDown={(event) => {
+                            focusTextAnnotation(annotation.id);
+                            startTextRotate(page.id, annotation.id, event);
                           }}
                         >
                           <RotateCcw className="h-4 w-4" />
@@ -1436,6 +1454,16 @@ function WorkspaceClient() {
     };
   }
 
+  function registerTextAnnotationNode(id: string) {
+    return (node: HTMLDivElement | null) => {
+      if (node) {
+        textAnnotationRefs.current.set(id, node);
+      } else {
+        textAnnotationRefs.current.delete(id);
+      }
+    };
+  }
+
   function updateTextAnnotation(
     pageId: string,
     id: string,
@@ -1466,6 +1494,65 @@ function WorkspaceClient() {
     });
     setFocusedTextId((current) => (current === id ? null : current));
   }
+
+  const startTextRotate = useCallback(
+    (pageId: string, annotationId: string, startEvent: ReactPointerEvent<HTMLButtonElement>) => {
+      if (startEvent.button !== 0 && startEvent.pointerType !== "touch") return;
+      startEvent.preventDefault();
+      startEvent.stopPropagation();
+      const target = textAnnotationRefs.current.get(annotationId);
+      const annotation = textAnnotations[pageId]?.find((a) => a.id === annotationId);
+      if (!target || !annotation) return;
+      const rect = target.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      let lastAngle = Math.atan2(startEvent.clientY - centerY, startEvent.clientX - centerX);
+      let accumulatedDelta = 0;
+      const baseRotation = annotation.rotation ?? 0;
+      const pointerId = startEvent.pointerId;
+
+      textRotateCleanupRef.current?.();
+
+      const handleMove = (event: PointerEvent) => {
+        if (event.pointerId !== pointerId) return;
+        const angle = Math.atan2(event.clientY - centerY, event.clientX - centerX);
+        let delta = angle - lastAngle;
+        if (delta > Math.PI) delta -= Math.PI * 2;
+        if (delta < -Math.PI) delta += Math.PI * 2;
+        accumulatedDelta += delta;
+        lastAngle = angle;
+        const deltaDegrees = (accumulatedDelta * 180) / Math.PI;
+        const nextRotation = normalizeRotation(baseRotation + deltaDegrees);
+        setTextAnnotations((prev) => {
+          const existing = prev[pageId] ?? [];
+          const updated = existing.map((item) =>
+            item.id === annotationId ? { ...item, rotation: nextRotation } : item
+          );
+          return { ...prev, [pageId]: updated };
+        });
+      };
+
+      const cleanup = () => {
+        window.removeEventListener("pointermove", handleMove);
+        window.removeEventListener("pointerup", handleUp);
+        window.removeEventListener("pointercancel", handleUp);
+        textRotateCleanupRef.current = null;
+        setRotatingText(null);
+      };
+
+      const handleUp = (event: PointerEvent) => {
+        if (event.pointerId !== pointerId) return;
+        cleanup();
+      };
+
+      window.addEventListener("pointermove", handleMove);
+      window.addEventListener("pointerup", handleUp);
+      window.addEventListener("pointercancel", handleUp);
+      textRotateCleanupRef.current = cleanup;
+      setRotatingText({ pageId, id: annotationId, pointerId });
+    },
+    [textAnnotations]
+  );
 
 
   const itemsIds = useMemo(() => pages.map((p) => p.id), [pages]);
@@ -2028,6 +2115,7 @@ function WorkspaceClient() {
     return () => {
       textDragCleanupRef.current?.();
       textResizeCleanupRef.current?.();
+      textRotateCleanupRef.current?.();
     };
   }, []);
 
