@@ -488,6 +488,14 @@ function WorkspaceClient() {
   } | null>(null);
   const [focusedTextId, setFocusedTextId] = useState<string | null>(null);
   const textNodeRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  function focusTextAnnotation(id: string) {
+    setFocusedTextId(id);
+    const node = textNodeRefs.current.get(id);
+    if (node) {
+      node.focus();
+    }
+  }
   const [deleteMode, setDeleteMode] = useState(false);
   const [projectName, setProjectName] = useState("Untitled Project");
   const [projectNameEditing, setProjectNameEditing] = useState(false);
@@ -1052,7 +1060,14 @@ function WorkspaceClient() {
                     width: `${annotationWidth * 100}%`,
                     height: `${annotationHeight * 100}%`,
                   }}
-                  onClick={(event) => event.stopPropagation()}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    focusTextAnnotation(annotation.id);
+                  }}
+                  onMouseDown={(event) => {
+                    event.stopPropagation();
+                    focusTextAnnotation(annotation.id);
+                  }}
                 >
                   <div className="relative h-full w-full">
                     <div
@@ -1065,17 +1080,17 @@ function WorkspaceClient() {
                           ? `border ${isDraggingThis ? "border-dashed border-slate-400" : "border-slate-400"} shadow-sm`
                           : "border border-transparent"
                       }`}
-                      onInput={(event) => {
-                        const value = event.currentTarget.textContent ?? "";
-                        updateTextAnnotation(page.id, annotation.id, (item) => ({ ...item, text: value }));
-                        syncTextAnnotationSize(page.id, annotation.id, event.currentTarget);
-                      }}
-                      onBlur={(event) => {
-                        const value = event.currentTarget.textContent ?? "";
-                        updateTextAnnotation(page.id, annotation.id, (item) => ({ ...item, text: value }));
-                        syncTextAnnotationSize(page.id, annotation.id, event.currentTarget);
-                        setFocusedTextId((current) => (current === annotation.id ? null : current));
-                      }}
+                    onInput={(event) => {
+                      const value = event.currentTarget.textContent ?? "";
+                      updateTextAnnotation(page.id, annotation.id, (item) => ({ ...item, text: value }));
+                      syncTextAnnotationSize(page.id, annotation.id, event.currentTarget);
+                    }}
+                    onBlur={(event) => {
+                      const value = event.currentTarget.textContent ?? "";
+                      updateTextAnnotation(page.id, annotation.id, (item) => ({ ...item, text: value }));
+                      syncTextAnnotationSize(page.id, annotation.id, event.currentTarget);
+                      setFocusedTextId((current) => (current === annotation.id ? null : current));
+                    }}
                       ref={registerTextNode(annotation.id)}
                       tabIndex={0}
                       style={{
@@ -1083,8 +1098,6 @@ function WorkspaceClient() {
                         height: "100%",
                         direction: "ltr",
                         textAlign: "left",
-                        writingMode: "horizontal-tb",
-                        unicodeBidi: "plaintext",
                         backgroundColor: "transparent",
                         fontWeight: textBold ? 700 : 500,
                         fontStyle: textItalic ? "italic" : "normal",
