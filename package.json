@@ -27,6 +27,9 @@
     "react-dropzone": "^14.3.8",
     "resend": "^6.4.0"
   },
+  "optionalDependencies": {
+    "fontkit": "^2.0.2"
+  },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",

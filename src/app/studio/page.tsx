@@ -82,7 +82,75 @@ type TextAnnotation = {
   height: number;
   rotation?: number;
 };
-type TextFont = "Inter" | "Georgia" | "Courier New";
+type TextFont = "Inter" | "Georgia" | "Courier New" | "Merriweather";
+type TextFontVariant = "normal" | "bold" | "italic" | "boldItalic";
+
+type FontOption =
+  | {
+      label: string;
+      cssFamily: string;
+      pdf: { type: "standard"; variants: Record<TextFontVariant, StandardFonts> };
+    }
+  | {
+      label: string;
+      cssFamily: string;
+      pdf: { type: "custom"; variants: Record<TextFontVariant, string> };
+    };
+
+const TEXT_FONT_OPTIONS: Record<TextFont, FontOption> = {
+  Inter: {
+    label: "Inter",
+    cssFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    pdf: {
+      type: "custom",
+      variants: {
+        normal: "/fonts/Inter-Regular.ttf",
+        bold: "/fonts/Inter-Bold.ttf",
+        italic: "/fonts/Inter-Italic.ttf",
+        boldItalic: "/fonts/Inter-BoldItalic.ttf",
+      },
+    },
+  },
+  Georgia: {
+    label: "Georgia",
+    cssFamily: "'Georgia', 'Times New Roman', serif",
+    pdf: {
+      type: "standard",
+      variants: {
+        normal: StandardFonts.TimesRoman,
+        bold: StandardFonts.TimesRomanBold,
+        italic: StandardFonts.TimesRomanItalic,
+        boldItalic: StandardFonts.TimesRomanBoldItalic,
+      },
+    },
+  },
+  "Courier New": {
+    label: "Monospace",
+    cssFamily: "'Courier New', 'SFMono-Regular', Consolas, monospace",
+    pdf: {
+      type: "standard",
+      variants: {
+        normal: StandardFonts.Courier,
+        bold: StandardFonts.CourierBold,
+        italic: StandardFonts.CourierOblique,
+        boldItalic: StandardFonts.CourierBoldOblique,
+      },
+    },
+  },
+  Merriweather: {
+    label: "Merriweather",
+    cssFamily: "'Merriweather', 'Times New Roman', serif",
+    pdf: {
+      type: "custom",
+      variants: {
+        normal: "/fonts/Merriweather-Regular.ttf",
+        bold: "/fonts/Merriweather-Bold.ttf",
+        italic: "/fonts/Merriweather-Italic.ttf",
+        boldItalic: "/fonts/Merriweather-BoldItalic.ttf",
+      },
+    },
+  },
+};
 
 const HIGHLIGHT_COLORS = {
   yellow: "#fff266",
@@ -518,30 +586,15 @@ function WorkspaceClient() {
   const focusedTextIdRef = useRef<string | null>(null);
   const textNodeRefs = useRef<Map<string, HTMLTextAreaElement>>(new Map());
   const textAnnotationRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const customFontBytesRef = useRef<Map<string, Uint8Array>>(new Map());
+  const pdfFontCacheRef = useRef<Map<string, PDFFont>>(new Map());
+  const fontkitModuleRef = useRef<null | { default?: unknown }>(null);
 
-  function resolveStandardFont(family: TextFont, bold: boolean, italic: boolean): StandardFonts {
-    const variant = bold && italic ? "boldItalic" : bold ? "bold" : italic ? "italic" : "normal";
-    const map: Record<TextFont, Record<typeof variant, StandardFonts>> = {
-      Inter: {
-        normal: StandardFonts.Helvetica,
-        bold: StandardFonts.HelveticaBold,
-        italic: StandardFonts.HelveticaOblique,
-        boldItalic: StandardFonts.HelveticaBoldOblique,
-      },
-      Georgia: {
-        normal: StandardFonts.TimesRoman,
-        bold: StandardFonts.TimesRomanBold,
-        italic: StandardFonts.TimesRomanItalic,
-        boldItalic: StandardFonts.TimesRomanBoldItalic,
-      },
-      "Courier New": {
-        normal: StandardFonts.Courier,
-        bold: StandardFonts.CourierBold,
-        italic: StandardFonts.CourierOblique,
-        boldItalic: StandardFonts.CourierBoldOblique,
-      },
-    };
-    return map[family][variant];
+  function resolveFontVariant(bold: boolean, italic: boolean): TextFontVariant {
+    if (bold && italic) return "boldItalic";
+    if (bold) return "bold";
+    if (italic) return "italic";
+    return "normal";
   }
 
   function focusTextAnnotation(id: string) {
@@ -1312,7 +1365,7 @@ function WorkspaceClient() {
                         backgroundColor: "transparent",
                         fontWeight: textBold ? 700 : 500,
                         fontStyle: textItalic ? "italic" : "normal",
-                        fontFamily: textFont,
+                        fontFamily: TEXT_FONT_OPTIONS[textFont].cssFamily,
                         fontSize: `${displayFontSize}px`,
                       }}
                     />
@@ -1563,6 +1616,10 @@ function WorkspaceClient() {
   const highlightColorEntries = Object.entries(
     HIGHLIGHT_COLORS
   ) as [HighlightColorKey, string][];
+  const textFontEntries = useMemo(
+    () => Object.entries(TEXT_FONT_OPTIONS) as [TextFont, FontOption][],
+    []
+  );
   const highlightButtonOn = highlightMode && !highlightButtonDisabled;
   const pencilButtonOn = pencilMode && !highlightButtonDisabled;
   const textButtonOn = textMode && !highlightButtonDisabled;
@@ -1854,13 +1911,43 @@ function WorkspaceClient() {
 
       // Now copy pages in the displayed order
       const out = await PDFDocument.create();
-      const fontCache = new Map<StandardFonts, PDFFont>();
-      async function getDownloadFont() {
-        const fontName = resolveStandardFont(textFont, textBold, textItalic);
-        const cached = fontCache.get(fontName);
+      const standardFontCache = new Map<StandardFonts, PDFFont>();
+      let fontkitRegistered = false;
+      async function loadFontBytes(path: string) {
+        const cached = customFontBytesRef.current.get(path);
         if (cached) return cached;
-        const embedded = await out.embedFont(fontName);
-        fontCache.set(fontName, embedded);
+        const response = await fetch(path);
+        const arrayBuffer = await response.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuffer);
+        customFontBytesRef.current.set(path, bytes);
+        return bytes;
+      }
+      async function getDownloadFont() {
+        const config = TEXT_FONT_OPTIONS[textFont];
+        const variant = resolveFontVariant(textBold, textItalic);
+        if (config.pdf.type === "standard") {
+          const fontName = config.pdf.variants[variant];
+          const cached = standardFontCache.get(fontName);
+          if (cached) return cached;
+          const embedded = await out.embedFont(fontName);
+          standardFontCache.set(fontName, embedded);
+          return embedded;
+        }
+        if (!fontkitRegistered) {
+          if (!fontkitModuleRef.current) {
+            const fontkit = await import("fontkit");
+            fontkitModuleRef.current = fontkit as { default?: unknown };
+          }
+          out.registerFontkit(fontkitModuleRef.current.default ?? fontkitModuleRef.current);
+          fontkitRegistered = true;
+        }
+        const src = config.pdf.variants[variant];
+        const cacheKey = `${textFont}:${variant}`;
+        const cached = pdfFontCacheRef.current.get(cacheKey);
+        if (cached) return cached;
+        const fontBytes = await loadFontBytes(src);
+        const embedded = await out.embedFont(fontBytes);
+        pdfFontCacheRef.current.set(cacheKey, embedded);
         return embedded;
       }
       for (const p of pages) {
@@ -2518,13 +2605,13 @@ function WorkspaceClient() {
                     <select
                       className="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 shadow-inner focus:border-slate-400 focus:outline-none"
                       value={textFont}
-                      onChange={(event) =>
-                        setTextFont(event.target.value as "Inter" | "Georgia" | "Courier New")
-                      }
+                      onChange={(event) => setTextFont(event.target.value as TextFont)}
                     >
-                      <option value="Inter">Inter</option>
-                      <option value="Georgia">Serif</option>
-                      <option value="Courier New">Mono</option>
+                      {textFontEntries.map(([key, option]) => (
+                        <option key={key} value={key}>
+                          {option.label}
+                        </option>
+                      ))}
                     </select>
                     <div className="flex items-center gap-1">
                       <span className="text-[0.65rem] text-slate-500">Size</span>
