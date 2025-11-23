@@ -817,6 +817,7 @@ function WorkspaceClient() {
   const VIEWER_PADDING_X = 60;
   const VIEWER_PADDING_TOP = 40;
   const VIEWER_PADDING_BOTTOM = 120;
+  const VIEWER_SCROLL_HEIGHT = "calc(100vh - 260px)";
   const toolSwitchBase = "flex items-center gap-2 px-4 py-2 text-sm font-semibold transition";
   const toolSwitchActive = "bg-[#024d7c] text-white shadow-sm";
   const toolSwitchInactive = "bg-white text-slate-700 hover:bg-slate-50";
@@ -1681,7 +1682,6 @@ function WorkspaceClient() {
   const highlightActive = highlightButtonOn && !deleteMode;
   const pencilActive = pencilButtonOn && !deleteMode;
   const textActive = textButtonOn && !deleteMode;
-  const showScrollbars = zoomPercent > 100;
   const activeDrawingTool: DrawingTool | null = highlightActive
     ? "highlight"
     : pencilActive
@@ -2862,15 +2862,17 @@ function WorkspaceClient() {
                   >
                     <div className="viewer flex-1 min-h-0 overflow-hidden">
                       <div className="flex h-full min-h-0 flex-col overflow-hidden">
-                        <div
-                          ref={viewerScrollRef}
-                          className="viewer-shell viewer-scroll mx-auto flex flex-1 min-h-0 w-full max-w-[1000px] flex-col items-start justify-start"
-                          style={{
-                            padding: `${VIEWER_PADDING_TOP}px ${VIEWER_PADDING_X}px ${VIEWER_PADDING_BOTTOM}px`,
-                            overflow: showScrollbars ? "auto" : "hidden",
-                            scrollbarGutter: showScrollbars ? "stable both-edges" : undefined,
-                          }}
-                        >
+                    <div
+                      ref={viewerScrollRef}
+                      className="viewer-shell viewer-scroll mx-auto flex flex-1 min-h-0 w-full max-w-[1000px] flex-col items-start justify-start"
+                      style={{
+                        padding: `${VIEWER_PADDING_TOP}px ${VIEWER_PADDING_X}px ${VIEWER_PADDING_BOTTOM}px`,
+                        height: VIEWER_SCROLL_HEIGHT,
+                        maxHeight: VIEWER_SCROLL_HEIGHT,
+                        overflow: "auto",
+                        scrollbarGutter: "stable both-edges",
+                      }}
+                    >
                           <div className="flex w-full flex-col items-center gap-8">
                             {activePageIndex >= 0 && pages[activePageIndex]
                               ? renderPreviewPage(pages[activePageIndex], activePageIndex)
