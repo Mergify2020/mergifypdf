@@ -496,6 +496,14 @@ function WorkspaceClient() {
       node.focus();
     }
   }
+
+  function clearTextFocus() {
+    if (focusedTextId) {
+      const node = textNodeRefs.current.get(focusedTextId);
+      node?.blur();
+    }
+    setFocusedTextId(null);
+  }
   const [deleteMode, setDeleteMode] = useState(false);
   const [projectName, setProjectName] = useState("Untitled Project");
   const [projectNameEditing, setProjectNameEditing] = useState(false);
@@ -1397,10 +1405,10 @@ function WorkspaceClient() {
   }, [zoomPercent, baseScale]);
 
   function handleMarkupPointerDown(pageId: string, event: ReactMouseEvent<HTMLDivElement>) {
-    if (deleteMode) return;
     if (!event.target || !(event.target as HTMLElement).closest("[data-text-annotation]")) {
-      setFocusedTextId(null);
+      clearTextFocus();
     }
+    if (deleteMode) return;
     const tool = getActiveTool();
     if (!tool) return;
     const point = getPointerPoint(event);
