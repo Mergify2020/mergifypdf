@@ -805,6 +805,7 @@ function WorkspaceClient() {
   const renderedSourcesRef = useRef(0);
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const viewerScrollRef = previewContainerRef;
+  const [viewerWidth, setViewerWidth] = useState(0);
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
   const previewNodeMap = useRef<Map<string, HTMLDivElement>>(new Map());
   const hasHydratedSources = useRef(false);
@@ -1242,6 +1243,9 @@ function WorkspaceClient() {
     const rotated = rotationDegrees % 180 !== 0;
     const baseWidth = rotated ? naturalHeight : naturalWidth;
     const baseHeight = rotated ? naturalWidth : naturalHeight;
+    const fittedWidth = baseWidth * baseScale;
+    const displayWidth = Math.max(200, Math.min(viewerWidth || fittedWidth, fittedWidth * zoomMultiplier));
+    const viewScale = displayWidth / fittedWidth;
     return (
       <div
         key={page.id}
@@ -1254,7 +1258,7 @@ function WorkspaceClient() {
             idx === activePageIndex ? "shadow-brand/30" : ""
           }`}
           style={{
-            width: baseWidth * baseScale * zoomMultiplier,
+            width: displayWidth,
             aspectRatio: `${baseWidth} / ${baseHeight}`,
           }}
           onClick={() => handleSelectPage(idx)}
@@ -1352,7 +1356,7 @@ function WorkspaceClient() {
                 const isRotatingThis = rotatingText?.id === annotation.id;
                 const rotation = annotation.rotation ?? 0;
                 const displayRotation = normalizeRotation(rotation);
-                const displayFontSize = textSize * zoomMultiplier;
+                const displayFontSize = textSize * viewScale;
                 return (
                 <div
                   key={annotation.id}
@@ -1716,6 +1720,7 @@ function WorkspaceClient() {
       container.clientHeight - (VIEWER_PADDING_TOP + VIEWER_PADDING_BOTTOM),
       200
     );
+    setViewerWidth(availableWidth);
     const fitScale = Math.max(0.2, Math.min(availableWidth / baseWidth, availableHeight / baseHeight));
     setBaseScale((prev) => (Math.abs(prev - fitScale) > 0.001 ? fitScale : prev));
   }, [activePageIndex, pages]);
@@ -2863,15 +2868,16 @@ function WorkspaceClient() {
                     <div className="viewer flex-1 min-h-0 overflow-hidden">
                       <div className="flex h-full min-h-0 flex-col overflow-hidden">
                         <div
-                          ref={viewerScrollRef}
-                          className="viewer-shell viewer-scroll mx-auto flex flex-1 min-h-0 w-full max-w-[1000px] flex-col items-center justify-start"
-                          style={{
-                            padding: `${VIEWER_PADDING_TOP}px ${VIEWER_PADDING_X}px ${VIEWER_PADDING_BOTTOM}px`,
-                            maxHeight: VIEWER_SCROLL_HEIGHT,
-                            overflow: "auto",
-                            scrollbarGutter: "stable both-edges",
-                          }}
-                        >
+                      ref={viewerScrollRef}
+                      className="viewer-shell viewer-scroll mx-auto flex flex-1 min-h-0 w-full flex-col items-center justify-start"
+                      style={{
+                        padding: `${VIEWER_PADDING_TOP}px ${VIEWER_PADDING_X}px ${VIEWER_PADDING_BOTTOM}px`,
+                        maxHeight: VIEWER_SCROLL_HEIGHT,
+                        overflowY: "auto",
+                        overflowX: "hidden",
+                        scrollbarGutter: "stable both-edges",
+                      }}
+                    >
                           <div className="flex w-full flex-col items-center gap-8">
                             {activePageIndex >= 0 && pages[activePageIndex]
                               ? renderPreviewPage(pages[activePageIndex], activePageIndex)
