@@ -2862,17 +2862,16 @@ function WorkspaceClient() {
                   >
                     <div className="viewer flex-1 min-h-0 overflow-hidden">
                       <div className="flex h-full min-h-0 flex-col overflow-hidden">
-                    <div
-                      ref={viewerScrollRef}
-                      className="viewer-shell viewer-scroll mx-auto flex flex-1 min-h-0 w-full max-w-[1000px] flex-col items-start justify-start"
-                      style={{
-                        padding: `${VIEWER_PADDING_TOP}px ${VIEWER_PADDING_X}px ${VIEWER_PADDING_BOTTOM}px`,
-                        height: VIEWER_SCROLL_HEIGHT,
-                        maxHeight: VIEWER_SCROLL_HEIGHT,
-                        overflow: "auto",
-                        scrollbarGutter: "stable both-edges",
-                      }}
-                    >
+                        <div
+                          ref={viewerScrollRef}
+                          className="viewer-shell viewer-scroll mx-auto flex flex-1 min-h-0 w-full max-w-[1000px] flex-col items-center justify-start"
+                          style={{
+                            padding: `${VIEWER_PADDING_TOP}px ${VIEWER_PADDING_X}px ${VIEWER_PADDING_BOTTOM}px`,
+                            maxHeight: VIEWER_SCROLL_HEIGHT,
+                            overflow: "auto",
+                            scrollbarGutter: "stable both-edges",
+                          }}
+                        >
                           <div className="flex w-full flex-col items-center gap-8">
                             {activePageIndex >= 0 && pages[activePageIndex]
                               ? renderPreviewPage(pages[activePageIndex], activePageIndex)
