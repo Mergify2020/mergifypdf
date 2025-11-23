@@ -1243,9 +1243,6 @@ function WorkspaceClient() {
     const rotated = rotationDegrees % 180 !== 0;
     const baseWidth = rotated ? naturalHeight : naturalWidth;
     const baseHeight = rotated ? naturalWidth : naturalHeight;
-    const fittedWidth = baseWidth * baseScale;
-    const displayWidth = Math.max(200, Math.min(viewerWidth || fittedWidth, fittedWidth * zoomMultiplier));
-    const viewScale = displayWidth / fittedWidth;
     return (
       <div
         key={page.id}
@@ -1258,7 +1255,7 @@ function WorkspaceClient() {
             idx === activePageIndex ? "shadow-brand/30" : ""
           }`}
           style={{
-            width: displayWidth,
+            width: baseWidth * baseScale * zoomMultiplier,
             aspectRatio: `${baseWidth} / ${baseHeight}`,
           }}
           onClick={() => handleSelectPage(idx)}
@@ -1356,7 +1353,7 @@ function WorkspaceClient() {
                 const isRotatingThis = rotatingText?.id === annotation.id;
                 const rotation = annotation.rotation ?? 0;
                 const displayRotation = normalizeRotation(rotation);
-                const displayFontSize = textSize * viewScale;
+                const displayFontSize = textSize * zoomMultiplier;
                 return (
                 <div
                   key={annotation.id}
@@ -2869,7 +2866,7 @@ function WorkspaceClient() {
                       <div className="flex h-full min-h-0 flex-col overflow-hidden">
                         <div
                       ref={viewerScrollRef}
-                      className="viewer-shell viewer-scroll mx-auto flex flex-1 min-h-0 w-full flex-col items-center justify-start"
+                      className="viewer-shell viewer-scroll mx-auto flex flex-1 min-h-0 w-full flex-col items-start justify-start"
                       style={{
                         padding: `${VIEWER_PADDING_TOP}px ${VIEWER_PADDING_X}px ${VIEWER_PADDING_BOTTOM}px`,
                         maxHeight: VIEWER_SCROLL_HEIGHT,
