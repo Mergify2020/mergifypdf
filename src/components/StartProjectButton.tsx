@@ -91,6 +91,8 @@ export default function StartProjectButton({ className }: Props) {
       return;
     }
     const clean = sanitizeProjectName(value);
+    const projectId =
+      typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}`;
     try {
       window.localStorage?.setItem(PROJECT_NAME_STORAGE_KEY, clean);
     } catch {
@@ -99,13 +101,13 @@ export default function StartProjectButton({ className }: Props) {
     setBusy(true);
     await resetWorkspaceStorage();
     try {
-      addRecentProject(session?.user?.id, clean);
+      addRecentProject(session?.user?.id, clean, projectId);
     } catch (err) {
       console.error("Failed to add recent project", err);
     }
     setOpen(false);
     setBusy(false);
-    router.push("/studio");
+    router.push(`/studio/${projectId}`);
   }
 
   return (

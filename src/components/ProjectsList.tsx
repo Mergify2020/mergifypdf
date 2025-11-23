@@ -189,7 +189,7 @@ export default function ProjectsList({ initialProjects = [] }: Props) {
     setSelectionMode(false);
   }
 
-  const getOpenHref = (project: ProjectItem) => (project.isLocal ? "/studio" : `/studio/${project.id}`);
+  const getOpenHref = (project: ProjectItem) => `/studio/${project.id}`;
 
   return (
     <>

@@ -38,9 +38,11 @@ export function saveRecentProjects(ownerId: string | null | undefined, projects:
   }
 }
 
-export function addRecentProject(ownerId: string | null | undefined, title: string) {
+export function addRecentProject(ownerId: string | null | undefined, title: string, id?: string) {
   const entry: RecentProjectEntry = {
-    id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}`,
+    id:
+      id ??
+      (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}`),
     title,
     updatedAt: Date.now(),
   };
