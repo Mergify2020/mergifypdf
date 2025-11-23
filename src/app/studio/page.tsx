@@ -1352,12 +1352,7 @@ function WorkspaceClient() {
                       </div>
                     ) : null}
                     <div
-                      className="absolute -bottom-2 -right-2 h-5 w-5 cursor-se-resize rounded-full border border-slate-500 shadow-sm transition hover:border-slate-600"
-                      style={{
-                        backgroundColor: "rgba(255,255,255,0.9)",
-                        backgroundImage:
-                          "repeating-linear-gradient(135deg, rgba(51,65,85,0.9) 0 2px, transparent 2px 4px)",
-                      }}
+                      className="absolute -bottom-2 -right-2 h-4 w-4 cursor-se-resize rounded-full border border-slate-600 bg-white shadow-sm transition hover:border-slate-700 hover:shadow-md"
                       onPointerDown={(event) => {
                         startTextResize(page.id, annotation.id, event);
                       }}
