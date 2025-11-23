@@ -1081,7 +1081,7 @@ function WorkspaceClient() {
                       onFocus={() => setFocusedTextId(annotation.id)}
                       onClick={() => setFocusedTextId(annotation.id)}
                       ref={registerTextNode(annotation.id)}
-                      className={`min-w-[80px] min-h-[24px] resize-none rounded border px-1 py-0.5 text-[12px] leading-snug text-slate-900 transition ${
+                      className={`min-w-[80px] min-h-[24px] resize-none rounded px-1 py-0.5 text-[12px] leading-snug text-slate-900 transition ${
                         focusedTextId === annotation.id || isDraggingThis
                           ? `border-slate-400 bg-white/80 shadow-sm`
                           : "border-0 bg-transparent shadow-none"
