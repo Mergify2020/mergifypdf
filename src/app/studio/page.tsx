@@ -1295,7 +1295,7 @@ function WorkspaceClient() {
                       }}
                     />
                     {focusedTextId === annotation.id ? (
-                      <div className="absolute -bottom-7 left-0 flex items-center gap-2">
+                      <div className="absolute -bottom-9 left-0 flex items-center gap-2">
                         <button
                           type="button"
                           className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 bg-white/80 text-slate-700 shadow-sm transition hover:bg-white active:translate-y-[1px]"
@@ -1333,10 +1333,15 @@ function WorkspaceClient() {
                       </div>
                     ) : null}
                     <div
-                      className={`absolute -bottom-1 -right-1 h-4 w-4 cursor-se-resize rounded-sm border border-slate-400 bg-white/80 shadow-sm ${
-                        isResizingThis ? "border-slate-600 bg-white" : ""
-                      }`}
-                      onPointerDown={(event) => startTextResize(page.id, annotation.id, event)}
+                      className="absolute -bottom-2 -right-2 h-5 w-5 cursor-se-resize rounded-full border border-slate-500 shadow-sm transition hover:border-slate-600"
+                      style={{
+                        backgroundColor: "rgba(255,255,255,0.9)",
+                        backgroundImage:
+                          "repeating-linear-gradient(135deg, rgba(51,65,85,0.9) 0 2px, transparent 2px 4px)",
+                      }}
+                      onPointerDown={(event) => {
+                        startTextResize(page.id, annotation.id, event);
+                      }}
                     />
                   </div>
                 </div>
