@@ -17,7 +17,7 @@ import {
   type PDFFont,
 } from "pdf-lib";
 import { AnimatePresence, motion } from "framer-motion";
-import { Highlighter, Minus, Plus, Trash2, Undo2, Eraser, Pencil, RotateCcw, Move } from "lucide-react";
+import { Highlighter, Minus, Plus, Trash2, Undo2, Eraser, Pencil, RotateCcw, Move, ChevronDown } from "lucide-react";
 import {
   DndContext,
   PointerSensor,
@@ -82,7 +82,17 @@ type TextAnnotation = {
   height: number;
   rotation?: number;
 };
-type TextFont = "Inter" | "Georgia" | "Courier New" | "Merriweather";
+type TextFont =
+  | "Inter"
+  | "Georgia"
+  | "Courier New"
+  | "Merriweather"
+  | "Arimo"
+  | "Roboto"
+  | "Playfair Display"
+  | "Source Code Pro"
+  | "Lato"
+  | "Poppins";
 type TextFontVariant = "normal" | "bold" | "italic" | "boldItalic";
 
 type FontOption =
@@ -147,6 +157,84 @@ const TEXT_FONT_OPTIONS: Record<TextFont, FontOption> = {
         bold: "/fonts/Merriweather-Bold.ttf",
         italic: "/fonts/Merriweather-Italic.ttf",
         boldItalic: "/fonts/Merriweather-BoldItalic.ttf",
+      },
+    },
+  },
+  Arimo: {
+    label: "Arial (Arimo)",
+    cssFamily: "'Arimo', 'Arial', 'Helvetica Neue', sans-serif",
+    pdf: {
+      type: "custom",
+      variants: {
+        normal: "/fonts/Arimo-Regular.ttf",
+        bold: "/fonts/Arimo-Bold.ttf",
+        italic: "/fonts/Arimo-Italic.ttf",
+        boldItalic: "/fonts/Arimo-BoldItalic.ttf",
+      },
+    },
+  },
+  Roboto: {
+    label: "Roboto",
+    cssFamily: "'Roboto', 'Arial', 'Helvetica Neue', sans-serif",
+    pdf: {
+      type: "custom",
+      variants: {
+        normal: "/fonts/Roboto-Regular.ttf",
+        bold: "/fonts/Roboto-Bold.ttf",
+        italic: "/fonts/Roboto-Italic.ttf",
+        boldItalic: "/fonts/Roboto-BoldItalic.ttf",
+      },
+    },
+  },
+  "Playfair Display": {
+    label: "Playfair Display",
+    cssFamily: "'Playfair Display', 'Times New Roman', serif",
+    pdf: {
+      type: "custom",
+      variants: {
+        normal: "/fonts/PlayfairDisplay-Regular.ttf",
+        bold: "/fonts/PlayfairDisplay-Bold.ttf",
+        italic: "/fonts/PlayfairDisplay-Italic.ttf",
+        boldItalic: "/fonts/PlayfairDisplay-BoldItalic.ttf",
+      },
+    },
+  },
+  "Source Code Pro": {
+    label: "Source Code Pro",
+    cssFamily: "'Source Code Pro', 'SFMono-Regular', Consolas, monospace",
+    pdf: {
+      type: "custom",
+      variants: {
+        normal: "/fonts/SourceCodePro-Regular.ttf",
+        bold: "/fonts/SourceCodePro-Bold.ttf",
+        italic: "/fonts/SourceCodePro-Italic.ttf",
+        boldItalic: "/fonts/SourceCodePro-BoldItalic.ttf",
+      },
+    },
+  },
+  Lato: {
+    label: "Lato",
+    cssFamily: "'Lato', 'Arial', sans-serif",
+    pdf: {
+      type: "custom",
+      variants: {
+        normal: "/fonts/Lato-Regular.ttf",
+        bold: "/fonts/Lato-Bold.ttf",
+        italic: "/fonts/Lato-Italic.ttf",
+        boldItalic: "/fonts/Lato-BoldItalic.ttf",
+      },
+    },
+  },
+  Poppins: {
+    label: "Poppins",
+    cssFamily: "'Poppins', 'Helvetica Neue', 'Arial', sans-serif",
+    pdf: {
+      type: "custom",
+      variants: {
+        normal: "/fonts/Poppins-Regular.ttf",
+        bold: "/fonts/Poppins-Bold.ttf",
+        italic: "/fonts/Poppins-Italic.ttf",
+        boldItalic: "/fonts/Poppins-BoldItalic.ttf",
       },
     },
   },
@@ -582,6 +670,8 @@ function WorkspaceClient() {
     currentX: number;
     currentY: number;
   } | null>(null);
+  const [fontMenuOpen, setFontMenuOpen] = useState(false);
+  const fontMenuRef = useRef<HTMLDivElement | null>(null);
   const [focusedTextId, setFocusedTextId] = useState<string | null>(null);
   const focusedTextIdRef = useRef<string | null>(null);
   const textNodeRefs = useRef<Map<string, HTMLTextAreaElement>>(new Map());
@@ -2205,6 +2295,20 @@ function WorkspaceClient() {
       textRotateCleanupRef.current?.();
     };
   }, []);
+  useEffect(() => {
+    if (!fontMenuOpen) return;
+    const handleOutside = (event: PointerEvent) => {
+      if (!(event.target instanceof Node)) return;
+      if (!fontMenuRef.current?.contains(event.target)) {
+        setFontMenuOpen(false);
+      }
+    };
+    window.addEventListener("pointerdown", handleOutside);
+    return () => window.removeEventListener("pointerdown", handleOutside);
+  }, [fontMenuOpen]);
+  useEffect(() => {
+    if (!textMode) setFontMenuOpen(false);
+  }, [textMode]);
 
   function adjustHighlightThickness(delta: number) {
     setHighlightThickness((prev) => clamp(prev + delta, MIN_HIGHLIGHT_THICKNESS, MAX_HIGHLIGHT_THICKNESS));
@@ -2603,17 +2707,43 @@ function WorkspaceClient() {
                     >
                       I
                     </button>
-                    <select
-                      className="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 shadow-inner focus:border-slate-400 focus:outline-none"
-                      value={textFont}
-                      onChange={(event) => setTextFont(event.target.value as TextFont)}
-                    >
-                      {textFontEntries.map(([key, option]) => (
-                        <option key={key} value={key}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="relative" ref={fontMenuRef}>
+                      <button
+                        type="button"
+                        onClick={() => setFontMenuOpen((prev) => !prev)}
+                        className="flex items-center gap-2 rounded border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-inner transition hover:border-slate-300 focus:outline-none"
+                      >
+                        <span className="truncate" style={{ fontFamily: TEXT_FONT_OPTIONS[textFont].cssFamily }}>
+                          {TEXT_FONT_OPTIONS[textFont].label}
+                        </span>
+                        <ChevronDown className="h-3.5 w-3.5 text-slate-500" />
+                      </button>
+                      {fontMenuOpen ? (
+                        <div className="absolute z-20 mt-1 w-52 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
+                          <div className="max-h-56 overflow-y-auto">
+                            {textFontEntries.map(([key, option]) => (
+                              <button
+                                key={key}
+                                type="button"
+                                onClick={() => {
+                                  setTextFont(key);
+                                  setFontMenuOpen(false);
+                                }}
+                                className={`flex w-full items-center justify-between px-3 py-2 text-left text-xs transition hover:bg-slate-50 ${
+                                  textFont === key ? "bg-slate-100 font-semibold text-slate-900" : "text-slate-700"
+                                }`}
+                                style={{ fontFamily: option.cssFamily }}
+                              >
+                                <span>{option.label}</span>
+                                {textFont === key ? (
+                                  <span className="text-[10px] uppercase text-slate-500">Active</span>
+                                ) : null}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
                     <div className="flex items-center gap-1">
                       <span className="text-[0.65rem] text-slate-500">Size</span>
                       <input
