@@ -487,7 +487,7 @@ function WorkspaceClient() {
     currentY: number;
   } | null>(null);
   const [focusedTextId, setFocusedTextId] = useState<string | null>(null);
-  const textNodeRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const textNodeRefs = useRef<Map<string, HTMLTextAreaElement>>(new Map());
 
   function focusTextAnnotation(id: string) {
     setFocusedTextId(id);
@@ -1217,7 +1217,7 @@ function WorkspaceClient() {
   }
 
   function registerTextNode(id: string) {
-    return (node: HTMLDivElement | null) => {
+    return (node: HTMLTextAreaElement | null) => {
       if (node) {
         textNodeRefs.current.set(id, node);
       } else {
