@@ -2864,11 +2864,11 @@ function WorkspaceClient() {
                       <div className="flex h-full min-h-0 flex-col overflow-hidden">
                         <div
                           ref={viewerScrollRef}
-                          className={`viewer-shell viewer-scroll mx-auto flex flex-1 min-h-0 w-full max-w-[1000px] flex-col items-start justify-start ${
-                            showScrollbars ? "overflow-auto" : "overflow-hidden"
-                          }`}
+                          className="viewer-shell viewer-scroll mx-auto flex flex-1 min-h-0 w-full max-w-[1000px] flex-col items-start justify-start"
                           style={{
                             padding: `${VIEWER_PADDING_TOP}px ${VIEWER_PADDING_X}px ${VIEWER_PADDING_BOTTOM}px`,
+                            overflow: showScrollbars ? "auto" : "hidden",
+                            scrollbarGutter: showScrollbars ? "stable both-edges" : undefined,
                           }}
                         >
                           <div className="flex w-full flex-col items-center gap-8">
