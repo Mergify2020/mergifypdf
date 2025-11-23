@@ -467,6 +467,10 @@ function WorkspaceClient() {
   const [textMode, setTextMode] = useState(false);
   const [highlights, setHighlights] = useState<Record<string, HighlightStroke[]>>({});
   const [textAnnotations, setTextAnnotations] = useState<Record<string, TextAnnotation[]>>({});
+  const [textBold, setTextBold] = useState(false);
+  const [textItalic, setTextItalic] = useState(false);
+  const [textFont, setTextFont] = useState<"Inter" | "Georgia" | "Courier New">("Inter");
+  const [textSize, setTextSize] = useState(12);
   const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]>([]);
   const [draftHighlight, setDraftHighlight] = useState<DraftHighlight | null>(null);
   const [draggingText, setDraggingText] = useState<{
@@ -1046,48 +1050,81 @@ function WorkspaceClient() {
                     width: `${annotationWidth * 100}%`,
                     height: `${annotationHeight * 100}%`,
                   }}
-                  onMouseDown={(event) => {
-                    event.stopPropagation();
-                    const point = getPageNormalizedPoint(page.id, event.clientX, event.clientY);
-                    if (!point) return;
-                    setDraggingText({
-                      pageId: page.id,
-                      id: annotation.id,
-                      offsetX: point.x - annotation.x,
-                      offsetY: point.y - annotation.y,
-                    });
-                  }}
-                  onMouseUp={(event) => {
-                    event.stopPropagation();
-                    setDraggingText((current) =>
-                      current && current.id === annotation.id ? null : current
-                    );
-                  }}
                   onClick={(event) => event.stopPropagation()}
                 >
-                  <div
-                    contentEditable
-                    suppressContentEditableWarning
-                    onFocus={() => setFocusedTextId(annotation.id)}
-                    className={`min-w-[60px] inline-block px-1 py-0.5 text-[12px] text-slate-900 rounded transition whitespace-pre-wrap break-words text-left ${
-                      focusedTextId === annotation.id || isDraggingThis
-                        ? `border ${isDraggingThis ? "border-dashed border-slate-400" : "border-slate-300"} bg-white/70 shadow-sm`
-                        : "border border-transparent bg-transparent"
-                    }`}
-                    onInput={(event) => {
-                      const value = event.currentTarget.textContent ?? "";
-                      updateTextAnnotation(page.id, annotation.id, (item) => ({ ...item, text: value }));
-                      syncTextAnnotationSize(page.id, annotation.id, event.currentTarget);
-                    }}
-                    onBlur={(event) => {
-                      const value = event.currentTarget.textContent ?? "";
-                      updateTextAnnotation(page.id, annotation.id, (item) => ({ ...item, text: value }));
-                      syncTextAnnotationSize(page.id, annotation.id, event.currentTarget);
-                      setFocusedTextId((current) => (current === annotation.id ? null : current));
-                    }}
-                    style={{ width: "100%", height: "100%", direction: "ltr" }}
-                  >
-                    {annotation.text}
+                  <div className="relative h-full w-full">
+                    <div
+                      contentEditable
+                      suppressContentEditableWarning
+                      onFocus={() => setFocusedTextId(annotation.id)}
+                      onClick={() => setFocusedTextId(annotation.id)}
+                      className={`min-w-[60px] inline-block px-1 py-0.5 text-[12px] text-slate-900 rounded transition whitespace-pre-wrap break-words text-left ${
+                        focusedTextId === annotation.id || isDraggingThis
+                          ? `border ${isDraggingThis ? "border-dashed border-slate-400" : "border-slate-400"} shadow-sm`
+                          : "border border-transparent"
+                      }`}
+                      onInput={(event) => {
+                        const value = event.currentTarget.textContent ?? "";
+                        updateTextAnnotation(page.id, annotation.id, (item) => ({ ...item, text: value }));
+                        syncTextAnnotationSize(page.id, annotation.id, event.currentTarget);
+                      }}
+                      onBlur={(event) => {
+                        const value = event.currentTarget.textContent ?? "";
+                        updateTextAnnotation(page.id, annotation.id, (item) => ({ ...item, text: value }));
+                        syncTextAnnotationSize(page.id, annotation.id, event.currentTarget);
+                        setFocusedTextId((current) => (current === annotation.id ? null : current));
+                      }}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        direction: "ltr",
+                        textAlign: "left",
+                        writingMode: "horizontal-tb",
+                        unicodeBidi: "plaintext",
+                        backgroundColor: "transparent",
+                        fontWeight: textBold ? 700 : 500,
+                        fontStyle: textItalic ? "italic" : "normal",
+                        fontFamily: textFont,
+                        fontSize: `${textSize}px`,
+                      }}
+                    >
+                      {annotation.text}
+                    </div>
+                    {focusedTextId === annotation.id ? (
+                      <div className="absolute -bottom-7 left-0 flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="rounded border border-slate-300 bg-white/80 px-2 py-0.5 text-[11px] font-semibold text-slate-700 shadow-sm hover:bg-white"
+                          onMouseDown={(event) => {
+                            event.stopPropagation();
+                            event.preventDefault();
+                            const point = getPageNormalizedPoint(page.id, event.clientX, event.clientY);
+                            if (!point) return;
+                            setDraggingText({
+                              pageId: page.id,
+                              id: annotation.id,
+                              offsetX: point.x - annotation.x,
+                              offsetY: point.y - annotation.y,
+                            });
+                            setFocusedTextId(annotation.id);
+                          }}
+                          onMouseUp={(event) => event.stopPropagation()}
+                        >
+                          Drag
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded border border-rose-300 bg-white/80 px-2 py-0.5 text-[11px] font-semibold text-rose-700 shadow-sm hover:bg-rose-50"
+                          onMouseDown={(event) => event.stopPropagation()}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            deleteTextAnnotation(page.id, annotation.id);
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               );
@@ -1194,6 +1231,14 @@ function WorkspaceClient() {
     updateTextAnnotation(pageId, id, (annotation) => ({ ...annotation, width, height }));
   }
 
+  function deleteTextAnnotation(pageId: string, id: string) {
+    setTextAnnotations((prev) => {
+      const existing = prev[pageId] ?? [];
+      return { ...prev, [pageId]: existing.filter((item) => item.id !== id) };
+    });
+    setFocusedTextId((current) => (current === id ? null : current));
+  }
+
 
   const itemsIds = useMemo(() => pages.map((p) => p.id), [pages]);
   const downloadDisabled = busy || pages.length === 0;
@@ -1207,7 +1252,7 @@ function WorkspaceClient() {
   const highlightButtonOn = highlightMode && !highlightButtonDisabled;
   const pencilButtonOn = pencilMode && !highlightButtonDisabled;
   const textButtonOn = textMode && !highlightButtonDisabled;
-  const highlightTrayVisible = (highlightMode || pencilMode || deleteMode) && !highlightButtonDisabled;
+  const highlightTrayVisible = (highlightMode || pencilMode || deleteMode || textMode) && !highlightButtonDisabled;
   const highlightActive = highlightButtonOn && !deleteMode;
   const pencilActive = pencilButtonOn && !deleteMode;
   const textActive = textButtonOn && !deleteMode;
@@ -2085,6 +2130,53 @@ function WorkspaceClient() {
                     </span>
                   ) : null}
                 </div>
+                {textMode ? (
+                  <div className="flex flex-wrap items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-3 py-1.5 text-[0.7rem] font-semibold text-slate-700 shadow-sm">
+                    <button
+                      type="button"
+                      className={`rounded px-2 py-1 transition ${
+                        textBold ? "bg-slate-900 text-white shadow-sm" : "hover:bg-slate-100"
+                      }`}
+                      onClick={() => setTextBold((prev) => !prev)}
+                    >
+                      B
+                    </button>
+                    <button
+                      type="button"
+                      className={`rounded px-2 py-1 transition ${
+                        textItalic ? "bg-slate-900 text-white shadow-sm" : "hover:bg-slate-100"
+                      }`}
+                      onClick={() => setTextItalic((prev) => !prev)}
+                    >
+                      I
+                    </button>
+                    <select
+                      className="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 shadow-inner focus:border-slate-400 focus:outline-none"
+                      value={textFont}
+                      onChange={(event) =>
+                        setTextFont(event.target.value as "Inter" | "Georgia" | "Courier New")
+                      }
+                    >
+                      <option value="Inter">Inter</option>
+                      <option value="Georgia">Serif</option>
+                      <option value="Courier New">Mono</option>
+                    </select>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[0.65rem] text-slate-500">Size</span>
+                      <input
+                        type="range"
+                        min={10}
+                        max={28}
+                        value={textSize}
+                        onChange={(event) => setTextSize(Number(event.target.value))}
+                        className="h-1 w-24 accent-slate-500"
+                      />
+                      <span className="text-[0.65rem] text-slate-700 min-w-[28px] text-right">
+                        {textSize}px
+                      </span>
+                    </div>
+                  </div>
+                ) : null}
                 {highlightActive ? (
                   <>
                     <div className="flex items-center gap-2">
