@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowUpRight, Check } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { sanitizeProjectName } from "@/lib/projectName";
+import { loadRecentProjects, type RecentProjectEntry } from "@/lib/recentProjects";
 
 type ProjectItem = {
   id: string;
@@ -50,6 +51,17 @@ function mapApiProject(project: any): ProjectItem {
   };
 }
 
+function mapRecentProject(project: RecentProjectEntry): ProjectItem {
+  const updatedAt = project.updatedAt || Date.now();
+  return {
+    id: project.id,
+    title: project.title,
+    updatedAt,
+    updated: formatUpdatedLabel(updatedAt),
+    thumbnailUrl: null,
+  };
+}
+
 export default function ProjectsList({ initialProjects = [] }: Props) {
   const { data: session } = useSession();
   const router = useRouter();
@@ -64,14 +76,26 @@ export default function ProjectsList({ initialProjects = [] }: Props) {
 
   useEffect(() => {
     let cancelled = false;
+    const ownerId = session?.user?.id ?? null;
+
+    const localProjects = loadRecentProjects(ownerId).map(mapRecentProject);
+    if (localProjects.length > 0) {
+      setProjects(localProjects);
+      setLoading(false);
+    } else if (initialProjects.length > 0) {
+      setProjects(initialProjects);
+      setLoading(false);
+    }
 
     async function fetchProjects() {
       try {
-        setLoading(true);
+        if (!localProjects.length) {
+          setLoading(true);
+        }
         const res = await fetch("/api/projects", { cache: "no-store" });
         if (!res.ok) {
           if (res.status === 401) {
-            setProjects(initialProjects);
+            setProjects(localProjects.length > 0 ? localProjects : initialProjects);
             return;
           }
           throw new Error("Failed to fetch projects");
@@ -79,12 +103,11 @@ export default function ProjectsList({ initialProjects = [] }: Props) {
         const data = await res.json();
         const mapped = Array.isArray(data?.projects) ? data.projects.map(mapApiProject) : [];
         if (!cancelled) {
-          setProjects(mapped);
+          setProjects(mapped.length > 0 ? mapped : localProjects);
         }
       } catch (err) {
-        if (!cancelled) {
-          setError("Unable to load projects right now.");
-        }
+        console.error("Failed to load projects", err);
+        if (!cancelled) setProjects(localProjects);
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -96,7 +119,7 @@ export default function ProjectsList({ initialProjects = [] }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [initialProjects]);
+  }, [initialProjects, session?.user?.id]);
 
   function openRename(project: ProjectItem) {
     setRenaming({ id: project.id, value: project.title });
