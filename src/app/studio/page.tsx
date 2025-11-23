@@ -1938,7 +1938,8 @@ function WorkspaceClient() {
             const fontkit = await import("fontkit");
             fontkitModuleRef.current = fontkit as { default?: unknown };
           }
-          out.registerFontkit(fontkitModuleRef.current.default ?? fontkitModuleRef.current);
+          const fontkitInstance = fontkitModuleRef.current.default ?? fontkitModuleRef.current;
+          out.registerFontkit(fontkitInstance as unknown as never);
           fontkitRegistered = true;
         }
         const src = config.pdf.variants[variant];
