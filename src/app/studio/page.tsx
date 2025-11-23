@@ -1070,45 +1070,34 @@ function WorkspaceClient() {
                   }}
                 >
                   <div className="relative h-full w-full">
-                    <div
-                      contentEditable
-                      suppressContentEditableWarning
+                    <textarea
+                      value={annotation.text}
+                      onChange={(event) =>
+                        updateTextAnnotation(page.id, annotation.id, (item) => ({
+                          ...item,
+                          text: event.target.value,
+                        }))
+                      }
                       onFocus={() => setFocusedTextId(annotation.id)}
                       onClick={() => setFocusedTextId(annotation.id)}
-                      dir="ltr"
-                      className={`min-w-[60px] inline-block px-1 py-0.5 text-[12px] text-slate-900 rounded transition whitespace-pre-wrap break-words text-left ${
-                        focusedTextId === annotation.id || isDraggingThis
-                          ? `border ${isDraggingThis ? "border-dashed border-slate-400" : "border-slate-400"} shadow-sm`
-                          : "border border-transparent"
-                      }`}
-                    onInput={(event) => {
-                      const value = event.currentTarget.textContent ?? "";
-                      updateTextAnnotation(page.id, annotation.id, (item) => ({ ...item, text: value }));
-                      syncTextAnnotationSize(page.id, annotation.id, event.currentTarget);
-                    }}
-                    onBlur={(event) => {
-                      const value = event.currentTarget.textContent ?? "";
-                      updateTextAnnotation(page.id, annotation.id, (item) => ({ ...item, text: value }));
-                      syncTextAnnotationSize(page.id, annotation.id, event.currentTarget);
-                      setFocusedTextId((current) => (current === annotation.id ? null : current));
-                    }}
                       ref={registerTextNode(annotation.id)}
-                      tabIndex={0}
+                      className={`min-w-[80px] min-h-[24px] resize-none rounded border px-1 py-0.5 text-[12px] leading-snug text-slate-900 transition ${
+                        focusedTextId === annotation.id || isDraggingThis
+                          ? `border-slate-400 bg-white/80 shadow-sm`
+                          : "border-transparent bg-transparent"
+                      }`}
                       style={{
                         width: "100%",
                         height: "100%",
                         direction: "ltr",
                         textAlign: "left",
-                        unicodeBidi: "plaintext",
                         backgroundColor: "transparent",
                         fontWeight: textBold ? 700 : 500,
                         fontStyle: textItalic ? "italic" : "normal",
                         fontFamily: textFont,
                         fontSize: `${textSize}px`,
                       }}
-                    >
-                      {annotation.text}
-                    </div>
+                    />
                     {focusedTextId === annotation.id ? (
                       <div className="absolute -bottom-7 left-0 flex items-center gap-2">
                         <button
