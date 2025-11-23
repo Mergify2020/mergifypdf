@@ -467,6 +467,12 @@ function WorkspaceClient() {
   const [textAnnotations, setTextAnnotations] = useState<Record<string, TextAnnotation[]>>({});
   const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]>([]);
   const [draftHighlight, setDraftHighlight] = useState<DraftHighlight | null>(null);
+  const [draggingText, setDraggingText] = useState<{
+    pageId: string;
+    id: string;
+    offsetX: number;
+    offsetY: number;
+  } | null>(null);
   const [deleteMode, setDeleteMode] = useState(false);
   const [projectName, setProjectName] = useState("Untitled Project");
   const [projectNameEditing, setProjectNameEditing] = useState(false);
@@ -1006,28 +1012,60 @@ function WorkspaceClient() {
                 ) : null}
               </svg>
               {pageTexts.map((annotation) => (
-                <textarea
+                <div
                   key={annotation.id}
-                  value={annotation.text}
-                  onChange={(event) =>
-                    setTextAnnotations((prev) => {
-                      const existing = prev[page.id] ?? [];
-                      const updated = existing.map((item) =>
-                        item.id === annotation.id ? { ...item, text: event.target.value } : item
-                      );
-                      return { ...prev, [page.id]: updated };
-                    })
-                  }
-                  onMouseDown={(event) => event.stopPropagation()}
-                  onClick={(event) => event.stopPropagation()}
-                  onMouseUp={(event) => event.stopPropagation()}
-                  className="absolute min-w-[140px] resize-none rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#024d7c]/40"
+                  className="absolute"
                   style={{
                     left: `${annotation.x * 100}%`,
                     top: `${annotation.y * 100}%`,
-                    transform: "translate(-50%, -50%)",
                   }}
-                />
+                  onMouseDown={(event) => {
+                    event.stopPropagation();
+                    const point = getPageNormalizedPoint(page.id, event.clientX, event.clientY);
+                    if (!point) return;
+                    setDraggingText({
+                      pageId: page.id,
+                      id: annotation.id,
+                      offsetX: point.x - annotation.x,
+                      offsetY: point.y - annotation.y,
+                    });
+                  }}
+                  onMouseUp={(event) => {
+                    event.stopPropagation();
+                    setDraggingText((current) =>
+                      current && current.id === annotation.id ? null : current
+                    );
+                  }}
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <div
+                    contentEditable
+                    suppressContentEditableWarning
+                    className="min-w-[60px] inline-block px-1 py-0.5 text-[12px] text-slate-900 border border-slate-300 rounded bg-white/70 shadow-sm"
+                    onInput={(event) => {
+                      const value = event.currentTarget.textContent ?? "";
+                      setTextAnnotations((prev) => {
+                        const existing = prev[page.id] ?? [];
+                        const updated = existing.map((item) =>
+                          item.id === annotation.id ? { ...item, text: value } : item
+                        );
+                        return { ...prev, [page.id]: updated };
+                      });
+                    }}
+                    onBlur={(event) => {
+                      const value = event.currentTarget.textContent ?? "";
+                      setTextAnnotations((prev) => {
+                        const existing = prev[page.id] ?? [];
+                        const updated = existing.map((item) =>
+                          item.id === annotation.id ? { ...item, text: value } : item
+                        );
+                        return { ...prev, [page.id]: updated };
+                      });
+                    }}
+                  >
+                    {annotation.text}
+                  </div>
+                </div>
               ))}
             </div>
           </div>
@@ -1095,6 +1133,17 @@ function WorkspaceClient() {
     if (pencilMode) return "pencil";
     if (textMode) return "text";
     return null;
+  }
+
+  function getPageNormalizedPoint(pageId: string, clientX: number, clientY: number) {
+    const node = previewNodeMap.current.get(pageId);
+    if (!node) return null;
+    const rect = node.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+    return {
+      x: clamp((clientX - rect.left) / rect.width, 0, 1),
+      y: clamp((clientY - rect.top) / rect.height, 0, 1),
+    };
   }
 
 
@@ -1498,7 +1547,7 @@ function WorkspaceClient() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [hasWorkspaceData]);
 
-useEffect(() => {
+  useEffect(() => {
     if (typeof document === "undefined") return;
     if (!activeDrawingTool) {
       document.body.style.cursor = "";
@@ -1527,6 +1576,32 @@ useEffect(() => {
       setDeleteMode(false);
     }
   }, [hasAnyHighlights, deleteMode]);
+
+  useEffect(() => {
+    if (!draggingText) return;
+    function handleMove(event: MouseEvent) {
+      const point = getPageNormalizedPoint(draggingText.pageId, event.clientX, event.clientY);
+      if (!point) return;
+      const nextX = clamp(point.x - draggingText.offsetX, 0, 1);
+      const nextY = clamp(point.y - draggingText.offsetY, 0, 1);
+      setTextAnnotations((prev) => {
+        const existing = prev[draggingText.pageId] ?? [];
+        const updated = existing.map((item) =>
+          item.id === draggingText.id ? { ...item, x: nextX, y: nextY } : item
+        );
+        return { ...prev, [draggingText.pageId]: updated };
+      });
+    }
+    function handleUp() {
+      setDraggingText(null);
+    }
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleUp);
+    };
+  }, [draggingText]);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
