@@ -479,6 +479,7 @@ function WorkspaceClient() {
     offsetX: number;
     offsetY: number;
   } | null>(null);
+  const textDragCleanupRef = useRef<(() => void) | null>(null);
   const [draftTextBox, setDraftTextBox] = useState<{
     pageId: string;
     startX: number;
@@ -505,6 +506,63 @@ function WorkspaceClient() {
     node?.blur();
     setFocusedTextId(null);
   }, []);
+
+  const startTextDrag = useCallback(
+    (
+      pageId: string,
+      annotationId: string,
+      startEvent: ReactMouseEvent<HTMLButtonElement> | ReactMouseEvent<HTMLDivElement>
+    ) => {
+      if (startEvent.button !== 0) return;
+      startEvent.preventDefault();
+      startEvent.stopPropagation();
+
+      const annotation = textAnnotations[pageId]?.find((a) => a.id === annotationId);
+      if (!annotation) return;
+      const startPoint = getPageNormalizedPoint(pageId, startEvent.clientX, startEvent.clientY);
+      if (!startPoint) return;
+
+      textDragCleanupRef.current?.();
+
+      const offsetX = startPoint.x - annotation.x;
+      const offsetY = startPoint.y - annotation.y;
+
+      const handleMove = (event: MouseEvent) => {
+        const point = getPageNormalizedPoint(pageId, event.clientX, event.clientY);
+        if (!point) return;
+        setTextAnnotations((prev) => {
+          const existing = prev[pageId] ?? [];
+          const active = existing.find((a) => a.id === annotationId);
+          const width = active?.width ?? 0;
+          const height = active?.height ?? 0;
+          const nextX = clamp(point.x - offsetX, 0, 1 - width);
+          const nextY = clamp(point.y - offsetY, 0, 1 - height);
+          const updated = existing.map((item) =>
+            item.id === annotationId ? { ...item, x: nextX, y: nextY } : item
+          );
+          return { ...prev, [pageId]: updated };
+        });
+      };
+
+      function cleanup() {
+        window.removeEventListener("mousemove", handleMove);
+        window.removeEventListener("mouseup", handleUp);
+        textDragCleanupRef.current = null;
+      }
+
+      function handleUp() {
+        setDraggingText(null);
+        cleanup();
+      }
+
+      window.addEventListener("mousemove", handleMove);
+      window.addEventListener("mouseup", handleUp);
+
+      textDragCleanupRef.current = cleanup;
+      setDraggingText({ pageId, id: annotationId, offsetX, offsetY });
+    },
+    [getPageNormalizedPoint, textAnnotations]
+  );
   const [deleteMode, setDeleteMode] = useState(false);
   const [projectName, setProjectName] = useState("Untitled Project");
   const [projectNameEditing, setProjectNameEditing] = useState(false);
@@ -1090,10 +1148,10 @@ function WorkspaceClient() {
                       onFocus={() => setFocusedTextId(annotation.id)}
                       onClick={() => setFocusedTextId(annotation.id)}
                       ref={registerTextNode(annotation.id)}
-                      className={`min-w-[80px] min-h-[24px] resize-none rounded px-1 py-0.5 text-[12px] leading-snug text-slate-900 transition ${
+                      className={`min-w-[80px] min-h-[24px] resize-none rounded px-1 py-0.5 text-[12px] leading-snug text-slate-900 transition border border-dashed ${
                         focusedTextId === annotation.id || isDraggingThis
-                          ? `border-slate-400 bg-white/80 shadow-sm`
-                          : "border-0 bg-transparent shadow-none"
+                          ? `${isDraggingThis ? "border-slate-700 bg-white/90" : "border-slate-500 bg-white/80"} shadow-sm`
+                          : "border-transparent bg-transparent shadow-none"
                       }`}
                       style={{
                         width: "100%",
@@ -1113,18 +1171,8 @@ function WorkspaceClient() {
                           type="button"
                           className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 bg-white/80 text-slate-700 shadow-sm transition hover:bg-white active:translate-y-[1px]"
                           onMouseDown={(event) => {
-                            event.stopPropagation();
-                            event.preventDefault();
-                            if (event.button !== 0) return;
-                            const point = getPageNormalizedPoint(page.id, event.clientX, event.clientY);
-                            if (!point) return;
-                            setDraggingText({
-                              pageId: page.id,
-                              id: annotation.id,
-                              offsetX: point.x - annotation.x,
-                              offsetY: point.y - annotation.y,
-                            });
-                            setFocusedTextId(annotation.id);
+                            focusTextAnnotation(annotation.id);
+                            startTextDrag(page.id, annotation.id, event);
                           }}
                         >
                           <Move className="h-4 w-4" />
@@ -1740,36 +1788,6 @@ function WorkspaceClient() {
   }, [hasAnyHighlights, deleteMode]);
 
   useEffect(() => {
-    if (!draggingText) return;
-    const current = draggingText;
-    function handleMove(event: MouseEvent) {
-      const point = getPageNormalizedPoint(current.pageId, event.clientX, event.clientY);
-      if (!point) return;
-      const active = textAnnotations[current.pageId]?.find((a) => a.id === current.id);
-      const width = active?.width ?? 0;
-      const height = active?.height ?? 0;
-      const nextX = clamp(point.x - current.offsetX, 0, 1 - width);
-      const nextY = clamp(point.y - current.offsetY, 0, 1 - height);
-      setTextAnnotations((prev) => {
-        const existing = prev[current.pageId] ?? [];
-        const updated = existing.map((item) =>
-          item.id === current.id ? { ...item, x: nextX, y: nextY } : item
-        );
-        return { ...prev, [current.pageId]: updated };
-      });
-    }
-    function handleUp() {
-      setDraggingText(null);
-    }
-    window.addEventListener("mousemove", handleMove);
-    window.addEventListener("mouseup", handleUp);
-    return () => {
-      window.removeEventListener("mousemove", handleMove);
-      window.removeEventListener("mouseup", handleUp);
-    };
-  }, [draggingText]);
-
-  useEffect(() => {
     if (!focusedTextId) return;
     const node = textNodeRefs.current.get(focusedTextId);
     if (node) {
@@ -1807,6 +1825,12 @@ function WorkspaceClient() {
     document.body.classList.add("studio-page");
     return () => {
       document.body.classList.remove("studio-page");
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      textDragCleanupRef.current?.();
     };
   }, []);
 
