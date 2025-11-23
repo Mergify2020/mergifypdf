@@ -9,7 +9,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { PDFDocument, rgb, LineCapStyle, LineJoinStyle, degrees } from "pdf-lib";
 import { AnimatePresence, motion } from "framer-motion";
-import { Highlighter, Minus, Plus, Trash2, Undo2, Eraser, Pencil, RotateCcw } from "lucide-react";
+import { Highlighter, Minus, Plus, Trash2, Undo2, Eraser, Pencil, RotateCcw, Move } from "lucide-react";
 import {
   DndContext,
   PointerSensor,
@@ -1094,10 +1094,11 @@ function WorkspaceClient() {
                       <div className="absolute -bottom-7 left-0 flex items-center gap-2">
                         <button
                           type="button"
-                          className="rounded border border-slate-300 bg-white/80 px-2 py-0.5 text-[11px] font-semibold text-slate-700 shadow-sm hover:bg-white"
+                          className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 bg-white/80 text-slate-700 shadow-sm transition hover:bg-white active:translate-y-[1px]"
                           onMouseDown={(event) => {
                             event.stopPropagation();
                             event.preventDefault();
+                            if (event.button !== 0) return;
                             const point = getPageNormalizedPoint(page.id, event.clientX, event.clientY);
                             if (!point) return;
                             setDraggingText({
@@ -1108,20 +1109,28 @@ function WorkspaceClient() {
                             });
                             setFocusedTextId(annotation.id);
                           }}
-                          onMouseUp={(event) => event.stopPropagation()}
+                          onMouseUp={(event) => {
+                            event.stopPropagation();
+                            setDraggingText(null);
+                          }}
+                          onMouseLeave={() => {
+                            setDraggingText((current) =>
+                              current && current.id === annotation.id ? null : current
+                            );
+                          }}
                         >
-                          Drag
+                          <Move className="h-4 w-4" />
                         </button>
                         <button
                           type="button"
-                          className="rounded border border-rose-300 bg-white/80 px-2 py-0.5 text-[11px] font-semibold text-rose-700 shadow-sm hover:bg-rose-50"
+                          className="flex h-8 w-8 items-center justify-center rounded-full border border-rose-300 bg-white/80 text-rose-700 shadow-sm transition hover:bg-rose-50 active:translate-y-[1px]"
                           onMouseDown={(event) => event.stopPropagation()}
                           onClick={(event) => {
                             event.stopPropagation();
                             deleteTextAnnotation(page.id, annotation.id);
                           }}
                         >
-                          Delete
+                          <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
                     ) : null}
