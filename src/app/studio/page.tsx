@@ -1579,17 +1579,18 @@ function WorkspaceClient() {
 
   useEffect(() => {
     if (!draggingText) return;
+    const current = draggingText;
     function handleMove(event: MouseEvent) {
-      const point = getPageNormalizedPoint(draggingText.pageId, event.clientX, event.clientY);
+      const point = getPageNormalizedPoint(current.pageId, event.clientX, event.clientY);
       if (!point) return;
-      const nextX = clamp(point.x - draggingText.offsetX, 0, 1);
-      const nextY = clamp(point.y - draggingText.offsetY, 0, 1);
+      const nextX = clamp(point.x - current.offsetX, 0, 1);
+      const nextY = clamp(point.y - current.offsetY, 0, 1);
       setTextAnnotations((prev) => {
-        const existing = prev[draggingText.pageId] ?? [];
+        const existing = prev[current.pageId] ?? [];
         const updated = existing.map((item) =>
-          item.id === draggingText.id ? { ...item, x: nextX, y: nextY } : item
+          item.id === current.id ? { ...item, x: nextX, y: nextY } : item
         );
-        return { ...prev, [draggingText.pageId]: updated };
+        return { ...prev, [current.pageId]: updated };
       });
     }
     function handleUp() {
