@@ -1035,6 +1035,7 @@ function WorkspaceClient() {
               {pageTexts.map((annotation) => {
                 const annotationWidth = annotation.width ?? 0.14;
                 const annotationHeight = annotation.height ?? 0.06;
+                const isDraggingThis = draggingText?.id === annotation.id;
                 return (
                 <div
                   key={annotation.id}
@@ -1042,8 +1043,8 @@ function WorkspaceClient() {
                   style={{
                     left: `${annotation.x * 100}%`,
                     top: `${annotation.y * 100}%`,
-                    minWidth: `${annotationWidth * 100}%`,
-                    minHeight: `${annotationHeight * 100}%`,
+                    width: `${annotationWidth * 100}%`,
+                    height: `${annotationHeight * 100}%`,
                   }}
                   onMouseDown={(event) => {
                     event.stopPropagation();
@@ -1068,9 +1069,9 @@ function WorkspaceClient() {
                     contentEditable
                     suppressContentEditableWarning
                     onFocus={() => setFocusedTextId(annotation.id)}
-                    className={`min-w-[60px] inline-block px-1 py-0.5 text-[12px] text-slate-900 rounded transition ${
-                      focusedTextId === annotation.id
-                        ? "border border-slate-300 bg-white/70 shadow-sm"
+                    className={`min-w-[60px] inline-block px-1 py-0.5 text-[12px] text-slate-900 rounded transition whitespace-pre-wrap break-words text-left ${
+                      focusedTextId === annotation.id || isDraggingThis
+                        ? `border ${isDraggingThis ? "border-dashed border-slate-400" : "border-slate-300"} bg-white/70 shadow-sm`
                         : "border border-transparent bg-transparent"
                     }`}
                     onInput={(event) => {
@@ -1084,6 +1085,7 @@ function WorkspaceClient() {
                       syncTextAnnotationSize(page.id, annotation.id, event.currentTarget);
                       setFocusedTextId((current) => (current === annotation.id ? null : current));
                     }}
+                    style={{ width: "100%", height: "100%", direction: "ltr" }}
                   >
                     {annotation.text}
                   </div>
@@ -1668,8 +1670,11 @@ function WorkspaceClient() {
     function handleMove(event: MouseEvent) {
       const point = getPageNormalizedPoint(current.pageId, event.clientX, event.clientY);
       if (!point) return;
-      const nextX = clamp(point.x - current.offsetX, 0, 1);
-      const nextY = clamp(point.y - current.offsetY, 0, 1);
+      const active = textAnnotations[current.pageId]?.find((a) => a.id === current.id);
+      const width = active?.width ?? 0;
+      const height = active?.height ?? 0;
+      const nextX = clamp(point.x - current.offsetX, 0, 1 - width);
+      const nextY = clamp(point.y - current.offsetY, 0, 1 - height);
       setTextAnnotations((prev) => {
         const existing = prev[current.pageId] ?? [];
         const updated = existing.map((item) =>
