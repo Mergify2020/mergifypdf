@@ -487,6 +487,7 @@ function WorkspaceClient() {
     currentY: number;
   } | null>(null);
   const [focusedTextId, setFocusedTextId] = useState<string | null>(null);
+  const focusedTextIdRef = useRef<string | null>(null);
   const textNodeRefs = useRef<Map<string, HTMLTextAreaElement>>(new Map());
 
   function focusTextAnnotation(id: string) {
@@ -497,13 +498,13 @@ function WorkspaceClient() {
     }
   }
 
-  function clearTextFocus() {
-    if (focusedTextId) {
-      const node = textNodeRefs.current.get(focusedTextId);
-      node?.blur();
-    }
+  const clearTextFocus = useCallback(() => {
+    const activeId = focusedTextIdRef.current;
+    if (!activeId) return;
+    const node = textNodeRefs.current.get(activeId);
+    node?.blur();
     setFocusedTextId(null);
-  }
+  }, []);
   const [deleteMode, setDeleteMode] = useState(false);
   const [projectName, setProjectName] = useState("Untitled Project");
   const [projectNameEditing, setProjectNameEditing] = useState(false);
@@ -1775,6 +1776,25 @@ function WorkspaceClient() {
       node.focus();
     }
   }, [focusedTextId]);
+
+  useEffect(() => {
+    focusedTextIdRef.current = focusedTextId;
+  }, [focusedTextId]);
+
+  useEffect(() => {
+    const handleGlobalPointerDown = (event: PointerEvent) => {
+      if (!(event.target instanceof HTMLElement)) {
+        clearTextFocus();
+        return;
+      }
+      if (!event.target.closest("[data-text-annotation]")) {
+        clearTextFocus();
+      }
+    };
+
+    window.addEventListener("pointerdown", handleGlobalPointerDown);
+    return () => window.removeEventListener("pointerdown", handleGlobalPointerDown);
+  }, [clearTextFocus]);
 
   useEffect(() => {
     if (!textMode) {
