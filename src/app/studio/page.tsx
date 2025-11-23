@@ -589,8 +589,6 @@ function WorkspaceClient() {
   const [shouldCenterOnChange, setShouldCenterOnChange] = useState(false);
   const [zoomPercent, setZoomPercent] = useState(100);
   const [baseScale, setBaseScale] = useState(1);
-  const [scrollX, setScrollX] = useState(0);
-  const [maxScrollX, setMaxScrollX] = useState(0);
   const scrollRatioRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const [highlightMode, setHighlightMode] = useState(false);
   const [highlightColor, setHighlightColor] = useState<HighlightColorKey>("yellow");
@@ -1683,6 +1681,7 @@ function WorkspaceClient() {
   const highlightActive = highlightButtonOn && !deleteMode;
   const pencilActive = pencilButtonOn && !deleteMode;
   const textActive = textButtonOn && !deleteMode;
+  const showScrollbars = zoomPercent > 100;
   const activeDrawingTool: DrawingTool | null = highlightActive
     ? "highlight"
     : pencilActive
@@ -1753,30 +1752,6 @@ function WorkspaceClient() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, [computeBaseScale]);
-
-  useEffect(() => {
-    const el = viewerScrollRef.current;
-    if (!el) return;
-
-    const update = () => {
-      const max = Math.max(el.scrollWidth - el.clientWidth, 0);
-      setMaxScrollX(max);
-      el.scrollLeft = 0;
-      setScrollX(0);
-    };
-
-    const handleScroll = () => {
-      setScrollX(el.scrollLeft);
-    };
-
-    update();
-    el.addEventListener("scroll", handleScroll);
-    window.addEventListener("resize", update);
-    return () => {
-      el.removeEventListener("scroll", handleScroll);
-      window.removeEventListener("resize", update);
-    };
-  }, [zoomPercent, baseScale, activePageIndex]);
 
   const setZoomWithScrollPreserved = useCallback(
     (nextPercent: number) => {
@@ -2887,27 +2862,11 @@ function WorkspaceClient() {
                   >
                     <div className="viewer flex-1 min-h-0 overflow-hidden">
                       <div className="flex h-full min-h-0 flex-col overflow-hidden">
-                        {maxScrollX > 0 ? (
-                          <div className="mb-2 px-4">
-                            <input
-                              type="range"
-                              min={0}
-                              max={maxScrollX}
-                              value={scrollX}
-                              onChange={(e) => {
-                                const el = viewerScrollRef.current;
-                                if (!el) return;
-                                const next = Number(e.target.value);
-                                el.scrollLeft = next;
-                                setScrollX(next);
-                              }}
-                              className="horizontal-slider w-full"
-                            />
-                          </div>
-                        ) : null}
                         <div
                           ref={viewerScrollRef}
-                          className="viewer-shell viewer-scroll mx-auto flex flex-1 min-h-0 w-full max-w-[1000px] flex-col items-start justify-start overflow-auto"
+                          className={`viewer-shell viewer-scroll mx-auto flex flex-1 min-h-0 w-full max-w-[1000px] flex-col items-start justify-start ${
+                            showScrollbars ? "overflow-auto" : "overflow-hidden"
+                          }`}
                           style={{
                             padding: `${VIEWER_PADDING_TOP}px ${VIEWER_PADDING_X}px ${VIEWER_PADDING_BOTTOM}px`,
                           }}
