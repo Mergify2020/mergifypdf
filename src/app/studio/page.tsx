@@ -43,7 +43,7 @@ type PageItem = {
   height: number;
 };
 type Point = { x: number; y: number };
-type DrawingTool = "highlight" | "pencil";
+type DrawingTool = "highlight" | "pencil" | "text";
 type HighlightStroke = {
   id: string;
   tool: DrawingTool;
@@ -52,7 +52,7 @@ type HighlightStroke = {
   thickness: number;
 };
 type DraftHighlight = {
-  tool: DrawingTool;
+  tool: Exclude<DrawingTool, "text">;
   pageId: string;
   points: Point[];
   color: string;
@@ -62,6 +62,15 @@ type HighlightHistoryEntry =
   | { type: "add"; pageId: string; highlight: HighlightStroke }
   | { type: "delete"; pageId: string; highlight: HighlightStroke }
   | { type: "clear"; previous: Record<string, HighlightStroke[]> };
+
+type TextAnnotation = {
+  id: string;
+  pageId: string;
+  pageIndex: number;
+  x: number;
+  y: number;
+  text: string;
+};
 
 const HIGHLIGHT_COLORS = {
   yellow: "#fff266",
@@ -453,7 +462,9 @@ function WorkspaceClient() {
   const [highlightThickness, setHighlightThickness] = useState(14);
   const [pencilMode, setPencilMode] = useState(false);
   const [pencilThickness, setPencilThickness] = useState(4);
+  const [textMode, setTextMode] = useState(false);
   const [highlights, setHighlights] = useState<Record<string, HighlightStroke[]>>({});
+  const [textAnnotations, setTextAnnotations] = useState<Record<string, TextAnnotation[]>>({});
   const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]>([]);
   const [draftHighlight, setDraftHighlight] = useState<DraftHighlight | null>(null);
   const [deleteMode, setDeleteMode] = useState(false);
@@ -896,6 +907,7 @@ function WorkspaceClient() {
 
   const renderPreviewPage = (page: PageItem, idx: number) => {
     const pageHighlights = highlights[page.id] ?? [];
+    const pageTexts = textAnnotations[page.id] ?? [];
     const rotationDegrees = normalizeRotation(page.rotation);
     const naturalWidth = page.width || 612;
     const naturalHeight = page.height || naturalWidth * DEFAULT_ASPECT_RATIO;
@@ -936,6 +948,8 @@ function WorkspaceClient() {
                     ? (`url(${HIGHLIGHT_CURSOR}) 4 24, crosshair` as CSSProperties["cursor"])
                     : activeDrawingTool === "pencil"
                     ? ("crosshair" as CSSProperties["cursor"])
+                    : activeDrawingTool === "text"
+                    ? ("text" as CSSProperties["cursor"])
                     : undefined,
               }}
               onMouseDown={(event) => handleMarkupPointerDown(page.id, event)}
@@ -991,6 +1005,30 @@ function WorkspaceClient() {
                   />
                 ) : null}
               </svg>
+              {pageTexts.map((annotation) => (
+                <textarea
+                  key={annotation.id}
+                  value={annotation.text}
+                  onChange={(event) =>
+                    setTextAnnotations((prev) => {
+                      const existing = prev[page.id] ?? [];
+                      const updated = existing.map((item) =>
+                        item.id === annotation.id ? { ...item, text: event.target.value } : item
+                      );
+                      return { ...prev, [page.id]: updated };
+                    })
+                  }
+                  onMouseDown={(event) => event.stopPropagation()}
+                  onClick={(event) => event.stopPropagation()}
+                  onMouseUp={(event) => event.stopPropagation()}
+                  className="absolute min-w-[140px] resize-none rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#024d7c]/40"
+                  style={{
+                    left: `${annotation.x * 100}%`,
+                    top: `${annotation.y * 100}%`,
+                    transform: "translate(-50%, -50%)",
+                  }}
+                />
+              ))}
             </div>
           </div>
         </div>
@@ -1037,6 +1075,7 @@ function WorkspaceClient() {
     if (deleteMode) {
       setHighlightMode(false);
       setPencilMode(false);
+      setTextMode(false);
       setDraftHighlight(null);
     }
   }, [deleteMode]);
@@ -1054,6 +1093,7 @@ function WorkspaceClient() {
   function getActiveTool(): DrawingTool | null {
     if (highlightMode) return "highlight";
     if (pencilMode) return "pencil";
+    if (textMode) return "text";
     return null;
   }
 
@@ -1069,15 +1109,27 @@ function WorkspaceClient() {
   ) as [HighlightColorKey, string][];
   const highlightButtonOn = highlightMode && !highlightButtonDisabled;
   const pencilButtonOn = pencilMode && !highlightButtonDisabled;
+  const textButtonOn = textMode && !highlightButtonDisabled;
   const highlightTrayVisible = (highlightMode || pencilMode || deleteMode) && !highlightButtonDisabled;
   const highlightActive = highlightButtonOn && !deleteMode;
   const pencilActive = pencilButtonOn && !deleteMode;
-  const activeDrawingTool: DrawingTool | null = highlightActive ? "highlight" : pencilActive ? "pencil" : null;
+  const textActive = textButtonOn && !deleteMode;
+  const activeDrawingTool: DrawingTool | null = highlightActive
+    ? "highlight"
+    : pencilActive
+    ? "pencil"
+    : textActive
+    ? "text"
+    : null;
   const highlightCount = useMemo(
     () => Object.values(highlights).reduce((sum, list) => sum + list.length, 0),
     [highlights]
   );
-  const hasWorkspaceData = pages.length > 0 || highlightCount > 0 || !!draftHighlight;
+  const textAnnotationCount = useMemo(
+    () => Object.values(textAnnotations).reduce((sum, list) => sum + (list?.length ?? 0), 0),
+    [textAnnotations]
+  );
+  const hasWorkspaceData = pages.length > 0 || highlightCount > 0 || textAnnotationCount > 0 || !!draftHighlight;
 
   const computeBaseScale = useCallback(() => {
     const container = previewContainerRef.current;
@@ -1189,6 +1241,23 @@ function WorkspaceClient() {
     if (!tool) return;
     const point = getPointerPoint(event);
     if (!point) return;
+    if (tool === "text") {
+      const pageIndex = pages.findIndex((p) => p.id === pageId);
+      const annotation: TextAnnotation = {
+        id: crypto.randomUUID(),
+        pageId,
+        pageIndex,
+        x: point.x,
+        y: point.y,
+        text: "Type here",
+      };
+      setTextAnnotations((prev) => {
+        const existing = prev[pageId] ?? [];
+        return { ...prev, [pageId]: [...existing, annotation] };
+      });
+      event.preventDefault();
+      return;
+    }
     const baseThickness = tool === "highlight" ? highlightThickness : pencilThickness;
     setDraftHighlight({
       tool,
@@ -1202,6 +1271,7 @@ function WorkspaceClient() {
 
   function handleMarkupPointerMove(pageId: string, event: ReactMouseEvent<HTMLDivElement>) {
     if (deleteMode) return;
+    if (getActiveTool() === "text") return;
     const point = getPointerPoint(event);
     if (!point) return;
     setDraftHighlight((prev) => {
@@ -1225,6 +1295,7 @@ function WorkspaceClient() {
 
   function handleMarkupPointerUp(pageId: string) {
     if (deleteMode) return;
+    if (getActiveTool() === "text") return;
     setDraftHighlight((prev) => {
       if (!prev || prev.pageId !== pageId) return prev;
       commitDraftHighlight(prev);
@@ -1435,7 +1506,11 @@ useEffect(() => {
     }
     const previous = document.body.style.cursor;
     document.body.style.cursor =
-      activeDrawingTool === "highlight" ? `url(${HIGHLIGHT_CURSOR}) 4 24, crosshair` : "crosshair";
+      activeDrawingTool === "highlight"
+        ? `url(${HIGHLIGHT_CURSOR}) 4 24, crosshair`
+        : activeDrawingTool === "pencil"
+        ? "crosshair"
+        : "text";
     return () => {
       document.body.style.cursor = previous;
     };
@@ -1694,11 +1769,12 @@ useEffect(() => {
                     type="button"
                     aria-pressed={!highlightButtonOn && !pencilButtonOn}
                     className={`${toolSwitchBase} ${
-                      !highlightButtonOn && !pencilButtonOn ? toolSwitchActive : toolSwitchInactive
+                      !highlightButtonOn && !pencilButtonOn && !textButtonOn ? toolSwitchActive : toolSwitchInactive
                     }`}
                     onClick={() => {
                       setHighlightMode(false);
                       setPencilMode(false);
+                      setTextMode(false);
                       setDeleteMode(false);
                       setDraftHighlight(null);
                     }}
@@ -1718,6 +1794,7 @@ useEffect(() => {
                         if (next) {
                           setDeleteMode(false);
                           setPencilMode(false);
+                          setTextMode(false);
                         }
                         return next;
                       })
@@ -1739,6 +1816,7 @@ useEffect(() => {
                         if (next) {
                           setDeleteMode(false);
                           setHighlightMode(false);
+                          setTextMode(false);
                         }
                         return next;
                       })
@@ -1746,6 +1824,28 @@ useEffect(() => {
                   >
                     <Pencil className="h-4 w-4" />
                     Pencil
+                  </button>
+                  <button
+                    type="button"
+                    disabled={highlightButtonDisabled}
+                    aria-pressed={textButtonOn}
+                    className={`${toolSwitchBase} ${
+                      textButtonOn ? toolSwitchActive : toolSwitchInactive
+                    } border-l border-slate-200 disabled:cursor-not-allowed disabled:opacity-50`}
+                    onClick={() =>
+                      setTextMode((prev) => {
+                        const next = !prev;
+                        if (next) {
+                          setDeleteMode(false);
+                          setHighlightMode(false);
+                          setPencilMode(false);
+                          setDraftHighlight(null);
+                        }
+                        return next;
+                      })
+                    }
+                  >
+                    Text
                   </button>
                 </div>
                 <div className="hidden h-8 w-px bg-slate-200 sm:block" aria-hidden />
