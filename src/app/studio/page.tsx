@@ -1121,6 +1121,7 @@ function WorkspaceClient() {
                 const annotationWidth = annotation.width ?? 0.14;
                 const annotationHeight = annotation.height ?? 0.06;
                 const isDraggingThis = draggingText?.id === annotation.id;
+                const displayFontSize = textSize * zoomMultiplier;
                 return (
                 <div
                   key={annotation.id}
@@ -1174,7 +1175,7 @@ function WorkspaceClient() {
                         fontWeight: textBold ? 700 : 500,
                         fontStyle: textItalic ? "italic" : "normal",
                         fontFamily: textFont,
-                        fontSize: `${textSize}px`,
+                        fontSize: `${displayFontSize}px`,
                       }}
                     />
                     {focusedTextId === annotation.id ? (
