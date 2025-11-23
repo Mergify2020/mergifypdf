@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import type { CSSProperties, MouseEvent as ReactMouseEvent } from "react";
+import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
@@ -511,9 +511,9 @@ function WorkspaceClient() {
     (
       pageId: string,
       annotationId: string,
-      startEvent: ReactMouseEvent<HTMLButtonElement> | ReactMouseEvent<HTMLDivElement>
+      startEvent: ReactPointerEvent<HTMLButtonElement> | ReactPointerEvent<HTMLDivElement>
     ) => {
-      if (startEvent.button !== 0) return;
+      if (startEvent.button !== 0 && startEvent.pointerType !== "touch") return;
       startEvent.preventDefault();
       startEvent.stopPropagation();
 
@@ -527,7 +527,10 @@ function WorkspaceClient() {
       const offsetX = startPoint.x - annotation.x;
       const offsetY = startPoint.y - annotation.y;
 
-      const handleMove = (event: MouseEvent) => {
+      const pointerId = startEvent.pointerId;
+
+      const handleMove = (event: PointerEvent) => {
+        if (event.pointerId !== pointerId) return;
         const point = getPageNormalizedPoint(pageId, event.clientX, event.clientY);
         if (!point) return;
         setTextAnnotations((prev) => {
@@ -545,8 +548,9 @@ function WorkspaceClient() {
       };
 
       function cleanup() {
-        window.removeEventListener("mousemove", handleMove);
-        window.removeEventListener("mouseup", handleUp);
+        window.removeEventListener("pointermove", handleMove);
+        window.removeEventListener("pointerup", handleUp);
+        window.removeEventListener("pointercancel", handleUp);
         textDragCleanupRef.current = null;
       }
 
@@ -555,8 +559,9 @@ function WorkspaceClient() {
         cleanup();
       }
 
-      window.addEventListener("mousemove", handleMove);
-      window.addEventListener("mouseup", handleUp);
+      window.addEventListener("pointermove", handleMove);
+      window.addEventListener("pointerup", handleUp);
+      window.addEventListener("pointercancel", handleUp);
 
       textDragCleanupRef.current = cleanup;
       setDraggingText({ pageId, id: annotationId, offsetX, offsetY });
@@ -1170,7 +1175,7 @@ function WorkspaceClient() {
                         <button
                           type="button"
                           className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 bg-white/80 text-slate-700 shadow-sm transition hover:bg-white active:translate-y-[1px]"
-                          onMouseDown={(event) => {
+                          onPointerDown={(event) => {
                             focusTextAnnotation(annotation.id);
                             startTextDrag(page.id, annotation.id, event);
                           }}
