@@ -80,6 +80,7 @@ type TextAnnotation = {
   text: string;
   width: number;
   height: number;
+  rotation?: number;
 };
 type TextFont = "Inter" | "Georgia" | "Courier New";
 
@@ -490,6 +491,16 @@ function WorkspaceClient() {
     offsetY: number;
   } | null>(null);
   const textDragCleanupRef = useRef<(() => void) | null>(null);
+  const [resizingText, setResizingText] = useState<{
+    pageId: string;
+    id: string;
+    startWidth: number;
+    startHeight: number;
+    pointerId: number;
+    startX: number;
+    startY: number;
+  } | null>(null);
+  const textResizeCleanupRef = useRef<(() => void) | null>(null);
   const [draftTextBox, setDraftTextBox] = useState<{
     pageId: string;
     startX: number;
@@ -600,6 +611,72 @@ function WorkspaceClient() {
 
       textDragCleanupRef.current = cleanup;
       setDraggingText({ pageId, id: annotationId, offsetX, offsetY });
+    },
+    [getPageNormalizedPoint, textAnnotations]
+  );
+
+  const startTextResize = useCallback(
+    (
+      pageId: string,
+      annotationId: string,
+      startEvent: ReactPointerEvent<HTMLDivElement>
+    ) => {
+      if (startEvent.button !== 0 && startEvent.pointerType !== "touch") return;
+      startEvent.preventDefault();
+      startEvent.stopPropagation();
+      const annotation = textAnnotations[pageId]?.find((a) => a.id === annotationId);
+      if (!annotation) return;
+      const startPoint = getPageNormalizedPoint(pageId, startEvent.clientX, startEvent.clientY);
+      if (!startPoint) return;
+      const pointerId = startEvent.pointerId;
+
+      textResizeCleanupRef.current?.();
+      const startWidth = annotation.width ?? 0.14;
+      const startHeight = annotation.height ?? 0.06;
+      const handleMove = (event: PointerEvent) => {
+        if (event.pointerId !== pointerId) return;
+        const point = getPageNormalizedPoint(pageId, event.clientX, event.clientY);
+        if (!point) return;
+        setTextAnnotations((prev) => {
+          const existing = prev[pageId] ?? [];
+          const current = existing.find((a) => a.id === annotationId);
+          if (!current) return prev;
+          const deltaX = point.x - startPoint.x;
+          const deltaY = point.y - startPoint.y;
+          const nextWidth = clamp(startWidth + deltaX, 0.04, 1 - current.x);
+          const nextHeight = clamp(startHeight + deltaY, 0.03, 1 - current.y);
+          const updated = existing.map((item) =>
+            item.id === annotationId
+              ? { ...item, width: nextWidth, height: nextHeight }
+              : item
+          );
+          return { ...prev, [pageId]: updated };
+        });
+      };
+      const handleUp = (event: PointerEvent) => {
+        if (event.pointerId !== pointerId) return;
+        setResizingText(null);
+        cleanup();
+      };
+      function cleanup() {
+        window.removeEventListener("pointermove", handleMove);
+        window.removeEventListener("pointerup", handleUp);
+        window.removeEventListener("pointercancel", handleUp);
+        textResizeCleanupRef.current = null;
+      }
+      window.addEventListener("pointermove", handleMove);
+      window.addEventListener("pointerup", handleUp);
+      window.addEventListener("pointercancel", handleUp);
+      textResizeCleanupRef.current = cleanup;
+      setResizingText({
+        pageId,
+        id: annotationId,
+        startWidth,
+        startHeight,
+        startX: startPoint.x,
+        startY: startPoint.y,
+        pointerId,
+      });
     },
     [getPageNormalizedPoint, textAnnotations]
   );
@@ -1155,7 +1232,9 @@ function WorkspaceClient() {
               {pageTexts.map((annotation) => {
                 const annotationWidth = annotation.width ?? 0.14;
                 const annotationHeight = annotation.height ?? 0.06;
+                const rotation = annotation.rotation ?? 0;
                 const isDraggingThis = draggingText?.id === annotation.id;
+                const isResizingThis = resizingText?.id === annotation.id;
                 const displayFontSize = textSize * zoomMultiplier;
                 return (
                 <div
@@ -1211,6 +1290,8 @@ function WorkspaceClient() {
                         fontStyle: textItalic ? "italic" : "normal",
                         fontFamily: textFont,
                         fontSize: `${displayFontSize}px`,
+                        transform: `rotate(${rotation}deg)`,
+                        transformOrigin: "center",
                       }}
                     />
                     {focusedTextId === annotation.id ? (
@@ -1227,6 +1308,19 @@ function WorkspaceClient() {
                         </button>
                         <button
                           type="button"
+                          className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 bg-white/80 text-slate-700 shadow-sm transition hover:bg-white active:translate-y-[1px]"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            updateTextAnnotation(page.id, annotation.id, (item) => ({
+                              ...item,
+                              rotation: ((item.rotation ?? 0) + 15) % 360,
+                            }));
+                          }}
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
                           className="flex h-8 w-8 items-center justify-center rounded-full border border-rose-300 bg-white/80 text-rose-700 shadow-sm transition hover:bg-rose-50 active:translate-y-[1px]"
                           onMouseDown={(event) => event.stopPropagation()}
                           onClick={(event) => {
@@ -1238,6 +1332,12 @@ function WorkspaceClient() {
                         </button>
                       </div>
                     ) : null}
+                    <div
+                      className={`absolute -bottom-1 -right-1 h-4 w-4 cursor-se-resize rounded-sm border border-slate-400 bg-white/80 shadow-sm ${
+                        isResizingThis ? "border-slate-600 bg-white" : ""
+                      }`}
+                      onPointerDown={(event) => startTextResize(page.id, annotation.id, event)}
+                    />
                   </div>
                 </div>
               );
@@ -1594,6 +1694,7 @@ function WorkspaceClient() {
                 width,
                 height,
                 text: TEXT_PLACEHOLDER,
+                rotation: 0,
               },
             ],
           };
@@ -1718,6 +1819,7 @@ function WorkspaceClient() {
             const startY = pageHeight - annotation.y * pageHeight - padding;
             let cursorY = startY;
             const lines = content.split(/\r?\n/);
+            const rotation = annotation.rotation ?? 0;
             lines.forEach((line) => {
               cursorY -= fontSize;
               copied.drawText(line, {
@@ -1727,6 +1829,7 @@ function WorkspaceClient() {
                 font,
                 color: textColor,
                 maxWidth: Math.max(10, boxWidth - padding * 2),
+                rotate: degrees(rotation),
               });
               cursorY -= lineHeight - fontSize;
             });
@@ -1918,6 +2021,7 @@ function WorkspaceClient() {
   useEffect(() => {
     return () => {
       textDragCleanupRef.current?.();
+      textResizeCleanupRef.current?.();
     };
   }, []);
 
