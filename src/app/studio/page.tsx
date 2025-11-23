@@ -70,6 +70,8 @@ type TextAnnotation = {
   x: number;
   y: number;
   text: string;
+  width: number;
+  height: number;
 };
 
 const HIGHLIGHT_COLORS = {
@@ -473,6 +475,14 @@ function WorkspaceClient() {
     offsetX: number;
     offsetY: number;
   } | null>(null);
+  const [draftTextBox, setDraftTextBox] = useState<{
+    pageId: string;
+    startX: number;
+    startY: number;
+    currentX: number;
+    currentY: number;
+  } | null>(null);
+  const [focusedTextId, setFocusedTextId] = useState<string | null>(null);
   const [deleteMode, setDeleteMode] = useState(false);
   const [projectName, setProjectName] = useState("Untitled Project");
   const [projectNameEditing, setProjectNameEditing] = useState(false);
@@ -1011,13 +1021,29 @@ function WorkspaceClient() {
                   />
                 ) : null}
               </svg>
-              {pageTexts.map((annotation) => (
+              {draftTextBox && draftTextBox.pageId === page.id ? (
+                <div
+                  className="absolute border border-dashed border-slate-300 bg-white/40"
+                  style={{
+                    left: `${Math.min(draftTextBox.startX, draftTextBox.currentX) * 100}%`,
+                    top: `${Math.min(draftTextBox.startY, draftTextBox.currentY) * 100}%`,
+                    width: `${Math.max(Math.abs(draftTextBox.currentX - draftTextBox.startX), 0.01) * 100}%`,
+                    height: `${Math.max(Math.abs(draftTextBox.currentY - draftTextBox.startY), 0.01) * 100}%`,
+                  }}
+                />
+              ) : null}
+              {pageTexts.map((annotation) => {
+                const annotationWidth = annotation.width ?? 0.14;
+                const annotationHeight = annotation.height ?? 0.06;
+                return (
                 <div
                   key={annotation.id}
                   className="absolute"
                   style={{
                     left: `${annotation.x * 100}%`,
                     top: `${annotation.y * 100}%`,
+                    minWidth: `${annotationWidth * 100}%`,
+                    minHeight: `${annotationHeight * 100}%`,
                   }}
                   onMouseDown={(event) => {
                     event.stopPropagation();
@@ -1041,32 +1067,29 @@ function WorkspaceClient() {
                   <div
                     contentEditable
                     suppressContentEditableWarning
-                    className="min-w-[60px] inline-block px-1 py-0.5 text-[12px] text-slate-900 border border-slate-300 rounded bg-white/70 shadow-sm"
+                    onFocus={() => setFocusedTextId(annotation.id)}
+                    className={`min-w-[60px] inline-block px-1 py-0.5 text-[12px] text-slate-900 rounded transition ${
+                      focusedTextId === annotation.id
+                        ? "border border-slate-300 bg-white/70 shadow-sm"
+                        : "border border-transparent bg-transparent"
+                    }`}
                     onInput={(event) => {
                       const value = event.currentTarget.textContent ?? "";
-                      setTextAnnotations((prev) => {
-                        const existing = prev[page.id] ?? [];
-                        const updated = existing.map((item) =>
-                          item.id === annotation.id ? { ...item, text: value } : item
-                        );
-                        return { ...prev, [page.id]: updated };
-                      });
+                      updateTextAnnotation(page.id, annotation.id, (item) => ({ ...item, text: value }));
+                      syncTextAnnotationSize(page.id, annotation.id, event.currentTarget);
                     }}
                     onBlur={(event) => {
                       const value = event.currentTarget.textContent ?? "";
-                      setTextAnnotations((prev) => {
-                        const existing = prev[page.id] ?? [];
-                        const updated = existing.map((item) =>
-                          item.id === annotation.id ? { ...item, text: value } : item
-                        );
-                        return { ...prev, [page.id]: updated };
-                      });
+                      updateTextAnnotation(page.id, annotation.id, (item) => ({ ...item, text: value }));
+                      syncTextAnnotationSize(page.id, annotation.id, event.currentTarget);
+                      setFocusedTextId((current) => (current === annotation.id ? null : current));
                     }}
                   >
                     {annotation.text}
                   </div>
                 </div>
-              ))}
+              );
+              })}
             </div>
           </div>
         </div>
@@ -1146,6 +1169,29 @@ function WorkspaceClient() {
     };
   }
 
+  function updateTextAnnotation(
+    pageId: string,
+    id: string,
+    updater: (annotation: TextAnnotation) => TextAnnotation
+  ) {
+    setTextAnnotations((prev) => {
+      const existing = prev[pageId] ?? [];
+      const updated = existing.map((item) => (item.id === id ? updater(item) : item));
+      return { ...prev, [pageId]: updated };
+    });
+  }
+
+  function syncTextAnnotationSize(pageId: string, id: string, element: HTMLElement) {
+    const node = previewNodeMap.current.get(pageId);
+    if (!node) return;
+    const containerRect = node.getBoundingClientRect();
+    if (!containerRect.width || !containerRect.height) return;
+    const boxRect = element.getBoundingClientRect();
+    const width = clamp(boxRect.width / containerRect.width, 0.02, 1);
+    const height = clamp(boxRect.height / containerRect.height, 0.02, 1);
+    updateTextAnnotation(pageId, id, (annotation) => ({ ...annotation, width, height }));
+  }
+
 
   const itemsIds = useMemo(() => pages.map((p) => p.id), [pages]);
   const downloadDisabled = busy || pages.length === 0;
@@ -1178,7 +1224,8 @@ function WorkspaceClient() {
     () => Object.values(textAnnotations).reduce((sum, list) => sum + (list?.length ?? 0), 0),
     [textAnnotations]
   );
-  const hasWorkspaceData = pages.length > 0 || highlightCount > 0 || textAnnotationCount > 0 || !!draftHighlight;
+  const hasWorkspaceData =
+    pages.length > 0 || highlightCount > 0 || textAnnotationCount > 0 || !!draftHighlight || !!draftTextBox;
 
   const computeBaseScale = useCallback(() => {
     const container = previewContainerRef.current;
@@ -1291,18 +1338,12 @@ function WorkspaceClient() {
     const point = getPointerPoint(event);
     if (!point) return;
     if (tool === "text") {
-      const pageIndex = pages.findIndex((p) => p.id === pageId);
-      const annotation: TextAnnotation = {
-        id: crypto.randomUUID(),
+      setDraftTextBox({
         pageId,
-        pageIndex,
-        x: point.x,
-        y: point.y,
-        text: "Type here",
-      };
-      setTextAnnotations((prev) => {
-        const existing = prev[pageId] ?? [];
-        return { ...prev, [pageId]: [...existing, annotation] };
+        startX: point.x,
+        startY: point.y,
+        currentX: point.x,
+        currentY: point.y,
       });
       event.preventDefault();
       return;
@@ -1320,7 +1361,14 @@ function WorkspaceClient() {
 
   function handleMarkupPointerMove(pageId: string, event: ReactMouseEvent<HTMLDivElement>) {
     if (deleteMode) return;
-    if (getActiveTool() === "text") return;
+    if (getActiveTool() === "text") {
+      if (!draftTextBox || draftTextBox.pageId !== pageId) return;
+      const point = getPointerPoint(event);
+      if (!point) return;
+      setDraftTextBox((prev) => (prev ? { ...prev, currentX: point.x, currentY: point.y } : prev));
+      event.preventDefault();
+      return;
+    }
     const point = getPointerPoint(event);
     if (!point) return;
     setDraftHighlight((prev) => {
@@ -1344,7 +1392,44 @@ function WorkspaceClient() {
 
   function handleMarkupPointerUp(pageId: string) {
     if (deleteMode) return;
-    if (getActiveTool() === "text") return;
+    if (getActiveTool() === "text") {
+      if (draftTextBox && draftTextBox.pageId === pageId) {
+        const widthDelta = Math.abs(draftTextBox.currentX - draftTextBox.startX);
+        const heightDelta = Math.abs(draftTextBox.currentY - draftTextBox.startY);
+        if (widthDelta < 0.005 && heightDelta < 0.005) {
+          setDraftTextBox(null);
+          return;
+        }
+        const width = Math.max(widthDelta, 0.04);
+        const height = Math.max(heightDelta, 0.03);
+        const x = Math.min(draftTextBox.startX, draftTextBox.currentX);
+        const y = Math.min(draftTextBox.startY, draftTextBox.currentY);
+        const annotationId = crypto.randomUUID();
+        const pageIndex = pages.findIndex((p) => p.id === pageId);
+        setTextAnnotations((prev) => {
+          const existing = prev[pageId] ?? [];
+          return {
+            ...prev,
+            [pageId]: [
+              ...existing,
+              {
+                id: annotationId,
+                pageId,
+                pageIndex,
+                x,
+                y,
+                width,
+                height,
+                text: "Type here",
+              },
+            ],
+          };
+        });
+        setFocusedTextId(annotationId);
+        setDraftTextBox(null);
+      }
+      return;
+    }
     setDraftHighlight((prev) => {
       if (!prev || prev.pageId !== pageId) return prev;
       commitDraftHighlight(prev);
@@ -1603,6 +1688,12 @@ function WorkspaceClient() {
       window.removeEventListener("mouseup", handleUp);
     };
   }, [draggingText]);
+
+  useEffect(() => {
+    if (!textMode) {
+      setDraftTextBox(null);
+    }
+  }, [textMode]);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
