@@ -487,6 +487,7 @@ function WorkspaceClient() {
     currentY: number;
   } | null>(null);
   const [focusedTextId, setFocusedTextId] = useState<string | null>(null);
+  const textNodeRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [deleteMode, setDeleteMode] = useState(false);
   const [projectName, setProjectName] = useState("Untitled Project");
   const [projectNameEditing, setProjectNameEditing] = useState(false);
@@ -1044,6 +1045,7 @@ function WorkspaceClient() {
                 <div
                   key={annotation.id}
                   className="absolute"
+                  data-text-annotation
                   style={{
                     left: `${annotation.x * 100}%`,
                     top: `${annotation.y * 100}%`,
@@ -1074,6 +1076,8 @@ function WorkspaceClient() {
                         syncTextAnnotationSize(page.id, annotation.id, event.currentTarget);
                         setFocusedTextId((current) => (current === annotation.id ? null : current));
                       }}
+                      ref={registerTextNode(annotation.id)}
+                      tabIndex={0}
                       style={{
                         width: "100%",
                         height: "100%",
@@ -1205,6 +1209,16 @@ function WorkspaceClient() {
     return {
       x: clamp((clientX - rect.left) / rect.width, 0, 1),
       y: clamp((clientY - rect.top) / rect.height, 0, 1),
+    };
+  }
+
+  function registerTextNode(id: string) {
+    return (node: HTMLDivElement | null) => {
+      if (node) {
+        textNodeRefs.current.set(id, node);
+      } else {
+        textNodeRefs.current.delete(id);
+      }
     };
   }
 
@@ -1380,6 +1394,9 @@ function WorkspaceClient() {
 
   function handleMarkupPointerDown(pageId: string, event: ReactMouseEvent<HTMLDivElement>) {
     if (deleteMode) return;
+    if (!event.target || !(event.target as HTMLElement).closest("[data-text-annotation]")) {
+      setFocusedTextId(null);
+    }
     const tool = getActiveTool();
     if (!tool) return;
     const point = getPointerPoint(event);
@@ -1738,6 +1755,14 @@ function WorkspaceClient() {
       window.removeEventListener("mouseup", handleUp);
     };
   }, [draggingText]);
+
+  useEffect(() => {
+    if (!focusedTextId) return;
+    const node = textNodeRefs.current.get(focusedTextId);
+    if (node) {
+      node.focus();
+    }
+  }, [focusedTextId]);
 
   useEffect(() => {
     if (!textMode) {
