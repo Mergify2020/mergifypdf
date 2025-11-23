@@ -1243,6 +1243,7 @@ function WorkspaceClient() {
                 const isResizingThis = resizingText?.id === annotation.id;
                 const isRotatingThis = rotatingText?.id === annotation.id;
                 const rotation = annotation.rotation ?? 0;
+                const displayRotation = normalizeRotation(rotation);
                 const displayFontSize = textSize * zoomMultiplier;
                 return (
                 <div
@@ -1257,7 +1258,7 @@ function WorkspaceClient() {
                     top: `${annotation.y * 100}%`,
                     width: `${annotationWidth * 100}%`,
                     height: `${annotationHeight * 100}%`,
-                    transform: `rotate(${rotation}deg)`,
+                    transform: `rotate(${displayRotation}deg)`,
                     transformOrigin: "center",
                     willChange: isRotatingThis ? "transform" : undefined,
                     transitionDuration: isRotatingThis ? "0ms" : undefined,
@@ -1275,9 +1276,9 @@ function WorkspaceClient() {
                     {isRotatingThis ? (
                       <div
                         className="absolute -top-8 left-1/2 rounded-full bg-slate-900/85 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm"
-                        style={{ transform: `translate(-50%, 0) rotate(${-rotation}deg)` }}
+                        style={{ transform: `translate(-50%, 0) rotate(${-displayRotation}deg)` }}
                       >
-                        {Math.round(rotation)}°
+                        {Math.round(displayRotation)}°
                       </div>
                     ) : null}
                     <textarea
