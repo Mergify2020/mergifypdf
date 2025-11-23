@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { PROJECT_NAME_STORAGE_KEY, sanitizeProjectName } from "@/lib/projectName";
-import { addRecentProject } from "@/lib/recentProjects";
 
 const WORKSPACE_META_KEY = "mpdf:files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
@@ -98,11 +97,26 @@ export default function StartProjectButton({ className }: Props) {
     }
     setBusy(true);
     await resetWorkspaceStorage();
-    const ownerId = session?.user?.id ?? session?.user?.email ?? null;
-    addRecentProject(ownerId, clean);
-    setBusy(false);
-    setOpen(false);
-    router.push("/studio");
+    try {
+      const res = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: clean, pdfKey: `pending-${crypto.randomUUID()}` }),
+      });
+      if (!res.ok) {
+        throw new Error("Failed to create project");
+      }
+      const data = await res.json();
+      const projectId = data?.project?.id;
+      if (!projectId) throw new Error("Project id missing");
+      setOpen(false);
+      router.push(`/studio/${projectId}`);
+    } catch (err) {
+      console.error(err);
+      setError("Unable to start the project right now.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (

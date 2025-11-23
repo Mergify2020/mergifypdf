@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { PENDING_UPLOAD_STORAGE_KEY } from "@/lib/pendingUpload";
+import { sanitizeProjectName } from "@/lib/projectName";
 
 type UploadCtaProps = {
   usedToday: boolean;
@@ -65,7 +66,21 @@ export default function UploadCta({ usedToday, variant = "default", className }:
             JSON.stringify({ name: file.name, data: reader.result })
           );
         }
-        router.push("/studio");
+        const cleanName = sanitizeProjectName(file.name);
+        fetch("/api/projects", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: cleanName, pdfKey: `upload-${crypto.randomUUID()}` }),
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            const projectId = data?.project?.id;
+            router.push(projectId ? `/studio/${projectId}` : "/studio");
+          })
+          .catch((err) => {
+            console.error("Failed to create project", err);
+            router.push("/studio");
+          });
       } catch (err) {
         console.error("Failed to stage upload", err);
         setError("Unable to prepare that file. Please try a smaller PDF.");

@@ -68,30 +68,6 @@ const features = [
   },
 ] as const;
 
-const curatedProjects = [
-  {
-    id: "client-audit",
-    title: "Client Audit Packet",
-    subtitle: "Golden Rain Masonry • 36 pages",
-    status: "In review",
-    updated: "Today • 9:24 AM",
-  },
-  {
-    id: "vendor-lux",
-    title: "Vendor Renewal Agreement",
-    subtitle: "Pinnacol Assurance • 12 pages",
-    status: "Awaiting signature",
-    updated: "Yesterday • 4:08 PM",
-  },
-  {
-    id: "compliance-deck",
-    title: "Compliance Addendum",
-    subtitle: "MergifyPDF Studio • 8 pages",
-    status: "Draft",
-    updated: "Tuesday • 10:41 AM",
-  },
-];
-
 export default async function Home() {
   const session = await getServerSession(authOptions);
   if (session?.user) {
@@ -195,7 +171,7 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
         <ProjectsWorkspaceShelf />
 
         <section className="grid gap-5 lg:grid-cols-[2fr,1fr]">
-          <ProjectsList initialProjects={curatedProjects} />
+          <ProjectsList initialProjects={[]} />
 
           <div className="space-y-4">
             <div className="rounded-[36px] border border-dashed border-slate-200 bg-white/95 p-6 text-slate-500 shadow-[0_25px_60px_rgba(15,23,42,0.08)]">
