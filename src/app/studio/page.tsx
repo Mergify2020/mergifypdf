@@ -1248,7 +1248,7 @@ function WorkspaceClient() {
                 <div
                   key={annotation.id}
                   ref={registerTextAnnotationNode(annotation.id)}
-                    className={`absolute transition-transform duration-150 ${
+                  className={`absolute transition-transform duration-150 ${
                     isRotatingThis ? "scale-[1.02] drop-shadow-[0_4px_18px_rgba(2,77,124,0.25)]" : ""
                   }`}
                   data-text-annotation
@@ -1260,7 +1260,7 @@ function WorkspaceClient() {
                     transform: `rotate(${rotation}deg)`,
                     transformOrigin: "center",
                     willChange: isRotatingThis ? "transform" : undefined,
-                    transitionDuration: isRotatingThis ? "60ms" : undefined,
+                    transitionDuration: isRotatingThis ? "0ms" : undefined,
                   }}
                   onClick={(event) => {
                     event.stopPropagation();
@@ -1522,7 +1522,7 @@ function WorkspaceClient() {
         accumulatedDelta += delta;
         lastAngle = angle;
         const deltaDegrees = (accumulatedDelta * 180) / Math.PI;
-        const nextRotation = normalizeRotation(baseRotation + deltaDegrees);
+        const nextRotation = baseRotation + deltaDegrees;
         setTextAnnotations((prev) => {
           const existing = prev[pageId] ?? [];
           const updated = existing.map((item) =>
