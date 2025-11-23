@@ -107,7 +107,7 @@ export default function StartProjectButton({ className }: Props) {
     }
     setOpen(false);
     setBusy(false);
-    router.push(`/studio/${projectId}`);
+    router.push("/workbench");
   }
 
   return (
