@@ -1150,6 +1150,13 @@ function WorkspaceClient() {
                           text: event.target.value,
                         }))
                       }
+                      onBeforeInput={(event) => {
+                        // Clear the placeholder text on first keystroke so the user never types over "Type here".
+                        const target = event.currentTarget;
+                        if (target.value === "Type here") {
+                          target.value = "";
+                        }
+                      }}
                       onFocus={() => setFocusedTextId(annotation.id)}
                       onClick={() => setFocusedTextId(annotation.id)}
                       ref={registerTextNode(annotation.id)}
