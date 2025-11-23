@@ -84,14 +84,11 @@ type TextAnnotation = {
 };
 type TextFont =
   | "Inter"
-  | "Georgia"
-  | "Courier New"
-  | "Merriweather"
-  | "Arimo"
+  | "Arial"
   | "Roboto"
-  | "Playfair Display"
-  | "Source Code Pro"
-  | "Lato"
+  | "Times New Roman"
+  | "Courier New"
+  | "Georgia"
   | "Poppins";
 type TextFontVariant = "normal" | "bold" | "italic" | "boldItalic";
 
@@ -104,7 +101,11 @@ type FontOption =
   | {
       label: string;
       cssFamily: string;
-      pdf: { type: "custom"; variants: Record<TextFontVariant, string> };
+      pdf: {
+        type: "custom";
+        variants: Record<TextFontVariant, string>;
+        fallback: StandardFonts;
+      };
     };
 
 const TEXT_FONT_OPTIONS: Record<TextFont, FontOption> = {
@@ -119,49 +120,11 @@ const TEXT_FONT_OPTIONS: Record<TextFont, FontOption> = {
         italic: "/fonts/Inter-Italic.ttf",
         boldItalic: "/fonts/Inter-BoldItalic.ttf",
       },
+      fallback: StandardFonts.Helvetica,
     },
   },
-  Georgia: {
-    label: "Georgia",
-    cssFamily: "'Georgia', 'Times New Roman', serif",
-    pdf: {
-      type: "standard",
-      variants: {
-        normal: StandardFonts.TimesRoman,
-        bold: StandardFonts.TimesRomanBold,
-        italic: StandardFonts.TimesRomanItalic,
-        boldItalic: StandardFonts.TimesRomanBoldItalic,
-      },
-    },
-  },
-  "Courier New": {
-    label: "Monospace",
-    cssFamily: "'Courier New', 'SFMono-Regular', Consolas, monospace",
-    pdf: {
-      type: "standard",
-      variants: {
-        normal: StandardFonts.Courier,
-        bold: StandardFonts.CourierBold,
-        italic: StandardFonts.CourierOblique,
-        boldItalic: StandardFonts.CourierBoldOblique,
-      },
-    },
-  },
-  Merriweather: {
-    label: "Merriweather",
-    cssFamily: "'Merriweather', 'Times New Roman', serif",
-    pdf: {
-      type: "custom",
-      variants: {
-        normal: "/fonts/Merriweather-Regular.ttf",
-        bold: "/fonts/Merriweather-Bold.ttf",
-        italic: "/fonts/Merriweather-Italic.ttf",
-        boldItalic: "/fonts/Merriweather-BoldItalic.ttf",
-      },
-    },
-  },
-  Arimo: {
-    label: "Arial (Arimo)",
+  Arial: {
+    label: "Arial",
     cssFamily: "'Arimo', 'Arial', 'Helvetica Neue', sans-serif",
     pdf: {
       type: "custom",
@@ -171,6 +134,7 @@ const TEXT_FONT_OPTIONS: Record<TextFont, FontOption> = {
         italic: "/fonts/Arimo-Italic.ttf",
         boldItalic: "/fonts/Arimo-BoldItalic.ttf",
       },
+      fallback: StandardFonts.Helvetica,
     },
   },
   Roboto: {
@@ -184,45 +148,7 @@ const TEXT_FONT_OPTIONS: Record<TextFont, FontOption> = {
         italic: "/fonts/Roboto-Italic.ttf",
         boldItalic: "/fonts/Roboto-BoldItalic.ttf",
       },
-    },
-  },
-  "Playfair Display": {
-    label: "Playfair Display",
-    cssFamily: "'Playfair Display', 'Times New Roman', serif",
-    pdf: {
-      type: "custom",
-      variants: {
-        normal: "/fonts/PlayfairDisplay-Regular.ttf",
-        bold: "/fonts/PlayfairDisplay-Bold.ttf",
-        italic: "/fonts/PlayfairDisplay-Italic.ttf",
-        boldItalic: "/fonts/PlayfairDisplay-BoldItalic.ttf",
-      },
-    },
-  },
-  "Source Code Pro": {
-    label: "Source Code Pro",
-    cssFamily: "'Source Code Pro', 'SFMono-Regular', Consolas, monospace",
-    pdf: {
-      type: "custom",
-      variants: {
-        normal: "/fonts/SourceCodePro-Regular.ttf",
-        bold: "/fonts/SourceCodePro-Bold.ttf",
-        italic: "/fonts/SourceCodePro-Italic.ttf",
-        boldItalic: "/fonts/SourceCodePro-BoldItalic.ttf",
-      },
-    },
-  },
-  Lato: {
-    label: "Lato",
-    cssFamily: "'Lato', 'Arial', sans-serif",
-    pdf: {
-      type: "custom",
-      variants: {
-        normal: "/fonts/Lato-Regular.ttf",
-        bold: "/fonts/Lato-Bold.ttf",
-        italic: "/fonts/Lato-Italic.ttf",
-        boldItalic: "/fonts/Lato-BoldItalic.ttf",
-      },
+      fallback: StandardFonts.Helvetica,
     },
   },
   Poppins: {
@@ -235,6 +161,46 @@ const TEXT_FONT_OPTIONS: Record<TextFont, FontOption> = {
         bold: "/fonts/Poppins-Bold.ttf",
         italic: "/fonts/Poppins-Italic.ttf",
         boldItalic: "/fonts/Poppins-BoldItalic.ttf",
+      },
+      fallback: StandardFonts.Helvetica,
+    },
+  },
+  "Times New Roman": {
+    label: "Times New Roman",
+    cssFamily: "'Times New Roman', Times, serif",
+    pdf: {
+      type: "standard",
+      variants: {
+        normal: StandardFonts.TimesRoman,
+        bold: StandardFonts.TimesRomanBold,
+        italic: StandardFonts.TimesRomanItalic,
+        boldItalic: StandardFonts.TimesRomanBoldItalic,
+      },
+    },
+  },
+  "Courier New": {
+    label: "Courier New",
+    cssFamily: "'Courier New', 'SFMono-Regular', Consolas, monospace",
+    pdf: {
+      type: "standard",
+      variants: {
+        normal: StandardFonts.Courier,
+        bold: StandardFonts.CourierBold,
+        italic: StandardFonts.CourierOblique,
+        boldItalic: StandardFonts.CourierBoldOblique,
+      },
+    },
+  },
+  Georgia: {
+    label: "Georgia",
+    cssFamily: "'Georgia', 'Times New Roman', serif",
+    pdf: {
+      type: "standard",
+      variants: {
+        normal: StandardFonts.TimesRoman,
+        bold: StandardFonts.TimesRomanBold,
+        italic: StandardFonts.TimesRomanItalic,
+        boldItalic: StandardFonts.TimesRomanBoldItalic,
       },
     },
   },
@@ -1977,8 +1943,8 @@ function WorkspaceClient() {
   /** Build final PDF respecting order + keep flags */
   async function handleDownload(forceBypass = false) {
     if (!forceBypass && !authSession?.user) {
+      // Allow anonymous downloads; still surface the gate UI without blocking the flow.
       setShowDownloadGate(true);
-      return;
     }
     try {
       if (pages.length === 0) {
@@ -2036,10 +2002,20 @@ function WorkspaceClient() {
         const cacheKey = `${textFont}:${variant}`;
         const cached = pdfFontCacheRef.current.get(cacheKey);
         if (cached) return cached;
-        const fontBytes = await loadFontBytes(src);
-        const embedded = await out.embedFont(fontBytes);
-        pdfFontCacheRef.current.set(cacheKey, embedded);
-        return embedded;
+        try {
+          const fontBytes = await loadFontBytes(src);
+          const embedded = await out.embedFont(fontBytes);
+          pdfFontCacheRef.current.set(cacheKey, embedded);
+          return embedded;
+        } catch (err) {
+          console.warn("Falling back to standard font for PDF export", err);
+          const fallback = config.pdf.fallback;
+          const fallbackCached = standardFontCache.get(fallback);
+          if (fallbackCached) return fallbackCached;
+          const embeddedFallback = await out.embedFont(fallback);
+          standardFontCache.set(fallback, embeddedFallback);
+          return embeddedFallback;
+        }
       }
       for (const p of pages) {
         const srcDoc = docCache.get(p.srcIdx)!;
