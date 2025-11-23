@@ -15,6 +15,7 @@ type ProjectItem = {
   updatedAt?: number;
   thumbnailUrl?: string | null;
   pdfKey?: string;
+  isLocal?: boolean;
 };
 
 type Props = {
@@ -48,6 +49,7 @@ function mapApiProject(project: any): ProjectItem {
     updated: formatUpdatedLabel(updatedAt),
     thumbnailUrl: project?.thumbnailUrl ?? null,
     pdfKey: project?.pdfKey,
+    isLocal: false,
   };
 }
 
@@ -59,6 +61,7 @@ function mapRecentProject(project: RecentProjectEntry): ProjectItem {
     updatedAt,
     updated: formatUpdatedLabel(updatedAt),
     thumbnailUrl: null,
+    isLocal: true,
   };
 }
 
@@ -186,6 +189,8 @@ export default function ProjectsList({ initialProjects = [] }: Props) {
     setSelectionMode(false);
   }
 
+  const getOpenHref = (project: ProjectItem) => (project.isLocal ? "/studio" : `/studio/${project.id}`);
+
   return (
     <>
       <div className="rounded-[36px] border border-white/60 bg-white/95 p-8 shadow-[0_40px_120px_rgba(15,23,42,0.08)] backdrop-blur">
@@ -291,6 +296,7 @@ export default function ProjectsList({ initialProjects = [] }: Props) {
                         <button
                           type="button"
                           className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1 text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
+                          disabled={project.isLocal}
                         >
                           Download
                           <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
@@ -305,7 +311,7 @@ export default function ProjectsList({ initialProjects = [] }: Props) {
                           </svg>
                         </button>
                         <Link
-                          href={`/studio/${project.id}`}
+                          href={getOpenHref(project)}
                           className="inline-flex items-center gap-1 rounded-full bg-[#024d7c] px-3 py-1 text-white transition hover:bg-[#013a60]"
                         >
                           Open
@@ -328,7 +334,7 @@ export default function ProjectsList({ initialProjects = [] }: Props) {
                   <div
                     key={project.id}
                     className="group relative cursor-pointer rounded-xl border border-slate-200/70 bg-white p-4 pb-14 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-slate-200/70"
-                    onClick={() => router.push(`/studio/${project.id}`)}
+                    onClick={() => router.push(getOpenHref(project))}
                   >
                     {project.thumbnailUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -339,7 +345,7 @@ export default function ProjectsList({ initialProjects = [] }: Props) {
                         loading="lazy"
                       />
                     ) : (
-                      <div className="mb-3 h-24 rounded-lg border border-dashed border-slate-200 bg-slate-100" />
+                      <div className="mb-3 h-24 rounded-lg border border-dashed border-slate-200 bg-gradient-to-br from-slate-50 to-slate-100" />
                     )}
                     <p className="text-base font-semibold text-slate-900">{project.title}</p>
                     <p className="mt-1 text-sm text-slate-500">Last edited {project.updated}</p>
@@ -348,7 +354,7 @@ export default function ProjectsList({ initialProjects = [] }: Props) {
                         type="button"
                         onClick={(event) => {
                           event.stopPropagation();
-                          router.push(`/studio/${project.id}`);
+                          router.push(getOpenHref(project));
                         }}
                         className="pointer-events-auto inline-flex items-center gap-1 rounded-full bg-[#024d7c] px-3 py-1 text-xs font-semibold text-white shadow-sm transition hover:bg-[#013a60]"
                       >
