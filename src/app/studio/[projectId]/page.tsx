@@ -289,39 +289,37 @@ function getAspectPadding(width?: number, height?: number) {
     return ((value % 360) + 360) % 360;
   }
 
-  const captureFirstPageThumbnail = useCallback(async (): Promise<string | null> => {
-    if (typeof document === "undefined") return null;
-    const firstPage = pages[0];
-    if (!firstPage?.preview) return null;
-    await new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve(null);
-      img.onerror = reject;
-      img.src = firstPage.preview;
-    }).catch(() => null);
-    const img = new Image();
-    img.src = firstPage.preview;
-    await img.decode().catch(() => null);
-    if (!img.naturalWidth || !img.naturalHeight) return null;
-    const canvas = document.createElement("canvas");
-    canvas.width = img.naturalWidth;
-    canvas.height = img.naturalHeight;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return null;
-    ctx.drawImage(img, 0, 0);
-    return canvas.toDataURL("image/jpeg", 0.8);
-  }, [pages]);
+  const captureFirstPageThumbnail = useCallback(
+    async (): Promise<string | null> => {
+      if (typeof document === "undefined") return null;
 
-  const uploadThumbnail = useCallback(async () => {
-    if (!projectId) return;
-    const image = await captureFirstPageThumbnail();
-    if (!image) return;
-    await fetch(`/api/projects/${projectId}/thumbnail`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ image }),
-    }).catch(() => null);
-  }, [captureFirstPageThumbnail, projectId]);
+      // Grab the first rendered PDF canvas on the page as a fallback
+      const canvas = document.querySelector<HTMLCanvasElement>("canvas");
+      if (!canvas) return null;
+
+      try {
+        return canvas.toDataURL("image/jpeg", 0.8);
+      } catch (err) {
+        console.error("Failed to capture thumbnail", err);
+        return null;
+      }
+    },
+    []
+  );
+
+  const uploadThumbnail = useCallback(
+    async (targetProjectId?: string) => {
+      if (!targetProjectId) return;
+      const image = await captureFirstPageThumbnail();
+      if (!image) return;
+      await fetch(`/api/projects/${targetProjectId}/thumbnail`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image }),
+      }).catch(() => null);
+    },
+    [captureFirstPageThumbnail]
+  );
 
 
 /** One sortable thumbnail tile */
@@ -1898,7 +1896,7 @@ function WorkspaceClient() {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      uploadThumbnail().catch(() => undefined);
+      uploadThumbnail(projectId).catch(() => undefined);
     } catch (e) {
       console.error(e);
       setError("Failed to build the PDF. Try smaller or non-encrypted files.");

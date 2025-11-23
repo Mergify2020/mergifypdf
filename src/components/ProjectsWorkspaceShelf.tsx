@@ -66,7 +66,7 @@ export default function ProjectsWorkspaceShelf() {
           </div>
           <button
             onClick={async () => {
-              const name = snapshot?.fileName ?? "Untitled Project";
+              const name = "Untitled Project";
               const res = await fetch("/api/projects", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
