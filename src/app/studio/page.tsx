@@ -1351,12 +1351,15 @@ function WorkspaceClient() {
                         </button>
                       </div>
                     ) : null}
-                    <div
-                      className="absolute -bottom-2 -right-2 h-4 w-4 cursor-se-resize rounded-full border border-slate-600 bg-white shadow-sm transition hover:border-slate-700 hover:shadow-md"
-                      onPointerDown={(event) => {
-                        startTextResize(page.id, annotation.id, event);
-                      }}
-                    />
+                    {focusedTextId === annotation.id || isResizingThis ? (
+                      <div
+                        className="absolute -bottom-2 -right-2 h-4 w-4 cursor-se-resize rounded-full border border-slate-600 bg-white shadow-sm transition hover:border-slate-700 hover:shadow-md"
+                        onPointerDown={(event) => {
+                          focusTextAnnotation(annotation.id);
+                          startTextResize(page.id, annotation.id, event);
+                        }}
+                      />
+                    ) : null}
                   </div>
                 </div>
               );
