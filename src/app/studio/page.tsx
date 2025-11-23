@@ -1996,11 +1996,12 @@ function WorkspaceClient() {
 
   useEffect(() => {
     const handleGlobalPointerDown = (event: PointerEvent) => {
-      if (!(event.target instanceof HTMLElement)) {
+      const target = event.target;
+      if (!(target instanceof Element)) {
         clearTextFocus();
         return;
       }
-      if (!event.target.closest("[data-text-annotation]")) {
+      if (!target.closest("[data-text-annotation]")) {
         clearTextFocus();
       }
     };
