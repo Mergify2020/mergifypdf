@@ -7,7 +7,15 @@ import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as Reac
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
-import { PDFDocument, rgb, LineCapStyle, LineJoinStyle, degrees } from "pdf-lib";
+import {
+  PDFDocument,
+  rgb,
+  LineCapStyle,
+  LineJoinStyle,
+  degrees,
+  StandardFonts,
+  type PDFFont,
+} from "pdf-lib";
 import { AnimatePresence, motion } from "framer-motion";
 import { Highlighter, Minus, Plus, Trash2, Undo2, Eraser, Pencil, RotateCcw, Move } from "lucide-react";
 import {
@@ -73,6 +81,7 @@ type TextAnnotation = {
   width: number;
   height: number;
 };
+type TextFont = "Inter" | "Georgia" | "Courier New";
 
 const HIGHLIGHT_COLORS = {
   yellow: "#fff266",
@@ -88,6 +97,7 @@ const HIGHLIGHT_CURSOR =
   "data:image/svg+xml;utf8,%3Csvg width='32' height='32' viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 24 L24 2 L30 8 L10 28 L3 29 Z' fill='%23024d7c'/%3E%3Crect x='5' y='25' width='10' height='3' fill='%23ffd43b'/%3E%3C/svg%3E";
 const PREVIEW_BASE_SCALE = 1.85;
 const MAX_DEVICE_PIXEL_RATIO = 3.5;
+const TEXT_PLACEHOLDER = "Type here";
 const THUMB_MAX_WIDTH = 200;
 const PREVIEW_IMAGE_QUALITY = 0.95;
 const WORKSPACE_SESSION_KEY = "mpdf:files";
@@ -469,7 +479,7 @@ function WorkspaceClient() {
   const [textAnnotations, setTextAnnotations] = useState<Record<string, TextAnnotation[]>>({});
   const [textBold, setTextBold] = useState(false);
   const [textItalic, setTextItalic] = useState(false);
-  const [textFont, setTextFont] = useState<"Inter" | "Georgia" | "Courier New">("Inter");
+  const [textFont, setTextFont] = useState<TextFont>("Inter");
   const [textSize, setTextSize] = useState(12);
   const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]>([]);
   const [draftHighlight, setDraftHighlight] = useState<DraftHighlight | null>(null);
@@ -490,6 +500,31 @@ function WorkspaceClient() {
   const [focusedTextId, setFocusedTextId] = useState<string | null>(null);
   const focusedTextIdRef = useRef<string | null>(null);
   const textNodeRefs = useRef<Map<string, HTMLTextAreaElement>>(new Map());
+
+  function resolveStandardFont(family: TextFont, bold: boolean, italic: boolean): StandardFonts {
+    const variant = bold && italic ? "boldItalic" : bold ? "bold" : italic ? "italic" : "normal";
+    const map: Record<TextFont, Record<typeof variant, StandardFonts>> = {
+      Inter: {
+        normal: StandardFonts.Helvetica,
+        bold: StandardFonts.HelveticaBold,
+        italic: StandardFonts.HelveticaOblique,
+        boldItalic: StandardFonts.HelveticaBoldOblique,
+      },
+      Georgia: {
+        normal: StandardFonts.TimesRoman,
+        bold: StandardFonts.TimesRomanBold,
+        italic: StandardFonts.TimesRomanItalic,
+        boldItalic: StandardFonts.TimesRomanBoldItalic,
+      },
+      "Courier New": {
+        normal: StandardFonts.Courier,
+        bold: StandardFonts.CourierBold,
+        italic: StandardFonts.CourierOblique,
+        boldItalic: StandardFonts.CourierBoldOblique,
+      },
+    };
+    return map[family][variant];
+  }
 
   function focusTextAnnotation(id: string) {
     setFocusedTextId(id);
@@ -1154,7 +1189,7 @@ function WorkspaceClient() {
                       onBeforeInput={(event) => {
                         // Clear the placeholder text on first keystroke so the user never types over "Type here".
                         const target = event.currentTarget;
-                        if (target.value === "Type here") {
+                        if (target.value === TEXT_PLACEHOLDER) {
                           target.value = "";
                         }
                       }}
@@ -1558,7 +1593,7 @@ function WorkspaceClient() {
                 y,
                 width,
                 height,
-                text: "Type here",
+                text: TEXT_PLACEHOLDER,
               },
             ],
           };
@@ -1627,11 +1662,21 @@ function WorkspaceClient() {
 
       // Now copy pages in the displayed order
       const out = await PDFDocument.create();
+      const fontCache = new Map<StandardFonts, PDFFont>();
+      async function getDownloadFont() {
+        const fontName = resolveStandardFont(textFont, textBold, textItalic);
+        const cached = fontCache.get(fontName);
+        if (cached) return cached;
+        const embedded = await out.embedFont(fontName);
+        fontCache.set(fontName, embedded);
+        return embedded;
+      }
       for (const p of pages) {
         const srcDoc = docCache.get(p.srcIdx)!;
         const [copied] = await out.copyPages(srcDoc, [p.pageIdx]);
         copied.setRotation(degrees(p.rotation ?? 0));
         const pageHighlights = highlights[p.id] ?? [];
+        const pageTexts = textAnnotations[p.id] ?? [];
         if (pageHighlights.length > 0) {
           const { width: pageWidth, height: pageHeight } = copied.getSize();
           pageHighlights.forEach((stroke) => {
@@ -1640,7 +1685,7 @@ function WorkspaceClient() {
             for (let i = 1; i < stroke.points.length; i++) {
               const start = stroke.points[i - 1];
               const end = stroke.points[i];
-                const opacity = stroke.tool === "pencil" ? 1 : 0.25;
+              const opacity = stroke.tool === "pencil" ? 1 : 0.25;
               copied.drawLine({
                 start: {
                   x: start.x * pageWidth,
@@ -1656,6 +1701,35 @@ function WorkspaceClient() {
                 lineCap: LineCapStyle.Round,
               });
             }
+          });
+        }
+        if (pageTexts.length > 0) {
+          const font = await getDownloadFont();
+          const { width: pageWidth, height: pageHeight } = copied.getSize();
+          const fontSize = textSize;
+          const lineHeight = fontSize * 1.3;
+          const textColor = rgb(0.13, 0.15, 0.18);
+          pageTexts.forEach((annotation) => {
+            const content = annotation.text;
+            if (!content || content === TEXT_PLACEHOLDER) return;
+            const boxWidth = (annotation.width ?? 0.14) * pageWidth;
+            const padding = Math.min(6, boxWidth * 0.05);
+            const x = annotation.x * pageWidth + padding;
+            const startY = pageHeight - annotation.y * pageHeight - padding;
+            let cursorY = startY;
+            const lines = content.split(/\r?\n/);
+            lines.forEach((line) => {
+              cursorY -= fontSize;
+              copied.drawText(line, {
+                x,
+                y: cursorY,
+                size: fontSize,
+                font,
+                color: textColor,
+                maxWidth: Math.max(10, boxWidth - padding * 2),
+              });
+              cursorY -= lineHeight - fontSize;
+            });
           });
         }
         out.addPage(copied);
