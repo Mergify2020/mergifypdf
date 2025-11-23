@@ -189,7 +189,7 @@ export default function ProjectsList({ initialProjects = [] }: Props) {
     setSelectionMode(false);
   }
 
-  const getOpenHref = (_project: ProjectItem) => "/workbench";
+  const getOpenHref = (project: ProjectItem) => `/studio/${project.id || ""}`;
 
   return (
     <>
