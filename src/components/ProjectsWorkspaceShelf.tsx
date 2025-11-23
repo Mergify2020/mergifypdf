@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { ArrowUpRight, Clock } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { PROJECT_NAME_STORAGE_KEY, sanitizeProjectName } from "@/lib/projectName";
 
 type StoredSourceMeta = { id: string; name?: string; size?: number; updatedAt?: number };
@@ -31,7 +30,6 @@ function formatLastEdited(timestamp: number) {
 
 export default function ProjectsWorkspaceShelf() {
   const [snapshot, setSnapshot] = useState<ResumeSnapshot | null>(null);
-  const router = useRouter();
 
   useEffect(() => {
     try {
@@ -64,22 +62,13 @@ export default function ProjectsWorkspaceShelf() {
               Start a new canvas and we&apos;ll remember where you left off next time.
             </p>
           </div>
-          <button
-            onClick={async () => {
-              const name = "Untitled Project";
-              const res = await fetch("/api/projects", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name, pdfKey: `resume-${crypto.randomUUID()}` }),
-              }).catch(() => null);
-              const projectId = await res?.json().then((data) => data?.project?.id).catch(() => null);
-              router.push(projectId ? `/studio/${projectId}` : "/studio");
-            }}
+          <Link
+            href="/studio"
             className="inline-flex items-center justify-center rounded-full bg-[#024d7c] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-[#012a44]/30 transition hover:-translate-y-0.5"
           >
             Launch workspace
             <ArrowUpRight className="ml-2 h-4 w-4" />
-          </button>
+          </Link>
         </div>
       </div>
     );
@@ -97,22 +86,13 @@ export default function ProjectsWorkspaceShelf() {
           </div>
         </div>
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <button
-            onClick={async () => {
-              const name = snapshot?.fileName ?? "Untitled Project";
-              const res = await fetch("/api/projects", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name, pdfKey: `resume-${crypto.randomUUID()}` }),
-              }).catch(() => null);
-              const projectId = await res?.json().then((data) => data?.project?.id).catch(() => null);
-              router.push(projectId ? `/studio/${projectId}` : "/studio");
-            }}
+          <Link
+            href="/studio"
             className="inline-flex items-center justify-center rounded-full bg-[#024d7c] px-8 py-4 text-sm font-semibold text-white shadow-[0_20px_40px_rgba(2,77,124,0.35)] transition hover:-translate-y-0.5"
           >
             Resume / Open
             <ArrowUpRight className="ml-2 h-4 w-4" />
-          </button>
+          </Link>
         </div>
       </div>
     </div>
