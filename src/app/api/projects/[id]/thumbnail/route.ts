@@ -1,11 +1,11 @@
-import type { AppRouteHandlerFnContext } from "next/dist/server/route-modules/app-route/module";
+import type { AppRouteRouteHandlerContext } from "next/dist/server/route-modules/app-route/module";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
 
-export async function POST(req: NextRequest, context: AppRouteHandlerFnContext) {
+export async function POST(req: NextRequest, context: AppRouteRouteHandlerContext) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
