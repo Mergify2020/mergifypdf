@@ -800,6 +800,7 @@ function WorkspaceClient() {
   const [projectNameDraft, setProjectNameDraft] = useState("Untitled Project");
   const [projectNameError, setProjectNameError] = useState<string | null>(null);
   const [organizeMode, setOrganizeMode] = useState(false);
+  const [viewerRightPadding, setViewerRightPadding] = useState(0);
 
   const addInputRef = useRef<HTMLInputElement>(null);
   const renderedSourcesRef = useRef(0);
@@ -1714,6 +1715,22 @@ function WorkspaceClient() {
     setBaseScale((prev) => (Math.abs(prev - fitScale) > 0.001 ? fitScale : prev));
   }, [activePageIndex, pages]);
 
+  const updateViewerPadding = useCallback(() => {
+    const container = previewContainerRef.current;
+    if (!container || pages.length === 0) return;
+    const targetIndex = activePageIndex >= 0 ? activePageIndex : 0;
+    const targetPage = pages[targetIndex];
+    const naturalWidth = targetPage?.width || 612;
+    const naturalHeight = targetPage?.height || naturalWidth * DEFAULT_ASPECT_RATIO;
+    const rotation = normalizeRotation(targetPage?.rotation ?? 0);
+    const rotated = rotation % 180 !== 0;
+    const baseWidth = rotated ? naturalHeight : naturalWidth;
+    const docWidth = baseWidth * baseScale * zoomMultiplier;
+    const available = container.clientWidth;
+    const padRight = Math.max(0, (available - docWidth) / 2);
+    setViewerRightPadding(padRight);
+  }, [activePageIndex, baseScale, pages, zoomMultiplier]);
+
   useEffect(() => {
     if (!shouldCenterOnChange) return;
     const container = previewContainerRef.current;
@@ -1742,10 +1759,11 @@ function WorkspaceClient() {
   useEffect(() => {
     function handleResize() {
       computeBaseScale();
+      updateViewerPadding();
     }
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [computeBaseScale]);
+  }, [computeBaseScale, updateViewerPadding]);
 
   const setZoomWithScrollPreserved = useCallback(
     (nextPercent: number) => {
@@ -2224,6 +2242,10 @@ function WorkspaceClient() {
       setDraftTextBox(null);
     }
   }, [textMode]);
+
+  useEffect(() => {
+    updateViewerPadding();
+  }, [updateViewerPadding, baseScale, activePageIndex, zoomMultiplier, pages.length]);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -2858,7 +2880,11 @@ function WorkspaceClient() {
                       <div ref={viewerScrollRef} className="flex-1 min-h-0 overflow-x-hidden overflow-y-auto">
                         <div
                           className="flex"
-                          style={{ justifyContent: zoomMultiplier > 1 ? "flex-end" : "center" }}
+                          style={{
+                            justifyContent: zoomMultiplier > 1 ? "flex-end" : "center",
+                            paddingRight: viewerRightPadding,
+                            transition: "padding-right 120ms ease",
+                          }}
                         >
                           <div
                             id="pdf-viewport"
