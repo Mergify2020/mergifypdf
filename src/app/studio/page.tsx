@@ -2346,7 +2346,7 @@ function WorkspaceClient() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col bg-[#f3f6fb]">
+    <main className="flex min-h-screen flex-col bg-[#f3f6fb] overflow-x-hidden">
       <header className="sticky top-0 z-40 border-b border-slate-100 bg-white/90 backdrop-blur shadow-[0_1px_4px_rgba(15,23,42,0.06)]">
         <div className="mx-auto flex h-16 w-full max-w-[1400px] items-center justify-between px-4 lg:px-6">
           <Link href="/" className="inline-flex items-center gap-2" aria-label="Back to workspace">
@@ -2855,11 +2855,11 @@ function WorkspaceClient() {
                     className="editor-shell mx-auto flex h-full min-h-0 w-full flex-1 flex-col gap-6 overflow-hidden px-4 lg:px-6"
                   >
                   <div className="flex h-full min-h-0 w-full gap-6">
-                    <div ref={viewerScrollRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+                    <div ref={viewerScrollRef} className="flex-1 min-h-0 overflow-x-auto overflow-y-auto">
                       <div className="flex justify-end">
                         <div
                           id="pdf-viewport"
-                          className="origin-top-right flex w-fit flex-col gap-8"
+                          className="origin-top-right inline-flex w-fit flex-col gap-8"
                           style={{ transform: `scale(${zoomMultiplier})`, transformOrigin: "top right" }}
                         >
                           {activePageIndex >= 0 && pages[activePageIndex]
