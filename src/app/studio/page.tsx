@@ -2236,6 +2236,8 @@ function WorkspaceClient() {
     updateWidth();
     const observer = new ResizeObserver(updateWidth);
     observer.observe(content);
+    const viewport = content.querySelector<HTMLElement>("#pdf-viewport");
+    if (viewport) observer.observe(viewport);
     return () => observer.disconnect();
   }, [zoomMultiplier, pages.length, activePageIndex]);
 
@@ -2877,7 +2879,7 @@ function WorkspaceClient() {
                       <div className="sticky top-0 z-10 bg-[#f3f6fb]">
                         <div
                           ref={horizontalMirrorRef}
-                          className="overflow-x-auto"
+                          className="h-4 overflow-x-auto"
                           onScroll={() => {
                             if (isSyncingHorizontalRef.current) return;
                             const source = horizontalMirrorRef.current;
@@ -2891,7 +2893,12 @@ function WorkspaceClient() {
                           }}
                           style={{ scrollbarGutter: "stable both-edges" }}
                         >
-                          <div style={{ width: horizontalContentWidth || "100%", height: 1 }} />
+                          <div
+                            style={{
+                              width: horizontalContentWidth || "100%",
+                              height: 1,
+                            }}
+                          />
                         </div>
                       </div>
                       <div
