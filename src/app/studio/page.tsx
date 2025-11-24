@@ -2855,20 +2855,24 @@ function WorkspaceClient() {
                     className="editor-shell mx-auto flex h-full min-h-0 w-full flex-1 flex-col gap-6 overflow-hidden px-4 lg:px-6"
                   >
                     <div className="flex h-full min-h-0 w-full gap-6">
-                      <div
-                        ref={viewerScrollRef}
-                        className="viewer-scroll relative flex-1 min-h-0 overflow-x-auto overflow-y-auto"
-                        style={{ scrollbarGutter: "stable both-edges" }}
-                      >
-                        <div className="flex justify-center">
+                      <div className="flex-1 min-h-0 overflow-hidden">
+                        <div className="flex h-full w-full items-start justify-center">
                           <div
-                            id="pdf-viewport"
-                            className="origin-top flex w-fit flex-col gap-8"
-                            style={{ transform: `scale(${zoomMultiplier})`, transformOrigin: "top center" }}
+                            ref={viewerScrollRef}
+                            className="viewer-scroll relative inline-flex max-h-full max-w-full overflow-auto"
+                            style={{ scrollbarGutter: "stable" }}
                           >
-                            {activePageIndex >= 0 && pages[activePageIndex]
-                              ? renderPreviewPage(pages[activePageIndex], activePageIndex)
-                              : null}
+                            <div className="flex justify-center">
+                              <div
+                                id="pdf-viewport"
+                                className="origin-top flex w-fit flex-col gap-8"
+                                style={{ transform: `scale(${zoomMultiplier})`, transformOrigin: "top center" }}
+                              >
+                                {activePageIndex >= 0 && pages[activePageIndex]
+                                  ? renderPreviewPage(pages[activePageIndex], activePageIndex)
+                                  : null}
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
