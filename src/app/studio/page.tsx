@@ -1245,8 +1245,10 @@ function WorkspaceClient() {
     const baseHeight = rotated ? naturalWidth : naturalHeight;
     const fittedWidth = baseWidth * baseScale;
     const availableWidth = viewerWidth || fittedWidth;
-    const displayWidth = Math.max(200, Math.min(availableWidth, fittedWidth * zoomMultiplier));
-    const viewScale = displayWidth / fittedWidth;
+    const displayWidth = Math.max(200, availableWidth);
+    const viewScale = zoomMultiplier;
+    const scaledHeight = (baseHeight / baseWidth) * displayWidth * viewScale;
+    const unscaledHeight = scaledHeight / viewScale;
     return (
       <div
         key={page.id}
@@ -1260,7 +1262,7 @@ function WorkspaceClient() {
           }`}
           style={{
             width: displayWidth,
-            aspectRatio: `${baseWidth} / ${baseHeight}`,
+            height: scaledHeight,
           }}
           onClick={() => handleSelectPage(idx)}
         >
@@ -1270,12 +1272,14 @@ function WorkspaceClient() {
               width: "100%",
               height: "100%",
             }}
-          >
-            <div
-              className="absolute inset-0 bg-white"
-              style={{
-                transform: `rotate(${rotationDegrees}deg)`,
-                transformOrigin: "center",
+            >
+              <div
+                className="absolute inset-0 bg-white"
+                style={{
+                width: displayWidth,
+                height: unscaledHeight,
+                transform: `scale(${viewScale}) rotate(${rotationDegrees}deg)`,
+                transformOrigin: "top left",
                 cursor:
                   activeDrawingTool === "highlight"
                     ? (`url(${HIGHLIGHT_CURSOR}) 4 24, crosshair` as CSSProperties["cursor"])
