@@ -2866,22 +2866,19 @@ function WorkspaceClient() {
                       <div className="flex-1 min-h-0 overflow-hidden">
                         <div
                           ref={viewerScrollRef}
-                          className="viewer-scroll relative flex h-full w-full justify-center overflow-auto"
+                          className="viewer-scroll relative flex h-full w-full overflow-auto"
                           style={{ scrollbarGutter: "stable both-edges" }}
                         >
-                          <div className="flex w-fit items-start gap-6">
-                            <div className="flex justify-center">
-                              <div
-                                id="pdf-viewport"
-                                className="origin-top flex w-fit flex-col gap-8"
-                              >
+                          <div className="relative flex w-fit items-start">
+                            <div className="flex w-fit justify-center pr-[320px]">
+                              <div id="pdf-viewport" className="origin-top flex w-fit flex-col gap-8">
                                 {activePageIndex >= 0 && pages[activePageIndex]
                                   ? renderPreviewPage(pages[activePageIndex], activePageIndex)
                                   : null}
                               </div>
                             </div>
 
-                            <aside className="w-[260px] shrink-0">
+                            <aside className="sticky right-4 top-4 z-10 w-[260px] shrink-0">
                               <div className="flex h-full flex-col rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
                                 <div className="flex flex-col gap-1">
                                   <p className="text-sm font-semibold text-white">Page order</p>
