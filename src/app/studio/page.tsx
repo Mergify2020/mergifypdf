@@ -2856,7 +2856,10 @@ function WorkspaceClient() {
                   >
                     <div className="flex h-full min-h-0 w-full gap-6">
                       <div ref={viewerScrollRef} className="flex-1 min-h-0 overflow-x-hidden overflow-y-auto">
-                        <div className="flex justify-end">
+                        <div
+                          className="flex"
+                          style={{ justifyContent: zoomMultiplier > 1 ? "flex-end" : "center" }}
+                        >
                           <div
                             id="pdf-viewport"
                             className="origin-top-right flex w-fit flex-col gap-8"
