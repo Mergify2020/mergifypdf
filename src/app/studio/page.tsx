@@ -1238,8 +1238,9 @@ function WorkspaceClient() {
     const rotated = rotationDegrees % 180 !== 0;
     const baseWidth = rotated ? naturalHeight : naturalWidth;
     const baseHeight = rotated ? naturalWidth : naturalHeight;
-    const fittedWidth = baseWidth * baseScale;
-    const fittedHeight = baseHeight * baseScale;
+    const effectiveScale = baseScale * zoomMultiplier;
+    const fittedWidth = baseWidth * effectiveScale;
+    const fittedHeight = baseHeight * effectiveScale;
     return (
       <div
         key={page.id}
@@ -1710,7 +1711,10 @@ function WorkspaceClient() {
     const baseHeight = rotated ? naturalWidth : naturalHeight;
     const availableWidth = Math.max(container.clientWidth, 200);
     const availableHeight = Math.max(container.clientHeight, 200);
-    const fitScale = Math.max(0.2, Math.min(availableWidth / baseWidth, availableHeight / baseHeight));
+    const fitScale = Math.max(
+      0.2,
+      Math.min(availableWidth / baseWidth, availableHeight / baseHeight, 1) // cap auto-fit at 100% to avoid starting zoomed-in
+    );
     setBaseScale((prev) => (Math.abs(prev - fitScale) > 0.001 ? fitScale : prev));
   }, [activePageIndex, pages]);
 
@@ -2866,7 +2870,6 @@ function WorkspaceClient() {
                               <div
                                 id="pdf-viewport"
                                 className="origin-top flex w-fit flex-col gap-8"
-                                style={{ transform: `scale(${zoomMultiplier})`, transformOrigin: "top center" }}
                               >
                                 {activePageIndex >= 0 && pages[activePageIndex]
                                   ? renderPreviewPage(pages[activePageIndex], activePageIndex)
