@@ -2851,17 +2851,17 @@ function WorkspaceClient() {
                     initial={{ opacity: 0.95, scale: 0.97 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.97 }}
-                    transition={VIEW_TRANSITION}
-                    className="editor-shell mx-auto flex h-full min-h-0 w-full flex-1 flex-col gap-6 overflow-hidden px-4 lg:px-6"
-                  >
-                    <div className="flex h-full min-h-0 w-full gap-6">
+                  transition={VIEW_TRANSITION}
+                  className="editor-shell mx-auto flex h-full min-h-0 w-full flex-1 flex-col gap-6 overflow-hidden px-4 lg:px-6"
+                >
+                    <div className="flex h-full min-h-0 w-full">
                       <div className="flex-1 min-h-0 overflow-hidden">
-                        <div className="flex h-full w-full items-start justify-center">
-                          <div
-                            ref={viewerScrollRef}
-                            className="viewer-scroll relative inline-flex max-h-full max-w-full overflow-auto"
-                            style={{ scrollbarGutter: "stable" }}
-                          >
+                        <div
+                          ref={viewerScrollRef}
+                          className="viewer-scroll relative flex h-full w-full justify-center overflow-auto"
+                          style={{ scrollbarGutter: "stable both-edges" }}
+                        >
+                          <div className="flex w-fit items-start gap-6">
                             <div className="flex justify-center">
                               <div
                                 id="pdf-viewport"
@@ -2873,37 +2873,37 @@ function WorkspaceClient() {
                                   : null}
                               </div>
                             </div>
+
+                            <aside className="w-[260px] shrink-0">
+                              <div className="flex h-full flex-col rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
+                                <div className="flex flex-col gap-1">
+                                  <p className="text-sm font-semibold text-white">Page order</p>
+                                  <p className="text-xs text-slate-300">Tap to focus or drag to reorder</p>
+                                </div>
+                                <DndContext
+                                  sensors={sensors}
+                                  collisionDetection={closestCenter}
+                                  onDragEnd={handleDragEnd}
+                                >
+                                  <SortableContext items={itemsIds} strategy={verticalListSortingStrategy}>
+                                    <ul className="mt-4 flex max-h-[70vh] flex-col gap-3 overflow-y-auto pr-1">
+                                      {pages.map((p, i) => (
+                                        <SortableThumb
+                                          key={p.id}
+                                          item={p}
+                                          index={i}
+                                          selected={p.id === activePageId}
+                                          onSelect={() => handleSelectPage(i)}
+                                        />
+                                      ))}
+                                    </ul>
+                                  </SortableContext>
+                                </DndContext>
+                              </div>
+                            </aside>
                           </div>
                         </div>
                       </div>
-
-                      <aside className="w-[260px] shrink-0">
-                        <div className="flex h-full flex-col rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
-                          <div className="flex flex-col gap-1">
-                            <p className="text-sm font-semibold text-white">Page order</p>
-                            <p className="text-xs text-slate-300">Tap to focus or drag to reorder</p>
-                          </div>
-                          <DndContext
-                            sensors={sensors}
-                            collisionDetection={closestCenter}
-                            onDragEnd={handleDragEnd}
-                          >
-                            <SortableContext items={itemsIds} strategy={verticalListSortingStrategy}>
-                              <ul className="mt-4 flex max-h-[70vh] flex-col gap-3 overflow-y-auto pr-1">
-                                {pages.map((p, i) => (
-                                  <SortableThumb
-                                    key={p.id}
-                                    item={p}
-                                    index={i}
-                                    selected={p.id === activePageId}
-                                    onSelect={() => handleSelectPage(i)}
-                                  />
-                                ))}
-                              </ul>
-                            </SortableContext>
-                          </DndContext>
-                        </div>
-                      </aside>
                     </div>
                   </motion.div>
                 ) : null}
