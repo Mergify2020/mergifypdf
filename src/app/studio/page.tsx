@@ -229,7 +229,7 @@ const WORKSPACE_DB_STORE = "files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
 const DEFAULT_ASPECT_RATIO = 792 / 612; // fallback letter portrait
 const SOFT_EASE: [number, number, number, number] = [0.4, 0, 0.2, 1];
-const ZOOM_LEVELS = [0.5, 0.75, 1, 1.5, 2, 2.5];
+const ZOOM_LEVELS = [0.5, 0.75, 1, 1.5, 2, 3];
 const VIEW_TRANSITION = { duration: 0.2, ease: SOFT_EASE };
 const GRID_VARIANTS = {
   hidden: { opacity: 0, scale: 0.97 },
@@ -800,7 +800,6 @@ function WorkspaceClient() {
   const [projectNameDraft, setProjectNameDraft] = useState("Untitled Project");
   const [projectNameError, setProjectNameError] = useState<string | null>(null);
   const [organizeMode, setOrganizeMode] = useState(false);
-  const [viewerRightPadding, setViewerRightPadding] = useState(0);
 
   const addInputRef = useRef<HTMLInputElement>(null);
   const renderedSourcesRef = useRef(0);
@@ -1663,7 +1662,7 @@ function WorkspaceClient() {
   const itemsIds = useMemo(() => pages.map((p) => p.id), [pages]);
   const downloadDisabled = busy || pages.length === 0;
   const activePageIndex = activePageIndexState >= 0 && activePageIndexState < pages.length ? activePageIndexState : -1;
-  const zoomMultiplier = clamp(zoomPercent / 100, 1, 2.5);
+  const zoomMultiplier = clamp(zoomPercent / 100, 1, 3);
   const zoomLabel = `${Math.round(zoomPercent)}%`;
   const highlightButtonDisabled = pages.length === 0 || loading;
   const highlightColorEntries = Object.entries(
@@ -1715,22 +1714,6 @@ function WorkspaceClient() {
     setBaseScale((prev) => (Math.abs(prev - fitScale) > 0.001 ? fitScale : prev));
   }, [activePageIndex, pages]);
 
-  const updateViewerPadding = useCallback(() => {
-    const container = previewContainerRef.current;
-    if (!container || pages.length === 0) return;
-    const targetIndex = activePageIndex >= 0 ? activePageIndex : 0;
-    const targetPage = pages[targetIndex];
-    const naturalWidth = targetPage?.width || 612;
-    const naturalHeight = targetPage?.height || naturalWidth * DEFAULT_ASPECT_RATIO;
-    const rotation = normalizeRotation(targetPage?.rotation ?? 0);
-    const rotated = rotation % 180 !== 0;
-    const baseWidth = rotated ? naturalHeight : naturalWidth;
-    const docWidth = baseWidth * baseScale * zoomMultiplier;
-    const available = container.clientWidth;
-    const padRight = Math.max(0, (available - docWidth) / 2);
-    setViewerRightPadding(padRight);
-  }, [activePageIndex, baseScale, pages, zoomMultiplier]);
-
   useEffect(() => {
     if (!shouldCenterOnChange) return;
     const container = previewContainerRef.current;
@@ -1759,15 +1742,14 @@ function WorkspaceClient() {
   useEffect(() => {
     function handleResize() {
       computeBaseScale();
-      updateViewerPadding();
     }
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [computeBaseScale, updateViewerPadding]);
+  }, [computeBaseScale]);
 
   const setZoomWithScrollPreserved = useCallback(
     (nextPercent: number) => {
-      const clamped = clamp(nextPercent, 100, 250);
+      const clamped = clamp(nextPercent, 100, 300);
       const container = previewContainerRef.current;
       if (container) {
         scrollRatioRef.current = {
@@ -2244,10 +2226,6 @@ function WorkspaceClient() {
   }, [textMode]);
 
   useEffect(() => {
-    updateViewerPadding();
-  }, [updateViewerPadding, baseScale, activePageIndex, zoomMultiplier, pages.length]);
-
-  useEffect(() => {
     if (typeof document === "undefined") return;
     document.body.classList.add("studio-page");
     return () => {
@@ -2468,7 +2446,7 @@ function WorkspaceClient() {
                   <input
                     type="range"
                     min={100}
-                    max={250}
+                    max={300}
                     step={25}
                     value={zoomPercent}
                     onChange={(e) => setZoomWithScrollPreserved(Number(e.target.value))}
@@ -2877,21 +2855,8 @@ function WorkspaceClient() {
                     className="editor-shell mx-auto flex h-full min-h-0 w-full flex-1 flex-col gap-6 overflow-hidden px-4 lg:px-6"
                   >
                     <div className="flex h-full min-h-0 w-full gap-6">
-                      <div
-                        ref={viewerScrollRef}
-                        className="flex-1 min-h-0 overflow-x-hidden overflow-y-auto"
-                        style={{
-                          paddingRight: viewerRightPadding,
-                          marginRight: -viewerRightPadding,
-                          transition: "padding-right 120ms ease, margin-right 120ms ease",
-                        }}
-                      >
-                        <div
-                          className="flex"
-                          style={{
-                            justifyContent: zoomMultiplier > 1 ? "flex-end" : "center",
-                          }}
-                        >
+                      <div ref={viewerScrollRef} className="flex-1 min-h-0 overflow-x-hidden overflow-y-auto">
+                        <div className="flex justify-end">
                           <div
                             id="pdf-viewport"
                             className="origin-top-right flex w-fit flex-col gap-8"
