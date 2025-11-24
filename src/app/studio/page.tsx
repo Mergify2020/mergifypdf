@@ -218,11 +218,11 @@ type HighlightColorKey = keyof typeof HIGHLIGHT_COLORS;
 
 const HIGHLIGHT_CURSOR =
   "data:image/svg+xml;utf8,%3Csvg width='32' height='32' viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 24 L24 2 L30 8 L10 28 L3 29 Z' fill='%23024d7c'/%3E%3Crect x='5' y='25' width='10' height='3' fill='%23ffd43b'/%3E%3C/svg%3E";
-const PREVIEW_BASE_SCALE = 1.85;
-const MAX_DEVICE_PIXEL_RATIO = 3.5;
+const PREVIEW_BASE_SCALE = 3;
+const MAX_DEVICE_PIXEL_RATIO = 4;
 const TEXT_PLACEHOLDER = "Type here";
 const THUMB_MAX_WIDTH = 200;
-const PREVIEW_IMAGE_QUALITY = 0.95;
+const PREVIEW_IMAGE_QUALITY = 0.98;
 const WORKSPACE_SESSION_KEY = "mpdf:files";
 const WORKSPACE_DB_NAME = "mpdf-file-store";
 const WORKSPACE_DB_STORE = "files";
