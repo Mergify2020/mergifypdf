@@ -817,6 +817,10 @@ function WorkspaceClient() {
   const toolSwitchBase = "flex items-center gap-2 px-4 py-2 text-sm font-semibold transition";
   const toolSwitchActive = "bg-[#024d7c] text-white shadow-sm";
   const toolSwitchInactive = "bg-white text-slate-700 hover:bg-slate-50";
+  const horizontalMirrorRef = useRef<HTMLDivElement>(null);
+  const horizontalContentRef = useRef<HTMLDivElement>(null);
+  const [horizontalContentWidth, setHorizontalContentWidth] = useState(0);
+  const isSyncingHorizontalRef = useRef(false);
 
   // Better drag in grids
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
@@ -2226,6 +2230,16 @@ function WorkspaceClient() {
   }, [textMode]);
 
   useEffect(() => {
+    const content = horizontalContentRef.current;
+    if (!content) return;
+    const updateWidth = () => setHorizontalContentWidth(content.scrollWidth);
+    updateWidth();
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, [zoomMultiplier, pages.length, activePageIndex]);
+
+  useEffect(() => {
     if (typeof document === "undefined") return;
     document.body.classList.add("studio-page");
     return () => {
@@ -2854,25 +2868,66 @@ function WorkspaceClient() {
                     transition={VIEW_TRANSITION}
                     className="editor-shell mx-auto flex h-full min-h-0 w-full flex-1 flex-col gap-6 overflow-hidden px-4 lg:px-6"
                   >
-                  <div className="flex h-full min-h-0 w-full gap-6">
-                    <div ref={viewerScrollRef} className="flex-1 min-h-0 overflow-x-auto overflow-y-auto">
-                      <div className="flex justify-end">
+                    <div className="flex h-full min-h-0 w-full gap-6">
+                    <div
+                      ref={viewerScrollRef}
+                      className="flex-1 min-h-0 overflow-y-auto"
+                      style={{ scrollbarGutter: "stable both-edges" }}
+                    >
+                      <div className="sticky top-0 z-10 bg-[#f3f6fb]">
                         <div
-                          id="pdf-viewport"
-                          className="origin-top-right inline-flex w-fit flex-col gap-8"
-                          style={{ transform: `scale(${zoomMultiplier})`, transformOrigin: "top right" }}
+                          ref={horizontalMirrorRef}
+                          className="overflow-x-auto"
+                          onScroll={() => {
+                            if (isSyncingHorizontalRef.current) return;
+                            const source = horizontalMirrorRef.current;
+                            const target = horizontalContentRef.current;
+                            if (!source || !target) return;
+                            isSyncingHorizontalRef.current = true;
+                            target.scrollLeft = source.scrollLeft;
+                            requestAnimationFrame(() => {
+                              isSyncingHorizontalRef.current = false;
+                            });
+                          }}
+                          style={{ scrollbarGutter: "stable both-edges" }}
                         >
-                          {activePageIndex >= 0 && pages[activePageIndex]
-                            ? renderPreviewPage(pages[activePageIndex], activePageIndex)
-                            : null}
+                          <div style={{ width: horizontalContentWidth || "100%", height: 1 }} />
+                        </div>
+                      </div>
+                      <div
+                        ref={horizontalContentRef}
+                        className="overflow-x-auto"
+                        onScroll={() => {
+                          if (isSyncingHorizontalRef.current) return;
+                          const source = horizontalContentRef.current;
+                          const target = horizontalMirrorRef.current;
+                          if (!source || !target) return;
+                          isSyncingHorizontalRef.current = true;
+                          target.scrollLeft = source.scrollLeft;
+                          requestAnimationFrame(() => {
+                            isSyncingHorizontalRef.current = false;
+                          });
+                        }}
+                        style={{ scrollbarGutter: "stable both-edges" }}
+                      >
+                        <div className="flex justify-end">
+                          <div
+                            id="pdf-viewport"
+                            className="origin-top-right inline-flex w-fit flex-col gap-8"
+                            style={{ transform: `scale(${zoomMultiplier})`, transformOrigin: "top right" }}
+                          >
+                            {activePageIndex >= 0 && pages[activePageIndex]
+                              ? renderPreviewPage(pages[activePageIndex], activePageIndex)
+                              : null}
+                          </div>
                         </div>
                       </div>
                     </div>
 
-                    <aside className="w-[260px] shrink-0">
-                      <div className="flex h-full flex-col rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
-                        <div className="flex flex-col gap-1">
-                          <p className="text-sm font-semibold text-white">Page order</p>
+                      <aside className="w-[260px] shrink-0">
+                        <div className="flex h-full flex-col rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
+                          <div className="flex flex-col gap-1">
+                            <p className="text-sm font-semibold text-white">Page order</p>
                             <p className="text-xs text-slate-300">Tap to focus or drag to reorder</p>
                           </div>
                           <DndContext
