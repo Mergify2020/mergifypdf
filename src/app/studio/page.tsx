@@ -1243,6 +1243,10 @@ function WorkspaceClient() {
     const rotated = rotationDegrees % 180 !== 0;
     const baseWidth = rotated ? naturalHeight : naturalWidth;
     const baseHeight = rotated ? naturalWidth : naturalHeight;
+    const fittedWidth = baseWidth * baseScale;
+    const availableWidth = viewerWidth || fittedWidth;
+    const displayWidth = Math.max(200, Math.min(availableWidth, fittedWidth * zoomMultiplier));
+    const viewScale = displayWidth / fittedWidth;
     return (
       <div
         key={page.id}
@@ -1255,7 +1259,7 @@ function WorkspaceClient() {
             idx === activePageIndex ? "shadow-brand/30" : ""
           }`}
           style={{
-            width: baseWidth * baseScale * zoomMultiplier,
+            width: displayWidth,
             aspectRatio: `${baseWidth} / ${baseHeight}`,
           }}
           onClick={() => handleSelectPage(idx)}
@@ -1353,7 +1357,7 @@ function WorkspaceClient() {
                 const isRotatingThis = rotatingText?.id === annotation.id;
                 const rotation = annotation.rotation ?? 0;
                 const displayRotation = normalizeRotation(rotation);
-                const displayFontSize = textSize * zoomMultiplier;
+                const displayFontSize = textSize * viewScale;
                 return (
                 <div
                   key={annotation.id}
