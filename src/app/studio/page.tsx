@@ -805,7 +805,6 @@ function WorkspaceClient() {
   const renderedSourcesRef = useRef(0);
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const viewerScrollRef = previewContainerRef;
-  const [viewerWidth, setViewerWidth] = useState(0);
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
   const previewNodeMap = useRef<Map<string, HTMLDivElement>>(new Map());
   const hasHydratedSources = useRef(false);
@@ -1244,11 +1243,9 @@ function WorkspaceClient() {
     const baseWidth = rotated ? naturalHeight : naturalWidth;
     const baseHeight = rotated ? naturalWidth : naturalHeight;
     const fittedWidth = baseWidth * baseScale;
-    const availableWidth = viewerWidth || fittedWidth;
-    const displayWidth = Math.max(200, availableWidth);
+    const fittedHeight = baseHeight * baseScale;
     const viewScale = zoomMultiplier;
-    const scaledHeight = (baseHeight / baseWidth) * displayWidth * viewScale;
-    const unscaledHeight = scaledHeight / viewScale;
+    const scaledHeight = fittedHeight * viewScale;
     return (
       <div
         key={page.id}
@@ -1261,7 +1258,7 @@ function WorkspaceClient() {
             idx === activePageIndex ? "shadow-brand/30" : ""
           }`}
           style={{
-            width: displayWidth,
+            width: fittedWidth,
             height: scaledHeight,
           }}
           onClick={() => handleSelectPage(idx)}
@@ -1276,10 +1273,10 @@ function WorkspaceClient() {
               <div
                 className="absolute inset-0 bg-white"
                 style={{
-                width: displayWidth,
-                height: unscaledHeight,
+                width: "100%",
+                height: "100%",
                 transform: `scale(${viewScale}) rotate(${rotationDegrees}deg)`,
-                transformOrigin: "top left",
+                transformOrigin: "top right",
                 cursor:
                   activeDrawingTool === "highlight"
                     ? (`url(${HIGHLIGHT_CURSOR}) 4 24, crosshair` as CSSProperties["cursor"])
@@ -1361,7 +1358,7 @@ function WorkspaceClient() {
                 const isRotatingThis = rotatingText?.id === annotation.id;
                 const rotation = annotation.rotation ?? 0;
                 const displayRotation = normalizeRotation(rotation);
-                const displayFontSize = textSize * viewScale;
+                const displayFontSize = textSize;
                 return (
                 <div
                   key={annotation.id}
@@ -1725,7 +1722,6 @@ function WorkspaceClient() {
       container.clientHeight - (VIEWER_PADDING_TOP + VIEWER_PADDING_BOTTOM),
       200
     );
-    setViewerWidth(availableWidth);
     const fitScale = Math.max(0.2, Math.min(availableWidth / baseWidth, availableHeight / baseHeight));
     setBaseScale((prev) => (Math.abs(prev - fitScale) > 0.001 ? fitScale : prev));
   }, [activePageIndex, pages]);
@@ -2868,57 +2864,54 @@ function WorkspaceClient() {
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.97 }}
                     transition={VIEW_TRANSITION}
-                    className="editor-shell mx-auto flex h-full min-h-0 w-full max-w-[1280px] flex-1 flex-col gap-6 overflow-hidden px-4 lg:flex-row lg:items-start lg:gap-6 lg:px-6"
+                    className="editor-shell mx-auto flex h-full min-h-0 w-full max-w-[1280px] flex-1 flex-col gap-6 overflow-hidden px-4 lg:px-6"
                   >
-                    <div className="viewer flex-1 min-h-0 overflow-hidden">
-                      <div className="flex h-full min-h-0 flex-col overflow-hidden">
+                    <div className="flex h-full min-h-0 w-full gap-6">
+                      <div className="flex flex-1 justify-end overflow-hidden">
                         <div
-                      ref={viewerScrollRef}
-                      className="viewer-shell viewer-scroll mx-auto flex flex-1 min-h-0 w-full flex-col items-start justify-start"
-                      style={{
-                        padding: `${VIEWER_PADDING_TOP}px ${VIEWER_PADDING_X}px ${VIEWER_PADDING_BOTTOM}px`,
-                        maxHeight: VIEWER_SCROLL_HEIGHT,
-                        overflowY: "auto",
-                        overflowX: "hidden",
-                        scrollbarGutter: "stable both-edges",
-                      }}
-                    >
-                          <div className="flex w-full flex-col items-center gap-8">
+                          ref={viewerScrollRef}
+                          className="flex h-full w-full max-w-full justify-end overflow-y-auto overflow-x-hidden"
+                          style={{
+                            padding: `${VIEWER_PADDING_TOP}px ${VIEWER_PADDING_X}px ${VIEWER_PADDING_BOTTOM}px`,
+                            maxHeight: VIEWER_SCROLL_HEIGHT,
+                          }}
+                        >
+                          <div className="flex w-full flex-col items-end gap-8">
                             {activePageIndex >= 0 && pages[activePageIndex]
                               ? renderPreviewPage(pages[activePageIndex], activePageIndex)
                               : null}
                           </div>
                         </div>
                       </div>
-                    </div>
 
-                    <aside className="sidebar w-full lg:w-[260px] lg:shrink-0">
-                      <div className="flex h-full flex-col rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
-                        <div className="flex flex-col gap-1">
-                          <p className="text-sm font-semibold text-white">Page order</p>
-                          <p className="text-xs text-slate-300">Tap to focus or drag to reorder</p>
+                      <aside className="w-[260px] shrink-0">
+                        <div className="flex h-full flex-col rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
+                          <div className="flex flex-col gap-1">
+                            <p className="text-sm font-semibold text-white">Page order</p>
+                            <p className="text-xs text-slate-300">Tap to focus or drag to reorder</p>
+                          </div>
+                          <DndContext
+                            sensors={sensors}
+                            collisionDetection={closestCenter}
+                            onDragEnd={handleDragEnd}
+                          >
+                            <SortableContext items={itemsIds} strategy={verticalListSortingStrategy}>
+                              <ul className="mt-4 flex max-h-[70vh] flex-col gap-3 overflow-y-auto pr-1">
+                                {pages.map((p, i) => (
+                                  <SortableThumb
+                                    key={p.id}
+                                    item={p}
+                                    index={i}
+                                    selected={p.id === activePageId}
+                                    onSelect={() => handleSelectPage(i)}
+                                  />
+                                ))}
+                              </ul>
+                            </SortableContext>
+                          </DndContext>
                         </div>
-                        <DndContext
-                          sensors={sensors}
-                          collisionDetection={closestCenter}
-                          onDragEnd={handleDragEnd}
-                        >
-                          <SortableContext items={itemsIds} strategy={verticalListSortingStrategy}>
-                            <ul className="mt-4 flex max-h-[70vh] flex-col gap-3 overflow-y-auto pr-1">
-                              {pages.map((p, i) => (
-                                <SortableThumb
-                                  key={p.id}
-                                  item={p}
-                                  index={i}
-                                  selected={p.id === activePageId}
-                                  onSelect={() => handleSelectPage(i)}
-                                />
-                              ))}
-                            </ul>
-                          </SortableContext>
-                        </DndContext>
-                      </div>
-                    </aside>
+                      </aside>
+                    </div>
                   </motion.div>
                 ) : null}
               </AnimatePresence>
