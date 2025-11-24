@@ -2850,18 +2850,16 @@ function WorkspaceClient() {
                     key="preview-view"
                     initial={{ opacity: 0.95, scale: 0.97 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.97 }}
-                    transition={VIEW_TRANSITION}
-                    className="editor-shell mx-auto flex h-full min-h-0 w-full max-w-[1280px] flex-1 flex-col gap-6 overflow-hidden px-4 lg:px-6"
-                  >
-                    <div className="flex h-full min-h-0 w-full gap-6">
-                      <div
-                        ref={viewerScrollRef}
-                        className="flex flex-1 min-h-0 justify-end overflow-y-auto overflow-x-hidden"
-                      >
+                  exit={{ opacity: 0, scale: 0.97 }}
+                  transition={VIEW_TRANSITION}
+                  className="editor-shell mx-auto flex h-full min-h-0 w-full max-w-[1280px] flex-1 flex-col gap-6 overflow-hidden px-4 lg:px-6"
+                >
+                  <div className="flex h-full min-h-0 w-full gap-6">
+                    <div ref={viewerScrollRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+                      <div className="flex justify-end">
                         <div
                           id="pdf-viewport"
-                          className="origin-top-right flex w-fit flex-col items-end gap-8"
+                          className="origin-top-right flex w-fit flex-col gap-8"
                           style={{ transform: `scale(${zoomMultiplier})`, transformOrigin: "top right" }}
                         >
                           {activePageIndex >= 0 && pages[activePageIndex]
@@ -2869,11 +2867,12 @@ function WorkspaceClient() {
                             : null}
                         </div>
                       </div>
+                    </div>
 
-                      <aside className="w-[260px] shrink-0">
-                        <div className="flex h-full flex-col rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
-                          <div className="flex flex-col gap-1">
-                            <p className="text-sm font-semibold text-white">Page order</p>
+                    <aside className="w-[260px] shrink-0">
+                      <div className="flex h-full flex-col rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
+                        <div className="flex flex-col gap-1">
+                          <p className="text-sm font-semibold text-white">Page order</p>
                             <p className="text-xs text-slate-300">Tap to focus or drag to reorder</p>
                           </div>
                           <DndContext
