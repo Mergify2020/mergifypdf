@@ -589,6 +589,7 @@ function WorkspaceClient() {
   const [shouldCenterOnChange, setShouldCenterOnChange] = useState(false);
   const [zoomPercent, setZoomPercent] = useState(100);
   const [baseScale, setBaseScale] = useState(1);
+  const [userAdjustedZoom, setUserAdjustedZoom] = useState(false);
   const scrollRatioRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const [highlightMode, setHighlightMode] = useState(false);
   const [highlightColor, setHighlightColor] = useState<HighlightColorKey>("yellow");
@@ -1745,11 +1746,12 @@ function WorkspaceClient() {
 
   useEffect(() => {
     function handleResize() {
+      if (userAdjustedZoom) return; // keep user-chosen zoom steady across resizes
       computeBaseScale();
     }
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [computeBaseScale]);
+  }, [computeBaseScale, userAdjustedZoom]);
 
   const setZoomWithScrollPreserved = useCallback(
     (nextPercent: number) => {
@@ -1761,6 +1763,7 @@ function WorkspaceClient() {
           y: container.scrollTop / Math.max(1, container.scrollHeight - container.clientHeight),
         };
       }
+      setUserAdjustedZoom(true);
       setZoomPercent(clamped);
     },
     []
@@ -2136,8 +2139,9 @@ function WorkspaceClient() {
   }
 
   useEffect(() => {
+    if (userAdjustedZoom) return; // preserve manual zoom after user interaction
     computeBaseScale();
-  }, [computeBaseScale, pages.length, activePageIndex]);
+  }, [computeBaseScale, pages.length, activePageIndex, userAdjustedZoom]);
 
   useEffect(() => {
     if (!showDelayOverlay) return;
