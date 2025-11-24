@@ -229,7 +229,7 @@ const WORKSPACE_DB_STORE = "files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
 const DEFAULT_ASPECT_RATIO = 792 / 612; // fallback letter portrait
 const SOFT_EASE: [number, number, number, number] = [0.4, 0, 0.2, 1];
-const ZOOM_LEVELS = [0.5, 0.75, 1, 1.5, 2, 3];
+const ZOOM_LEVELS = [0.5, 0.75, 1, 1.5, 2, 2.5];
 const VIEW_TRANSITION = { duration: 0.2, ease: SOFT_EASE };
 const GRID_VARIANTS = {
   hidden: { opacity: 0, scale: 0.97 },
@@ -1662,7 +1662,7 @@ function WorkspaceClient() {
   const itemsIds = useMemo(() => pages.map((p) => p.id), [pages]);
   const downloadDisabled = busy || pages.length === 0;
   const activePageIndex = activePageIndexState >= 0 && activePageIndexState < pages.length ? activePageIndexState : -1;
-  const zoomMultiplier = clamp(zoomPercent / 100, 1, 3);
+  const zoomMultiplier = clamp(zoomPercent / 100, 1, 2.5);
   const zoomLabel = `${Math.round(zoomPercent)}%`;
   const highlightButtonDisabled = pages.length === 0 || loading;
   const highlightColorEntries = Object.entries(
@@ -1749,7 +1749,7 @@ function WorkspaceClient() {
 
   const setZoomWithScrollPreserved = useCallback(
     (nextPercent: number) => {
-      const clamped = clamp(nextPercent, 100, 300);
+      const clamped = clamp(nextPercent, 100, 250);
       const container = previewContainerRef.current;
       if (container) {
         scrollRatioRef.current = {
@@ -2446,7 +2446,7 @@ function WorkspaceClient() {
                   <input
                     type="range"
                     min={100}
-                    max={300}
+                    max={250}
                     step={25}
                     value={zoomPercent}
                     onChange={(e) => setZoomWithScrollPreserved(Number(e.target.value))}
