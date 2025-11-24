@@ -814,10 +814,6 @@ function WorkspaceClient() {
   const MAX_HIGHLIGHT_THICKNESS = 32;
   const MIN_PENCIL_THICKNESS = 1;
   const MAX_PENCIL_THICKNESS = 10;
-  const VIEWER_PADDING_X = 60;
-  const VIEWER_PADDING_TOP = 40;
-  const VIEWER_PADDING_BOTTOM = 120;
-  const VIEWER_SCROLL_HEIGHT = "calc(100vh - 260px)";
   const toolSwitchBase = "flex items-center gap-2 px-4 py-2 text-sm font-semibold transition";
   const toolSwitchActive = "bg-[#024d7c] text-white shadow-sm";
   const toolSwitchInactive = "bg-white text-slate-700 hover:bg-slate-50";
@@ -1244,8 +1240,6 @@ function WorkspaceClient() {
     const baseHeight = rotated ? naturalWidth : naturalHeight;
     const fittedWidth = baseWidth * baseScale;
     const fittedHeight = baseHeight * baseScale;
-    const viewScale = zoomMultiplier;
-    const scaledHeight = fittedHeight * viewScale;
     return (
       <div
         key={page.id}
@@ -1259,23 +1253,20 @@ function WorkspaceClient() {
           }`}
           style={{
             width: fittedWidth,
-            height: scaledHeight,
+            height: fittedHeight,
           }}
           onClick={() => handleSelectPage(idx)}
         >
           <div
             className="absolute inset-0 flex items-center justify-center overflow-visible"
-            style={{
-              width: "100%",
-              height: "100%",
-            }}
-            >
-              <div
-                className="absolute inset-0 bg-white"
-                style={{
+            style={{ width: "100%", height: "100%" }}
+          >
+            <div
+              className="absolute inset-0 bg-white"
+              style={{
                 width: "100%",
                 height: "100%",
-                transform: `scale(${viewScale}) rotate(${rotationDegrees}deg)`,
+                transform: `rotate(${rotationDegrees}deg)`,
                 transformOrigin: "top right",
                 cursor:
                   activeDrawingTool === "highlight"
@@ -1717,11 +1708,8 @@ function WorkspaceClient() {
     const rotated = rotation % 180 !== 0;
     const baseWidth = rotated ? naturalHeight : naturalWidth;
     const baseHeight = rotated ? naturalWidth : naturalHeight;
-    const availableWidth = Math.max(container.clientWidth - VIEWER_PADDING_X * 2, 200);
-    const availableHeight = Math.max(
-      container.clientHeight - (VIEWER_PADDING_TOP + VIEWER_PADDING_BOTTOM),
-      200
-    );
+    const availableWidth = Math.max(container.clientWidth, 200);
+    const availableHeight = Math.max(container.clientHeight, 200);
     const fitScale = Math.max(0.2, Math.min(availableWidth / baseWidth, availableHeight / baseHeight));
     setBaseScale((prev) => (Math.abs(prev - fitScale) > 0.001 ? fitScale : prev));
   }, [activePageIndex, pages]);
@@ -2867,20 +2855,18 @@ function WorkspaceClient() {
                     className="editor-shell mx-auto flex h-full min-h-0 w-full max-w-[1280px] flex-1 flex-col gap-6 overflow-hidden px-4 lg:px-6"
                   >
                     <div className="flex h-full min-h-0 w-full gap-6">
-                      <div className="flex flex-1 justify-end overflow-hidden">
+                      <div
+                        ref={viewerScrollRef}
+                        className="flex flex-1 min-h-0 justify-end overflow-y-auto overflow-x-hidden"
+                      >
                         <div
-                          ref={viewerScrollRef}
-                          className="flex h-full w-full max-w-full justify-end overflow-y-auto overflow-x-hidden"
-                          style={{
-                            padding: `${VIEWER_PADDING_TOP}px ${VIEWER_PADDING_X}px ${VIEWER_PADDING_BOTTOM}px`,
-                            maxHeight: VIEWER_SCROLL_HEIGHT,
-                          }}
+                          id="pdf-viewport"
+                          className="origin-top-right flex w-fit flex-col items-end gap-8"
+                          style={{ transform: `scale(${zoomMultiplier})`, transformOrigin: "top right" }}
                         >
-                          <div className="flex w-full flex-col items-end gap-8">
-                            {activePageIndex >= 0 && pages[activePageIndex]
-                              ? renderPreviewPage(pages[activePageIndex], activePageIndex)
-                              : null}
-                          </div>
+                          {activePageIndex >= 0 && pages[activePageIndex]
+                            ? renderPreviewPage(pages[activePageIndex], activePageIndex)
+                            : null}
                         </div>
                       </div>
 
