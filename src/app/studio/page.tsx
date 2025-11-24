@@ -2850,10 +2850,10 @@ function WorkspaceClient() {
                     key="preview-view"
                     initial={{ opacity: 0.95, scale: 0.97 }}
                     animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.97 }}
-                  transition={VIEW_TRANSITION}
-                  className="editor-shell mx-auto flex h-full min-h-0 w-full max-w-[1280px] flex-1 flex-col gap-6 overflow-hidden px-4 lg:px-6"
-                >
+                    exit={{ opacity: 0, scale: 0.97 }}
+                    transition={VIEW_TRANSITION}
+                    className="editor-shell mx-auto flex h-full min-h-0 w-full flex-1 flex-col gap-6 overflow-hidden px-4 lg:px-6"
+                  >
                   <div className="flex h-full min-h-0 w-full gap-6">
                     <div ref={viewerScrollRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
                       <div className="flex justify-end">
