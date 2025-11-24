@@ -2855,12 +2855,12 @@ function WorkspaceClient() {
                     className="editor-shell mx-auto flex h-full min-h-0 w-full flex-1 flex-col gap-6 overflow-hidden px-4 lg:px-6"
                   >
                     <div className="flex h-full min-h-0 w-full gap-6">
-                      <div ref={viewerScrollRef} className="flex-1 min-h-0 overflow-x-hidden overflow-y-auto">
-                        <div className="flex justify-end">
+                      <div ref={viewerScrollRef} className="flex-1 min-h-0 overflow-x-auto overflow-y-auto">
+                        <div className="flex justify-center">
                           <div
                             id="pdf-viewport"
-                            className="origin-top-right flex w-fit flex-col gap-8"
-                            style={{ transform: `scale(${zoomMultiplier})`, transformOrigin: "top right" }}
+                            className="origin-top flex w-fit flex-col gap-8"
+                            style={{ transform: `scale(${zoomMultiplier})`, transformOrigin: "top center" }}
                           >
                             {activePageIndex >= 0 && pages[activePageIndex]
                               ? renderPreviewPage(pages[activePageIndex], activePageIndex)
