@@ -817,10 +817,6 @@ function WorkspaceClient() {
   const toolSwitchBase = "flex items-center gap-2 px-4 py-2 text-sm font-semibold transition";
   const toolSwitchActive = "bg-[#024d7c] text-white shadow-sm";
   const toolSwitchInactive = "bg-white text-slate-700 hover:bg-slate-50";
-  const horizontalMirrorRef = useRef<HTMLDivElement>(null);
-  const horizontalContentRef = useRef<HTMLDivElement>(null);
-  const [horizontalContentWidth, setHorizontalContentWidth] = useState(0);
-  const isSyncingHorizontalRef = useRef(false);
 
   // Better drag in grids
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
@@ -2230,18 +2226,6 @@ function WorkspaceClient() {
   }, [textMode]);
 
   useEffect(() => {
-    const content = horizontalContentRef.current;
-    if (!content) return;
-    const updateWidth = () => setHorizontalContentWidth(content.scrollWidth);
-    updateWidth();
-    const observer = new ResizeObserver(updateWidth);
-    observer.observe(content);
-    const viewport = content.querySelector<HTMLElement>("#pdf-viewport");
-    if (viewport) observer.observe(viewport);
-    return () => observer.disconnect();
-  }, [zoomMultiplier, pages.length, activePageIndex]);
-
-  useEffect(() => {
     if (typeof document === "undefined") return;
     document.body.classList.add("studio-page");
     return () => {
@@ -2362,7 +2346,7 @@ function WorkspaceClient() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col bg-[#f3f6fb] overflow-x-hidden">
+    <main className="flex min-h-screen flex-col bg-[#f3f6fb]">
       <header className="sticky top-0 z-40 border-b border-slate-100 bg-white/90 backdrop-blur shadow-[0_1px_4px_rgba(15,23,42,0.06)]">
         <div className="mx-auto flex h-16 w-full max-w-[1400px] items-center justify-between px-4 lg:px-6">
           <Link href="/" className="inline-flex items-center gap-2" aria-label="Back to workspace">
@@ -2871,56 +2855,11 @@ function WorkspaceClient() {
                     className="editor-shell mx-auto flex h-full min-h-0 w-full flex-1 flex-col gap-6 overflow-hidden px-4 lg:px-6"
                   >
                     <div className="flex h-full min-h-0 w-full gap-6">
-                    <div
-                      ref={viewerScrollRef}
-                      className="flex-1 min-h-0 overflow-y-auto"
-                      style={{ scrollbarGutter: "stable both-edges" }}
-                    >
-                      <div className="sticky top-0 z-10 bg-[#f3f6fb]">
-                        <div
-                          ref={horizontalMirrorRef}
-                          className="h-4 overflow-x-auto"
-                          onScroll={() => {
-                            if (isSyncingHorizontalRef.current) return;
-                            const source = horizontalMirrorRef.current;
-                            const target = horizontalContentRef.current;
-                            if (!source || !target) return;
-                            isSyncingHorizontalRef.current = true;
-                            target.scrollLeft = source.scrollLeft;
-                            requestAnimationFrame(() => {
-                              isSyncingHorizontalRef.current = false;
-                            });
-                          }}
-                          style={{ scrollbarGutter: "stable both-edges" }}
-                        >
-                          <div
-                            style={{
-                              width: horizontalContentWidth || "100%",
-                              height: 1,
-                            }}
-                          />
-                        </div>
-                      </div>
-                      <div
-                        ref={horizontalContentRef}
-                        className="overflow-x-auto"
-                        onScroll={() => {
-                          if (isSyncingHorizontalRef.current) return;
-                          const source = horizontalContentRef.current;
-                          const target = horizontalMirrorRef.current;
-                          if (!source || !target) return;
-                          isSyncingHorizontalRef.current = true;
-                          target.scrollLeft = source.scrollLeft;
-                          requestAnimationFrame(() => {
-                            isSyncingHorizontalRef.current = false;
-                          });
-                        }}
-                        style={{ scrollbarGutter: "stable both-edges" }}
-                      >
+                      <div ref={viewerScrollRef} className="flex-1 min-h-0 overflow-x-hidden overflow-y-auto">
                         <div className="flex justify-end">
                           <div
                             id="pdf-viewport"
-                            className="origin-top-right inline-flex w-fit flex-col gap-8"
+                            className="origin-top-right flex w-fit flex-col gap-8"
                             style={{ transform: `scale(${zoomMultiplier})`, transformOrigin: "top right" }}
                           >
                             {activePageIndex >= 0 && pages[activePageIndex]
@@ -2929,7 +2868,6 @@ function WorkspaceClient() {
                           </div>
                         </div>
                       </div>
-                    </div>
 
                       <aside className="w-[260px] shrink-0">
                         <div className="flex h-full flex-col rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
