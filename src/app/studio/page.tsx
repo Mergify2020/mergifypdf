@@ -2860,8 +2860,8 @@ function WorkspaceClient() {
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.97 }}
                   transition={VIEW_TRANSITION}
-                  className="editor-shell mx-auto flex h-full min-h-0 w-full flex-1 flex-col gap-6 overflow-hidden px-4 lg:px-6"
-                >
+                    className="editor-shell mx-auto flex h-full min-h-0 w-full flex-1 flex-col gap-6 overflow-hidden px-4 lg:px-6"
+                  >
                     <div className="flex h-full min-h-0 w-full">
                       <div className="flex-1 min-h-0 overflow-hidden">
                         <div
@@ -2869,8 +2869,8 @@ function WorkspaceClient() {
                           className="viewer-scroll relative flex h-full w-full overflow-auto"
                           style={{ scrollbarGutter: "stable both-edges" }}
                         >
-                          <div className="relative flex w-fit items-start">
-                            <div className="flex w-fit justify-center pr-[320px]">
+                          <div className="relative grid h-full w-full grid-cols-[minmax(0,1fr)_260px] items-start gap-6 pr-4">
+                            <div className="flex min-w-[640px] justify-center">
                               <div id="pdf-viewport" className="origin-top flex w-fit flex-col gap-8">
                                 {activePageIndex >= 0 && pages[activePageIndex]
                                   ? renderPreviewPage(pages[activePageIndex], activePageIndex)
@@ -2878,7 +2878,7 @@ function WorkspaceClient() {
                               </div>
                             </div>
 
-                            <aside className="sticky right-4 top-4 z-10 w-[260px] shrink-0">
+                            <aside className="sticky top-4 z-10 w-[260px] shrink-0">
                               <div className="flex h-full flex-col rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
                                 <div className="flex flex-col gap-1">
                                   <p className="text-sm font-semibold text-white">Page order</p>
