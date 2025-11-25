@@ -799,6 +799,7 @@ function WorkspaceClient() {
     [getPageNormalizedPoint, textAnnotations]
   );
   const [deleteMode, setDeleteMode] = useState(false);
+  const [isErasing, setIsErasing] = useState(false);
   const [projectName, setProjectName] = useState("Untitled Project");
   const [projectNameEditing, setProjectNameEditing] = useState(false);
   const [projectNameDraft, setProjectNameDraft] = useState("Untitled Project");
@@ -1309,9 +1310,18 @@ function WorkspaceClient() {
                 ? ("text" as CSSProperties["cursor"])
                 : undefined,
             }}
-            onMouseDown={(event) => handleMarkupPointerDown(page.id, event)}
+            onMouseDown={(event) => {
+              if (deleteMode) {
+                setIsErasing(true);
+                event.preventDefault();
+              }
+              handleMarkupPointerDown(page.id, event);
+            }}
             onMouseMove={(event) => handleMarkupPointerMove(page.id, event)}
-            onMouseUp={() => handleMarkupPointerUp(page.id)}
+            onMouseUp={() => {
+              setIsErasing(false);
+              handleMarkupPointerUp(page.id);
+            }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -1333,24 +1343,31 @@ function WorkspaceClient() {
                       points={stroke.points.map((pt) => `${pt.x * 1000},${pt.y * 1000}`).join(" ")}
                       fill="none"
                       stroke={stroke.color}
-                      strokeWidth={Math.max(1, stroke.thickness * 1000)}
-                      strokeLinecap="round"
-                      strokeOpacity={stroke.tool === "pencil" ? 1 : 0.25}
-                      style={{
+                  strokeWidth={Math.max(1, stroke.thickness * 1000)}
+                  strokeLinecap="round"
+                  strokeOpacity={stroke.tool === "pencil" ? 1 : 0.25}
+                  style={{
                         pointerEvents: deleteMode ? "stroke" : "none",
                         cursor: deleteMode
                           ? ("url('/icons/eraser.svg') 4 4, auto" as CSSProperties["cursor"])
                           : "default",
                       }}
-                      onClick={(event) => {
+                      onPointerDown={(event) => {
                         if (!deleteMode) return;
+                        event.preventDefault();
+                        event.stopPropagation();
+                        setIsErasing(true);
+                        handleDeleteStroke(page.id, stroke.id);
+                      }}
+                      onPointerEnter={(event) => {
+                        if (!deleteMode || !isErasing) return;
                         event.preventDefault();
                         event.stopPropagation();
                         handleDeleteStroke(page.id, stroke.id);
                       }}
-                    />
-                  ) : null
-                )}
+                  />
+                ) : null
+              )}
                 {draftHighlight?.pageId === page.id && draftHighlight.points.length > 1 ? (
                   <polyline
                     aria-hidden
@@ -1403,18 +1420,19 @@ function WorkspaceClient() {
                     transitionDuration: isRotatingThis ? "0ms" : undefined,
                     cursor: deleteMode ? ("url('/icons/eraser.svg') 4 4, auto" as CSSProperties["cursor"]) : undefined,
                   }}
-                  onClick={(event) => {
+                  onPointerDown={(event) => {
                     event.stopPropagation();
                     if (deleteMode) {
+                      setIsErasing(true);
                       deleteTextAnnotation(page.id, annotation.id);
                       return;
                     }
                     focusTextAnnotation(annotation.id);
                   }}
-                  onMouseDown={(event) => {
+                  onPointerEnter={(event) => {
+                    if (!deleteMode || !isErasing) return;
                     event.stopPropagation();
-                    if (deleteMode) return;
-                    focusTextAnnotation(annotation.id);
+                    deleteTextAnnotation(page.id, annotation.id);
                   }}
                 >
                   <div className="relative h-full w-full">
@@ -2258,6 +2276,17 @@ function WorkspaceClient() {
   }, [hasAnyHighlights, deleteMode]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handlePointerUp = () => setIsErasing(false);
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerUp);
+    return () => {
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!focusedTextId) return;
     const node = textNodeRefs.current.get(focusedTextId);
     if (node) {
@@ -2369,6 +2398,7 @@ function WorkspaceClient() {
     if (!hasAnyAnnotations) return;
     setDraftHighlight(null);
     setDeleteMode(false);
+    setIsErasing(false);
     setHighlights((current) => {
       const snapshot = cloneHighlightMap(current);
       if (Object.keys(current).length > 0) {
