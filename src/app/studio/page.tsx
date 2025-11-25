@@ -2583,6 +2583,7 @@ function WorkspaceClient() {
                   Text
                 </button>
               </div>
+
               <button
                 type="button"
                 onClick={() => setOrganizeMode(true)}
@@ -2637,31 +2638,11 @@ function WorkspaceClient() {
                 </button>
               </div>
             </div>
-              <div className="flex-1" />
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleUndoHighlight}
-                  disabled={!hasUndoHistory}
-                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <Undo2 className="h-4 w-4" />
-                  Undo
-                </button>
-                <button
-                  type="button"
-                  onClick={handleClearHighlights}
-                  disabled={!hasAnyHighlights}
-                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Clear
-                </button>
-              </div>
-            </div>
+
             {projectNameError ? (
               <div className="px-1 pb-1 text-sm text-rose-500">{projectNameError}</div>
             ) : null}
+
             <div
               className={`border-t border-slate-100/80 bg-slate-50/80 px-2 transition-all duration-300 ease-out sm:px-4 ${
                 highlightTrayVisible
