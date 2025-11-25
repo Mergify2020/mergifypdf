@@ -587,7 +587,7 @@ function WorkspaceClient() {
   const [activePageId, setActivePageId] = useState<string | null>(null);
   const [activePageIndexState, setActivePageIndex] = useState(0);
   const [shouldCenterOnChange, setShouldCenterOnChange] = useState(false);
-  const [zoomPercent, setZoomPercent] = useState(100);
+  const [zoomPercent, setZoomPercent] = useState(125);
   const [baseScale, setBaseScale] = useState(1);
   const [userAdjustedZoom, setUserAdjustedZoom] = useState(false);
   const scrollRatioRef = useRef<{ x: number; y: number }>({ x: 0.5, y: 0 });
