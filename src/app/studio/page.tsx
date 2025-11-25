@@ -3548,20 +3548,12 @@ function WorkspaceClient() {
                               key={sig.id}
                               className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 hover:bg-white hover:shadow-sm transition"
                             >
-                              <div className="flex items-center justify-center rounded-xl bg-white border border-slate-200 h-16 overflow-hidden">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img
-                                  src={sig.dataUrl}
-                                  alt={sig.name}
-                                  className="h-full w-full object-contain"
-                                />
-                              </div>
                               <div className="flex flex-col gap-1">
                                 <div className="text-sm font-medium text-slate-800">{sig.name}</div>
-                                <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                                <div className="flex flex-wrap gap-x-3 gap-y-2 text-xs items-center">
                                   <button
                                     type="button"
-                                    className="font-semibold text-[#024d7c] transition hover:underline"
+                                    className="rounded-full bg-[#024d7c] px-3 py-1 text-xs font-semibold text-white shadow-sm transition hover:bg-[#013d63]"
                                     onClick={() => {
                                       beginSignaturePlacement(sig);
                                       const targetPageId = activePageId || pages[0]?.id;
@@ -3572,7 +3564,7 @@ function WorkspaceClient() {
                                       setSignaturePanelMode("saved");
                                     }}
                                   >
-                                    Place on page
+                                    Insert signature
                                   </button>
                                   <button
                                     type="button"
@@ -3600,9 +3592,13 @@ function WorkspaceClient() {
                                   <button
                                     type="button"
                                     className="text-red-500 transition hover:underline"
-                                    onClick={() =>
-                                      setSavedSignatures((prev) => prev.filter((item) => item.id !== sig.id))
-                                    }
+                                    onClick={() => {
+                                      const confirmed = window.confirm(
+                                        "Are you sure you want to delete this signature? You can't go back."
+                                      );
+                                      if (!confirmed) return;
+                                      setSavedSignatures((prev) => prev.filter((item) => item.id !== sig.id));
+                                    }}
                                   >
                                     Delete
                                   </button>
