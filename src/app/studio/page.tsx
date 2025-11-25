@@ -2869,8 +2869,8 @@ function WorkspaceClient() {
                           className="viewer-scroll relative flex h-full w-full overflow-auto"
                           style={{ scrollbarGutter: "stable both-edges" }}
                         >
-                          <div className="relative grid h-full w-full grid-cols-[minmax(0,1fr)_260px] items-start gap-6 pr-4">
-                            <div className="flex min-w-[640px] justify-center">
+                          <div className="relative flex w-fit items-start gap-6 pr-4">
+                            <div className="flex w-fit justify-center">
                               <div id="pdf-viewport" className="origin-top flex w-fit flex-col gap-8">
                                 {activePageIndex >= 0 && pages[activePageIndex]
                                   ? renderPreviewPage(pages[activePageIndex], activePageIndex)
