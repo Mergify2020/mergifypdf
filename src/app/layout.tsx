@@ -1,6 +1,12 @@
 ﻿// src/app/layout.tsx
 import type { Metadata } from "next";
+import Image from "next/image";
+import Link from "next/link";
 import Providers from "@/components/Providers";
+import WorkspaceSettingsMenu from "@/components/WorkspaceSettingsMenu";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/authOptions";
+import HeaderLoginButton from "@/components/HeaderLoginButton";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -18,6 +24,8 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const session = await getServerSession(authOptions);
+
   return (
     <html lang="en">
       <head>
@@ -35,7 +43,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
 
       <body className="min-h-screen bg-white text-gray-900">
-        <Providers>{children}</Providers>
+        <Providers session={session}>
+          <header className="sticky top-0 z-50 w-full border-b border-slate-100 bg-white/90 backdrop-blur">
+            <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 lg:px-6">
+              <Link href="/" className="inline-flex items-center gap-2" aria-label="Back to workspace">
+                <Image src="/logo-wordmark2.svg" alt="MergifyPDF" width={160} height={40} priority />
+              </Link>
+              {session?.user ? <WorkspaceSettingsMenu /> : <HeaderLoginButton />}
+            </div>
+          </header>
+          <main className="pt-4">{children}</main>
+        </Providers>
       </body>
     </html>
   );
