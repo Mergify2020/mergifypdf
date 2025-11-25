@@ -2012,8 +2012,8 @@ function WorkspaceClient() {
       if (!placement) return;
       setSignaturePlacements((prev) => {
         const existing = prev[pageId] ?? [];
-        const updated = existing.map((item) =>
-          item.id === placementId ? { ...item, status: "placed" } : item
+        const updated: SignaturePlacement[] = existing.map((item) =>
+          item.id === placementId ? { ...item, status: "placed" as const } : item
         );
         return { ...prev, [pageId]: updated };
       });
