@@ -840,6 +840,8 @@ function WorkspaceClient() {
   const toolButtonInactive =
     "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50";
   const toolButtonActive = "border-transparent bg-[#024d7c] text-white shadow-sm";
+  const controlButtonClass =
+    "flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,0.08)] transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-40";
 
   // Better drag in grids
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
@@ -2496,207 +2498,208 @@ function WorkspaceClient() {
         </div>
         
         <div className="mx-auto w-full px-4 pb-4 lg:px-10">
-          <div className="w-full max-w-[1400px] mx-auto rounded-2xl border border-slate-200/80 bg-white/95 px-5 py-4 shadow-[0_16px_40px_rgba(15,23,42,0.08)] ring-1 ring-white/60">
-            <div className="flex w-full flex-wrap items-start justify-between gap-4">
-              <div className="flex w-full max-w-[380px] flex-col gap-3 rounded-xl bg-slate-50/80 p-4 shadow-inner">
-                <div className="relative w-full">
-                  {projectNameEditing ? (
-                    <input
-                      className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 pr-9 text-sm font-semibold text-slate-900 shadow-inner outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200/70"
-                      value={projectNameDraft}
-                      onChange={(event) => {
-                        setProjectNameDraft(event.target.value);
-                        if (projectNameError) setProjectNameError(null);
-                      }}
-                      placeholder="Name your project"
-                    />
-                  ) : (
-                    <input
-                      className="h-10 w-full cursor-text rounded-lg border border-slate-200 bg-white px-3 pr-9 text-sm font-semibold text-slate-900 shadow-inner outline-none transition hover:border-slate-300 focus:border-slate-400 focus:ring-2 focus:ring-slate-200/70"
-                      value={projectName}
-                      readOnly
-                      aria-readonly="true"
-                      onClick={() => {
-                        setProjectNameDraft(projectName);
-                        setProjectNameError(null);
-                        setProjectNameEditing(true);
-                      }}
-                    />
-                  )}
-                  <button
-                    type="button"
+          <div className="w-full max-w-[1400px] mx-auto rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <div className="flex w-full flex-wrap items-center gap-3 lg:gap-4">
+              <div className="flex items-center gap-2 min-w-[260px]">
+                {projectNameEditing ? (
+                  <input
+                    className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 pr-9 text-sm font-semibold text-slate-900 shadow-inner outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200/70"
+                    value={projectNameDraft}
+                    onChange={(event) => {
+                      setProjectNameDraft(event.target.value);
+                      if (projectNameError) setProjectNameError(null);
+                    }}
+                    placeholder="Name your project"
+                  />
+                ) : (
+                  <input
+                    className="h-10 w-full cursor-text rounded-lg border border-slate-200 bg-white px-3 pr-9 text-sm font-semibold text-slate-900 shadow-inner outline-none transition hover:border-slate-300 focus:border-slate-400 focus:ring-2 focus:ring-slate-200/70"
+                    value={projectName}
+                    readOnly
+                    aria-readonly="true"
                     onClick={() => {
                       setProjectNameDraft(projectName);
                       setProjectNameError(null);
                       setProjectNameEditing(true);
                     }}
-                    className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white p-1.5 text-slate-500 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
-                    aria-label="Edit project name"
-                  >
-                    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
-                      <path d="M12 20h9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                      <path
-                        d="M16.5 3.5a2.121 2.121 0 013 3L7 19.5 3 21l1.5-4L16.5 3.5z"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </button>
-                </div>
-                <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
-                  <div className="text-xs font-semibold text-slate-600">Zoom</div>
-                  <button
-                    type="button"
-                    aria-label="Zoom out"
-                    className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-40 shadow-[0_4px_12px_rgba(15,23,42,0.08)]"
-                    onClick={() => setZoomWithScrollPreserved(zoomPercent - 25)}
-                    disabled={zoomPercent <= 100}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </button>
-                  <input
-                    type="range"
-                    min={100}
-                    max={300}
-                    step={25}
-                    value={zoomPercent}
-                    onChange={(e) => setZoomWithScrollPreserved(Number(e.target.value))}
-                    className="horizontal-slider w-32"
                   />
-                  <span className="min-w-[44px] text-right text-sm font-semibold text-slate-800">{zoomLabel}</span>
-                </div>
-              </div>
-
-              <div className="flex flex-1 min-w-[360px] flex-col items-center gap-3 rounded-xl bg-slate-50/80 p-4 shadow-inner">
-                <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm justify-center">
-                  <button
-                    type="button"
-                    aria-label="Previous page"
-                    className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-40 shadow-[0_4px_12px_rgba(15,23,42,0.08)]"
-                    onClick={() => handlePageStep(-1)}
-                    disabled={activePageIndex <= 0}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                      <path d="M14 6l-6 6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </button>
-                  <div className="text-xs font-semibold text-slate-700">
-                    Page {activePageIndex >= 0 ? activePageIndex + 1 : 0} / {pages.length || 0}
-                  </div>
-                  <button
-                    type="button"
-                    aria-label="Next page"
-                    className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-40 shadow-[0_4px_12px_rgba(15,23,42,0.08)]"
-                    onClick={() => handlePageStep(1)}
-                    disabled={activePageIndex === pages.length - 1 || pages.length === 0}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                      <path d="M10 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </button>
-                </div>
-                <div className="flex flex-wrap justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
-                  <button
-                    type="button"
-                    disabled={highlightButtonDisabled}
-                    aria-pressed={highlightButtonOn}
-                    className={`${toolButtonBase} ${highlightButtonOn ? toolButtonActive : toolButtonInactive}`}
-                    onClick={() =>
-                      setHighlightMode((prev) => {
-                        const next = !prev;
-                        if (next) {
-                          setDeleteMode(false);
-                          setPencilMode(false);
-                          setTextMode(false);
-                        }
-                        return next;
-                      })
-                    }
-                  >
-                    <Highlighter className="h-4 w-4" />
-                    Highlight
-                  </button>
-                  <button
-                    type="button"
-                    disabled={highlightButtonDisabled}
-                    aria-pressed={pencilButtonOn}
-                    className={`${toolButtonBase} ${pencilButtonOn ? toolButtonActive : toolButtonInactive}`}
-                    onClick={() =>
-                      setPencilMode((prev) => {
-                        const next = !prev;
-                        if (next) {
-                          setDeleteMode(false);
-                          setHighlightMode(false);
-                          setTextMode(false);
-                        }
-                        return next;
-                      })
-                    }
-                  >
-                    <Pencil className="h-4 w-4" />
-                    Pencil
-                  </button>
-                  <button
-                    type="button"
-                    disabled={highlightButtonDisabled}
-                    aria-pressed={textButtonOn}
-                    className={`${toolButtonBase} ${textButtonOn ? toolButtonActive : toolButtonInactive}`}
-                    onClick={() =>
-                      setTextMode((prev) => {
-                        const next = !prev;
-                        if (next) {
-                          setDeleteMode(false);
-                          setHighlightMode(false);
-                          setPencilMode(false);
-                          setDraftHighlight(null);
-                        }
-                        return next;
-                      })
-                    }
-                  >
-                    Text
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setOrganizeMode(true)}
-                    disabled={pages.length === 0 || organizeMode}
-                    aria-pressed={organizeMode}
-                    className={`${toolButtonBase} ${organizeMode ? toolButtonActive : toolButtonInactive}`}
-                  >
-                    Manage pages
-                  </button>
-                  <button
-                    className={`${toolButtonBase} ${toolButtonInactive}`}
-                    onClick={handleUndoHighlight}
-                    disabled={!hasUndoHistory}
-                  >
-                    <Undo2 className="h-4 w-4" />
-                    Undo
-                  </button>
-                  <button
-                    className={`${toolButtonBase} ${deleteMode ? toolButtonActive : toolButtonInactive}`}
-                    onClick={handleToggleDeleteMode}
-                    aria-pressed={deleteMode}
-                    disabled={!hasAnyAnnotations && !deleteMode}
-                  >
-                    <Eraser className="h-4 w-4" />
-                    Eraser
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex w-full max-w-[220px] flex-col gap-3 rounded-xl bg-slate-50/80 p-4 shadow-inner">
+                )}
                 <button
-                  className={`${buttonPrimary} w-full px-6 py-2 justify-center`}
+                  type="button"
+                  onClick={() => {
+                    setProjectNameDraft(projectName);
+                    setProjectNameError(null);
+                    setProjectNameEditing(true);
+                  }}
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
+                  aria-label="Edit project name"
+                >
+                  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 20h9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    <path
+                      d="M16.5 3.5a2.121 2.121 0 013 3L7 19.5 3 21l1.5-4L16.5 3.5z"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-slate-600">Zoom</span>
+                <button
+                  type="button"
+                  aria-label="Zoom out"
+                  className={controlButtonClass}
+                  onClick={() => setZoomWithScrollPreserved(zoomPercent - 25)}
+                  disabled={zoomPercent <= 100}
+                >
+                  <Minus className="h-4 w-4" />
+                </button>
+                <input
+                  type="range"
+                  min={100}
+                  max={300}
+                  step={25}
+                  value={zoomPercent}
+                  onChange={(e) => setZoomWithScrollPreserved(Number(e.target.value))}
+                  className="horizontal-slider w-32"
+                />
+                <span className="min-w-[44px] text-right text-sm font-semibold text-slate-800">{zoomLabel}</span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  aria-label="Previous page"
+                  className={controlButtonClass}
+                  onClick={() => handlePageStep(-1)}
+                  disabled={activePageIndex <= 0}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <path d="M14 6l-6 6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                <div className="text-xs font-semibold text-slate-700">
+                  Page {activePageIndex >= 0 ? activePageIndex + 1 : 0} / {pages.length || 0}
+                </div>
+                <button
+                  type="button"
+                  aria-label="Next page"
+                  className={controlButtonClass}
+                  onClick={() => handlePageStep(1)}
+                  disabled={activePageIndex === pages.length - 1 || pages.length === 0}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <path d="M10 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  disabled={highlightButtonDisabled}
+                  aria-pressed={highlightButtonOn}
+                  className={`${toolButtonBase} ${highlightButtonOn ? toolButtonActive : toolButtonInactive}`}
+                  onClick={() =>
+                    setHighlightMode((prev) => {
+                      const next = !prev;
+                      if (next) {
+                        setDeleteMode(false);
+                        setPencilMode(false);
+                        setTextMode(false);
+                      }
+                      return next;
+                    })
+                  }
+                >
+                  <Highlighter className="h-4 w-4" />
+                  Highlight
+                </button>
+                <button
+                  type="button"
+                  disabled={highlightButtonDisabled}
+                  aria-pressed={pencilButtonOn}
+                  className={`${toolButtonBase} ${pencilButtonOn ? toolButtonActive : toolButtonInactive}`}
+                  onClick={() =>
+                    setPencilMode((prev) => {
+                      const next = !prev;
+                      if (next) {
+                        setDeleteMode(false);
+                        setHighlightMode(false);
+                        setTextMode(false);
+                      }
+                      return next;
+                    })
+                  }
+                >
+                  <Pencil className="h-4 w-4" />
+                  Pencil
+                </button>
+                <button
+                  type="button"
+                  disabled={highlightButtonDisabled}
+                  aria-pressed={textButtonOn}
+                  className={`${toolButtonBase} ${textButtonOn ? toolButtonActive : toolButtonInactive}`}
+                  onClick={() =>
+                    setTextMode((prev) => {
+                      const next = !prev;
+                      if (next) {
+                        setDeleteMode(false);
+                        setHighlightMode(false);
+                        setPencilMode(false);
+                        setDraftHighlight(null);
+                      }
+                      return next;
+                    })
+                  }
+                >
+                  Text
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOrganizeMode(true)}
+                  disabled={pages.length === 0 || organizeMode}
+                  aria-pressed={organizeMode}
+                  className={`${toolButtonBase} ${organizeMode ? toolButtonActive : toolButtonInactive}`}
+                >
+                  Manage pages
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  className={`${toolButtonBase} ${toolButtonInactive}`}
+                  onClick={handleUndoHighlight}
+                  disabled={!hasUndoHistory}
+                >
+                  <Undo2 className="h-4 w-4" />
+                  Undo
+                </button>
+                <button
+                  className={`${toolButtonBase} ${deleteMode ? toolButtonActive : toolButtonInactive}`}
+                  onClick={handleToggleDeleteMode}
+                  aria-pressed={deleteMode}
+                  disabled={!hasAnyAnnotations && !deleteMode}
+                >
+                  <Eraser className="h-4 w-4" />
+                  Eraser
+                </button>
+              </div>
+
+              <div className="ml-auto flex items-center gap-2">
+                <button
+                  className={`${buttonPrimary} px-5 py-2`}
                   onClick={() => handleDownload()}
                   disabled={downloadDisabled}
                 >
                   {busy ? "Building..." : "Download pages"}
                 </button>
                 <button
-                  className={`${buttonNeutral} w-full px-6 py-2 justify-center`}
+                  className={`${buttonNeutral} px-5 py-2`}
                   onClick={handleAddClick}
                   disabled={pages.length === 0}
                 >
@@ -2712,7 +2715,7 @@ function WorkspaceClient() {
                 />
               </div>
             </div>
-{projectNameError ? (
+            {projectNameError ? (
               <div className="px-1 pb-1 text-sm text-rose-500">{projectNameError}</div>
             ) : null}
 
