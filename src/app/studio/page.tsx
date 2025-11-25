@@ -662,6 +662,7 @@ function WorkspaceClient() {
   const [showDrawModal, setShowDrawModal] = useState(false);
   const [drawStep, setDrawStep] = useState<"canvas" | "name">("canvas");
   const drawCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const drawLastPointRef = useRef<Point | null>(null);
   const [isDrawingSignature, setIsDrawingSignature] = useState(false);
   const [drawnSignatureData, setDrawnSignatureData] = useState<string | null>(null);
   const [drawSignatureName, setDrawSignatureName] = useState("");
@@ -1551,7 +1552,9 @@ function WorkspaceClient() {
                       height: `${signature.height * 100}%`,
                       cursor: deleteMode
                         ? ("url('/icons/eraser.svg') 4 4, auto" as CSSProperties["cursor"])
-                        : "move",
+                        : isActive
+                        ? "default"
+                        : "pointer",
                     }}
                     onPointerDown={(event) => {
                       event.stopPropagation();
@@ -1560,7 +1563,6 @@ function WorkspaceClient() {
                         return;
                       }
                       setActiveSignaturePlacementId(signature.id);
-                      startSignatureDrag(page.id, signature.id, event);
                     }}
                   >
                     <div className="relative h-full w-full overflow-hidden rounded-lg bg-white shadow-[0_10px_24px_rgba(15,23,42,0.18)]">
@@ -1572,35 +1574,48 @@ function WorkspaceClient() {
                         draggable={false}
                       />
                       {isActive ? (
-                        <div className="absolute -top-10 left-0 flex items-center gap-2">
-                          {signature.status === "draft" ? (
+                        <>
+                          <div className="absolute -top-10 left-0 flex items-center gap-2">
+                            {signature.status === "draft" ? (
+                              <button
+                                type="button"
+                                className="rounded-full bg-[#024d7c] px-3 py-1 text-xs font-semibold text-white shadow-sm transition hover:bg-[#013d63]"
+                                onPointerDown={(event) => event.stopPropagation()}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleApplySignaturePlacement(page.id, signature.id);
+                                }}
+                              >
+                                Apply
+                              </button>
+                            ) : null}
+                            <div className="rounded-full bg-white/85 px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
+                              {signature.name}
+                            </div>
+                          </div>
+                          <div className="absolute -bottom-9 left-0 flex items-center gap-2">
                             <button
                               type="button"
-                              className="rounded-full bg-[#024d7c] px-3 py-1 text-xs font-semibold text-white shadow-sm transition hover:bg-[#013d63]"
-                              onPointerDown={(event) => event.stopPropagation()}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                handleApplySignaturePlacement(page.id, signature.id);
+                              className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 bg-white/90 text-slate-700 shadow-sm transition hover:bg-white active:translate-y-[1px]"
+                              onPointerDown={(event: ReactPointerEvent<HTMLButtonElement>) => {
+                                startSignatureDrag(page.id, signature.id, event);
                               }}
                             >
-                              Apply
+                              <Move className="h-4 w-4" />
                             </button>
-                          ) : null}
-                          <div className="rounded-full bg-white/85 px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
-                            {signature.name}
                           </div>
-                        </div>
+                          <div
+                            className={`absolute -right-2 -bottom-2 h-4 w-4 cursor-se-resize rounded-full border border-slate-600 bg-white shadow-sm transition hover:border-slate-700 hover:shadow-md ${
+                              isResizingThis ? "scale-110" : ""
+                            }`}
+                            onPointerDown={(event) => {
+                              event.stopPropagation();
+                              setActiveSignaturePlacementId(signature.id);
+                              startSignatureResize(page.id, signature.id, event);
+                            }}
+                          />
+                        </>
                       ) : null}
-                      <div
-                        className={`absolute -right-2 -bottom-2 h-4 w-4 cursor-se-resize rounded-full border border-slate-600 bg-white shadow-sm transition hover:border-slate-700 hover:shadow-md ${
-                          isResizingThis ? "scale-110" : ""
-                        }`}
-                        onPointerDown={(event) => {
-                          event.stopPropagation();
-                          setActiveSignaturePlacementId(signature.id);
-                          startSignatureResize(page.id, signature.id, event);
-                        }}
-                      />
                     </div>
                   </div>
                 );
@@ -1901,7 +1916,7 @@ function WorkspaceClient() {
   }
 
   const startSignatureDrag = useCallback(
-    (pageId: string, placementId: string, startEvent: ReactPointerEvent<HTMLDivElement>) => {
+    (pageId: string, placementId: string, startEvent: ReactPointerEvent<HTMLElement>) => {
       if (startEvent.button !== 0 && startEvent.pointerType !== "touch") return;
       startEvent.preventDefault();
       startEvent.stopPropagation();
@@ -2430,6 +2445,7 @@ function WorkspaceClient() {
     ctx.strokeStyle = "#0f172a";
     ctx.fillStyle = "white";
     ctx.clearRect(0, 0, width, height);
+    drawLastPointRef.current = null;
   }, []);
 
   const clearDrawCanvas = useCallback(() => {
@@ -2448,6 +2464,7 @@ function WorkspaceClient() {
       ctx.beginPath();
       ctx.moveTo(x, y);
       setIsDrawingSignature(true);
+      drawLastPointRef.current = { x, y };
     },
     []
   );
@@ -2461,14 +2478,25 @@ function WorkspaceClient() {
       const rect = canvas.getBoundingClientRect();
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
-      ctx.lineTo(x, y);
+      const last = drawLastPointRef.current;
+      if (!last) {
+        ctx.lineTo(x, y);
+        ctx.stroke();
+        drawLastPointRef.current = { x, y };
+        return;
+      }
+      const midX = (last.x + x) / 2;
+      const midY = (last.y + y) / 2;
+      ctx.quadraticCurveTo(last.x, last.y, midX, midY);
       ctx.stroke();
+      drawLastPointRef.current = { x, y };
     },
     [isDrawingSignature]
   );
 
   const handleDrawPointerUp = useCallback(() => {
     setIsDrawingSignature(false);
+    drawLastPointRef.current = null;
   }, []);
 
   const handleDrawContinue = useCallback(() => {
