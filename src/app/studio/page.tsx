@@ -1565,9 +1565,7 @@ function WorkspaceClient() {
                       transformOrigin: "center",
                       cursor: deleteMode
                         ? ("url('/icons/eraser.svg') 4 4, auto" as CSSProperties["cursor"])
-                        : isActive
-                        ? "default"
-                        : "pointer",
+                        : "move",
                     }}
                     onPointerDown={(event) => {
                       event.stopPropagation();
@@ -1576,9 +1574,10 @@ function WorkspaceClient() {
                         return;
                       }
                       setActiveSignaturePlacementId(signature.id);
+                      startSignatureDrag(page.id, signature.id, event as unknown as ReactPointerEvent<HTMLElement>);
                     }}
                   >
-                    <div className="relative h-full w-full overflow-hidden rounded-lg bg-white shadow-[0_10px_24px_rgba(15,23,42,0.18)]">
+                    <div className="relative h-full w-full overflow-visible rounded-lg bg-white shadow-[0_10px_24px_rgba(15,23,42,0.18)]">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={signature.dataUrl}
@@ -1586,69 +1585,65 @@ function WorkspaceClient() {
                         className="h-full w-full select-none object-contain"
                         draggable={false}
                       />
-                      {isActive ? (
-                        <>
-                          <div className="absolute -top-10 left-0 flex items-center gap-2">
-                            {signature.status === "draft" ? (
-                              <button
-                                type="button"
-                                className="rounded-full bg-[#024d7c] px-3 py-1 text-xs font-semibold text-white shadow-sm transition hover:bg-[#013d63]"
-                                onPointerDown={(event) => event.stopPropagation()}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  handleApplySignaturePlacement(page.id, signature.id);
-                                }}
-                              >
-                                Apply
-                              </button>
-                            ) : null}
-                            <div className="rounded-full bg-white/85 px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
-                              {signature.name}
-                            </div>
-                          </div>
-                          <div className="absolute -bottom-9 left-0 flex items-center gap-2">
-                            <button
-                              type="button"
-                              className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 bg-white/90 text-slate-700 shadow-sm transition hover:bg-white active:translate-y-[1px]"
-                              onPointerDown={(event: ReactPointerEvent<HTMLButtonElement>) => {
-                                startSignatureDrag(page.id, signature.id, event);
-                              }}
-                            >
-                              <Move className="h-4 w-4" />
-                            </button>
-                            <button
-                              type="button"
-                              className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 bg-white/90 text-slate-700 shadow-sm transition hover:bg-white active:translate-y-[1px]"
-                              onPointerDown={(event: ReactPointerEvent<HTMLButtonElement>) => {
-                                startSignatureRotate(page.id, signature.id, event);
-                              }}
-                            >
-                              <RotateCcw className="h-4 w-4" />
-                            </button>
-                            <button
-                              type="button"
-                              className="flex h-8 w-8 items-center justify-center rounded-full border border-rose-300 bg-white/90 text-rose-700 shadow-sm transition hover:bg-rose-50 active:translate-y-[1px]"
-                              onPointerDown={(event) => event.stopPropagation()}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                handleDeleteSignaturePlacement(page.id, signature.id);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                          <div
-                            className={`absolute -right-2 -bottom-2 h-4 w-4 cursor-se-resize rounded-full border border-slate-600 bg-white shadow-sm transition hover:border-slate-700 hover:shadow-md ${
-                              isResizingThis ? "scale-110" : ""
-                            }`}
-                            onPointerDown={(event) => {
+                      <div className="pointer-events-none absolute -top-12 left-0 flex items-center gap-2">
+                        {signature.status === "draft" ? (
+                          <button
+                            type="button"
+                            className="pointer-events-auto rounded-full bg-[#024d7c] px-3 py-1 text-xs font-semibold text-white shadow-sm transition hover:bg-[#013d63]"
+                            onPointerDown={(event) => event.stopPropagation()}
+                            onClick={(event) => {
                               event.stopPropagation();
-                              setActiveSignaturePlacementId(signature.id);
-                              startSignatureResize(page.id, signature.id, event);
+                              handleApplySignaturePlacement(page.id, signature.id);
                             }}
-                          />
-                        </>
-                      ) : null}
+                          >
+                            Apply
+                          </button>
+                        ) : null}
+                        <div className="pointer-events-auto rounded-full bg-white/85 px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
+                          {signature.name}
+                        </div>
+                      </div>
+                      <div className="pointer-events-none absolute -bottom-12 left-1/2 flex -translate-x-1/2 items-center gap-2">
+                        <button
+                          type="button"
+                          className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 bg-white/90 text-slate-700 shadow-sm transition hover:bg-white active:translate-y-[1px]"
+                          onPointerDown={(event: ReactPointerEvent<HTMLButtonElement>) => {
+                            startSignatureDrag(page.id, signature.id, event);
+                          }}
+                        >
+                          <Move className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 bg-white/90 text-slate-700 shadow-sm transition hover:bg-white active:translate-y-[1px]"
+                          onPointerDown={(event: ReactPointerEvent<HTMLButtonElement>) => {
+                            startSignatureRotate(page.id, signature.id, event);
+                          }}
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full border border-rose-300 bg-white/90 text-rose-700 shadow-sm transition hover:bg-rose-50 active:translate-y-[1px]"
+                          onPointerDown={(event) => event.stopPropagation()}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleDeleteSignaturePlacement(page.id, signature.id);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <div
+                        className={`absolute -right-2 -bottom-2 h-4 w-4 cursor-se-resize rounded-full border border-slate-600 bg-white shadow-sm transition hover:border-slate-700 hover:shadow-md ${
+                          isResizingThis ? "scale-110" : ""
+                        }`}
+                        onPointerDown={(event) => {
+                          event.stopPropagation();
+                          setActiveSignaturePlacementId(signature.id);
+                          startSignatureResize(page.id, signature.id, event);
+                        }}
+                      />
                     </div>
                   </div>
                 );
