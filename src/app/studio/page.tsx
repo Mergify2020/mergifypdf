@@ -230,6 +230,7 @@ const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
 const DEFAULT_ASPECT_RATIO = 792 / 612; // fallback letter portrait
 const SOFT_EASE: [number, number, number, number] = [0.4, 0, 0.2, 1];
 const BASE_ZOOM_MULTIPLIER = 1; // true 100% baseline
+const MAX_ZOOM_MULTIPLIER = 2.5; // cap matches previous 250% even when UI shows 300%
 const ZOOM_LEVELS = [0.5, 0.75, 1, 1.5, 2, 3];
 const VIEW_TRANSITION = { duration: 0.2, ease: SOFT_EASE };
 const GRID_VARIANTS = {
@@ -1686,7 +1687,11 @@ function WorkspaceClient() {
   const itemsIds = useMemo(() => pages.map((p) => p.id), [pages]);
   const downloadDisabled = busy || pages.length === 0;
   const activePageIndex = activePageIndexState >= 0 && activePageIndexState < pages.length ? activePageIndexState : -1;
-  const zoomMultiplier = clamp((zoomPercent / 100) * BASE_ZOOM_MULTIPLIER, 0.8, 3);
+  const zoomMultiplier = clamp(
+    (zoomPercent / 100) * (MAX_ZOOM_MULTIPLIER / 3), // 300% label maps to 250% effective
+    0.8,
+    MAX_ZOOM_MULTIPLIER
+  );
   const zoomLabel = `${Math.round(zoomPercent)}%`;
   const highlightButtonDisabled = pages.length === 0 || loading;
   const highlightColorEntries = Object.entries(
