@@ -3402,50 +3402,67 @@ function WorkspaceClient() {
             ) : null}
 
             {highlightActive || pencilActive || signatureButtonOn ? (
-              <div className="mt-3 flex flex-col gap-3">
-                <div className="flex flex-wrap items-center gap-4 rounded-xl border border-slate-200 bg-white px-4 py-2 shadow-sm">
+              <div className="mt-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-wrap items-center gap-4">
                   {signatureButtonOn ? (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        className={`${toolButtonBase} ${signaturePanelMode === "draw" ? toolButtonActive : toolButtonInactive}`}
-                        title="Draw signature"
-                        onClick={() => {
-                          setSignaturePanelMode("draw");
-                          setShowDrawModal(true);
-                          setDrawStep("canvas");
+                    <div className="flex items-center gap-2">
+                      {(() => {
+                        const tabBase =
+                          "px-3 py-1.5 text-sm font-medium rounded-full border border-slate-200 bg-slate-50 text-slate-700 hover:bg-white transition";
+                        const tabActive = "bg-[#024d7c] text-white border-transparent";
+                        const tabInactive = "";
+                        return (
+                          <>
+                          <button
+                            type="button"
+                            className={`${tabBase} ${
+                              signaturePanelMode === "draw" ? tabActive : tabInactive
+                            }`}
+                            title="Draw signature"
+                            onClick={() => {
+                              setSignaturePanelMode("draw");
+                              setShowDrawModal(true);
+                              setDrawStep("canvas");
                           setDrawSignatureName("");
                           setDrawSignatureError(null);
                           setDrawnSignatureData(null);
                         }}
-                      >
-                        <Pencil className="h-4 w-4" />
-                        Draw
-                      </button>
-                      <button
-                        type="button"
-                        className={`${toolButtonBase} ${signaturePanelMode === "upload" ? toolButtonActive : toolButtonInactive}`}
-                        title="Upload signature"
-                        onClick={() => {
-                          setSignaturePanelMode("upload");
-                          setShowUploadModal(true);
-                          setUploadPreview(null);
+                          >
+                            <Pencil className="h-4 w-4" />
+                            Draw
+                          </button>
+                          <button
+                            type="button"
+                            className={`${tabBase} ${
+                              signaturePanelMode === "upload" ? tabActive : tabInactive
+                            }`}
+                            title="Upload signature"
+                            onClick={() => {
+                              setSignaturePanelMode("upload");
+                              setShowUploadModal(true);
+                              setUploadPreview(null);
                           setUploadName("");
                           setUploadError(null);
                         }}
-                      >
-                        <UploadCloud className="h-4 w-4" />
-                        Upload
-                      </button>
-                      <button
-                        type="button"
-                        className={`${toolButtonBase} ${signaturePanelMode === "saved" ? toolButtonActive : toolButtonInactive}`}
-                        title="Saved signatures"
-                        onClick={() => setSignaturePanelMode("saved")}
-                      >
-                        <ImageIcon className="h-4 w-4" />
-                        Saved
-                      </button>
+                          >
+                            <UploadCloud className="h-4 w-4" />
+                            Upload
+                          </button>
+                          <button
+                            type="button"
+                            className={`${tabBase} ${
+                              signaturePanelMode === "saved" ? tabActive : tabInactive
+                            }`}
+                            title="Saved signatures"
+                            onClick={() => setSignaturePanelMode("saved")}
+                          >
+                            <ImageIcon className="h-4 w-4" />
+                            Saved
+                          </button>
+                          </>
+                        );
+                      })()}
                     </div>
                   ) : null}
 
@@ -3521,12 +3538,12 @@ function WorkspaceClient() {
                 </div>
 
                 {signatureButtonOn && signaturePanelMode === "saved" ? (
-                  <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                    <div className="flex items-center justify-between">
+                  <div className="mt-2">
+                    <div className="mb-2 flex items-center justify-between">
                       <h3 className="text-sm font-semibold text-slate-800">Saved signatures</h3>
                       <span className="text-xs text-slate-500">{savedSignatures.length} total</span>
                     </div>
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3">
+                    <div className="grid gap-3 md:grid-cols-3 sm:grid-cols-2 grid-cols-1">
                       {savedSignatures.length === 0 ? (
                         <div className="col-span-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
                           No saved signatures yet. Draw or upload to save one.
@@ -3535,23 +3552,24 @@ function WorkspaceClient() {
                         savedSignatures.map((sig) => (
                           <div
                             key={sig.id}
-                            className="group flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300"
+                            className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 hover:bg-white hover:shadow-sm transition"
                           >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={sig.dataUrl}
-                              alt={sig.name}
-                              className="h-12 w-20 shrink-0 rounded border border-slate-100 object-contain"
-                            />
+                            <div className="flex items-center justify-center rounded-xl bg-white border border-slate-200 h-16 overflow-hidden">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={sig.dataUrl}
+                                alt={sig.name}
+                                className="h-full w-full object-contain"
+                              />
+                            </div>
                             <div className="flex flex-col gap-1">
-                              <div className="text-sm font-semibold text-slate-800">{sig.name}</div>
-                              <div className="flex flex-wrap items-center gap-2">
+                              <div className="text-sm font-medium text-slate-800">{sig.name}</div>
+                              <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
                                 <button
                                   type="button"
-                                  className="text-xs font-semibold text-[#024d7c] transition hover:underline"
+                                  className="font-semibold text-[#024d7c] transition hover:underline"
                                   onClick={() => {
                                     beginSignaturePlacement(sig);
-                                    // Auto place once at center of current page for speed
                                     const targetPageId = activePageId || pages[0]?.id;
                                     if (targetPageId) {
                                       placeSignatureAtPoint(sig, targetPageId, { x: 0.5, y: 0.5 });
@@ -3564,7 +3582,7 @@ function WorkspaceClient() {
                                 </button>
                                 <button
                                   type="button"
-                                  className="text-xs font-semibold text-slate-600 transition hover:underline"
+                                  className="text-slate-500 transition hover:underline"
                                   onClick={() => {
                                     const nextName = prompt("Rename signature", sig.name)?.trim();
                                     if (!nextName) return;
@@ -3587,7 +3605,7 @@ function WorkspaceClient() {
                                 </button>
                                 <button
                                   type="button"
-                                  className="text-xs font-semibold text-rose-600 transition hover:underline"
+                                  className="text-red-500 transition hover:underline"
                                   onClick={() =>
                                     setSavedSignatures((prev) => prev.filter((item) => item.id !== sig.id))
                                   }
