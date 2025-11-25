@@ -589,7 +589,7 @@ function WorkspaceClient() {
   const [activePageId, setActivePageId] = useState<string | null>(null);
   const [activePageIndexState, setActivePageIndex] = useState(0);
   const [shouldCenterOnChange, setShouldCenterOnChange] = useState(false);
-  const [zoomPercent, setZoomPercent] = useState(100);
+  const [zoomPercent, setZoomPercent] = useState(125);
   const [baseScale, setBaseScale] = useState(1);
   const [userAdjustedZoom, setUserAdjustedZoom] = useState(false);
   const scrollRatioRef = useRef<{ x: number; y: number }>({ x: 0.5, y: 0 });
@@ -1260,7 +1260,7 @@ function WorkspaceClient() {
     const fittedWidth = baseWidth * effectiveScale;
     const fittedHeight = baseHeight * effectiveScale;
     const heightLimit =
-      zoomPercent > 100 && previewHeightLimit ? previewHeightLimit * 1.08 : null; // allow a bit more than the sidebar to avoid early clipping
+      zoomPercent > 125 && previewHeightLimit ? previewHeightLimit * 1.08 : null; // allow a bit more than the sidebar to avoid early clipping
     const displayHeight =
       heightLimit && heightLimit > 0 ? Math.min(fittedHeight, heightLimit) : fittedHeight;
     const clipped = heightLimit != null && displayHeight < fittedHeight;
