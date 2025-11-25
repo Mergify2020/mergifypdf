@@ -590,7 +590,7 @@ function WorkspaceClient() {
   const [zoomPercent, setZoomPercent] = useState(100);
   const [baseScale, setBaseScale] = useState(1);
   const [userAdjustedZoom, setUserAdjustedZoom] = useState(false);
-  const scrollRatioRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const scrollRatioRef = useRef<{ x: number; y: number }>({ x: 0.5, y: 0 });
   const [highlightMode, setHighlightMode] = useState(false);
   const [highlightColor, setHighlightColor] = useState<HighlightColorKey>("yellow");
   const [highlightThickness, setHighlightThickness] = useState(14);
@@ -1758,9 +1758,15 @@ function WorkspaceClient() {
       const clamped = clamp(nextPercent, 100, 300);
       const container = previewContainerRef.current;
       if (container) {
+        const maxX = Math.max(1, container.scrollWidth);
+        const maxY = Math.max(1, container.scrollHeight - container.clientHeight);
         scrollRatioRef.current = {
-          x: container.scrollLeft / Math.max(1, container.scrollWidth - container.clientWidth),
-          y: container.scrollTop / Math.max(1, container.scrollHeight - container.clientHeight),
+          x: clamp(
+            (container.scrollLeft + container.clientWidth / 2) / maxX,
+            0,
+            1
+          ),
+          y: maxY > 0 ? clamp(container.scrollTop / maxY, 0, 1) : 0,
         };
       }
       setUserAdjustedZoom(true);
@@ -1776,8 +1782,9 @@ function WorkspaceClient() {
     requestAnimationFrame(() => {
       const maxX = Math.max(0, container.scrollWidth - container.clientWidth);
       const maxY = Math.max(0, container.scrollHeight - container.clientHeight);
-      container.scrollLeft = maxX * x;
-      container.scrollTop = maxY * y;
+      const targetLeft = x * container.scrollWidth - container.clientWidth / 2;
+      container.scrollLeft = clamp(targetLeft, 0, maxX);
+      container.scrollTop = clamp(maxY * y, 0, maxY);
     });
   }, [zoomPercent, baseScale]);
 
@@ -2869,7 +2876,7 @@ function WorkspaceClient() {
                           className="viewer-scroll relative flex h-full w-full overflow-auto"
                           style={{ scrollbarGutter: "stable both-edges" }}
                         >
-                          <div className="relative flex w-fit items-start gap-6 pr-4">
+                          <div className="relative mx-auto flex min-w-full items-start justify-center gap-6 pr-4">
                             <div className="flex w-fit justify-center">
                               <div id="pdf-viewport" className="origin-top flex w-fit flex-col gap-8">
                                 {activePageIndex >= 0 && pages[activePageIndex]
