@@ -1257,10 +1257,10 @@ function WorkspaceClient() {
     const effectiveScale = baseScale * zoomMultiplier;
     const fittedWidth = baseWidth * effectiveScale;
     const fittedHeight = baseHeight * effectiveScale;
-    const heightLimit = previewHeightLimit ?? null;
+    const heightLimit = zoomPercent > 100 ? previewHeightLimit : null;
     const displayHeight =
       heightLimit && heightLimit > 0 ? Math.min(fittedHeight, heightLimit) : fittedHeight;
-    const clipped = displayHeight < fittedHeight;
+    const clipped = heightLimit != null && displayHeight < fittedHeight;
     return (
       <div
         key={page.id}
