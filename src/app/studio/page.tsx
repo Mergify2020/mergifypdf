@@ -836,6 +836,10 @@ function WorkspaceClient() {
     `${buttonBase} border border-slate-200 bg-white text-slate-800 shadow-[0_4px_14px_rgba(15,23,42,0.12)] hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50`;
   const buttonPrimary =
     `${buttonBase} bg-[#024d7c] text-white shadow-md shadow-[#012a44]/30 hover:-translate-y-0.5 hover:bg-[#013d63]`;
+  const toolButtonBase = "inline-flex h-10 items-center gap-2 rounded-lg border px-4 text-sm font-semibold transition";
+  const toolButtonInactive =
+    "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50";
+  const toolButtonActive = "border-transparent bg-[#024d7c] text-white shadow-sm";
 
   // Better drag in grids
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
@@ -2492,8 +2496,8 @@ function WorkspaceClient() {
         </div>
         <div className="mx-auto w-full px-4 pb-4 lg:px-10">
           <div className="bg-white shadow-sm rounded-lg px-4 py-4 w-full max-w-[1400px] mx-auto">
-            <div className="grid w-full grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-[1.5fr_1.5fr_auto_auto] items-start">
-              <div className="flex flex-col gap-2">
+            <div className="flex w-full items-stretch justify-between gap-4 flex-wrap lg:flex-nowrap">
+              <div className="flex flex-col gap-2 min-w-[280px] max-w-[420px]">
                 <div className="relative w-full max-w-[420px]">
                   {projectNameEditing ? (
                     <input
@@ -2540,11 +2544,11 @@ function WorkspaceClient() {
                     </svg>
                 </button>
               </div>
-              <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
-                <div className="text-xs font-semibold text-slate-600">Zoom</div>
-                <button
-                  type="button"
-                  aria-label="Zoom out"
+                <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
+                  <div className="text-xs font-semibold text-slate-600">Zoom</div>
+                  <button
+                    type="button"
+                    aria-label="Zoom out"
                   className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-40 shadow-[0_4px_12px_rgba(15,23,42,0.08)]"
                   onClick={() => setZoomWithScrollPreserved(zoomPercent - 25)}
                   disabled={zoomPercent <= 100}
@@ -2564,8 +2568,8 @@ function WorkspaceClient() {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
+              <div className="flex flex-col gap-2 flex-1 min-w-[320px]">
+                <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm justify-start">
                   <button
                     type="button"
                     aria-label="Previous page"
@@ -2592,15 +2596,15 @@ function WorkspaceClient() {
                     </svg>
                   </button>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 shadow-sm">
-                  <div className="inline-flex overflow-hidden rounded-xl border border-slate-200 bg-white">
+                <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 shadow-sm">
+                  <div className="flex items-center gap-2">
                     <button
                       type="button"
                       disabled={highlightButtonDisabled}
                       aria-pressed={highlightButtonOn}
-                      className={`${toolSwitchBase} ${
-                        highlightButtonOn ? toolSwitchActive : toolSwitchInactive
-                      } disabled:cursor-not-allowed disabled:opacity-50`}
+                      className={`${toolButtonBase} ${
+                        highlightButtonOn ? toolButtonActive : toolButtonInactive
+                      }`}
                       onClick={() =>
                         setHighlightMode((prev) => {
                           const next = !prev;
@@ -2620,9 +2624,9 @@ function WorkspaceClient() {
                       type="button"
                       disabled={highlightButtonDisabled}
                       aria-pressed={pencilButtonOn}
-                      className={`${toolSwitchBase} ${
-                        pencilButtonOn ? toolSwitchActive : toolSwitchInactive
-                      } border-l border-slate-200 disabled:cursor-not-allowed disabled:opacity-50`}
+                      className={`${toolButtonBase} ${
+                        pencilButtonOn ? toolButtonActive : toolButtonInactive
+                      }`}
                       onClick={() =>
                         setPencilMode((prev) => {
                           const next = !prev;
@@ -2642,9 +2646,7 @@ function WorkspaceClient() {
                       type="button"
                       disabled={highlightButtonDisabled}
                       aria-pressed={textButtonOn}
-                      className={`${toolSwitchBase} ${
-                        textButtonOn ? toolSwitchActive : toolSwitchInactive
-                      } border-l border-slate-200 disabled:cursor-not-allowed disabled:opacity-50`}
+                      className={`${toolButtonBase} ${textButtonOn ? toolButtonActive : toolButtonInactive}`}
                       onClick={() =>
                         setTextMode((prev) => {
                           const next = !prev;
@@ -2661,36 +2663,38 @@ function WorkspaceClient() {
                       Text
                     </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setOrganizeMode(true)}
-                    disabled={pages.length === 0 || organizeMode}
-                    aria-pressed={organizeMode}
-                    className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c]/40 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    Manage pages
-                  </button>
-                  <button
-                    className={`${buttonNeutral} px-4`}
-                    onClick={handleUndoHighlight}
-                    disabled={!hasUndoHistory}
-                  >
-                    <Undo2 className="h-4 w-4" />
-                    Undo
-                  </button>
-                  <button
-                    className={`${deleteMode ? buttonPrimary : buttonNeutral} px-4`}
-                    onClick={handleToggleDeleteMode}
-                    aria-pressed={deleteMode}
-                    disabled={!hasAnyAnnotations && !deleteMode}
-                  >
-                    <Eraser className="h-4 w-4" />
-                    Eraser
-                  </button>
-              </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setOrganizeMode(true)}
+                      disabled={pages.length === 0 || organizeMode}
+                      aria-pressed={organizeMode}
+                      className={`${toolButtonBase} ${organizeMode ? toolButtonActive : toolButtonInactive}`}
+                    >
+                      Manage pages
+                    </button>
+                    <button
+                      className={`${toolButtonBase} ${toolButtonInactive}`}
+                      onClick={handleUndoHighlight}
+                      disabled={!hasUndoHistory}
+                    >
+                      <Undo2 className="h-4 w-4" />
+                      Undo
+                    </button>
+                    <button
+                      className={`${toolButtonBase} ${deleteMode ? toolButtonActive : toolButtonInactive}`}
+                      onClick={handleToggleDeleteMode}
+                      aria-pressed={deleteMode}
+                      disabled={!hasAnyAnnotations && !deleteMode}
+                    >
+                      <Eraser className="h-4 w-4" />
+                      Eraser
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2 items-end min-w-[200px]">
                 <button
                   className={`${buttonPrimary} w-full px-6 py-3 justify-center`}
                   onClick={() => handleDownload()}
@@ -2715,92 +2719,12 @@ function WorkspaceClient() {
                 />
               </div>
             </div>
-
             {projectNameError ? (
               <div className="px-1 pb-1 text-sm text-rose-500">{projectNameError}</div>
             ) : null}
 
-            <div
-              className={`border-t border-slate-100/80 bg-slate-50/80 px-2 transition-all duration-300 ease-out sm:px-4 ${
-                highlightTrayVisible
-                  ? "pointer-events-auto max-h-40 translate-x-0 opacity-100 py-3"
-                  : "pointer-events-none max-h-0 -translate-x-4 opacity-0 py-0"
-              }`}
-            >
-              <div className="flex flex-wrap items-center gap-4 text-xs font-semibold text-slate-700">
-                {textMode ? (
-                  <div className="flex flex-wrap items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-3 py-1.5 text-[0.7rem] font-semibold text-slate-700 shadow-sm">
-                    <button
-                      type="button"
-                      className={`rounded px-2 py-1 transition ${
-                        textBold ? "bg-slate-900 text-white shadow-sm" : "hover:bg-slate-100"
-                      }`}
-                      onClick={() => setTextBold((prev) => !prev)}
-                    >
-                      B
-                    </button>
-                    <button
-                      type="button"
-                      className={`rounded px-2 py-1 transition ${
-                        textItalic ? "bg-slate-900 text-white shadow-sm" : "hover:bg-slate-100"
-                      }`}
-                      onClick={() => setTextItalic((prev) => !prev)}
-                    >
-                      I
-                    </button>
-                    <div className="relative" ref={fontMenuRef}>
-                      <button
-                        type="button"
-                        onClick={() => setFontMenuOpen((prev) => !prev)}
-                        className="flex items-center gap-2 rounded border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-inner transition hover:border-slate-300 focus:outline-none"
-                      >
-                        <span className="truncate" style={{ fontFamily: TEXT_FONT_OPTIONS[textFont].cssFamily }}>
-                          {TEXT_FONT_OPTIONS[textFont].label}
-                        </span>
-                        <ChevronDown className="h-3.5 w-3.5 text-slate-500" />
-                      </button>
-                      {fontMenuOpen ? (
-                        <div className="absolute z-20 mt-1 w-52 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
-                          <div className="max-h-56 overflow-y-auto">
-                            {textFontEntries.map(([key, option]) => (
-                              <button
-                                key={key}
-                                type="button"
-                                onClick={() => {
-                                  setTextFont(key);
-                                  setFontMenuOpen(false);
-                                }}
-                                className={`flex w-full items-center justify-between px-3 py-2 text-left text-xs transition hover:bg-slate-50 ${
-                                  textFont === key ? "bg-slate-100 font-semibold text-slate-900" : "text-slate-700"
-                                }`}
-                                style={{ fontFamily: option.cssFamily }}
-                              >
-                                <span>{option.label}</span>
-                                {textFont === key ? (
-                                  <span className="text-[10px] uppercase text-slate-500">Active</span>
-                                ) : null}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      ) : null}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <span className="text-[0.65rem] text-slate-500">Size</span>
-                      <input
-                        type="range"
-                        min={10}
-                        max={28}
-                        value={textSize}
-                        onChange={(event) => setTextSize(Number(event.target.value))}
-                        className="h-1 w-24 accent-slate-500"
-                      />
-                      <span className="text-[0.65rem] text-slate-700 min-w-[28px] text-right">
-                        {textSize}px
-                      </span>
-                    </div>
-                  </div>
-                ) : null}
+            {highlightActive || pencilActive ? (
+              <div className="mt-3 flex items-center gap-4 rounded-xl border border-slate-200 bg-white px-4 py-2 shadow-sm">
                 {highlightActive ? (
                   <>
                     <div className="flex items-center gap-2">
@@ -2840,6 +2764,7 @@ function WorkspaceClient() {
                     </div>
                   </>
                 ) : null}
+
                 {pencilActive ? (
                   <>
                     <div className="flex items-center gap-2 rounded-full border border-slate-300 bg-white/80 px-3 py-1.5 text-[0.65rem] font-semibold uppercase tracking-wide text-slate-600 shadow-sm">
@@ -2870,7 +2795,7 @@ function WorkspaceClient() {
                   </>
                 ) : null}
               </div>
-            </div>
+            ) : null}
           </div>
         </div>
       </header>
