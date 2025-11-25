@@ -44,7 +44,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
       <body className="min-h-screen bg-white text-gray-900">
         <Providers session={session}>
-          <header className="sticky top-0 z-50 w-full border-b border-slate-100 bg-white/95 backdrop-blur">
+          <header className="sticky top-0 z-50 w-full border-b border-slate-100 bg-white shadow-sm">
             <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 lg:px-6">
               <Link
                 href={session?.user ? "/" : "/"}
@@ -53,11 +53,21 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               >
                 <Image src="/logo-wordmark2.svg" alt="MergifyPDF" width={192} height={48} priority />
               </Link>
-              {session?.user ? (
-                <WorkspaceSettingsMenu />
-              ) : (
-                <HeaderLoginButton />
-              )}
+              <div className="flex items-center gap-4">
+                <input type="text" className="border rounded px-3 py-1" placeholder="Coco" aria-label="PDF Name" />
+                <div className="flex items-center gap-2">
+                  <button className="border rounded px-3 py-1">Zoom</button>
+                  <input type="range" min="50" max="200" defaultValue="125" className="w-24" />
+                  <span>125%</span>
+                </div>
+                <button className="bg-blue-600 text-white px-4 py-2 rounded shadow-md hover:bg-blue-500 transition">
+                  Download pages
+                </button>
+                <button className="bg-white text-blue-600 px-4 py-2 rounded shadow-md border hover:bg-blue-50 transition">
+                  Add pages
+                </button>
+                {session?.user ? <WorkspaceSettingsMenu /> : <HeaderLoginButton />}
+              </div>
             </div>
           </header>
 
@@ -110,3 +120,4 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     </html>
   );
 }
+
