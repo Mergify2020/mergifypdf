@@ -1714,7 +1714,7 @@ function WorkspaceClient() {
     const availableHeight = Math.max(container.clientHeight, 200);
     const fitScale = Math.max(
       0.2,
-      Math.min(availableWidth / baseWidth, availableHeight / baseHeight, 1) // cap auto-fit at 100% to avoid starting zoomed-in
+      Math.min(availableWidth / baseWidth, availableHeight / baseHeight, 1) * 0.9 // start slightly smaller than 100% to leave zoom headroom
     );
     setBaseScale((prev) => (Math.abs(prev - fitScale) > 0.001 ? fitScale : prev));
   }, [activePageIndex, pages]);
@@ -2869,8 +2869,8 @@ function WorkspaceClient() {
                           className="viewer-scroll relative flex h-full w-full overflow-auto"
                           style={{ scrollbarGutter: "stable both-edges" }}
                         >
-                          <div className="relative flex w-fit items-start">
-                            <div className="flex w-fit justify-center pr-[320px]">
+                          <div className="relative grid h-full w-full grid-cols-[minmax(0,1fr)_260px] items-start gap-6 pr-4">
+                            <div className="flex min-w-[640px] justify-center">
                               <div id="pdf-viewport" className="origin-top flex w-fit flex-col gap-8">
                                 {activePageIndex >= 0 && pages[activePageIndex]
                                   ? renderPreviewPage(pages[activePageIndex], activePageIndex)
@@ -2878,7 +2878,7 @@ function WorkspaceClient() {
                               </div>
                             </div>
 
-                            <aside className="sticky right-4 top-4 z-10 w-[260px] shrink-0">
+                            <aside className="w-[260px] shrink-0">
                               <div className="flex h-full flex-col rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
                                 <div className="flex flex-col gap-1">
                                   <p className="text-sm font-semibold text-white">Page order</p>
