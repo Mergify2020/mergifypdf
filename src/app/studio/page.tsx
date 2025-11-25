@@ -1255,11 +1255,12 @@ function WorkspaceClient() {
     const baseWidth = rotated ? naturalHeight : naturalWidth;
     const baseHeight = rotated ? naturalWidth : naturalHeight;
     const effectiveScale = baseScale * zoomMultiplier;
-    const heightLimit = previewHeightLimit;
-    const limitedScale =
-      heightLimit && heightLimit > 0 ? Math.min(effectiveScale, heightLimit / baseHeight) : effectiveScale;
-    const fittedWidth = baseWidth * limitedScale;
-    const fittedHeight = baseHeight * limitedScale;
+    const fittedWidth = baseWidth * effectiveScale;
+    const fittedHeight = baseHeight * effectiveScale;
+    const heightLimit = previewHeightLimit ?? null;
+    const displayHeight =
+      heightLimit && heightLimit > 0 ? Math.min(fittedHeight, heightLimit) : fittedHeight;
+    const clipped = displayHeight < fittedHeight;
     return (
       <div
         key={page.id}
@@ -1273,19 +1274,20 @@ function WorkspaceClient() {
           }`}
           style={{
             width: fittedWidth,
-            height: fittedHeight,
+            height: displayHeight,
+            overflow: clipped ? "hidden" : undefined,
           }}
           onClick={() => handleSelectPage(idx)}
         >
           <div
-            className="absolute inset-0 flex items-center justify-center overflow-visible"
+            className="absolute inset-0 flex items-start justify-center overflow-visible"
             style={{ width: "100%", height: "100%" }}
           >
             <div
-              className="absolute inset-0 bg-white"
+              className="absolute left-0 top-0 bg-white"
               style={{
-                width: "100%",
-                height: "100%",
+                width: fittedWidth,
+                height: fittedHeight,
                 transform: `rotate(${rotationDegrees}deg)`,
                 transformOrigin: "top right",
                 cursor:
