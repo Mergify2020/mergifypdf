@@ -229,7 +229,7 @@ const WORKSPACE_DB_STORE = "files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
 const DEFAULT_ASPECT_RATIO = 792 / 612; // fallback letter portrait
 const SOFT_EASE: [number, number, number, number] = [0.4, 0, 0.2, 1];
-const BASE_ZOOM_MULTIPLIER = 1.5; // Treat previous 150% as the new 100%
+const BASE_ZOOM_MULTIPLIER = 1.25; // Slightly larger baseline without blowing up the view
 const ZOOM_LEVELS = [0.5, 0.75, 1, 1.5, 2, 3];
 const VIEW_TRANSITION = { duration: 0.2, ease: SOFT_EASE };
 const GRID_VARIANTS = {
@@ -1258,7 +1258,8 @@ function WorkspaceClient() {
     const effectiveScale = baseScale * zoomMultiplier;
     const fittedWidth = baseWidth * effectiveScale;
     const fittedHeight = baseHeight * effectiveScale;
-    const heightLimit = zoomPercent > 100 ? previewHeightLimit : null;
+    const heightLimit =
+      zoomPercent > 100 && previewHeightLimit ? previewHeightLimit * 1.08 : null; // allow a bit more than the sidebar to avoid early clipping
     const displayHeight =
       heightLimit && heightLimit > 0 ? Math.min(fittedHeight, heightLimit) : fittedHeight;
     const clipped = heightLimit != null && displayHeight < fittedHeight;
@@ -1685,7 +1686,7 @@ function WorkspaceClient() {
   const itemsIds = useMemo(() => pages.map((p) => p.id), [pages]);
   const downloadDisabled = busy || pages.length === 0;
   const activePageIndex = activePageIndexState >= 0 && activePageIndexState < pages.length ? activePageIndexState : -1;
-  const zoomMultiplier = clamp((zoomPercent / 100) * BASE_ZOOM_MULTIPLIER, BASE_ZOOM_MULTIPLIER, 3 * BASE_ZOOM_MULTIPLIER);
+  const zoomMultiplier = clamp((zoomPercent / 100) * BASE_ZOOM_MULTIPLIER, 0.8, 3);
   const zoomLabel = `${Math.round(zoomPercent)}%`;
   const highlightButtonDisabled = pages.length === 0 || loading;
   const highlightColorEntries = Object.entries(
