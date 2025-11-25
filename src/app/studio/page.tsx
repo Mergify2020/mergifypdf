@@ -856,10 +856,6 @@ function WorkspaceClient() {
     return () => window.removeEventListener("resize", updatePreviewHeightLimit);
   }, [updatePreviewHeightLimit]);
 
-  useEffect(() => {
-    updatePreviewHeightLimit();
-  }, [updatePreviewHeightLimit, pages.length, activePageIndex]);
-
   /** Rehydrate any stored PDFs from IndexedDB so refreshes survive deployments */
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1718,6 +1714,9 @@ function WorkspaceClient() {
     () => Object.values(textAnnotations).reduce((sum, list) => sum + (list?.length ?? 0), 0),
     [textAnnotations]
   );
+  useEffect(() => {
+    updatePreviewHeightLimit();
+  }, [updatePreviewHeightLimit, pages.length, activePageIndex]);
   const hasWorkspaceData =
     pages.length > 0 || highlightCount > 0 || textAnnotationCount > 0 || !!draftHighlight || !!draftTextBox;
 
