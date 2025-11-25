@@ -2495,9 +2495,9 @@ function WorkspaceClient() {
           {authSession?.user ? <WorkspaceSettingsMenu /> : <HeaderLoginButton />}
         </div>
         <div className="mx-auto w-full px-4 pb-4 lg:px-10">
-          <div className="w-full max-w-[1400px] mx-auto rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          <div className="w-full max-w-[1400px] mx-auto rounded-2xl border border-slate-200/80 bg-white/95 px-5 py-3 shadow-[0_16px_40px_rgba(15,23,42,0.08)] ring-1 ring-white/60">
             <div className="flex w-full items-center justify-between gap-4 flex-wrap lg:flex-nowrap">
-              <div className="flex flex-col gap-2 min-w-[280px] max-w-[420px]">
+              <div className="flex flex-col gap-3 min-w-[280px] max-w-[420px] rounded-xl bg-slate-50/70 p-3 shadow-inner">
                 <div className="relative w-full max-w-[420px]">
                   {projectNameEditing ? (
                     <input
@@ -2568,7 +2568,7 @@ function WorkspaceClient() {
                 </div>
               </div>
 
-              <div className="flex flex-col items-center gap-2 flex-1 min-w-[320px]">
+              <div className="flex flex-col items-center gap-3 flex-1 min-w-[320px] rounded-xl bg-slate-50/60 p-3 shadow-sm">
                 <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm justify-start">
                   <button
                     type="button"
@@ -2694,7 +2694,7 @@ function WorkspaceClient() {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-2 items-end min-w-[200px]">
+              <div className="flex flex-col items-end gap-3 min-w-[200px] rounded-xl bg-slate-50/70 p-3 shadow-inner">
                 <button
                   className={`${buttonPrimary} w-full px-6 py-2 justify-center`}
                   onClick={() => handleDownload()}
