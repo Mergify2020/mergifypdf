@@ -924,8 +924,8 @@ function WorkspaceClient() {
   const controlButtonClass =
     "flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,0.08)] transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-40";
   const signatureTabBase =
-    "px-3 py-1.5 text-sm font-medium rounded-full border border-slate-200 bg-slate-50 text-slate-700 hover:bg-white transition";
-  const signatureTabActive = "bg-[#024d7c] text-white border-transparent";
+    "w-full justify-center px-4 py-2 text-sm font-semibold rounded-full border border-[#024d7c] bg-[#035f97] text-white shadow-sm transition hover:bg-[#024d7c]";
+  const signatureTabActive = "bg-[#024d7c] text-white border-[#013d63]";
   const signatureTabInactive = "";
 
   // Better drag in grids
@@ -3410,7 +3410,7 @@ function WorkspaceClient() {
                 <div className="flex flex-col gap-3">
                   <div className="flex flex-wrap items-center gap-4">
                     {signatureButtonOn ? (
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 w-full">
                         <button
                           type="button"
                           className={`${signatureTabBase} ${
@@ -3535,9 +3535,8 @@ function WorkspaceClient() {
                     <div className="mt-2">
                       <div className="mb-2 flex items-center justify-between">
                         <h3 className="text-sm font-semibold text-slate-800">Saved signatures</h3>
-                        <span className="text-xs text-slate-500">{savedSignatures.length} total</span>
                       </div>
-                      <div className="grid gap-3 md:grid-cols-3 sm:grid-cols-2 grid-cols-1">
+                      <div className="flex gap-3 overflow-x-auto pb-2">
                         {savedSignatures.length === 0 ? (
                           <div className="col-span-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
                             No saved signatures yet. Draw or upload to save one.
@@ -3546,7 +3545,7 @@ function WorkspaceClient() {
                           savedSignatures.map((sig) => (
                             <div
                               key={sig.id}
-                              className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 hover:bg-white hover:shadow-sm transition"
+                              className="flex min-w-[220px] flex-col gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 hover:bg-white hover:shadow-sm transition"
                             >
                               <div className="flex flex-col gap-1">
                                 <div className="text-sm font-medium text-slate-800">{sig.name}</div>
