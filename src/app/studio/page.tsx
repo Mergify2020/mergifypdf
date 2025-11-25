@@ -1714,7 +1714,7 @@ function WorkspaceClient() {
     const availableHeight = Math.max(container.clientHeight, 200);
     const fitScale = Math.max(
       0.2,
-      Math.min(availableWidth / baseWidth, availableHeight / baseHeight, 1) * 0.9 // start slightly smaller than 100% to leave zoom headroom
+      Math.min(availableWidth / baseWidth, availableHeight / baseHeight, 1) // cap auto-fit at 100% to avoid starting zoomed-in
     );
     setBaseScale((prev) => (Math.abs(prev - fitScale) > 0.001 ? fitScale : prev));
   }, [activePageIndex, pages]);
