@@ -216,10 +216,8 @@ const PENCIL_COLOR = "#111827";
 
 type HighlightColorKey = keyof typeof HIGHLIGHT_COLORS;
 
-const HIGHLIGHT_CURSOR =
-  "data:image/svg+xml;utf8,%3Csvg width='32' height='32' viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 24 L24 2 L30 8 L10 28 L3 29 Z' fill='%23024d7c'/%3E%3Crect x='5' y='25' width='10' height='3' fill='%23ffd43b'/%3E%3C/svg%3E";
-const ERASER_CURSOR =
-  "data:image/svg+xml;utf8,%3Csvg width='28' height='28' viewBox='0 0 28 28' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 18.5 14.5 8l3.5 3.5-10.5 10.5H4z' fill='%23f97316' stroke='%23ea580c' stroke-width='1.2'/%3E%3Cpath d='M18 11l2.5-2.5-3.5-3.5L14.5 7.5' stroke='%23262626' stroke-width='1.2'/%3E%3Ccircle cx='22' cy='22' r='3' fill='%23ffffff' stroke='%23262626' stroke-width='1.2'/%3E%3C/svg%3E";
+  const HIGHLIGHT_CURSOR =
+    "data:image/svg+xml;utf8,%3Csvg width='32' height='32' viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 24 L24 2 L30 8 L10 28 L3 29 Z' fill='%23024d7c'/%3E%3Crect x='5' y='25' width='10' height='3' fill='%23ffd43b'/%3E%3C/svg%3E";
 const PREVIEW_BASE_SCALE = 3;
 const MAX_DEVICE_PIXEL_RATIO = 4;
 const TEXT_PLACEHOLDER = "Type here";
@@ -1302,7 +1300,7 @@ function WorkspaceClient() {
               transform: `rotate(${rotationDegrees}deg)`,
               transformOrigin: "top right",
               cursor: deleteMode
-                ? (`url(${ERASER_CURSOR}) 4 4, pointer` as CSSProperties["cursor"])
+                ? ("url('/icons/eraser.svg') 4 4, auto" as CSSProperties["cursor"])
                 : activeDrawingTool === "highlight"
                 ? (`url(${HIGHLIGHT_CURSOR}) 4 24, crosshair` as CSSProperties["cursor"])
                 : activeDrawingTool === "pencil"
@@ -1340,7 +1338,7 @@ function WorkspaceClient() {
                       strokeOpacity={stroke.tool === "pencil" ? 1 : 0.25}
                       style={{
                         pointerEvents: deleteMode ? "stroke" : "none",
-                        cursor: deleteMode ? (`url(${ERASER_CURSOR}) 4 4, pointer` as CSSProperties["cursor"]) : "default",
+                        cursor: deleteMode ? url('/icons/eraser.svg') 4 4, auto : "default",
                       }}
                       onClick={(event) => {
                         if (!deleteMode) return;
@@ -1401,7 +1399,7 @@ function WorkspaceClient() {
                     transformOrigin: "center",
                     willChange: isRotatingThis ? "transform" : undefined,
                     transitionDuration: isRotatingThis ? "0ms" : undefined,
-                    cursor: deleteMode ? (`url(${ERASER_CURSOR}) 4 4, pointer` as CSSProperties["cursor"]) : undefined,
+                    cursor: deleteMode ? url('/icons/eraser.svg') 4 4, auto : undefined,
                   }}
                   onClick={(event) => {
                     event.stopPropagation();
@@ -2231,7 +2229,7 @@ function WorkspaceClient() {
     }
     const previous = document.body.style.cursor;
     if (deleteMode) {
-      document.body.style.cursor = `url(${ERASER_CURSOR}) 4 4, pointer`;
+      document.body.style.cursor = "url('/icons/eraser.svg') 4 4, auto";
     } else {
       document.body.style.cursor =
         activeDrawingTool === "highlight"
@@ -2889,7 +2887,7 @@ function WorkspaceClient() {
                       <div className="flex-1 min-h-0 overflow-hidden">
                         <div
                           ref={viewerScrollRef}
-                          className="viewer-scroll relative flex h-full w-full overflow-auto"
+                          className={`viewer-scroll relative flex h-full w-full overflow-auto ${deleteMode ? "eraser-cursor" : ""}`}
                           style={{ scrollbarGutter: "stable both-edges" }}
                         >
                           <div className="relative mx-auto flex min-w-full items-start justify-center gap-6 pr-4">
@@ -3050,6 +3048,10 @@ function WorkspaceClient() {
           height: 4px;
           border-radius: 9999px;
           background-color: #e5e7eb;
+        }
+        .eraser-cursor,
+        .eraser-cursor * {
+          cursor: url("/icons/eraser.svg") 4 4, auto !important;
         }
         .viewer-scroll {
           overflow: auto;
