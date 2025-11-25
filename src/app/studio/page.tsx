@@ -1809,7 +1809,11 @@ function WorkspaceClient() {
   const loadImageDimensions = useCallback(
     (dataUrl: string) =>
       new Promise<{ width: number; height: number }>((resolve) => {
-        const img = new Image();
+        if (typeof window === "undefined") {
+          resolve({ width: 600, height: 200 });
+          return;
+        }
+        const img = new window.Image();
         img.onload = () => resolve({ width: img.naturalWidth || 600, height: img.naturalHeight || 200 });
         img.onerror = () => resolve({ width: 600, height: 200 });
         img.src = dataUrl;
