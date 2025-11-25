@@ -1,5 +1,10 @@
 "use client";
 
+import Image from "next/image";
+import Link from "next/link";
+import { useSession } from "next-auth/react";
+import WorkspaceSettingsMenu from "@/components/WorkspaceSettingsMenu";
+import HeaderLoginButton from "@/components/HeaderLoginButton";
 import { Check, X } from "lucide-react";
 
 const tiers = [
@@ -85,9 +90,20 @@ const faqs = [
 ];
 
 export default function PricingPlans() {
+  const { data: session } = useSession();
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#050915] via-[#081327] to-[#05060c] px-6 py-12 text-slate-900">
       <div className="mx-auto max-w-6xl space-y-10 px-2">
+        <header className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-5 py-3 shadow-[0_10px_40px_rgba(0,0,0,0.25)] backdrop-blur">
+          <Link href="/" className="inline-flex items-center gap-2" aria-label="Back to workspace">
+            <Image src="/logo-wordmark2.svg" alt="MergifyPDF" width={150} height={38} priority />
+          </Link>
+          <div className="flex items-center gap-3">
+            {session?.user ? <WorkspaceSettingsMenu /> : <HeaderLoginButton />}
+          </div>
+        </header>
+
         <div className="text-center text-white">
           <h1 className="text-4xl font-semibold tracking-tight text-white drop-shadow-[0_10px_45px_rgba(0,0,0,0.35)]">
             Choose the workspace built for your workflow.
