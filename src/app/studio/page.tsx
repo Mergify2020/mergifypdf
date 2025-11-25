@@ -229,7 +229,7 @@ const WORKSPACE_DB_STORE = "files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
 const DEFAULT_ASPECT_RATIO = 792 / 612; // fallback letter portrait
 const SOFT_EASE: [number, number, number, number] = [0.4, 0, 0.2, 1];
-const BASE_ZOOM_MULTIPLIER = 1.25; // Slightly larger baseline without blowing up the view
+const BASE_ZOOM_MULTIPLIER = 1; // true 100% baseline
 const ZOOM_LEVELS = [0.5, 0.75, 1, 1.5, 2, 3];
 const VIEW_TRANSITION = { duration: 0.2, ease: SOFT_EASE };
 const GRID_VARIANTS = {
@@ -1739,7 +1739,7 @@ function WorkspaceClient() {
     const availableHeight = Math.max(container.clientHeight, 200);
     const fitScale = Math.max(
       0.2,
-      Math.min(availableWidth / baseWidth, availableHeight / baseHeight, 1) * 0.98 // start closer to full size for a larger default preview
+      Math.min(availableWidth / baseWidth, availableHeight / baseHeight, 1) * 0.85 // start smaller so ~75% height is visible at 100%
     );
     setBaseScale((prev) => (Math.abs(prev - fitScale) > 0.001 ? fitScale : prev));
   }, [activePageIndex, pages]);
