@@ -1729,6 +1729,8 @@ function WorkspaceClient() {
     () => Object.values(textAnnotations).reduce((sum, list) => sum + (list?.length ?? 0), 0),
     [textAnnotations]
   );
+  const hasAnyTextAnnotations = textAnnotationCount > 0;
+  const hasAnyAnnotations = highlightCount > 0 || hasAnyTextAnnotations;
   useEffect(() => {
     updatePreviewHeightLimit();
   }, [updatePreviewHeightLimit, pages.length, activePageIndex]);
@@ -2351,14 +2353,19 @@ function WorkspaceClient() {
   }
 
   function handleClearHighlights() {
-    if (!hasAnyHighlights) return;
+    if (!hasAnyAnnotations) return;
     setDraftHighlight(null);
     setDeleteMode(false);
     setHighlights((current) => {
       const snapshot = cloneHighlightMap(current);
-      setHighlightHistory((prev) => [...prev, { type: "clear", previous: snapshot }]);
+      if (Object.keys(current).length > 0) {
+        setHighlightHistory((prev) => [...prev, { type: "clear", previous: snapshot }]);
+      }
       return {};
     });
+    setDraftTextBox(null);
+    setTextAnnotations({});
+    setFocusedTextId(null);
   }
 
   function handleDeleteStroke(pageId: string, strokeId: string) {
@@ -2511,27 +2518,11 @@ function WorkspaceClient() {
                   <div className="inline-flex overflow-hidden rounded-xl border border-slate-200 bg-white">
                     <button
                       type="button"
-                      aria-pressed={!highlightButtonOn && !pencilButtonOn}
-                      className={`${toolSwitchBase} ${
-                        !highlightButtonOn && !pencilButtonOn && !textButtonOn ? toolSwitchActive : toolSwitchInactive
-                      }`}
-                      onClick={() => {
-                        setHighlightMode(false);
-                        setPencilMode(false);
-                        setTextMode(false);
-                        setDeleteMode(false);
-                        setDraftHighlight(null);
-                      }}
-                    >
-                      Select
-                    </button>
-                    <button
-                      type="button"
                       disabled={highlightButtonDisabled}
                       aria-pressed={highlightButtonOn}
                       className={`${toolSwitchBase} ${
                         highlightButtonOn ? toolSwitchActive : toolSwitchInactive
-                      } border-l border-slate-200 disabled:cursor-not-allowed disabled:opacity-50`}
+                      } disabled:cursor-not-allowed disabled:opacity-50`}
                       onClick={() =>
                         setHighlightMode((prev) => {
                           const next = !prev;
@@ -2602,22 +2593,22 @@ function WorkspaceClient() {
                     Manage pages
                   </button>
                   <button
+                  className={`${buttonNeutral} px-4`}
+                  onClick={handleUndoHighlight}
+                  disabled={!hasUndoHistory}
+                >
+                  <Undo2 className="h-4 w-4" />
+                  Undo
+                </button>
+                <button
                     className={`${buttonNeutral} px-4`}
-                    onClick={handleUndoHighlight}
-                    disabled={!hasUndoHistory}
-                  >
-                    <Undo2 className="h-4 w-4" />
-                    Undo
-                  </button>
-                  <button
-                    className={`${buttonNeutral} px-4`}
-                    onClick={handleClearHighlights}
-                    disabled={!hasAnyHighlights}
-                  >
-                    <Eraser className="h-4 w-4" />
-                    Clear
-                  </button>
-                </div>
+                  onClick={handleClearHighlights}
+                  disabled={!hasAnyAnnotations}
+                >
+                  <Eraser className="h-4 w-4" />
+                  Eraser
+                </button>
+              </div>
               </div>
 
               <div className="flex flex-col gap-2">
@@ -2658,27 +2649,6 @@ function WorkspaceClient() {
               }`}
             >
               <div className="flex flex-wrap items-center gap-4 text-xs font-semibold text-slate-700">
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleToggleDeleteMode}
-                    disabled={!hasAnyHighlights && !deleteMode}
-                    aria-pressed={deleteMode}
-                    className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold transition ${
-                      deleteMode
-                        ? "border-transparent bg-slate-900 text-white shadow-lg shadow-slate-900/25"
-                        : "border-slate-200 text-slate-700 hover:border-slate-300 disabled:hover:border-slate-200"
-                    } disabled:cursor-not-allowed disabled:opacity-50`}
-                  >
-                    <Eraser className="h-3.5 w-3.5" />
-                    Select markups
-                  </button>
-                  {deleteMode ? (
-                    <span className="text-[0.6rem] font-semibold uppercase tracking-wide text-slate-500">
-                      Tap a highlight or pencil mark to remove it
-                    </span>
-                  ) : null}
-                </div>
                 {textMode ? (
                   <div className="flex flex-wrap items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-3 py-1.5 text-[0.7rem] font-semibold text-slate-700 shadow-sm">
                     <button
