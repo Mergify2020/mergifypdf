@@ -2597,16 +2597,16 @@ function WorkspaceClient() {
               <div className="flex items-center gap-3">
                 <button
                   className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300"
-                  onClick={undo}
-                  disabled={!canUndo}
+                  onClick={handleUndoHighlight}
+                  disabled={!hasUndoHistory}
                 >
                   <Undo2 className="h-4 w-4" />
                   Undo
                 </button>
                 <button
                   className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300"
-                  onClick={clearAllHighlights}
-                  disabled={highlightCount === 0}
+                  onClick={handleClearHighlights}
+                  disabled={!hasAnyHighlights}
                 >
                   <Eraser className="h-4 w-4" />
                   Clear
