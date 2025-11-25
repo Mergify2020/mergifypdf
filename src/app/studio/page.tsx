@@ -2494,11 +2494,12 @@ function WorkspaceClient() {
           </Link>
           {authSession?.user ? <WorkspaceSettingsMenu /> : <HeaderLoginButton />}
         </div>
+        
         <div className="mx-auto w-full px-4 pb-4 lg:px-10">
-          <div className="w-full max-w-[1400px] mx-auto rounded-2xl border border-slate-200/80 bg-white/95 px-5 py-3 shadow-[0_16px_40px_rgba(15,23,42,0.08)] ring-1 ring-white/60">
-            <div className="flex w-full items-center justify-between gap-4 flex-wrap lg:flex-nowrap">
-              <div className="flex flex-col gap-3 min-w-[280px] max-w-[420px] rounded-xl bg-slate-50/70 p-3 shadow-inner">
-                <div className="relative w-full max-w-[420px]">
+          <div className="w-full max-w-[1400px] mx-auto rounded-2xl border border-slate-200/80 bg-white/95 px-5 py-4 shadow-[0_16px_40px_rgba(15,23,42,0.08)] ring-1 ring-white/60">
+            <div className="flex w-full flex-wrap items-start justify-between gap-4">
+              <div className="flex w-full max-w-[380px] flex-col gap-3 rounded-xl bg-slate-50/80 p-4 shadow-inner">
+                <div className="relative w-full">
                   {projectNameEditing ? (
                     <input
                       className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 pr-9 text-sm font-semibold text-slate-900 shadow-inner outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200/70"
@@ -2542,19 +2543,19 @@ function WorkspaceClient() {
                         strokeLinejoin="round"
                       />
                     </svg>
-                </button>
-              </div>
+                  </button>
+                </div>
                 <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
                   <div className="text-xs font-semibold text-slate-600">Zoom</div>
                   <button
                     type="button"
                     aria-label="Zoom out"
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-40 shadow-[0_4px_12px_rgba(15,23,42,0.08)]"
-                  onClick={() => setZoomWithScrollPreserved(zoomPercent - 25)}
-                  disabled={zoomPercent <= 100}
-                >
-                  <Minus className="h-4 w-4" />
-                </button>
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-40 shadow-[0_4px_12px_rgba(15,23,42,0.08)]"
+                    onClick={() => setZoomWithScrollPreserved(zoomPercent - 25)}
+                    disabled={zoomPercent <= 100}
+                  >
+                    <Minus className="h-4 w-4" />
+                  </button>
                   <input
                     type="range"
                     min={100}
@@ -2568,8 +2569,8 @@ function WorkspaceClient() {
                 </div>
               </div>
 
-              <div className="flex flex-col items-center gap-3 flex-1 min-w-[320px] rounded-xl bg-slate-50/60 p-3 shadow-sm">
-                <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm justify-start">
+              <div className="flex flex-1 min-w-[360px] flex-col items-center gap-3 rounded-xl bg-slate-50/80 p-4 shadow-inner">
+                <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm justify-center">
                   <button
                     type="button"
                     aria-label="Previous page"
@@ -2596,105 +2597,97 @@ function WorkspaceClient() {
                     </svg>
                   </button>
                 </div>
-                <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 shadow-sm">
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      disabled={highlightButtonDisabled}
-                      aria-pressed={highlightButtonOn}
-                      className={`${toolButtonBase} ${
-                        highlightButtonOn ? toolButtonActive : toolButtonInactive
-                      }`}
-                      onClick={() =>
-                        setHighlightMode((prev) => {
-                          const next = !prev;
-                          if (next) {
-                            setDeleteMode(false);
-                            setPencilMode(false);
-                            setTextMode(false);
-                          }
-                          return next;
-                        })
-                      }
-                    >
-                      <Highlighter className="h-4 w-4" />
-                      Highlight
-                    </button>
-                    <button
-                      type="button"
-                      disabled={highlightButtonDisabled}
-                      aria-pressed={pencilButtonOn}
-                      className={`${toolButtonBase} ${
-                        pencilButtonOn ? toolButtonActive : toolButtonInactive
-                      }`}
-                      onClick={() =>
-                        setPencilMode((prev) => {
-                          const next = !prev;
-                          if (next) {
-                            setDeleteMode(false);
-                            setHighlightMode(false);
-                            setTextMode(false);
-                          }
-                          return next;
-                        })
-                      }
-                    >
-                      <Pencil className="h-4 w-4" />
-                      Pencil
-                    </button>
-                    <button
-                      type="button"
-                      disabled={highlightButtonDisabled}
-                      aria-pressed={textButtonOn}
-                      className={`${toolButtonBase} ${textButtonOn ? toolButtonActive : toolButtonInactive}`}
-                      onClick={() =>
-                        setTextMode((prev) => {
-                          const next = !prev;
-                          if (next) {
-                            setDeleteMode(false);
-                            setHighlightMode(false);
-                            setPencilMode(false);
-                            setDraftHighlight(null);
-                          }
-                          return next;
-                        })
-                      }
-                    >
-                      Text
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setOrganizeMode(true)}
-                      disabled={pages.length === 0 || organizeMode}
-                      aria-pressed={organizeMode}
-                      className={`${toolButtonBase} ${organizeMode ? toolButtonActive : toolButtonInactive}`}
-                    >
-                      Manage pages
-                    </button>
-                    <button
-                      className={`${toolButtonBase} ${toolButtonInactive}`}
-                      onClick={handleUndoHighlight}
-                      disabled={!hasUndoHistory}
-                    >
-                      <Undo2 className="h-4 w-4" />
-                      Undo
-                    </button>
-                    <button
-                      className={`${toolButtonBase} ${deleteMode ? toolButtonActive : toolButtonInactive}`}
-                      onClick={handleToggleDeleteMode}
-                      aria-pressed={deleteMode}
-                      disabled={!hasAnyAnnotations && !deleteMode}
-                    >
-                      <Eraser className="h-4 w-4" />
-                      Eraser
-                    </button>
-                  </div>
+                <div className="flex flex-wrap justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
+                  <button
+                    type="button"
+                    disabled={highlightButtonDisabled}
+                    aria-pressed={highlightButtonOn}
+                    className={`${toolButtonBase} ${highlightButtonOn ? toolButtonActive : toolButtonInactive}`}
+                    onClick={() =>
+                      setHighlightMode((prev) => {
+                        const next = !prev;
+                        if (next) {
+                          setDeleteMode(false);
+                          setPencilMode(false);
+                          setTextMode(false);
+                        }
+                        return next;
+                      })
+                    }
+                  >
+                    <Highlighter className="h-4 w-4" />
+                    Highlight
+                  </button>
+                  <button
+                    type="button"
+                    disabled={highlightButtonDisabled}
+                    aria-pressed={pencilButtonOn}
+                    className={`${toolButtonBase} ${pencilButtonOn ? toolButtonActive : toolButtonInactive}`}
+                    onClick={() =>
+                      setPencilMode((prev) => {
+                        const next = !prev;
+                        if (next) {
+                          setDeleteMode(false);
+                          setHighlightMode(false);
+                          setTextMode(false);
+                        }
+                        return next;
+                      })
+                    }
+                  >
+                    <Pencil className="h-4 w-4" />
+                    Pencil
+                  </button>
+                  <button
+                    type="button"
+                    disabled={highlightButtonDisabled}
+                    aria-pressed={textButtonOn}
+                    className={`${toolButtonBase} ${textButtonOn ? toolButtonActive : toolButtonInactive}`}
+                    onClick={() =>
+                      setTextMode((prev) => {
+                        const next = !prev;
+                        if (next) {
+                          setDeleteMode(false);
+                          setHighlightMode(false);
+                          setPencilMode(false);
+                          setDraftHighlight(null);
+                        }
+                        return next;
+                      })
+                    }
+                  >
+                    Text
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setOrganizeMode(true)}
+                    disabled={pages.length === 0 || organizeMode}
+                    aria-pressed={organizeMode}
+                    className={`${toolButtonBase} ${organizeMode ? toolButtonActive : toolButtonInactive}`}
+                  >
+                    Manage pages
+                  </button>
+                  <button
+                    className={`${toolButtonBase} ${toolButtonInactive}`}
+                    onClick={handleUndoHighlight}
+                    disabled={!hasUndoHistory}
+                  >
+                    <Undo2 className="h-4 w-4" />
+                    Undo
+                  </button>
+                  <button
+                    className={`${toolButtonBase} ${deleteMode ? toolButtonActive : toolButtonInactive}`}
+                    onClick={handleToggleDeleteMode}
+                    aria-pressed={deleteMode}
+                    disabled={!hasAnyAnnotations && !deleteMode}
+                  >
+                    <Eraser className="h-4 w-4" />
+                    Eraser
+                  </button>
                 </div>
               </div>
 
-              <div className="flex flex-col items-end gap-3 min-w-[200px] rounded-xl bg-slate-50/70 p-3 shadow-inner">
+              <div className="flex w-full max-w-[220px] flex-col gap-3 rounded-xl bg-slate-50/80 p-4 shadow-inner">
                 <button
                   className={`${buttonPrimary} w-full px-6 py-2 justify-center`}
                   onClick={() => handleDownload()}
@@ -2719,7 +2712,7 @@ function WorkspaceClient() {
                 />
               </div>
             </div>
-            {projectNameError ? (
+{projectNameError ? (
               <div className="px-1 pb-1 text-sm text-rose-500">{projectNameError}</div>
             ) : null}
 
