@@ -2279,11 +2279,6 @@ function WorkspaceClient() {
     });
   }, [zoomPercent, baseScale]);
 
-  useEffect(() => {
-    if (!showDrawModal) return;
-    prepareDrawCanvas();
-  }, [prepareDrawCanvas, showDrawModal]);
-
   function handleMarkupPointerDown(pageId: string, event: ReactMouseEvent<HTMLDivElement>) {
     if (pendingSignatureForPlacement) {
       const point = getPointerPoint(event);
@@ -2557,6 +2552,11 @@ function WorkspaceClient() {
     };
     reader.readAsDataURL(file);
   }, []);
+
+  useEffect(() => {
+    if (!showDrawModal) return;
+    prepareDrawCanvas();
+  }, [prepareDrawCanvas, showDrawModal]);
 
 
   /** Drag end reorders the pages array */
