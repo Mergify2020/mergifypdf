@@ -1552,8 +1552,10 @@ function WorkspaceClient() {
                   <div
                     key={signature.id}
                     className={`absolute transition-all duration-150 ${
-                      isActive ? "ring-2 ring-[#024d7c]" : "ring-1 ring-transparent"
-                    }`}
+                      isActive
+                        ? "ring-2 ring-[#024d7c] border border-dashed border-slate-400"
+                        : "ring-1 ring-transparent border border-transparent"
+                    } rounded-lg`}
                     style={{
                       left: `${signature.x * 100}%`,
                       top: `${signature.y * 100}%`,
