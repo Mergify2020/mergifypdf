@@ -126,6 +126,7 @@ type SignaturePlacement = {
   y: number;
   width: number;
   height: number;
+  rotation?: number;
   status: "draft" | "placed";
 };
 
@@ -658,6 +659,14 @@ function WorkspaceClient() {
     startHeight: number;
     startX: number;
     startY: number;
+  } | null>(null);
+  const [signatureRotate, setSignatureRotate] = useState<{
+    pageId: string;
+    id: string;
+    pointerId: number;
+    centerX: number;
+    centerY: number;
+    baseRotation: number;
   } | null>(null);
   const [showDrawModal, setShowDrawModal] = useState(false);
   const [drawStep, setDrawStep] = useState<"canvas" | "name">("canvas");
@@ -1550,6 +1559,8 @@ function WorkspaceClient() {
                       top: `${signature.y * 100}%`,
                       width: `${signature.width * 100}%`,
                       height: `${signature.height * 100}%`,
+                      transform: `rotate(${signature.rotation ?? 0}deg)`,
+                      transformOrigin: "center",
                       cursor: deleteMode
                         ? ("url('/icons/eraser.svg') 4 4, auto" as CSSProperties["cursor"])
                         : isActive
@@ -1602,6 +1613,26 @@ function WorkspaceClient() {
                               }}
                             >
                               <Move className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 bg-white/90 text-slate-700 shadow-sm transition hover:bg-white active:translate-y-[1px]"
+                              onPointerDown={(event: ReactPointerEvent<HTMLButtonElement>) => {
+                                startSignatureRotate(page.id, signature.id, event);
+                              }}
+                            >
+                              <RotateCcw className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              className="flex h-8 w-8 items-center justify-center rounded-full border border-rose-300 bg-white/90 text-rose-700 shadow-sm transition hover:bg-rose-50 active:translate-y-[1px]"
+                              onPointerDown={(event) => event.stopPropagation()}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleDeleteSignaturePlacement(page.id, signature.id);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </button>
                           </div>
                           <div
@@ -1892,6 +1923,7 @@ function WorkspaceClient() {
         y,
         width,
         height,
+        rotation: 0,
         status: "draft",
       };
       setSignaturePlacements((prev) => {
@@ -2016,6 +2048,61 @@ function WorkspaceClient() {
     [getPageNormalizedPoint, signaturePlacements]
   );
 
+  const startSignatureRotate = useCallback(
+    (pageId: string, placementId: string, startEvent: ReactPointerEvent<HTMLButtonElement>) => {
+      if (startEvent.button !== 0 && startEvent.pointerType !== "touch") return;
+      startEvent.preventDefault();
+      startEvent.stopPropagation();
+      const target = previewNodeMap.current.get(pageId);
+      const placement = signaturePlacements[pageId]?.find((p) => p.id === placementId);
+      if (!target || !placement) return;
+      const rect = target.getBoundingClientRect();
+      const centerX = rect.left + rect.width * (placement.x + placement.width / 2);
+      const centerY = rect.top + rect.height * (placement.y + placement.height / 2);
+      let lastAngle = Math.atan2(startEvent.clientY - centerY, startEvent.clientX - centerX);
+      let accumulatedDelta = 0;
+      const baseRotation = placement.rotation ?? 0;
+      const pointerId = startEvent.pointerId;
+
+      const handleMove = (event: PointerEvent) => {
+        if (event.pointerId !== pointerId) return;
+        const angle = Math.atan2(event.clientY - centerY, event.clientX - centerX);
+        let delta = angle - lastAngle;
+        if (delta > Math.PI) delta -= Math.PI * 2;
+        if (delta < -Math.PI) delta += Math.PI * 2;
+        accumulatedDelta += delta;
+        lastAngle = angle;
+        const deltaDegrees = (accumulatedDelta * 180) / Math.PI;
+        const nextRotation = baseRotation + deltaDegrees;
+        setSignaturePlacements((prev) => {
+          const existing = prev[pageId] ?? [];
+          const updated = existing.map((item) =>
+            item.id === placementId ? { ...item, rotation: nextRotation } : item
+          );
+          return { ...prev, [pageId]: updated };
+        });
+      };
+
+      const cleanup = () => {
+        window.removeEventListener("pointermove", handleMove);
+        window.removeEventListener("pointerup", handleUp);
+        window.removeEventListener("pointercancel", handleUp);
+        setSignatureRotate(null);
+      };
+
+      const handleUp = (event: PointerEvent) => {
+        if (event.pointerId !== pointerId) return;
+        cleanup();
+      };
+
+      window.addEventListener("pointermove", handleMove);
+      window.addEventListener("pointerup", handleUp);
+      window.addEventListener("pointercancel", handleUp);
+      setSignatureRotate({ pageId, id: placementId, pointerId, centerX, centerY, baseRotation });
+    },
+    [signaturePlacements]
+  );
+
   const addSignatureToPage = useCallback((payload: SignaturePlacement) => {
     // Stub: wire into real PDF flattening later.
     console.log("addSignatureToPage", payload);
@@ -2037,6 +2124,14 @@ function WorkspaceClient() {
     },
     [addSignatureToPage, signaturePlacements]
   );
+
+  const handleDeleteSignaturePlacement = useCallback((pageId: string, placementId: string) => {
+    setSignaturePlacements((prev) => {
+      const existing = prev[pageId] ?? [];
+      return { ...prev, [pageId]: existing.filter((item) => item.id !== placementId) };
+    });
+    setActiveSignaturePlacementId((prev) => (prev === placementId ? null : prev));
+  }, []);
 
   function registerTextNode(id: string) {
     return (node: HTMLTextAreaElement | null) => {
@@ -3459,10 +3554,16 @@ function WorkspaceClient() {
                                   className="text-xs font-semibold text-[#024d7c] transition hover:underline"
                                   onClick={() => {
                                     beginSignaturePlacement(sig);
+                                    // Auto place once at center of current page for speed
+                                    const targetPageId = activePageId || pages[0]?.id;
+                                    if (targetPageId) {
+                                      placeSignatureAtPoint(sig, targetPageId, { x: 0.5, y: 0.5 });
+                                      setActiveSignaturePlacementId((prev) => prev);
+                                    }
                                     setSignaturePanelMode("saved");
                                   }}
                                 >
-                                  Use
+                                  Place on page
                                 </button>
                                 <button
                                   type="button"
