@@ -591,6 +591,7 @@ function WorkspaceClient() {
   const [baseScale, setBaseScale] = useState(1);
   const [userAdjustedZoom, setUserAdjustedZoom] = useState(false);
   const scrollRatioRef = useRef<{ x: number; y: number }>({ x: 0.5, y: 0 });
+  const [previewHeightLimit, setPreviewHeightLimit] = useState<number | null>(null);
   const [highlightMode, setHighlightMode] = useState(false);
   const [highlightColor, setHighlightColor] = useState<HighlightColorKey>("yellow");
   const [highlightThickness, setHighlightThickness] = useState(14);
@@ -811,6 +812,14 @@ function WorkspaceClient() {
   const hasHydratedSources = useRef(false);
   const objectUrlCacheRef = useRef<Map<string, string>>(new Map());
   const hasHydratedHighlights = useRef(false);
+  const updatePreviewHeightLimit = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const container = previewContainerRef.current;
+    const sidebarLimit = window.innerHeight * 0.7; // mirrors the 70vh sidebar list
+    const containerLimit = container?.clientHeight ?? Infinity;
+    const next = Math.min(sidebarLimit, containerLimit);
+    setPreviewHeightLimit(Number.isFinite(next) ? Math.max(0, next) : null);
+  }, []);
   const MIN_HIGHLIGHT_THICKNESS = 6;
   const MAX_HIGHLIGHT_THICKNESS = 32;
   const MIN_PENCIL_THICKNESS = 1;
@@ -840,6 +849,16 @@ function WorkspaceClient() {
   useEffect(() => {
     setProjectNameDraft(projectName);
   }, [projectName]);
+
+  useEffect(() => {
+    updatePreviewHeightLimit();
+    window.addEventListener("resize", updatePreviewHeightLimit);
+    return () => window.removeEventListener("resize", updatePreviewHeightLimit);
+  }, [updatePreviewHeightLimit]);
+
+  useEffect(() => {
+    updatePreviewHeightLimit();
+  }, [updatePreviewHeightLimit, pages.length, activePageIndex]);
 
   /** Rehydrate any stored PDFs from IndexedDB so refreshes survive deployments */
   useEffect(() => {
@@ -1240,8 +1259,11 @@ function WorkspaceClient() {
     const baseWidth = rotated ? naturalHeight : naturalWidth;
     const baseHeight = rotated ? naturalWidth : naturalHeight;
     const effectiveScale = baseScale * zoomMultiplier;
-    const fittedWidth = baseWidth * effectiveScale;
-    const fittedHeight = baseHeight * effectiveScale;
+    const heightLimit = previewHeightLimit;
+    const limitedScale =
+      heightLimit && heightLimit > 0 ? Math.min(effectiveScale, heightLimit / baseHeight) : effectiveScale;
+    const fittedWidth = baseWidth * limitedScale;
+    const fittedHeight = baseHeight * limitedScale;
     return (
       <div
         key={page.id}
