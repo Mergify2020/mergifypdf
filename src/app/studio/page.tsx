@@ -17,7 +17,22 @@ import {
   type PDFFont,
 } from "pdf-lib";
 import { AnimatePresence, motion } from "framer-motion";
-import { Highlighter, Minus, Plus, Trash2, Undo2, Eraser, Pencil, RotateCcw, Move, ChevronDown } from "lucide-react";
+import {
+  Highlighter,
+  Minus,
+  Plus,
+  Trash2,
+  Undo2,
+  Eraser,
+  Pencil,
+  RotateCcw,
+  Move,
+  ChevronDown,
+  Signature as SignatureIcon,
+  UploadCloud,
+  Image as ImageIcon,
+  X,
+} from "lucide-react";
 import {
   DndContext,
   PointerSensor,
@@ -91,6 +106,28 @@ type TextFont =
   | "Georgia"
   | "Poppins";
 type TextFontVariant = "normal" | "bold" | "italic" | "boldItalic";
+type SignaturePanelMode = "none" | "draw" | "upload" | "saved";
+type SavedSignature = {
+  id: string;
+  name: string;
+  dataUrl: string;
+  naturalWidth: number;
+  naturalHeight: number;
+  createdAt: number;
+};
+type SignaturePlacement = {
+  id: string;
+  signatureId: string;
+  name: string;
+  dataUrl: string;
+  pageId: string;
+  pageIndex: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  status: "draft" | "placed";
+};
 
 type FontOption =
   | {
@@ -227,6 +264,7 @@ const WORKSPACE_SESSION_KEY = "mpdf:files";
 const WORKSPACE_DB_NAME = "mpdf-file-store";
 const WORKSPACE_DB_STORE = "files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
+const WORKSPACE_SIGNATURES_KEY = "mpdf:signatures";
 const DEFAULT_ASPECT_RATIO = 792 / 612; // fallback letter portrait
 const SOFT_EASE: [number, number, number, number] = [0.4, 0, 0.2, 1];
 const BASE_ZOOM_MULTIPLIER = 1; // true 100% baseline
@@ -600,6 +638,38 @@ function WorkspaceClient() {
   const [pencilMode, setPencilMode] = useState(false);
   const [pencilThickness, setPencilThickness] = useState(4);
   const [textMode, setTextMode] = useState(false);
+  const [signaturePanelMode, setSignaturePanelMode] = useState<SignaturePanelMode>("none");
+  const [savedSignatures, setSavedSignatures] = useState<SavedSignature[]>([]);
+  const [signatureNameError, setSignatureNameError] = useState<string | null>(null);
+  const [pendingSignatureForPlacement, setPendingSignatureForPlacement] = useState<SavedSignature | null>(null);
+  const [signaturePlacements, setSignaturePlacements] = useState<Record<string, SignaturePlacement[]>>({});
+  const [activeSignaturePlacementId, setActiveSignaturePlacementId] = useState<string | null>(null);
+  const [signatureDrag, setSignatureDrag] = useState<{
+    pageId: string;
+    id: string;
+    offsetX: number;
+    offsetY: number;
+  } | null>(null);
+  const [signatureResize, setSignatureResize] = useState<{
+    pageId: string;
+    id: string;
+    pointerId: number;
+    startWidth: number;
+    startHeight: number;
+    startX: number;
+    startY: number;
+  } | null>(null);
+  const [showDrawModal, setShowDrawModal] = useState(false);
+  const [drawStep, setDrawStep] = useState<"canvas" | "name">("canvas");
+  const drawCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [isDrawingSignature, setIsDrawingSignature] = useState(false);
+  const [drawnSignatureData, setDrawnSignatureData] = useState<string | null>(null);
+  const [drawSignatureName, setDrawSignatureName] = useState("");
+  const [drawSignatureError, setDrawSignatureError] = useState<string | null>(null);
+  const [uploadPreview, setUploadPreview] = useState<string | null>(null);
+  const [uploadName, setUploadName] = useState("");
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [showUploadModal, setShowUploadModal] = useState(false);
   const [highlights, setHighlights] = useState<Record<string, HighlightStroke[]>>({});
   const [textAnnotations, setTextAnnotations] = useState<Record<string, TextAnnotation[]>>({});
   const [textBold, setTextBold] = useState(false);
@@ -815,6 +885,7 @@ function WorkspaceClient() {
   const hasHydratedSources = useRef(false);
   const objectUrlCacheRef = useRef<Map<string, string>>(new Map());
   const hasHydratedHighlights = useRef(false);
+  const hasHydratedSignatures = useRef(false);
   const updatePreviewHeightLimit = useCallback(() => {
     if (typeof window === "undefined") return;
     const container = previewContainerRef.current;
@@ -1002,6 +1073,33 @@ function WorkspaceClient() {
       console.error("Failed to persist highlights", err);
     }
   }, [highlights]);
+
+  /** Restore saved signatures */
+  useEffect(() => {
+    if (typeof window === "undefined" || hasHydratedSignatures.current) return;
+    hasHydratedSignatures.current = true;
+    try {
+      const raw = getLocalStorage()?.getItem(WORKSPACE_SIGNATURES_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        setSavedSignatures(parsed as SavedSignature[]);
+      }
+    } catch (err) {
+      console.error("Failed to restore saved signatures", err);
+      getLocalStorage()?.removeItem(WORKSPACE_SIGNATURES_KEY);
+    }
+  }, []);
+
+  /** Persist saved signatures */
+  useEffect(() => {
+    if (typeof window === "undefined" || !hasHydratedSignatures.current) return;
+    try {
+      getLocalStorage()?.setItem(WORKSPACE_SIGNATURES_KEY, JSON.stringify(savedSignatures));
+    } catch (err) {
+      console.error("Failed to persist signatures", err);
+    }
+  }, [savedSignatures]);
 
   /** Render thumbnails for any sources that haven't been processed yet */
   useEffect(() => {
@@ -1263,6 +1361,7 @@ function WorkspaceClient() {
   const renderPreviewPage = (page: PageItem, idx: number) => {
     const pageHighlights = highlights[page.id] ?? [];
     const pageTexts = textAnnotations[page.id] ?? [];
+    const pageSignatures = signaturePlacements[page.id] ?? [];
     const rotationDegrees = normalizeRotation(page.rotation);
     const naturalWidth = page.width || 612;
     const naturalHeight = page.height || naturalWidth * DEFAULT_ASPECT_RATIO;
@@ -1435,6 +1534,77 @@ function WorkspaceClient() {
                   }}
                 />
               ) : null}
+              {pageSignatures.map((signature) => {
+                const isActive = activeSignaturePlacementId === signature.id;
+                const isDraggingThis = signatureDrag?.id === signature.id;
+                const isResizingThis = signatureResize?.id === signature.id;
+                return (
+                  <div
+                    key={signature.id}
+                    className={`absolute transition-all duration-150 ${
+                      isActive ? "ring-2 ring-[#024d7c]" : "ring-1 ring-transparent"
+                    }`}
+                    style={{
+                      left: `${signature.x * 100}%`,
+                      top: `${signature.y * 100}%`,
+                      width: `${signature.width * 100}%`,
+                      height: `${signature.height * 100}%`,
+                      cursor: deleteMode
+                        ? ("url('/icons/eraser.svg') 4 4, auto" as CSSProperties["cursor"])
+                        : "move",
+                    }}
+                    onPointerDown={(event) => {
+                      event.stopPropagation();
+                      if (deleteMode) {
+                        setIsErasing(true);
+                        return;
+                      }
+                      setActiveSignaturePlacementId(signature.id);
+                      startSignatureDrag(page.id, signature.id, event);
+                    }}
+                  >
+                    <div className="relative h-full w-full overflow-hidden rounded-lg bg-white shadow-[0_10px_24px_rgba(15,23,42,0.18)]">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={signature.dataUrl}
+                        alt={signature.name}
+                        className="h-full w-full select-none object-contain"
+                        draggable={false}
+                      />
+                      {isActive ? (
+                        <div className="absolute -top-10 left-0 flex items-center gap-2">
+                          {signature.status === "draft" ? (
+                            <button
+                              type="button"
+                              className="rounded-full bg-[#024d7c] px-3 py-1 text-xs font-semibold text-white shadow-sm transition hover:bg-[#013d63]"
+                              onPointerDown={(event) => event.stopPropagation()}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleApplySignaturePlacement(page.id, signature.id);
+                              }}
+                            >
+                              Apply
+                            </button>
+                          ) : null}
+                          <div className="rounded-full bg-white/85 px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
+                            {signature.name}
+                          </div>
+                        </div>
+                      ) : null}
+                      <div
+                        className={`absolute -right-2 -bottom-2 h-4 w-4 cursor-se-resize rounded-full border border-slate-600 bg-white shadow-sm transition hover:border-slate-700 hover:shadow-md ${
+                          isResizingThis ? "scale-110" : ""
+                        }`}
+                        onPointerDown={(event) => {
+                          event.stopPropagation();
+                          setActiveSignaturePlacementId(signature.id);
+                          startSignatureResize(page.id, signature.id, event);
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
               {pageTexts.map((annotation) => {
                 const annotationWidth = annotation.width ?? 0.14;
                 const annotationHeight = annotation.height ?? 0.06;
@@ -1636,6 +1806,85 @@ function WorkspaceClient() {
     return null;
   }
 
+  const loadImageDimensions = useCallback(
+    (dataUrl: string) =>
+      new Promise<{ width: number; height: number }>((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve({ width: img.naturalWidth || 600, height: img.naturalHeight || 200 });
+        img.onerror = () => resolve({ width: 600, height: 200 });
+        img.src = dataUrl;
+      }),
+    []
+  );
+
+  const saveSignatureEntry = useCallback(
+    async (name: string, dataUrl: string) => {
+      const trimmed = name.trim();
+      if (!trimmed) {
+        setSignatureNameError("Name your signature.");
+        return null;
+      }
+      if (savedSignatures.some((sig) => sig.name.toLowerCase() === trimmed.toLowerCase())) {
+        setSignatureNameError("Choose a unique name.");
+        return null;
+      }
+      const { width, height } = await loadImageDimensions(dataUrl);
+      const entry: SavedSignature = {
+        id: crypto.randomUUID(),
+        name: trimmed,
+        dataUrl,
+        naturalWidth: width,
+        naturalHeight: height,
+        createdAt: Date.now(),
+      };
+      setSavedSignatures((prev) => [...prev, entry]);
+      setSignatureNameError(null);
+      return entry;
+    },
+    [loadImageDimensions, savedSignatures]
+  );
+
+  const beginSignaturePlacement = useCallback((signature: SavedSignature) => {
+    setPendingSignatureForPlacement(signature);
+    setActiveSignaturePlacementId(null);
+    setDeleteMode(false);
+    setHighlightMode(false);
+    setPencilMode(false);
+    setTextMode(false);
+  }, []);
+
+  const placeSignatureAtPoint = useCallback(
+    (signature: SavedSignature, pageId: string, point: { x: number; y: number }) => {
+      const pageIndex = pages.findIndex((p) => p.id === pageId);
+      const aspect = signature.naturalHeight && signature.naturalWidth ? signature.naturalHeight / signature.naturalWidth : 0.35;
+      const baseWidth = clamp(0.3, 0.18, 0.42); // middle-ground width for initial placement
+      const width = baseWidth;
+      const height = clamp(width * aspect, 0.06, 0.6);
+      const x = clamp(point.x - width / 2, 0, 1 - width);
+      const y = clamp(point.y - height / 2, 0, 1 - height);
+      const placement: SignaturePlacement = {
+        id: crypto.randomUUID(),
+        signatureId: signature.id,
+        name: signature.name,
+        dataUrl: signature.dataUrl,
+        pageId,
+        pageIndex,
+        x,
+        y,
+        width,
+        height,
+        status: "draft",
+      };
+      setSignaturePlacements((prev) => {
+        const existing = prev[pageId] ?? [];
+        return { ...prev, [pageId]: [...existing, placement] };
+      });
+      setActiveSignaturePlacementId(placement.id);
+      setPendingSignatureForPlacement(null);
+    },
+    [pages]
+  );
+
   function getPageNormalizedPoint(pageId: string, clientX: number, clientY: number) {
     const node = previewNodeMap.current.get(pageId);
     if (!node) return null;
@@ -1646,6 +1895,129 @@ function WorkspaceClient() {
       y: clamp((clientY - rect.top) / rect.height, 0, 1),
     };
   }
+
+  const startSignatureDrag = useCallback(
+    (pageId: string, placementId: string, startEvent: ReactPointerEvent<HTMLDivElement>) => {
+      if (startEvent.button !== 0 && startEvent.pointerType !== "touch") return;
+      startEvent.preventDefault();
+      startEvent.stopPropagation();
+      const placement = signaturePlacements[pageId]?.find((p) => p.id === placementId);
+      if (!placement) return;
+      const startPoint = getPageNormalizedPoint(pageId, startEvent.clientX, startEvent.clientY);
+      if (!startPoint) return;
+      const offsetX = startPoint.x - placement.x;
+      const offsetY = startPoint.y - placement.y;
+      const pointerId = startEvent.pointerId;
+      const handleMove = (event: PointerEvent) => {
+        if (event.pointerId !== pointerId) return;
+        const point = getPageNormalizedPoint(pageId, event.clientX, event.clientY);
+        if (!point) return;
+        setSignaturePlacements((prev) => {
+          const existing = prev[pageId] ?? [];
+          const updated = existing.map((item) =>
+            item.id === placementId
+              ? {
+                  ...item,
+                  x: clamp(point.x - offsetX, 0, 1 - item.width),
+                  y: clamp(point.y - offsetY, 0, 1 - item.height),
+                }
+              : item
+          );
+          return { ...prev, [pageId]: updated };
+        });
+      };
+      const handleUp = (event: PointerEvent) => {
+        if (event.pointerId !== pointerId) return;
+        cleanup();
+      };
+      function cleanup() {
+        window.removeEventListener("pointermove", handleMove);
+        window.removeEventListener("pointerup", handleUp);
+        window.removeEventListener("pointercancel", handleUp);
+        setSignatureDrag(null);
+      }
+      window.addEventListener("pointermove", handleMove);
+      window.addEventListener("pointerup", handleUp);
+      window.addEventListener("pointercancel", handleUp);
+      setSignatureDrag({ pageId, id: placementId, offsetX, offsetY });
+    },
+    [getPageNormalizedPoint, signaturePlacements]
+  );
+
+  const startSignatureResize = useCallback(
+    (pageId: string, placementId: string, startEvent: ReactPointerEvent<HTMLDivElement>) => {
+      if (startEvent.button !== 0 && startEvent.pointerType !== "touch") return;
+      startEvent.preventDefault();
+      startEvent.stopPropagation();
+      const placement = signaturePlacements[pageId]?.find((p) => p.id === placementId);
+      if (!placement) return;
+      const startPoint = getPageNormalizedPoint(pageId, startEvent.clientX, startEvent.clientY);
+      if (!startPoint) return;
+      const pointerId = startEvent.pointerId;
+      const handleMove = (event: PointerEvent) => {
+        if (event.pointerId !== pointerId) return;
+        const point = getPageNormalizedPoint(pageId, event.clientX, event.clientY);
+        if (!point) return;
+        const deltaX = point.x - startPoint.x;
+        const deltaY = point.y - startPoint.y;
+        setSignaturePlacements((prev) => {
+          const existing = prev[pageId] ?? [];
+          const updated = existing.map((item) => {
+            if (item.id !== placementId) return item;
+            const nextWidth = clamp(item.width + deltaX, 0.08, 1 - item.x);
+            const nextHeight = clamp(item.height + deltaY, 0.04, 1 - item.y);
+            return { ...item, width: nextWidth, height: nextHeight };
+          });
+          return { ...prev, [pageId]: updated };
+        });
+      };
+      const handleUp = (event: PointerEvent) => {
+        if (event.pointerId !== pointerId) return;
+        cleanup();
+      };
+      function cleanup() {
+        window.removeEventListener("pointermove", handleMove);
+        window.removeEventListener("pointerup", handleUp);
+        window.removeEventListener("pointercancel", handleUp);
+        setSignatureResize(null);
+      }
+      window.addEventListener("pointermove", handleMove);
+      window.addEventListener("pointerup", handleUp);
+      window.addEventListener("pointercancel", handleUp);
+      setSignatureResize({
+        pageId,
+        id: placementId,
+        pointerId,
+        startWidth: placement.width,
+        startHeight: placement.height,
+        startX: startPoint.x,
+        startY: startPoint.y,
+      });
+    },
+    [getPageNormalizedPoint, signaturePlacements]
+  );
+
+  const addSignatureToPage = useCallback((payload: SignaturePlacement) => {
+    // Stub: wire into real PDF flattening later.
+    console.log("addSignatureToPage", payload);
+  }, []);
+
+  const handleApplySignaturePlacement = useCallback(
+    (pageId: string, placementId: string) => {
+      const placement = signaturePlacements[pageId]?.find((p) => p.id === placementId);
+      if (!placement) return;
+      setSignaturePlacements((prev) => {
+        const existing = prev[pageId] ?? [];
+        const updated = existing.map((item) =>
+          item.id === placementId ? { ...item, status: "placed" } : item
+        );
+        return { ...prev, [pageId]: updated };
+      });
+      addSignatureToPage(placement);
+      setPendingSignatureForPlacement(null);
+    },
+    [addSignatureToPage, signaturePlacements]
+  );
 
   function registerTextNode(id: string) {
     return (node: HTMLTextAreaElement | null) => {
@@ -1778,7 +2150,7 @@ function WorkspaceClient() {
   const highlightButtonOn = highlightMode && !highlightButtonDisabled;
   const pencilButtonOn = pencilMode && !highlightButtonDisabled;
   const textButtonOn = textMode && !highlightButtonDisabled;
-  const highlightTrayVisible = (highlightMode || pencilMode || deleteMode || textMode) && !highlightButtonDisabled;
+  const signatureButtonOn = signaturePanelMode !== "none";
   const highlightActive = highlightButtonOn && !deleteMode;
   const pencilActive = pencilButtonOn && !deleteMode;
   const textActive = textButtonOn && !deleteMode;
@@ -1797,13 +2169,22 @@ function WorkspaceClient() {
     () => Object.values(textAnnotations).reduce((sum, list) => sum + (list?.length ?? 0), 0),
     [textAnnotations]
   );
+  const signaturePlacementCount = useMemo(
+    () => Object.values(signaturePlacements).reduce((sum, list) => sum + (list?.length ?? 0), 0),
+    [signaturePlacements]
+  );
   const hasAnyTextAnnotations = textAnnotationCount > 0;
-  const hasAnyAnnotations = highlightCount > 0 || hasAnyTextAnnotations;
+  const hasAnyAnnotations = highlightCount > 0 || hasAnyTextAnnotations || signaturePlacementCount > 0;
   useEffect(() => {
     updatePreviewHeightLimit();
   }, [updatePreviewHeightLimit, pages.length, activePageIndex]);
   const hasWorkspaceData =
-    pages.length > 0 || highlightCount > 0 || textAnnotationCount > 0 || !!draftHighlight || !!draftTextBox;
+    pages.length > 0 ||
+    highlightCount > 0 ||
+    textAnnotationCount > 0 ||
+    signaturePlacementCount > 0 ||
+    !!draftHighlight ||
+    !!draftTextBox;
 
   const computeBaseScale = useCallback(() => {
     const container = previewContainerRef.current;
@@ -1894,7 +2275,20 @@ function WorkspaceClient() {
     });
   }, [zoomPercent, baseScale]);
 
+  useEffect(() => {
+    if (!showDrawModal) return;
+    prepareDrawCanvas();
+  }, [prepareDrawCanvas, showDrawModal]);
+
   function handleMarkupPointerDown(pageId: string, event: ReactMouseEvent<HTMLDivElement>) {
+    if (pendingSignatureForPlacement) {
+      const point = getPointerPoint(event);
+      if (point) {
+        placeSignatureAtPoint(pendingSignatureForPlacement, pageId, point);
+      }
+      event.preventDefault();
+      return;
+    }
     if (!event.target || !(event.target as HTMLElement).closest("[data-text-annotation]")) {
       clearTextFocus();
     }
@@ -2017,6 +2411,148 @@ function WorkspaceClient() {
       handleSelectPage(nextIndex);
     }
   }
+
+  const prepareDrawCanvas = useCallback(() => {
+    const canvas = drawCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const dpr = getDevicePixelRatio();
+    const width = 640;
+    const height = 220;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.lineWidth = 2.6;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = "#0f172a";
+    ctx.fillStyle = "white";
+    ctx.clearRect(0, 0, width, height);
+  }, []);
+
+  const clearDrawCanvas = useCallback(() => {
+    prepareDrawCanvas();
+    setDrawnSignatureData(null);
+  }, [prepareDrawCanvas]);
+
+  const handleDrawPointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLCanvasElement>) => {
+      const canvas = drawCanvasRef.current;
+      const ctx = canvas?.getContext("2d");
+      if (!canvas || !ctx) return;
+      const rect = canvas.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      setIsDrawingSignature(true);
+    },
+    []
+  );
+
+  const handleDrawPointerMove = useCallback(
+    (event: ReactPointerEvent<HTMLCanvasElement>) => {
+      if (!isDrawingSignature) return;
+      const canvas = drawCanvasRef.current;
+      const ctx = canvas?.getContext("2d");
+      if (!canvas || !ctx) return;
+      const rect = canvas.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      ctx.lineTo(x, y);
+      ctx.stroke();
+    },
+    [isDrawingSignature]
+  );
+
+  const handleDrawPointerUp = useCallback(() => {
+    setIsDrawingSignature(false);
+  }, []);
+
+  const handleDrawContinue = useCallback(() => {
+    const canvas = drawCanvasRef.current;
+    if (!canvas) return;
+    const data = canvas.toDataURL("image/png");
+    setDrawnSignatureData(data);
+    setDrawStep("name");
+    setDrawSignatureName((prev) => prev || `Signature ${savedSignatures.length + 1}`);
+    setSignatureNameError(null);
+    setDrawSignatureError(null);
+  }, [savedSignatures.length]);
+
+  const handleSaveDrawnSignature = useCallback(async () => {
+    if (!drawnSignatureData) {
+      setDrawSignatureError("Please draw a signature first.");
+      return;
+    }
+    const entry = await saveSignatureEntry(drawSignatureName || `Signature ${savedSignatures.length + 1}`, drawnSignatureData);
+    if (!entry) {
+      setDrawSignatureError(signatureNameError ?? "Give your signature a unique name.");
+      return;
+    }
+    setShowDrawModal(false);
+    setDrawStep("canvas");
+    setDrawSignatureName("");
+    setDrawnSignatureData(null);
+    setSignaturePanelMode("saved");
+    beginSignaturePlacement(entry);
+  }, [beginSignaturePlacement, drawSignatureName, drawnSignatureData, saveSignatureEntry, savedSignatures.length, signatureNameError]);
+
+  const handleCloseDrawModal = useCallback(() => {
+    setShowDrawModal(false);
+    setDrawStep("canvas");
+    setDrawSignatureName("");
+    setSignatureNameError(null);
+    setDrawSignatureError(null);
+    setDrawnSignatureData(null);
+    setSignaturePanelMode("saved");
+  }, []);
+
+  const handleSaveUploadedSignature = useCallback(async () => {
+    if (!uploadPreview) {
+      setUploadError("Upload an image file first.");
+      return;
+    }
+    const entry = await saveSignatureEntry(uploadName || `Signature ${savedSignatures.length + 1}`, uploadPreview);
+    if (!entry) {
+      setUploadError(signatureNameError ?? "Name must be unique.");
+      return;
+    }
+    setShowUploadModal(false);
+    setUploadName("");
+    setUploadError(null);
+    setUploadPreview(null);
+    setSignaturePanelMode("saved");
+    beginSignaturePlacement(entry);
+  }, [beginSignaturePlacement, saveSignatureEntry, savedSignatures.length, signatureNameError, uploadName, uploadPreview]);
+
+  const handleCloseUploadModal = useCallback(() => {
+    setShowUploadModal(false);
+    setUploadName("");
+    setUploadPreview(null);
+    setUploadError(null);
+    setSignatureNameError(null);
+    setSignaturePanelMode("saved");
+  }, []);
+
+  const handleUploadFileInput = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result === "string") {
+        setUploadPreview(result);
+      }
+    };
+    reader.onerror = () => {
+      setUploadError("Could not read that file. Try a PNG, JPG, or SVG.");
+    };
+    reader.readAsDataURL(file);
+  }, []);
 
 
   /** Drag end reorders the pages array */
@@ -2606,6 +3142,8 @@ function WorkspaceClient() {
                   className={`${toolButtonBase} ${highlightButtonOn ? toolButtonActive : toolButtonInactive}`}
                   onClick={() =>
                     setHighlightMode((prev) => {
+                      setSignaturePanelMode("none");
+                      setPendingSignatureForPlacement(null);
                       const next = !prev;
                       if (next) {
                         setDeleteMode(false);
@@ -2626,6 +3164,8 @@ function WorkspaceClient() {
                   className={`${toolButtonBase} ${pencilButtonOn ? toolButtonActive : toolButtonInactive}`}
                   onClick={() =>
                     setPencilMode((prev) => {
+                      setSignaturePanelMode("none");
+                      setPendingSignatureForPlacement(null);
                       const next = !prev;
                       if (next) {
                         setDeleteMode(false);
@@ -2646,6 +3186,8 @@ function WorkspaceClient() {
                   className={`${toolButtonBase} ${textButtonOn ? toolButtonActive : toolButtonInactive}`}
                   onClick={() =>
                     setTextMode((prev) => {
+                      setSignaturePanelMode("none");
+                      setPendingSignatureForPlacement(null);
                       const next = !prev;
                       if (next) {
                         setDeleteMode(false);
@@ -2658,6 +3200,22 @@ function WorkspaceClient() {
                   }
                 >
                   Text
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={signatureButtonOn}
+                  className={`${toolButtonBase} ${signatureButtonOn ? toolButtonActive : toolButtonInactive}`}
+                  onClick={() => {
+                    setSignaturePanelMode((prev) => (prev === "none" ? "saved" : "none"));
+                    setPendingSignatureForPlacement(null);
+                    setHighlightMode(false);
+                    setPencilMode(false);
+                    setTextMode(false);
+                    setDeleteMode(false);
+                  }}
+                >
+                  <SignatureIcon className="h-4 w-4" />
+                  Signature
                 </button>
                 <button
                   type="button"
@@ -2719,76 +3277,203 @@ function WorkspaceClient() {
               <div className="px-1 pb-1 text-sm text-rose-500">{projectNameError}</div>
             ) : null}
 
-            {highlightActive || pencilActive ? (
-              <div className="mt-3 flex items-center gap-4 rounded-xl border border-slate-200 bg-white px-4 py-2 shadow-sm">
-                {highlightActive ? (
-                  <>
-                    <div className="flex items-center gap-2">
-                      {highlightColorEntries.map(([key, value]) => (
-                        <button
-                          key={key}
-                          type="button"
-                          onClick={() => setHighlightColor(key)}
-                          className={`flex h-8 w-8 items-center justify-center rounded-full border transition ${
-                            highlightColor === key
-                              ? "border-[#024d7c] ring-2 ring-[#024d7c]/30"
-                              : "border-white/30 hover:border-slate-300"
-                          }`}
-                          style={{ backgroundColor: value }}
-                          aria-label={`Use ${key} highlighter`}
-                        />
-                      ))}
-                    </div>
-                    <div className="flex items-center gap-2 rounded-full border border-slate-300 bg-white/80 px-3 py-1.5 text-[0.65rem] font-semibold uppercase tracking-wide text-slate-600 shadow-sm">
+            {highlightActive || pencilActive || signatureButtonOn ? (
+              <div className="mt-3 flex flex-col gap-3">
+                <div className="flex flex-wrap items-center gap-4 rounded-xl border border-slate-200 bg-white px-4 py-2 shadow-sm">
+                  {signatureButtonOn ? (
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => adjustHighlightThickness(-2)}
-                        disabled={highlightThickness <= MIN_HIGHLIGHT_THICKNESS}
-                        className="rounded-full border border-transparent p-1 transition hover:border-slate-200 hover:bg-white disabled:opacity-40"
+                        className={`${toolButtonBase} ${signaturePanelMode === "draw" ? toolButtonActive : toolButtonInactive}`}
+                        title="Draw signature"
+                        onClick={() => {
+                          setSignaturePanelMode("draw");
+                          setShowDrawModal(true);
+                          setDrawStep("canvas");
+                          setDrawSignatureName("");
+                          setDrawSignatureError(null);
+                          setDrawnSignatureData(null);
+                        }}
                       >
-                        <Minus className="h-3.5 w-3.5" />
+                        <Pencil className="h-4 w-4" />
+                        Draw
                       </button>
-                      <span>{Math.round(highlightThickness)} px</span>
                       <button
                         type="button"
-                        onClick={() => adjustHighlightThickness(2)}
-                        disabled={highlightThickness >= MAX_HIGHLIGHT_THICKNESS}
-                        className="rounded-full border border-transparent p-1 transition hover:border-slate-200 hover:bg-white disabled:opacity-40"
+                        className={`${toolButtonBase} ${signaturePanelMode === "upload" ? toolButtonActive : toolButtonInactive}`}
+                        title="Upload signature"
+                        onClick={() => {
+                          setSignaturePanelMode("upload");
+                          setShowUploadModal(true);
+                          setUploadPreview(null);
+                          setUploadName("");
+                          setUploadError(null);
+                        }}
                       >
-                        <Plus className="h-3.5 w-3.5" />
+                        <UploadCloud className="h-4 w-4" />
+                        Upload
+                      </button>
+                      <button
+                        type="button"
+                        className={`${toolButtonBase} ${signaturePanelMode === "saved" ? toolButtonActive : toolButtonInactive}`}
+                        title="Saved signatures"
+                        onClick={() => setSignaturePanelMode("saved")}
+                      >
+                        <ImageIcon className="h-4 w-4" />
+                        Saved
                       </button>
                     </div>
-                  </>
-                ) : null}
+                  ) : null}
 
-                {pencilActive ? (
-                  <>
-                    <div className="flex items-center gap-2 rounded-full border border-slate-300 bg-white/80 px-3 py-1.5 text-[0.65rem] font-semibold uppercase tracking-wide text-slate-600 shadow-sm">
+                  {highlightActive ? (
+                    <>
+                      <div className="flex items-center gap-2">
+                        {highlightColorEntries.map(([key, value]) => (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => setHighlightColor(key)}
+                            className={`flex h-8 w-8 items-center justify-center rounded-full border transition ${
+                              highlightColor === key
+                                ? "border-[#024d7c] ring-2 ring-[#024d7c]/30"
+                                : "border-white/30 hover:border-slate-300"
+                            }`}
+                            style={{ backgroundColor: value }}
+                            aria-label={`Use ${key} highlighter`}
+                          />
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-2 rounded-full border border-slate-300 bg-white/80 px-3 py-1.5 text-[0.65rem] font-semibold uppercase tracking-wide text-slate-600 shadow-sm">
+                        <button
+                          type="button"
+                          onClick={() => adjustHighlightThickness(-2)}
+                          disabled={highlightThickness <= MIN_HIGHLIGHT_THICKNESS}
+                          className="rounded-full border border-transparent p-1 transition hover:border-slate-200 hover:bg-white disabled:opacity-40"
+                        >
+                          <Minus className="h-3.5 w-3.5" />
+                        </button>
+                        <span>{Math.round(highlightThickness)} px</span>
+                        <button
+                          type="button"
+                          onClick={() => adjustHighlightThickness(2)}
+                          disabled={highlightThickness >= MAX_HIGHLIGHT_THICKNESS}
+                          className="rounded-full border border-transparent p-1 transition hover:border-slate-200 hover:bg-white disabled:opacity-40"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </>
+                  ) : null}
+
+                  {pencilActive ? (
+                    <>
+                      <div className="flex items-center gap-2 rounded-full border border-slate-300 bg-white/80 px-3 py-1.5 text-[0.65rem] font-semibold uppercase tracking-wide text-slate-600 shadow-sm">
+                        <span className="text-[0.6rem] font-semibold uppercase tracking-wide text-slate-500">
+                          Streak
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => adjustPencilThickness(-1)}
+                          disabled={pencilThickness <= MIN_PENCIL_THICKNESS}
+                          className="rounded-full border border-transparent p-1 transition hover:border-slate-200 hover:bg-white disabled:opacity-40"
+                        >
+                          <Minus className="h-3.5 w-3.5" />
+                        </button>
+                        <span>{Math.round(pencilThickness)} px</span>
+                        <button
+                          type="button"
+                          onClick={() => adjustPencilThickness(1)}
+                          disabled={pencilThickness >= MAX_PENCIL_THICKNESS}
+                          className="rounded-full border border-transparent p-1 transition hover:border-slate-200 hover:bg-white disabled:opacity-40"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                       <span className="text-[0.6rem] font-semibold uppercase tracking-wide text-slate-500">
-                        Streak
+                        Ink color: black
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => adjustPencilThickness(-1)}
-                        disabled={pencilThickness <= MIN_PENCIL_THICKNESS}
-                        className="rounded-full border border-transparent p-1 transition hover:border-slate-200 hover:bg-white disabled:opacity-40"
-                      >
-                        <Minus className="h-3.5 w-3.5" />
-                      </button>
-                      <span>{Math.round(pencilThickness)} px</span>
-                      <button
-                        type="button"
-                        onClick={() => adjustPencilThickness(1)}
-                        disabled={pencilThickness >= MAX_PENCIL_THICKNESS}
-                        className="rounded-full border border-transparent p-1 transition hover:border-slate-200 hover:bg-white disabled:opacity-40"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                      </button>
+                    </>
+                  ) : null}
+                </div>
+
+                {signatureButtonOn && signaturePanelMode === "saved" ? (
+                  <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-slate-800">Saved signatures</h3>
+                      <span className="text-xs text-slate-500">{savedSignatures.length} total</span>
                     </div>
-                    <span className="text-[0.6rem] font-semibold uppercase tracking-wide text-slate-500">
-                      Ink color: black
-                    </span>
-                  </>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3">
+                      {savedSignatures.length === 0 ? (
+                        <div className="col-span-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+                          No saved signatures yet. Draw or upload to save one.
+                        </div>
+                      ) : (
+                        savedSignatures.map((sig) => (
+                          <div
+                            key={sig.id}
+                            className="group flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={sig.dataUrl}
+                              alt={sig.name}
+                              className="h-12 w-20 shrink-0 rounded border border-slate-100 object-contain"
+                            />
+                            <div className="flex flex-col gap-1">
+                              <div className="text-sm font-semibold text-slate-800">{sig.name}</div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <button
+                                  type="button"
+                                  className="text-xs font-semibold text-[#024d7c] transition hover:underline"
+                                  onClick={() => {
+                                    beginSignaturePlacement(sig);
+                                    setSignaturePanelMode("saved");
+                                  }}
+                                >
+                                  Use
+                                </button>
+                                <button
+                                  type="button"
+                                  className="text-xs font-semibold text-slate-600 transition hover:underline"
+                                  onClick={() => {
+                                    const nextName = prompt("Rename signature", sig.name)?.trim();
+                                    if (!nextName) return;
+                                    if (
+                                      savedSignatures.some(
+                                        (existing) =>
+                                          existing.id !== sig.id &&
+                                          existing.name.toLowerCase() === nextName.toLowerCase()
+                                      )
+                                    ) {
+                                      setSignatureNameError("Choose a unique name.");
+                                      return;
+                                    }
+                                    setSavedSignatures((prev) =>
+                                      prev.map((item) => (item.id === sig.id ? { ...item, name: nextName } : item))
+                                    );
+                                  }}
+                                >
+                                  Rename
+                                </button>
+                                <button
+                                  type="button"
+                                  className="text-xs font-semibold text-rose-600 transition hover:underline"
+                                  onClick={() =>
+                                    setSavedSignatures((prev) => prev.filter((item) => item.id !== sig.id))
+                                  }
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    {signatureNameError ? (
+                      <div className="text-xs font-semibold text-rose-600">{signatureNameError}</div>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
             ) : null}
@@ -2951,6 +3636,176 @@ function WorkspaceClient() {
             </div>
           </div>
         </div>
+      {showDrawModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleCloseDrawModal} />
+          <div className="relative z-10 w-full max-w-3xl rounded-2xl bg-white p-6 shadow-[0_40px_120px_rgba(5,10,30,0.45)]">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-semibold text-slate-900">Draw signature</h3>
+                <p className="text-sm text-slate-600">Use your mouse or trackpad. Clear if you want to restart.</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseDrawModal}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+              <canvas
+                ref={drawCanvasRef}
+                className="h-[220px] w-full bg-white"
+                onPointerDown={handleDrawPointerDown}
+                onPointerMove={handleDrawPointerMove}
+                onPointerUp={handleDrawPointerUp}
+                onPointerLeave={handleDrawPointerUp}
+              />
+            </div>
+            <div className="mt-3 flex items-center justify-between">
+              <button
+                type="button"
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300"
+                onClick={clearDrawCanvas}
+              >
+                Clear
+              </button>
+              {drawStep === "name" ? null : (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300"
+                    onClick={handleCloseDrawModal}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-full bg-[#024d7c] px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-[#012a44]/30 transition hover:-translate-y-0.5"
+                    onClick={handleDrawContinue}
+                  >
+                    Continue
+                  </button>
+                </div>
+              )}
+            </div>
+            {drawStep === "name" ? (
+              <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-semibold text-slate-800">Name this signature</label>
+                  <input
+                    type="text"
+                    value={drawSignatureName}
+                    onChange={(event) => {
+                      setDrawSignatureName(event.target.value);
+                      setSignatureNameError(null);
+                      setDrawSignatureError(null);
+                    }}
+                    placeholder="Alan – full signature"
+                    className="h-10 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-900 shadow-inner outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200/70"
+                  />
+                  {(drawSignatureError || signatureNameError) && (
+                    <p className="text-xs font-semibold text-rose-600">
+                      {drawSignatureError || signatureNameError}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 justify-end">
+                  <button
+                    type="button"
+                    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300"
+                    onClick={() => setDrawStep("canvas")}
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-full bg-[#024d7c] px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-[#012a44]/30 transition hover:-translate-y-0.5"
+                    onClick={handleSaveDrawnSignature}
+                  >
+                    Save &amp; Use
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      {showUploadModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleCloseUploadModal} />
+          <div className="relative z-10 w-full max-w-2xl rounded-2xl bg-white p-6 shadow-[0_40px_120px_rgba(5,10,30,0.45)]">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-semibold text-slate-900">Upload signature</h3>
+                <p className="text-sm text-slate-600">Use a PNG, JPG, or SVG and give it a name.</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseUploadModal}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mt-4 flex flex-col gap-3">
+              <label className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-100">
+                <UploadCloud className="h-5 w-5" />
+                <span>Select signature image</span>
+                <input type="file" accept="image/*" className="hidden" onChange={handleUploadFileInput} />
+              </label>
+              {uploadPreview ? (
+                <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={uploadPreview}
+                    alt="Uploaded signature preview"
+                    className="h-16 w-28 rounded border border-slate-100 object-contain"
+                  />
+                  <div className="text-sm text-slate-700">Preview</div>
+                </div>
+              ) : null}
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-semibold text-slate-800">Name this signature</label>
+                <input
+                  type="text"
+                  value={uploadName}
+                  onChange={(event) => {
+                    setUploadName(event.target.value);
+                    setUploadError(null);
+                    setSignatureNameError(null);
+                  }}
+                  placeholder="e.g. Alan – initials"
+                  className="h-10 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-900 shadow-inner outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200/70"
+                />
+              </div>
+              {(uploadError || signatureNameError) && (
+                <p className="text-xs font-semibold text-rose-600">{uploadError || signatureNameError}</p>
+              )}
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300"
+                  onClick={handleCloseUploadModal}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="rounded-full bg-[#024d7c] px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-[#012a44]/30 transition hover:-translate-y-0.5 disabled:opacity-50"
+                  disabled={!uploadPreview}
+                  onClick={handleSaveUploadedSignature}
+                >
+                  Save &amp; Use
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {showDownloadGate ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowDownloadGate(false)} />
