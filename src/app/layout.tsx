@@ -52,7 +52,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               {session?.user ? <WorkspaceSettingsMenu /> : <HeaderLoginButton />}
             </div>
           </header>
-          <main className="pt-4">{children}</main>
+          <main>{children}</main>
         </Providers>
       </body>
     </html>
