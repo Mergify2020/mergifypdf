@@ -1338,7 +1338,9 @@ function WorkspaceClient() {
                       strokeOpacity={stroke.tool === "pencil" ? 1 : 0.25}
                       style={{
                         pointerEvents: deleteMode ? "stroke" : "none",
-                        cursor: deleteMode ? url('/icons/eraser.svg') 4 4, auto : "default",
+                        cursor: deleteMode
+                          ? ("url('/icons/eraser.svg') 4 4, auto" as CSSProperties["cursor"])
+                          : "default",
                       }}
                       onClick={(event) => {
                         if (!deleteMode) return;
@@ -1399,7 +1401,7 @@ function WorkspaceClient() {
                     transformOrigin: "center",
                     willChange: isRotatingThis ? "transform" : undefined,
                     transitionDuration: isRotatingThis ? "0ms" : undefined,
-                    cursor: deleteMode ? url('/icons/eraser.svg') 4 4, auto : undefined,
+                    cursor: deleteMode ? ("url('/icons/eraser.svg') 4 4, auto" as CSSProperties["cursor"]) : undefined,
                   }}
                   onClick={(event) => {
                     event.stopPropagation();
