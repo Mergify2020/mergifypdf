@@ -1296,23 +1296,24 @@ function WorkspaceClient() {
           >
             <div
               className="absolute left-0 top-0 bg-white"
-              style={{
-                width: fittedWidth,
-                height: fittedHeight,
-                transform: `rotate(${rotationDegrees}deg)`,
-                transformOrigin: "top right",
-                cursor:
-                  activeDrawingTool === "highlight"
-                    ? (`url(${HIGHLIGHT_CURSOR}) 4 24, crosshair` as CSSProperties["cursor"])
-                    : activeDrawingTool === "pencil"
-                    ? ("crosshair" as CSSProperties["cursor"])
-                    : activeDrawingTool === "text"
-                    ? ("text" as CSSProperties["cursor"])
-                    : undefined,
-              }}
-              onMouseDown={(event) => handleMarkupPointerDown(page.id, event)}
-              onMouseMove={(event) => handleMarkupPointerMove(page.id, event)}
-              onMouseUp={() => handleMarkupPointerUp(page.id)}
+            style={{
+              width: fittedWidth,
+              height: fittedHeight,
+              transform: `rotate(${rotationDegrees}deg)`,
+              transformOrigin: "top right",
+              cursor: deleteMode
+                ? (`url(${ERASER_CURSOR}) 4 4, pointer` as CSSProperties["cursor"])
+                : activeDrawingTool === "highlight"
+                ? (`url(${HIGHLIGHT_CURSOR}) 4 24, crosshair` as CSSProperties["cursor"])
+                : activeDrawingTool === "pencil"
+                ? ("crosshair" as CSSProperties["cursor"])
+                : activeDrawingTool === "text"
+                ? ("text" as CSSProperties["cursor"])
+                : undefined,
+            }}
+            onMouseDown={(event) => handleMarkupPointerDown(page.id, event)}
+            onMouseMove={(event) => handleMarkupPointerMove(page.id, event)}
+            onMouseUp={() => handleMarkupPointerUp(page.id)}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -1339,7 +1340,7 @@ function WorkspaceClient() {
                       strokeOpacity={stroke.tool === "pencil" ? 1 : 0.25}
                       style={{
                         pointerEvents: deleteMode ? "stroke" : "none",
-                        cursor: deleteMode ? "pointer" : "default",
+                        cursor: deleteMode ? (`url(${ERASER_CURSOR}) 4 4, pointer` as CSSProperties["cursor"]) : "default",
                       }}
                       onClick={(event) => {
                         if (!deleteMode) return;
@@ -1400,6 +1401,7 @@ function WorkspaceClient() {
                     transformOrigin: "center",
                     willChange: isRotatingThis ? "transform" : undefined,
                     transitionDuration: isRotatingThis ? "0ms" : undefined,
+                    cursor: deleteMode ? (`url(${ERASER_CURSOR}) 4 4, pointer` as CSSProperties["cursor"]) : undefined,
                   }}
                   onClick={(event) => {
                     event.stopPropagation();
