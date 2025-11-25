@@ -829,6 +829,12 @@ function WorkspaceClient() {
   const toolSwitchBase = "flex items-center gap-2 px-4 py-2 text-sm font-semibold transition";
   const toolSwitchActive = "bg-[#024d7c] text-white shadow-sm";
   const toolSwitchInactive = "bg-white text-slate-700 hover:bg-slate-50";
+  const buttonBase =
+    "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition";
+  const buttonNeutral =
+    `${buttonBase} border border-slate-200 bg-white text-slate-800 shadow-[0_4px_14px_rgba(15,23,42,0.12)] hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50`;
+  const buttonPrimary =
+    `${buttonBase} bg-[#024d7c] text-white shadow-md shadow-[#012a44]/30 hover:-translate-y-0.5 hover:bg-[#013d63]`;
 
   // Better drag in grids
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
@@ -2400,7 +2406,7 @@ function WorkspaceClient() {
           {authSession?.user ? <WorkspaceSettingsMenu /> : <HeaderLoginButton />}
         </div>
         <div className="mx-auto w-full px-4 pb-4 lg:px-10">
-          <div className="bg-white shadow-sm rounded-lg px-4 py-3 w-full max-w-[1400px] mx-auto">
+          <div className="bg-white shadow-sm rounded-lg px-4 py-4 w-full max-w-[1400px] mx-auto">
             <div className="grid w-full grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-[1.5fr_1.5fr_auto_auto] items-start">
               <div className="flex flex-col gap-2">
                 <div className="relative w-full max-w-[420px]">
@@ -2447,19 +2453,19 @@ function WorkspaceClient() {
                         strokeLinejoin="round"
                       />
                     </svg>
-                  </button>
-                </div>
-                <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
-                  <div className="text-xs font-semibold text-slate-600">Zoom</div>
-                  <button
-                    type="button"
-                    aria-label="Zoom out"
-                    className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-40"
-                    onClick={() => setZoomWithScrollPreserved(zoomPercent - 25)}
-                    disabled={zoomPercent <= 100}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </button>
+                </button>
+              </div>
+              <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
+                <div className="text-xs font-semibold text-slate-600">Zoom</div>
+                <button
+                  type="button"
+                  aria-label="Zoom out"
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-40 shadow-[0_4px_12px_rgba(15,23,42,0.08)]"
+                  onClick={() => setZoomWithScrollPreserved(zoomPercent - 25)}
+                  disabled={zoomPercent <= 100}
+                >
+                  <Minus className="h-4 w-4" />
+                </button>
                   <input
                     type="range"
                     min={100}
@@ -2478,7 +2484,7 @@ function WorkspaceClient() {
                   <button
                     type="button"
                     aria-label="Previous page"
-                    className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-40"
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-40 shadow-[0_4px_12px_rgba(15,23,42,0.08)]"
                     onClick={() => handlePageStep(-1)}
                     disabled={activePageIndex <= 0}
                   >
@@ -2492,7 +2498,7 @@ function WorkspaceClient() {
                   <button
                     type="button"
                     aria-label="Next page"
-                    className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-40"
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-40 shadow-[0_4px_12px_rgba(15,23,42,0.08)]"
                     onClick={() => handlePageStep(1)}
                     disabled={activePageIndex === pages.length - 1 || pages.length === 0}
                   >
@@ -2501,7 +2507,7 @@ function WorkspaceClient() {
                     </svg>
                   </button>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 shadow-sm">
                   <div className="inline-flex overflow-hidden rounded-xl border border-slate-200 bg-white">
                     <button
                       type="button"
@@ -2596,7 +2602,7 @@ function WorkspaceClient() {
                     Manage pages
                   </button>
                   <button
-                    className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300"
+                    className={`${buttonNeutral} px-4`}
                     onClick={handleUndoHighlight}
                     disabled={!hasUndoHistory}
                   >
@@ -2604,7 +2610,7 @@ function WorkspaceClient() {
                     Undo
                   </button>
                   <button
-                    className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300"
+                    className={`${buttonNeutral} px-4`}
                     onClick={handleClearHighlights}
                     disabled={!hasAnyHighlights}
                   >
@@ -2616,14 +2622,14 @@ function WorkspaceClient() {
 
               <div className="flex flex-col gap-2">
                 <button
-                  className="w-full rounded-lg bg-[#024d7c] px-6 py-3 text-sm font-semibold text-white shadow-md shadow-[#012a44]/30 transition hover:-translate-y-0.5 hover:bg-[#013d63] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c] focus-visible:ring-offset-1 active:translate-y-0 disabled:cursor-not-allowed disabled:bg-[#d1e3f2] disabled:text-[#5f7085] disabled:shadow-none"
+                  className={`${buttonPrimary} w-full px-6 py-3 justify-center`}
                   onClick={() => handleDownload()}
                   disabled={downloadDisabled}
                 >
                   {busy ? "Building..." : "Download pages"}
                 </button>
                 <button
-                  className="w-full rounded-lg border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c]/40 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60"
+                  className={`${buttonNeutral} w-full px-6 py-3 justify-center`}
                   onClick={handleAddClick}
                   disabled={pages.length === 0}
                 >
