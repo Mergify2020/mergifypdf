@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import SettingsMenu from "./SettingsMenu";
 
-const ALLOWED_PREFIXES = ["/studio", "/"];
+const ALLOWED_PREFIXES = ["/studio", "/", "/pricing"];
 
 export default function WorkspaceSettingsMenu() {
   const pathname = usePathname();
