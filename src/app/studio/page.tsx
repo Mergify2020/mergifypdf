@@ -218,6 +218,8 @@ type HighlightColorKey = keyof typeof HIGHLIGHT_COLORS;
 
 const HIGHLIGHT_CURSOR =
   "data:image/svg+xml;utf8,%3Csvg width='32' height='32' viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 24 L24 2 L30 8 L10 28 L3 29 Z' fill='%23024d7c'/%3E%3Crect x='5' y='25' width='10' height='3' fill='%23ffd43b'/%3E%3C/svg%3E";
+const ERASER_CURSOR =
+  "data:image/svg+xml;utf8,%3Csvg width='28' height='28' viewBox='0 0 28 28' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 18.5 14.5 8l3.5 3.5-10.5 10.5H4z' fill='%23f97316' stroke='%23ea580c' stroke-width='1.2'/%3E%3Cpath d='M18 11l2.5-2.5-3.5-3.5L14.5 7.5' stroke='%23262626' stroke-width='1.2'/%3E%3Ccircle cx='22' cy='22' r='3' fill='%23ffffff' stroke='%23262626' stroke-width='1.2'/%3E%3C/svg%3E";
 const PREVIEW_BASE_SCALE = 3;
 const MAX_DEVICE_PIXEL_RATIO = 4;
 const TEXT_PLACEHOLDER = "Type here";
@@ -2221,21 +2223,25 @@ function WorkspaceClient() {
 
   useEffect(() => {
     if (typeof document === "undefined") return;
-    if (!activeDrawingTool) {
+    if (!activeDrawingTool && !deleteMode) {
       document.body.style.cursor = "";
       return;
     }
     const previous = document.body.style.cursor;
-    document.body.style.cursor =
-      activeDrawingTool === "highlight"
-        ? `url(${HIGHLIGHT_CURSOR}) 4 24, crosshair`
-        : activeDrawingTool === "pencil"
-        ? "crosshair"
-        : "text";
+    if (deleteMode) {
+      document.body.style.cursor = `url(${ERASER_CURSOR}) 4 4, pointer`;
+    } else {
+      document.body.style.cursor =
+        activeDrawingTool === "highlight"
+          ? `url(${HIGHLIGHT_CURSOR}) 4 24, crosshair`
+          : activeDrawingTool === "pencil"
+          ? "crosshair"
+          : "text";
+    }
     return () => {
       document.body.style.cursor = previous;
     };
-  }, [activeDrawingTool]);
+  }, [activeDrawingTool, deleteMode]);
   useEffect(() => {
     if (!highlightMode && !pencilMode) {
       setDraftHighlight(null);
