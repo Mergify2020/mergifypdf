@@ -2495,8 +2495,8 @@ function WorkspaceClient() {
           {authSession?.user ? <WorkspaceSettingsMenu /> : <HeaderLoginButton />}
         </div>
         <div className="mx-auto w-full px-4 pb-4 lg:px-10">
-          <div className="bg-white shadow-sm rounded-lg px-4 py-4 w-full max-w-[1400px] mx-auto">
-            <div className="flex w-full items-stretch justify-between gap-4 flex-wrap lg:flex-nowrap">
+          <div className="w-full max-w-[1400px] mx-auto rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <div className="flex w-full items-center justify-between gap-4 flex-wrap lg:flex-nowrap">
               <div className="flex flex-col gap-2 min-w-[280px] max-w-[420px]">
                 <div className="relative w-full max-w-[420px]">
                   {projectNameEditing ? (
@@ -2568,7 +2568,7 @@ function WorkspaceClient() {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-2 flex-1 min-w-[320px]">
+              <div className="flex flex-col items-center gap-2 flex-1 min-w-[320px]">
                 <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm justify-start">
                   <button
                     type="button"
@@ -2696,14 +2696,14 @@ function WorkspaceClient() {
 
               <div className="flex flex-col gap-2 items-end min-w-[200px]">
                 <button
-                  className={`${buttonPrimary} w-full px-6 py-3 justify-center`}
+                  className={`${buttonPrimary} w-full px-6 py-2 justify-center`}
                   onClick={() => handleDownload()}
                   disabled={downloadDisabled}
                 >
                   {busy ? "Building..." : "Download pages"}
                 </button>
                 <button
-                  className={`${buttonNeutral} w-full px-6 py-3 justify-center`}
+                  className={`${buttonNeutral} w-full px-6 py-2 justify-center`}
                   onClick={handleAddClick}
                   disabled={pages.length === 0}
                 >
@@ -2935,7 +2935,7 @@ function WorkspaceClient() {
                   <button
                     type="button"
                     onClick={handleAddClick}
-                    className="mx-auto mt-6 inline-flex items-center gap-2 rounded-full bg-[#024d7c] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-[#012a44]/20 transition hover:bg-[#013d63] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#024d7c]"
+                    className="mx-auto mt-6 inline-flex items-center gap-2 rounded-full bg-[#024d7c] px-6 py-2 text-sm font-semibold text-white shadow-lg shadow-[#012a44]/20 transition hover:bg-[#013d63] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#024d7c]"
                   >
                     Upload PDFs
                     <svg
