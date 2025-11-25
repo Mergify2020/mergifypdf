@@ -1336,6 +1336,43 @@ function WorkspaceClient() {
                 viewBox="0 0 1000 1000"
                 preserveAspectRatio="none"
               >
+                {deleteMode
+                  ? pageHighlights.map((stroke) =>
+                      stroke.points.length > 1 ? (
+                        <polyline
+                          key={`${stroke.id}-hit`}
+                          points={stroke.points.map((pt) => `${pt.x * 1000},${pt.y * 1000}`).join(" ")}
+                          fill="none"
+                          stroke="transparent"
+                          strokeWidth={Math.max(12, stroke.thickness * 3000)}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          style={{
+                            pointerEvents: "stroke",
+                            cursor: "url('/icons/eraser.svg') 4 4, auto" as CSSProperties["cursor"],
+                          }}
+                          onPointerDown={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            setIsErasing(true);
+                            handleDeleteStroke(page.id, stroke.id);
+                          }}
+                          onPointerMove={(event) => {
+                            if (!isErasing) return;
+                            event.preventDefault();
+                            event.stopPropagation();
+                            handleDeleteStroke(page.id, stroke.id);
+                          }}
+                          onPointerEnter={(event) => {
+                            if (!isErasing) return;
+                            event.preventDefault();
+                            event.stopPropagation();
+                            handleDeleteStroke(page.id, stroke.id);
+                          }}
+                        />
+                      ) : null
+                    )
+                  : null}
                 {pageHighlights.map((stroke) =>
                   stroke.points.length > 1 ? (
                     <polyline
@@ -1424,7 +1461,6 @@ function WorkspaceClient() {
                     event.stopPropagation();
                     if (deleteMode) {
                       setIsErasing(true);
-                      deleteTextAnnotation(page.id, annotation.id);
                       return;
                     }
                     focusTextAnnotation(annotation.id);
@@ -1432,7 +1468,6 @@ function WorkspaceClient() {
                   onPointerEnter={(event) => {
                     if (!deleteMode || !isErasing) return;
                     event.stopPropagation();
-                    deleteTextAnnotation(page.id, annotation.id);
                   }}
                 >
                   <div className="relative h-full w-full">
