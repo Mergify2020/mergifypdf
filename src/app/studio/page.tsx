@@ -1401,10 +1401,15 @@ function WorkspaceClient() {
                   }}
                   onClick={(event) => {
                     event.stopPropagation();
+                    if (deleteMode) {
+                      deleteTextAnnotation(page.id, annotation.id);
+                      return;
+                    }
                     focusTextAnnotation(annotation.id);
                   }}
                   onMouseDown={(event) => {
                     event.stopPropagation();
+                    if (deleteMode) return;
                     focusTextAnnotation(annotation.id);
                   }}
                 >
@@ -2593,21 +2598,22 @@ function WorkspaceClient() {
                     Manage pages
                   </button>
                   <button
-                  className={`${buttonNeutral} px-4`}
-                  onClick={handleUndoHighlight}
-                  disabled={!hasUndoHistory}
-                >
-                  <Undo2 className="h-4 w-4" />
-                  Undo
-                </button>
-                <button
                     className={`${buttonNeutral} px-4`}
-                  onClick={handleClearHighlights}
-                  disabled={!hasAnyAnnotations}
-                >
-                  <Eraser className="h-4 w-4" />
-                  Eraser
-                </button>
+                    onClick={handleUndoHighlight}
+                    disabled={!hasUndoHistory}
+                  >
+                    <Undo2 className="h-4 w-4" />
+                    Undo
+                  </button>
+                  <button
+                    className={`${deleteMode ? buttonPrimary : buttonNeutral} px-4`}
+                    onClick={handleToggleDeleteMode}
+                    aria-pressed={deleteMode}
+                    disabled={!hasAnyAnnotations && !deleteMode}
+                  >
+                    <Eraser className="h-4 w-4" />
+                    Eraser
+                  </button>
               </div>
               </div>
 
