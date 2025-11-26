@@ -1937,20 +1937,34 @@ function WorkspaceClient() {
   }, [generateTypedSignatureImage, showSignatureHub, signatureHubStep, typeSignatureStyle, typeSignatureText]);
 
   const saveSignatureEntry = useCallback(
-    async (name: string, dataUrl: string) => {
+    async (name: string, dataUrl: string, options?: { autoResolveName?: boolean }) => {
       const trimmed = name.trim();
       if (!trimmed) {
         setSignatureNameError("Name your signature.");
         return null;
       }
-      if (savedSignatures.some((sig) => sig.name.toLowerCase() === trimmed.toLowerCase())) {
-        setSignatureNameError("Choose a unique name.");
-        return null;
+      let finalName = trimmed;
+      const lower = trimmed.toLowerCase();
+      const hasConflict = savedSignatures.some((sig) => sig.name.toLowerCase() === lower);
+      if (hasConflict) {
+        if (options?.autoResolveName) {
+          let counter = 2;
+          let candidate = `${trimmed} (${counter})`;
+          const existingLower = new Set(savedSignatures.map((sig) => sig.name.toLowerCase()));
+          while (existingLower.has(candidate.toLowerCase())) {
+            counter += 1;
+            candidate = `${trimmed} (${counter})`;
+          }
+          finalName = candidate;
+        } else {
+          setSignatureNameError("Choose a unique name.");
+          return null;
+        }
       }
       const { width, height } = await loadImageDimensions(dataUrl);
       const entry: SavedSignature = {
         id: crypto.randomUUID(),
-        name: trimmed,
+        name: finalName,
         dataUrl,
         naturalWidth: width,
         naturalHeight: height,
@@ -2710,7 +2724,10 @@ function WorkspaceClient() {
       setDrawSignatureError("Please draw a signature first.");
       return;
     }
-    const entry = await saveSignatureEntry(drawSignatureName || `Signature ${savedSignatures.length + 1}`, drawnSignatureData);
+    const entry = await saveSignatureEntry(
+      drawSignatureName || `Signature ${savedSignatures.length + 1}`,
+      drawnSignatureData
+    );
     if (!entry) {
       setDrawSignatureError(signatureNameError ?? "Give your signature a unique name.");
       return;
@@ -2865,7 +2882,7 @@ function WorkspaceClient() {
           const uniqueName = data.name?.trim()
             ? data.name
             : `Mobile signature ${data.id.slice(0, 6)}-${Date.now().toString().slice(-4)}`;
-          const entry = await saveSignatureEntry(uniqueName, data.signatureDataUrl);
+          const entry = await saveSignatureEntry(uniqueName, data.signatureDataUrl, { autoResolveName: true });
           if (entry) {
             applySignatureToActivePage(entry);
           }
