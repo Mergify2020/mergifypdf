@@ -1,3 +1,5 @@
+import { Redis } from "@upstash/redis";
+
 type SignSession = {
   id: string;
   signatureDataUrl?: string;
@@ -12,36 +14,14 @@ globalStore.__mpdfSignSessions = memoryStore;
 
 const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
 const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
-const useRedis = Boolean(redisUrl && redisToken);
+const redis: Redis | null =
+  redisUrl && redisToken
+    ? new Redis({
+        url: redisUrl,
+        token: redisToken,
+      })
+    : null;
 const TTL_SECONDS = 60 * 60 * 24;
-
-async function redisSet(key: string, value: string) {
-  if (!useRedis) return false;
-  try {
-    const url = `${redisUrl}/set/${encodeURIComponent(key)}/${encodeURIComponent(value)}?EX=${TTL_SECONDS}`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${redisToken}` },
-      cache: "no-store",
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
-async function redisGet(key: string) {
-  if (!useRedis) return null;
-  try {
-    const url = `${redisUrl}/get/${encodeURIComponent(key)}`;
-    const res = await fetch(url, { cache: "no-store", headers: { Authorization: `Bearer ${redisToken}` } });
-    if (!res.ok) return null;
-    const data = (await res.json()) as { result?: string | null };
-    return data.result ?? null;
-  } catch {
-    return null;
-  }
-}
 
 function memoryCreate(id: string) {
   const session: SignSession = { id, createdAt: Date.now(), updatedAt: Date.now() };
@@ -52,21 +32,26 @@ function memoryCreate(id: string) {
 export async function createSignSession() {
   const id = crypto.randomUUID();
   const session: SignSession = { id, createdAt: Date.now(), updatedAt: Date.now() };
-  const stored = await redisSet(`mpdf:sign:${id}`, JSON.stringify(session));
-  if (!stored) {
+  try {
+    if (redis) {
+      await redis.set(`mpdf:sign:${id}`, session, { ex: TTL_SECONDS });
+    } else {
+      memoryCreate(id);
+    }
+  } catch {
     memoryCreate(id);
   }
   return session;
 }
 
 export async function getSignSession(id: string) {
-  const redisValue = await redisGet(`mpdf:sign:${id}`);
-  if (redisValue) {
-    try {
-      return JSON.parse(redisValue) as SignSession;
-    } catch {
-      // fall through
+  try {
+    if (redis) {
+      const value = await redis.get<SignSession>(`mpdf:sign:${id}`);
+      if (value) return value;
     }
+  } catch {
+    // fall back to memory
   }
   return memoryStore.get(id) ?? null;
 }
@@ -80,8 +65,13 @@ export async function updateSignSession(id: string, data: { signatureDataUrl?: s
       updatedAt: Date.now(),
     };
   const next: SignSession = { ...base, ...data, updatedAt: Date.now() };
-  const stored = await redisSet(`mpdf:sign:${id}`, JSON.stringify(next));
-  if (!stored) {
+  try {
+    if (redis) {
+      await redis.set(`mpdf:sign:${id}`, next, { ex: TTL_SECONDS });
+    } else {
+      memoryStore.set(id, next);
+    }
+  } catch {
     memoryStore.set(id, next);
   }
   return next;
