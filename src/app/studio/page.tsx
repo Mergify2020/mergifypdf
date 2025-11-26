@@ -2847,7 +2847,10 @@ function WorkspaceClient() {
   useEffect(() => {
     if (!mobileSessionId || (signatureHubStep !== "qr" && signatureHubStep !== "email")) return;
     let cancelled = false;
+    let handled = false;
+
     const poll = async () => {
+      if (handled) return;
       try {
         const res = await fetch(`/api/sign-session/${mobileSessionId}`, { cache: "no-store" });
         if (!res.ok) {
@@ -2857,6 +2860,7 @@ function WorkspaceClient() {
         const data = (await res.json()) as { id: string; signatureDataUrl: string | null; name: string | null };
         if (cancelled) return;
         if (data.signatureDataUrl) {
+          handled = true;
           setMobileSessionStatus("received");
           const uniqueName = data.name?.trim()
             ? data.name
@@ -2864,12 +2868,12 @@ function WorkspaceClient() {
           const entry = await saveSignatureEntry(uniqueName, data.signatureDataUrl);
           if (entry) {
             applySignatureToActivePage(entry);
-            setSignaturePanelMode("saved");
-            setSignatureHubStep("gallery");
-            setMobileSessionId(null);
-            setMobileSessionUrl(null);
-            setMobileSessionStatus("idle");
           }
+          setSignaturePanelMode("saved");
+          setSignatureHubStep("gallery");
+          setMobileSessionId(null);
+          setMobileSessionUrl(null);
+          setMobileSessionStatus("idle");
         }
       } catch (err) {
         if (!cancelled) {
