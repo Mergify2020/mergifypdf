@@ -447,9 +447,6 @@ function useProjects() {
         const data = (await res.json()) as { projects?: CloudProject[] };
         if (!cancelled && Array.isArray(data.projects)) {
           setProjects(data.projects);
-          if (!currentProjectId && data.projects[0]?.id) {
-            setCurrentProjectId(data.projects[0].id);
-          }
         }
       } catch {
         // ignore network errors
