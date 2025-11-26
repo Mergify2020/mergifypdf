@@ -95,7 +95,14 @@ export default function ProjectsList({ initialProjects }: Props) {
         if (!res.ok) return;
         const data = (await res.json()) as { projects?: RecentProjectEntry[] };
         if (!Array.isArray(data.projects)) return;
-        saveRecentProjects(ownerId, data.projects);
+        const local = loadRecentProjects(ownerId);
+        if (data.projects.length === 0 && local.length > 0) {
+          // No server-side projects yet — promote local ones so they follow the account.
+          saveRecentProjects(ownerId, local);
+        } else if (data.projects.length > 0) {
+          // Server has the source of truth — sync it down.
+          saveRecentProjects(ownerId, data.projects);
+        }
       } catch {
         // ignore network errors; fall back to local storage only
       }
