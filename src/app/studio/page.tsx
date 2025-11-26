@@ -2865,9 +2865,10 @@ function WorkspaceClient() {
           if (entry) {
             applySignatureToActivePage(entry);
             setSignaturePanelMode("saved");
-            closeSignatureHub();
+            setSignatureHubStep("gallery");
             setMobileSessionId(null);
             setMobileSessionUrl(null);
+            setMobileSessionStatus("idle");
           }
         }
       } catch (err) {
@@ -2884,9 +2885,13 @@ function WorkspaceClient() {
     };
   }, [
     applySignatureToActivePage,
-    closeSignatureHub,
     mobileSessionId,
     saveSignatureEntry,
+    setSignatureHubStep,
+    setSignaturePanelMode,
+    setMobileSessionId,
+    setMobileSessionStatus,
+    setMobileSessionUrl,
     signatureHubStep,
   ]);
 
@@ -3952,7 +3957,9 @@ function WorkspaceClient() {
                       No saved signatures yet. Add one to get started.
                     </div>
                   ) : null}
-                  {savedSignatures.map((sig) => (
+                  {savedSignatures.map((sig) => {
+                    const isRecent = Date.now() - sig.createdAt <= 10 * 60 * 1000;
+                    return (
                     <div
                       key={sig.id}
                       className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-[0_6px_18px_rgba(15,23,42,0.08)]"
@@ -3960,7 +3967,7 @@ function WorkspaceClient() {
                       <div className="flex items-center justify-between gap-2">
                         <div className="text-sm font-semibold text-slate-800">{sig.name}</div>
                         <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[0.65rem] font-semibold text-slate-500">
-                          Saved
+                          {isRecent ? "Recently added" : "Saved"}
                         </span>
                       </div>
                       <div className="flex items-center gap-3">
@@ -4019,7 +4026,8 @@ function WorkspaceClient() {
                         </div>
                       </div>
                     </div>
-                  ))}
+                  );
+                  })}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-[0.7rem] font-semibold uppercase tracking-wide text-slate-500">Create:</span>
