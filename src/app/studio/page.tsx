@@ -923,8 +923,8 @@ function WorkspaceClient() {
   const controlButtonClass =
     "flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,0.08)] transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-40";
   const signatureTabBase =
-    "inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-[0_6px_18px_rgba(15,23,42,0.08)] transition hover:border-[#024d7c]/40 hover:text-[#024d7c]";
-  const signatureTabActive = "border-[#024d7c] bg-[#024d7c] text-white shadow-[0_10px_30px_rgba(2,77,124,0.25)]";
+    "inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-[0_6px_14px_rgba(15,23,42,0.06)] transition hover:border-[#024d7c]/40 hover:text-[#024d7c]";
+  const signatureTabActive = "border-[#024d7c] bg-[#024d7c] text-white shadow-[0_10px_24px_rgba(2,77,124,0.2)]";
   const signatureTabInactive = "";
 
   // Better drag in grids
@@ -3343,6 +3343,11 @@ function WorkspaceClient() {
                 >
                   <SignatureIcon className="h-4 w-4" />
                   Signature
+                  {savedSignatures.length > 0 ? (
+                    <span className="inline-flex min-w-[18px] items-center justify-center rounded-full bg-white/80 px-1 text-[0.65rem] font-bold text-[#024d7c]">
+                      {savedSignatures.length}
+                    </span>
+                  ) : null}
                 </button>
                 <button
                   type="button"
@@ -3405,18 +3410,11 @@ function WorkspaceClient() {
             ) : null}
 
             {highlightActive || pencilActive || signatureButtonOn ? (
-              <div className="mt-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                  <div className="flex flex-col gap-3">
+              <div className="mt-3 rounded-2xl border border-slate-200 bg-white px-4 py-2 shadow-sm">
+                <div className="flex flex-col gap-2">
                   {signatureButtonOn ? (
-                    <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-r from-white via-slate-50 to-white px-4 py-3 shadow-[0_12px_40px_rgba(15,23,42,0.06)]">
-                      <div className="flex flex-wrap items-center gap-3">
-                        <div className="flex items-center gap-2 rounded-full bg-[#e8f2f9] px-3 py-1 text-[0.72rem] font-semibold text-[#024d7c]">
-                          <SignatureIcon className="h-4 w-4" />
-                          Signatures
-                          <span className="rounded-full bg-white/80 px-2 py-0.5 text-[0.65rem] font-bold text-[#024d7c]">
-                            {savedSignatures.length}
-                          </span>
-                        </div>
+                    <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-r from-white via-slate-50 to-white px-3 py-2 shadow-[0_10px_32px_rgba(15,23,42,0.05)]">
+                      <div className="flex flex-wrap items-center gap-2">
                         <div className="flex shrink-0 items-center gap-2">
                           <button
                             type="button"
@@ -3454,11 +3452,8 @@ function WorkspaceClient() {
                             Upload
                           </button>
                         </div>
-                        <div className="ml-auto hidden text-xs font-semibold uppercase tracking-wide text-slate-400 sm:block">
-                          Tap to insert or rename
-                        </div>
                       </div>
-                      <div className="mt-3 flex flex-1 flex-nowrap gap-3 overflow-x-auto pb-1">
+                      <div className="mt-2 flex flex-1 flex-nowrap gap-3 overflow-x-auto pb-1">
                         {savedSignatures.length === 0 ? (
                           <div className="min-w-[260px] shrink-0 rounded-xl border border-dashed border-slate-200/80 bg-white/70 px-4 py-4 text-sm text-slate-600 shadow-inner">
                             No saved signatures yet. Draw or upload to save one.
@@ -3467,7 +3462,7 @@ function WorkspaceClient() {
                           savedSignatures.map((sig) => (
                             <div
                               key={sig.id}
-                              className="flex min-w-[220px] flex-col gap-2 rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 shadow-[0_8px_24px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:border-[#024d7c]/40 hover:shadow-[0_12px_32px_rgba(2,77,124,0.14)]"
+                              className="flex min-w-[200px] flex-col gap-1.5 rounded-2xl border border-slate-200 bg-white/90 px-3 py-2.5 shadow-[0_6px_20px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:border-[#024d7c]/40 hover:shadow-[0_10px_28px_rgba(2,77,124,0.12)]"
                             >
                               <div className="flex items-start justify-between gap-2">
                                 <div className="text-sm font-semibold text-slate-800">{sig.name}</div>
