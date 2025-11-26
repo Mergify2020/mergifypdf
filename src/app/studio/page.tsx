@@ -87,6 +87,14 @@ type HighlightHistoryEntry =
   | { type: "delete"; pageId: string; highlight: HighlightStroke }
   | { type: "clear"; previous: Record<string, HighlightStroke[]> };
 
+type Project = {
+  id: string;
+  name: string;
+  data: any;
+  createdAt: string;
+  updatedAt: string;
+};
+
 type TextAnnotation = {
   id: string;
   pageId: string;
@@ -129,6 +137,14 @@ type SignaturePlacement = {
   height: number;
   rotation?: number;
   status: "draft" | "placed";
+};
+
+type CloudProject = {
+  id: string;
+  name: string;
+  data: unknown;
+  createdAt?: string | number;
+  updatedAt?: string | number;
 };
 
 const TYPED_SIGNATURE_STYLES = [
@@ -414,6 +430,109 @@ function hexToRgb(hex: string) {
   return { r, g, b };
 }
 
+function useProjects() {
+  const [projects, setProjects] = useState<CloudProject[]>([]);
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [savingProject, setSavingProject] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const hydrate = async () => {
+      setLoadingProjects(true);
+      try {
+        const res = await fetch("/api/projects", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as { projects?: CloudProject[] };
+        if (!cancelled && Array.isArray(data.projects)) {
+          setProjects(data.projects);
+          if (!currentProjectId && data.projects[0]?.id) {
+            setCurrentProjectId(data.projects[0].id);
+          }
+        }
+      } catch {
+        // ignore network errors
+      } finally {
+        if (!cancelled) {
+          setLoadingProjects(false);
+        }
+      }
+    };
+    void hydrate();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const saveProject = useCallback(
+    async (name: string, data: unknown) => {
+      const trimmedName = name.trim();
+      if (!trimmedName) return;
+      setSavingProject(true);
+      try {
+        const payload = { name: trimmedName, data };
+        if (currentProjectId) {
+          const res = await fetch(`/api/projects/${currentProjectId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!res.ok) return;
+          const json = (await res.json().catch(() => null)) as { project?: CloudProject } | null;
+          const updated =
+            json?.project ??
+            ({
+              id: currentProjectId,
+              name: trimmedName,
+              data,
+              updatedAt: Date.now(),
+            } as CloudProject);
+          setProjects((prev) =>
+            prev.map((project) => (project.id === updated.id ? { ...project, ...updated } : project))
+          );
+        } else {
+          const res = await fetch("/api/projects", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!res.ok) return;
+          const json = (await res.json().catch(() => null)) as { project?: CloudProject } | null;
+          const created =
+            json?.project ??
+            ({
+              id:
+                typeof crypto !== "undefined" && "randomUUID" in crypto
+                  ? crypto.randomUUID()
+                  : `${Date.now()}`,
+              name: trimmedName,
+              data,
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            } as CloudProject);
+          setProjects((prev) => [created, ...prev]);
+          setCurrentProjectId(created.id);
+        }
+      } catch {
+        // ignore network errors
+      } finally {
+        setSavingProject(false);
+      }
+    },
+    [currentProjectId]
+  );
+
+  return {
+    projects,
+    currentProjectId,
+    loadingProjects,
+    savingProject,
+    saveProject,
+    setCurrentProjectId,
+  };
+}
+
 function pointDistance(a: Point, b: Point) {
   const dx = a.x - b.x;
   const dy = a.y - b.y;
@@ -626,6 +745,7 @@ function SortableOrganizeTile({
 function WorkspaceClient() {
   const { data: authSession } = useSession();
   const router = useRouter();
+  const { saveProject } = useProjects();
   const [showDownloadGate, setShowDownloadGate] = useState(false);
   const [showDelayOverlay, setShowDelayOverlay] = useState<"intro" | "progress" | null>(null);
   const [sources, setSources] = useState<SourceRef[]>([]);
@@ -3038,6 +3158,30 @@ function WorkspaceClient() {
 
   /** Build final PDF respecting order + keep flags */
   async function handleDownload(forceBypass = false) {
+    if (authSession?.user) {
+      const projectData = {
+        name: projectName,
+        sources: sources.map((source) => ({
+          id: source.storageId,
+          name: source.name,
+          size: source.size,
+          updatedAt: source.updatedAt,
+        })),
+        pages: pages.map((page) => ({
+          id: page.id,
+          srcIdx: page.srcIdx,
+          pageIdx: page.pageIdx,
+          rotation: page.rotation,
+          width: page.width,
+          height: page.height,
+        })),
+        highlights,
+        textAnnotations,
+        signaturePlacements,
+        savedSignatures,
+      };
+      void saveProject(projectName, projectData);
+    }
     if (!forceBypass && !authSession?.user) {
       // Allow anonymous downloads; still surface the gate UI without blocking the flow.
       setShowDownloadGate(true);

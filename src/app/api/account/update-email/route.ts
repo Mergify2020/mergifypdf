@@ -75,6 +75,5 @@ export async function GET() {
     where: { id: session.user.id },
     select: { image: true },
   });
-
   return NextResponse.json({ success: true, image: user?.image ?? null });
 }
