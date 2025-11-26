@@ -129,6 +129,13 @@ type SignaturePlacement = {
   status: "draft" | "placed";
 };
 
+const TYPED_SIGNATURE_STYLES = [
+  { id: "script", label: "Script", fontFamily: "'Segoe Script', 'Comic Sans MS', cursive" },
+  { id: "classic", label: "Classic", fontFamily: "'Georgia', 'Times New Roman', serif" },
+  { id: "minimal", label: "Minimal", fontFamily: "'Inter', 'Helvetica', sans-serif" },
+  { id: "marker", label: "Marker", fontFamily: "'Poppins', 'Arial', sans-serif" },
+] as const;
+
 type FontOption =
   | {
       label: string;
@@ -667,6 +674,17 @@ function WorkspaceClient() {
     centerY: number;
     baseRotation: number;
   } | null>(null);
+  const [showSignatureHub, setShowSignatureHub] = useState(false);
+  const [signatureHubStep, setSignatureHubStep] = useState<"gallery" | "type" | "draw" | "upload" | "qr" | "email">(
+    "gallery"
+  );
+  const [typeSignatureText, setTypeSignatureText] = useState("");
+  const [typeSignatureStyle, setTypeSignatureStyle] = useState<(typeof TYPED_SIGNATURE_STYLES)[number]["id"]>(
+    TYPED_SIGNATURE_STYLES[0].id
+  );
+  const [typedSignaturePreview, setTypedSignaturePreview] = useState<string | null>(null);
+  const [typedSignatureError, setTypedSignatureError] = useState<string | null>(null);
+  const [mobileEmail, setMobileEmail] = useState("");
   const [showDrawModal, setShowDrawModal] = useState(false);
   const [drawStep, setDrawStep] = useState<"canvas" | "name">("canvas");
   const drawCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -954,6 +972,28 @@ function WorkspaceClient() {
     window.addEventListener("resize", updatePreviewHeightLimit);
     return () => window.removeEventListener("resize", updatePreviewHeightLimit);
   }, [updatePreviewHeightLimit]);
+
+  useEffect(() => {
+    let mounted = true;
+    if (!showSignatureHub || signatureHubStep !== "type") {
+      if (!typeSignatureText.trim()) {
+        setTypedSignaturePreview(null);
+      }
+      return;
+    }
+    if (!typeSignatureText.trim()) {
+      setTypedSignaturePreview(null);
+      return;
+    }
+    generateTypedSignatureImage(typeSignatureText, typeSignatureStyle).then((data) => {
+      if (mounted) {
+        setTypedSignaturePreview(data);
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [generateTypedSignatureImage, showSignatureHub, signatureHubStep, typeSignatureStyle, typeSignatureText]);
 
   /** Rehydrate any stored PDFs from IndexedDB so refreshes survive deployments */
   useEffect(() => {
@@ -1867,6 +1907,31 @@ function WorkspaceClient() {
     []
   );
 
+  const generateTypedSignatureImage = useCallback(
+    async (text: string, styleId: (typeof TYPED_SIGNATURE_STYLES)[number]["id"]) => {
+      if (typeof document === "undefined") return null;
+      const clean = text.trim();
+      if (!clean) return null;
+      const canvas = document.createElement("canvas");
+      const width = 720;
+      const height = 240;
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return null;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, width, height);
+      const style = TYPED_SIGNATURE_STYLES.find((item) => item.id === styleId) ?? TYPED_SIGNATURE_STYLES[0];
+      ctx.fillStyle = "#0f172a";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = `48px ${style.fontFamily}`;
+      ctx.fillText(clean, width / 2, height / 2);
+      return canvas.toDataURL("image/png");
+    },
+    []
+  );
+
   const saveSignatureEntry = useCallback(
     async (name: string, dataUrl: string) => {
       const trimmed = name.trim();
@@ -1893,6 +1958,18 @@ function WorkspaceClient() {
     },
     [loadImageDimensions, savedSignatures]
   );
+
+  const closeSignatureHub = useCallback(() => {
+    setShowSignatureHub(false);
+    setSignatureHubStep("gallery");
+    setTypeSignatureText("");
+    setTypedSignaturePreview(null);
+    setTypedSignatureError(null);
+    setSignatureNameError(null);
+    setSignaturePanelMode("none");
+    setShowDrawModal(false);
+    setShowUploadModal(false);
+  }, []);
 
   const beginSignaturePlacement = useCallback((signature: SavedSignature) => {
     setPendingSignatureForPlacement(signature);
@@ -1934,6 +2011,18 @@ function WorkspaceClient() {
       setPendingSignatureForPlacement(null);
     },
     [pages]
+  );
+
+  const applySignatureToActivePage = useCallback(
+    (signature: SavedSignature) => {
+      beginSignaturePlacement(signature);
+      const targetPageId = activePageId || pages[0]?.id;
+      if (targetPageId) {
+        placeSignatureAtPoint(signature, targetPageId, { x: 0.5, y: 0.5 });
+        setActiveSignaturePlacementId((prev) => prev);
+      }
+    },
+    [activePageId, beginSignaturePlacement, pages, placeSignatureAtPoint]
   );
 
   function getPageNormalizedPoint(pageId: string, clientX: number, clientY: number) {
@@ -2264,10 +2353,31 @@ function WorkspaceClient() {
   const highlightButtonOn = highlightMode && !highlightButtonDisabled;
   const pencilButtonOn = pencilMode && !highlightButtonDisabled;
   const textButtonOn = textMode && !highlightButtonDisabled;
-  const signatureButtonOn = signaturePanelMode !== "none";
+  const signatureButtonOn = signaturePanelMode !== "none" || showSignatureHub;
   const highlightActive = highlightButtonOn && !deleteMode;
   const pencilActive = pencilButtonOn && !deleteMode;
   const textActive = textButtonOn && !deleteMode;
+  const mobileCaptureLink = useMemo(
+    () => (typeof window !== "undefined" ? `${window.location.origin}/sign-on-mobile` : "https://mergifypdf.com/sign-on-mobile"),
+    []
+  );
+  const fallbackQrData = useMemo(() => {
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140" width="140" height="140">
+        <rect width="140" height="140" fill="#0f172a"/>
+        <rect x="8" y="8" width="40" height="40" fill="#fff"/>
+        <rect x="16" y="16" width="24" height="24" fill="#0f172a"/>
+        <rect x="92" y="8" width="40" height="40" fill="#fff"/>
+        <rect x="100" y="16" width="24" height="24" fill="#0f172a"/>
+        <rect x="8" y="92" width="40" height="40" fill="#fff"/>
+        <rect x="16" y="100" width="24" height="24" fill="#0f172a"/>
+        <rect x="56" y="56" width="28" height="12" fill="#fff"/>
+        <rect x="56" y="74" width="12" height="20" fill="#fff"/>
+        <rect x="74" y="74" width="20" height="12" fill="#fff"/>
+        <text x="70" y="132" font-size="8" fill="#fff" text-anchor="middle">Scan to sign</text>
+      </svg>`;
+    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  }, []);
   const activeDrawingTool: DrawingTool | null = highlightActive
     ? "highlight"
     : pencilActive
@@ -2620,11 +2730,21 @@ function WorkspaceClient() {
     setDrawSignatureName("");
     setDrawnSignatureData(null);
     setSignaturePanelMode("saved");
-    beginSignaturePlacement(entry);
-  }, [beginSignaturePlacement, drawSignatureName, drawnSignatureData, saveSignatureEntry, savedSignatures.length, signatureNameError]);
+    setSignatureHubStep("gallery");
+    setShowSignatureHub(false);
+    applySignatureToActivePage(entry);
+  }, [
+    applySignatureToActivePage,
+    drawSignatureName,
+    drawnSignatureData,
+    saveSignatureEntry,
+    savedSignatures.length,
+    signatureNameError,
+  ]);
 
   const handleCloseDrawModal = useCallback(() => {
     setShowDrawModal(false);
+    setShowSignatureHub(true);
     setDrawStep("canvas");
     setDrawSignatureName("");
     setSignatureNameError(null);
@@ -2648,16 +2768,76 @@ function WorkspaceClient() {
     setUploadError(null);
     setUploadPreview(null);
     setSignaturePanelMode("saved");
-    beginSignaturePlacement(entry);
-  }, [beginSignaturePlacement, saveSignatureEntry, savedSignatures.length, signatureNameError, uploadName, uploadPreview]);
+    setSignatureHubStep("gallery");
+    setShowSignatureHub(false);
+    applySignatureToActivePage(entry);
+  }, [
+    applySignatureToActivePage,
+    saveSignatureEntry,
+    savedSignatures.length,
+    signatureNameError,
+    uploadName,
+    uploadPreview,
+  ]);
 
   const handleCloseUploadModal = useCallback(() => {
     setShowUploadModal(false);
+    setShowSignatureHub(true);
     setUploadName("");
     setUploadPreview(null);
     setUploadError(null);
     setSignatureNameError(null);
     setSignaturePanelMode("saved");
+  }, []);
+
+  const handleSaveTypedSignature = useCallback(async () => {
+    if (!typeSignatureText.trim()) {
+      setTypedSignatureError("Enter your name or initials.");
+      return;
+    }
+    const rendered = await generateTypedSignatureImage(typeSignatureText, typeSignatureStyle);
+    if (!rendered) {
+      setTypedSignatureError("Could not render that style. Try again.");
+      return;
+    }
+    const entry = await saveSignatureEntry(typeSignatureText, rendered);
+    if (!entry) return;
+    setSignatureHubStep("gallery");
+    setShowSignatureHub(false);
+    setTypedSignatureError(null);
+    setSignaturePanelMode("saved");
+    applySignatureToActivePage(entry);
+  }, [
+    applySignatureToActivePage,
+    generateTypedSignatureImage,
+    saveSignatureEntry,
+    typeSignatureStyle,
+    typeSignatureText,
+  ]);
+
+  const handleCopyMobileLink = useCallback(async () => {
+    try {
+      await navigator.clipboard?.writeText(mobileCaptureLink);
+    } catch {
+      // ignore copy failures
+    }
+  }, [mobileCaptureLink]);
+
+  const handleOpenDrawFromHub = useCallback(() => {
+    setShowSignatureHub(false);
+    setShowDrawModal(true);
+    setDrawStep("canvas");
+    setDrawSignatureName("");
+    setDrawSignatureError(null);
+    setDrawnSignatureData(null);
+  }, []);
+
+  const handleOpenUploadFromHub = useCallback(() => {
+    setShowSignatureHub(false);
+    setShowUploadModal(true);
+    setUploadPreview(null);
+    setUploadName("");
+    setUploadError(null);
   }, []);
 
   const handleUploadFileInput = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
@@ -3269,6 +3449,7 @@ function WorkspaceClient() {
                   className={`${toolButtonBase} ${highlightButtonOn ? toolButtonActive : toolButtonInactive}`}
                   onClick={() =>
                     setHighlightMode((prev) => {
+                      setShowSignatureHub(false);
                       setSignaturePanelMode("none");
                       setPendingSignatureForPlacement(null);
                       const next = !prev;
@@ -3291,6 +3472,7 @@ function WorkspaceClient() {
                   className={`${toolButtonBase} ${pencilButtonOn ? toolButtonActive : toolButtonInactive}`}
                   onClick={() =>
                     setPencilMode((prev) => {
+                      setShowSignatureHub(false);
                       setSignaturePanelMode("none");
                       setPendingSignatureForPlacement(null);
                       const next = !prev;
@@ -3313,6 +3495,7 @@ function WorkspaceClient() {
                   className={`${toolButtonBase} ${textButtonOn ? toolButtonActive : toolButtonInactive}`}
                   onClick={() =>
                     setTextMode((prev) => {
+                      setShowSignatureHub(false);
                       setSignaturePanelMode("none");
                       setPendingSignatureForPlacement(null);
                       const next = !prev;
@@ -3333,7 +3516,9 @@ function WorkspaceClient() {
                   aria-pressed={signatureButtonOn}
                   className={`${toolButtonBase} ${signatureButtonOn ? toolButtonActive : toolButtonInactive}`}
                   onClick={() => {
-                    setSignaturePanelMode((prev) => (prev === "none" ? "saved" : "none"));
+                    setShowSignatureHub(true);
+                    setSignatureHubStep("gallery");
+                    setSignaturePanelMode("none");
                     setPendingSignatureForPlacement(null);
                     setHighlightMode(false);
                     setPencilMode(false);
@@ -3409,201 +3594,76 @@ function WorkspaceClient() {
               <div className="px-1 pb-1 text-sm text-rose-500">{projectNameError}</div>
             ) : null}
 
-            {highlightActive || pencilActive || signatureButtonOn ? (
+            {highlightActive || pencilActive ? (
               <div className="mt-3 rounded-2xl border border-slate-200 bg-white px-4 py-2 shadow-sm">
-                <div className="flex flex-col gap-2">
-                  {signatureButtonOn ? (
-                    <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-r from-white via-slate-50 to-white px-3 py-2 shadow-[0_10px_32px_rgba(15,23,42,0.05)]">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <div className="flex shrink-0 items-center gap-2">
+                <div className="flex flex-wrap items-center gap-4">
+                  {highlightActive ? (
+                    <>
+                      <div className="flex items-center gap-2">
+                        {highlightColorEntries.map(([key, value]) => (
                           <button
+                            key={key}
                             type="button"
-                            className={`${signatureTabBase} ${
-                              signaturePanelMode === "draw" ? signatureTabActive : signatureTabInactive
+                            onClick={() => setHighlightColor(key)}
+                            className={`flex h-8 w-8 items-center justify-center rounded-full border transition ${
+                              highlightColor === key
+                                ? "border-[#024d7c] ring-2 ring-[#024d7c]/30"
+                                : "border-white/30 hover:border-slate-300"
                             }`}
-                            title="Draw signature"
-                            onClick={() => {
-                              setSignaturePanelMode("draw");
-                              setShowDrawModal(true);
-                              setDrawStep("canvas");
-                              setDrawSignatureName("");
-                              setDrawSignatureError(null);
-                              setDrawnSignatureData(null);
-                            }}
-                          >
-                            <Pencil className="h-4 w-4" />
-                            Draw
-                          </button>
-                          <button
-                            type="button"
-                            className={`${signatureTabBase} ${
-                              signaturePanelMode === "upload" ? signatureTabActive : signatureTabInactive
-                            }`}
-                            title="Upload signature"
-                            onClick={() => {
-                              setSignaturePanelMode("upload");
-                              setShowUploadModal(true);
-                              setUploadPreview(null);
-                              setUploadName("");
-                              setUploadError(null);
-                            }}
-                          >
-                            <UploadCloud className="h-4 w-4" />
-                            Upload
-                          </button>
-                        </div>
+                            style={{ backgroundColor: value }}
+                            aria-label={`Use ${key} highlighter`}
+                          />
+                        ))}
                       </div>
-                      <div className="mt-2 flex flex-1 flex-nowrap gap-3 overflow-x-auto pb-1">
-                        {savedSignatures.length === 0 ? (
-                          <div className="min-w-[260px] shrink-0 rounded-xl border border-dashed border-slate-200/80 bg-white/70 px-4 py-4 text-sm text-slate-600 shadow-inner">
-                            No saved signatures yet. Draw or upload to save one.
-                          </div>
-                        ) : (
-                          savedSignatures.map((sig) => (
-                            <div
-                              key={sig.id}
-                              className="flex min-w-[200px] flex-col gap-1.5 rounded-2xl border border-slate-200 bg-white/90 px-3 py-2.5 shadow-[0_6px_20px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:border-[#024d7c]/40 hover:shadow-[0_10px_28px_rgba(2,77,124,0.12)]"
-                            >
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="text-sm font-semibold text-slate-800">{sig.name}</div>
-                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[0.65rem] font-semibold text-slate-500">
-                                  Saved
-                                </span>
-                              </div>
-                              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">
-                                <button
-                                  type="button"
-                                  className="rounded-full bg-[#024d7c] px-3 py-1 text-xs font-semibold text-white shadow-sm transition hover:bg-[#013d63]"
-                                  onClick={() => {
-                                    beginSignaturePlacement(sig);
-                                    const targetPageId = activePageId || pages[0]?.id;
-                                    if (targetPageId) {
-                                      placeSignatureAtPoint(sig, targetPageId, { x: 0.5, y: 0.5 });
-                                      setActiveSignaturePlacementId((prev) => prev);
-                                    }
-                                    setSignaturePanelMode("saved");
-                                  }}
-                                >
-                                  Insert signature
-                                </button>
-                                <button
-                                  type="button"
-                                  className="text-slate-500 transition hover:text-[#024d7c] hover:underline"
-                                  onClick={() => {
-                                    const nextName = prompt("Rename signature", sig.name)?.trim();
-                                    if (!nextName) return;
-                                    if (
-                                      savedSignatures.some(
-                                        (existing) =>
-                                          existing.id !== sig.id && existing.name.toLowerCase() === nextName.toLowerCase()
-                                      )
-                                    ) {
-                                      setSignatureNameError("Choose a unique name.");
-                                      return;
-                                    }
-                                    setSavedSignatures((prev) =>
-                                      prev.map((item) => (item.id === sig.id ? { ...item, name: nextName } : item))
-                                    );
-                                  }}
-                                >
-                                  Rename
-                                </button>
-                                <button
-                                  type="button"
-                                  className="text-rose-500 transition hover:text-rose-600 hover:underline"
-                                  onClick={() => {
-                                    const confirmed = window.confirm(
-                                      "Are you sure you want to delete this signature? You can't go back."
-                                    );
-                                    if (!confirmed) return;
-                                    setSavedSignatures((prev) => prev.filter((item) => item.id !== sig.id));
-                                  }}
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                            </div>
-                          ))
-                        )}
+                      <div className="flex items-center gap-2 rounded-full border border-slate-300 bg-white/80 px-3 py-1.5 text-[0.65rem] font-semibold uppercase tracking-wide text-slate-600 shadow-sm">
+                        <button
+                          type="button"
+                          onClick={() => adjustHighlightThickness(-2)}
+                          disabled={highlightThickness <= MIN_HIGHLIGHT_THICKNESS}
+                          className="rounded-full border border-transparent p-1 transition hover:border-slate-200 hover:bg-white disabled:opacity-40"
+                        >
+                          <Minus className="h-3.5 w-3.5" />
+                        </button>
+                        <span>{Math.round(highlightThickness)} px</span>
+                        <button
+                          type="button"
+                          onClick={() => adjustHighlightThickness(2)}
+                          disabled={highlightThickness >= MAX_HIGHLIGHT_THICKNESS}
+                          className="rounded-full border border-transparent p-1 transition hover:border-slate-200 hover:bg-white disabled:opacity-40"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </button>
                       </div>
-                    </div>
+                    </>
                   ) : null}
 
-                  {signatureButtonOn && signatureNameError ? (
-                    <div className="text-xs font-semibold text-rose-600">{signatureNameError}</div>
+                  {pencilActive ? (
+                    <>
+                      <div className="flex items-center gap-2 rounded-full border border-slate-300 bg-white/80 px-3 py-1.5 text-[0.65rem] font-semibold uppercase tracking-wide text-slate-600 shadow-sm">
+                        <span className="text-[0.6rem] font-semibold uppercase tracking-wide text-slate-500">Streak</span>
+                        <button
+                          type="button"
+                          onClick={() => adjustPencilThickness(-1)}
+                          disabled={pencilThickness <= MIN_PENCIL_THICKNESS}
+                          className="rounded-full border border-transparent p-1 transition hover:border-slate-200 hover:bg-white disabled:opacity-40"
+                        >
+                          <Minus className="h-3.5 w-3.5" />
+                        </button>
+                        <span>{Math.round(pencilThickness)} px</span>
+                        <button
+                          type="button"
+                          onClick={() => adjustPencilThickness(1)}
+                          disabled={pencilThickness >= MAX_PENCIL_THICKNESS}
+                          className="rounded-full border border-transparent p-1 transition hover:border-slate-200 hover:bg-white disabled:opacity-40"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      <span className="text-[0.6rem] font-semibold uppercase tracking-wide text-slate-500">
+                        Ink color: black
+                      </span>
+                    </>
                   ) : null}
-
-                  <div className="flex flex-wrap items-center gap-4">
-                    {highlightActive ? (
-                      <>
-                        <div className="flex items-center gap-2">
-                          {highlightColorEntries.map(([key, value]) => (
-                            <button
-                              key={key}
-                              type="button"
-                              onClick={() => setHighlightColor(key)}
-                              className={`flex h-8 w-8 items-center justify-center rounded-full border transition ${
-                                highlightColor === key
-                                  ? "border-[#024d7c] ring-2 ring-[#024d7c]/30"
-                                  : "border-white/30 hover:border-slate-300"
-                              }`}
-                              style={{ backgroundColor: value }}
-                              aria-label={`Use ${key} highlighter`}
-                            />
-                          ))}
-                        </div>
-                        <div className="flex items-center gap-2 rounded-full border border-slate-300 bg-white/80 px-3 py-1.5 text-[0.65rem] font-semibold uppercase tracking-wide text-slate-600 shadow-sm">
-                          <button
-                            type="button"
-                            onClick={() => adjustHighlightThickness(-2)}
-                            disabled={highlightThickness <= MIN_HIGHLIGHT_THICKNESS}
-                            className="rounded-full border border-transparent p-1 transition hover:border-slate-200 hover:bg-white disabled:opacity-40"
-                          >
-                            <Minus className="h-3.5 w-3.5" />
-                          </button>
-                          <span>{Math.round(highlightThickness)} px</span>
-                          <button
-                            type="button"
-                            onClick={() => adjustHighlightThickness(2)}
-                            disabled={highlightThickness >= MAX_HIGHLIGHT_THICKNESS}
-                            className="rounded-full border border-transparent p-1 transition hover:border-slate-200 hover:bg-white disabled:opacity-40"
-                          >
-                            <Plus className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      </>
-                    ) : null}
-
-                    {pencilActive ? (
-                      <>
-                        <div className="flex items-center gap-2 rounded-full border border-slate-300 bg-white/80 px-3 py-1.5 text-[0.65rem] font-semibold uppercase tracking-wide text-slate-600 shadow-sm">
-                          <span className="text-[0.6rem] font-semibold uppercase tracking-wide text-slate-500">
-                            Streak
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => adjustPencilThickness(-1)}
-                            disabled={pencilThickness <= MIN_PENCIL_THICKNESS}
-                            className="rounded-full border border-transparent p-1 transition hover:border-slate-200 hover:bg-white disabled:opacity-40"
-                          >
-                            <Minus className="h-3.5 w-3.5" />
-                          </button>
-                          <span>{Math.round(pencilThickness)} px</span>
-                          <button
-                            type="button"
-                            onClick={() => adjustPencilThickness(1)}
-                            disabled={pencilThickness >= MAX_PENCIL_THICKNESS}
-                            className="rounded-full border border-transparent p-1 transition hover:border-slate-200 hover:bg-white disabled:opacity-40"
-                          >
-                            <Plus className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                        <span className="text-[0.6rem] font-semibold uppercase tracking-wide text-slate-500">
-                          Ink color: black
-                        </span>
-                      </>
-                    ) : null}
-                  </div>
                 </div>
               </div>
             ) : null}
@@ -3766,6 +3826,349 @@ function WorkspaceClient() {
             </div>
           </div>
         </div>
+      {showSignatureHub ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeSignatureHub} />
+          <div className="relative z-10 w-full max-w-4xl rounded-2xl bg-white p-5 shadow-[0_32px_90px_rgba(5,10,30,0.45)]">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-xl font-semibold text-slate-900">
+                  {signatureHubStep === "gallery"
+                    ? "Sign"
+                    : signatureHubStep === "type"
+                    ? "Type signature"
+                    : signatureHubStep === "qr"
+                    ? "Add signature via QR code"
+                    : signatureHubStep === "email"
+                    ? "Add signature via email"
+                    : signatureHubStep === "draw"
+                    ? "Draw signature"
+                    : "Upload signature"}
+                </h3>
+                <p className="text-sm text-slate-600">
+                  {signatureHubStep === "gallery"
+                    ? "Pick an existing signature or create a new one."
+                    : "Save it to drop onto your document instantly."}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeSignatureHub}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {signatureHubStep === "gallery" ? (
+              <div className="mt-4 space-y-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSignatureHubStep("type");
+                      setTypeSignatureText("");
+                      setTypedSignatureError(null);
+                    }}
+                    className="flex min-h-[120px] items-center justify-center gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-[#024d7c]/50 hover:bg-white"
+                  >
+                    <div className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm">
+                      <Plus className="h-5 w-5 text-[#024d7c]" />
+                    </div>
+                    <div className="text-left">
+                      <div className="text-base font-semibold text-slate-900">Add signature</div>
+                      <div className="text-xs text-slate-600">Type, draw, or upload a new signature.</div>
+                    </div>
+                  </button>
+                  {savedSignatures.length === 0 ? (
+                    <div className="flex min-h-[120px] items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm">
+                      No saved signatures yet. Add one to get started.
+                    </div>
+                  ) : null}
+                  {savedSignatures.map((sig) => (
+                    <div
+                      key={sig.id}
+                      className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-[0_6px_18px_rgba(15,23,42,0.08)]"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-sm font-semibold text-slate-800">{sig.name}</div>
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[0.65rem] font-semibold text-slate-500">
+                          Saved
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={sig.dataUrl}
+                          alt={sig.name}
+                          className="h-16 w-32 rounded-lg border border-slate-100 object-contain bg-white"
+                        />
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          <button
+                            type="button"
+                            className="rounded-full bg-[#024d7c] px-3 py-1 text-xs font-semibold text-white shadow-sm transition hover:bg-[#013d63]"
+                            onClick={() => {
+                              applySignatureToActivePage(sig);
+                              closeSignatureHub();
+                            }}
+                          >
+                            Use
+                          </button>
+                          <button
+                            type="button"
+                            className="text-slate-500 transition hover:text-[#024d7c] hover:underline"
+                            onClick={() => {
+                              const nextName = prompt("Rename signature", sig.name)?.trim();
+                              if (!nextName) return;
+                              if (
+                                savedSignatures.some(
+                                  (existing) =>
+                                    existing.id !== sig.id && existing.name.toLowerCase() === nextName.toLowerCase()
+                                )
+                              ) {
+                                setSignatureNameError("Choose a unique name.");
+                                return;
+                              }
+                              setSavedSignatures((prev) =>
+                                prev.map((item) => (item.id === sig.id ? { ...item, name: nextName } : item))
+                              );
+                            }}
+                          >
+                            Rename
+                          </button>
+                          <button
+                            type="button"
+                            className="text-rose-500 transition hover:text-rose-600 hover:underline"
+                            onClick={() => {
+                              const confirmed = window.confirm(
+                                "Are you sure you want to delete this signature? You can't go back."
+                              );
+                              if (!confirmed) return;
+                              setSavedSignatures((prev) => prev.filter((item) => item.id !== sig.id));
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[0.7rem] font-semibold uppercase tracking-wide text-slate-500">Create:</span>
+                  <button
+                    type="button"
+                    className={`${signatureTabBase} ${signatureHubStep === "type" ? signatureTabActive : signatureTabInactive}`}
+                    onClick={() => {
+                      setSignatureHubStep("type");
+                      setTypeSignatureText("");
+                      setTypedSignatureError(null);
+                    }}
+                  >
+                    <span className="text-xs font-semibold">Type</span>
+                  </button>
+                  <button type="button" className={signatureTabBase} onClick={handleOpenDrawFromHub}>
+                    Draw
+                  </button>
+                  <button type="button" className={signatureTabBase} onClick={handleOpenUploadFromHub}>
+                    Upload
+                  </button>
+                  <button type="button" className={signatureTabBase} onClick={() => setSignatureHubStep("qr")}>
+                    QR code
+                  </button>
+                  <button type="button" className={signatureTabBase} onClick={() => setSignatureHubStep("email")}>
+                    Email
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {signatureHubStep === "type" ? (
+              <div className="mt-4 space-y-4">
+                <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-semibold text-slate-800">Type your name</label>
+                    <input
+                      type="text"
+                      value={typeSignatureText}
+                      onChange={(event) => {
+                        setTypeSignatureText(event.target.value);
+                        setTypedSignatureError(null);
+                        setSignatureNameError(null);
+                      }}
+                      placeholder="e.g. John Smith"
+                      className="h-10 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-900 shadow-inner outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200/70"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Style</div>
+                    <div className="flex flex-wrap gap-2">
+                      {TYPED_SIGNATURE_STYLES.map((style) => (
+                        <button
+                          key={style.id}
+                          type="button"
+                          className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                            typeSignatureStyle === style.id
+                              ? "border-[#024d7c] bg-[#024d7c] text-white shadow-sm"
+                              : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                          }`}
+                          onClick={() => {
+                            setTypeSignatureStyle(style.id);
+                            setTypedSignatureError(null);
+                          }}
+                        >
+                          {style.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Preview</div>
+                  <div className="mt-2 flex min-h-[140px] items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white px-3 py-2">
+                    {typedSignaturePreview ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={typedSignaturePreview}
+                        alt="Typed signature preview"
+                        className="max-h-24 w-full max-w-xl object-contain"
+                      />
+                    ) : (
+                      <span className="text-sm text-slate-500">Enter a name to preview.</span>
+                    )}
+                  </div>
+                  {(typedSignatureError || signatureNameError) && (
+                    <p className="mt-2 text-xs font-semibold text-rose-600">
+                      {typedSignatureError || signatureNameError}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center justify-between">
+                  <button
+                    type="button"
+                    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300"
+                    onClick={() => setSignatureHubStep("gallery")}
+                  >
+                    Back
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300"
+                      onClick={() => setTypeSignatureText("")}
+                    >
+                      Clear
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-full bg-[#024d7c] px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-[#012a44]/30 transition hover:-translate-y-0.5 disabled:opacity-50"
+                      onClick={handleSaveTypedSignature}
+                      disabled={!typeSignatureText.trim()}
+                    >
+                      Save &amp; Use
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {signatureHubStep === "qr" ? (
+              <div className="mt-4 space-y-4">
+                <p className="text-sm text-slate-600">
+                  Scan with your phone to open a signing link and draw in landscape mode. Copy the link if your camera can&apos;t read the QR.
+                </p>
+                <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+                  <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-center sm:gap-6">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={fallbackQrData}
+                      alt="QR code"
+                      className="h-40 w-40 rounded-lg border border-slate-200 bg-white p-3 shadow-inner"
+                    />
+                    <div className="space-y-2 text-sm text-slate-700">
+                      <div className="font-semibold text-slate-900">How it works</div>
+                      <ol className="list-decimal space-y-1 pl-4">
+                        <li>Scan the QR with your phone.</li>
+                        <li>Draw or upload your signature on mobile.</li>
+                        <li>Return here to place it instantly.</li>
+                      </ol>
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <span className="rounded-full bg-white px-2 py-1 font-semibold text-slate-600">Link</span>
+                        <code className="rounded bg-white px-2 py-1 text-[0.7rem] text-slate-700">{mobileCaptureLink}</code>
+                        <button
+                          type="button"
+                          className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300"
+                          onClick={handleCopyMobileLink}
+                        >
+                          Copy link
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300"
+                    onClick={() => setSignatureHubStep("gallery")}
+                  >
+                    Back
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {signatureHubStep === "email" ? (
+              <div className="mt-4 space-y-4">
+                <p className="text-sm text-slate-600">
+                  Send yourself a link to draw a signature on your phone. We&apos;ll open your mail client so you keep control of your inbox.
+                </p>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 shadow-inner">
+                  <label className="text-sm font-semibold text-slate-800">Email for mobile signing link</label>
+                  <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <input
+                      type="email"
+                      value={mobileEmail}
+                      onChange={(event) => setMobileEmail(event.target.value)}
+                      placeholder="you@example.com"
+                      className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-900 shadow-inner outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200/70"
+                    />
+                    <button
+                      type="button"
+                      className="rounded-full bg-[#024d7c] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 disabled:opacity-50"
+                      onClick={() => {
+                        if (!mobileEmail.trim()) return;
+                        const mailto = `mailto:${mobileEmail}?subject=Sign%20on%20your%20phone&body=${encodeURIComponent(
+                          `Open this link on your phone to draw your signature: ${mobileCaptureLink}`
+                        )}`;
+                        window.open(mailto, "_blank");
+                      }}
+                      disabled={!mobileEmail.trim()}
+                    >
+                      Open email app
+                    </button>
+                  </div>
+                  <p className="mt-2 text-xs text-slate-600">
+                    The link is{" "}
+                    <code className="rounded bg-white px-2 py-1 text-[0.7rem] text-slate-700">{mobileCaptureLink}</code>. Save it if you prefer to
+                    share manually.
+                  </p>
+                </div>
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300"
+                    onClick={() => setSignatureHubStep("gallery")}
+                  >
+                    Back
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
       {showDrawModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleCloseDrawModal} />
