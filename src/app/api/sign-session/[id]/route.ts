@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { getSignSession, updateSignSession } from "@/lib/signSessionStore";
@@ -7,7 +9,7 @@ export async function GET(_: NextRequest, context: any) {
   if (!sessionId) {
     return NextResponse.json({ error: "Missing id" }, { status: 400 });
   }
-  const session = getSignSession(sessionId);
+  const session = await getSignSession(sessionId);
   if (!session) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -29,7 +31,7 @@ export async function PUT(request: NextRequest, context: any) {
     return NextResponse.json({ error: "Missing dataUrl" }, { status: 400 });
   }
   const name = typeof body.name === "string" ? body.name : undefined;
-  const session = updateSignSession(sessionId, { signatureDataUrl: body.dataUrl, name });
+  const session = await updateSignSession(sessionId, { signatureDataUrl: body.dataUrl, name });
   if (!session) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
