@@ -52,6 +52,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import WorkspaceSettingsMenu from "@/components/WorkspaceSettingsMenu";
 import HeaderLoginButton from "@/components/HeaderLoginButton";
+import { addRecentProject } from "@/lib/recentProjects";
 import { PROJECT_NAME_STORAGE_KEY, projectNameToFile, sanitizeProjectName } from "@/lib/projectName";
 import { PENDING_UPLOAD_STORAGE_KEY } from "@/lib/pendingUpload";
 
@@ -466,9 +467,9 @@ function useProjects() {
   }, []);
 
   const saveProject = useCallback(
-    async (name: string, data: unknown) => {
+    async (name: string, data: unknown): Promise<CloudProject | null> => {
       const trimmedName = name.trim();
-      if (!trimmedName) return;
+      if (!trimmedName) return null;
       setSavingProject(true);
       try {
         const payload = { name: trimmedName, data };
@@ -478,7 +479,7 @@ function useProjects() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
           });
-          if (!res.ok) return;
+          if (!res.ok) return null;
           const json = (await res.json().catch(() => null)) as { project?: CloudProject } | null;
           const updated =
             json?.project ??
@@ -491,13 +492,14 @@ function useProjects() {
           setProjects((prev) =>
             prev.map((project) => (project.id === updated.id ? { ...project, ...updated } : project))
           );
+          return updated;
         } else {
           const res = await fetch("/api/projects", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
           });
-          if (!res.ok) return;
+          if (!res.ok) return null;
           const json = (await res.json().catch(() => null)) as { project?: CloudProject } | null;
           const created =
             json?.project ??
@@ -513,12 +515,14 @@ function useProjects() {
             } as CloudProject);
           setProjects((prev) => [created, ...prev]);
           setCurrentProjectId(created.id);
+          return created;
         }
       } catch {
         // ignore network errors
       } finally {
         setSavingProject(false);
       }
+      return null;
     },
     [currentProjectId]
   );
@@ -3197,7 +3201,11 @@ function WorkspaceClient() {
     }
     const projectData = buildCloudProjectData();
     if (!projectData) return;
-    await saveProject(projectName, projectData);
+    const saved = await saveProject(projectName, projectData);
+    const ownerId = authSession.user.id ?? authSession.user.email ?? null;
+    if (saved && ownerId) {
+      addRecentProject(ownerId, saved.name ?? projectName, saved.id);
+    }
   }
 
   /** Build final PDF respecting order + keep flags */
@@ -3205,7 +3213,12 @@ function WorkspaceClient() {
     if (authSession?.user) {
       const projectData = buildCloudProjectData();
       if (projectData) {
-        void saveProject(projectName, projectData);
+        const ownerId = authSession.user.id ?? authSession.user.email ?? null;
+        void saveProject(projectName, projectData).then((saved) => {
+          if (saved && ownerId) {
+            addRecentProject(ownerId, saved.name ?? projectName, saved.id);
+          }
+        });
       }
     }
     if (!forceBypass && !authSession?.user) {
