@@ -120,6 +120,9 @@ export default function MobileSignClient({ sessionId }: { sessionId: string }) {
         throw new Error("Could not save signature.");
       }
       setSaved(true);
+      setTimeout(() => {
+        window.location.href = "/"; // invalidate this window after save
+      }, 800);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save.");
     } finally {

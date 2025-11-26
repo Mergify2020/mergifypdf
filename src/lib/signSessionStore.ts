@@ -18,7 +18,7 @@ const TTL_SECONDS = 60 * 60 * 24;
 async function redisSet(key: string, value: string) {
   if (!useRedis) return false;
   try {
-    const url = `${redisUrl}/SET/${encodeURIComponent(key)}/${encodeURIComponent(value)}?EX=${TTL_SECONDS}`;
+    const url = `${redisUrl}/set/${encodeURIComponent(key)}/${encodeURIComponent(value)}?EX=${TTL_SECONDS}`;
     const res = await fetch(url, {
       method: "POST",
       headers: { Authorization: `Bearer ${redisToken}` },
@@ -33,7 +33,7 @@ async function redisSet(key: string, value: string) {
 async function redisGet(key: string) {
   if (!useRedis) return null;
   try {
-    const url = `${redisUrl}/GET/${encodeURIComponent(key)}`;
+    const url = `${redisUrl}/get/${encodeURIComponent(key)}`;
     const res = await fetch(url, { cache: "no-store", headers: { Authorization: `Bearer ${redisToken}` } });
     if (!res.ok) return null;
     const data = (await res.json()) as { result?: string | null };
