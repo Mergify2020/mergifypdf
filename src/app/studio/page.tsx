@@ -3958,7 +3958,7 @@ function WorkspaceClient() {
                   <span className="text-[0.7rem] font-semibold uppercase tracking-wide text-slate-500">Create:</span>
                   <button
                     type="button"
-                    className={`${signatureTabBase} ${signatureHubStep === "type" ? signatureTabActive : signatureTabInactive}`}
+                    className={signatureTabBase}
                     onClick={() => {
                       setSignatureHubStep("type");
                       setTypeSignatureText("");
