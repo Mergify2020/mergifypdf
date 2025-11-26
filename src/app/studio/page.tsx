@@ -873,6 +873,7 @@ function WorkspaceClient() {
   const customFontBytesRef = useRef<Map<string, Uint8Array>>(new Map());
   const pdfFontCacheRef = useRef<Map<string, PDFFont>>(new Map());
   const fontkitModuleRef = useRef<null | { default?: unknown }>(null);
+  const hasAutoSavedCloudProjectRef = useRef(false);
 
   function resolveFontVariant(bold: boolean, italic: boolean): TextFontVariant {
     if (bold && italic) return "boldItalic";
@@ -2642,6 +2643,26 @@ function WorkspaceClient() {
     signaturePlacements,
     savedSignatures,
   ]);
+
+  useEffect(() => {
+    if (!authSession?.user) return;
+    if (!hasWorkspaceData) return;
+    if (hasAutoSavedCloudProjectRef.current) return;
+    let cancelled = false;
+    const ownerId = authSession.user.id ?? authSession.user.email ?? null;
+    const run = async () => {
+      const projectData = buildCloudProjectData();
+      if (!projectData) return;
+      const saved = await saveProject(projectName, projectData);
+      if (!saved || !ownerId || cancelled) return;
+      addRecentProject(ownerId, saved.name ?? projectName, saved.id);
+      hasAutoSavedCloudProjectRef.current = true;
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [authSession?.user, buildCloudProjectData, hasWorkspaceData, projectName, saveProject]);
 
   const computeBaseScale = useCallback(() => {
     const container = previewContainerRef.current;
