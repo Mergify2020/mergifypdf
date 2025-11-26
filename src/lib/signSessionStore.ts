@@ -12,15 +12,25 @@ const globalStore = globalThis as typeof globalThis & { __mpdfSignSessions?: Map
 const memoryStore = globalStore.__mpdfSignSessions ?? new Map<string, SignSession>();
 globalStore.__mpdfSignSessions = memoryStore;
 
-const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
-const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
-const redis: Redis | null =
-  redisUrl && redisToken
-    ? new Redis({
-        url: redisUrl,
-        token: redisToken,
-      })
-    : null;
+const rawRedisUrl = process.env.UPSTASH_REDIS_REST_URL;
+const rawRedisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+
+const redisUrl = rawRedisUrl?.trim();
+const redisToken = rawRedisToken?.trim();
+
+let redis: Redis | null = null;
+
+if (redisUrl && redisToken) {
+  try {
+    redis = new Redis({
+      url: redisUrl,
+      token: redisToken,
+    });
+  } catch {
+    redis = null;
+  }
+}
+
 const TTL_SECONDS = 60 * 60 * 24;
 
 function memoryCreate(id: string) {
