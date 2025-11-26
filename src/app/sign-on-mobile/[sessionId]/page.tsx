@@ -5,8 +5,8 @@ import Link from "next/link";
 
 type Point = { x: number; y: number };
 
-export default function MobileSignPage({ params }: { params: { sessionId: string } }) {
-  const [sessionId] = useState<string | null>(params?.sessionId ?? null);
+export default function MobileSignPage(props: any) {
+  const [sessionId] = useState<string | null>(props?.params?.sessionId ?? null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const lastPointRef = useRef<Point | null>(null);
