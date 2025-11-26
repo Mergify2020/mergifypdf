@@ -973,28 +973,6 @@ function WorkspaceClient() {
     return () => window.removeEventListener("resize", updatePreviewHeightLimit);
   }, [updatePreviewHeightLimit]);
 
-  useEffect(() => {
-    let mounted = true;
-    if (!showSignatureHub || signatureHubStep !== "type") {
-      if (!typeSignatureText.trim()) {
-        setTypedSignaturePreview(null);
-      }
-      return;
-    }
-    if (!typeSignatureText.trim()) {
-      setTypedSignaturePreview(null);
-      return;
-    }
-    generateTypedSignatureImage(typeSignatureText, typeSignatureStyle).then((data) => {
-      if (mounted) {
-        setTypedSignaturePreview(data);
-      }
-    });
-    return () => {
-      mounted = false;
-    };
-  }, [generateTypedSignatureImage, showSignatureHub, signatureHubStep, typeSignatureStyle, typeSignatureText]);
-
   /** Rehydrate any stored PDFs from IndexedDB so refreshes survive deployments */
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1931,6 +1909,28 @@ function WorkspaceClient() {
     },
     []
   );
+
+  useEffect(() => {
+    let mounted = true;
+    if (!showSignatureHub || signatureHubStep !== "type") {
+      if (!typeSignatureText.trim()) {
+        setTypedSignaturePreview(null);
+      }
+      return;
+    }
+    if (!typeSignatureText.trim()) {
+      setTypedSignaturePreview(null);
+      return;
+    }
+    generateTypedSignatureImage(typeSignatureText, typeSignatureStyle).then((data) => {
+      if (mounted) {
+        setTypedSignaturePreview(data);
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [generateTypedSignatureImage, showSignatureHub, signatureHubStep, typeSignatureStyle, typeSignatureText]);
 
   const saveSignatureEntry = useCallback(
     async (name: string, dataUrl: string) => {
