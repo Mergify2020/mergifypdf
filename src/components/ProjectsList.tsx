@@ -87,6 +87,20 @@ export default function ProjectsList({ initialProjects }: Props) {
       setStorageReady(true);
     };
     syncFromStorage();
+    // Also hydrate from the account-level API when signed in so projects follow the user.
+    const hydrateFromApi = async () => {
+      if (!ownerId) return;
+      try {
+        const res = await fetch("/api/recent-projects", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as { projects?: RecentProjectEntry[] };
+        if (!Array.isArray(data.projects)) return;
+        saveRecentProjects(ownerId, data.projects);
+      } catch {
+        // ignore network errors; fall back to local storage only
+      }
+    };
+    void hydrateFromApi();
     const eventKey = `${RECENT_PROJECTS_EVENT}:${ownerId ?? "anon"}`;
     window.addEventListener(eventKey, syncFromStorage);
     return () => window.removeEventListener(eventKey, syncFromStorage);

@@ -32,6 +32,7 @@ import {
   Signature as SignatureIcon,
   UploadCloud,
   X,
+  Mail,
 } from "lucide-react";
 import {
   DndContext,
@@ -1127,13 +1128,37 @@ function WorkspaceClient() {
     }
   }, [authSession?.user?.id]);
 
-  /** Restore saved signatures for signed-in users from the API */
+  /** Restore saved signatures for signed-in users from local storage (migration) or the API */
   useEffect(() => {
     if (!authSession?.user?.id || hasHydratedSignatures.current) return;
     hasHydratedSignatures.current = true;
     let cancelled = false;
     const hydrate = async () => {
       try {
+        // First, try migrating any browser-local signatures into the account store.
+        const local = getLocalStorage();
+        const rawLocal = local?.getItem(WORKSPACE_SIGNATURES_KEY);
+        if (rawLocal) {
+          try {
+            const parsed = JSON.parse(rawLocal);
+            if (Array.isArray(parsed) && !cancelled) {
+              const migrated = parsed as SavedSignature[];
+              setSavedSignatures(migrated);
+              // Persist to API so they follow the account across devices.
+              await fetch("/api/signatures", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ signatures: migrated }),
+              });
+              local?.removeItem(WORKSPACE_SIGNATURES_KEY);
+              return;
+            }
+          } catch {
+            // ignore malformed local signatures and fall through to API
+          }
+        }
+
+        // Otherwise, hydrate from the account-level API.
         const res = await fetch("/api/signatures", { cache: "no-store" });
         if (!res.ok) return;
         const data = (await res.json()) as { signatures?: SavedSignature[] };
@@ -4096,30 +4121,83 @@ function WorkspaceClient() {
                   );
                   })}
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[0.7rem] font-semibold uppercase tracking-wide text-slate-500">Create:</span>
+                <div className="mt-2 grid gap-3 sm:grid-cols-2">
                   <button
                     type="button"
-                    className={signatureTabBase}
                     onClick={() => {
                       setSignatureHubStep("type");
                       setTypeSignatureText("");
                       setTypedSignatureError(null);
                     }}
+                    className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-[#024d7c]/60 hover:shadow-md"
                   >
-                    <span className="text-xs font-semibold">Type</span>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 text-slate-700">
+                      <SignatureIcon className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold text-slate-900">Type signature</div>
+                      <div className="text-xs text-slate-500">Turn your name into a styled signature.</div>
+                    </div>
                   </button>
-                  <button type="button" className={signatureTabBase} onClick={handleOpenDrawFromHub}>
-                    Draw
+                  <button
+                    type="button"
+                    onClick={handleOpenDrawFromHub}
+                    className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-[#024d7c]/60 hover:shadow-md"
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 text-slate-700">
+                      <Pencil className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold text-slate-900">Draw signature</div>
+                      <div className="text-xs text-slate-500">Use your mouse or trackpad to draw.</div>
+                    </div>
                   </button>
-                  <button type="button" className={signatureTabBase} onClick={handleOpenUploadFromHub}>
-                    Upload
+                  <button
+                    type="button"
+                    onClick={handleOpenUploadFromHub}
+                    className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-[#024d7c]/60 hover:shadow-md"
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 text-slate-700">
+                      <UploadCloud className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold text-slate-900">Upload signature</div>
+                      <div className="text-xs text-slate-500">Upload a scanned signature image.</div>
+                    </div>
                   </button>
-                  <button type="button" className={signatureTabBase} onClick={() => setSignatureHubStep("qr")}>
-                    QR code
+                  <button
+                    type="button"
+                    onClick={() => setSignatureHubStep("qr")}
+                    className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-[#024d7c]/60 hover:shadow-md"
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 text-slate-700">
+                      {/* simple QR-like icon using squares */}
+                      <div className="grid h-5 w-5 grid-cols-2 gap-[2px]">
+                        <span className="h-full w-full rounded-sm bg-slate-700" />
+                        <span className="h-full w-full rounded-sm border border-slate-400" />
+                        <span className="h-full w-full rounded-sm border border-slate-400" />
+                        <span className="h-full w-full rounded-sm bg-slate-700" />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold text-slate-900">QR code</div>
+                      <div className="text-xs text-slate-500">Scan to sign on your phone.</div>
+                    </div>
                   </button>
-                  <button type="button" className={signatureTabBase} onClick={() => setSignatureHubStep("email")}>
-                    Email
+                  <button
+                    type="button"
+                    onClick={() => setSignatureHubStep("email")}
+                    className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-[#024d7c]/60 hover:shadow-md sm:col-span-2"
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 text-slate-700">
+                      <Mail className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold text-slate-900">Email link</div>
+                      <div className="text-xs text-slate-500">
+                        Email yourself a link to sign on another device.
+                      </div>
+                    </div>
                   </button>
                 </div>
               </div>

@@ -33,6 +33,15 @@ export function saveRecentProjects(ownerId: string | null | undefined, projects:
   try {
     window.localStorage.setItem(storageKey(ownerId), JSON.stringify(projects));
     window.dispatchEvent(new Event(`${RECENT_PROJECTS_EVENT}:${ownerId ?? "anon"}`));
+    if (ownerId) {
+      void fetch("/api/recent-projects", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projects }),
+      }).catch(() => {
+        // ignore network errors
+      });
+    }
   } catch {
     // ignore storage failures
   }
