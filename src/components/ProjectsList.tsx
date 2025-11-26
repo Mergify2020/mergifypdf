@@ -90,6 +90,7 @@ export default function ProjectsList({ initialProjects }: Props) {
     // Also hydrate from the account-level API when signed in so projects follow the user.
     const hydrateFromApi = async () => {
       if (!ownerId) return;
+      // First try the recent-projects bridge (Redis)
       try {
         const res = await fetch("/api/recent-projects", { cache: "no-store" });
         if (!res.ok) return;
@@ -102,9 +103,29 @@ export default function ProjectsList({ initialProjects }: Props) {
         } else if (data.projects.length > 0) {
           // Server has the source of truth — sync it down.
           saveRecentProjects(ownerId, data.projects);
+          return;
         }
       } catch {
-        // ignore network errors; fall back to local storage only
+        // ignore and fall through to the Prisma-backed projects API
+      }
+      // If Redis is empty or unavailable, fall back to the primary Project table
+      try {
+        const res = await fetch("/api/projects", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          projects?: { id: string; name?: string | null; updatedAt?: string | number | null }[];
+        };
+        if (!Array.isArray(data.projects)) return;
+        const mapped: RecentProjectEntry[] = data.projects.map((project) => ({
+          id: project.id,
+          title: project.name?.trim() || "Untitled project",
+          updatedAt: project.updatedAt ? new Date(project.updatedAt).getTime() : Date.now(),
+        }));
+        if (mapped.length > 0) {
+          saveRecentProjects(ownerId, mapped);
+        }
+      } catch {
+        // final fallback is whatever is already in local storage
       }
     };
     void hydrateFromApi();
