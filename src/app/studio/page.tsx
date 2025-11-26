@@ -1109,9 +1109,10 @@ function WorkspaceClient() {
     }
   }, [highlights]);
 
-  /** Restore saved signatures */
+  /** Restore saved signatures for guests from localStorage */
   useEffect(() => {
     if (typeof window === "undefined" || hasHydratedSignatures.current) return;
+    if (authSession?.user?.id) return;
     hasHydratedSignatures.current = true;
     try {
       const raw = getLocalStorage()?.getItem(WORKSPACE_SIGNATURES_KEY);
@@ -1124,17 +1125,62 @@ function WorkspaceClient() {
       console.error("Failed to restore saved signatures", err);
       getLocalStorage()?.removeItem(WORKSPACE_SIGNATURES_KEY);
     }
-  }, []);
+  }, [authSession?.user?.id]);
+
+  /** Restore saved signatures for signed-in users from the API */
+  useEffect(() => {
+    if (!authSession?.user?.id || hasHydratedSignatures.current) return;
+    hasHydratedSignatures.current = true;
+    let cancelled = false;
+    const hydrate = async () => {
+      try {
+        const res = await fetch("/api/signatures", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as { signatures?: SavedSignature[] };
+        if (!cancelled && Array.isArray(data.signatures)) {
+          setSavedSignatures(data.signatures);
+        }
+      } catch {
+        // ignore network errors
+      }
+    };
+    void hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, [authSession?.user?.id]);
 
   /** Persist saved signatures */
   useEffect(() => {
-    if (typeof window === "undefined" || !hasHydratedSignatures.current) return;
+    if (!hasHydratedSignatures.current) return;
+    // Signed-in users: sync to API so signatures follow the account across devices.
+    if (authSession?.user?.id) {
+      const controller = new AbortController();
+      const persist = async () => {
+        try {
+          await fetch("/api/signatures", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ signatures: savedSignatures }),
+            signal: controller.signal,
+          });
+        } catch {
+          // ignore network errors; local state still works
+        }
+      };
+      void persist();
+      return () => {
+        controller.abort();
+      };
+    }
+    // Guests: keep using localStorage, scoped to this browser only.
+    if (typeof window === "undefined") return;
     try {
       getLocalStorage()?.setItem(WORKSPACE_SIGNATURES_KEY, JSON.stringify(savedSignatures));
     } catch (err) {
       console.error("Failed to persist signatures", err);
     }
-  }, [savedSignatures]);
+  }, [authSession?.user?.id, savedSignatures]);
 
   /** Render thumbnails for any sources that haven't been processed yet */
   useEffect(() => {
