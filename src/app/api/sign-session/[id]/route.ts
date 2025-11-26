@@ -1,9 +1,8 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { getSignSession, updateSignSession } from "@/lib/signSessionStore";
-import type { SignSessionRouteContext } from "../types";
 
-export async function GET(_: NextRequest, { params }: SignSessionRouteContext) {
+export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
   const session = getSignSession(params.id);
   if (!session) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -16,7 +15,7 @@ export async function GET(_: NextRequest, { params }: SignSessionRouteContext) {
   });
 }
 
-export async function PUT(request: NextRequest, { params }: SignSessionRouteContext) {
+export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   const body = await request.json().catch(() => null);
   if (!body || typeof body.dataUrl !== "string") {
     return NextResponse.json({ error: "Missing dataUrl" }, { status: 400 });
