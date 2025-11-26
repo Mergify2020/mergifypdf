@@ -2,6 +2,7 @@ import MobileSignClient from "./MobileSignClient";
 
 export const dynamic = "force-dynamic";
 
-export default function Page({ params }: { params: { sessionId: string } }) {
-  return <MobileSignClient sessionId={params.sessionId} />;
+export default async function Page({ params }: { params: Promise<{ sessionId: string }> }) {
+  const resolved = await params;
+  return <MobileSignClient sessionId={resolved.sessionId} />;
 }
