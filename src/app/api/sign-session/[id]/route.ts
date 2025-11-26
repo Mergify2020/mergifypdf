@@ -4,8 +4,21 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { getSignSession, updateSignSession } from "@/lib/signSessionStore";
 
-export async function GET(_: NextRequest, context: any) {
-  const sessionId = context?.params?.id as string | undefined;
+function extractIdFromPath(request: NextRequest) {
+  const segments = request.nextUrl.pathname.split("/");
+  return segments[segments.length - 1] || null;
+}
+
+function resolveSessionId(request: NextRequest, context: any): string | null {
+  const ctxId = context?.params?.id as string | undefined;
+  if (ctxId && typeof ctxId === "string") {
+    return ctxId;
+  }
+  return extractIdFromPath(request);
+}
+
+export async function GET(request: NextRequest, context: any) {
+  const sessionId = resolveSessionId(request, context);
   if (!sessionId) {
     return NextResponse.json({ error: "Missing id" }, { status: 400 });
   }
@@ -22,7 +35,7 @@ export async function GET(_: NextRequest, context: any) {
 }
 
 export async function PUT(request: NextRequest, context: any) {
-  const sessionId = context?.params?.id as string | undefined;
+  const sessionId = resolveSessionId(request, context);
   if (!sessionId) {
     return NextResponse.json({ error: "Missing id" }, { status: 400 });
   }
