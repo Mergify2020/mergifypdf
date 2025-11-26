@@ -23,6 +23,7 @@
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^3.11.174",
     "react": "19.2.0",
+    "react-qr-code": "^2.0.12",
     "react-dom": "19.2.0",
     "react-dropzone": "^14.3.8",
     "resend": "^6.4.0"

@@ -7,6 +7,7 @@ import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as Reac
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
+import QRCode from "react-qr-code";
 import {
   PDFDocument,
   rgb,
@@ -685,6 +686,9 @@ function WorkspaceClient() {
   const [typedSignaturePreview, setTypedSignaturePreview] = useState<string | null>(null);
   const [typedSignatureError, setTypedSignatureError] = useState<string | null>(null);
   const [mobileEmail, setMobileEmail] = useState("");
+  const [mobileSessionId, setMobileSessionId] = useState<string | null>(null);
+  const [mobileSessionUrl, setMobileSessionUrl] = useState<string | null>(null);
+  const [mobileSessionStatus, setMobileSessionStatus] = useState<"idle" | "waiting" | "received" | "error">("idle");
   const [showDrawModal, setShowDrawModal] = useState(false);
   const [drawStep, setDrawStep] = useState<"canvas" | "name">("canvas");
   const drawCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -1969,6 +1973,9 @@ function WorkspaceClient() {
     setSignaturePanelMode("none");
     setShowDrawModal(false);
     setShowUploadModal(false);
+    setMobileSessionId(null);
+    setMobileSessionUrl(null);
+    setMobileSessionStatus("idle");
   }, []);
 
   const beginSignaturePlacement = useCallback((signature: SavedSignature) => {
@@ -2361,23 +2368,6 @@ function WorkspaceClient() {
     () => (typeof window !== "undefined" ? `${window.location.origin}/sign-on-mobile` : "https://mergifypdf.com/sign-on-mobile"),
     []
   );
-  const fallbackQrData = useMemo(() => {
-    const svg = `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140" width="140" height="140">
-        <rect width="140" height="140" fill="#0f172a"/>
-        <rect x="8" y="8" width="40" height="40" fill="#fff"/>
-        <rect x="16" y="16" width="24" height="24" fill="#0f172a"/>
-        <rect x="92" y="8" width="40" height="40" fill="#fff"/>
-        <rect x="100" y="16" width="24" height="24" fill="#0f172a"/>
-        <rect x="8" y="92" width="40" height="40" fill="#fff"/>
-        <rect x="16" y="100" width="24" height="24" fill="#0f172a"/>
-        <rect x="56" y="56" width="28" height="12" fill="#fff"/>
-        <rect x="56" y="74" width="12" height="20" fill="#fff"/>
-        <rect x="74" y="74" width="20" height="12" fill="#fff"/>
-        <text x="70" y="132" font-size="8" fill="#fff" text-anchor="middle">Scan to sign</text>
-      </svg>`;
-    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-  }, []);
   const activeDrawingTool: DrawingTool | null = highlightActive
     ? "highlight"
     : pencilActive
@@ -2817,11 +2807,85 @@ function WorkspaceClient() {
 
   const handleCopyMobileLink = useCallback(async () => {
     try {
-      await navigator.clipboard?.writeText(mobileCaptureLink);
+      const link = mobileSessionUrl ?? mobileCaptureLink;
+      await navigator.clipboard?.writeText(link);
     } catch {
       // ignore copy failures
     }
-  }, [mobileCaptureLink]);
+  }, [mobileCaptureLink, mobileSessionUrl]);
+
+  const startMobileSession = useCallback(async () => {
+    if (typeof window === "undefined") return;
+    setMobileSessionStatus("waiting");
+    setMobileSessionUrl(null);
+    try {
+      const res = await fetch("/api/sign-session", { method: "POST" });
+      if (!res.ok) {
+        throw new Error("Could not start session.");
+      }
+      const data = (await res.json()) as { id: string };
+      const origin = window.location.origin;
+      setMobileSessionId(data.id);
+      setMobileSessionUrl(`${origin}/sign-on-mobile/${data.id}`);
+      setMobileSessionStatus("waiting");
+    } catch (err) {
+      console.error(err);
+      setMobileSessionStatus("error");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (signatureHubStep === "qr" || signatureHubStep === "email") {
+      startMobileSession();
+    } else {
+      setMobileSessionId(null);
+      setMobileSessionUrl(null);
+      setMobileSessionStatus("idle");
+    }
+  }, [signatureHubStep, startMobileSession]);
+
+  useEffect(() => {
+    if (!mobileSessionId || (signatureHubStep !== "qr" && signatureHubStep !== "email")) return;
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/sign-session/${mobileSessionId}`);
+        if (!res.ok) throw new Error("Session not found");
+        const data = (await res.json()) as { id: string; signatureDataUrl: string | null; name: string | null };
+        if (cancelled) return;
+        if (data.signatureDataUrl) {
+          setMobileSessionStatus("received");
+          const uniqueName = data.name?.trim()
+            ? data.name
+            : `Mobile signature ${data.id.slice(0, 6)}-${Date.now().toString().slice(-4)}`;
+          const entry = await saveSignatureEntry(uniqueName, data.signatureDataUrl);
+          if (entry) {
+            applySignatureToActivePage(entry);
+            setSignaturePanelMode("saved");
+            closeSignatureHub();
+            setMobileSessionId(null);
+            setMobileSessionUrl(null);
+          }
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setMobileSessionStatus("error");
+        }
+      }
+    };
+    const interval = window.setInterval(poll, 2500);
+    poll();
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [
+    applySignatureToActivePage,
+    closeSignatureHub,
+    mobileSessionId,
+    saveSignatureEntry,
+    signatureHubStep,
+  ]);
 
   const handleOpenDrawFromHub = useCallback(() => {
     setShowSignatureHub(false);
@@ -4078,27 +4142,45 @@ function WorkspaceClient() {
                   Scan with your phone to open a signing link and draw in landscape mode. Copy the link if your camera can&apos;t read the QR.
                 </p>
                 <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
-                  <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-center sm:gap-6">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={fallbackQrData}
-                      alt="QR code"
-                      className="h-40 w-40 rounded-lg border border-slate-200 bg-white p-3 shadow-inner"
-                    />
+                  <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-6">
+                    <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-white px-4 py-4 shadow-inner">
+                      {mobileSessionUrl ? (
+                        <QRCode value={mobileSessionUrl} size={160} className="h-40 w-40" />
+                      ) : (
+                        <div className="flex h-40 w-40 items-center justify-center text-sm text-slate-500">Preparing QR…</div>
+                      )}
+                      <button
+                        type="button"
+                        className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300"
+                        onClick={startMobileSession}
+                      >
+                        Generate new QR
+                      </button>
+                      {mobileSessionStatus === "received" ? (
+                        <div className="text-xs font-semibold text-emerald-600">Signature received!</div>
+                      ) : mobileSessionStatus === "error" ? (
+                        <div className="text-xs font-semibold text-rose-600">Connection error. Regenerate.</div>
+                      ) : (
+                        <div className="text-xs text-slate-500">Waiting for your phone…</div>
+                      )}
+                    </div>
                     <div className="space-y-2 text-sm text-slate-700">
                       <div className="font-semibold text-slate-900">How it works</div>
                       <ol className="list-decimal space-y-1 pl-4">
                         <li>Scan the QR with your phone.</li>
-                        <li>Draw or upload your signature on mobile.</li>
-                        <li>Return here to place it instantly.</li>
+                        <li>Draw your signature on the mobile page.</li>
+                        <li>We&apos;ll drop it into this project automatically.</li>
                       </ol>
                       <div className="flex flex-wrap items-center gap-2 text-xs">
                         <span className="rounded-full bg-white px-2 py-1 font-semibold text-slate-600">Link</span>
-                        <code className="rounded bg-white px-2 py-1 text-[0.7rem] text-slate-700">{mobileCaptureLink}</code>
+                        <code className="rounded bg-white px-2 py-1 text-[0.7rem] text-slate-700">
+                          {mobileSessionUrl ?? mobileCaptureLink}
+                        </code>
                         <button
                           type="button"
                           className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300"
                           onClick={handleCopyMobileLink}
+                          disabled={!mobileSessionUrl}
                         >
                           Copy link
                         </button>
@@ -4138,8 +4220,9 @@ function WorkspaceClient() {
                       className="rounded-full bg-[#024d7c] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 disabled:opacity-50"
                       onClick={() => {
                         if (!mobileEmail.trim()) return;
+                        const link = mobileSessionUrl ?? mobileCaptureLink;
                         const mailto = `mailto:${mobileEmail}?subject=Sign%20on%20your%20phone&body=${encodeURIComponent(
-                          `Open this link on your phone to draw your signature: ${mobileCaptureLink}`
+                          `Open this link on your phone to draw your signature: ${link}`
                         )}`;
                         window.open(mailto, "_blank");
                       }}
@@ -4150,8 +4233,10 @@ function WorkspaceClient() {
                   </div>
                   <p className="mt-2 text-xs text-slate-600">
                     The link is{" "}
-                    <code className="rounded bg-white px-2 py-1 text-[0.7rem] text-slate-700">{mobileCaptureLink}</code>. Save it if you prefer to
-                    share manually.
+                    <code className="rounded bg-white px-2 py-1 text-[0.7rem] text-slate-700">
+                      {mobileSessionUrl ?? mobileCaptureLink}
+                    </code>
+                    . Save it if you prefer to share manually.
                   </p>
                 </div>
                 <div className="flex items-center justify-end gap-2">
