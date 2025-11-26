@@ -745,7 +745,7 @@ function SortableOrganizeTile({
 function WorkspaceClient() {
   const { data: authSession } = useSession();
   const router = useRouter();
-  const { saveProject } = useProjects();
+  const { saveProject, savingProject } = useProjects();
   const [showDownloadGate, setShowDownloadGate] = useState(false);
   const [showDelayOverlay, setShowDelayOverlay] = useState<"intro" | "progress" | null>(null);
   const [sources, setSources] = useState<SourceRef[]>([]);
@@ -2605,6 +2605,40 @@ function WorkspaceClient() {
     !!draftHighlight ||
     !!draftTextBox;
 
+  const buildCloudProjectData = useCallback(() => {
+    if (!hasWorkspaceData) return null;
+    return {
+      name: projectName,
+      sources: sources.map((source) => ({
+        id: source.storageId,
+        name: source.name,
+        size: source.size,
+        updatedAt: source.updatedAt,
+      })),
+      pages: pages.map((page) => ({
+        id: page.id,
+        srcIdx: page.srcIdx,
+        pageIdx: page.pageIdx,
+        rotation: page.rotation,
+        width: page.width,
+        height: page.height,
+      })),
+      highlights,
+      textAnnotations,
+      signaturePlacements,
+      savedSignatures,
+    };
+  }, [
+    hasWorkspaceData,
+    projectName,
+    sources,
+    pages,
+    highlights,
+    textAnnotations,
+    signaturePlacements,
+    savedSignatures,
+  ]);
+
   const computeBaseScale = useCallback(() => {
     const container = previewContainerRef.current;
     if (!container || pages.length === 0) return;
@@ -3156,31 +3190,23 @@ function WorkspaceClient() {
     setPages((prev) => arrayMove(prev, oldIndex, newIndex));
   }
 
+  async function handleSaveProject() {
+    if (!authSession?.user) {
+      setShowDownloadGate(true);
+      return;
+    }
+    const projectData = buildCloudProjectData();
+    if (!projectData) return;
+    await saveProject(projectName, projectData);
+  }
+
   /** Build final PDF respecting order + keep flags */
   async function handleDownload(forceBypass = false) {
     if (authSession?.user) {
-      const projectData = {
-        name: projectName,
-        sources: sources.map((source) => ({
-          id: source.storageId,
-          name: source.name,
-          size: source.size,
-          updatedAt: source.updatedAt,
-        })),
-        pages: pages.map((page) => ({
-          id: page.id,
-          srcIdx: page.srcIdx,
-          pageIdx: page.pageIdx,
-          rotation: page.rotation,
-          width: page.width,
-          height: page.height,
-        })),
-        highlights,
-        textAnnotations,
-        signaturePlacements,
-        savedSignatures,
-      };
-      void saveProject(projectName, projectData);
+      const projectData = buildCloudProjectData();
+      if (projectData) {
+        void saveProject(projectName, projectData);
+      }
     }
     if (!forceBypass && !authSession?.user) {
       // Allow anonymous downloads; still surface the gate UI without blocking the flow.
@@ -3880,6 +3906,14 @@ function WorkspaceClient() {
                   disabled={downloadDisabled}
                 >
                   {busy ? "Building..." : "Download pages"}
+                </button>
+                <button
+                  type="button"
+                  className={`${buttonNeutral} px-5 py-2`}
+                  onClick={() => void handleSaveProject()}
+                  disabled={!hasWorkspaceData || savingProject}
+                >
+                  {savingProject ? "Saving…" : "Save project"}
                 </button>
                 <button
                   className={`${buttonNeutral} px-5 py-2`}
