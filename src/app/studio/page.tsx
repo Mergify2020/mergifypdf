@@ -2819,7 +2819,7 @@ function WorkspaceClient() {
     setMobileSessionStatus("waiting");
     setMobileSessionUrl(null);
     try {
-      const res = await fetch("/api/sign-session", { method: "POST" });
+      const res = await fetch("/api/sign-session", { method: "POST", cache: "no-store" });
       if (!res.ok) {
         throw new Error("Could not start session.");
       }
@@ -2849,8 +2849,11 @@ function WorkspaceClient() {
     let cancelled = false;
     const poll = async () => {
       try {
-        const res = await fetch(`/api/sign-session/${mobileSessionId}`);
-        if (!res.ok) throw new Error("Session not found");
+        const res = await fetch(`/api/sign-session/${mobileSessionId}`, { cache: "no-store" });
+        if (!res.ok) {
+          if (res.status >= 500) setMobileSessionStatus("error");
+          return;
+        }
         const data = (await res.json()) as { id: string; signatureDataUrl: string | null; name: string | null };
         if (cancelled) return;
         if (data.signatureDataUrl) {

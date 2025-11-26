@@ -5,7 +5,11 @@ import Link from "next/link";
 
 type Point = { x: number; y: number };
 
-export default function MobileSignPage({ params }: { params: Promise<{ sessionId: string }> }) {
+type RouteParams =
+  | { params: { sessionId: string } }
+  | { params: Promise<{ sessionId: string }> };
+
+export default function MobileSignPage(props: RouteParams) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -17,13 +21,18 @@ export default function MobileSignPage({ params }: { params: Promise<{ sessionId
 
   useEffect(() => {
     let active = true;
-    params.then((value) => {
-      if (active) setSessionId(value.sessionId);
-    });
+    const incoming = props.params;
+    if (incoming instanceof Promise) {
+      incoming.then((value) => {
+        if (active) setSessionId(value.sessionId);
+      });
+    } else {
+      setSessionId(incoming.sessionId);
+    }
     return () => {
       active = false;
     };
-  }, [params]);
+  }, [props.params]);
 
   const resizeCanvas = useCallback(() => {
     const canvas = canvasRef.current;

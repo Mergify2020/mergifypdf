@@ -6,7 +6,9 @@ type SignSession = {
   updatedAt: number;
 };
 
-const signSessionStore = new Map<string, SignSession>();
+const globalStore = globalThis as typeof globalThis & { __mpdfSignSessions?: Map<string, SignSession> };
+const signSessionStore = globalStore.__mpdfSignSessions ?? new Map<string, SignSession>();
+globalStore.__mpdfSignSessions = signSessionStore;
 
 export function createSignSession() {
   const id = crypto.randomUUID();
@@ -20,13 +22,8 @@ export function getSignSession(id: string) {
 }
 
 export function updateSignSession(id: string, data: { signatureDataUrl?: string; name?: string }) {
-  const existing = signSessionStore.get(id);
-  if (!existing) return null;
-  const next: SignSession = {
-    ...existing,
-    ...data,
-    updatedAt: Date.now(),
-  };
+  const existing = signSessionStore.get(id) ?? { id, createdAt: Date.now(), updatedAt: Date.now() };
+  const next: SignSession = { ...existing, ...data, updatedAt: Date.now() };
   signSessionStore.set(id, next);
   return next;
 }
