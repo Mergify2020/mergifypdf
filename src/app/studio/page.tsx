@@ -30,7 +30,6 @@ import {
   ChevronDown,
   Signature as SignatureIcon,
   UploadCloud,
-  Image as ImageIcon,
   X,
 } from "lucide-react";
 import {
@@ -924,7 +923,7 @@ function WorkspaceClient() {
   const controlButtonClass =
     "flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,0.08)] transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-40";
   const signatureTabBase =
-    "w-full justify-center px-4 py-2 text-sm font-semibold rounded-full border border-[#024d7c] bg-[#035f97] text-white shadow-sm transition hover:bg-[#024d7c]";
+    "inline-flex items-center gap-1.5 rounded-full border border-[#024d7c] bg-[#035f97] px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-[#024d7c]";
   const signatureTabActive = "bg-[#024d7c] text-white border-[#013d63]";
   const signatureTabInactive = "";
 
@@ -3408,9 +3407,9 @@ function WorkspaceClient() {
             {highlightActive || pencilActive || signatureButtonOn ? (
               <div className="mt-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
                 <div className="flex flex-col gap-3">
-                  <div className="flex flex-wrap items-center gap-4">
-                    {signatureButtonOn ? (
-                      <div className="flex items-center gap-2 w-full">
+                  {signatureButtonOn ? (
+                    <div className="flex items-stretch gap-3 overflow-hidden">
+                      <div className="flex shrink-0 items-center gap-2">
                         <button
                           type="button"
                           className={`${signatureTabBase} ${
@@ -3446,20 +3445,86 @@ function WorkspaceClient() {
                           <UploadCloud className="h-4 w-4" />
                           Upload
                         </button>
-                        <button
-                          type="button"
-                          className={`${signatureTabBase} ${
-                            signaturePanelMode === "saved" ? signatureTabActive : signatureTabInactive
-                          }`}
-                          title="Saved signatures"
-                          onClick={() => setSignaturePanelMode("saved")}
-                        >
-                          <ImageIcon className="h-4 w-4" />
-                          Saved
-                        </button>
                       </div>
-                    ) : null}
+                      <div className="flex flex-1 flex-nowrap gap-3 overflow-x-auto pb-2">
+                        {savedSignatures.length === 0 ? (
+                          <div className="min-w-[240px] shrink-0 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+                            No saved signatures yet. Draw or upload to save one.
+                          </div>
+                        ) : (
+                          savedSignatures.map((sig) => (
+                            <div
+                              key={sig.id}
+                              className="flex min-w-[200px] flex-col gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 transition hover:bg-white hover:shadow-sm"
+                            >
+                              <div className="flex flex-col gap-1">
+                                <div className="text-sm font-medium text-slate-800">{sig.name}</div>
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">
+                                  <button
+                                    type="button"
+                                    className="rounded-full bg-[#024d7c] px-3 py-1 text-xs font-semibold text-white shadow-sm transition hover:bg-[#013d63]"
+                                    onClick={() => {
+                                      beginSignaturePlacement(sig);
+                                      const targetPageId = activePageId || pages[0]?.id;
+                                      if (targetPageId) {
+                                        placeSignatureAtPoint(sig, targetPageId, { x: 0.5, y: 0.5 });
+                                        setActiveSignaturePlacementId((prev) => prev);
+                                      }
+                                      setSignaturePanelMode("saved");
+                                    }}
+                                  >
+                                    Insert signature
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="text-slate-500 transition hover:underline"
+                                    onClick={() => {
+                                      const nextName = prompt("Rename signature", sig.name)?.trim();
+                                      if (!nextName) return;
+                                      if (
+                                        savedSignatures.some(
+                                          (existing) =>
+                                            existing.id !== sig.id &&
+                                            existing.name.toLowerCase() === nextName.toLowerCase()
+                                        )
+                                      ) {
+                                        setSignatureNameError("Choose a unique name.");
+                                        return;
+                                      }
+                                      setSavedSignatures((prev) =>
+                                        prev.map((item) => (item.id === sig.id ? { ...item, name: nextName } : item))
+                                      );
+                                    }}
+                                  >
+                                    Rename
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="text-red-500 transition hover:underline"
+                                    onClick={() => {
+                                      const confirmed = window.confirm(
+                                        "Are you sure you want to delete this signature? You can't go back."
+                                      );
+                                      if (!confirmed) return;
+                                      setSavedSignatures((prev) => prev.filter((item) => item.id !== sig.id));
+                                    }}
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
 
+                  {signatureButtonOn && signatureNameError ? (
+                    <div className="text-xs font-semibold text-rose-600">{signatureNameError}</div>
+                  ) : null}
+
+                  <div className="flex flex-wrap items-center gap-4">
                     {highlightActive ? (
                       <>
                         <div className="flex items-center gap-2">
@@ -3530,88 +3595,6 @@ function WorkspaceClient() {
                       </>
                     ) : null}
                   </div>
-
-                  {signatureButtonOn && signaturePanelMode === "saved" ? (
-                    <div className="mt-2">
-                      <div className="mb-2 flex items-center justify-between">
-                        <h3 className="text-sm font-semibold text-slate-800">Saved signatures</h3>
-                      </div>
-                      <div className="flex gap-3 overflow-x-auto pb-2">
-                        {savedSignatures.length === 0 ? (
-                          <div className="col-span-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
-                            No saved signatures yet. Draw or upload to save one.
-                          </div>
-                        ) : (
-                          savedSignatures.map((sig) => (
-                            <div
-                              key={sig.id}
-                              className="flex min-w-[220px] flex-col gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 hover:bg-white hover:shadow-sm transition"
-                            >
-                              <div className="flex flex-col gap-1">
-                                <div className="text-sm font-medium text-slate-800">{sig.name}</div>
-                                <div className="flex flex-wrap gap-x-3 gap-y-2 text-xs items-center">
-                                  <button
-                                    type="button"
-                                    className="rounded-full bg-[#024d7c] px-3 py-1 text-xs font-semibold text-white shadow-sm transition hover:bg-[#013d63]"
-                                    onClick={() => {
-                                      beginSignaturePlacement(sig);
-                                      const targetPageId = activePageId || pages[0]?.id;
-                                      if (targetPageId) {
-                                        placeSignatureAtPoint(sig, targetPageId, { x: 0.5, y: 0.5 });
-                                        setActiveSignaturePlacementId((prev) => prev);
-                                      }
-                                      setSignaturePanelMode("saved");
-                                    }}
-                                  >
-                                    Insert signature
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="text-slate-500 transition hover:underline"
-                                    onClick={() => {
-                                      const nextName = prompt("Rename signature", sig.name)?.trim();
-                                      if (!nextName) return;
-                                      if (
-                                        savedSignatures.some(
-                                          (existing) =>
-                                            existing.id !== sig.id &&
-                                            existing.name.toLowerCase() === nextName.toLowerCase()
-                                        )
-                                      ) {
-                                        setSignatureNameError("Choose a unique name.");
-                                        return;
-                                      }
-                                      setSavedSignatures((prev) =>
-                                        prev.map((item) => (item.id === sig.id ? { ...item, name: nextName } : item))
-                                      );
-                                    }}
-                                  >
-                                    Rename
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="text-red-500 transition hover:underline"
-                                    onClick={() => {
-                                      const confirmed = window.confirm(
-                                        "Are you sure you want to delete this signature? You can't go back."
-                                      );
-                                      if (!confirmed) return;
-                                      setSavedSignatures((prev) => prev.filter((item) => item.id !== sig.id));
-                                    }}
-                                  >
-                                    Delete
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                      {signatureNameError ? (
-                        <div className="text-xs font-semibold text-rose-600">{signatureNameError}</div>
-                      ) : null}
-                    </div>
-                  ) : null}
                 </div>
               </div>
             ) : null}
