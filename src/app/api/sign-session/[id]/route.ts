@@ -2,8 +2,12 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { getSignSession, updateSignSession } from "@/lib/signSessionStore";
 
-export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
-  const session = getSignSession(params.id);
+export async function GET(_: NextRequest, context: any) {
+  const sessionId = context?.params?.id as string | undefined;
+  if (!sessionId) {
+    return NextResponse.json({ error: "Missing id" }, { status: 400 });
+  }
+  const session = getSignSession(sessionId);
   if (!session) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -15,13 +19,17 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
   });
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, context: any) {
+  const sessionId = context?.params?.id as string | undefined;
+  if (!sessionId) {
+    return NextResponse.json({ error: "Missing id" }, { status: 400 });
+  }
   const body = await request.json().catch(() => null);
   if (!body || typeof body.dataUrl !== "string") {
     return NextResponse.json({ error: "Missing dataUrl" }, { status: 400 });
   }
   const name = typeof body.name === "string" ? body.name : undefined;
-  const session = updateSignSession(params.id, { signatureDataUrl: body.dataUrl, name });
+  const session = updateSignSession(sessionId, { signatureDataUrl: body.dataUrl, name });
   if (!session) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
