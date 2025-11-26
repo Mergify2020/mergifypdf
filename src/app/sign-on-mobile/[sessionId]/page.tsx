@@ -5,8 +5,8 @@ import Link from "next/link";
 
 type Point = { x: number; y: number };
 
-export default function MobileSignPage({ params }: { params: { sessionId: string } }) {
-  const { sessionId } = params;
+export default function MobileSignPage({ params }: { params: Promise<{ sessionId: string }> }) {
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const lastPointRef = useRef<Point | null>(null);
@@ -14,6 +14,16 @@ export default function MobileSignPage({ params }: { params: { sessionId: string
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    params.then((value) => {
+      if (active) setSessionId(value.sessionId);
+    });
+    return () => {
+      active = false;
+    };
+  }, [params]);
 
   const resizeCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -98,6 +108,10 @@ export default function MobileSignPage({ params }: { params: { sessionId: string
   }, [resizeCanvas]);
 
   const handleSave = useCallback(async () => {
+    if (!sessionId) {
+      setError("Missing session.");
+      return;
+    }
     const canvas = canvasRef.current;
     if (!canvas) return;
     const dataUrl = canvas.toDataURL("image/png");
