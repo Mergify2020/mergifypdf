@@ -202,9 +202,9 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
           <ProjectsList initialProjects={curatedProjects} />
 
           <div className="space-y-4">
-            <div className="rounded-[10px] border border-slate-200 bg-white p-5 text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between gap-3">
+            <div className="mx-auto max-w-sm rounded-[10px] border border-slate-200 bg-white p-5 text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
+              <div className="flex flex-col items-center gap-3 text-center">
+                <div className="flex items-center justify-center gap-2">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]">
                     Mergify Sign
                   </p>
@@ -250,7 +250,7 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
                 <p className="max-w-[420px] text-sm leading-relaxed text-[#4B5563]">
                   Get contracts and important documents signed fast, with reminders and completion tracking built in.
                 </p>
-                  <div className="mt-1 flex flex-wrap gap-2 text-[13px] text-[#4B5563]">
+                <div className="mt-1 flex flex-wrap justify-center gap-2 text-[13px] text-[#4B5563]">
                     <span className="inline-flex items-center rounded-full border border-[#D3E2FF] bg-white px-3 py-1.5">
                       Remote signatures
                     </span>
@@ -260,11 +260,11 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
                     <span className="inline-flex items-center rounded-full border border-[#D3E2FF] bg-white px-3 py-1.5">
                       Completion tracking
                     </span>
-                  </div>
-                  <Link href="/signature-center" className="btn-primary mt-4 px-5">
-                    Open Signature Requests
-                    <ArrowUpRight className="ml-2 h-4 w-4" />
-                  </Link>
+                </div>
+                <Link href="/signature-center" className="btn-primary mt-4 px-5">
+                  Open Signature Requests
+                  <ArrowUpRight className="ml-2 h-4 w-4" />
+                </Link>
               </div>
             </div>
           </div>
