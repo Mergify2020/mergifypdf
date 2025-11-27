@@ -11,7 +11,7 @@ export default function AppHeaderBrand() {
   if (isSignatureExperience) {
     return (
       <Link href="/" className="inline-flex items-center gap-2" aria-label="Back to dashboard">
-        <Image src="/Mergify-Sign.svg" alt="Mergify Sign" width={190} height={40} priority />
+        <Image src="/Mergify-Sign.svg" alt="Mergify Sign" width={152} height={32} priority />
       </Link>
     );
   }
