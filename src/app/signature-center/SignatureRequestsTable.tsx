@@ -17,6 +17,7 @@ type SignatureRequest = {
   primaryRecipientEmail: string;
   signers: Signer[];
   updated: string;
+   state?: "pending" | "completed" | "voided";
 };
 
 const SKELETON_ROWS = 6;
@@ -53,6 +54,7 @@ export default function SignatureRequestsTable() {
             { name: "Legal Reviewer", email: "legal@pinnacolassurance.com", hasSigned: false },
           ],
           updated: "Today • 3:44 AM",
+          state: "pending",
         },
         {
           id: "2",
@@ -66,6 +68,7 @@ export default function SignatureRequestsTable() {
             { name: "Auditor", email: "audit@goldenrainmasonry.com", hasSigned: false },
           ],
           updated: "Yesterday • 9:24 AM",
+          state: "voided",
         },
         {
           id: "3",
@@ -78,6 +81,7 @@ export default function SignatureRequestsTable() {
             { name: "Operations", email: "ops@mergifypdf.com", hasSigned: true },
           ],
           updated: "Tuesday • 10:41 AM",
+          state: "completed",
         },
         {
           id: "4",
@@ -90,6 +94,7 @@ export default function SignatureRequestsTable() {
             { name: "Client Sponsor", email: "sponsor@northbridgepartners.co", hasSigned: true },
           ],
           updated: "Monday • 1:18 PM",
+          state: "completed",
         },
         {
           id: "5",
@@ -102,6 +107,7 @@ export default function SignatureRequestsTable() {
             { name: "New Hire", email: "newhire@acmecorp.com", hasSigned: false },
           ],
           updated: "Last week",
+          state: "pending",
         },
       ]);
     }
@@ -120,9 +126,9 @@ export default function SignatureRequestsTable() {
     if (activeFilter === "All") return requests;
 
     return requests.filter((request) => {
-      const { isCompleted } = getRequestProgress(request);
+      const { isCompleted, isPending } = getRequestProgress(request);
       if (activeFilter === "Pending") {
-        return !isCompleted;
+        return isPending;
       }
       if (activeFilter === "Completed") {
         return isCompleted;
@@ -134,32 +140,44 @@ export default function SignatureRequestsTable() {
   function getRequestProgress(request: SignatureRequest) {
     const totalSigners = request.signers.length;
     const signedCount = request.signers.filter((signer) => signer.hasSigned).length;
-    const isCompleted = totalSigners > 0 && signedCount === totalSigners;
+    const isVoided = request.state === "voided";
+    const isCompleted = !isVoided && totalSigners > 0 && signedCount === totalSigners;
+    const isPending = !isVoided && !isCompleted;
     const nextSigner = request.signers.find((signer) => !signer.hasSigned) ?? null;
 
-    return { totalSigners, signedCount, isCompleted, nextSigner };
+    return { totalSigners, signedCount, isCompleted, isPending, isVoided, nextSigner };
   }
 
   function renderStatusCell(request: SignatureRequest) {
-    const { totalSigners, signedCount, isCompleted, nextSigner } = getRequestProgress(request);
+    const { totalSigners, signedCount, isCompleted, isPending, isVoided, nextSigner } =
+      getRequestProgress(request);
 
-    const primaryLabel = isCompleted
-      ? "Completed"
-      : `Pending — ${signedCount}/${totalSigners || 1} signed`;
+    let primaryLabel: string;
+    if (isVoided) {
+      primaryLabel = "Voided";
+    } else if (isCompleted) {
+      primaryLabel = "Completed";
+    } else {
+      primaryLabel = `Pending — ${signedCount}/${totalSigners || 1} signed`;
+    }
 
-    const tooltip = isCompleted
-      ? "All signatures collected"
-      : nextSigner
-        ? `Pending signature from ${nextSigner.name}`
-        : "Pending signatures";
+    const tooltip = isVoided
+      ? "This request was voided"
+      : isCompleted
+        ? "All signatures collected"
+        : nextSigner
+          ? `Pending signature from ${nextSigner.name}`
+          : "Pending signatures";
 
     return (
       <div className="space-y-1" title={tooltip}>
         <span
           className={
-            isCompleted
-              ? "inline-flex items-center rounded-[999px] border border-[#A7F3D0] bg-[#ECFDF3] px-2.5 py-0.5 text-xs font-medium text-[#166534]"
-              : "inline-flex items-center rounded-[999px] border border-slate-300 bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700"
+            isVoided
+              ? "inline-flex items-center rounded-[999px] border border-[#FECACA] bg-[#FEF2F2] px-2.5 py-0.5 text-xs font-medium text-[#B91C1C]"
+              : isCompleted
+                ? "inline-flex items-center rounded-[999px] border border-[#A7F3D0] bg-[#ECFDF3] px-2.5 py-0.5 text-xs font-medium text-[#166534]"
+                : "inline-flex items-center rounded-[999px] border border-[#FACC15] bg-[#FEF3C7] px-2.5 py-0.5 text-xs font-medium text-[#854D0E]"
           }
         >
           {primaryLabel}
