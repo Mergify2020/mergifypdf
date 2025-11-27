@@ -183,11 +183,11 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
         <div className="rounded-[10px] border border-slate-200 bg-white p-6 shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
           <header className="flex flex-col gap-4 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
-              <h1 className="text-[20px] font-semibold text-[#111827]">
-                Welcome back, {shortName}.
+              <h1 className="text-[22px] font-semibold text-[#111827] sm:text-[24px]">
+                Your workspace is ready, {shortName}.
               </h1>
               <p className="text-sm text-slate-500">
-                Continue your work or begin a new document.
+                Pick up where you left off, create a new document, or send one for signature.
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">

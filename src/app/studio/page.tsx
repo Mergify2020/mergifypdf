@@ -4833,7 +4833,7 @@ function WorkspaceClient() {
             {showDelayOverlay === "progress" ? (
               <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100">
                 <div
-                  className="h-full w-full rounded-full bg-gradient-to-r from-[#0ea5e9] via-[#2563eb] to-[#4c1d95]"
+                  className="h-full w-full rounded-full bg-gradient-to-r from-[#0ea5e9] via-[#2563eb] to-[#1e4fd6]"
                   style={{ animation: "mpdf-progress 3s linear forwards" }}
                 />
               </div>
