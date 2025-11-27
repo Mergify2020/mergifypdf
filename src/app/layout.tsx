@@ -1,12 +1,11 @@
 ﻿// src/app/layout.tsx
 import type { Metadata } from "next";
-import Image from "next/image";
-import Link from "next/link";
 import Providers from "@/components/Providers";
 import WorkspaceSettingsMenu from "@/components/WorkspaceSettingsMenu";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import HeaderLoginButton from "@/components/HeaderLoginButton";
+import AppHeaderBrand from "@/components/AppHeaderBrand";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -46,9 +45,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <Providers session={session}>
           <header className="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/90 backdrop-blur">
             <div className="mx-auto flex h-[76px] w-full max-w-6xl items-center justify-between px-4 lg:px-6">
-              <Link href="/" className="inline-flex items-center gap-2" aria-label="Back to dashboard">
-                <Image src="/logo-wordmark2.svg" alt="MergifyPDF" width={160} height={40} priority />
-              </Link>
+              <AppHeaderBrand />
               {session?.user ? <WorkspaceSettingsMenu /> : <HeaderLoginButton />}
             </div>
           </header>
