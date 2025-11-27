@@ -203,13 +203,67 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
 
           <div className="space-y-4">
             <div
-              className="rounded-[10px] border border-slate-200 text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,0.04)]"
-              style={{ background: "linear-gradient(135deg, #ffffff 0%, #f3f7ff 100%)", padding: "20px 24px" }}
+              className="relative rounded-[10px] border border-slate-200 text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,0.04)]"
+              style={{ background: "linear-gradient(135deg, #F9FBFF 0%, #E8F0FF 100%)", padding: "20px 24px" }}
             >
+              <div className="mb-4 h-1 w-full rounded-full bg-[#1C80D6]" />
+              <div className="absolute right-6 top-5 inline-flex items-center rounded-full border border-[#D3E2FF] bg-white/80 px-2.5 py-[3px] text-[11px] font-medium text-[#1C80D6]">
+                Pro feature
+              </div>
               <div className="grid grid-cols-1 gap-6 md:grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)] md:gap-6">
-                <div className="flex flex-col gap-3 md:max-w-md">
+                <div className="relative flex flex-col gap-3 md:max-w-md">
+                  <div className="pointer-events-none absolute -bottom-2 -left-6 hidden h-32 w-32 opacity-[0.04] md:block">
+                    <svg viewBox="0 0 64 64" aria-hidden="true" className="h-full w-full text-[#1C80D6]">
+                      <path
+                        d="M22 14h18l6 6v26a4 4 0 0 1-4 4H22a4 4 0 0 1-4-4V18a4 4 0 0 1 4-4z"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M40 14v8h8"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M24 24h14"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                      />
+                      <path
+                        d="M24 30h10"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                      />
+                      <path
+                        d="M22 42c2.1-2.2 4.1-2.2 6.2 0 2 2.2 4 2.2 6 0 2-2.2 4-2.2 6.1 0"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M22 46h18"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]">
                     Mergify Sign
+                  </p>
+                  <p className="mt-[2px] text-[12px] text-[#6B7280]">
+                    Professional document signing
                   </p>
                   <h3 className="text-[18px] font-semibold text-[#111827]">
                     Request a Signature
@@ -228,17 +282,20 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
                       Completion tracking
                     </span>
                   </div>
-                  <Link href="/signature-center" className="btn-primary mt-4 px-5">
+                  <Link
+                    href="/signature-center"
+                    className="btn-primary mt-4 w-full px-5 shadow-[0_4px_10px_rgba(12,74,153,0.35)] bg-[#1C80D6] hover:bg-[#1667AD]"
+                  >
                     Open Signature Requests
                     <ArrowUpRight className="ml-2 h-4 w-4" />
                   </Link>
                 </div>
                 <div className="flex items-center justify-center md:justify-end">
-                  <div className="flex h-24 w-24 items-center justify-center rounded-[10px] border border-[#D3E2FF] bg-[#E7F1FF]">
+                  <div className="flex h-28 w-28 items-center justify-center rounded-[12px] border border-[#D3E2FF] bg-[#F1F6FF]">
                     <svg
                       viewBox="0 0 64 64"
                       aria-hidden="true"
-                      className="h-16 w-16 text-[#1C80D6]"
+                      className="h-20 w-20 text-[#1C80D6]"
                     >
                       <path
                         d="M22 14h18l6 6v26a4 4 0 0 1-4 4H22a4 4 0 0 1-4-4V18a4 4 0 0 1 4-4z"
