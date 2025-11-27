@@ -218,9 +218,9 @@ export default function ProjectsList({ initialProjects }: Props) {
 
   return (
     <>
-      <div className="rounded-[14px] border border-slate-200 bg-white p-6 shadow-[0_12px_24px_rgba(15,23,42,0.06)]">
+      <div className="rounded-[10px] border border-slate-200 bg-white p-6 shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <h2 className="text-2xl font-semibold text-slate-900">Your projects</h2>
+          <h2 className="text-[17px] font-semibold text-slate-900">Your projects</h2>
           <div className="flex items-center gap-3 text-sm">
             <button
               type="button"
@@ -254,13 +254,19 @@ export default function ProjectsList({ initialProjects }: Props) {
             showAll ? "max-h-[2400px]" : "max-h-[520px]"
           }`}
         >
-          <div className="divide-y divide-slate-100">
+          <div className="border-t border-slate-200">
+            <div className="hidden grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_auto] items-center gap-4 px-1 pb-2 pt-3 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9CA3AF] md:grid">
+              <span>Project</span>
+              <span>Last updated</span>
+              <span className="text-right">Actions</span>
+            </div>
+            <div className="divide-y divide-slate-100">
             {visibleProjects.map((project) => {
               const isSelected = selected.has(project.id);
               return (
                 <div
                   key={project.id}
-                  className="group flex flex-col gap-3 py-3 first:pt-0 last:pb-0 md:grid md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_auto] md:items-center md:gap-4 md:px-1 hover:bg-slate-50/60"
+                  className="group flex flex-col gap-3 py-3 first:pt-0 last:pb-0 md:grid md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_auto] md:items-center md:gap-4 md:px-1 hover:bg-[#F9FAFB]"
                 >
                   <div className="flex items-center gap-3">
                     {selectionMode ? (
@@ -295,10 +301,10 @@ export default function ProjectsList({ initialProjects }: Props) {
                   </div>
                   <p className="text-sm text-slate-500">Updated {project.updated}</p>
                   <div className="flex flex-wrap justify-start gap-3 text-sm md:justify-end">
-                  <button
-                    type="button"
-                    className="btn-secondary gap-1 px-3 py-1"
-                  >
+                    <button
+                      type="button"
+                      className="btn-secondary gap-1 px-3 py-1"
+                    >
                       Download
                       <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
                         <path
@@ -311,10 +317,10 @@ export default function ProjectsList({ initialProjects }: Props) {
                         <path d="M5 19h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                       </svg>
                     </button>
-                  <Link
-                    href="/studio"
-                    className="btn-primary gap-1 px-3 py-1"
-                  >
+                    <Link
+                      href="/studio"
+                      className="btn-primary gap-1 px-3 py-1"
+                    >
                       Open
                       <ArrowUpRight className="h-4 w-4" />
                     </Link>
@@ -322,6 +328,7 @@ export default function ProjectsList({ initialProjects }: Props) {
                 </div>
               );
             })}
+            </div>
           </div>
         </div>
       </div>

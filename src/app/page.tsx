@@ -178,12 +178,12 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
   const shortName = displayName.split(" ")[0] ?? "Guest";
 
   return (
-    <div className="min-h-screen bg-[#F4F6FB] text-slate-900">
+    <div className="min-h-screen bg-[#F9FAFB] text-slate-900">
       <div className="mx-auto flex max-w-[1120px] flex-col gap-6 px-6 py-8">
-        <div className="rounded-[14px] border border-slate-200 bg-white p-6 shadow-[0_12px_24px_rgba(15,23,42,0.06)]">
+        <div className="rounded-[10px] border border-slate-200 bg-white p-6 shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
           <header className="flex flex-col gap-4 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
-              <h1 className="text-[1.5rem] font-bold text-[#0F172A]">
+              <h1 className="text-[20px] font-semibold text-[#111827]">
                 Welcome back, {shortName}.
               </h1>
               <p className="text-sm text-slate-500">
@@ -202,22 +202,16 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
           <ProjectsList initialProjects={curatedProjects} />
 
           <div className="space-y-4">
-            <div className="group relative overflow-hidden rounded-[14px] border border-slate-200 bg-white p-6 text-slate-600 shadow-[0_12px_24px_rgba(15,23,42,0.06)] transition-transform duration-150 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(15,23,42,0.12)]">
-              <div
-                className="pointer-events-none absolute inset-0 rounded-[14px]"
-                style={{
-                  background: "radial-gradient(circle at top left, #E0EAFF 0, #FFFFFF 55%)",
-                }}
-              />
-              <div className="relative z-10 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="rounded-[10px] border border-slate-200 bg-white p-6 text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div className="space-y-2 md:max-w-md">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#9CA3AF]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]">
                     Sign documents with clients
                   </p>
-                  <h3 className="text-lg font-semibold text-slate-900 sm:text-xl">
+                  <h3 className="text-[18px] font-semibold text-slate-900">
                     Send documents for signature
                   </h3>
-                  <p className="mt-1 text-sm text-slate-600">
+                  <p className="mt-1 max-w-[420px] text-sm text-slate-600">
                     Collect legally binding client signatures. Track opens, reminders, and completion—all in one place.
                   </p>
                   <Link href="/signature-center" className="btn-primary mt-3 px-5">
@@ -226,7 +220,7 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
                   </Link>
                 </div>
                 <div className="mt-4 flex justify-center md:block">
-                  <div className="flex h-44 w-44 items-center justify-center rounded-[12px] border border-slate-200 bg-white/80 shadow-[0_8px_18px_rgba(15,23,42,0.05)]">
+                  <div className="flex h-44 w-44 items-center justify-center rounded-[10px] border border-slate-200 bg-white">
                     <FileSignature className="h-16 w-16 text-[#1E4FD6]" />
                   </div>
                 </div>

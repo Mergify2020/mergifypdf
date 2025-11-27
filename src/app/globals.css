@@ -159,20 +159,26 @@ body {
 
 @layer components {
   .btn-primary {
-    @apply inline-flex items-center justify-center rounded-full px-5 py-2 text-sm font-semibold text-white shadow-[0_6px_14px_rgba(15,23,42,0.16)] transition disabled:cursor-not-allowed disabled:opacity-60;
+    @apply inline-flex items-center justify-center px-4 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60;
+    border-radius: 0.5rem; /* 8px */
     background-color: var(--color-primary);
-    min-height: 44px;
+    min-height: 40px;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.1);
   }
   .btn-primary:hover {
     background-color: var(--color-primary-hover);
+    box-shadow: 0 3px 8px rgba(15, 23, 42, 0.14);
   }
   .btn-secondary {
-    @apply inline-flex items-center justify-center rounded-full border px-4 py-2 text-sm font-semibold text-slate-800 shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60;
+    @apply inline-flex items-center justify-center border px-3 text-sm font-semibold text-slate-800 transition disabled:cursor-not-allowed disabled:opacity-60;
+    border-radius: 0.5rem; /* 8px */
     background-color: #ffffff;
     border-color: var(--color-border-subtle);
-    min-height: 40px;
+    min-height: 38px;
+    box-shadow: none;
   }
   .btn-secondary:hover {
-    @apply bg-slate-50 border-slate-400;
+    background-color: #f3f4f6;
+    border-color: #cbd5f5;
   }
 }

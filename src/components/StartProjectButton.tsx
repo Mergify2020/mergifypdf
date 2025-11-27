@@ -110,7 +110,7 @@ export default function StartProjectButton({ className }: Props) {
       <button
         type="button"
         onClick={launchModal}
-        className={`btn-primary px-8 py-2.5 text-base ${className ?? ""}`}
+        className={`btn-primary px-8 text-base ${className ?? ""}`}
       >
         Start a new project
         <svg className="ml-2 h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
