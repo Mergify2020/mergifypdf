@@ -6,9 +6,10 @@
   --background: #ffffff;
   --foreground: #171717;
   color-scheme: light;
-  --color-primary: #2d5af0;
-  --color-primary-hover: #1f46c8;
-  --color-primary-light: #f2f5ff;
+  --color-primary: #1c80d6;
+  --color-primary-hover: #1667ad;
+  --color-primary-active: #0f4e84;
+  --color-primary-light: #e7f3ff;
   --color-bg-soft: #f4f6fb;
   --color-card-bg: #ffffff;
   --color-border-subtle: #e1e5f0;
