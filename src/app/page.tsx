@@ -208,34 +208,7 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
                   <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]">
                     Mergify Sign
                   </p>
-                  <svg
-                    viewBox="0 0 64 64"
-                    aria-hidden="true"
-                    className="h-10 w-10 flex-shrink-0 text-[var(--color-primary)]"
-                  >
-                    <path
-                      d="M46 6 58 18 40 54 28 42z"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.8"
-                      strokeLinejoin="round"
-                    />
-                    <path
-                      d="M28 42 24 56"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.8"
-                      strokeLinecap="round"
-                    />
-                    <path
-                      d="M14 56c2.4-1.8 4.4-2.2 6.4-1.8 1.4.3 2.4.9 3.3 1.5.9.6 1.8 1.1 3.1 1.1 1.9 0 3.4-.8 4.6-1.6 1.3-.9 2.6-1.6 4.2-1.5 1.6.1 2.8.9 3.8 1.7"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.8"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
+                  <PenLine className="h-6 w-6 flex-shrink-0 text-[var(--color-primary)]" />
                 </div>
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex flex-col gap-2">
