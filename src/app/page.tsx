@@ -199,16 +199,21 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
 
           <div className="space-y-4">
             <div className="rounded-[36px] border border-dashed border-slate-200 bg-white/95 p-6 text-slate-500 shadow-[0_25px_60px_rgba(15,23,42,0.08)]">
-              <p className="text-sm uppercase tracking-[0.4em] text-slate-400">Team Hub workspace</p>
-              <h3 className="mt-2 text-xl font-semibold text-slate-900">Upgrade to Premium</h3>
-              <p className="mt-1 text-sm">
-                Unlock the Team Hub to invite collaborators, organize shared stacks, and stay perfectly in sync.
+              <p className="text-sm uppercase tracking-[0.4em] text-slate-400">
+                Send documents for signature
+              </p>
+              <h3 className="mt-2 text-xl font-semibold text-slate-900">
+                ✅ #1 (Best Option) — “Send Documents for Signature”
+              </h3>
+              <p className="mt-1 text-sm text-slate-600">
+                Request legally binding signatures from clients and recipients. Track opens, reminders, and completed
+                agreements in one place.
               </p>
               <Link
-                href="/pricing"
-                className="mt-4 inline-flex items-center justify-center rounded-full bg-gradient-to-r from-[#f97316] to-[#fb7185] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-[#f97316]/30 transition hover:opacity-90"
+                href="/signature-center"
+                className="mt-4 inline-flex items-center justify-center rounded-full bg-[#024d7c] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-[#012a44]/30 transition hover:-translate-y-0.5"
               >
-                Upgrade to Premium
+                Open Signature Center
                 <ArrowUpRight className="ml-2 h-4 w-4" />
               </Link>
             </div>

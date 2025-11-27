@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { ArrowUpRight, Clock } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 import { PROJECT_NAME_STORAGE_KEY, sanitizeProjectName } from "@/lib/projectName";
+import { loadRecentProjects, type RecentProjectEntry } from "@/lib/recentProjects";
 
 type StoredSourceMeta = { id: string; name?: string; size?: number; updatedAt?: number };
 type ResumeSnapshot = { fileName: string; lastEditedLabel: string };
@@ -30,26 +32,79 @@ function formatLastEdited(timestamp: number) {
 
 export default function ProjectsWorkspaceShelf() {
   const [snapshot, setSnapshot] = useState<ResumeSnapshot | null>(null);
+  const { data: session } = useSession();
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage?.getItem(WORKSPACE_META_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as StoredSourceMeta[];
-      if (!Array.isArray(parsed) || parsed.length === 0) return;
-      const [primary] = [...parsed].sort((a, b) => (b?.updatedAt ?? 0) - (a?.updatedAt ?? 0));
-      if (!primary) return;
-      const storedProjectName = sanitizeProjectName(
-        window.localStorage?.getItem(PROJECT_NAME_STORAGE_KEY) ?? primary.name
-      );
-      setSnapshot({
-        fileName: storedProjectName,
-        lastEditedLabel: formatLastEdited(primary.updatedAt ?? Date.now()),
-      });
-    } catch (err) {
-      console.error("Failed to parse saved workspace metadata", err);
-    }
-  }, []);
+    if (typeof window === "undefined") return;
+
+    const ownerId = session?.user?.id ?? session?.user?.email ?? null;
+
+    const hydrateFromWorkspaceStorage = () => {
+      try {
+        const raw = window.localStorage?.getItem(WORKSPACE_META_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw) as StoredSourceMeta[];
+        if (!Array.isArray(parsed) || parsed.length === 0) return;
+        const [primary] = [...parsed].sort((a, b) => (b?.updatedAt ?? 0) - (a?.updatedAt ?? 0));
+        if (!primary) return;
+        const storedProjectName = sanitizeProjectName(
+          window.localStorage?.getItem(PROJECT_NAME_STORAGE_KEY) ?? primary.name
+        );
+        setSnapshot({
+          fileName: storedProjectName,
+          lastEditedLabel: formatLastEdited(primary.updatedAt ?? Date.now()),
+        });
+      } catch (err) {
+        console.error("Failed to parse saved workspace metadata", err);
+      }
+    };
+
+    const hydrateFromRecentProjects = async () => {
+      if (!ownerId) return false;
+      try {
+        const res = await fetch("/api/recent-projects", { cache: "no-store" });
+        if (res.ok) {
+          const data = (await res.json()) as { projects?: RecentProjectEntry[] };
+          if (Array.isArray(data.projects) && data.projects.length > 0) {
+            const [latest] = [...data.projects].sort(
+              (a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0)
+            );
+            if (latest) {
+              setSnapshot({
+                fileName: latest.title,
+                lastEditedLabel: formatLastEdited(latest.updatedAt),
+              });
+              return true;
+            }
+          }
+        }
+      } catch {
+        // ignore and fall back
+      }
+
+      const local = loadRecentProjects(ownerId);
+      if (local.length > 0) {
+        const [latestLocal] = [...local].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+        if (latestLocal) {
+          setSnapshot({
+            fileName: latestLocal.title,
+            lastEditedLabel: formatLastEdited(latestLocal.updatedAt),
+          });
+          return true;
+        }
+      }
+      return false;
+    };
+
+    const run = async () => {
+      const hydratedFromAccount = await hydrateFromRecentProjects();
+      if (!hydratedFromAccount) {
+        hydrateFromWorkspaceStorage();
+      }
+    };
+
+    void run();
+  }, [session?.user?.email, session?.user?.id]);
 
   if (!snapshot) {
     return (
