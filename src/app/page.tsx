@@ -250,15 +250,15 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
                       Completion tracking
                     </span>
                   </div>
-                  <div className="mt-3">
-                    <Link
-                      href="/signature-center"
-                      className="inline-flex h-11 items-center justify-center rounded-[8px] bg-[#6D5AE0] px-5 text-sm font-semibold text-white shadow-md transition-colors hover:bg-[#5D4EE8]"
-                    >
-                      Open Signature Requests
-                      <ArrowUpRight className="ml-2 h-4 w-4" />
-                    </Link>
-                  </div>
+                </div>
+                <div className="flex items-center">
+                  <Link
+                    href="/signature-center"
+                    className="inline-flex h-11 items-center justify-center rounded-[8px] bg-[#6D5AE0] px-5 text-sm font-semibold text-white shadow-md transition-colors hover:bg-[#5D4EE8]"
+                  >
+                    Open Signature Requests
+                    <ArrowUpRight className="ml-2 h-4 w-4" />
+                  </Link>
                 </div>
               </div>
             </div>
