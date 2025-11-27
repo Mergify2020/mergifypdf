@@ -183,7 +183,7 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
         <div className="rounded-[10px] border border-slate-200 bg-white p-6 shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
           <header className="flex flex-col gap-4 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
-              <h1 className="text-[22px] font-semibold text-[#111827] sm:text-[24px]">
+              <h1 className="text-[24px] font-semibold text-[#111827] sm:text-[30px]">
                 Your workspace is ready, {shortName}.
               </h1>
               <p className="text-sm text-slate-500">
@@ -202,7 +202,10 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
           <ProjectsList initialProjects={curatedProjects} />
 
           <div className="space-y-4">
-            <div className="rounded-[10px] border border-slate-200 bg-white p-6 text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
+            <div
+              className="rounded-[10px] border border-slate-200 p-6 text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,0.04)]"
+              style={{ background: "linear-gradient(135deg, #ffffff 0%, var(--color-primary-light) 100%)" }}
+            >
               <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div className="space-y-2 md:max-w-md">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]">
@@ -221,7 +224,7 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
                 </div>
                 <div className="mt-4 flex justify-center md:block">
                   <div className="flex h-44 w-44 items-center justify-center rounded-[10px] border border-slate-200 bg-white">
-                    <FileSignature className="h-16 w-16 text-[#1E4FD6]" />
+                    <FileSignature className="h-16 w-16 text-[var(--color-primary)]" />
                   </div>
                 </div>
               </div>

@@ -132,7 +132,7 @@ export default function ProjectsWorkspaceShelf() {
   return (
     <div className="rounded-[10px] border border-slate-200 bg-white p-6 text-slate-900 shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="space-y-2">
+            <div className="space-y-2">
           <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#9CA3AF]">
             Continue your last project
           </p>
@@ -141,11 +141,14 @@ export default function ProjectsWorkspaceShelf() {
               {snapshot.fileName}
             </p>
             <div className="inline-flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-4 py-1.5 text-xs font-medium text-slate-500">
-              <Clock className="h-4 w-4" />
+              <Clock className="h-4 w-4 text-[var(--color-primary)]" />
               Updated {snapshot.lastEditedLabel}
             </div>
-            <div className="mt-2 h-1 w-2/5 overflow-hidden rounded-full bg-slate-100">
-              <div className="h-full w-2/5 bg-gradient-to-r from-[#1E4FD6] to-[#1740AC]" />
+            <div className="mt-2 h-1 w-2/5 overflow-hidden rounded-full bg-[var(--color-primary-light)]">
+              <div
+                className="h-full w-2/5 rounded-full"
+                style={{ backgroundColor: "var(--color-primary)" }}
+              />
             </div>
           </div>
         </div>

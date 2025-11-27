@@ -6,8 +6,9 @@
   --background: #ffffff;
   --foreground: #171717;
   color-scheme: light;
-  --color-primary: #1e4fd6;
-  --color-primary-hover: #1740ac;
+  --color-primary: #2d5af0;
+  --color-primary-hover: #1f46c8;
+  --color-primary-light: #f2f5ff;
   --color-bg-soft: #f4f6fb;
   --color-card-bg: #ffffff;
   --color-border-subtle: #e1e5f0;
@@ -170,10 +171,11 @@ body {
     box-shadow: 0 3px 8px rgba(15, 23, 42, 0.14);
   }
   .btn-secondary {
-    @apply inline-flex items-center justify-center border px-3 text-sm font-semibold text-slate-800 transition disabled:cursor-not-allowed disabled:opacity-60;
+    @apply inline-flex items-center justify-center border px-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60;
     border-radius: 0.5rem; /* 8px */
     background-color: #ffffff;
-    border-color: var(--color-border-subtle);
+    color: var(--color-primary);
+    border-color: #d1d5db;
     min-height: 38px;
     box-shadow: none;
   }
