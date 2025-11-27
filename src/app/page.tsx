@@ -265,7 +265,10 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
                     </div>
                   </div>
                   <div className="mt-1 flex flex-col items-end">
-                    <Link href="/signature-center" className="btn-primary px-5">
+                    <Link
+                      href="/signature-center"
+                      className="btn-primary px-5 rounded-[12px] bg-[#3B82F6] shadow-[0_4px_12px_rgba(59,130,246,0.25)] hover:bg-[#2563EB]"
+                    >
                       Open Signature Requests
                       <ArrowUpRight className="ml-2 h-4 w-4" />
                     </Link>
