@@ -218,7 +218,7 @@ export default function ProjectsList({ initialProjects }: Props) {
 
   return (
     <>
-      <div className="rounded-[18px] border border-slate-200 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
+      <div className="rounded-[14px] border border-slate-200 bg-white p-6 shadow-[0_12px_24px_rgba(15,23,42,0.06)]">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <h2 className="text-2xl font-semibold text-slate-900">Your projects</h2>
           <div className="flex items-center gap-3 text-sm">

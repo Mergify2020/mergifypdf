@@ -44,7 +44,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
       <body className="min-h-screen bg-white text-gray-900">
         <Providers session={session}>
-          <header className="sticky top-0 z-50 w-full border-b border-slate-100 bg-white/90 backdrop-blur">
+          <header className="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/90 backdrop-blur">
             <div className="mx-auto flex h-[76px] w-full max-w-6xl items-center justify-between px-4 lg:px-6">
               <Link href="/" className="inline-flex items-center gap-2" aria-label="Back to workspace">
                 <Image src="/logo-wordmark2.svg" alt="MergifyPDF" width={160} height={40} priority />

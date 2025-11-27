@@ -108,7 +108,7 @@ export default function ProjectsWorkspaceShelf() {
 
   if (!snapshot) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 shadow-[0_22px_60px_rgba(15,23,42,0.08)]">
+      <div className="rounded-[14px] border border-slate-200 bg-white p-6 text-slate-900 shadow-[0_12px_24px_rgba(15,23,42,0.06)]">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#9CA3AF]">Workspace</p>
@@ -130,7 +130,7 @@ export default function ProjectsWorkspaceShelf() {
   }
 
   return (
-    <div className="rounded-[18px] border border-slate-200 bg-white p-6 text-slate-900 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
+    <div className="rounded-[14px] border border-slate-200 bg-white p-6 text-slate-900 shadow-[0_12px_24px_rgba(15,23,42,0.06)]">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="space-y-2">
           <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#9CA3AF]">

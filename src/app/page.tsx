@@ -180,7 +180,7 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
   return (
     <div className="min-h-screen bg-[#F4F6FB] text-slate-900">
       <div className="mx-auto flex max-w-[1120px] flex-col gap-6 px-6 py-8">
-        <div className="rounded-[18px] border border-slate-200 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
+        <div className="rounded-[14px] border border-slate-200 bg-white p-6 shadow-[0_12px_24px_rgba(15,23,42,0.06)]">
           <header className="flex flex-col gap-4 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
               <h1 className="text-[1.5rem] font-bold text-[#0F172A]">
@@ -202,9 +202,9 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
           <ProjectsList initialProjects={curatedProjects} />
 
           <div className="space-y-4">
-            <div className="group relative overflow-hidden rounded-[18px] border border-slate-200 bg-white p-6 text-slate-600 shadow-[0_12px_24px_rgba(15,23,42,0.06)] transition-transform duration-150 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(15,23,42,0.12)]">
+            <div className="group relative overflow-hidden rounded-[14px] border border-slate-200 bg-white p-6 text-slate-600 shadow-[0_12px_24px_rgba(15,23,42,0.06)] transition-transform duration-150 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(15,23,42,0.12)]">
               <div
-                className="pointer-events-none absolute inset-0 rounded-[18px]"
+                className="pointer-events-none absolute inset-0 rounded-[14px]"
                 style={{
                   background: "radial-gradient(circle at top left, #E0EAFF 0, #FFFFFF 55%)",
                 }}
@@ -226,7 +226,7 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
                   </Link>
                 </div>
                 <div className="mt-4 flex justify-center md:block">
-                  <div className="flex h-44 w-44 items-center justify-center rounded-2xl border border-slate-200 bg-white/80 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
+                  <div className="flex h-44 w-44 items-center justify-center rounded-[12px] border border-slate-200 bg-white/80 shadow-[0_8px_18px_rgba(15,23,42,0.05)]">
                     <FileSignature className="h-16 w-16 text-[#1E4FD6]" />
                   </div>
                 </div>
