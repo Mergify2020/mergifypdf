@@ -159,7 +159,7 @@ body {
 
 @layer components {
   .btn-primary {
-    @apply inline-flex items-center justify-center rounded-full px-5 py-2 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(30,79,214,0.45)] transition disabled:cursor-not-allowed disabled:opacity-60;
+    @apply inline-flex items-center justify-center rounded-full px-5 py-2 text-sm font-semibold text-white shadow-[0_6px_14px_rgba(15,23,42,0.16)] transition disabled:cursor-not-allowed disabled:opacity-60;
     background-color: var(--color-primary);
     min-height: 44px;
   }
