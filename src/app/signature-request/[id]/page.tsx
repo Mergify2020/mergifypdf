@@ -1,9 +1,5 @@
 import { notFound } from "next/navigation";
 
-type PageProps = {
-  params: { id: string };
-};
-
 const MOCK_REQUEST = {
   id: "1",
   documentName: "Vendor Renewal Agreement",
@@ -22,9 +18,14 @@ const MOCK_REQUEST = {
   ],
 };
 
-export default function SignatureRequestDetailPage({ params }: PageProps) {
+export default async function SignatureRequestDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   // In a future phase, replace with real data fetching.
-  const request = params.id === MOCK_REQUEST.id ? MOCK_REQUEST : null;
+  const { id } = await params;
+  const request = id === MOCK_REQUEST.id ? MOCK_REQUEST : null;
 
   if (!request) {
     notFound();
@@ -184,4 +185,3 @@ export default function SignatureRequestDetailPage({ params }: PageProps) {
     </div>
   );
 }
-

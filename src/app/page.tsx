@@ -185,7 +185,7 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
           <header className="flex flex-col gap-4 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
               <h1 className="text-[24px] font-semibold text-[#111827] sm:text-[30px]">
-                Your dashboard is ready, {shortName}.
+                Welcome back, {shortName}.
               </h1>
               <p className="text-sm text-slate-500">
                 Pick up where you left off, create a new document, or send one for signature.

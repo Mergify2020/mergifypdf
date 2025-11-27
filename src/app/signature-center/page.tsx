@@ -1,8 +1,14 @@
 import Link from "next/link";
 import { FileSignature } from "lucide-react";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/authOptions";
 import SignatureRequestsTable from "./SignatureRequestsTable";
 
-export default function SignatureCenterPage() {
+export default async function SignatureCenterPage() {
+  const session = await getServerSession(authOptions);
+  const displayName = session?.user?.name ?? session?.user?.email ?? "Guest";
+  const shortName = displayName.split(" ")[0] ?? "Guest";
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#F4E9FF] via-[#EEF4FF] to-white text-slate-900">
       <div className="mx-auto flex max-w-5xl flex-col gap-8 px-6 py-10">
@@ -12,6 +18,9 @@ export default function SignatureCenterPage() {
               <FileSignature className="h-4 w-4" aria-hidden />
             </div>
             <div>
+              <p className="text-sm font-medium text-slate-900">
+                Welcome back, {shortName}.
+              </p>
               <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
                 Mergify Sign — Signature Requests
               </h1>
