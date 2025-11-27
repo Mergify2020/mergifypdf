@@ -200,7 +200,7 @@ export default function SignatureRequestsTable() {
                 onClick={() => setActiveFilter(filter)}
                 className={`inline-flex items-center rounded-[999px] border px-3 py-1 text-xs font-medium transition ${
                   isActive
-                    ? "border-[#1F456E] bg-[#1F456E] text-white shadow-sm"
+                    ? "border-[#6A4EE8] bg-[#6A4EE8] text-white shadow-sm"
                     : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
                 }`}
               >

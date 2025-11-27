@@ -39,7 +39,7 @@ export default async function SignatureCenterPage() {
               </Link>
               <button
                 type="button"
-                className="inline-flex items-center justify-center rounded-[8px] bg-[#1F456E] px-5 py-2 text-sm font-semibold text-white shadow-[0_3px_10px_rgba(15,23,42,0.18)] transition-colors hover:bg-[#173552]"
+                className="inline-flex items-center justify-center rounded-[8px] bg-[#6A4EE8] px-5 py-2 text-sm font-semibold text-white shadow-[0_3px_10px_rgba(15,23,42,0.18)] transition-colors hover:bg-[#5C3EDB]"
               >
                 Send Signature Request
               </button>
