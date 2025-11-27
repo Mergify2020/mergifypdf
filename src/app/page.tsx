@@ -202,8 +202,7 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
           <ProjectsList initialProjects={curatedProjects} />
 
           <div className="space-y-4">
-            <div className="relative overflow-hidden rounded-[10px] border border-[#E3DFFF] bg-[#FBFAFF] text-slate-600 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
-              <div className="h-0.5 w-full bg-[#1C80D6]" />
+            <div className="relative overflow-hidden rounded-[10px] border border-slate-200 bg-white text-slate-600 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
               <div className="pointer-events-none absolute -bottom-16 -left-16 text-[#1C80D6] opacity-[0.04]">
                 <svg
                   aria-hidden
@@ -233,9 +232,6 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
                       height={32}
                       className="h-8 w-auto"
                     />
-                    <span className="inline-flex items-center rounded-full border border-[#6D5AE0] bg-white/90 px-[10px] py-[3px] text-[11px] font-medium text-[#1C80D6]">
-                      Pro feature
-                    </span>
                   </div>
                   <h3 className="text-[18px] font-semibold text-[#111827]">
                     Request a Signature
@@ -257,7 +253,7 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
                   <div className="mt-3">
                     <Link
                       href="/signature-center"
-                      className="inline-flex h-11 items-center justify-center rounded-[8px] bg-[#6D5AE0] px-5 text-sm font-semibold text-white shadow-[0_6px_16px_rgba(37,99,235,0.35)] transition-colors hover:bg-[#5D4EE8]"
+                      className="inline-flex h-11 items-center justify-center rounded-[8px] bg-[#6D5AE0] px-5 text-sm font-semibold text-white shadow-md transition-colors hover:bg-[#5D4EE8]"
                     >
                       Open Signature Requests
                       <ArrowUpRight className="ml-2 h-4 w-4" />
