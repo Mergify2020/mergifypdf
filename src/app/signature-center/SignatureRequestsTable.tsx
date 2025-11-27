@@ -13,7 +13,8 @@ type SignatureRequest = {
   id: string;
   documentName: string;
   projectName?: string;
-  primaryRecipient: string;
+  primaryRecipientName: string;
+  primaryRecipientEmail: string;
   signers: Signer[];
   updated: string;
 };
@@ -27,6 +28,7 @@ type FilterValue = (typeof FILTERS)[number];
 export default function SignatureRequestsTable() {
   const [requests, setRequests] = useState<SignatureRequest[] | null>(null);
   const [activeFilter, setActiveFilter] = useState<FilterValue>("All");
+  const [openMenuForId, setOpenMenuForId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -43,7 +45,8 @@ export default function SignatureRequestsTable() {
           id: "1",
           documentName: "Vendor Renewal Agreement",
           projectName: "Pinnacol Renewal 2025",
-          primaryRecipient: "operations@pinnacolassurance.com",
+          primaryRecipientName: "Pinnacol Ops Team",
+          primaryRecipientEmail: "operations@pinnacolassurance.com",
           signers: [
             { name: "Leticia Silva", email: "leticia@mergifypdf.com", hasSigned: true },
             { name: "Pinnacol Ops", email: "operations@pinnacolassurance.com", hasSigned: false },
@@ -55,7 +58,8 @@ export default function SignatureRequestsTable() {
           id: "2",
           documentName: "Client Audit Packet",
           projectName: "Golden Rain FY25",
-          primaryRecipient: "finance@goldenrainmasonry.com",
+          primaryRecipientName: "Golden Rain Finance",
+          primaryRecipientEmail: "finance@goldenrainmasonry.com",
           signers: [
             { name: "Finance Lead", email: "finance@goldenrainmasonry.com", hasSigned: true },
             { name: "Owner Signer", email: "owner@goldenrainmasonry.com", hasSigned: true },
@@ -67,7 +71,8 @@ export default function SignatureRequestsTable() {
           id: "3",
           documentName: "Compliance Addendum",
           projectName: "MergifyPDF Studio",
-          primaryRecipient: "legal@mergifypdf.com",
+          primaryRecipientName: "MergifyPDF Legal",
+          primaryRecipientEmail: "legal@mergifypdf.com",
           signers: [
             { name: "Head of Legal", email: "legal@mergifypdf.com", hasSigned: true },
             { name: "Operations", email: "ops@mergifypdf.com", hasSigned: true },
@@ -78,7 +83,8 @@ export default function SignatureRequestsTable() {
           id: "4",
           documentName: "Project T – SOW",
           projectName: "Project T",
-          primaryRecipient: "projects@northbridgepartners.co",
+          primaryRecipientName: "Northbridge Projects",
+          primaryRecipientEmail: "projects@northbridgepartners.co",
           signers: [
             { name: "Account Lead", email: "projects@northbridgepartners.co", hasSigned: true },
             { name: "Client Sponsor", email: "sponsor@northbridgepartners.co", hasSigned: true },
@@ -89,7 +95,8 @@ export default function SignatureRequestsTable() {
           id: "5",
           documentName: "Onboarding Packet",
           projectName: "Acme HR Setup",
-          primaryRecipient: "hr@acmecorp.com",
+          primaryRecipientName: "Acme HR",
+          primaryRecipientEmail: "hr@acmecorp.com",
           signers: [
             { name: "HR Lead", email: "hr@acmecorp.com", hasSigned: false },
             { name: "New Hire", email: "newhire@acmecorp.com", hasSigned: false },
@@ -160,14 +167,12 @@ export default function SignatureRequestsTable() {
         {totalSigners > 0 ? (
           <div className="flex items-center gap-1.5">
             {request.signers.map((signer) => {
-              let dotClass = "bg-slate-300";
+              let dotClass = "bg-slate-300"; // default: not signed
 
-              if (isCompleted) {
-                dotClass = "bg-[#22C55E]";
-              } else if (signer.hasSigned) {
-                dotClass = "bg-[#2563EB]";
+              if (isCompleted || signer.hasSigned) {
+                dotClass = "bg-[#22C55E]"; // green = signed
               } else if (nextSigner && signer.email === nextSigner.email) {
-                dotClass = "bg-[#FACC15]";
+                dotClass = "bg-[#2563EB]"; // blue = currently signing
               }
 
               return (
@@ -212,7 +217,7 @@ export default function SignatureRequestsTable() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      <div className="overflow-hidden rounded-2xl border border-[#EDE3FF] bg-white">
         <div className="grid grid-cols-[minmax(0,2.1fr)_minmax(0,1.8fr)_minmax(0,1.2fr)_minmax(0,1.1fr)_auto] gap-4 border-b border-slate-100 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]">
           <span>Document</span>
           <span>Recipient</span>
@@ -265,7 +270,7 @@ export default function SignatureRequestsTable() {
                     ) : null}
                   </div>
                   <div className="truncate text-slate-600">
-                    {request.primaryRecipient}
+                    {request.primaryRecipientName}
                   </div>
                   <div>
                     {renderStatusCell(request)}
@@ -273,14 +278,52 @@ export default function SignatureRequestsTable() {
                   <div className="text-right text-slate-500">
                     {request.updated}
                   </div>
-                  <div className="flex items-center justify-end">
+                  <div className="relative flex items-center justify-end">
                     <button
                       type="button"
+                      onClick={() =>
+                        setOpenMenuForId((current) => (current === request.id ? null : request.id))
+                      }
                       className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
                     >
                       Open
-                      <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
+                      <span className="ml-0.5 text-[10px] text-slate-500">▾</span>
                     </button>
+                    {openMenuForId === request.id ? (
+                      <div className="absolute right-0 top-9 z-10 w-40 rounded-xl border border-slate-200 bg-white py-1 text-xs shadow-lg">
+                        <button
+                          type="button"
+                          className="flex w-full items-center justify-between px-3 py-1.5 text-left text-slate-700 hover:bg-slate-50"
+                          onClick={() => {
+                            console.log("Open request", request.id);
+                            setOpenMenuForId(null);
+                          }}
+                        >
+                          <span>Open request</span>
+                          <ArrowUpRight className="h-3 w-3" aria-hidden />
+                        </button>
+                        <button
+                          type="button"
+                          className="flex w-full items-center justify-between px-3 py-1.5 text-left text-slate-700 hover:bg-slate-50"
+                          onClick={() => {
+                            console.log("Resend request", request.id);
+                            setOpenMenuForId(null);
+                          }}
+                        >
+                          <span>Resend request</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="flex w-full items-center justify-between px-3 py-1.5 text-left text-rose-600 hover:bg-rose-50"
+                          onClick={() => {
+                            console.log("Cancel request", request.id);
+                            setOpenMenuForId(null);
+                          }}
+                        >
+                          <span>Cancel request</span>
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               ))}

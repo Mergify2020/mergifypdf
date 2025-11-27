@@ -3,6 +3,7 @@ import React from "react";
 import { Resend } from "resend";
 import { ResetPasswordEmail } from "@/emails/ResetPasswordEmail";
 import { SignupCodeEmail } from "@/emails/SignupCodeEmail";
+import { SignatureRequestEmail } from "@/emails/SignatureRequestEmail";
 
 type SendArgs = { to: string; token: string };
 
@@ -138,22 +139,18 @@ export async function sendSignupCodeEmail({ to, code }: SignupArgs) {
   }
 }
 
-type SignatureEmailKind = "request" | "reminder" | "completed";
-
 export type SignatureRequestEmailArgs = {
   to: string;
   senderName: string;
   documentName: string;
-  kind: SignatureEmailKind;
-  html: string;
+  reviewUrl: string;
 };
 
-export async function sendSignatureEmail({
+export async function sendSignatureRequestEmail({
   to,
   senderName,
   documentName,
-  kind,
-  html,
+  reviewUrl,
 }: SignatureRequestEmailArgs) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
@@ -162,33 +159,25 @@ export async function sendSignatureEmail({
   }
 
   const resend = new Resend(apiKey);
-  const from = `${senderName} via Mergify Sign <sign@mergifypdf.com>`;
-
-  let subject: string;
-  if (kind === "request") {
-    subject = `${senderName} sent you a document to sign — ${documentName}`;
-  } else if (kind === "reminder") {
-    subject = `Reminder: ${senderName} sent you a document to sign — ${documentName}`;
-  } else {
-    subject = `${documentName} is fully signed`;
-  }
+  const from = `Mergify Sign <sign@mergifypdf.com>`;
+  const subject = "Your signature is requested — Mergify Sign";
 
   try {
     const { data, error } = await resend.emails.send({
       from,
       to,
       subject,
-      html,
+      react: <SignatureRequestEmail documentName={documentName} senderName={senderName} reviewUrl={reviewUrl} />,
     });
 
     if (error) {
-      console.error("[email] Signature email error:", error);
+      console.error("[email] Signature request email error:", error);
       return { ok: false, error: String(error) };
     }
 
     return { ok: true, id: data?.id };
   } catch (err) {
-    console.error("[email] sendSignatureEmail fatal:", err);
+    console.error("[email] sendSignatureRequestEmail fatal:", err);
     return { ok: false, error: String(err) };
   }
 }
