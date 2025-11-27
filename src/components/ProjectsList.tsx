@@ -218,14 +218,14 @@ export default function ProjectsList({ initialProjects }: Props) {
 
   return (
     <>
-      <div className="rounded-[36px] border border-white/60 bg-white/95 p-8 shadow-[0_40px_120px_rgba(15,23,42,0.08)] backdrop-blur">
+      <div className="rounded-[18px] border border-slate-200 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <h2 className="text-2xl font-semibold text-slate-900">Your projects</h2>
           <div className="flex items-center gap-3 text-sm">
             <button
               type="button"
               onClick={toggleSelectMode}
-              className="rounded-full border border-slate-200 px-4 py-2 font-medium text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
+              className="btn-secondary font-medium"
             >
               {selectionMode ? "Cancel" : "Select"}
             </button>
@@ -234,7 +234,7 @@ export default function ProjectsList({ initialProjects }: Props) {
                 type="button"
                 onClick={handleDeleteSelected}
                 disabled={selected.size === 0}
-                className="rounded-full border border-rose-200 px-4 py-2 font-semibold text-rose-600 transition hover:border-rose-400 hover:text-rose-700 disabled:border-slate-200 disabled:text-slate-400"
+                className="btn-secondary border-rose-200 text-rose-600 hover:border-rose-400 hover:text-rose-700"
               >
                 Delete
               </button>
@@ -242,7 +242,7 @@ export default function ProjectsList({ initialProjects }: Props) {
             <button
               type="button"
               onClick={() => setShowAll((prev) => !prev)}
-              className="inline-flex items-center rounded-full border border-slate-200 px-4 py-2 font-semibold text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
+              className="btn-secondary"
             >
               {showAll ? "Collapse" : "View all"}
               <ArrowUpRight className="ml-2 h-4 w-4" />
@@ -260,7 +260,7 @@ export default function ProjectsList({ initialProjects }: Props) {
               return (
                 <div
                   key={project.id}
-                  className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 md:flex-row md:items-center md:justify-between"
+                  className="group flex flex-col gap-3 py-3 first:pt-0 last:pb-0 md:grid md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_auto] md:items-center md:gap-4 md:px-1 hover:bg-slate-50/60"
                 >
                   <div className="flex items-center gap-3">
                     {selectionMode ? (
@@ -292,13 +292,13 @@ export default function ProjectsList({ initialProjects }: Props) {
                       </svg>
                       Edit
                     </button>
-                    <p className="text-sm text-slate-500">Last edited {project.updated}</p>
                   </div>
-                  <div className="flex flex-wrap gap-3 text-sm">
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1 text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
-                    >
+                  <p className="text-sm text-slate-500">Last edited {project.updated}</p>
+                  <div className="flex flex-wrap justify-start gap-3 text-sm md:justify-end">
+                  <button
+                    type="button"
+                    className="btn-secondary gap-1 px-3 py-1"
+                  >
                       Download
                       <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
                         <path
@@ -311,10 +311,10 @@ export default function ProjectsList({ initialProjects }: Props) {
                         <path d="M5 19h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                       </svg>
                     </button>
-                    <Link
-                      href="/studio"
-                      className="inline-flex items-center gap-1 rounded-full bg-[#024d7c] px-3 py-1 text-white transition hover:bg-[#013a60]"
-                    >
+                  <Link
+                    href="/studio"
+                    className="btn-primary gap-1 px-3 py-1"
+                  >
                       Open
                       <ArrowUpRight className="h-4 w-4" />
                     </Link>
@@ -346,14 +346,14 @@ export default function ProjectsList({ initialProjects }: Props) {
               <button
                 type="button"
                 onClick={closeRename}
-                className="rounded-full border border-slate-200 px-4 py-2 text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
+                className="btn-secondary"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleRenameSave}
-                className="rounded-full bg-[#024d7c] px-5 py-2 font-semibold text-white shadow-lg shadow-[#012a44]/30 transition hover:-translate-y-0.5"
+                className="btn-primary px-5 py-2"
               >
                 Save name
               </button>

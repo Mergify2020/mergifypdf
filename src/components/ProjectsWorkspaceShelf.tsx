@@ -119,7 +119,7 @@ export default function ProjectsWorkspaceShelf() {
           </div>
           <Link
             href="/studio"
-            className="inline-flex items-center justify-center rounded-xl bg-[#024d7c] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(2,77,124,0.4)] transition hover:-translate-y-0.5"
+            className="btn-primary px-5 py-2.5"
           >
             Launch workspace
             <ArrowUpRight className="ml-2 h-4 w-4" />
@@ -130,23 +130,27 @@ export default function ProjectsWorkspaceShelf() {
   }
 
   return (
-    <div className="rounded-3xl border border-slate-100 bg-white p-8 text-slate-900 shadow-[0_32px_90px_rgba(15,23,42,0.12)]">
-      <div className="flex flex-col gap-6">
-        <p className="text-xs font-medium uppercase tracking-[0.22em] text-[#7b8ca8]">
-          Continue your last project
-        </p>
-        <div className="flex flex-col gap-1">
-          <p className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">{snapshot.fileName}</p>
-          <div className="inline-flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-4 py-1.5 text-xs font-medium text-slate-500">
-            <Clock className="h-4 w-4" />
-            Last edited {snapshot.lastEditedLabel}
+    <div className="rounded-[18px] border border-slate-200 bg-white p-6 text-slate-900 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-2">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-[#7b8ca8]">
+            Continue your last project
+          </p>
+          <div className="space-y-2">
+            <p className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
+              {snapshot.fileName}
+            </p>
+            <div className="inline-flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-4 py-1.5 text-xs font-medium text-slate-500">
+              <Clock className="h-4 w-4" />
+              Last edited {snapshot.lastEditedLabel}
+            </div>
+            <div className="mt-2 h-1 w-2/5 overflow-hidden rounded-full bg-slate-100">
+              <div className="h-full w-2/5 bg-gradient-to-r from-[#1E4FD6] to-[#1740AC]" />
+            </div>
           </div>
         </div>
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <Link
-            href="/studio"
-            className="inline-flex items-center justify-center rounded-xl bg-[#024d7c] px-7 py-3 text-sm font-semibold text-white shadow-[0_18px_36px_rgba(2,77,124,0.4)] transition hover:-translate-y-0.5"
-          >
+        <div className="shrink-0">
+          <Link href="/studio" className="btn-primary px-7 py-3">
             Resume / Open
             <ArrowUpRight className="ml-2 h-4 w-4" />
           </Link>
