@@ -52,7 +52,7 @@ export default function MergifySignCard() {
             />
           </div>
           <h3 className="text-[18px] font-semibold text-[#111827]">
-            Request a Signature
+            Send a Signature Request
           </h3>
           <p className="max-w-[420px] text-sm leading-relaxed text-[#4B5563]">
             Get contracts and important documents signed fast, with reminders and completion tracking built in.
@@ -86,7 +86,7 @@ export default function MergifySignCard() {
               </>
             ) : (
               <>
-                <span>Open Signature Requests</span>
+                <span>Go to Signature Dashboard</span>
                 <ArrowUpRight className="ml-2 h-4 w-4" />
               </>
             )}
@@ -96,4 +96,3 @@ export default function MergifySignCard() {
     </div>
   );
 }
-
