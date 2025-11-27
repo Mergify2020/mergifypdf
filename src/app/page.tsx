@@ -212,7 +212,7 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
                     Sign documents with clients
                   </p>
                   <h3 className="text-[18px] font-semibold text-[#111827]">
-                    Send documents for signature
+                    Request a Signature on a Document
                   </h3>
                   <p className="max-w-[420px] text-sm leading-relaxed text-[#4B5563]">
                     Get contracts and important documents signed fast, with reminders and completion tracking built in.
@@ -229,7 +229,7 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
                     </span>
                   </div>
                   <Link href="/signature-center" className="btn-primary mt-4 px-5">
-                    Open Signature Center
+                    Open Signature Requests
                     <ArrowUpRight className="ml-2 h-4 w-4" />
                   </Link>
                 </div>
@@ -282,6 +282,21 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
                         stroke="currentColor"
                         strokeWidth="2.3"
                         strokeLinecap="round"
+                      />
+                      <path
+                        d="M38 36 48 26"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.3"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M49.5 24.5 46 23 44.5 24.5 47 27z"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.3"
+                        strokeLinejoin="round"
                       />
                     </svg>
                   </div>
