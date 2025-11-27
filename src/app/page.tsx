@@ -206,67 +206,98 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
               className="rounded-[10px] border border-slate-200 p-6 text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,0.04)]"
               style={{ background: "linear-gradient(135deg, #ffffff 0%, var(--color-primary-light) 100%)" }}
             >
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
                 <div className="space-y-2 md:max-w-md">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]">
                     Sign documents with clients
                   </p>
-                  <h3 className="text-[18px] font-semibold text-slate-900">
+                  <h3 className="text-[19px] font-semibold text-slate-900 sm:text-[20px]">
                     Send documents for signature
                   </h3>
                   <p className="mt-1 max-w-[420px] text-sm text-slate-600">
                     Collect legally binding client signatures. Track opens, reminders, and completion—all in one place.
                   </p>
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
+                    <span className="inline-flex items-center rounded-full border border-slate-200 bg-white/70 px-3 py-1 font-medium">
+                      Remote signatures
+                    </span>
+                    <span className="inline-flex items-center rounded-full border border-slate-200 bg-white/70 px-3 py-1 font-medium">
+                      Status tracking
+                    </span>
+                    <span className="inline-flex items-center rounded-full border border-slate-200 bg-white/70 px-3 py-1 font-medium">
+                      Audit-ready history
+                    </span>
+                  </div>
                   <Link href="/signature-center" className="btn-primary mt-3 px-5">
                     Open Signature Center
                     <ArrowUpRight className="ml-2 h-4 w-4" />
                   </Link>
                 </div>
                 <div className="mt-4 flex justify-center md:block">
-                  <div className="flex h-40 w-40 items-center justify-center rounded-[10px] border border-[#E5E7EB] bg-white">
+                  <div className="flex h-36 w-36 items-center justify-center rounded-[10px] border border-[#E5E7EB] bg-white">
                     <svg
                       viewBox="0 0 64 64"
                       aria-hidden="true"
                       className="h-20 w-20 text-[var(--color-primary)]"
                     >
-                      <rect
-                        x="18"
-                        y="10"
-                        width="28"
-                        height="44"
-                        rx="4"
+                      <path
+                        d="M22 14h18l6 6v26a4 4 0 0 1-4 4H22a4 4 0 0 1-4-4V18a4 4 0 0 1 4-4z"
+                        fill="none"
                         stroke="currentColor"
                         strokeWidth="2.4"
-                        fill="none"
+                        strokeLinejoin="round"
                       />
                       <path
-                        d="M24 20h16"
+                        d="M40 14v8h8"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.4"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M24 24h14"
+                        fill="none"
                         stroke="currentColor"
                         strokeWidth="2.4"
                         strokeLinecap="round"
-                        fill="none"
                       />
                       <path
-                        d="M24 28h12"
+                        d="M24 30h10"
+                        fill="none"
                         stroke="currentColor"
                         strokeWidth="2.4"
                         strokeLinecap="round"
-                        fill="none"
                       />
                       <path
-                        d="M22 42c2-3 4-3 6 0 2 3 4 3 6 0 2-3 4-3 6 0"
+                        d="M22 42c2.1-2.2 4.1-2.2 6.2 0 2 2.2 4 2.2 6 0 2-2.2 4-2.2 6.1 0"
+                        fill="none"
                         stroke="currentColor"
                         strokeWidth="2.4"
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        fill="none"
                       />
                       <path
-                        d="M22 46h20"
+                        d="M22 46h18"
+                        fill="none"
                         stroke="currentColor"
                         strokeWidth="2.25"
                         strokeLinecap="round"
+                      />
+                      <circle
+                        cx="44"
+                        cy="44"
+                        r="6"
                         fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.4"
+                      />
+                      <path
+                        d="M41.5 44.1 43.2 46 46.5 42"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
                       />
                     </svg>
                   </div>
