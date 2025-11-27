@@ -266,23 +266,13 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
                   </div>
                 </div>
                 <div className="ml-0 hidden h-[96px] w-[96px] flex-shrink-0 items-center justify-center rounded-[12px] border border-[#E5E7EB] bg-[#F3F4F6] sm:flex">
-                  <svg
-                    aria-hidden
-                    className="h-12 w-12 text-[#1C80D6]"
-                    viewBox="0 0 64 64"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <rect x="16" y="10" width="28" height="40" rx="3" stroke="currentColor" strokeWidth="2" />
-                    <path d="M22 20H38" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                    <path d="M22 27H34" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                    <path
-                      d="M22 40C24 42.2 26.5 43.5 29 43.5C32 43.5 33.5 41.5 36.5 41.5C38.7 41.5 40.3 42.3 41.5 43.5"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    />
-                  </svg>
+                  <Image
+                    src="/Mergify-Sign.svg"
+                    alt="Mergify Sign logo"
+                    width={56}
+                    height={56}
+                    className="h-14 w-14"
+                  />
                 </div>
               </div>
             </div>
