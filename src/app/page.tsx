@@ -202,16 +202,16 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
           <ProjectsList initialProjects={curatedProjects} />
 
           <div className="space-y-4">
-            <div className="mx-auto max-w-sm rounded-[10px] border border-slate-200 bg-white p-5 text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
-              <div className="flex flex-col items-center gap-3 text-center">
-                <div className="flex items-center justify-center gap-2">
+            <div className="rounded-[10px] border border-slate-200 bg-white p-5 text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between gap-3">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]">
                     Mergify Sign
                   </p>
                   <svg
                     viewBox="0 0 64 64"
                     aria-hidden="true"
-                    className="h-8 w-8 flex-shrink-0 text-[var(--color-primary)]"
+                    className="h-7 w-7 flex-shrink-0 text-[var(--color-primary)]"
                   >
                     <path
                       d="M40 16 50 26 40 36 30 26z"
@@ -244,27 +244,33 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
                     />
                   </svg>
                 </div>
-                <h3 className="text-[18px] font-semibold text-[#111827]">
-                  Request a Signature
-                </h3>
-                <p className="max-w-[420px] text-sm leading-relaxed text-[#4B5563]">
-                  Get contracts and important documents signed fast, with reminders and completion tracking built in.
-                </p>
-                <div className="mt-1 flex flex-wrap justify-center gap-2 text-[13px] text-[#4B5563]">
-                    <span className="inline-flex items-center rounded-full border border-[#D3E2FF] bg-white px-3 py-1.5">
-                      Remote signatures
-                    </span>
-                    <span className="inline-flex items-center rounded-full border border-[#D3E2FF] bg-white px-3 py-1.5">
-                      Reminder scheduling
-                    </span>
-                    <span className="inline-flex items-center rounded-full border border-[#D3E2FF] bg-white px-3 py-1.5">
-                      Completion tracking
-                    </span>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex flex-col gap-2">
+                    <h3 className="text-[18px] font-semibold text-[#111827]">
+                      Request a Signature
+                    </h3>
+                    <p className="max-w-[420px] text-sm leading-relaxed text-[#4B5563]">
+                      Get contracts and important documents signed fast, with reminders and completion tracking built in.
+                    </p>
+                    <div className="mt-1 flex flex-wrap gap-2 text-[13px] text-[#4B5563]">
+                      <span className="inline-flex items-center rounded-full border border-[#D3E2FF] bg-white px-3 py-1.5">
+                        Remote signatures
+                      </span>
+                      <span className="inline-flex items-center rounded-full border border-[#D3E2FF] bg-white px-3 py-1.5">
+                        Reminder scheduling
+                      </span>
+                      <span className="inline-flex items-center rounded-full border border-[#D3E2FF] bg-white px-3 py-1.5">
+                        Completion tracking
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-1 flex flex-col items-end">
+                    <Link href="/signature-center" className="btn-primary px-5">
+                      Open Signature Requests
+                      <ArrowUpRight className="ml-2 h-4 w-4" />
+                    </Link>
+                  </div>
                 </div>
-                <Link href="/signature-center" className="btn-primary mt-4 px-5">
-                  Open Signature Requests
-                  <ArrowUpRight className="ml-2 h-4 w-4" />
-                </Link>
               </div>
             </div>
           </div>
