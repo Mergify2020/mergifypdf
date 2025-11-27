@@ -137,3 +137,58 @@ export async function sendSignupCodeEmail({ to, code }: SignupArgs) {
     }
   }
 }
+
+type SignatureEmailKind = "request" | "reminder" | "completed";
+
+export type SignatureRequestEmailArgs = {
+  to: string;
+  senderName: string;
+  documentName: string;
+  kind: SignatureEmailKind;
+  html: string;
+};
+
+export async function sendSignatureEmail({
+  to,
+  senderName,
+  documentName,
+  kind,
+  html,
+}: SignatureRequestEmailArgs) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.error("[email] Missing RESEND_API_KEY");
+    return { ok: false, error: "Missing RESEND_API_KEY" };
+  }
+
+  const resend = new Resend(apiKey);
+  const from = `${senderName} via Mergify Sign <sign@mergifypdf.com>`;
+
+  let subject: string;
+  if (kind === "request") {
+    subject = `${senderName} sent you a document to sign — ${documentName}`;
+  } else if (kind === "reminder") {
+    subject = `Reminder: ${senderName} sent you a document to sign — ${documentName}`;
+  } else {
+    subject = `${documentName} is fully signed`;
+  }
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from,
+      to,
+      subject,
+      html,
+    });
+
+    if (error) {
+      console.error("[email] Signature email error:", error);
+      return { ok: false, error: String(error) };
+    }
+
+    return { ok: true, id: data?.id };
+  } catch (err) {
+    console.error("[email] sendSignatureEmail fatal:", err);
+    return { ok: false, error: String(err) };
+  }
+}

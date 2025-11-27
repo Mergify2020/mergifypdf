@@ -3,17 +3,24 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowUpRight, FileSignature } from "lucide-react";
 
+type Signer = {
+  name: string;
+  email: string;
+  hasSigned: boolean;
+};
+
 type SignatureRequest = {
   id: string;
-  document: string;
-  recipient: string;
-  status: string;
+  documentName: string;
+  projectName?: string;
+  primaryRecipient: string;
+  signers: Signer[];
   updated: string;
 };
 
 const SKELETON_ROWS = 6;
 
-const FILTERS = ["All", "Awaiting Signature", "Sent", "Viewed", "Completed"] as const;
+const FILTERS = ["All", "Pending", "Completed"] as const;
 
 type FilterValue = (typeof FILTERS)[number];
 
@@ -34,37 +41,59 @@ export default function SignatureRequestsTable() {
       setRequests([
         {
           id: "1",
-          document: "Vendor Renewal Agreement",
-          recipient: "operations@pinnacolassurance.com",
-          status: "Awaiting signature",
+          documentName: "Vendor Renewal Agreement",
+          projectName: "Pinnacol Renewal 2025",
+          primaryRecipient: "operations@pinnacolassurance.com",
+          signers: [
+            { name: "Leticia Silva", email: "leticia@mergifypdf.com", hasSigned: true },
+            { name: "Pinnacol Ops", email: "operations@pinnacolassurance.com", hasSigned: false },
+            { name: "Legal Reviewer", email: "legal@pinnacolassurance.com", hasSigned: false },
+          ],
           updated: "Today • 3:44 AM",
         },
         {
           id: "2",
-          document: "Client Audit Packet",
-          recipient: "finance@goldenrainmasonry.com",
-          status: "Sent",
+          documentName: "Client Audit Packet",
+          projectName: "Golden Rain FY25",
+          primaryRecipient: "finance@goldenrainmasonry.com",
+          signers: [
+            { name: "Finance Lead", email: "finance@goldenrainmasonry.com", hasSigned: true },
+            { name: "Owner Signer", email: "owner@goldenrainmasonry.com", hasSigned: true },
+            { name: "Auditor", email: "audit@goldenrainmasonry.com", hasSigned: false },
+          ],
           updated: "Yesterday • 9:24 AM",
         },
         {
           id: "3",
-          document: "Compliance Addendum",
-          recipient: "legal@mergifypdf.com",
-          status: "Viewed",
+          documentName: "Compliance Addendum",
+          projectName: "MergifyPDF Studio",
+          primaryRecipient: "legal@mergifypdf.com",
+          signers: [
+            { name: "Head of Legal", email: "legal@mergifypdf.com", hasSigned: true },
+            { name: "Operations", email: "ops@mergifypdf.com", hasSigned: true },
+          ],
           updated: "Tuesday • 10:41 AM",
         },
         {
           id: "4",
-          document: "Project T – SOW",
-          recipient: "projects@northbridgepartners.co",
-          status: "Completed",
+          documentName: "Project T – SOW",
+          projectName: "Project T",
+          primaryRecipient: "projects@northbridgepartners.co",
+          signers: [
+            { name: "Account Lead", email: "projects@northbridgepartners.co", hasSigned: true },
+            { name: "Client Sponsor", email: "sponsor@northbridgepartners.co", hasSigned: true },
+          ],
           updated: "Monday • 1:18 PM",
         },
         {
           id: "5",
-          document: "Onboarding Packet",
-          recipient: "hr@acmecorp.com",
-          status: "Awaiting signature",
+          documentName: "Onboarding Packet",
+          projectName: "Acme HR Setup",
+          primaryRecipient: "hr@acmecorp.com",
+          signers: [
+            { name: "HR Lead", email: "hr@acmecorp.com", hasSigned: false },
+            { name: "New Hire", email: "newhire@acmecorp.com", hasSigned: false },
+          ],
           updated: "Last week",
         },
       ]);
@@ -84,52 +113,73 @@ export default function SignatureRequestsTable() {
     if (activeFilter === "All") return requests;
 
     return requests.filter((request) => {
-      if (activeFilter === "Awaiting Signature") {
-        return request.status.toLowerCase().startsWith("awaiting");
+      const { isCompleted } = getRequestProgress(request);
+      if (activeFilter === "Pending") {
+        return !isCompleted;
       }
-      return request.status.toLowerCase() === activeFilter.toLowerCase();
+      if (activeFilter === "Completed") {
+        return isCompleted;
+      }
+      return true;
     });
   }, [activeFilter, requests]);
 
-  function renderStatusPill(status: string) {
-    const normalized = status.toLowerCase();
+  function getRequestProgress(request: SignatureRequest) {
+    const totalSigners = request.signers.length;
+    const signedCount = request.signers.filter((signer) => signer.hasSigned).length;
+    const isCompleted = totalSigners > 0 && signedCount === totalSigners;
+    const nextSigner = request.signers.find((signer) => !signer.hasSigned) ?? null;
 
-    if (normalized.startsWith("awaiting")) {
-      return (
-        <span className="inline-flex items-center rounded-full border border-[#C7B9FF] bg-[#F5F3FF] px-2.5 py-0.5 text-xs font-medium text-[#6A4EE8]">
-          {status}
-        </span>
-      );
-    }
+    return { totalSigners, signedCount, isCompleted, nextSigner };
+  }
 
-    if (normalized === "sent") {
-      return (
-        <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">
-          {status}
-        </span>
-      );
-    }
+  function renderStatusCell(request: SignatureRequest) {
+    const { totalSigners, signedCount, isCompleted, nextSigner } = getRequestProgress(request);
 
-    if (normalized === "viewed") {
-      return (
-        <span className="inline-flex items-center rounded-full border border-[#BFDBFE] bg-[#EFF6FF] px-2.5 py-0.5 text-xs font-medium text-[#1D4ED8]">
-          {status}
-        </span>
-      );
-    }
+    const primaryLabel = isCompleted
+      ? "Completed"
+      : `Pending signatures (${signedCount}/${totalSigners || 1})`;
 
-    if (normalized === "completed") {
-      return (
-        <span className="inline-flex items-center rounded-full border border-[#A7F3D0] bg-[#ECFDF3] px-2.5 py-0.5 text-xs font-medium text-[#166534]">
-          {status}
-        </span>
-      );
-    }
+    const tooltip = isCompleted
+      ? "All signatures collected"
+      : nextSigner
+        ? `Pending signature from ${nextSigner.name}`
+        : "Pending signatures";
 
     return (
-      <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">
-        {status}
-      </span>
+      <div className="space-y-1" title={tooltip}>
+        <span
+          className={
+            isCompleted
+              ? "inline-flex items-center rounded-full border border-[#A7F3D0] bg-[#ECFDF3] px-2.5 py-0.5 text-xs font-medium text-[#166534]"
+              : "inline-flex items-center rounded-full border border-[#C7B9FF] bg-[#F5F3FF] px-2.5 py-0.5 text-xs font-medium text-[#6A4EE8]"
+          }
+        >
+          {primaryLabel}
+        </span>
+        {totalSigners > 0 ? (
+          <div className="flex items-center gap-1.5">
+            {request.signers.map((signer) => {
+              let dotClass = "bg-slate-300";
+
+              if (isCompleted) {
+                dotClass = "bg-[#22C55E]";
+              } else if (signer.hasSigned) {
+                dotClass = "bg-[#2563EB]";
+              } else if (nextSigner && signer.email === nextSigner.email) {
+                dotClass = "bg-[#FACC15]";
+              }
+
+              return (
+                <span
+                  key={signer.email}
+                  className={`h-2.5 w-2.5 rounded-full ${dotClass}`}
+                />
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
     );
   }
 
@@ -204,14 +254,21 @@ export default function SignatureRequestsTable() {
                     index % 2 === 0 ? "bg-white" : "bg-slate-50"
                   } hover:bg-[#F3F4FF]`}
                 >
-                  <div className="truncate font-medium text-slate-900">
-                    {request.document}
+                  <div className="min-w-0">
+                    <div className="truncate font-medium text-slate-900">
+                      {request.documentName}
+                    </div>
+                    {request.projectName ? (
+                      <div className="truncate text-xs text-slate-500">
+                        Project: {request.projectName}
+                      </div>
+                    ) : null}
                   </div>
                   <div className="truncate text-slate-600">
-                    {request.recipient}
+                    {request.primaryRecipient}
                   </div>
                   <div>
-                    {renderStatusPill(request.status)}
+                    {renderStatusCell(request)}
                   </div>
                   <div className="text-right text-slate-500">
                     {request.updated}

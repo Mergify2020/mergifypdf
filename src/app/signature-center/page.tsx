@@ -16,7 +16,7 @@ export default function SignatureCenterPage() {
                 Mergify Sign — Signature Requests
               </h1>
               <p className="mt-1 text-sm text-slate-600">
-                Track your pending, sent, and completed signature requests in one place.
+                Track your pending and completed signature requests in one place.
               </p>
             </div>
           </div>
