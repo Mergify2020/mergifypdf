@@ -226,17 +226,21 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
               <div className="relative z-10 flex items-stretch justify-between gap-5 px-5 py-2">
                 <div className="flex min-w-0 flex-1 flex-col gap-3">
                   <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]">
-                        Mergify Sign
-                      </p>
-                      <p className="mt-0.5 text-[12px] text-[#6B7280]">
-                        Professional document signing
-                      </p>
+                    <p className="mt-0.5 text-[12px] text-[#6B7280]">
+                      Professional document signing
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Image
+                        src="/Mergify-Sign.svg"
+                        alt="Mergify Sign logo"
+                        width={72}
+                        height={20}
+                        className="h-5 w-auto"
+                      />
+                      <span className="inline-flex items-center rounded-full border border-[#D3E2FF] bg-white/90 px-[10px] py-[3px] text-[11px] font-medium text-[#1C80D6]">
+                        Pro feature
+                      </span>
                     </div>
-                    <span className="inline-flex items-center rounded-full border border-[#D3E2FF] bg-white/90 px-[10px] py-[3px] text-[11px] font-medium text-[#1C80D6]">
-                      Pro feature
-                    </span>
                   </div>
                   <h3 className="text-[18px] font-semibold text-[#111827]">
                     Request a Signature
@@ -264,15 +268,6 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
                       <ArrowUpRight className="ml-2 h-4 w-4" />
                     </Link>
                   </div>
-                </div>
-                <div className="ml-0 hidden h-[96px] w-[96px] flex-shrink-0 items-center justify-center rounded-[12px] border border-[#E5E7EB] bg-[#F3F4F6] sm:flex">
-                  <Image
-                    src="/Mergify-Sign.svg"
-                    alt="Mergify Sign logo"
-                    width={56}
-                    height={56}
-                    className="h-14 w-14"
-                  />
                 </div>
               </div>
             </div>
