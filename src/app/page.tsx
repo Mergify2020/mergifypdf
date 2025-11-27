@@ -203,76 +203,76 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
 
           <div className="space-y-4">
             <div
-              className="rounded-[10px] border border-slate-200 p-6 text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,0.04)]"
-              style={{ background: "linear-gradient(135deg, #ffffff 0%, var(--color-primary-light) 100%)" }}
+              className="rounded-[10px] border border-slate-200 text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,0.04)]"
+              style={{ background: "linear-gradient(135deg, #ffffff 0%, #f3f7ff 100%)", padding: "20px 24px" }}
             >
-              <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)] md:gap-6">
                 <div className="flex flex-col gap-3 md:max-w-md">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]">
                     Sign documents with clients
                   </p>
-                  <h3 className="text-[19px] font-semibold text-slate-900 sm:text-[20px]">
+                  <h3 className="text-[18px] font-semibold text-[#111827]">
                     Send documents for signature
                   </h3>
-                  <p className="max-w-[420px] text-sm text-slate-600">
-                    Collect legally binding client signatures. Track opens, reminders, and completion—all in one place.
+                  <p className="max-w-[420px] text-sm leading-relaxed text-[#4B5563]">
+                    Get contracts and important documents signed fast, with reminders and completion tracking built in.
                   </p>
-                  <div className="flex flex-wrap gap-2 text-xs text-slate-500">
-                    <span className="inline-flex items-center rounded-full border border-slate-200 bg-white/70 px-3 py-1 font-medium">
+                  <div className="mt-1 flex flex-wrap gap-2 text-[13px] text-[#4B5563]">
+                    <span className="inline-flex items-center rounded-full border border-[#E5E7EB] bg-white px-3 py-1.5">
                       Remote signatures
                     </span>
-                    <span className="inline-flex items-center rounded-full border border-slate-200 bg-white/70 px-3 py-1 font-medium">
+                    <span className="inline-flex items-center rounded-full border border-[#E5E7EB] bg-white px-3 py-1.5">
                       Reminder scheduling
                     </span>
-                    <span className="inline-flex items-center rounded-full border border-slate-200 bg-white/70 px-3 py-1 font-medium">
+                    <span className="inline-flex items-center rounded-full border border-[#E5E7EB] bg-white px-3 py-1.5">
                       Completion tracking
                     </span>
                   </div>
-                  <Link href="/signature-center" className="btn-primary mt-1 px-5">
+                  <Link href="/signature-center" className="btn-primary mt-4 px-5">
                     Open Signature Center
                     <ArrowUpRight className="ml-2 h-4 w-4" />
                   </Link>
                 </div>
-                <div className="mt-2 flex justify-center md:block">
-                  <div className="flex h-32 w-32 items-center justify-center rounded-[10px] border border-[#E5E7EB] bg-white">
+                <div className="flex items-center justify-center md:justify-end">
+                  <div className="flex h-24 w-24 items-center justify-center rounded-[10px] border border-[#E5E7EB] bg-white">
                     <svg
                       viewBox="0 0 64 64"
                       aria-hidden="true"
-                      className="h-20 w-20 text-[var(--color-primary)]"
+                      className="h-16 w-16 text-[var(--color-primary)]"
                     >
                       <path
                         d="M22 14h18l6 6v26a4 4 0 0 1-4 4H22a4 4 0 0 1-4-4V18a4 4 0 0 1 4-4z"
                         fill="none"
                         stroke="currentColor"
-                        strokeWidth="2.4"
+                        strokeWidth="2.3"
                         strokeLinejoin="round"
                       />
                       <path
                         d="M40 14v8h8"
                         fill="none"
                         stroke="currentColor"
-                        strokeWidth="2.4"
+                        strokeWidth="2.3"
                         strokeLinejoin="round"
                       />
                       <path
                         d="M24 24h14"
                         fill="none"
                         stroke="currentColor"
-                        strokeWidth="2.4"
+                        strokeWidth="2.3"
                         strokeLinecap="round"
                       />
                       <path
                         d="M24 30h10"
                         fill="none"
                         stroke="currentColor"
-                        strokeWidth="2.4"
+                        strokeWidth="2.3"
                         strokeLinecap="round"
                       />
                       <path
                         d="M22 42c2.1-2.2 4.1-2.2 6.2 0 2 2.2 4 2.2 6 0 2-2.2 4-2.2 6.1 0"
                         fill="none"
                         stroke="currentColor"
-                        strokeWidth="2.4"
+                        strokeWidth="2.3"
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       />
@@ -280,24 +280,8 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
                         d="M22 46h18"
                         fill="none"
                         stroke="currentColor"
-                        strokeWidth="2.25"
+                        strokeWidth="2.3"
                         strokeLinecap="round"
-                      />
-                      <circle
-                        cx="44"
-                        cy="44"
-                        r="6"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.4"
-                      />
-                      <path
-                        d="M41.5 44.1 43.2 46 46.5 42"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.4"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
                       />
                     </svg>
                   </div>
