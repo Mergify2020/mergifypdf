@@ -223,8 +223,52 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
                   </Link>
                 </div>
                 <div className="mt-4 flex justify-center md:block">
-                  <div className="flex h-44 w-44 items-center justify-center rounded-[10px] border border-slate-200 bg-white">
-                    <FileSignature className="h-16 w-16 text-[var(--color-primary)]" />
+                  <div className="flex h-40 w-40 items-center justify-center rounded-[10px] border border-[#E5E7EB] bg-white">
+                    <svg
+                      viewBox="0 0 64 64"
+                      aria-hidden="true"
+                      className="h-20 w-20 text-[var(--color-primary)]"
+                    >
+                      <rect
+                        x="18"
+                        y="10"
+                        width="28"
+                        height="44"
+                        rx="4"
+                        stroke="currentColor"
+                        strokeWidth="2.4"
+                        fill="none"
+                      />
+                      <path
+                        d="M24 20h16"
+                        stroke="currentColor"
+                        strokeWidth="2.4"
+                        strokeLinecap="round"
+                        fill="none"
+                      />
+                      <path
+                        d="M24 28h12"
+                        stroke="currentColor"
+                        strokeWidth="2.4"
+                        strokeLinecap="round"
+                        fill="none"
+                      />
+                      <path
+                        d="M22 42c2-3 4-3 6 0 2 3 4 3 6 0 2-3 4-3 6 0"
+                        stroke="currentColor"
+                        strokeWidth="2.4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        fill="none"
+                      />
+                      <path
+                        d="M22 46h20"
+                        stroke="currentColor"
+                        strokeWidth="2.25"
+                        strokeLinecap="round"
+                        fill="none"
+                      />
+                    </svg>
                   </div>
                 </div>
               </div>
