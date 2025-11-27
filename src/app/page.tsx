@@ -202,6 +202,7 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
           <ProjectsList initialProjects={curatedProjects} />
 
           <div className="space-y-4">
+            <div className="h-px w-full rounded-full bg-[#1C80D6]/70" />
             <div className="rounded-[10px] border border-slate-200 bg-white p-6 text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
               <div className="grid grid-cols-1 gap-6 md:grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)] md:gap-6">
                 <div className="flex flex-col gap-3 md:max-w-md">
@@ -241,35 +242,35 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
                         d="M22 14h18l6 6v26a4 4 0 0 1-4 4H22a4 4 0 0 1-4-4V18a4 4 0 0 1 4-4z"
                         fill="none"
                         stroke="currentColor"
-                        strokeWidth="2.3"
+                        strokeWidth="2.5"
                         strokeLinejoin="round"
                       />
                       <path
                         d="M40 14v8h8"
                         fill="none"
                         stroke="currentColor"
-                        strokeWidth="2.3"
+                        strokeWidth="2.5"
                         strokeLinejoin="round"
                       />
                       <path
                         d="M24 24h14"
                         fill="none"
                         stroke="currentColor"
-                        strokeWidth="2.3"
+                        strokeWidth="2.5"
                         strokeLinecap="round"
                       />
                       <path
                         d="M24 30h10"
                         fill="none"
                         stroke="currentColor"
-                        strokeWidth="2.3"
+                        strokeWidth="2.5"
                         strokeLinecap="round"
                       />
                       <path
-                        d="M22 42c1.5-1.6 3-2 4.5-1.5 1.2.4 2 1.2 2.8 1.8.8.6 1.6 1 2.8.8 1.7-.3 3-1.6 4.1-2.6 1-.9 1.9-1.4 3.1-1.2 1 .1 2 .7 2.7 1.3"
+                        d="M22 42c1.2-1.1 2.4-1.5 3.6-1.3 1.3.2 2.1.9 3 1.6.9.7 1.8 1.3 3 1.3 1.6 0 2.9-.8 3.9-1.6 1.1-.9 2.1-1.6 3.4-1.5 1.3.1 2.3.8 3.1 1.6"
                         fill="none"
                         stroke="currentColor"
-                        strokeWidth="2.3"
+                        strokeWidth="2.5"
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       />
@@ -277,7 +278,7 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
                         d="M22 46h18"
                         fill="none"
                         stroke="currentColor"
-                        strokeWidth="2.3"
+                        strokeWidth="2.5"
                         strokeLinecap="round"
                       />
                       <path
