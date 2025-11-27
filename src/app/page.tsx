@@ -226,21 +226,26 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
               <div className="relative z-10 flex items-stretch justify-between gap-5 px-5 py-2">
                 <div className="flex min-w-0 flex-1 flex-col gap-3">
                   <div className="flex items-start justify-between gap-3">
-                    <p className="mt-0.5 text-[12px] text-[#6B7280]">
-                      Professional document signing
-                    </p>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
                       <Image
                         src="/Mergify-Sign.svg"
                         alt="Mergify Sign logo"
-                        width={72}
-                        height={20}
-                        className="h-5 w-auto"
+                        width={96}
+                        height={24}
+                        className="h-7 w-auto"
                       />
-                      <span className="inline-flex items-center rounded-full border border-[#D3E2FF] bg-white/90 px-[10px] py-[3px] text-[11px] font-medium text-[#1C80D6]">
-                        Pro feature
-                      </span>
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]">
+                          Mergify Sign
+                        </p>
+                        <p className="mt-0.5 text-[12px] text-[#6B7280]">
+                          Professional document signing
+                        </p>
+                      </div>
                     </div>
+                    <span className="inline-flex items-center rounded-full border border-[#D3E2FF] bg-white/90 px-[10px] py-[3px] text-[11px] font-medium text-[#1C80D6]">
+                      Pro feature
+                    </span>
                   </div>
                   <h3 className="text-[18px] font-semibold text-[#111827]">
                     Request a Signature
