@@ -186,3 +186,18 @@ body {
     border-color: #cbd5f5;
   }
 }
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-shimmer {
+  background-image: linear-gradient(90deg, #f9fafb 0%, #e5e7eb 50%, #f9fafb 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}

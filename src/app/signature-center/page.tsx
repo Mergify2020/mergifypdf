@@ -1,4 +1,5 @@
 import Link from "next/link";
+import SignatureRequestsTable from "./SignatureRequestsTable";
 
 export default function SignatureCenterPage() {
   return (
@@ -24,6 +25,8 @@ export default function SignatureCenterPage() {
             We&apos;ll build out full send‑for‑signature workflows here soon. For now, this page is a simple starting
             point where we can add queues, templates, and status tracking for your signature requests.
           </p>
+
+          <SignatureRequestsTable />
         </main>
       </div>
     </div>
