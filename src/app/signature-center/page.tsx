@@ -3,6 +3,7 @@ import { FileSignature } from "lucide-react";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import SignatureRequestsTable from "./SignatureRequestsTable";
+import SignatureTemplates from "./SignatureTemplates";
 
 export default async function SignatureCenterPage() {
   const session = await getServerSession(authOptions);
@@ -35,7 +36,7 @@ export default async function SignatureCenterPage() {
                 href="/"
                 className="inline-flex items-center justify-center rounded-[8px] border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
               >
-                Return to Dashboard
+                Back to Workspace
               </Link>
               <button
                 type="button"
@@ -66,6 +67,8 @@ export default async function SignatureCenterPage() {
               </button>
             </div>
           </section>
+
+          <SignatureTemplates />
 
           <SignatureRequestsTable />
         </main>
