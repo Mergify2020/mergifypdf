@@ -211,27 +211,27 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
                   <svg
                     viewBox="0 0 64 64"
                     aria-hidden="true"
-                    className="h-8 w-8 flex-shrink-0 text-[var(--color-primary)]"
+                    className="h-10 w-10 flex-shrink-0 text-[var(--color-primary)]"
                   >
                     <path
-                      d="M40 8 52 20 42 44 30 32z"
+                      d="M46 6 58 18 40 54 28 42z"
                       fill="none"
                       stroke="currentColor"
-                      strokeWidth="2.6"
+                      strokeWidth="2.8"
                       strokeLinejoin="round"
                     />
                     <path
-                      d="M28 34 24 46"
+                      d="M28 42 24 56"
                       fill="none"
                       stroke="currentColor"
-                      strokeWidth="2.6"
+                      strokeWidth="2.8"
                       strokeLinecap="round"
                     />
                     <path
-                      d="M18 50c2-1.6 3.7-2 5.4-1.7 1.3.3 2.2.9 3.1 1.5.9.6 1.8 1.1 3 1.1 1.7 0 3-.7 4.1-1.4 1.2-.8 2.4-1.4 3.8-1.3 1.4.1 2.5.8 3.4 1.5"
+                      d="M14 56c2.4-1.8 4.4-2.2 6.4-1.8 1.4.3 2.4.9 3.3 1.5.9.6 1.8 1.1 3.1 1.1 1.9 0 3.4-.8 4.6-1.6 1.3-.9 2.6-1.6 4.2-1.5 1.6.1 2.8.9 3.8 1.7"
                       fill="none"
                       stroke="currentColor"
-                      strokeWidth="2.6"
+                      strokeWidth="2.8"
                       strokeLinecap="round"
                       strokeLinejoin="round"
                     />
