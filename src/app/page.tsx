@@ -202,43 +202,87 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
           <ProjectsList initialProjects={curatedProjects} />
 
           <div className="space-y-4">
-            <div className="rounded-[10px] border border-slate-200 bg-white p-5 text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]">
-                    Mergify Sign
-                  </p>
-                  <PenLine className="h-6 w-6 flex-shrink-0 text-[var(--color-primary)]" />
-                </div>
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex flex-col gap-2">
-                    <h3 className="text-[18px] font-semibold text-[#111827]">
-                      Request a Signature
-                    </h3>
-                    <p className="max-w-[420px] text-sm leading-relaxed text-[#4B5563]">
-                      Get contracts and important documents signed fast, with reminders and completion tracking built in.
-                    </p>
-                    <div className="mt-1 flex flex-wrap gap-2 text-[13px] text-[#4B5563]">
-                      <span className="inline-flex items-center rounded-full border border-[#D3E2FF] bg-white px-3 py-1.5">
-                        Remote signatures
-                      </span>
-                      <span className="inline-flex items-center rounded-full border border-[#D3E2FF] bg-white px-3 py-1.5">
-                        Reminder scheduling
-                      </span>
-                      <span className="inline-flex items-center rounded-full border border-[#D3E2FF] bg-white px-3 py-1.5">
-                        Completion tracking
-                      </span>
+            <div className="relative overflow-hidden rounded-[10px] border border-slate-200 bg-[linear-gradient(135deg,#F9FBFF_0%,#E7F0FF_100%)] text-slate-600 shadow-[0_14px_30px_rgba(15,23,42,0.10)]">
+              <div className="h-1 w-full bg-[#1C80D6]" />
+              <div className="pointer-events-none absolute -bottom-16 -left-16 text-[#1C80D6] opacity-[0.04]">
+                <svg
+                  aria-hidden
+                  className="h-40 w-40"
+                  viewBox="0 0 64 64"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <rect x="14" y="10" width="32" height="44" rx="3" stroke="currentColor" strokeWidth="2.5" />
+                  <path d="M22 20H38" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                  <path d="M22 27H34" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                  <path
+                    d="M22 40C24 42.2 26.5 43.5 29 43.5C32 43.5 33.5 41.5 36.5 41.5C38.7 41.5 40.3 42.3 41.5 43.5"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </div>
+              <div className="relative z-10 flex items-stretch justify-between gap-5 p-5">
+                <div className="flex min-w-0 flex-1 flex-col gap-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]">
+                        Mergify Sign
+                      </p>
+                      <p className="mt-0.5 text-[12px] text-[#6B7280]">
+                        Professional document signing
+                      </p>
                     </div>
+                    <span className="inline-flex items-center rounded-full border border-[#D3E2FF] bg-white/90 px-[10px] py-[3px] text-[11px] font-medium text-[#1C80D6]">
+                      Pro feature
+                    </span>
                   </div>
-                  <div className="mt-1 flex flex-col items-end">
+                  <h3 className="text-[18px] font-semibold text-[#111827]">
+                    Request a Signature
+                  </h3>
+                  <p className="max-w-[420px] text-sm leading-relaxed text-[#4B5563]">
+                    Get contracts and important documents signed fast, with reminders and completion tracking built in.
+                  </p>
+                  <div className="mt-1 flex flex-wrap gap-2 text-[13px] text-[#4B5563]">
+                    <span className="inline-flex items-center rounded-full border border-[#D3E2FF] bg-white px-3 py-1.5">
+                      Remote signatures
+                    </span>
+                    <span className="inline-flex items-center rounded-full border border-[#D3E2FF] bg-white px-3 py-1.5">
+                      Reminder scheduling
+                    </span>
+                    <span className="inline-flex items-center rounded-full border border-[#D3E2FF] bg-white px-3 py-1.5">
+                      Completion tracking
+                    </span>
+                  </div>
+                  <div className="mt-4">
                     <Link
                       href="/signature-center"
-                      className="btn-primary px-5 rounded-[12px] bg-[#2A7C7C] shadow-[0_4px_12px_rgba(42,124,124,0.25)] hover:bg-[#245f5f]"
+                      className="inline-flex h-11 items-center justify-center rounded-[8px] bg-[#3B82F6] px-5 text-sm font-semibold text-white shadow-[0_6px_16px_rgba(37,99,235,0.35)] transition-colors hover:bg-[#2563EB]"
                     >
                       Open Signature Requests
                       <ArrowUpRight className="ml-2 h-4 w-4" />
                     </Link>
                   </div>
+                </div>
+                <div className="ml-2 hidden h-[120px] w-[120px] flex-shrink-0 items-center justify-center rounded-[12px] border border-[#D3E2FF] bg-[#F1F6FF] sm:flex">
+                  <svg
+                    aria-hidden
+                    className="h-16 w-16 text-[#1C80D6]"
+                    viewBox="0 0 64 64"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <rect x="16" y="10" width="28" height="40" rx="3" stroke="currentColor" strokeWidth="2.5" />
+                    <path d="M22 20H38" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                    <path d="M22 27H34" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                    <path
+                      d="M22 40C24 42.2 26.5 43.5 29 43.5C32 43.5 33.5 41.5 36.5 41.5C38.7 41.5 40.3 42.3 41.5 43.5"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                    />
+                  </svg>
                 </div>
               </div>
             </div>
