@@ -174,10 +174,10 @@ export default function SignatureRequestsTable() {
         <span
           className={
             isVoided
-              ? "inline-flex items-center rounded-[999px] border border-[#FECACA] bg-[#FEF2F2] px-2.5 py-0.5 text-xs font-medium text-[#B91C1C]"
+              ? "inline-flex items-center rounded-[999px] border border-transparent bg-[#DC2626] px-2.5 py-0.5 text-xs font-medium text-white"
               : isCompleted
-                ? "inline-flex items-center rounded-[999px] border border-[#A7F3D0] bg-[#ECFDF3] px-2.5 py-0.5 text-xs font-medium text-[#166534]"
-                : "inline-flex items-center rounded-[999px] border border-[#FACC15] bg-[#FEF3C7] px-2.5 py-0.5 text-xs font-medium text-[#854D0E]"
+                ? "inline-flex items-center rounded-[999px] border border-transparent bg-[#16A34A] px-2.5 py-0.5 text-xs font-medium text-white"
+                : "inline-flex items-center rounded-[999px] border border-transparent bg-[#E3A400] px-2.5 py-0.5 text-xs font-medium text-white"
           }
         >
           {primaryLabel}
