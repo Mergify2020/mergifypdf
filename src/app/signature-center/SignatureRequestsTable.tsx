@@ -96,7 +96,7 @@ export default function SignatureRequestsTable() {
 
     if (normalized.startsWith("awaiting")) {
       return (
-        <span className=\"inline-flex items-center rounded-full border border-[#C7B9FF] bg-[#F5F3FF] px-2.5 py-0.5 text-xs font-medium text-[#6A4EE8]\">
+        <span className="inline-flex items-center rounded-full border border-[#C7B9FF] bg-[#F5F3FF] px-2.5 py-0.5 text-xs font-medium text-[#6A4EE8]">
           {status}
         </span>
       );
@@ -104,7 +104,7 @@ export default function SignatureRequestsTable() {
 
     if (normalized === "sent") {
       return (
-        <span className=\"inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700\">
+        <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">
           {status}
         </span>
       );
@@ -112,7 +112,7 @@ export default function SignatureRequestsTable() {
 
     if (normalized === "viewed") {
       return (
-        <span className=\"inline-flex items-center rounded-full border border-[#BFDBFE] bg-[#EFF6FF] px-2.5 py-0.5 text-xs font-medium text-[#1D4ED8]\">
+        <span className="inline-flex items-center rounded-full border border-[#BFDBFE] bg-[#EFF6FF] px-2.5 py-0.5 text-xs font-medium text-[#1D4ED8]">
           {status}
         </span>
       );
@@ -120,14 +120,14 @@ export default function SignatureRequestsTable() {
 
     if (normalized === "completed") {
       return (
-        <span className=\"inline-flex items-center rounded-full border border-[#A7F3D0] bg-[#ECFDF3] px-2.5 py-0.5 text-xs font-medium text-[#166534]\">
+        <span className="inline-flex items-center rounded-full border border-[#A7F3D0] bg-[#ECFDF3] px-2.5 py-0.5 text-xs font-medium text-[#166534]">
           {status}
         </span>
       );
     }
 
     return (
-      <span className=\"inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700\">
+      <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">
         {status}
       </span>
     );
