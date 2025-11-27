@@ -203,7 +203,7 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
 
           <div className="space-y-4">
             <div
-              className="rounded-[10px] border border-slate-200 border-l-[4px] border-l-[#1C80D6] text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,0.04)]"
+              className="rounded-[10px] border border-slate-200 text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,0.04)]"
               style={{ background: "linear-gradient(135deg, #ffffff 0%, #f3f7ff 100%)", padding: "20px 24px" }}
             >
               <div className="grid grid-cols-1 gap-6 md:grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)] md:gap-6">
@@ -218,26 +218,23 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
                     Get contracts and important documents signed fast, with reminders and completion tracking built in.
                   </p>
                   <div className="mt-1 flex flex-wrap gap-2 text-[13px] text-[#4B5563]">
-                    <span className="inline-flex items-center rounded-full border border-[#E5E7EB] bg-white px-3 py-1.5">
+                    <span className="inline-flex items-center rounded-full border border-[#D3E2FF] bg-white px-3 py-1.5">
                       Remote signatures
                     </span>
-                    <span className="inline-flex items-center rounded-full border border-[#E5E7EB] bg-white px-3 py-1.5">
+                    <span className="inline-flex items-center rounded-full border border-[#D3E2FF] bg-white px-3 py-1.5">
                       Reminder scheduling
                     </span>
-                    <span className="inline-flex items-center rounded-full border border-[#E5E7EB] bg-white px-3 py-1.5">
+                    <span className="inline-flex items-center rounded-full border border-[#D3E2FF] bg-white px-3 py-1.5">
                       Completion tracking
                     </span>
                   </div>
-                  <Link
-                    href="/signature-center"
-                    className="btn-primary mt-4 px-5 bg-[#1C80D6] hover:bg-[#1667AD]"
-                  >
+                  <Link href="/signature-center" className="btn-primary mt-4 px-5">
                     Open Signature Requests
                     <ArrowUpRight className="ml-2 h-4 w-4" />
                   </Link>
                 </div>
                 <div className="flex items-center justify-center md:justify-end">
-                  <div className="flex h-24 w-24 items-center justify-center rounded-[10px] border border-[#DDE7FF] bg-white">
+                  <div className="flex h-24 w-24 items-center justify-center rounded-[10px] border border-[#D3E2FF] bg-[#E7F1FF]">
                     <svg
                       viewBox="0 0 64 64"
                       aria-hidden="true"
