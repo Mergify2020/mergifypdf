@@ -51,7 +51,20 @@ export default function SettingsMenu() {
     router.push("/account?view=pricing");
   }
 
+  function handleProjectsDashboard() {
+    setOpen(false);
+    router.push("/");
+  }
+
+  function handleSignatureDashboard() {
+    setOpen(false);
+    router.push("/signature-center");
+  }
+
   async function handleSignOut() {
+    if (busy) return;
+    const confirmed = window.confirm("Are you sure you want to log out?");
+    if (!confirmed) return;
     try {
       setBusy(true);
       setOpen(false);
@@ -94,26 +107,55 @@ export default function SettingsMenu() {
             </div>
 
             <div className="flex flex-col gap-1">
+              <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                Profile
+              </p>
               <button
                 type="button"
                 onClick={handleAccount}
-                className="rounded-lg px-3 py-2 text-left font-medium text-slate-800 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#024d7c]"
+                className="rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-800 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#024d7c]"
               >
-                Account
+                Profile / Account Settings
+              </button>
+            </div>
+
+            <div className="space-y-1 border-t border-slate-200 pt-3">
+              <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                Navigation
+              </p>
+              <button
+                type="button"
+                onClick={handleProjectsDashboard}
+                className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-800 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#024d7c]"
+              >
+                Projects Dashboard
+              </button>
+              <button
+                type="button"
+                onClick={handleSignatureDashboard}
+                className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-800 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#024d7c]"
+              >
+                Signature Dashboard
+              </button>
+            </div>
+
+            <div className="space-y-1 border-t border-slate-200 pt-3">
+              <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                Account &amp; help
+              </p>
+              <button
+                type="button"
+                onClick={handlePricing}
+                className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-800 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#024d7c]"
+              >
+                Subscription &amp; Billing
               </button>
               <button
                 type="button"
                 disabled
-                className="rounded-lg px-3 py-2 text-left font-medium text-slate-400"
+                className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-400"
               >
-                Signatures (soon)
-              </button>
-              <button
-                type="button"
-                onClick={handlePricing}
-                className="rounded-lg px-3 py-2 text-left font-medium text-slate-800 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#024d7c]"
-              >
-                Plans &amp; pricing
+                Help &amp; Support
               </button>
             </div>
 
@@ -123,10 +165,14 @@ export default function SettingsMenu() {
                 onClick={handleSignOut}
                 disabled={busy}
                 aria-disabled={busy}
-                className="w-full rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900"
+                className="w-full rounded-xl bg-[#DC2626] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#B91C1C] disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#DC2626]"
               >
                 Log out
               </button>
+              <div className="mt-3 flex justify-between px-1 text-[11px] text-slate-400">
+                <span>Terms &amp; Conditions</span>
+                <span>Privacy Policy</span>
+              </div>
             </div>
           </div>
         </div>
@@ -134,4 +180,3 @@ export default function SettingsMenu() {
     </div>
   );
 }
-
