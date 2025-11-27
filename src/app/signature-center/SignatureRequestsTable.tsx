@@ -145,7 +145,7 @@ export default function SignatureRequestsTable() {
 
     const primaryLabel = isCompleted
       ? "Completed"
-      : `Pending signatures (${signedCount}/${totalSigners || 1})`;
+      : `Pending — ${signedCount}/${totalSigners || 1} signed`;
 
     const tooltip = isCompleted
       ? "All signatures collected"
@@ -158,8 +158,8 @@ export default function SignatureRequestsTable() {
         <span
           className={
             isCompleted
-              ? "inline-flex items-center rounded-full border border-[#A7F3D0] bg-[#ECFDF3] px-2.5 py-0.5 text-xs font-medium text-[#166534]"
-              : "inline-flex items-center rounded-full border border-[#C7B9FF] bg-[#F5F3FF] px-2.5 py-0.5 text-xs font-medium text-[#6A4EE8]"
+              ? "inline-flex items-center rounded-[999px] border border-[#A7F3D0] bg-[#ECFDF3] px-2.5 py-0.5 text-xs font-medium text-[#166534]"
+              : "inline-flex items-center rounded-[999px] border border-slate-300 bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700"
           }
         >
           {primaryLabel}
@@ -167,13 +167,7 @@ export default function SignatureRequestsTable() {
         {totalSigners > 0 ? (
           <div className="flex items-center gap-1.5">
             {request.signers.map((signer) => {
-              let dotClass = "bg-slate-300"; // default: not signed
-
-              if (isCompleted || signer.hasSigned) {
-                dotClass = "bg-[#22C55E]"; // green = signed
-              } else if (nextSigner && signer.email === nextSigner.email) {
-                dotClass = "bg-[#2563EB]"; // blue = currently signing
-              }
+              const dotClass = signer.hasSigned ? "bg-[#22C55E]" : "bg-slate-300";
 
               return (
                 <span
@@ -204,9 +198,9 @@ export default function SignatureRequestsTable() {
                 key={filter}
                 type="button"
                 onClick={() => setActiveFilter(filter)}
-                className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium transition ${
+                className={`inline-flex items-center rounded-[999px] border px-3 py-1 text-xs font-medium transition ${
                   isActive
-                    ? "border-[#6A4EE8] bg-[#F5F3FF] text-[#4C3ACF]"
+                    ? "border-[#1F456E] bg-[#1F456E] text-white shadow-sm"
                     : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
                 }`}
               >
@@ -217,7 +211,7 @@ export default function SignatureRequestsTable() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-[#EDE3FF] bg-white">
+      <div className="overflow-hidden rounded-[8px] border border-slate-200 bg-white">
         <div className="grid grid-cols-[minmax(0,2.1fr)_minmax(0,1.8fr)_minmax(0,1.2fr)_minmax(0,1.1fr)_auto] gap-4 border-b border-slate-100 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]">
           <span>Document</span>
           <span>Recipient</span>

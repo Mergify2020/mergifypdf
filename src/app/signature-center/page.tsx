@@ -10,47 +10,45 @@ export default async function SignatureCenterPage() {
   const shortName = displayName.split(" ")[0] ?? "Guest";
 
   return (
-    <div className="min-h-screen bg-[#F3F4F6] text-slate-900">
-      <div className="mx-auto flex max-w-5xl flex-col gap-8 px-6 py-10">
-        <section className="overflow-hidden rounded-3xl bg-[#341465] text-white shadow-[0_24px_80px_rgba(15,23,42,0.40)]">
-          <div className="relative px-6 py-6 sm:px-8 sm:py-7">
-            <div className="flex flex-wrap items-center justify-between gap-6">
-              <div className="flex items-start gap-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-white">
-                  <FileSignature className="h-5 w-5" aria-hidden />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-white/80">
-                    Welcome back, {shortName}.
-                  </p>
-                  <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">
-                    Mergify Sign — Signature Requests
-                  </h1>
-                  <p className="mt-2 text-sm text-white/80">
-                    See what needs your attention, track pending signatures, and download completed documents.
-                  </p>
-                </div>
+    <div className="min-h-screen bg-[#F9FAFB] text-slate-900">
+      <div className="mx-auto flex max-w-[1120px] flex-col gap-6 px-6 py-8">
+        <section className="rounded-[10px] border border-slate-200 bg-white p-6 shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
+          <header className="flex flex-col gap-4 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-[9px] bg-[#E5EDFF] text-[#1D4ED8]">
+                <FileSignature className="h-4 w-4" aria-hidden />
               </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <Link
-                  href="/"
-                  className="inline-flex items-center justify-center rounded-full border border-white/40 bg-white/5 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-white/10"
-                >
-                  Return to Dashboard
-                </Link>
-                <button
-                  type="button"
-                  className="inline-flex items-center justify-center rounded-full bg-[#F7B500] px-5 py-2 text-sm font-semibold text-[#1F2937] shadow-md transition-colors hover:bg-[#E29E00]"
-                >
-                  Send Signature Request
-                </button>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-slate-900">
+                  Welcome back, {shortName}.
+                </p>
+                <h1 className="text-[22px] font-semibold text-[#111827] sm:text-[26px]">
+                  Mergify Sign — Signature Requests
+                </h1>
+                <p className="text-sm text-slate-500">
+                  See what needs your attention, track pending signatures, and download completed documents.
+                </p>
               </div>
             </div>
-          </div>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Link
+                href="/"
+                className="inline-flex items-center justify-center rounded-[8px] border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+              >
+                Return to Dashboard
+              </Link>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center rounded-[8px] bg-[#1F456E] px-5 py-2 text-sm font-semibold text-white shadow-[0_3px_10px_rgba(15,23,42,0.18)] transition-colors hover:bg-[#173552]"
+              >
+                Send Signature Request
+              </button>
+            </div>
+          </header>
         </section>
 
-        <main className="rounded-[24px] border border-slate-200 bg-white p-9 shadow-[0_30px_80px_rgba(15,23,42,0.10)]">
-          <section className="mb-6 rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-sm">
+        <main className="rounded-[10px] border border-slate-200 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
+          <section className="mb-5 rounded-[8px] border border-slate-200 bg-[#F9FAFB] p-4">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-[#6B7280]">
@@ -62,7 +60,7 @@ export default async function SignatureCenterPage() {
               </div>
               <button
                 type="button"
-                className="inline-flex items-center justify-center rounded-full bg-[#7D4CDB] px-5 py-2 text-sm font-semibold text-white shadow-md transition-colors hover:bg-[#6B3DBD]"
+                className="inline-flex items-center justify-center rounded-[999px] border border-slate-200 bg-white px-5 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50"
               >
                 Start a New Request
               </button>
