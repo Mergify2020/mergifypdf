@@ -202,8 +202,8 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
           <ProjectsList initialProjects={curatedProjects} />
 
           <div className="space-y-4">
-            <div className="relative overflow-hidden rounded-[10px] border border-slate-200 bg-[linear-gradient(135deg,#F9FBFF_0%,#E7F0FF_100%)] text-slate-600 shadow-[0_14px_30px_rgba(15,23,42,0.10)]">
-              <div className="h-1 w-full bg-[#1C80D6]" />
+            <div className="relative overflow-hidden rounded-[10px] border border-[#E5E7EB] bg-[#F9FBFF] text-slate-600 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
+              <div className="h-0.5 w-full bg-[#1C80D6]" />
               <div className="pointer-events-none absolute -bottom-16 -left-16 text-[#1C80D6] opacity-[0.04]">
                 <svg
                   aria-hidden
@@ -223,7 +223,7 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
                   />
                 </svg>
               </div>
-              <div className="relative z-10 flex items-stretch justify-between gap-5 p-5">
+              <div className="relative z-10 flex items-stretch justify-between gap-5 px-5 py-2">
                 <div className="flex min-w-0 flex-1 flex-col gap-3">
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -255,7 +255,7 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
                       Completion tracking
                     </span>
                   </div>
-                  <div className="mt-4">
+                  <div className="mt-3">
                     <Link
                       href="/signature-center"
                       className="inline-flex h-11 items-center justify-center rounded-[8px] bg-[#3B82F6] px-5 text-sm font-semibold text-white shadow-[0_6px_16px_rgba(37,99,235,0.35)] transition-colors hover:bg-[#2563EB]"
@@ -265,21 +265,21 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
                     </Link>
                   </div>
                 </div>
-                <div className="ml-2 hidden h-[120px] w-[120px] flex-shrink-0 items-center justify-center rounded-[12px] border border-[#D3E2FF] bg-[#F1F6FF] sm:flex">
+                <div className="ml-0 hidden h-[96px] w-[96px] flex-shrink-0 items-center justify-center rounded-[12px] border border-[#E5E7EB] bg-[#F3F4F6] sm:flex">
                   <svg
                     aria-hidden
-                    className="h-16 w-16 text-[#1C80D6]"
+                    className="h-12 w-12 text-[#1C80D6]"
                     viewBox="0 0 64 64"
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"
                   >
-                    <rect x="16" y="10" width="28" height="40" rx="3" stroke="currentColor" strokeWidth="2.5" />
-                    <path d="M22 20H38" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-                    <path d="M22 27H34" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                    <rect x="16" y="10" width="28" height="40" rx="3" stroke="currentColor" strokeWidth="2" />
+                    <path d="M22 20H38" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    <path d="M22 27H34" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                     <path
                       d="M22 40C24 42.2 26.5 43.5 29 43.5C32 43.5 33.5 41.5 36.5 41.5C38.7 41.5 40.3 42.3 41.5 43.5"
                       stroke="currentColor"
-                      strokeWidth="2.5"
+                      strokeWidth="2"
                       strokeLinecap="round"
                     />
                   </svg>
