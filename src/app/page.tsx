@@ -209,10 +209,10 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
               <div className="grid grid-cols-1 gap-6 md:grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)] md:gap-6">
                 <div className="flex flex-col gap-3 md:max-w-md">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]">
-                    Sign documents with clients
+                    Mergify Sign
                   </p>
                   <h3 className="text-[18px] font-semibold text-[#111827]">
-                    Request a Signature on a Document
+                    Request a Signature
                   </h3>
                   <p className="max-w-[420px] text-sm leading-relaxed text-[#4B5563]">
                     Get contracts and important documents signed fast, with reminders and completion tracking built in.
