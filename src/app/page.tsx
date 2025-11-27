@@ -177,12 +177,15 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
   const shortName = displayName.split(" ")[0] ?? "Guest";
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white via-[#f4f7fb] to-white text-slate-900">
-      <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-10">
-        <div className="rounded-[46px] border border-white/60 bg-white/95 p-10 shadow-[0_45px_120px_rgba(15,23,42,0.1)] backdrop-blur">
+    <div className="min-h-screen bg-gradient-to-b from-[#f5f7fb] via-white to-white text-slate-900">
+      <div className="mx-auto flex max-w-6xl flex-col gap-8 px-5 py-10 sm:px-6">
+        <div className="rounded-3xl border border-slate-100 bg-white/95 p-8 shadow-[0_30px_80px_rgba(15,23,42,0.08)] backdrop-blur">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h1 className="text-4xl font-semibold tracking-tight text-slate-900">
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
+                Dashboard
+              </p>
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
                 Welcome back, {shortName}.
               </h1>
             </div>
@@ -198,20 +201,20 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
           <ProjectsList initialProjects={curatedProjects} />
 
           <div className="space-y-4">
-            <div className="rounded-[36px] border border-dashed border-slate-200 bg-white/95 p-6 text-slate-500 shadow-[0_25px_60px_rgba(15,23,42,0.08)]">
-              <p className="text-sm uppercase tracking-[0.4em] text-slate-400">
-                Send documents for signature
+            <div className="rounded-3xl border border-slate-200 bg-gradient-to-br from-white via-[#f3f7ff] to-white p-6 text-slate-600 shadow-[0_25px_70px_rgba(15,23,42,0.10)]">
+              <p className="text-xs font-medium uppercase tracking-[0.22em] text-slate-500">
+                Sign documents with clients
               </p>
-              <h3 className="mt-2 text-xl font-semibold text-slate-900">
-                ✅ #1 (Best Option) — “Send Documents for Signature”
+              <h3 className="mt-2 text-lg font-semibold text-slate-900 sm:text-xl">
+                #1 Best Option — Send documents for signature
               </h3>
-              <p className="mt-1 text-sm text-slate-600">
+              <p className="mt-2 text-sm text-slate-600">
                 Request legally binding signatures from clients and recipients. Track opens, reminders, and completed
                 agreements in one place.
               </p>
               <Link
                 href="/signature-center"
-                className="mt-4 inline-flex items-center justify-center rounded-full bg-[#024d7c] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-[#012a44]/30 transition hover:-translate-y-0.5"
+                className="mt-4 inline-flex items-center justify-center rounded-xl bg-[#024d7c] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(2,77,124,0.45)] transition hover:-translate-y-0.5"
               >
                 Open Signature Center
                 <ArrowUpRight className="ml-2 h-4 w-4" />
