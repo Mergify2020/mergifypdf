@@ -10,42 +10,46 @@ export default async function SignatureCenterPage() {
   const shortName = displayName.split(" ")[0] ?? "Guest";
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#F4E9FF] via-[#EEF4FF] to-white text-slate-900">
+    <div className="min-h-screen bg-[#F3F4F6] text-slate-900">
       <div className="mx-auto flex max-w-5xl flex-col gap-8 px-6 py-10">
-        <header className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#EEF2FF] text-[#4F46E5]">
-              <FileSignature className="h-4 w-4" aria-hidden />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-slate-900">
-                Welcome back, {shortName}.
-              </p>
-              <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
-                Mergify Sign — Signature Requests
-              </h1>
-              <p className="mt-1 text-sm text-slate-600">
-                Track your pending and completed signature requests in one place.
-              </p>
+        <section className="overflow-hidden rounded-3xl bg-[#341465] text-white shadow-[0_24px_80px_rgba(15,23,42,0.40)]">
+          <div className="relative px-6 py-6 sm:px-8 sm:py-7">
+            <div className="flex flex-wrap items-center justify-between gap-6">
+              <div className="flex items-start gap-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-white">
+                  <FileSignature className="h-5 w-5" aria-hidden />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-white/80">
+                    Welcome back, {shortName}.
+                  </p>
+                  <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">
+                    Mergify Sign — Signature Requests
+                  </h1>
+                  <p className="mt-2 text-sm text-white/80">
+                    See what needs your attention, track pending signatures, and download completed documents.
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <Link
+                  href="/"
+                  className="inline-flex items-center justify-center rounded-full border border-white/40 bg-white/5 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-white/10"
+                >
+                  Return to Dashboard
+                </Link>
+                <button
+                  type="button"
+                  className="inline-flex items-center justify-center rounded-full bg-[#F7B500] px-5 py-2 text-sm font-semibold text-[#1F2937] shadow-md transition-colors hover:bg-[#E29E00]"
+                >
+                  Send Signature Request
+                </button>
+              </div>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <Link
-              href="/"
-              className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
-            >
-              Return to Dashboard
-            </Link>
-            <button
-              type="button"
-              className="inline-flex items-center justify-center rounded-full bg-[#7D4CDB] px-5 py-2 text-sm font-semibold text-white shadow-md transition-colors hover:bg-[#6B3DBD]"
-            >
-              Send Signature Request
-            </button>
-          </div>
-        </header>
+        </section>
 
-        <main className="rounded-[24px] border border-slate-200 bg-[#FBFAFF] p-9 shadow-[0_30px_80px_rgba(15,23,42,0.12)]">
+        <main className="rounded-[24px] border border-slate-200 bg-white p-9 shadow-[0_30px_80px_rgba(15,23,42,0.10)]">
           <section className="mb-6 rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-sm">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
