@@ -111,7 +111,7 @@ export default function ProjectsWorkspaceShelf() {
       <div className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 shadow-[0_22px_60px_rgba(15,23,42,0.08)]">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">Workspace</p>
+            <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#9CA3AF]">Workspace</p>
             <h2 className="mt-1 text-xl font-semibold text-slate-900">You&apos;re all caught up</h2>
             <p className="mt-1 text-sm text-slate-500">
               Start a new canvas and we&apos;ll remember where you left off next time.
@@ -133,7 +133,7 @@ export default function ProjectsWorkspaceShelf() {
     <div className="rounded-[18px] border border-slate-200 bg-white p-6 text-slate-900 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="space-y-2">
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-[#7b8ca8]">
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#9CA3AF]">
             Continue your last project
           </p>
           <div className="space-y-2">
@@ -142,7 +142,7 @@ export default function ProjectsWorkspaceShelf() {
             </p>
             <div className="inline-flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-4 py-1.5 text-xs font-medium text-slate-500">
               <Clock className="h-4 w-4" />
-              Last edited {snapshot.lastEditedLabel}
+              Updated {snapshot.lastEditedLabel}
             </div>
             <div className="mt-2 h-1 w-2/5 overflow-hidden rounded-full bg-slate-100">
               <div className="h-full w-2/5 bg-gradient-to-r from-[#1E4FD6] to-[#1740AC]" />

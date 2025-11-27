@@ -18,6 +18,7 @@ import {
   PenLine,
   RotateCcw,
   ScissorsSquare,
+  FileSignature,
 } from "lucide-react";
 
 const features = [
@@ -186,7 +187,7 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
                 Welcome back, {shortName}.
               </h1>
               <p className="text-sm text-slate-500">
-                Pick up where you left off or start a new document.
+                Continue your work or begin a new document.
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -201,7 +202,7 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
           <ProjectsList initialProjects={curatedProjects} />
 
           <div className="space-y-4">
-            <div className="group relative overflow-hidden rounded-[18px] border border-slate-200 bg-white p-6 text-slate-600 shadow-[0_18px_40px_rgba(15,23,42,0.08)] transition-transform duration-150 hover:-translate-y-0.5 hover:shadow-[0_24px_60px_rgba(15,23,42,0.16)]">
+            <div className="group relative overflow-hidden rounded-[18px] border border-slate-200 bg-white p-6 text-slate-600 shadow-[0_12px_24px_rgba(15,23,42,0.06)] transition-transform duration-150 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(15,23,42,0.12)]">
               <div
                 className="pointer-events-none absolute inset-0 rounded-[18px]"
                 style={{
@@ -210,35 +211,23 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
               />
               <div className="relative z-10 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div className="space-y-2 md:max-w-md">
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-600">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#9CA3AF]">
                     Sign documents with clients
                   </p>
                   <h3 className="text-lg font-semibold text-slate-900 sm:text-xl">
-                    #1 Best Option — Send documents for signature
+                    Send documents for signature
                   </h3>
                   <p className="mt-1 text-sm text-slate-600">
-                    Request legally binding signatures from clients and recipients. Track opens, reminders, and
-                    completed agreements in one place.
+                    Collect legally binding client signatures. Track opens, reminders, and completion—all in one place.
                   </p>
-                  <Link href="/signature-center" className="btn-primary mt-3 px-5 py-2.5">
+                  <Link href="/signature-center" className="btn-primary mt-3 px-5">
                     Open Signature Center
                     <ArrowUpRight className="ml-2 h-4 w-4" />
                   </Link>
                 </div>
-                <div className="mt-4 hidden shrink-0 md:block">
-                  <div className="relative rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 shadow-[0_10px_24px_rgba(15,23,42,0.12)]">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1E4FD6]/10 text-[#1E4FD6]">
-                        <PenLine className="h-5 w-5" />
-                      </div>
-                      <div className="space-y-0.5">
-                        <p className="text-xs font-semibold text-slate-900">Signature request</p>
-                        <p className="text-xs text-slate-500">Client proposal · Pending</p>
-                      </div>
-                    </div>
-                    <div className="mt-3 h-1 w-full rounded-full bg-slate-100">
-                      <div className="h-full w-2/3 rounded-full bg-gradient-to-r from-[#1E4FD6] to-[#1740AC]" />
-                    </div>
+                <div className="mt-4 flex justify-center md:block">
+                  <div className="flex h-44 w-44 items-center justify-center rounded-2xl border border-slate-200 bg-white/80 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
+                    <FileSignature className="h-16 w-16 text-[#1E4FD6]" />
                   </div>
                 </div>
               </div>

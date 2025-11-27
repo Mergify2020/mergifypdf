@@ -293,7 +293,7 @@ export default function ProjectsList({ initialProjects }: Props) {
                       Edit
                     </button>
                   </div>
-                  <p className="text-sm text-slate-500">Last edited {project.updated}</p>
+                  <p className="text-sm text-slate-500">Updated {project.updated}</p>
                   <div className="flex flex-wrap justify-start gap-3 text-sm md:justify-end">
                   <button
                     type="button"

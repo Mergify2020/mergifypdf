@@ -159,8 +159,9 @@ body {
 
 @layer components {
   .btn-primary {
-    @apply inline-flex items-center justify-center rounded-full px-5 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(30,79,214,0.45)] transition disabled:cursor-not-allowed disabled:opacity-60;
+    @apply inline-flex items-center justify-center rounded-full px-5 py-2 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(30,79,214,0.45)] transition disabled:cursor-not-allowed disabled:opacity-60;
     background-color: var(--color-primary);
+    min-height: 44px;
   }
   .btn-primary:hover {
     background-color: var(--color-primary-hover);
@@ -169,6 +170,7 @@ body {
     @apply inline-flex items-center justify-center rounded-full border px-4 py-2 text-sm font-semibold text-slate-800 shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60;
     background-color: #ffffff;
     border-color: var(--color-border-subtle);
+    min-height: 40px;
   }
   .btn-secondary:hover {
     @apply bg-slate-50 border-slate-400;
