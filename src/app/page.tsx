@@ -207,34 +207,34 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
               style={{ background: "linear-gradient(135deg, #ffffff 0%, var(--color-primary-light) 100%)" }}
             >
               <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-                <div className="space-y-2 md:max-w-md">
+                <div className="flex flex-col gap-3 md:max-w-md">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]">
                     Sign documents with clients
                   </p>
                   <h3 className="text-[19px] font-semibold text-slate-900 sm:text-[20px]">
                     Send documents for signature
                   </h3>
-                  <p className="mt-1 max-w-[420px] text-sm text-slate-600">
+                  <p className="max-w-[420px] text-sm text-slate-600">
                     Collect legally binding client signatures. Track opens, reminders, and completion—all in one place.
                   </p>
-                  <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
+                  <div className="flex flex-wrap gap-2 text-xs text-slate-500">
                     <span className="inline-flex items-center rounded-full border border-slate-200 bg-white/70 px-3 py-1 font-medium">
                       Remote signatures
                     </span>
                     <span className="inline-flex items-center rounded-full border border-slate-200 bg-white/70 px-3 py-1 font-medium">
-                      Status tracking
+                      Reminder scheduling
                     </span>
                     <span className="inline-flex items-center rounded-full border border-slate-200 bg-white/70 px-3 py-1 font-medium">
-                      Audit-ready history
+                      Completion tracking
                     </span>
                   </div>
-                  <Link href="/signature-center" className="btn-primary mt-3 px-5">
+                  <Link href="/signature-center" className="btn-primary mt-1 px-5">
                     Open Signature Center
                     <ArrowUpRight className="ml-2 h-4 w-4" />
                   </Link>
                 </div>
-                <div className="mt-4 flex justify-center md:block">
-                  <div className="flex h-36 w-36 items-center justify-center rounded-[10px] border border-[#E5E7EB] bg-white">
+                <div className="mt-2 flex justify-center md:block">
+                  <div className="flex h-32 w-32 items-center justify-center rounded-[10px] border border-[#E5E7EB] bg-white">
                     <svg
                       viewBox="0 0 64 64"
                       aria-hidden="true"
