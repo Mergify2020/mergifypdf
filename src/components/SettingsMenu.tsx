@@ -87,7 +87,7 @@ export default function SettingsMenu() {
       <button
         type="button"
         onClick={handleToggle}
-        className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white shadow-md transition hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#024d7c] active:scale-[0.96] active:shadow-sm"
+        className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white shadow-md transition hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#024d7c] active:scale-95 active:shadow-sm"
         aria-haspopup="menu"
         aria-expanded={open}
       >
@@ -101,7 +101,7 @@ export default function SettingsMenu() {
 
       <div
         className={`absolute right-0 z-40 mt-3 w-80 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-xl origin-top-right transition duration-200 ease-out ${
-          open ? "pointer-events-auto opacity-100 translate-y-0 scale-100" : "pointer-events-none opacity-0 translate-y-1 scale-[0.98]"
+          open ? "pointer-events-auto opacity-100 translate-y-0 scale-100" : "pointer-events-none opacity-0 translate-y-1 scale-95"
         }`}
       >
           <div className="space-y-4 text-sm text-slate-700">
@@ -181,7 +181,7 @@ export default function SettingsMenu() {
                 onClick={handleSignOut}
                 disabled={busy}
                 aria-disabled={busy}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#DC2626] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#B91C1C] hover:shadow-[0_4px_10px_rgba(220,38,38,0.35)] active:scale-[0.97] active:shadow-[0_2px_6px_rgba(220,38,38,0.25)] disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#DC2626]"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#DC2626] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#B91C1C] hover:shadow-md active:scale-95 active:shadow disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#DC2626]"
               >
                 <LogOut className="h-4 w-4" aria-hidden />
                 <span>Log out</span>
