@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { signOut, useSession } from "next-auth/react";
 import { useEffect, useRef, useState } from "react";
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
 import PricingPlans from "@/components/PricingPlans";
@@ -100,6 +100,7 @@ function resizeRectByHandle(
 }
 
 export default function AccountPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const view = searchParams.get("view");
   if (view === "pricing") {
@@ -130,6 +131,21 @@ export default function AccountPage() {
   const [pendingAvatar, setPendingAvatar] = useState<string | null>(null);
   const [displayMeta, setDisplayMeta] = useState<DisplayMeta | null>(null);
   const [cropRect, setCropRect] = useState<CropRect | null>(null);
+
+  const [twoFactorMethod, setTwoFactorMethod] = useState<"email" | "sms" | null>(null);
+  const [twoFactorModalMode, setTwoFactorModalMode] = useState<"enable" | "manage" | null>(null);
+  const [twoFactorSelection, setTwoFactorSelection] = useState<"email" | "sms">("email");
+  const [twoFactorPhone, setTwoFactorPhone] = useState("");
+  const [confirmDisable2fa, setConfirmDisable2fa] = useState(false);
+
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const [disconnectModalOpen, setDisconnectModalOpen] = useState(false);
+  const [disconnectPassword, setDisconnectPassword] = useState("");
+  const [disconnectBusy, setDisconnectBusy] = useState(false);
+  const [disconnectError, setDisconnectError] = useState<string | null>(null);
 
   useEffect(() => {
     if (session?.user?.email) {
@@ -393,6 +409,77 @@ export default function AccountPage() {
     }
   }
 
+  function openEnableTwoFactor() {
+    setTwoFactorSelection("email");
+    setTwoFactorPhone("");
+    setTwoFactorModalMode("enable");
+  }
+
+  function openManageTwoFactor() {
+    if (!twoFactorMethod) {
+      openEnableTwoFactor();
+      return;
+    }
+    setTwoFactorSelection(twoFactorMethod);
+    setTwoFactorModalMode("manage");
+  }
+
+  function handleConfirmEnableTwoFactor() {
+    setTwoFactorMethod(twoFactorSelection);
+    setTwoFactorModalMode(null);
+  }
+
+  function handleConfirmDisableTwoFactor() {
+    setTwoFactorMethod(null);
+    setConfirmDisable2fa(false);
+    setTwoFactorModalMode(null);
+  }
+
+  async function handleConfirmDeleteAccount() {
+    setDeleteError(null);
+    setDeleteBusy(true);
+    try {
+      const response = await fetch("/api/account/delete", { method: "POST" });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error ?? "Unable to delete your account right now.");
+      }
+      await signOut({ callbackUrl: "/" });
+    } catch (error) {
+      setDeleteError(
+        error instanceof Error ? error.message : "Unable to delete your account right now."
+      );
+      setDeleteBusy(false);
+    }
+  }
+
+  async function handleConfirmDisconnectGoogle(event: React.FormEvent) {
+    event.preventDefault();
+    if (disconnectPassword.length < 8) return;
+    setDisconnectError(null);
+    setDisconnectBusy(true);
+    try {
+      const response = await fetch("/api/account/disconnect-google", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: disconnectPassword }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error ?? "Unable to disconnect Google right now.");
+      }
+      setDisconnectBusy(false);
+      setDisconnectModalOpen(false);
+      setDisconnectPassword("");
+      router.refresh();
+    } catch (error) {
+      setDisconnectError(
+        error instanceof Error ? error.message : "Unable to disconnect Google right now."
+      );
+      setDisconnectBusy(false);
+    }
+  }
+
   return (
     <main className="mx-auto max-w-2xl px-6 py-12">
       <div className="mb-6 text-sm text-gray-500">
@@ -456,15 +543,9 @@ export default function AccountPage() {
         {avatarMessage && <p className="mt-2 text-sm text-gray-600">{avatarMessage}</p>}
       </div>
 
-      <section className="mt-8 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold">Change email</h2>
-        {!canManageEmail ? (
-          <p className="mt-2 text-sm text-gray-600">
-            {managedByGoogle
-              ? "Your email is handled by Google."
-              : "Your email is handled by your sign-in provider, so you can't update it from MergifyPDF."}
-          </p>
-        ) : (
+      {canManageEmail && (
+        <section className="mt-8 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold">Change email</h2>
           <>
             <p className="mt-1 text-sm text-gray-600">
               We will send confirmations to this email address.
@@ -492,18 +573,12 @@ export default function AccountPage() {
               {emailMessage && <p className="text-sm text-gray-600">{emailMessage}</p>}
             </form>
           </>
-        )}
-      </section>
+        </section>
+      )}
 
-      <section className="mt-8 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold">Change password</h2>
-        {!canChangePassword ? (
-          <p className="mt-2 text-sm text-gray-600">
-            {managedByGoogle
-              ? "Your password is handled by Google."
-              : "Your password is handled by your sign-in provider, so you can't update it from MergifyPDF."}
-          </p>
-        ) : (
+      {canChangePassword && (
+        <section className="mt-8 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold">Change password</h2>
           <>
             <p className="mt-1 text-sm text-gray-600">
               Choose a new password that you have not used elsewhere.
@@ -548,8 +623,337 @@ export default function AccountPage() {
               {passwordMessage && <p className="text-sm text-gray-600">{passwordMessage}</p>}
             </form>
           </>
-        )}
+        </section>
+      )}
+
+      <section className="mt-8 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+        <h2 className="text-lg font-semibold">Security</h2>
+        <p className="mt-1 text-sm text-gray-600">Keep your MergifyPDF account secure.</p>
+        <div className="mt-4 flex flex-col gap-3 rounded-lg border border-gray-200 bg-gray-50/80 p-4">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-800">Two-factor authentication</p>
+              <p className="text-xs text-gray-600">
+                Add an extra layer of protection to your account.
+              </p>
+              {twoFactorMethod && (
+                <p className="mt-1 text-xs font-medium text-green-700">
+                  2FA enabled · {twoFactorMethod === "email" ? "Email verification" : "SMS verification"}
+                </p>
+              )}
+            </div>
+            <div className="mt-2 sm:mt-0">
+              {twoFactorMethod ? (
+                <button
+                  type="button"
+                  onClick={openManageTwoFactor}
+                  className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-800 transition hover:bg-white"
+                >
+                  Manage
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={openEnableTwoFactor}
+                  className="rounded-md bg-[#024d7c] px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-[#013a60]"
+                >
+                  Enable 2FA
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       </section>
+
+      <section className="mt-8 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+        <h2 className="text-lg font-semibold">Data &amp; Privacy</h2>
+        <p className="mt-1 text-sm text-gray-600">
+          Control how your data and account are handled.
+        </p>
+        <div className="mt-4 space-y-6">
+          <div className="rounded-lg border border-gray-200 bg-gray-50/80 p-4">
+            <p className="text-sm font-medium text-gray-800">Delete account</p>
+            <p className="mt-1 text-xs text-gray-600">
+              Permanently delete your MergifyPDF account and all associated data. This action cannot be
+              undone.
+            </p>
+            <button
+              type="button"
+              onClick={() => setDeleteModalOpen(true)}
+              className="mt-3 rounded-md bg-[#DC2626] px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-[#B91C1C]"
+            >
+              Delete my account
+            </button>
+          </div>
+
+          {managedByGoogle && (
+            <div className="rounded-lg border border-gray-200 bg-gray-50/80 p-4">
+              <p className="text-sm font-medium text-gray-800">Connected account</p>
+              <p className="mt-1 text-xs text-gray-600">
+                Your MergifyPDF account is connected to Google for sign-in.
+              </p>
+              <button
+                type="button"
+                onClick={() => setDisconnectModalOpen(true)}
+                className="mt-3 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-800 transition hover:bg-white"
+              >
+                Disconnect Google
+              </button>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {twoFactorModalMode && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/60 px-4 py-8">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">
+                  {twoFactorModalMode === "enable" ? "Enable 2-factor authentication" : "Manage 2-factor authentication"}
+                </h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Choose how you&apos;d like to receive your verification codes.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTwoFactorModalMode(null)}
+                className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Close 2FA dialog"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form
+              className="mt-4 space-y-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (twoFactorModalMode === "enable" || twoFactorModalMode === "manage") {
+                  handleConfirmEnableTwoFactor();
+                }
+              }}
+            >
+              <fieldset className="space-y-3">
+                <legend className="text-xs font-medium text-slate-700">Verification method</legend>
+                <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm text-slate-800 hover:bg-slate-50">
+                  <input
+                    type="radio"
+                    className="mt-1"
+                    checked={twoFactorSelection === "email"}
+                    onChange={() => setTwoFactorSelection("email")}
+                  />
+                  <span>
+                    <span className="font-medium">Email verification</span>
+                    <br />
+                    <span className="text-xs text-slate-600">
+                      We&apos;ll email a code when you sign in.
+                    </span>
+                  </span>
+                </label>
+                <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm text-slate-800 hover:bg-slate-50">
+                  <input
+                    type="radio"
+                    className="mt-1"
+                    checked={twoFactorSelection === "sms"}
+                    onChange={() => setTwoFactorSelection("sms")}
+                  />
+                  <span>
+                    <span className="font-medium">Phone (SMS)</span>
+                    <br />
+                    <span className="text-xs text-slate-600">
+                      We&apos;ll text a code when you sign in.
+                    </span>
+                  </span>
+                </label>
+              </fieldset>
+
+              {twoFactorSelection === "sms" && (
+                <div className="space-y-1">
+                  <label className="block text-sm font-medium text-slate-700" htmlFor="twofactor-phone">
+                    Phone number
+                  </label>
+                  <input
+                    id="twofactor-phone"
+                    type="tel"
+                    value={twoFactorPhone}
+                    onChange={(event) => setTwoFactorPhone(event.target.value)}
+                    placeholder="+1 (555) 123-4567"
+                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c]"
+                  />
+                </div>
+              )}
+
+              <div className="mt-4 flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setTwoFactorModalMode(null)}
+                  className="rounded-md px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"
+                >
+                  Cancel
+                </button>
+                <div className="flex items-center gap-3">
+                  {twoFactorModalMode === "manage" && twoFactorMethod && (
+                    <button
+                      type="button"
+                      className="text-sm font-semibold text-rose-600 hover:text-rose-700"
+                      onClick={() => setConfirmDisable2fa(true)}
+                    >
+                      Disable 2FA
+                    </button>
+                  )}
+                  <button
+                    type="submit"
+                    className="rounded-md bg-[#024d7c] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#013a60]"
+                  >
+                    {twoFactorModalMode === "enable" ? "Turn on 2FA" : "Save changes"}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {confirmDisable2fa && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/60 px-4 py-8">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 className="text-lg font-semibold text-slate-900">Turn off 2-factor authentication?</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Your account will be protected by password only.
+            </p>
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                className="rounded-md px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"
+                onClick={() => setConfirmDisable2fa(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="rounded-md bg-[#DC2626] px-4 py-2 text-sm font-semibold text-white hover:bg-[#B91C1C]"
+                onClick={handleConfirmDisableTwoFactor}
+              >
+                Disable 2FA
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteModalOpen && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/60 px-4 py-8">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 className="text-lg font-semibold text-slate-900">Delete your account?</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              This will permanently delete your MergifyPDF account, documents, and settings. This action
+              cannot be undone.
+            </p>
+            <p className="mt-2 text-xs text-slate-500">
+              You may be asked to confirm your password or a verification code.
+            </p>
+            {deleteError && <p className="mt-3 text-sm text-rose-600">{deleteError}</p>}
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                className="rounded-md px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"
+                onClick={() => {
+                  if (deleteBusy) return;
+                  setDeleteModalOpen(false);
+                  setDeleteError(null);
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleteBusy}
+                className="rounded-md bg-[#DC2626] px-4 py-2 text-sm font-semibold text-white hover:bg-[#B91C1C] disabled:opacity-60"
+                onClick={handleConfirmDeleteAccount}
+              >
+                {deleteBusy ? "Deleting…" : "Yes, delete my account"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {disconnectModalOpen && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/60 px-4 py-8">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Disconnect Google account?</h2>
+                <p className="mt-2 text-sm text-slate-600">
+                  After disconnecting, you&apos;ll sign in to MergifyPDF with an email and password instead of
+                  Google.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDisconnectModalOpen(false)}
+                className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Close disconnect dialog"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmDisconnectGoogle} className="mt-4 space-y-4">
+              <div className="space-y-1">
+                <label className="block text-xs font-medium text-slate-700">Email</label>
+                <input
+                  type="email"
+                  readOnly
+                  value={email}
+                  className="w-full cursor-not-allowed rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-slate-700" htmlFor="disconnect-password">
+                  Create a password
+                </label>
+                <input
+                  id="disconnect-password"
+                  type="password"
+                  value={disconnectPassword}
+                  onChange={(event) => setDisconnectPassword(event.target.value)}
+                  minLength={8}
+                  required
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c]"
+                />
+                <p className="text-xs text-slate-500">
+                  You&apos;ll use this password to sign in after disconnecting.
+                </p>
+              </div>
+              {disconnectError && <p className="text-sm text-rose-600">{disconnectError}</p>}
+              <div className="mt-5 flex justify-end gap-3">
+                <button
+                  type="button"
+                  className="rounded-md px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"
+                  onClick={() => {
+                    if (disconnectBusy) return;
+                    setDisconnectModalOpen(false);
+                    setDisconnectError(null);
+                    setDisconnectPassword("");
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={disconnectBusy || disconnectPassword.length < 8}
+                  className="rounded-md bg-[#024d7c] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#013a60] disabled:opacity-60"
+                >
+                  {disconnectBusy ? "Saving…" : "Save and disconnect"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {showCropper && pendingAvatar ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 px-4 py-8">
