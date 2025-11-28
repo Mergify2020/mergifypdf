@@ -3,6 +3,7 @@ import Image from "next/image";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import UploadCta from "@/components/UploadCta";
+import HeroStats from "@/components/HeroStats";
 import { hasUsedToday } from "@/lib/quota";
 import ProjectsWorkspaceShelf from "@/components/ProjectsWorkspaceShelf";
 import StartProjectButton from "@/components/StartProjectButton";
@@ -139,6 +140,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
               ))}
             </div>
             <p className="text-sm text-slate-500">Loved by freelancers, students, and small businesses.</p>
+            <HeroStats />
           </div>
           <div className="relative mt-12 flex items-center justify-center lg:mt-12">
             <div className="pointer-events-none absolute -bottom-6 -right-6 h-72 w-72 rounded-full bg-indigo-100/60 blur-[140px]" />

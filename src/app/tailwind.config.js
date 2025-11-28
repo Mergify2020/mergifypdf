@@ -24,6 +24,10 @@ module.exports = {
         spinSlow: {
           to: { transform: "rotate(360deg)" },
         },
+        numberRoll: {
+          "0%": { transform: "translateY(8px)", opacity: 0 },
+          "100%": { transform: "translateY(0)", opacity: 1 },
+        },
       },
 
       // ✅ Animation utilities
@@ -31,6 +35,7 @@ module.exports = {
         squareA: "squareA 1.4s ease-in-out infinite",
         squareB: "squareB 1.4s ease-in-out infinite",
         "spin-slow": "spinSlow 2s linear infinite", // <— new line
+        numberRoll: "numberRoll 0.25s ease-out",
       },
     },
   },
