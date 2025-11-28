@@ -100,7 +100,7 @@ export default function SettingsMenu() {
       </button>
 
       <div
-        className={`absolute right-0 z-40 mt-3 w-80 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-xl origin-top-right transition duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
+        className={`absolute right-0 z-40 mt-3 w-80 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-xl origin-top-right transition duration-200 ease-out ${
           open ? "pointer-events-auto opacity-100 translate-y-0 scale-100" : "pointer-events-none opacity-0 translate-y-1 scale-[0.98]"
         }`}
       >
