@@ -91,76 +91,56 @@ export default async function SignatureCenterPage() {
 
         <main className="space-y-6">
           <section className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900">Start a New Request</h2>
-                <p className="mt-1 text-sm text-slate-600">
-                  Upload a document, choose your signers, and send for signature in a few clicks.
+            <h2 className="text-lg font-semibold text-slate-900">Start a New Request</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Upload a document, choose your signers, and send for signature in a few clicks.
+            </p>
+            <button
+              type="button"
+              className="mt-4 inline-flex items-center justify-center rounded-lg bg-[#6A4EE8] px-6 py-3 text-sm font-semibold text-white shadow-md transition-colors hover:bg-[#5C3EDB]"
+            >
+              Start a New Request
+            </button>
+          </section>
+
+          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-3">
+              <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Templates
+              </h2>
+            </div>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <article className="rounded-lg border border-slate-200 bg-white px-3 py-3 text-xs">
+                <h3 className="text-sm font-semibold text-slate-900">Mutual NDA</h3>
+                <p className="mt-1 text-[11px] text-slate-600">
+                  Standard two-party NDA for vendor or client onboarding.
                 </p>
                 <button
                   type="button"
-                  className="mt-3 inline-flex items-center justify-center rounded-md bg-[#6A4EE8] px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#5C3EDB]"
+                  className="mt-3 inline-flex w-full items-center justify-center rounded-md border border-slate-200 px-2 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
                 >
-                  Start a New Request
+                  Use template
                 </button>
-              </div>
+              </article>
+              <article className="rounded-lg border border-slate-200 bg-white px-3 py-3 text-xs">
+                <h3 className="text-sm font-semibold text-slate-900">W-9 Form</h3>
+                <p className="mt-1 text-[11px] text-slate-600">
+                  Collect taxpayer identification details for vendors and contractors.
+                </p>
+                <button
+                  type="button"
+                  className="mt-3 inline-flex w-full items-center justify-center rounded-md border border-slate-200 px-2 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Use template
+                </button>
+              </article>
             </div>
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="hidden md:block" />
-
-              <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                    Templates
-                  </span>
-                  <button
-                    type="button"
-                    className="text-xs font-medium text-slate-500 hover:text-slate-700"
-                  >
-                    Manage templates
-                  </button>
-                </div>
-                <div className="flex gap-3 overflow-x-auto pb-1">
-                  <article className="min-w-[180px] flex-1 rounded-lg border border-slate-200 bg-white px-3 py-3 text-xs">
-                    <h3 className="text-sm font-semibold text-slate-900">Mutual NDA</h3>
-                    <p className="mt-1 text-[11px] text-slate-600">
-                      Standard two-party NDA for vendor or client onboarding.
-                    </p>
-                    <button
-                      type="button"
-                      className="mt-3 inline-flex w-full items-center justify-center rounded-md border border-slate-200 px-2 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
-                    >
-                      Use template
-                    </button>
-                  </article>
-                  <article className="min-w-[180px] flex-1 rounded-lg border border-slate-200 bg-white px-3 py-3 text-xs">
-                    <h3 className="text-sm font-semibold text-slate-900">Master Services Agreement</h3>
-                    <p className="mt-1 text-[11px] text-slate-600">
-                      Baseline terms you can reuse across projects and clients.
-                    </p>
-                    <button
-                      type="button"
-                      className="mt-3 inline-flex w-full items-center justify-center rounded-md border border-slate-200 px-2 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
-                    >
-                      Use template
-                    </button>
-                  </article>
-                  <article className="min-w-[180px] flex-1 rounded-lg border border-slate-200 bg-white px-3 py-3 text-xs">
-                    <h3 className="text-sm font-semibold text-slate-900">Statement of Work</h3>
-                    <p className="mt-1 text-[11px] text-slate-600">
-                      Scope, timelines, and deliverables for a single engagement.
-                    </p>
-                    <button
-                      type="button"
-                      className="mt-3 inline-flex w-full items-center justify-center rounded-md border border-slate-200 px-2 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
-                    >
-                      Use template
-                    </button>
-                  </article>
-                </div>
-              </div>
-            </div>
+            <button
+              type="button"
+              className="mt-4 text-xs font-medium text-slate-500 hover:text-slate-700"
+            >
+              Browse more templates
+            </button>
           </section>
 
           <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
