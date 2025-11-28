@@ -57,7 +57,7 @@ export default function HeroStats() {
       <div className="grid w-full max-w-2xl grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="relative overflow-hidden rounded-2xl bg-[#6A4EE8] px-8 py-3 text-white shadow-lg">
           <p className="text-xs font-semibold uppercase tracking-wide text-violet-100">
-            Documents edited (year to date)
+            Documents edited
           </p>
           <div
             key={editedTick}
@@ -69,7 +69,7 @@ export default function HeroStats() {
 
         <div className="relative overflow-hidden rounded-2xl bg-[#6A4EE8] px-8 py-3 text-white shadow-lg">
           <p className="text-xs font-semibold uppercase tracking-wide text-violet-100">
-            Documents signed (year to date)
+            Documents signed
           </p>
           <div
             key={signedTick}
