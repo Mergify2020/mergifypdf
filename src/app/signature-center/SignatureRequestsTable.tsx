@@ -18,6 +18,7 @@ type SignatureRequest = {
   signers: Signer[];
   updated: string;
   state?: "pending" | "completed" | "voided";
+  attention?: "you" | "others";
 };
 
 const SKELETON_ROWS = 6;
@@ -56,6 +57,7 @@ export default function SignatureRequestsTable() {
           ],
           updated: "Today • 3:44 AM",
           state: "pending",
+          attention: "others",
         },
         {
           id: "2",
@@ -109,6 +111,7 @@ export default function SignatureRequestsTable() {
           ],
           updated: "Last week",
           state: "pending",
+          attention: "you",
         },
       ]);
     }
@@ -121,30 +124,6 @@ export default function SignatureRequestsTable() {
   }, []);
 
   const isLoading = !requests;
-
-  const summary = useMemo(() => {
-    if (!requests) return null;
-
-    let pending = 0;
-    let waitingOnOthers = 0;
-    let completed = 0;
-    const expiringSoon = 0;
-
-    for (const request of requests) {
-      const { signedCount, totalSigners, isPending, isCompleted } = getRequestProgress(request);
-
-      if (isPending) {
-        pending += 1;
-        if (signedCount > 0 && signedCount < totalSigners) {
-          waitingOnOthers += 1;
-        }
-      } else if (isCompleted) {
-        completed += 1;
-      }
-    }
-
-    return { pending, waitingOnOthers, completed, expiringSoon };
-  }, [requests]);
 
   const visibleRequests = useMemo(() => {
     if (!requests) return [];
@@ -174,70 +153,33 @@ export default function SignatureRequestsTable() {
   }
 
   function renderStatusCell(request: SignatureRequest) {
-    const { totalSigners, signedCount, isCompleted, isPending, isVoided, nextSigner } =
-      getRequestProgress(request);
+    const { isCompleted, isPending, isVoided } = getRequestProgress(request);
 
-    let primaryLabel: string;
+    let label = "";
+    let className =
+      "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ";
+
     if (isVoided) {
-      primaryLabel = "Voided by Sender";
+      label = "Voided by Sender";
+      className += "bg-red-100 text-red-800";
     } else if (isCompleted) {
-      primaryLabel = "Completed";
+      label = "Completed";
+      className += "bg-emerald-100 text-emerald-800";
+    } else if (isPending && request.attention === "you") {
+      label = "Waiting on You";
+      className += "bg-purple-100 text-purple-800";
     } else {
-      primaryLabel = `Awaiting Signatures (${signedCount} of ${totalSigners || 1} Signed)`;
+      label = "Awaiting Signatures";
+      className += "bg-yellow-100 text-yellow-800";
     }
 
-    const tooltip = isVoided
-      ? "This request was voided"
-      : isCompleted
-        ? "All signatures collected"
-        : nextSigner
-          ? `Pending signature from ${nextSigner.name}`
-          : "Pending signatures";
-
-    return (
-      <div className="space-y-1" title={tooltip}>
-        <span
-          className={
-            isVoided
-              ? "inline-flex items-center rounded-[999px] border border-transparent bg-[#DC2626] px-2.5 py-0.5 text-xs font-medium text-white"
-              : isCompleted
-                ? "inline-flex items-center rounded-[999px] border border-transparent bg-[#16A34A] px-2.5 py-0.5 text-xs font-medium text-white"
-                : "inline-flex items-center rounded-[999px] border border-transparent bg-[#E3A400] px-2.5 py-0.5 text-xs font-medium text-white"
-          }
-        >
-          {primaryLabel}
-        </span>
-        {totalSigners > 0 ? (
-          <div className="flex items-center gap-1.5">
-            {request.signers.map((signer) => {
-              const dotClass = signer.hasSigned ? "bg-[#22C55E]" : "bg-slate-300";
-
-              return (
-                <span
-                  key={signer.email}
-                  className={`h-2.5 w-2.5 rounded-full ${dotClass}`}
-                />
-              );
-            })}
-          </div>
-        ) : null}
-      </div>
-    );
+    return <span className={className}>{label}</span>;
   }
 
   const showEmptyState = !isLoading && visibleRequests.length === 0;
 
   return (
     <section className="mt-2">
-      {summary ? (
-        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-[8px] bg-[#F9FAFB] px-3 py-2 text-xs text-slate-600">
-          <span className="font-medium text-slate-700">Summary:</span>
-          <span>{summary.pending} requests pending</span>
-          <span>{summary.waitingOnOthers} waiting on others</span>
-          <span>{summary.completed} completed this week</span>
-          <span>{summary.expiringSoon} expiring soon</span>
-        </div>
-      ) : null}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-[#6B7280]">
           Signature requests
