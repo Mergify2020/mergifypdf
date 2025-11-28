@@ -1,5 +1,6 @@
 ﻿// src/app/layout.tsx
 import type { Metadata } from "next";
+import Link from "next/link";
 import Providers from "@/components/Providers";
 import WorkspaceSettingsMenu from "@/components/WorkspaceSettingsMenu";
 import { getServerSession } from "next-auth";
