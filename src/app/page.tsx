@@ -108,9 +108,9 @@ export default async function Home() {
 function MarketingLanding({ usedToday }: { usedToday: boolean }) {
   return (
     <div className="bg-gradient-to-b from-[#f3f8ff] via-white to-white">
-      <div className="mx-auto flex w-full max-w-7xl flex-col items-center gap-16 px-6 py-20 text-center">
-        <div className="flex w-full flex-col items-center">
-          <div className="space-y-6 max-w-2xl">
+      <div className="mx-auto w-full max-w-7xl px-6 py-20">
+        <div className="grid gap-12 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.1fr)] lg:items-center">
+          <div className="space-y-6 text-center lg:text-left">
             <h1 className="text-3xl font-semibold leading-tight tracking-tight sm:text-5xl">
               <span className="block">The fastest way to edit, sign,</span>
               <span className="block">and manage PDFs online.</span>
@@ -121,10 +121,10 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
             <p className="text-lg text-gray-600">
               Upgrade to get unlimited access to document editing and signing.
             </p>
-            <div className="mt-8 flex w-full justify-center">
+            <div className="mt-8 flex w-full justify-center lg:justify-start">
               <UploadCta usedToday={usedToday} variant="hero" className="w-full max-w-md" />
             </div>
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-sm text-slate-600">
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-sm text-slate-600 lg:justify-start">
               {["Fast performance", "Simple to use", "1 free upload per day"].map((badge) => (
                 <span
                   key={badge}
@@ -139,6 +139,17 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
               Trusted by freelancers, realtors, students, and small businesses.
             </p>
             <HeroStats />
+          </div>
+
+          <div className="mt-10 flex items-center justify-center lg:mt-0 lg:justify-end">
+            <Image
+              src="/visual-hero3.png"
+              alt="Preview of the MergifyPDF workspace"
+              width={880}
+              height={640}
+              className="w-full max-w-xl rounded-[32px] object-cover shadow-[0_40px_120px_rgba(9,20,45,0.25)]"
+              priority
+            />
           </div>
         </div>
 
