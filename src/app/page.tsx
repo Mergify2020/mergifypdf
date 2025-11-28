@@ -31,12 +31,12 @@ const features = [
   },
   {
     title: "Edit & Annotate",
-    description: "Add highlights, drawings, comments, shapes, and text.",
+    description: "Highlight, draw, comment, and add text anywhere.",
     icon: Highlighter,
   },
   {
     title: "Sign Documents",
-    description: "Draw, upload, or type your signature instantly.",
+    description: "Draw, upload, or type your signature in seconds.",
     icon: PenLine,
   },
   {
@@ -56,7 +56,7 @@ const features = [
   },
   {
     title: "Compress PDF",
-    description: "Reduce file size while keeping everything clear and readable.",
+    description: "Reduce file size while keeping everything clear.",
     icon: FileArchive,
   },
   {
@@ -160,19 +160,43 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
         <div className="mx-auto w-full max-w-7xl px-6 pt-6 pb-16">
           <div className="mb-4 h-px w-full bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
 
-          <div className="grid w-full gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {features.map(({ title, description, icon: Icon }) => (
-              <div
-                key={title}
-                className="flex flex-col items-center gap-2 rounded-2xl border border-black/10 bg-white/70 px-4 py-4 text-center shadow-[inset_0_0_0_1px_rgba(0,0,0,0.06)] transition-all hover:-translate-y-1 hover:border-[#024d7c]/60 hover:shadow-xl"
-              >
-                <Icon className="h-8 w-8 text-[#6A4EE8]" aria-hidden />
-                <h3 className="text-base font-semibold text-gray-900">{title}</h3>
-                <p className="text-sm leading-snug text-gray-600">{description}</p>
+          <section className="mt-12 mb-4 text-center">
+            <h2 className="text-xl font-semibold">
+              All the tools you need to work with PDFs.
+            </h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Merge, edit, sign, and organize your documents in one place.
+            </p>
+          </section>
+
+          {(() => {
+            const baseCardClasses =
+              "rounded-2xl border border-slate-100 bg-white px-5 py-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 flex flex-col gap-2";
+
+            return (
+              <div className="grid gap-4 md:gap-5 grid-cols-1 md:grid-cols-3 max-w-5xl mx-auto mb-12">
+                {features.map(({ title, description, icon: Icon }, index) => {
+                  const isPrimary = index < 3;
+                  return (
+                    <div
+                      key={title}
+                      className={`${baseCardClasses} ${
+                        isPrimary ? "md:bg-slate-50 md:py-6 md:border-t-2 md:border-t-purple-500" : ""
+                      }`}
+                    >
+                      <div className="mb-1 text-2xl text-purple-600">
+                        <Icon className="h-7 w-7" aria-hidden />
+                      </div>
+                      <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+                      <p className="text-xs text-gray-500">{description}</p>
+                    </div>
+                  );
+                })}
               </div>
-            ))}
-          </div>
-          <p className="mt-8 text-center text-base font-semibold text-slate-600">
+            );
+          })()}
+
+          <p className="text-center text-base font-semibold text-slate-600">
             More tools added regularly to simplify your workflow.
           </p>
         </div>
