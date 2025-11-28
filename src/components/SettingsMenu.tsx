@@ -3,6 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
+import {
+  CreditCard,
+  FolderKanban,
+  HelpCircle,
+  LogOut,
+  PenSquare,
+  User,
+} from "lucide-react";
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
 
 export default function SettingsMenu() {
@@ -113,9 +121,10 @@ export default function SettingsMenu() {
               <button
                 type="button"
                 onClick={handleAccount}
-                className="rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-800 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#024d7c]"
+                className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-800 transition hover:bg-[#F5F7FA] hover:text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#024d7c]"
               >
-                Profile / Account Settings
+                <User className="h-4 w-4 text-slate-500" aria-hidden />
+                <span>Profile / Account Settings</span>
               </button>
             </div>
 
@@ -126,36 +135,40 @@ export default function SettingsMenu() {
               <button
                 type="button"
                 onClick={handleProjectsDashboard}
-                className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-800 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#024d7c]"
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-800 transition hover:bg-[#F5F7FA] hover:text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#024d7c]"
               >
-                Projects Dashboard
+                <FolderKanban className="h-4 w-4 text-slate-500" aria-hidden />
+                <span>Projects Dashboard</span>
               </button>
               <button
                 type="button"
                 onClick={handleSignatureDashboard}
-                className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-800 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#024d7c]"
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-800 transition hover:bg-[#F5F7FA] hover:text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#024d7c]"
               >
-                Signature Dashboard
+                <PenSquare className="h-4 w-4 text-slate-500" aria-hidden />
+                <span>Signature Dashboard</span>
               </button>
             </div>
 
             <div className="space-y-1 border-t border-slate-200 pt-3">
               <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                Account &amp; help
+                Account
               </p>
               <button
                 type="button"
                 onClick={handlePricing}
-                className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-800 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#024d7c]"
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-800 transition hover:bg-[#F5F7FA] hover:text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#024d7c]"
               >
-                Subscription &amp; Billing
+                <CreditCard className="h-4 w-4 text-slate-500" aria-hidden />
+                <span>Subscription &amp; Billing</span>
               </button>
               <button
                 type="button"
                 disabled
-                className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-400"
+                className="flex w-full cursor-default items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-400 transition hover:bg-[#F5F7FA]"
               >
-                Help &amp; Support
+                <HelpCircle className="h-4 w-4 text-slate-400" aria-hidden />
+                <span>Help &amp; Support</span>
               </button>
             </div>
 
@@ -165,13 +178,18 @@ export default function SettingsMenu() {
                 onClick={handleSignOut}
                 disabled={busy}
                 aria-disabled={busy}
-                className="w-full rounded-xl bg-[#DC2626] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#B91C1C] disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#DC2626]"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#DC2626] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#B91C1C] disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#DC2626]"
               >
-                Log out
+                <LogOut className="h-4 w-4" aria-hidden />
+                <span>Log out</span>
               </button>
-              <div className="mt-3 flex justify-between px-1 text-[11px] text-slate-400">
-                <span>Terms &amp; Conditions</span>
-                <span>Privacy Policy</span>
+              <div className="mt-3 flex justify-between px-1 text-[10px] tracking-[0.2px] text-slate-400/60">
+                <span className="rounded px-1 py-0.5 transition hover:bg-[#F5F7FA] hover:text-[#1F2937]">
+                  Terms &amp; Conditions
+                </span>
+                <span className="rounded px-1 py-0.5 transition hover:bg-[#F5F7FA] hover:text-[#1F2937]">
+                  Privacy Policy
+                </span>
               </div>
             </div>
           </div>
