@@ -112,12 +112,14 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
         <div className="grid gap-12 lg:grid-cols-[1fr,1fr] lg:items-center">
           <div className="space-y-6">
             <h1 className="text-3xl font-semibold leading-tight tracking-tight sm:text-5xl">
-              <span className="block">Merge, edit, and sign your PDFs</span>
-              <span className="block">— all in your browser.</span>
+              <span className="block">The fastest way to edit, sign,</span>
+              <span className="block">and manage PDFs online.</span>
             </h1>
-            <p className="text-lg text-gray-700">A better, simpler way to work with your documents.</p>
+            <p className="text-lg text-gray-700">
+              Edit and sign all your business documents right in your browser.
+            </p>
             <p className="text-lg text-gray-600">
-              One free upload every day. Upgrade for unlimited merges and faster processing.
+              Upgrade to get unlimited access to document editing and signing.
             </p>
             <div className="mt-8 flex w-full flex-col items-center gap-4 sm:flex-row sm:justify-center">
               <UploadCta usedToday={usedToday} variant="hero" className="w-full sm:w-auto" />
@@ -129,7 +131,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
               </Link>
             </div>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-sm text-slate-600">
-              {["Blazing fast", "Privacy-first", "1 free upload per day"].map((badge) => (
+              {["Fast performance", "Simple to use", "1 free upload per day"].map((badge) => (
                 <span
                   key={badge}
                   className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-4 py-1.5 text-slate-700 shadow-sm"
@@ -139,7 +141,9 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
                 </span>
               ))}
             </div>
-            <p className="text-sm text-slate-500">Loved by freelancers, students, and small businesses.</p>
+            <p className="text-sm text-slate-500">
+              Trusted by freelancers, realtors, students, and small businesses.
+            </p>
             <HeroStats />
           </div>
           <div className="relative mt-12 flex items-center justify-center lg:mt-12">
