@@ -46,7 +46,19 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <header className="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/90 backdrop-blur">
             <div className="mx-auto flex h-[76px] w-full max-w-6xl items-center justify-between px-4 lg:px-6">
               <AppHeaderBrand />
-              {session?.user ? <WorkspaceSettingsMenu /> : <HeaderLoginButton />}
+              {session?.user ? (
+                <WorkspaceSettingsMenu />
+              ) : (
+                <div className="flex items-center gap-3">
+                  <Link
+                    href="/account?view=pricing"
+                    className="hidden rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 sm:inline-flex"
+                  >
+                    Pricing
+                  </Link>
+                  <HeaderLoginButton />
+                </div>
+              )}
             </div>
           </header>
           <main>{children}</main>

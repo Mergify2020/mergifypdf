@@ -147,7 +147,6 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
             <HeroStats />
           </div>
           <div className="relative mt-12 flex items-center justify-center lg:mt-12">
-            <div className="pointer-events-none absolute -bottom-6 -right-6 h-72 w-72 rounded-full bg-indigo-100/60 blur-[140px]" />
             <Image
               src="/visual-hero2.jpeg"
               alt="Preview of the MergifyPDF editor"
