@@ -171,7 +171,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
 
           {(() => {
             const baseCardClasses =
-              "relative overflow-hidden rounded-3xl bg-slate-950 text-white px-6 py-5 shadow-[0_18px_45px_rgba(15,23,42,0.6)] hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(15,23,42,0.85)] transition-all duration-200 flex flex-col gap-3";
+              "rounded-2xl border border-slate-200 bg-white/95 px-5 py-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 flex flex-col gap-2";
 
             return (
               <div className="grid gap-4 md:gap-5 grid-cols-1 md:grid-cols-3 max-w-5xl mx-auto mb-12">
@@ -181,23 +181,14 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
                     <div
                       key={title}
                       className={`${baseCardClasses} ${
-                        isPrimary ? "md:py-6" : "opacity-95"
+                        isPrimary ? "md:bg-gradient-to-br md:from-purple-50 md:to-indigo-50" : ""
                       }`}
                     >
-                      <div
-                        className={`pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-r ${
-                          isPrimary
-                            ? "from-[#6A4EE8] via-[#EC4899] to-[#22D3EE] opacity-80"
-                            : "from-[#4F46E5] via-[#8B5CF6] to-[#22D3EE] opacity-60"
-                        }`}
-                      />
-                      <div className="relative z-10">
-                        <div className="mb-2 text-2xl text-purple-300">
-                          <Icon className="h-7 w-7" aria-hidden />
-                        </div>
-                        <h3 className="text-sm font-semibold text-white">{title}</h3>
-                        <p className="mt-1 text-xs text-slate-100/80">{description}</p>
+                      <div className="mb-2 inline-flex h-9 w-9 items-center justify-center rounded-full bg-purple-100 text-purple-600">
+                        <Icon className="h-5 w-5" aria-hidden />
                       </div>
+                      <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+                      <p className="mt-1 text-xs text-gray-500">{description}</p>
                     </div>
                   );
                 })}
