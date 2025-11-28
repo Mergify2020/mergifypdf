@@ -53,7 +53,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <div className="flex items-center gap-3">
                   <Link
                     href="/account?view=pricing"
-                    className="hidden rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 sm:inline-flex"
+                    className="hidden rounded-full border border-slate-200 bg-white px-7 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 sm:inline-flex"
                   >
                     Pricing
                   </Link>

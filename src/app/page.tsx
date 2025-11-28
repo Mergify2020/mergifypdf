@@ -121,14 +121,8 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
             <p className="text-lg text-gray-600">
               Upgrade to get unlimited access to document editing and signing.
             </p>
-            <div className="mt-8 flex w-full flex-col items-center gap-4 sm:flex-row sm:justify-center">
-              <UploadCta usedToday={usedToday} variant="hero" className="w-full sm:w-auto" />
-              <Link
-                href="/account?view=pricing"
-                className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-10 py-4 text-base font-semibold text-[#024d7c] shadow-sm transition hover:-translate-y-0.5"
-              >
-                Pricing
-              </Link>
+            <div className="mt-8 flex w-full justify-center">
+              <UploadCta usedToday={usedToday} variant="hero" className="w-full max-w-md" />
             </div>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-sm text-slate-600">
               {["Fast performance", "Simple to use", "1 free upload per day"].map((badge) => (
