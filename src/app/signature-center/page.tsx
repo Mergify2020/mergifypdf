@@ -90,57 +90,59 @@ export default async function SignatureCenterPage() {
         </section>
 
         <main className="space-y-6">
-          <section className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
-            <h2 className="text-lg font-semibold text-slate-900">Start a New Request</h2>
-            <p className="mt-1 text-sm text-slate-600">
-              Upload a document, choose your signers, and send for signature in a few clicks.
-            </p>
-            <button
-              type="button"
-              className="mt-4 inline-flex items-center justify-center rounded-lg bg-[#6A4EE8] px-6 py-3 text-sm font-semibold text-white shadow-md transition-colors hover:bg-[#5C3EDB]"
-            >
-              Start a New Request
-            </button>
-          </section>
+          <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
+              <h2 className="text-lg font-semibold text-slate-900">Start a New Request</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Upload a document, choose your signers, and send for signature in a few clicks.
+              </p>
+              <button
+                type="button"
+                className="mt-5 inline-flex w-full items-center justify-center rounded-lg bg-[#6A4EE8] px-6 py-3 text-sm font-semibold text-white shadow-md transition-colors hover:bg-[#5C3EDB] md:w-auto"
+              >
+                Start a New Request
+              </button>
+            </div>
 
-          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="mb-3">
-              <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
-                Templates
-              </h2>
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="mb-3">
+                <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Templates
+                </h2>
+              </div>
+              <div className="grid grid-cols-1 gap-3">
+                <article className="rounded-lg border border-slate-200 bg-white px-3 py-3 text-xs">
+                  <h3 className="text-sm font-semibold text-slate-900">Mutual NDA</h3>
+                  <p className="mt-1 text-[11px] text-slate-600">
+                    Standard two-party NDA for vendor or client onboarding.
+                  </p>
+                  <button
+                    type="button"
+                    className="mt-3 inline-flex w-full items-center justify-center rounded-md border border-slate-200 px-2 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    Use template
+                  </button>
+                </article>
+                <article className="rounded-lg border border-slate-200 bg-white px-3 py-3 text-xs">
+                  <h3 className="text-sm font-semibold text-slate-900">W-9 Form</h3>
+                  <p className="mt-1 text-[11px] text-slate-600">
+                    Collect taxpayer identification details for vendors and contractors.
+                  </p>
+                  <button
+                    type="button"
+                    className="mt-3 inline-flex w-full items-center justify-center rounded-md border border-slate-200 px-2 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    Use template
+                  </button>
+                </article>
+              </div>
+              <button
+                type="button"
+                className="mt-4 text-xs font-medium text-slate-500 hover:text-slate-700"
+              >
+                Browse more templates
+              </button>
             </div>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <article className="rounded-lg border border-slate-200 bg-white px-3 py-3 text-xs">
-                <h3 className="text-sm font-semibold text-slate-900">Mutual NDA</h3>
-                <p className="mt-1 text-[11px] text-slate-600">
-                  Standard two-party NDA for vendor or client onboarding.
-                </p>
-                <button
-                  type="button"
-                  className="mt-3 inline-flex w-full items-center justify-center rounded-md border border-slate-200 px-2 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                  Use template
-                </button>
-              </article>
-              <article className="rounded-lg border border-slate-200 bg-white px-3 py-3 text-xs">
-                <h3 className="text-sm font-semibold text-slate-900">W-9 Form</h3>
-                <p className="mt-1 text-[11px] text-slate-600">
-                  Collect taxpayer identification details for vendors and contractors.
-                </p>
-                <button
-                  type="button"
-                  className="mt-3 inline-flex w-full items-center justify-center rounded-md border border-slate-200 px-2 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                  Use template
-                </button>
-              </article>
-            </div>
-            <button
-              type="button"
-              className="mt-4 text-xs font-medium text-slate-500 hover:text-slate-700"
-            >
-              Browse more templates
-            </button>
           </section>
 
           <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
