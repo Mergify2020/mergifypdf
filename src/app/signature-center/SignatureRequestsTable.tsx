@@ -185,23 +185,26 @@ export default function SignatureRequestsTable() {
           Signature requests
         </h2>
         <div className="flex flex-wrap gap-2">
-          {FILTERS.map((filter) => {
-            const isActive = filter === activeFilter;
-            return (
-              <button
-                key={filter}
-                type="button"
-                onClick={() => setActiveFilter(filter)}
-                className={`inline-flex items-center rounded-[999px] border px-3 py-1 text-xs font-medium transition ${
-                  isActive
-                    ? "border-[#6A4EE8] bg-[#6A4EE8] text-white shadow-sm"
-                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
-                }`}
-              >
-                {filter}
-              </button>
-            );
-          })}
+          <div className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 p-1">
+            {FILTERS.map((filter) => {
+              const isActive = filter === activeFilter;
+              return (
+                <button
+                  key={filter}
+                  type="button"
+                  onClick={() => setActiveFilter(filter)}
+                  className={
+                    "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium transition " +
+                    (isActive
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : "text-slate-500 hover:text-slate-900")
+                  }
+                >
+                  {filter}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -248,7 +251,7 @@ export default function SignatureRequestsTable() {
                     key={request.id}
                     className={`grid grid-cols-[minmax(0,2.1fr)_minmax(0,1.8fr)_minmax(0,1.2fr)_minmax(0,1.1fr)_auto] gap-4 px-4 py-3 text-sm text-slate-700 transition-colors ${
                       index % 2 === 0 ? "bg-white" : "bg-slate-50"
-                    } hover:bg-[#F3F4FF]`}
+                    } hover:bg-slate-100`}
                   >
                     <div className="min-w-0">
                       <div className="truncate font-medium text-slate-900">
@@ -340,7 +343,7 @@ export default function SignatureRequestsTable() {
             className="flex-1 bg-black/30"
             onClick={() => setActiveRequest(null)}
           />
-          <aside className="h-full w-full max-w-md border-l border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.35)]">
+          <aside className="h-full w-full max-w-md border-l border-slate-200 bg-slate-50 shadow-[0_20px_60px_rgba(15,23,42,0.35)]">
             <div className="flex items-start justify-between border-b border-slate-200 px-5 py-4">
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
@@ -364,25 +367,27 @@ export default function SignatureRequestsTable() {
               </button>
             </div>
 
-            <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-5 py-4 text-sm">
-              <div className="space-y-2">
+            <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-5 py-4 text-sm">
+              <div className="rounded-lg border border-slate-200 bg-white p-3">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                   Overall status
                 </p>
-                {renderStatusCell(activeRequest)}
+                <div className="mt-2">
+                  {renderStatusCell(activeRequest)}
+                </div>
               </div>
 
-              <div className="space-y-3">
+              <div className="rounded-lg border border-slate-200 bg-white p-3">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                   Signers
                 </p>
-                <ul className="space-y-2">
+                <ul className="mt-2 space-y-2">
                   {activeRequest.signers.map((signer) => (
                     <li key={signer.email} className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2">
                         <span
                           className={`h-2.5 w-2.5 rounded-full ${
-                            signer.hasSigned ? "bg-[#22C55E]" : "bg-slate-300"
+                            signer.hasSigned ? "bg-emerald-500" : "bg-slate-300"
                           }`}
                         />
                         <div>
@@ -398,20 +403,20 @@ export default function SignatureRequestsTable() {
                 </ul>
               </div>
 
-              <div className="space-y-3">
+              <div className="rounded-lg border border-slate-200 bg-white p-3">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                   Actions
                 </p>
-                <div className="flex flex-wrap gap-2">
+                <div className="mt-2 flex flex-wrap gap-2">
                   <button
                     type="button"
-                    className="inline-flex items-center justify-center rounded-[999px] bg-[#6A4EE8] px-4 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-[#5C3EDB]"
+                    className="inline-flex items-center justify-center rounded-full bg-[#6A4EE8] px-4 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-[#5C3EDB]"
                   >
                     Resend request
                   </button>
                   <button
                     type="button"
-                    className="inline-flex items-center justify-center rounded-[999px] border border-slate-300 bg-white px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                     onClick={() => {
                       const url = `${window.location.origin}/signature-request/${activeRequest.id}`;
                       if (navigator.clipboard?.writeText) {

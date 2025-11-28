@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Activity, Clock, UserCheck } from "lucide-react";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import SignatureRequestsTable from "./SignatureRequestsTable";
@@ -19,7 +20,10 @@ export default async function SignatureCenterPage() {
         <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold text-slate-900">Mergify Sign</h1>
-            <p className="text-sm text-slate-500">Signature Requests</p>
+            <p className="text-sm font-medium text-slate-600">Signature Requests</p>
+            <p className="mt-1 text-xs text-slate-500">
+              Track pending signatures, see what&apos;s waiting on you, and download completed PDFs.
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <Link
@@ -39,14 +43,27 @@ export default async function SignatureCenterPage() {
 
         <section className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                Requests Remaining
-              </p>
-              <p className="mt-2 text-sm font-semibold text-slate-900">
-                {requestsRemaining} of {requestLimit} left
-              </p>
-              <p className="mt-1 text-xs text-slate-500">Resets monthly</p>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-100 text-slate-500">
+                  <Activity className="h-4 w-4" aria-hidden />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Requests Remaining
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">
+                    {requestsRemaining} of {requestLimit} left
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">Resets monthly</p>
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 h-1.5 w-full rounded-full bg-slate-100">
+              <div
+                className="h-full rounded-full bg-[#6A4EE8]"
+                style={{ width: `${Math.max(0, Math.min(1, requestsRemaining / requestLimit)) * 100}%` }}
+              />
             </div>
             {requestsRemaining <= 0 ? (
               <button
@@ -58,27 +75,37 @@ export default async function SignatureCenterPage() {
             ) : null}
           </div>
           <div className="flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                Pending Signatures
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900">{pendingCount}</p>
-              <p className="mt-1 text-xs text-slate-500">Waiting on others</p>
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-100 text-slate-500">
+                <Clock className="h-4 w-4" aria-hidden />
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Pending Signatures
+                </p>
+                <p className="mt-2 text-2xl font-semibold text-slate-900">{pendingCount}</p>
+                <p className="mt-1 text-xs text-slate-500">Waiting on others</p>
+              </div>
             </div>
           </div>
           <div className="flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                Waiting for You
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900">{waitingForYouCount}</p>
-              <p className="mt-1 text-xs text-slate-500">You need to sign</p>
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-100 text-slate-500">
+                <UserCheck className="h-4 w-4" aria-hidden />
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Waiting for You
+                </p>
+                <p className="mt-2 text-2xl font-semibold text-slate-900">{waitingForYouCount}</p>
+                <p className="mt-1 text-xs text-slate-500">You need to sign</p>
+              </div>
             </div>
           </div>
         </section>
 
         <main className="space-y-6">
-          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <section className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
             <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-slate-900">Start a New Request</h2>
@@ -86,12 +113,14 @@ export default async function SignatureCenterPage() {
                   Upload a document, choose your signers, and send for signature in a few clicks.
                 </p>
               </div>
-              <button
-                type="button"
-                className="hidden rounded-md bg-[#6A4EE8] px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#5C3EDB] md:inline-flex"
-              >
-                Start a New Request
-              </button>
+              <div className="hidden md:block">
+                <button
+                  type="button"
+                  className="rounded-md bg-[#6A4EE8] px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#5C3EDB]"
+                >
+                  Start a New Request
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -108,10 +137,18 @@ export default async function SignatureCenterPage() {
 
               <div>
                 <div className="mb-2 flex items-center justify-between">
-                  <span className="text-sm font-medium text-slate-700">Templates</span>
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Templates
+                  </span>
+                  <button
+                    type="button"
+                    className="text-xs font-medium text-slate-500 hover:text-slate-700"
+                  >
+                    Manage templates
+                  </button>
                 </div>
                 <div className="flex gap-3 overflow-x-auto pb-1">
-                  <article className="min-w-[180px] flex-1 rounded-lg border border-slate-200 bg-white px-3 py-3 text-xs shadow-sm">
+                  <article className="min-w-[180px] flex-1 rounded-lg border border-slate-200 bg-white px-3 py-3 text-xs">
                     <h3 className="text-sm font-semibold text-slate-900">Mutual NDA</h3>
                     <p className="mt-1 text-[11px] text-slate-600">
                       Standard two-party NDA for vendor or client onboarding.
@@ -123,7 +160,7 @@ export default async function SignatureCenterPage() {
                       Use template
                     </button>
                   </article>
-                  <article className="min-w-[180px] flex-1 rounded-lg border border-slate-200 bg-white px-3 py-3 text-xs shadow-sm">
+                  <article className="min-w-[180px] flex-1 rounded-lg border border-slate-200 bg-white px-3 py-3 text-xs">
                     <h3 className="text-sm font-semibold text-slate-900">Master Services Agreement</h3>
                     <p className="mt-1 text-[11px] text-slate-600">
                       Baseline terms you can reuse across projects and clients.
@@ -135,7 +172,7 @@ export default async function SignatureCenterPage() {
                       Use template
                     </button>
                   </article>
-                  <article className="min-w-[180px] flex-1 rounded-lg border border-slate-200 bg-white px-3 py-3 text-xs shadow-sm">
+                  <article className="min-w-[180px] flex-1 rounded-lg border border-slate-200 bg-white px-3 py-3 text-xs">
                     <h3 className="text-sm font-semibold text-slate-900">Statement of Work</h3>
                     <p className="mt-1 text-[11px] text-slate-600">
                       Scope, timelines, and deliverables for a single engagement.
