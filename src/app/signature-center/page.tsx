@@ -47,7 +47,7 @@ export default async function SignatureCenterPage() {
             </div>
           </header>
           <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <div className="flex items-center justify-between rounded-full border border-slate-200 bg-[#F9FAFB] px-4 py-3">
+            <div className="flex items-center justify-between rounded-[10px] border border-slate-200 bg-[#F9FAFB] px-4 py-3 shadow-md">
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                   Requests remaining
@@ -62,7 +62,7 @@ export default async function SignatureCenterPage() {
                 Get More Requests
               </button>
             </div>
-            <div className="flex items-center justify-between rounded-full border border-slate-200 bg-[#F9FAFB] px-4 py-3">
+            <div className="flex items-center justify-between rounded-[10px] border border-slate-200 bg-[#F9FAFB] px-4 py-3 shadow-md">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                   Pending signatures
@@ -71,7 +71,7 @@ export default async function SignatureCenterPage() {
                 <p className="text-xs text-slate-500">Waiting on others</p>
               </div>
             </div>
-            <div className="flex items-center justify-between rounded-full border border-slate-200 bg-[#F9FAFB] px-4 py-3">
+            <div className="flex items-center justify-between rounded-[10px] border border-slate-200 bg-[#F9FAFB] px-4 py-3 shadow-md">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                   Waiting for you
