@@ -171,7 +171,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
 
           {(() => {
             const baseCardClasses =
-              "rounded-2xl border border-slate-100 bg-white px-5 py-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 flex flex-col gap-2";
+              "relative overflow-hidden rounded-3xl bg-slate-950 text-white px-6 py-5 shadow-[0_18px_45px_rgba(15,23,42,0.6)] hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(15,23,42,0.85)] transition-all duration-200 flex flex-col gap-3";
 
             return (
               <div className="grid gap-4 md:gap-5 grid-cols-1 md:grid-cols-3 max-w-5xl mx-auto mb-12">
@@ -181,14 +181,23 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
                     <div
                       key={title}
                       className={`${baseCardClasses} ${
-                        isPrimary ? "md:bg-slate-50 md:py-6 md:border-t-2 md:border-t-purple-500" : ""
+                        isPrimary ? "md:py-6" : "opacity-95"
                       }`}
                     >
-                      <div className="mb-1 text-2xl text-purple-600">
-                        <Icon className="h-7 w-7" aria-hidden />
+                      <div
+                        className={`pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-r ${
+                          isPrimary
+                            ? "from-[#6A4EE8] via-[#EC4899] to-[#22D3EE] opacity-80"
+                            : "from-[#4F46E5] via-[#8B5CF6] to-[#22D3EE] opacity-60"
+                        }`}
+                      />
+                      <div className="relative z-10">
+                        <div className="mb-2 text-2xl text-purple-300">
+                          <Icon className="h-7 w-7" aria-hidden />
+                        </div>
+                        <h3 className="text-sm font-semibold text-white">{title}</h3>
+                        <p className="mt-1 text-xs text-slate-100/80">{description}</p>
                       </div>
-                      <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
-                      <p className="text-xs text-gray-500">{description}</p>
                     </div>
                   );
                 })}
