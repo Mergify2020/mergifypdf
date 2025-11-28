@@ -157,8 +157,8 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
       </section>
 
       <section className="bg-[#F3F4F8]">
-        <div className="mx-auto w-full max-w-7xl px-6 pt-12 pb-16">
-          <div className="mb-8 h-px w-full bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
+        <div className="mx-auto w-full max-w-7xl px-6 pt-6 pb-16">
+          <div className="mb-4 h-px w-full bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
 
           <div className="grid w-full gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {features.map(({ title, description, icon: Icon }) => (
@@ -166,7 +166,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
                 key={title}
                 className="flex flex-col items-center gap-2 rounded-2xl border border-black/10 bg-white/70 px-4 py-4 text-center shadow-[inset_0_0_0_1px_rgba(0,0,0,0.06)] transition-all hover:-translate-y-1 hover:border-[#024d7c]/60 hover:shadow-xl"
               >
-                <Icon className="h-8 w-8 text-[#024d7c]" aria-hidden />
+                <Icon className="h-8 w-8 text-[#6A4EE8]" aria-hidden />
                 <h3 className="text-base font-semibold text-gray-900">{title}</h3>
                 <p className="text-sm leading-snug text-gray-600">{description}</p>
               </div>
