@@ -108,9 +108,9 @@ export default async function Home() {
 function MarketingLanding({ usedToday }: { usedToday: boolean }) {
   return (
     <div className="bg-gradient-to-b from-[#f3f8ff] via-white to-white">
-      <div className="mx-auto flex max-w-6xl flex-col items-center gap-16 px-6 py-20 text-center">
+      <div className="mx-auto flex w-full max-w-7xl flex-col items-center gap-16 px-6 py-20 text-center">
         <div className="flex w-full flex-col items-center">
-          <div className="space-y-6 max-w-xl">
+          <div className="space-y-6 max-w-2xl">
             <h1 className="text-3xl font-semibold leading-tight tracking-tight sm:text-5xl">
               <span className="block">The fastest way to edit, sign,</span>
               <span className="block">and manage PDFs online.</span>
