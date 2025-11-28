@@ -99,15 +99,15 @@ export default function SettingsMenu() {
         />
       </button>
 
-      {(() => {
-        const base =
-          "absolute right-0 z-40 mt-3 w-80 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-xl origin-top-right transition duration-200 ease-out ";
-        const openClasses = "pointer-events-auto opacity-100 translate-y-0 scale-100";
-        const closedClasses = "pointer-events-none opacity-0 translate-y-1 scale-95";
-        const menuClassName = base + (open ? openClasses : closedClasses);
-        return (
-          <div className={menuClassName}>
-            <div className="space-y-4 text-sm text-slate-700">
+      <div
+        className={
+          "absolute right-0 z-40 mt-3 w-80 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-xl origin-top-right transition duration-200 ease-out " +
+          (open
+            ? "pointer-events-auto opacity-100 translate-y-0 scale-100"
+            : "pointer-events-none opacity-0 translate-y-1 scale-95")
+        }
+      >
+        <div className="space-y-4 text-sm text-slate-700">
             <div className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3">
               <img src={avatar || "/Defaultpfp.svg"} alt="Your avatar" className="h-12 w-12 rounded-full object-cover" />
               <div>
@@ -198,9 +198,8 @@ export default function SettingsMenu() {
                 </span>
               </div>
             </div>
-          </div>
-        );
-      })()}
+        </div>
+      </div>
     </div>
   );
 }
