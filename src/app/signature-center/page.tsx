@@ -91,17 +91,19 @@ export default async function SignatureCenterPage() {
 
         <main className="space-y-6">
           <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
-              <h2 className="text-lg font-semibold text-slate-900">Start a New Request</h2>
-              <p className="mt-1 text-sm text-slate-600">
-                Upload a document, choose your signers, and send for signature in a few clicks.
-              </p>
-              <button
-                type="button"
-                className="mt-5 inline-flex w-full items-center justify-center rounded-lg bg-[#6A4EE8] px-6 py-3 text-sm font-semibold text-white shadow-md transition-colors hover:bg-[#5C3EDB] md:w-auto"
-              >
-                Start a New Request
-              </button>
+            <div className="flex min-h-[180px] items-center justify-center rounded-xl border border-slate-100 bg-white p-5 text-center shadow-sm">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Start a New Request</h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Upload a document, choose your signers, and send for signature in a few clicks.
+                </p>
+                <button
+                  type="button"
+                  className="mt-5 inline-flex items-center justify-center rounded-lg bg-[#6A4EE8] px-7 py-3 text-sm font-semibold text-white shadow-md transition-colors hover:bg-[#5C3EDB]"
+                >
+                  Start a New Request
+                </button>
+              </div>
             </div>
 
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -136,12 +138,14 @@ export default async function SignatureCenterPage() {
                   </button>
                 </article>
               </div>
-              <button
-                type="button"
-                className="mt-4 text-xs font-medium text-slate-500 hover:text-slate-700"
-              >
-                Browse more templates
-              </button>
+              <div className="mt-4 flex justify-center">
+                <button
+                  type="button"
+                  className="inline-flex w-full max-w-[220px] items-center justify-center rounded-md bg-[#6A4EE8] px-2 py-1.5 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-[#5C3EDB]"
+                >
+                  Browse more templates
+                </button>
+              </div>
             </div>
           </section>
 
