@@ -55,11 +55,6 @@ const features = [
     icon: FileOutput,
   },
   {
-    title: "Compress PDF",
-    description: "Reduce file size while keeping everything clear.",
-    icon: FileArchive,
-  },
-  {
     title: "Rotate Pages",
     description: "Quickly rotate any page to the correct orientation.",
     icon: RotateCcw,
@@ -174,13 +169,13 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
               "rounded-2xl border border-slate-200 bg-white/95 px-5 py-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 flex flex-col gap-2";
 
             return (
-              <div className="grid gap-4 md:gap-5 grid-cols-1 md:grid-cols-3 max-w-5xl mx-auto mb-12">
+              <div className="grid gap-4 md:gap-5 grid-cols-2 lg:grid-cols-4 max-w-6xl mx-auto mb-12 items-stretch">
                 {features.map(({ title, description, icon: Icon }, index) => {
-                  const isPrimary = index < 3;
+                  const isPrimary = index < 4;
                   return (
                     <div
                       key={title}
-                      className={`${baseCardClasses} ${
+                      className={`${baseCardClasses} h-full ${
                         isPrimary ? "md:bg-gradient-to-br md:from-purple-50 md:to-indigo-50" : ""
                       }`}
                     >
