@@ -17,28 +17,13 @@ export default async function SignatureCenterPage() {
   return (
     <div className="min-h-screen bg-[#F9FAFB] text-slate-900">
       <div className="mx-auto flex max-w-[1120px] flex-col gap-6 px-6 py-8">
-        <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold text-slate-900">Mergify Sign</h1>
-            <p className="text-sm font-medium text-slate-600">Signature Requests</p>
-            <p className="mt-1 text-xs text-slate-500">
-              Track pending signatures, see what&apos;s waiting on you, and download completed PDFs.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link
-              href="/"
-              className="inline-flex items-center justify-center rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
-            >
-              Back to Workspace
-            </Link>
-            <button
-              type="button"
-              className="inline-flex items-center justify-center rounded-md bg-[#6A4EE8] px-4 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-[#5C3EDB]"
-            >
-              Send Signature Request
-            </button>
-          </div>
+        <header className="mb-6 flex justify-between">
+          <Link
+            href="/"
+            className="inline-flex items-center justify-center rounded-md border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+          >
+            Back to Workspace
+          </Link>
         </header>
 
         <section className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -112,11 +97,9 @@ export default async function SignatureCenterPage() {
                 <p className="mt-1 text-sm text-slate-600">
                   Upload a document, choose your signers, and send for signature in a few clicks.
                 </p>
-              </div>
-              <div className="hidden md:block">
                 <button
                   type="button"
-                  className="rounded-md bg-[#6A4EE8] px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#5C3EDB]"
+                  className="mt-3 inline-flex items-center justify-center rounded-md bg-[#6A4EE8] px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#5C3EDB]"
                 >
                   Start a New Request
                 </button>
@@ -124,15 +107,6 @@ export default async function SignatureCenterPage() {
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="md:hidden">
-                <button
-                  type="button"
-                  className="mb-2 w-full rounded-md bg-[#6A4EE8] px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#5C3EDB]"
-                >
-                  Start a New Request
-                </button>
-              </div>
-
               <div className="hidden md:block" />
 
               <div>
