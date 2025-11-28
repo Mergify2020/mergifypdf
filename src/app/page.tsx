@@ -109,8 +109,8 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
   return (
     <div className="bg-gradient-to-b from-[#f3f8ff] via-white to-white">
       <div className="mx-auto flex max-w-6xl flex-col items-center gap-16 px-6 py-20 text-center">
-        <div className="grid gap-12 lg:grid-cols-[1fr,1fr] lg:items-center">
-          <div className="space-y-6">
+        <div className="flex w-full flex-col items-center">
+          <div className="space-y-6 max-w-xl">
             <h1 className="text-3xl font-semibold leading-tight tracking-tight sm:text-5xl">
               <span className="block">The fastest way to edit, sign,</span>
               <span className="block">and manage PDFs online.</span>
@@ -139,16 +139,6 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
               Trusted by freelancers, realtors, students, and small businesses.
             </p>
             <HeroStats />
-          </div>
-          <div className="relative mt-12 flex items-center justify-center lg:mt-12">
-            <Image
-              src="/visual-hero2.jpeg"
-              alt="Preview of the MergifyPDF editor"
-              width={900}
-              height={700}
-              className="relative w-full max-w-xl rounded-[32px] object-cover shadow-[0_40px_120px_rgba(9,20,45,0.25)]"
-              priority
-            />
           </div>
         </div>
 
