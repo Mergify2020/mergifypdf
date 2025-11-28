@@ -46,6 +46,41 @@ export default async function SignatureCenterPage() {
               </button>
             </div>
           </header>
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <div className="flex items-center justify-between rounded-full border border-slate-200 bg-[#F9FAFB] px-4 py-3">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Requests remaining
+                </p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">8 of 10 left</p>
+                <p className="text-xs text-slate-500">Resets monthly</p>
+              </div>
+              <button
+                type="button"
+                className="ml-4 whitespace-nowrap rounded-full bg-[#6A4EE8] px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-[#5C3EDB]"
+              >
+                Get More Requests
+              </button>
+            </div>
+            <div className="flex items-center justify-between rounded-full border border-slate-200 bg-[#F9FAFB] px-4 py-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Pending signatures
+                </p>
+                <p className="mt-1 text-2xl font-semibold text-slate-900">2</p>
+                <p className="text-xs text-slate-500">Waiting on others</p>
+              </div>
+            </div>
+            <div className="flex items-center justify-between rounded-full border border-slate-200 bg-[#F9FAFB] px-4 py-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Waiting for you
+                </p>
+                <p className="mt-1 text-2xl font-semibold text-slate-900">1</p>
+                <p className="text-xs text-slate-500">You need to sign</p>
+              </div>
+            </div>
+          </div>
         </section>
 
         <main className="rounded-[10px] border border-slate-200 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
