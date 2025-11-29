@@ -21,7 +21,7 @@ export default function PersonaHighlight() {
         <div className="relative flex-1">
           <div className="relative h-80 w-full overflow-hidden rounded-3xl border border-slate-200 bg-slate-100 shadow-[0_30px_90px_rgba(15,23,42,0.28)] sm:h-96 lg:h-[430px]">
             <Image
-              src="/hero-solo.svg"
+              src="/hero-solo1.svg"
               alt="Person working with documents in the MergifyPDF workspace"
               fill
               sizes="(min-width: 1024px) 60vw, 100vw"
