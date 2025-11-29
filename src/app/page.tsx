@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import type { ReactNode } from "react";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import UploadCta from "@/components/UploadCta";
@@ -55,6 +56,11 @@ const features = [
     icon: FileOutput,
   },
   {
+    title: "Compress PDF",
+    description: "Reduce file size while keeping everything clear.",
+    icon: FileArchive,
+  },
+  {
     title: "Rotate Pages",
     description: "Quickly rotate any page to the correct orientation.",
     icon: RotateCcw,
@@ -89,6 +95,24 @@ const curatedProjects = [
     updated: "Tuesday • 10:41 AM",
   },
 ];
+
+type FeatureItemProps = {
+  icon: ReactNode;
+  title: string;
+  description: string;
+};
+
+function FeatureItem({ icon, title, description }: FeatureItemProps) {
+  return (
+    <div className="flex flex-col gap-2 transition-transform duration-150 group hover:-translate-y-0.5">
+      <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-purple-50 text-purple-600 transition-colors group-hover:bg-purple-100">
+        {icon}
+      </div>
+      <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+      <p className="text-xs leading-relaxed text-slate-500">{description}</p>
+    </div>
+  );
+}
 
 export default async function Home() {
   const session = await getServerSession(authOptions);
