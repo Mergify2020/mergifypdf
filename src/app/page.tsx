@@ -50,7 +50,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
   return (
     <>
       <section className="w-full bg-gradient-to-r from-[#FDF2FF] via-[#EEF2FF] to-[#E0F7FF]">
-        <div className="mx-auto w-full max-w-7xl px-6 py-12 sm:py-16 lg:py-20">
+        <div className="mx-auto w-full max-w-7xl px-6 py-16 sm:py-20 lg:py-24">
           <div className="grid gap-12 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.1fr)] lg:items-center">
             <div className="space-y-6 text-center lg:text-left">
               <h1 className="text-3xl font-semibold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
