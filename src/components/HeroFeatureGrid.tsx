@@ -63,19 +63,19 @@ export default function HeroFeatureGrid() {
   return (
     <section
       aria-labelledby="hero-feature-grid-heading"
-      className="bg-slate-50/80"
+      className="bg-white"
     >
       <div className="mx-auto max-w-6xl px-4 py-10 md:px-6 md:py-14">
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 md:gap-8">
           {FEATURES.map((feature) => (
             <article
               key={feature.title}
-              className="relative overflow-hidden rounded-2xl border border-slate-100 bg-white p-6 pt-8 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
+              className="relative overflow-hidden rounded-2xl border border-slate-100 bg-white p-6 pt-8 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
             >
-              <div className="pointer-events-none absolute inset-x-0 top-0 h-12 bg-gradient-to-r from-[#4F46E5] via-[#7C3AED] to-[#EC4899] opacity-80" />
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-10 bg-gradient-to-r from-[#E5E7EB] via-[#EEF2FF] to-[#F5F3FF] opacity-70" />
 
               <div className="relative z-10">
-                <div className="relative -mt-4 mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-md">
+                <div className="relative -mt-4 mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm border border-slate-100">
                   {feature.icon}
                 </div>
 
