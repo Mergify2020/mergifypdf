@@ -20,42 +20,42 @@ const FEATURES: Feature[] = [
   {
     title: "Merge Documents",
     description: "Combine multiple PDFs into one clean file.",
-    icon: <Layers className="h-5 w-5 text-slate-900" aria-hidden />,
+    icon: <Layers className="h-5 w-5 text-[#6A4EE8]" aria-hidden />,
   },
   {
     title: "Edit & Annotate",
     description: "Highlight, draw, comment, and add text anywhere.",
-    icon: <Highlighter className="h-5 w-5 text-slate-900" aria-hidden />,
+    icon: <Highlighter className="h-5 w-5 text-[#6A4EE8]" aria-hidden />,
   },
   {
     title: "Sign Documents",
     description: "Draw, upload, or type your signature in seconds.",
-    icon: <PenLine className="h-5 w-5 text-slate-900" aria-hidden />,
+    icon: <PenLine className="h-5 w-5 text-[#6A4EE8]" aria-hidden />,
   },
   {
     title: "Reorder Pages",
     description: "Drag and drop pages into the perfect order.",
-    icon: <ListOrdered className="h-5 w-5 text-slate-900" aria-hidden />,
+    icon: <ListOrdered className="h-5 w-5 text-[#6A4EE8]" aria-hidden />,
   },
   {
     title: "Add or Remove Pages",
     description: "Insert new pages or delete unwanted ones.",
-    icon: <FilePlus className="h-5 w-5 text-slate-900" aria-hidden />,
+    icon: <FilePlus className="h-5 w-5 text-[#6A4EE8]" aria-hidden />,
   },
   {
     title: "Extract Pages",
     description: "Select specific pages and export them into a new PDF.",
-    icon: <FileOutput className="h-5 w-5 text-slate-900" aria-hidden />,
+    icon: <FileOutput className="h-5 w-5 text-[#6A4EE8]" aria-hidden />,
   },
   {
     title: "Rotate Pages",
     description: "Quickly rotate any page to the correct orientation.",
-    icon: <RotateCcw className="h-5 w-5 text-slate-900" aria-hidden />,
+    icon: <RotateCcw className="h-5 w-5 text-[#6A4EE8]" aria-hidden />,
   },
   {
     title: "PDF Splitter",
     description: "Split one PDF into multiple smaller files.",
-    icon: <ScissorsSquare className="h-5 w-5 text-slate-900" aria-hidden />,
+    icon: <ScissorsSquare className="h-5 w-5 text-[#6A4EE8]" aria-hidden />,
   },
 ];
 
@@ -70,9 +70,9 @@ export default function HeroFeatureGrid() {
           {FEATURES.map((feature) => (
             <article
               key={feature.title}
-              className="relative overflow-hidden rounded-2xl border border-slate-100 bg-white p-6 pt-8 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
+              className="relative overflow-hidden rounded-2xl border border-slate-100 bg-white px-7 py-6 pt-9 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
             >
-              <div className="pointer-events-none absolute inset-x-0 top-0 h-10 bg-gradient-to-r from-[#E5E7EB] via-[#EEF2FF] to-[#F5F3FF] opacity-70" />
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-10 bg-slate-900/90" />
 
               <div className="relative z-10">
                 <div className="relative -mt-4 mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm border border-slate-100">
