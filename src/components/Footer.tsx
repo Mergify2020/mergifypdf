@@ -31,18 +31,18 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* For Teams */}
+          {/* Control Center */}
           <div>
-            <h3 className="text-sm font-semibold text-slate-900">For Teams</h3>
+            <h3 className="text-sm font-semibold text-slate-900">Control Center</h3>
             <div className="mt-4 space-y-2">
               <a href="#" className="block text-sm text-slate-600 transition hover:text-slate-900">
-                PDF Workspaces
+                Project Dashboard
               </a>
               <a href="#" className="block text-sm text-slate-600 transition hover:text-slate-900">
-                Signature Requests
+                Signature Dashboard
               </a>
               <a href="#" className="block text-sm text-slate-600 transition hover:text-slate-900">
-                Team Collaboration (coming 2026)
+                Team Dashboard (Coming 2026)
               </a>
               <a href="#" className="block text-sm text-slate-600 transition hover:text-slate-900">
                 Plans &amp; Pricing
@@ -124,4 +124,3 @@ export default function Footer() {
     </footer>
   );
 }
-
