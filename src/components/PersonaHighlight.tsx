@@ -2,7 +2,7 @@ import Image from "next/image";
 
 export default function PersonaHighlight() {
   return (
-    <section className="bg-[#F9FAFB]">
+    <section className="bg-white">
       <div className="mx-auto flex max-w-6xl flex-col gap-10 px-4 py-14 sm:px-6 lg:flex-row lg:px-0 lg:py-20">
         <div className="relative z-10 max-w-lg rounded-3xl bg-slate-900 px-8 py-9 text-white shadow-[0_28px_80px_rgba(15,23,42,0.6)] lg:my-auto lg:-mr-24">
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-300">
