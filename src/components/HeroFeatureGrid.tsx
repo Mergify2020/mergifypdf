@@ -63,21 +63,9 @@ export default function HeroFeatureGrid() {
   return (
     <section
       aria-labelledby="hero-feature-grid-heading"
-      className="mt-12 border-t border-slate-100 bg-slate-50/80"
+      className="bg-slate-50/80"
     >
-      <div className="mx-auto max-w-6xl px-4 py-12 md:px-6 md:py-16">
-        <div className="mb-10 text-center">
-          <h2
-            id="hero-feature-grid-heading"
-            className="text-xl font-semibold md:text-2xl"
-          >
-            All the tools you need to work with PDFs.
-          </h2>
-          <p className="mt-2 text-sm text-slate-500">
-            Merge, edit, sign, and organize your documents in one place.
-          </p>
-        </div>
-
+      <div className="mx-auto max-w-6xl px-4 py-10 md:px-6 md:py-14">
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 md:gap-8">
           {FEATURES.map((feature) => (
             <article
