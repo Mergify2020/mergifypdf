@@ -7,7 +7,7 @@ export default function PersonaHighlight() {
         <div className="relative mx-auto w-full max-w-5xl">
           {/* Background with photo */}
           <div className="flex justify-end">
-            <div className="block w-[90%] overflow-hidden rounded-3xl border border-slate-200 bg-slate-100 shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
+            <div className="block w-[105%] overflow-hidden rounded-3xl border border-slate-200 bg-slate-100 shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
               <Image
                 src="/hero-team4.svg"
                 alt="Team collaborating with documents in the MergifyPDF workspace"
