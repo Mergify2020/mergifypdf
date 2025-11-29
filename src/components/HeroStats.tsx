@@ -54,26 +54,26 @@ export default function HeroStats() {
 
   return (
     <div className="mt-6 flex justify-center">
-      <div className="grid w-full max-w-2xl grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="relative overflow-hidden rounded-full bg-[#6A4EE8] px-8 py-3 text-center text-white shadow-md">
+      <div className="grid w-full max-w-xl grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="relative overflow-hidden rounded-full bg-[#6A4EE8] px-6 py-2 text-center text-white shadow-md">
           <p className="text-xs font-semibold uppercase tracking-wide text-violet-100">
             Documents edited
           </p>
           <div
             key={editedTick}
-            className="mt-1 text-2xl font-semibold leading-tight animate-numberRoll"
+            className="mt-0.5 text-lg font-semibold leading-tight sm:text-xl animate-numberRoll"
           >
             {formatNumber(edited)}
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-full bg-[#6A4EE8] px-8 py-3 text-center text-white shadow-md">
+        <div className="relative overflow-hidden rounded-full bg-[#6A4EE8] px-6 py-2 text-center text-white shadow-md">
           <p className="text-xs font-semibold uppercase tracking-wide text-violet-100">
             Documents signed
           </p>
           <div
             key={signedTick}
-            className="mt-1 text-2xl font-semibold leading-tight animate-numberRoll"
+            className="mt-0.5 text-lg font-semibold leading-tight sm:text-xl animate-numberRoll"
           >
             {formatNumber(signed)}
           </div>
