@@ -1,24 +1,5 @@
 import React from "react";
-import { Facebook, Instagram, Linkedin, Twitter } from "lucide-react";
-
-function TikTokIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      {...props}
-    >
-      <path
-        d="M15 4v2.5c0 1.1.9 2 2 2h2M11 8.5v7.25a2.25 2.25 0 1 1-2.25-2.25H11"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={1.8}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
+import { Facebook, Instagram, Linkedin, Music2, Twitter } from "lucide-react";
 
 export default function Footer() {
   return (
@@ -130,35 +111,35 @@ export default function Footer() {
             <div className="flex items-center gap-3 text-slate-500">
               <a
                 href="#"
-                className="flex h-8 w-8 items-center justify-center rounded bg-slate-200 text-slate-500 transition hover:bg-slate-300 hover:text-slate-700"
+                className="flex h-9 w-9 items-center justify-center rounded-md bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-slate-700"
                 aria-label="MergifyPDF on TikTok"
               >
-                <TikTokIcon className="h-4 w-4" />
+                <Music2 className="h-4 w-4" />
               </a>
               <a
                 href="#"
-                className="flex h-8 w-8 items-center justify-center rounded bg-slate-200 text-slate-500 transition hover:bg-slate-300 hover:text-slate-700"
+                className="flex h-9 w-9 items-center justify-center rounded-md bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-slate-700"
                 aria-label="MergifyPDF on Instagram"
               >
                 <Instagram className="h-4 w-4" />
               </a>
               <a
                 href="#"
-                className="flex h-8 w-8 items-center justify-center rounded bg-slate-200 text-slate-500 transition hover:bg-slate-300 hover:text-slate-700"
+                className="flex h-9 w-9 items-center justify-center rounded-md bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-slate-700"
                 aria-label="MergifyPDF on X (Twitter)"
               >
                 <Twitter className="h-4 w-4" />
               </a>
               <a
                 href="#"
-                className="flex h-8 w-8 items-center justify-center rounded bg-slate-200 text-slate-500 transition hover:bg-slate-300 hover:text-slate-700"
+                className="flex h-9 w-9 items-center justify-center rounded-md bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-slate-700"
                 aria-label="MergifyPDF on Facebook"
               >
                 <Facebook className="h-4 w-4" />
               </a>
               <a
                 href="#"
-                className="flex h-8 w-8 items-center justify-center rounded bg-slate-200 text-slate-500 transition hover:bg-slate-300 hover:text-slate-700"
+                className="flex h-9 w-9 items-center justify-center rounded-md bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-slate-700"
                 aria-label="MergifyPDF on LinkedIn"
               >
                 <Linkedin className="h-4 w-4" />
