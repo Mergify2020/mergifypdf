@@ -127,41 +127,41 @@ export default function Footer() {
               </p>
             </div>
 
-            <div className="flex items-center gap-4 text-slate-400">
+            <div className="flex items-center gap-3 text-slate-500">
               <a
                 href="#"
-                className="transition hover:text-slate-600"
+                className="flex h-8 w-8 items-center justify-center rounded bg-slate-200 text-slate-500 transition hover:bg-slate-300 hover:text-slate-700"
                 aria-label="MergifyPDF on TikTok"
               >
-                <TikTokIcon className="h-5 w-5" />
+                <TikTokIcon className="h-4 w-4" />
               </a>
               <a
                 href="#"
-                className="transition hover:text-slate-600"
+                className="flex h-8 w-8 items-center justify-center rounded bg-slate-200 text-slate-500 transition hover:bg-slate-300 hover:text-slate-700"
                 aria-label="MergifyPDF on Instagram"
               >
-                <Instagram className="h-5 w-5" />
+                <Instagram className="h-4 w-4" />
               </a>
               <a
                 href="#"
-                className="transition hover:text-slate-600"
+                className="flex h-8 w-8 items-center justify-center rounded bg-slate-200 text-slate-500 transition hover:bg-slate-300 hover:text-slate-700"
                 aria-label="MergifyPDF on X (Twitter)"
               >
-                <Twitter className="h-5 w-5" />
+                <Twitter className="h-4 w-4" />
               </a>
               <a
                 href="#"
-                className="transition hover:text-slate-600"
+                className="flex h-8 w-8 items-center justify-center rounded bg-slate-200 text-slate-500 transition hover:bg-slate-300 hover:text-slate-700"
                 aria-label="MergifyPDF on Facebook"
               >
-                <Facebook className="h-5 w-5" />
+                <Facebook className="h-4 w-4" />
               </a>
               <a
                 href="#"
-                className="transition hover:text-slate-600"
+                className="flex h-8 w-8 items-center justify-center rounded bg-slate-200 text-slate-500 transition hover:bg-slate-300 hover:text-slate-700"
                 aria-label="MergifyPDF on LinkedIn"
               >
-                <Linkedin className="h-5 w-5" />
+                <Linkedin className="h-4 w-4" />
               </a>
             </div>
           </div>
