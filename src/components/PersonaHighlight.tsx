@@ -5,17 +5,15 @@ export default function PersonaHighlight() {
     <section className="bg-white">
       <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 lg:px-0 lg:py-20">
         <div className="relative mx-auto max-w-5xl">
-          {/* Background image panel */}
-          <div className="h-[22rem] w-full overflow-hidden rounded-3xl border border-slate-200 bg-slate-100 shadow-[0_30px_90px_rgba(15,23,42,0.28)] sm:h-[26rem] lg:h-[460px]">
-            <Image
-              src="/hero-team4.svg"
-              alt="Team collaborating with documents in the MergifyPDF workspace"
-              fill
-              sizes="(min-width: 1024px) 100vw, 100vw"
-              className="object-cover"
-              priority={false}
-            />
-          </div>
+          {/* Background image panel, using intrinsic aspect ratio */}
+          <Image
+            src="/hero-team4.svg"
+            alt="Team collaborating with documents in the MergifyPDF workspace"
+            width={1440}
+            height={720}
+            className="w-full h-auto rounded-3xl border border-slate-200 bg-slate-100 shadow-[0_30px_90px_rgba(15,23,42,0.28)]"
+            priority={false}
+          />
 
           {/* Floating dark box above the picture */}
           <div className="pointer-events-none absolute inset-0 flex items-center justify-start px-4 sm:px-8">
