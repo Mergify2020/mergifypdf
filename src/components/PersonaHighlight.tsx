@@ -5,9 +5,9 @@ export default function PersonaHighlight() {
     <section className="bg-white">
       <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 lg:px-0 lg:py-20">
         <div className="mx-auto max-w-5xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
-          <div className="flex flex-col lg:flex-row lg:items-stretch">
-            {/* Left column: dark content box */}
-            <div className="flex items-center bg-slate-900/95 px-8 py-9 text-white lg:w-[46%]">
+          <div className="grid min-h-[260px] grid-cols-1 lg:grid-cols-2">
+            {/* Left column: dark text box */}
+            <div className="flex h-full items-center bg-slate-900/95 px-8 py-9 text-white">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-300">
                   Built for real workflows
@@ -23,8 +23,8 @@ export default function PersonaHighlight() {
               </div>
             </div>
 
-            {/* Right column: image fills full column, no void space */}
-            <div className="relative flex-1 min-h-[230px] sm:min-h-[260px]">
+            {/* Right column: full-bleed image, no padding */}
+            <div className="relative h-full w-full overflow-hidden">
               <Image
                 src="/hero-team4.svg"
                 alt="Team collaborating with documents in the MergifyPDF workspace"
