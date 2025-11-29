@@ -54,11 +54,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <div className="flex items-center gap-3">
                   <Link
                     href="/account?view=pricing"
-                    className="hidden rounded-full bg-gradient-to-r from-[#6A4EE8] via-[#5C6CFF] to-[#024d7c] p-[2px] text-xs shadow-md transition-all hover:-translate-y-0.5 hover:shadow-lg sm:inline-flex"
+                    className="hidden items-center rounded-full bg-gradient-to-r from-[#6A4EE8] via-[#5C6CFF] to-[#024d7c] px-8 py-2.5 text-sm font-semibold text-white shadow-md transition-all hover:-translate-y-0.5 hover:shadow-lg sm:inline-flex"
                   >
-                    <span className="flex w-full items-center justify-center rounded-full bg-white px-8 py-2.5 font-semibold text-slate-800">
-                      Pricing
-                    </span>
+                    Pricing
                   </Link>
                   <HeaderLoginButton />
                 </div>
