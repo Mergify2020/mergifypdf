@@ -17,13 +17,13 @@ export default function PersonaHighlight() {
             />
           </div>
 
-          {/* Overlapping dark content card */}
-          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center justify-start px-4 sm:px-6 lg:px-8">
-            <div className="pointer-events-auto max-w-lg rounded-3xl bg-slate-900/95 px-7 py-7 text-white shadow-[0_22px_60px_rgba(15,23,42,0.7)] sm:px-8 sm:py-8 lg:-ml-6">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300 sm:text-sm">
+          {/* Overlapping dark content card – smaller, centered, ~20–30% width */}
+          <div className="pointer-events-none absolute left-[5%] top-1/2 flex -translate-y-1/2 justify-start">
+            <div className="pointer-events-auto w-full max-w-xs rounded-3xl bg-slate-900/95 px-6 py-5 text-white shadow-[0_18px_50px_rgba(15,23,42,0.7)] sm:max-w-sm sm:px-7 sm:py-6 lg:max-w-[40%]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300 sm:text-xs">
                 Built for real workflows
               </p>
-              <h2 className="mt-3 text-2xl font-semibold leading-snug sm:mt-4 sm:text-3xl lg:text-4xl">
+              <h2 className="mt-3 text-xl font-semibold leading-snug sm:mt-4 sm:text-2xl lg:text-3xl">
                 For Individuals, Freelancers, Realtors, and more!
               </h2>
               <p className="mt-3 text-xs leading-relaxed text-slate-300 sm:mt-4 sm:text-sm">
