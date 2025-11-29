@@ -56,9 +56,9 @@ export default function HeroFeatureArea() {
           {FEATURE_BOXES.map((feature) => (
             <div
               key={feature.title}
-              className="group relative flex flex-col rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm backdrop-blur-sm transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md hover:border-slate-300 sm:p-5"
+              className="group relative flex flex-col items-center rounded-2xl border border-slate-200 bg-white/80 p-4 text-center shadow-sm backdrop-blur-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md sm:p-5"
             >
-              <div className="mb-3 flex items-center justify-start">
+              <div className="mb-3 flex items-center justify-center">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 sm:h-12 sm:w-12">
                   <span className="text-xl sm:text-2xl" aria-hidden>
                     {feature.icon}
