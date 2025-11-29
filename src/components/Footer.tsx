@@ -1,4 +1,24 @@
 import React from "react";
+import { Facebook, Instagram, Linkedin, Twitter } from "lucide-react";
+
+function TikTokIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      {...props}
+    >
+      <path
+        d="M15 4v2.5c0 1.1.9 2 2 2h2M11 8.5v7.25a2.25 2.25 0 1 1-2.25-2.25H11"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 export default function Footer() {
   return (
@@ -107,15 +127,41 @@ export default function Footer() {
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-4 text-xs sm:text-sm">
-              <a href="#" className="text-slate-600 transition hover:text-slate-900">
-                Privacy
+            <div className="flex items-center gap-4 text-slate-400">
+              <a
+                href="#"
+                className="transition hover:text-slate-600"
+                aria-label="MergifyPDF on TikTok"
+              >
+                <TikTokIcon className="h-5 w-5" />
               </a>
-              <a href="#" className="text-slate-600 transition hover:text-slate-900">
-                Terms
+              <a
+                href="#"
+                className="transition hover:text-slate-600"
+                aria-label="MergifyPDF on Instagram"
+              >
+                <Instagram className="h-5 w-5" />
               </a>
-              <a href="#" className="text-slate-600 transition hover:text-slate-900">
-                Contact
+              <a
+                href="#"
+                className="transition hover:text-slate-600"
+                aria-label="MergifyPDF on X (Twitter)"
+              >
+                <Twitter className="h-5 w-5" />
+              </a>
+              <a
+                href="#"
+                className="transition hover:text-slate-600"
+                aria-label="MergifyPDF on Facebook"
+              >
+                <Facebook className="h-5 w-5" />
+              </a>
+              <a
+                href="#"
+                className="transition hover:text-slate-600"
+                aria-label="MergifyPDF on LinkedIn"
+              >
+                <Linkedin className="h-5 w-5" />
               </a>
             </div>
           </div>
