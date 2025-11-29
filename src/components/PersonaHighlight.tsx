@@ -18,8 +18,8 @@ export default function PersonaHighlight() {
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-slate-900/40 via-slate-900/5 to-transparent" />
           </div>
 
-          {/* Dark label: ~20% inside the photo on larger screens, right side */}
-          <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center sm:right-6 lg:right-10">
+          {/* Dark label: ~20% inside the photo on larger screens, left side */}
+          <div className="pointer-events-none absolute inset-y-0 left-4 flex items-center sm:left-6 lg:left-10">
             <div className="pointer-events-auto max-w-lg rounded-3xl bg-slate-900/95 px-8 py-9 text-white shadow-[0_24px_70px_rgba(15,23,42,0.75)]">
               <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-300">
                 Built for real workflows
