@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/authOptions";
 import UploadCta from "@/components/UploadCta";
 import HeroStats from "@/components/HeroStats";
 import HeroFeatureArea from "@/components/HeroFeatureArea";
+import PersonaHighlight from "@/components/PersonaHighlight";
 import { hasUsedToday } from "@/lib/quota";
 import ProjectsWorkspaceShelf from "@/components/ProjectsWorkspaceShelf";
 import StartProjectButton from "@/components/StartProjectButton";
@@ -95,6 +96,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
       </section>
 
       <HeroFeatureArea />
+      <PersonaHighlight />
     </>
   );
 }
