@@ -12,14 +12,14 @@ export default function PersonaHighlight() {
               alt="Team collaborating with documents in the MergifyPDF workspace"
               width={1440}
               height={810}
-              className="block h-[360px] w-full object-cover object-[60%_40%]"
+              className="block h-[380px] w-full object-cover object-[55%_45%]"
               priority={false}
             />
           </div>
 
           {/* Floating text card */}
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center">
-            <div className="pointer-events-auto max-w-sm -translate-x-1/3 transform rounded-2xl bg-[#0D1B2A] px-8 py-7 text-white shadow-2xl sm:px-8 sm:py-8">
+            <div className="pointer-events-auto max-w-sm -translate-x-1/4 transform rounded-2xl bg-[#0D1B2A] px-8 py-7 text-white shadow-2xl sm:px-8 sm:py-8">
               <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-300 sm:text-xs">
                 Built for real workflows
               </p>
