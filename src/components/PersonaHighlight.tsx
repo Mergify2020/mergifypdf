@@ -6,13 +6,13 @@ export default function PersonaHighlight() {
       <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 lg:px-0 lg:py-20">
         <div className="relative mx-auto w-full max-w-6xl">
           {/* Background with photo – fills rounded container on all sides */}
-          <div className="relative h-[640px] w-full overflow-hidden rounded-3xl border border-slate-200 bg-slate-100 shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
+          <div className="relative h-[640px] w-full overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
             <Image
               src="/hero-team4.svg"
               alt="Team collaborating with documents in the MergifyPDF workspace"
               fill
               sizes="(min-width: 1024px) 100vw, 100vw"
-              className="object-cover object-[62%_45%]"
+              className="object-cover object-[62%_45%] scale-110"
               priority={false}
             />
           </div>
