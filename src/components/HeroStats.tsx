@@ -53,7 +53,7 @@ export default function HeroStats() {
   }, []);
 
   return (
-    <div className="mt-6 flex justify-center">
+    <div className="mt-8 flex justify-center">
       <div className="grid w-full max-w-xl grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="relative overflow-hidden rounded-full bg-[#6A4EE8] px-6 py-2 text-center text-white shadow-md">
           <p className="text-xs font-semibold uppercase tracking-wide text-violet-100">

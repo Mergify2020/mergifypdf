@@ -60,10 +60,10 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
               <p className="text-base text-gray-700 sm:text-lg">
                 Edit, manage, and sign your documents from anywhere with ease.
               </p>
-              <div className="mt-8 flex w-full justify-center lg:justify-start">
+              <div className="mt-6 flex w-full justify-center lg:justify-start">
                 <UploadCta usedToday={usedToday} variant="hero" className="w-full max-w-md" />
               </div>
-              <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-sm text-slate-600 lg:justify-start">
+              <div className="mt-10 flex flex-wrap items-center justify-center gap-3 text-sm text-slate-600 lg:justify-start">
                 {["1 free upload per day", "Fast performance", "Simple to use"].map((badge) => (
                   <span
                     key={badge}
