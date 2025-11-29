@@ -4,9 +4,9 @@ export default function PersonaHighlight() {
   return (
     <section className="bg-white">
       <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 lg:px-0 lg:py-20">
-        <div className="mx-auto flex max-w-5xl flex-col gap-8 lg:flex-row lg:items-stretch">
+        <div className="mx-auto flex max-w-5xl flex-col gap-8 lg:flex-row lg:items-stretch lg:gap-0">
           {/* Left column: dark content box */}
-          <div className="lg:flex-[1.05]">
+          <div className="relative z-10 lg:flex-[1.05]">
             <div className="flex h-full items-center rounded-3xl bg-slate-900/95 px-8 py-9 text-white shadow-[0_24px_70px_rgba(15,23,42,0.75)]">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-300">
@@ -24,8 +24,8 @@ export default function PersonaHighlight() {
             </div>
           </div>
 
-          {/* Right column: image fills full column, no extra white space */}
-          <div className="relative flex-1 overflow-hidden rounded-3xl border border-slate-200 bg-slate-100 shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
+          {/* Right column: image fills full column and extends behind the black box */}
+          <div className="relative flex-1 overflow-hidden rounded-3xl border border-slate-200 bg-slate-100 shadow-[0_30px_90px_rgba(15,23,42,0.28)] lg:-ml-16 lg:flex-[1.25]">
             <Image
               src="/hero-team4.svg"
               alt="Team collaborating with documents in the MergifyPDF workspace"
