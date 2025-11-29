@@ -1,71 +1,16 @@
 import Link from "next/link";
 import Image from "next/image";
-import type { ReactNode } from "react";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import UploadCta from "@/components/UploadCta";
 import HeroStats from "@/components/HeroStats";
+import HeroFeatureGrid from "@/components/HeroFeatureGrid";
 import { hasUsedToday } from "@/lib/quota";
 import ProjectsWorkspaceShelf from "@/components/ProjectsWorkspaceShelf";
 import StartProjectButton from "@/components/StartProjectButton";
 import ProjectsList from "@/components/ProjectsList";
 import MergifySignCard from "@/components/MergifySignCard";
-import {
-  ArrowUpRight,
-  FileArchive,
-  FileOutput,
-  FilePlus,
-  Highlighter,
-  Layers,
-  ListOrdered,
-  PenLine,
-  RotateCcw,
-  ScissorsSquare,
-  FileSignature,
-} from "lucide-react";
-
-const features = [
-  {
-    title: "Merge Documents",
-    description: "Combine multiple PDFs into one clean file.",
-    icon: Layers,
-  },
-  {
-    title: "Edit & Annotate",
-    description: "Highlight, draw, comment, and add text anywhere.",
-    icon: Highlighter,
-  },
-  {
-    title: "Sign Documents",
-    description: "Draw, upload, or type your signature in seconds.",
-    icon: PenLine,
-  },
-  {
-    title: "Reorder Pages",
-    description: "Drag and drop pages into the perfect order.",
-    icon: ListOrdered,
-  },
-  {
-    title: "Add or Remove Pages",
-    description: "Insert new pages or delete unwanted ones.",
-    icon: FilePlus,
-  },
-  {
-    title: "Extract Pages",
-    description: "Select specific pages and export them into a new PDF.",
-    icon: FileOutput,
-  },
-  {
-    title: "Rotate Pages",
-    description: "Quickly rotate any page to the correct orientation.",
-    icon: RotateCcw,
-  },
-  {
-    title: "PDF Splitter",
-    description: "Split one PDF into multiple smaller files in seconds.",
-    icon: ScissorsSquare,
-  },
-] as const;
+import { ArrowUpRight } from "lucide-react";
 
 const curatedProjects = [
   {
@@ -90,24 +35,6 @@ const curatedProjects = [
     updated: "Tuesday • 10:41 AM",
   },
 ];
-
-type FeatureItemProps = {
-  icon: ReactNode;
-  title: string;
-  description: string;
-};
-
-function FeatureItem({ icon, title, description }: FeatureItemProps) {
-  return (
-    <div className="flex flex-col gap-2 transition-transform duration-150 group hover:-translate-y-0.5">
-      <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-purple-50 text-purple-600 transition-colors group-hover:bg-purple-100">
-        {icon}
-      </div>
-      <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
-      <p className="text-xs leading-relaxed text-slate-500">{description}</p>
-    </div>
-  );
-}
 
 export default async function Home() {
   const session = await getServerSession(authOptions);
@@ -170,33 +97,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
         </div>
       </section>
 
-      <section className="mt-12 border-t border-slate-100 bg-slate-50/80">
-        <div className="mx-auto w-full max-w-5xl px-4 py-12 md:py-16">
-          <div className="mb-8 text-center">
-            <h2 className="text-xl font-semibold md:text-2xl">
-              All the tools you need to work with PDFs.
-            </h2>
-            <p className="mt-2 text-sm text-gray-500">
-              Merge, edit, sign, and organize your documents in one place.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 md:gap-8">
-            {features.map(({ title, description, icon: Icon }) => (
-              <FeatureItem
-                key={title}
-                icon={<Icon className="h-5 w-5" aria-hidden />}
-                title={title}
-                description={description}
-              />
-            ))}
-          </div>
-
-          <p className="mt-10 text-center text-base font-semibold text-slate-600">
-            More tools added regularly to simplify your workflow.
-          </p>
-        </div>
-      </section>
+      <HeroFeatureGrid />
     </>
   );
 }
