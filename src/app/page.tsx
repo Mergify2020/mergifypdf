@@ -60,9 +60,6 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
               <p className="text-base text-gray-700 sm:text-lg">
                 Edit, manage, and sign your documents from anywhere with ease.
               </p>
-              <p className="text-base text-gray-600 sm:text-lg">
-                Upgrade to get unlimited access to document editing and signing.
-              </p>
               <div className="mt-8 flex w-full justify-center lg:justify-start">
                 <UploadCta usedToday={usedToday} variant="hero" className="w-full max-w-md" />
               </div>
