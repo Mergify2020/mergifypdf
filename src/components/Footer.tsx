@@ -9,7 +9,7 @@ function SocialIcon(props: React.PropsWithChildren<{ label: string }>) {
     <a
       href="#"
       aria-label={label}
-      className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-300 bg-slate-300 text-slate-50 transition hover:bg-slate-400 hover:text-white"
+      className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-300 bg-slate-200 text-black transition hover:bg-slate-300 hover:text-black"
     >
       {children}
     </a>
