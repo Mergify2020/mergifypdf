@@ -66,21 +66,17 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
               <div className="mt-8 flex w-full justify-center lg:justify-start">
                 <UploadCta usedToday={usedToday} variant="hero" className="w-full max-w-md" />
               </div>
-              <div className="mt-6 flex justify-center lg:justify-start">
-                <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-2 py-1.5 text-sm text-slate-700 shadow-sm">
-                  {["Fast performance", "Simple to use", "Free daily upload"].map((badge) => (
-                    <span
-                      key={badge}
-                      className="rounded-full px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 sm:text-sm"
-                    >
-                      {badge}
-                    </span>
-                  ))}
-                </div>
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-sm text-slate-600 lg:justify-start">
+                {["Fast performance", "Simple to use", "1 free upload per day"].map((badge) => (
+                  <span
+                    key={badge}
+                    className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-4 py-1.5 text-slate-700 shadow-sm"
+                  >
+                    <span className="h-2 w-2 rounded-full bg-[#024d7c]" />
+                    {badge}
+                  </span>
+                ))}
               </div>
-              <p className="text-sm text-slate-500">
-                Trusted by freelancers, realtors, students, and small businesses.
-              </p>
               <HeroStats />
             </div>
 
