@@ -56,11 +56,6 @@ const features = [
     icon: FileOutput,
   },
   {
-    title: "Compress PDF",
-    description: "Reduce file size while keeping everything clear.",
-    icon: FileArchive,
-  },
-  {
     title: "Rotate Pages",
     description: "Quickly rotate any page to the correct orientation.",
     icon: RotateCcw,
@@ -175,47 +170,29 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
         </div>
       </section>
 
-      <section className="bg-[#F3F4F8]">
-        <div className="mx-auto w-full max-w-7xl px-6 pt-6 pb-16">
-          <div className="mb-4 h-px w-full bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
-
-          <section className="mt-12 mb-4 text-center">
-            <h2 className="text-xl font-semibold">
+      <section className="mt-12 border-t border-slate-100 bg-slate-50/80">
+        <div className="mx-auto w-full max-w-5xl px-4 py-12 md:py-16">
+          <div className="mb-8 text-center">
+            <h2 className="text-xl font-semibold md:text-2xl">
               All the tools you need to work with PDFs.
             </h2>
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="mt-2 text-sm text-gray-500">
               Merge, edit, sign, and organize your documents in one place.
             </p>
-          </section>
+          </div>
 
-          {(() => {
-            const baseCardClasses =
-              "rounded-2xl border border-slate-200 bg-white/95 px-5 py-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 flex flex-col gap-2";
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 md:gap-8">
+            {features.map(({ title, description, icon: Icon }) => (
+              <FeatureItem
+                key={title}
+                icon={<Icon className="h-5 w-5" aria-hidden />}
+                title={title}
+                description={description}
+              />
+            ))}
+          </div>
 
-            return (
-              <div className="grid gap-4 md:gap-5 grid-cols-2 lg:grid-cols-4 max-w-6xl mx-auto mb-12 items-stretch">
-                {features.map(({ title, description, icon: Icon }, index) => {
-                  const isPrimary = index < 4;
-                  return (
-                    <div
-                      key={title}
-                      className={`${baseCardClasses} h-full ${
-                        isPrimary ? "md:bg-gradient-to-br md:from-purple-50 md:to-indigo-50" : ""
-                      }`}
-                    >
-                      <div className="mb-2 inline-flex h-9 w-9 items-center justify-center rounded-full bg-purple-100 text-purple-600">
-                        <Icon className="h-5 w-5" aria-hidden />
-                      </div>
-                      <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
-                      <p className="mt-1 text-xs text-gray-500">{description}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })()}
-
-          <p className="text-center text-base font-semibold text-slate-600">
+          <p className="mt-10 text-center text-base font-semibold text-slate-600">
             More tools added regularly to simplify your workflow.
           </p>
         </div>
