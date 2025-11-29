@@ -58,7 +58,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
                 <span className="block">and manage PDFs online.</span>
               </h1>
               <p className="text-base text-gray-700 sm:text-lg">
-                Edit and sign all your business documents right in your browser.
+                Edit, manage, and sign your documents from anywhere with ease.
               </p>
               <p className="text-base text-gray-600 sm:text-lg">
                 Upgrade to get unlimited access to document editing and signing.
@@ -67,7 +67,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
                 <UploadCta usedToday={usedToday} variant="hero" className="w-full max-w-md" />
               </div>
               <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-sm text-slate-600 lg:justify-start">
-                {["Fast performance", "Simple to use", "1 free upload per day"].map((badge) => (
+                {["1 free upload per day", "Fast performance", "Simple to use"].map((badge) => (
                   <span
                     key={badge}
                     className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-4 py-1.5 text-slate-700 shadow-sm"
@@ -78,6 +78,9 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
                 ))}
               </div>
               <HeroStats />
+              <p className="mt-3 text-xs text-slate-500 sm:text-sm">
+                Upgrade to get unlimited access to document editing and signing.
+              </p>
             </div>
 
             <div className="mt-10 flex items-center justify-center lg:mt-0 lg:justify-end">

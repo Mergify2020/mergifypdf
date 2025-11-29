@@ -94,7 +94,7 @@ export default function UploadCta({ usedToday, variant = "default", className }:
   return (
     <div className={containerClass}>
       <button type="button" onClick={handleClick} disabled={busy} aria-disabled={busy} className={buttonClass}>
-        {alreadyUsed ? "Upgrade to keep going" : busy ? "Opening..." : "Upload a document"}
+        {alreadyUsed ? "Upgrade to keep going" : busy ? "Opening..." : "Start Editing for Free"}
       </button>
       <input
         ref={fileInputRef}
