@@ -4,7 +4,7 @@ export default function PersonaHighlight() {
   return (
     <section className="bg-white">
       <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 lg:px-0 lg:py-20">
-        <div className="relative mx-auto w-full max-w-5xl">
+        <div className="relative mx-auto w-full max-w-6xl">
           {/* Background with photo – fills rounded container on all sides */}
           <div className="relative h-[640px] w-full overflow-hidden rounded-3xl border border-slate-200 bg-slate-100 shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
             <Image
