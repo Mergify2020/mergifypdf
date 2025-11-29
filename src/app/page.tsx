@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import UploadCta from "@/components/UploadCta";
 import HeroStats from "@/components/HeroStats";
-import HeroFeatureGrid from "@/components/HeroFeatureGrid";
+import HeroFeatureArea from "@/components/HeroFeatureArea";
 import { hasUsedToday } from "@/lib/quota";
 import ProjectsWorkspaceShelf from "@/components/ProjectsWorkspaceShelf";
 import StartProjectButton from "@/components/StartProjectButton";
@@ -97,7 +97,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
         </div>
       </section>
 
-      <HeroFeatureGrid />
+      <HeroFeatureArea />
     </>
   );
 }
