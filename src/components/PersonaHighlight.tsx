@@ -5,16 +5,18 @@ export default function PersonaHighlight() {
     <section className="bg-white">
       <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 lg:px-0 lg:py-20">
         <div className="relative mx-auto w-full max-w-6xl">
-          {/* Background photo with shadow only */}
-          <div className="relative h-[640px] w-full shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
-            <Image
-              src="/hero-team4.svg"
-              alt="Team collaborating with documents in the MergifyPDF workspace"
-              fill
-              sizes="(min-width: 1024px) 100vw, 100vw"
-              className="object-cover object-[62%_45%]"
-              priority={false}
-            />
+          {/* Background photo aligned to the right, with full edge contact on the right */}
+          <div className="flex justify-end">
+            <div className="relative h-[640px] w-[95%] shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
+              <Image
+                src="/hero-team4.svg"
+                alt="Team collaborating with documents in the MergifyPDF workspace"
+                fill
+                sizes="(min-width: 1024px) 100vw, 100vw"
+                className="object-cover object-[62%_45%]"
+                priority={false}
+              />
+            </div>
           </div>
 
           {/* Floating text card */}
