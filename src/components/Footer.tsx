@@ -9,7 +9,7 @@ function SocialIcon(props: React.PropsWithChildren<{ label: string }>) {
     <a
       href="#"
       aria-label={label}
-      className="flex h-10 w-10 items-center justify-center rounded-md border border-slate-300 bg-slate-100 text-slate-600 transition hover:bg-slate-200 hover:text-slate-800"
+      className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-300 bg-slate-300 text-slate-50 transition hover:bg-slate-400 hover:text-white"
     >
       {children}
     </a>
@@ -140,19 +140,19 @@ export default function Footer() {
 
             <div className="flex items-center gap-3 text-slate-500">
               <SocialIcon label="MergifyPDF on TikTok">
-                <TikTokIcon className="h-4 w-4" />
+                <TikTokIcon className="h-5 w-5" />
               </SocialIcon>
               <SocialIcon label="MergifyPDF on Instagram">
-                <Instagram className="h-4 w-4" />
+                <Instagram className="h-5 w-5" />
               </SocialIcon>
               <SocialIcon label="MergifyPDF on X (Twitter)">
-                <Twitter className="h-4 w-4" />
+                <Twitter className="h-5 w-5" />
               </SocialIcon>
               <SocialIcon label="MergifyPDF on Facebook">
-                <Facebook className="h-4 w-4" />
+                <Facebook className="h-5 w-5" />
               </SocialIcon>
               <SocialIcon label="MergifyPDF on LinkedIn">
-                <Linkedin className="h-4 w-4" />
+                <Linkedin className="h-5 w-5" />
               </SocialIcon>
             </div>
           </div>
