@@ -74,19 +74,19 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
             {/* Sparkle A – top-left in gradient */}
             <Sparkle
               gradientId="sparkle-top-left"
-              className="pointer-events-none absolute left-8 top-14 z-20 h-6 w-6 opacity-90 sm:left-10 sm:top-16 sm:h-7 sm:w-7 md:left-9 md:top-14 md:h-8 md:w-8"
+              className="pointer-events-none absolute left-4 top-10 z-20 h-7 w-7 opacity-90 sm:left-6 sm:top-12 sm:h-8 sm:w-8 md:left-8 md:top-12 md:h-9 md:w-9"
             />
 
-            {/* Sparkle B – mid-right near screenshot */}
+            {/* Sparkle B – mid-gutter between text and screenshot */}
             <Sparkle
               gradientId="sparkle-mid-right"
-              className="pointer-events-none absolute right-6 top-1/2 z-20 h-6 w-6 -translate-y-1/2 opacity-85 sm:right-8 sm:h-7 sm:w-7 md:right-10 md:h-8 md:w-8"
+              className="pointer-events-none absolute left-[52%] top-1/2 z-20 h-7 w-7 -translate-y-1/2 opacity-85 sm:left-[54%] sm:h-8 sm:w-8 md:left-[55%] md:h-9 md:w-9"
             />
 
-            {/* Sparkle C – bottom-left accent near stats */}
+            {/* Sparkle C – bottom-right accent in gradient */}
             <Sparkle
               gradientId="sparkle-right-bottom"
-              className="pointer-events-none absolute bottom-6 right-8 z-20 h-6 w-6 opacity-70 sm:bottom-7 sm:right-10 sm:h-7 sm:w-7 md:bottom-8 md:right-12 md:h-8 md:w-8"
+              className="pointer-events-none absolute bottom-6 right-6 z-20 h-7 w-7 opacity-70 sm:bottom-7 sm:right-8 sm:h-8 sm:w-8 md:bottom-8 md:right-10 md:h-9 md:w-9"
             />
 
             <div className="relative z-10 space-y-6 text-center lg:text-left">
