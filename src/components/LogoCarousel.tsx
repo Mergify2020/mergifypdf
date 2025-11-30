@@ -23,7 +23,7 @@ export default function LogoCarousel() {
 
   return (
     <section className="bg-white">
-      <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-0 lg:py-12">
+      <div className="mx-auto w-full max-w-7xl px-6 py-10 lg:py-12">
         <div className="text-center">
           <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
             Trusted by the world&apos;s top companies

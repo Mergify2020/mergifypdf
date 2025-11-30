@@ -50,7 +50,7 @@ const FEATURE_BOXES: FeatureBox[] = [
 export default function HeroFeatureArea() {
   return (
     <section className="bg-white">
-      <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-0">
+      <div className="mx-auto w-full max-w-7xl px-6 py-10">
         {/* Feature grid */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 sm:gap-5">
           {FEATURE_BOXES.map((feature) => (
