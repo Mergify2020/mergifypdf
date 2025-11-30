@@ -37,16 +37,29 @@ export default function LogoCarousel() {
 
         <div className="mt-8">
           <div className="logo-marquee-mask">
-            <div className="logo-marquee-row flex items-center gap-16">
-              {[...logos, ...logos].map((logo, index) => (
-                <img
-                  key={`${logo.name}-${index}`}
-                  src={logo.url}
-                  alt={`${logo.name} logo`}
-                  className="h-10 w-auto"
-                  loading="lazy"
-                />
-              ))}
+            <div className="logo-marquee-row flex">
+              <div className="logo-track flex items-center gap-[48px]">
+                {logos.map((logo) => (
+                  <img
+                    key={logo.name}
+                    src={logo.url}
+                    alt={`${logo.name} logo`}
+                    className="h-10 w-auto flex-shrink-0"
+                    loading="lazy"
+                  />
+                ))}
+              </div>
+              <div className="logo-track flex items-center gap-[48px]" aria-hidden="true">
+                {logos.map((logo) => (
+                  <img
+                    key={`${logo.name}-duplicate`}
+                    src={logo.url}
+                    alt=""
+                    className="h-10 w-auto flex-shrink-0"
+                    loading="lazy"
+                  />
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -66,9 +79,13 @@ export default function LogoCarousel() {
         }
 
         .logo-marquee-row {
-          animation: logo-scroll 38s linear infinite;
+          width: max-content;
+          animation: logo-scroll 40s linear infinite;
         }
 
+        .logo-track {
+          flex-shrink: 0;
+        }
         @keyframes logo-scroll {
           0% {
             transform: translateX(0);
