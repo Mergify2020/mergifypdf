@@ -21,6 +21,8 @@ export default function LogoCarousel() {
     { name: "State Farm", url: "/statefarm.png" },
   ];
 
+  const mobileLogos: Logo[] = logos.filter((logo) => logo.name !== "Wayfair");
+
   return (
     <section className="bg-white">
       <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-0 lg:py-12">
@@ -34,33 +36,51 @@ export default function LogoCarousel() {
         </div>
 
         <div className="mt-8">
-          <div className="logo-marquee-mask logo-carousel-mask">
-            <div className="logo-marquee-row logo-carousel flex items-center gap-[48px]">
-              <div className="logo-track logo-carousel-track flex items-center gap-[48px]">
-                {logos.map((logo) => (
-                  <img
-                    key={logo.name}
-                    src={logo.url}
-                    alt={`${logo.name} logo`}
-                    className="logo-carousel-img h-10 w-auto flex-shrink-0"
-                    loading="lazy"
-                  />
-                ))}
+          {/* Desktop: marquee carousel */}
+          <div className="hidden md:block">
+            <div className="logo-marquee-mask logo-carousel-mask">
+              <div className="logo-marquee-row logo-carousel flex items-center gap-[48px]">
+                <div className="logo-track logo-carousel-track flex items-center gap-[48px]">
+                  {logos.map((logo) => (
+                    <img
+                      key={logo.name}
+                      src={logo.url}
+                      alt={`${logo.name} logo`}
+                      className="logo-carousel-img h-10 w-auto flex-shrink-0"
+                      loading="lazy"
+                    />
+                  ))}
+                </div>
+                <div
+                  className="logo-track logo-carousel-track logo-carousel-track--dup flex items-center gap-[48px]"
+                  aria-hidden="true"
+                >
+                  {logos.map((logo) => (
+                    <img
+                      key={`${logo.name}-duplicate`}
+                      src={logo.url}
+                      alt=""
+                      className="logo-carousel-img h-10 w-auto flex-shrink-0"
+                      loading="lazy"
+                    />
+                  ))}
+                </div>
               </div>
-              <div
-                className="logo-track logo-carousel-track logo-carousel-track--dup flex items-center gap-[48px]"
-                aria-hidden="true"
-              >
-                {logos.map((logo) => (
-                  <img
-                    key={`${logo.name}-duplicate`}
-                    src={logo.url}
-                    alt=""
-                    className="logo-carousel-img h-10 w-auto flex-shrink-0"
-                    loading="lazy"
-                  />
-                ))}
-              </div>
+            </div>
+          </div>
+
+          {/* Mobile: static logo grid (Wayfair removed) */}
+          <div className="block md:hidden">
+            <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-6">
+              {mobileLogos.map((logo) => (
+                <img
+                  key={`mobile-${logo.name}`}
+                  src={logo.url}
+                  alt={`${logo.name} logo`}
+                  className="h-7 w-auto"
+                  loading="lazy"
+                />
+              ))}
             </div>
           </div>
         </div>
@@ -76,7 +96,7 @@ export default function LogoCarousel() {
         .logo-marquee-row,
         .logo-carousel {
           width: max-content;
-          animation: logo-scroll 48s linear infinite;
+          animation: logo-scroll 60s linear infinite;
           will-change: transform;
         }
 
