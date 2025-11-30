@@ -1,7 +1,22 @@
  "use client";
 
+type Logo = {
+  name: string;
+  url: string;
+};
+
 export default function LogoCarousel() {
-  const logos = ["Netflix", "PepsiCo", "Kellogg's", "Kohl's", "Allstate", "Wayfair", "Facebook", "UPS", "FedEx"];
+  const logos: Logo[] = [
+    { name: "Wayfair", url: "https://cdn.simpleicons.org/wayfair" },
+    { name: "Facebook", url: "https://cdn.simpleicons.org/facebook" },
+    { name: "UPS", url: "https://cdn.simpleicons.org/ups" },
+    { name: "FedEx", url: "https://cdn.simpleicons.org/fedex" },
+    { name: "Netflix", url: "https://cdn.simpleicons.org/netflix" },
+    { name: "PepsiCo", url: "https://cdn.simpleicons.org/pepsico" },
+    { name: "Kellogg's", url: "https://cdn.simpleicons.org/kelloggs" },
+    { name: "Kohl's", url: "https://cdn.simpleicons.org/kohls" },
+    { name: "Allstate", url: "https://cdn.simpleicons.org/allstate" },
+  ];
 
   return (
     <section className="bg-white">
@@ -15,20 +30,38 @@ export default function LogoCarousel() {
           </p>
         </div>
 
-        <div className="mt-8 overflow-hidden">
-          <div className="logo-marquee flex items-center gap-12 whitespace-nowrap text-slate-400">
-            {[...logos, ...logos].map((name) => (
-              <span key={name} className="text-lg font-semibold tracking-wide sm:text-xl">
-                {name}
-              </span>
-            ))}
+        <div className="mt-8">
+          <div className="logo-marquee-mask">
+            <div className="logo-marquee-row flex items-center gap-16">
+              {[...logos, ...logos].map((logo, index) => (
+                <img
+                  key={`${logo.name}-${index}`}
+                  src={logo.url}
+                  alt={`${logo.name} logo`}
+                  className="h-7 w-auto"
+                  loading="lazy"
+                />
+              ))}
+            </div>
           </div>
         </div>
       </div>
 
       <style jsx>{`
-        .logo-marquee {
-          animation: logo-scroll 32s linear infinite;
+        .logo-marquee-mask {
+          overflow: hidden;
+          mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
+          -webkit-mask-image: linear-gradient(
+            to right,
+            transparent 0%,
+            black 15%,
+            black 85%,
+            transparent 100%
+          );
+        }
+
+        .logo-marquee-row {
+          animation: logo-scroll 34s linear infinite;
         }
 
         @keyframes logo-scroll {
