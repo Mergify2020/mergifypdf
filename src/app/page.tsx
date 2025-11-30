@@ -76,6 +76,11 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
               gradientId="sparkle-middle"
               className="pointer-events-none absolute right-[14%] top-10 hidden h-6 w-6 opacity-90 sm:right-[16%] sm:top-8 sm:h-7 sm:w-7 md:block md:h-10 md:w-10"
             />
+            {/* Sparkle near bottom-right of hero background beside picture */}
+            <Sparkle
+              gradientId="sparkle-right-bottom"
+              className="pointer-events-none absolute bottom-6 right-10 h-5 w-5 opacity-80 sm:bottom-8 sm:right-12 sm:h-6 sm:w-6 md:h-9 md:w-9"
+            />
 
             <div className="relative z-10 space-y-6 text-center lg:text-left">
               {/* Sparkle above/left of headline in empty space */}
