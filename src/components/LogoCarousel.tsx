@@ -7,7 +7,6 @@ type Logo = {
 
 export default function LogoCarousel() {
   const logos: Logo[] = [
-    { name: "Amazon", url: "/amazon.svg" },
     { name: "Netflix", url: "/netflix.svg" },
     { name: "Target", url: "/target.svg" },
     { name: "Walmart", url: "/walmart.svg" },
@@ -41,7 +40,10 @@ export default function LogoCarousel() {
               {[0, 1, 2].map((trackIndex) => (
                 <div
                   key={trackIndex}
-                  className="logo-track flex items-center gap-[48px]"
+                  className={
+                    "logo-track flex items-center gap-[48px] " +
+                    (trackIndex === 2 ? "ml-[67px]" : "")
+                  }
                   aria-hidden={trackIndex !== 0}
                 >
                   {logos.map((logo) => (
@@ -75,7 +77,7 @@ export default function LogoCarousel() {
 
         .logo-marquee-row {
           width: max-content;
-          animation: logo-scroll 42s linear infinite;
+          animation: logo-scroll 55s linear infinite;
         }
 
         .logo-track {
