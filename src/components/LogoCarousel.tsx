@@ -93,15 +93,6 @@ export default function LogoCarousel() {
           }
         }
 
-        @keyframes logoMarqueeMobile {
-          0% {
-            transform: translateX(0);
-          }
-          100% {
-            transform: translateX(-50%);
-          }
-        }
-
         /* Desktop: marquee animation + fade edges */
         @media (min-width: 769px) {
           .logo-marquee-row.logo-carousel {
@@ -124,7 +115,7 @@ export default function LogoCarousel() {
           }
         }
 
-        /* Mobile: simpler animation, no masks or filters */
+        /* Mobile: no masks, no animation – static clean logos */
         @media (max-width: 768px) {
           .logo-carousel-mask,
           .logo-carousel {
@@ -132,20 +123,28 @@ export default function LogoCarousel() {
             -webkit-mask-image: none !important;
             clip-path: none !important;
             filter: none !important;
-            mix-blend-mode: normal !important;
+          }
+
+          .logo-carousel {
+            width: 100%;
+            justify-content: center;
+            flex-wrap: wrap;
           }
 
           .logo-carousel-track {
-            animation: logoMarqueeMobile 30s linear infinite;
-            transform: translateX(0);
-            will-change: transform;
+            animation: none !important;
+            transform: none !important;
+            will-change: auto !important;
+          }
+
+          .logo-carousel-track--dup {
+            display: none;
           }
 
           .logo-carousel-img {
             height: 28px;
             transform: none !important;
             image-rendering: auto;
-            filter: none !important;
           }
         }
       `}</style>
