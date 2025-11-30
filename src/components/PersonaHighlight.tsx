@@ -13,7 +13,7 @@ export default function PersonaHighlight() {
                 alt="Team collaborating with documents in the MergifyPDF workspace"
                 fill
                 sizes="(min-width: 1024px) 100vw, 100vw"
-                className="object-cover object-[70%_45%]"
+                className="object-cover object-[80%_45%]"
                 priority={false}
               />
             </div>
