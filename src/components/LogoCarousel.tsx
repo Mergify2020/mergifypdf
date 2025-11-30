@@ -38,29 +38,59 @@ export default function LogoCarousel() {
           <div className="logo-marquee-mask logo-carousel-mask">
             <div className="logo-marquee-row logo-carousel flex items-center gap-[48px]">
               <div className="logo-track logo-carousel-track flex items-center gap-[48px]">
-                {logos.map((logo) => (
-                  <img
-                    key={logo.name}
-                    src={logo.url}
-                    alt={`${logo.name} logo`}
-                    className="logo-carousel-img h-10 w-auto flex-shrink-0"
-                    loading="lazy"
-                  />
-                ))}
+                {logos.map((logo) =>
+                  logo.name === "Netflix" ? (
+                    <picture key={logo.name}>
+                      <source
+                        srcSet={logo.url}
+                        media="(min-width: 769px)"
+                      />
+                      <img
+                        src="/netflix.png"
+                        alt="Netflix logo"
+                        className="logo-carousel-img h-10 w-auto flex-shrink-0"
+                        loading="lazy"
+                      />
+                    </picture>
+                  ) : (
+                    <img
+                      key={logo.name}
+                      src={logo.url}
+                      alt={`${logo.name} logo`}
+                      className="logo-carousel-img h-10 w-auto flex-shrink-0"
+                      loading="lazy"
+                    />
+                  )
+                )}
               </div>
               <div
                 className="logo-track logo-carousel-track logo-carousel-track--dup flex items-center gap-[48px]"
                 aria-hidden="true"
               >
-                {logos.map((logo) => (
-                  <img
-                    key={`${logo.name}-duplicate`}
-                    src={logo.url}
-                    alt=""
-                    className="logo-carousel-img h-10 w-auto flex-shrink-0"
-                    loading="lazy"
-                  />
-                ))}
+                {logos.map((logo) =>
+                  logo.name === "Netflix" ? (
+                    <picture key={`${logo.name}-duplicate`}>
+                      <source
+                        srcSet={logo.url}
+                        media="(min-width: 769px)"
+                      />
+                      <img
+                        src="/netflix.png"
+                        alt=""
+                        className="logo-carousel-img h-10 w-auto flex-shrink-0"
+                        loading="lazy"
+                      />
+                    </picture>
+                  ) : (
+                    <img
+                      key={`${logo.name}-duplicate`}
+                      src={logo.url}
+                      alt=""
+                      className="logo-carousel-img h-10 w-auto flex-shrink-0"
+                      loading="lazy"
+                    />
+                  )
+                )}
               </div>
             </div>
           </div>
@@ -77,6 +107,8 @@ export default function LogoCarousel() {
         .logo-marquee-row,
         .logo-carousel {
           width: max-content;
+          animation: logo-scroll 48s linear infinite;
+          will-change: transform;
         }
 
         .logo-track,
@@ -93,13 +125,8 @@ export default function LogoCarousel() {
           }
         }
 
-        /* Desktop: marquee animation + fade edges */
+        /* Desktop: fade edges */
         @media (min-width: 769px) {
-          .logo-marquee-row.logo-carousel {
-            animation: logo-scroll 48s linear infinite;
-            will-change: transform;
-          }
-
           .logo-marquee-mask::before {
             content: "";
             position: absolute;
@@ -115,7 +142,7 @@ export default function LogoCarousel() {
           }
         }
 
-        /* Mobile: no masks, no animation – static clean logos */
+        /* Mobile: no masks, no animation overrides—just disable masking if any */
         @media (max-width: 768px) {
           .logo-carousel-mask,
           .logo-carousel {
@@ -123,22 +150,6 @@ export default function LogoCarousel() {
             -webkit-mask-image: none !important;
             clip-path: none !important;
             filter: none !important;
-          }
-
-          .logo-carousel {
-            width: 100%;
-            justify-content: center;
-            flex-wrap: wrap;
-          }
-
-          .logo-carousel-track {
-            animation: none !important;
-            transform: none !important;
-            will-change: auto !important;
-          }
-
-          .logo-carousel-track--dup {
-            display: none;
           }
 
           .logo-carousel-img {
