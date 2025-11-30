@@ -54,19 +54,26 @@ export default function LogoCarousel() {
       <style jsx>{`
         .logo-marquee-mask {
           overflow: hidden;
-          mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
-          -webkit-mask-image: linear-gradient(
-            to right,
-            transparent 0%,
-            black 15%,
-            black 85%,
-            transparent 100%
-          );
+          position: relative;
         }
 
         .logo-marquee-row {
           width: max-content;
           animation: logo-scroll 48s linear infinite;
+        }
+
+        .logo-marquee-mask::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          background: linear-gradient(
+            to right,
+            rgba(255, 255, 255, 1) 0%,
+            rgba(255, 255, 255, 0) 15%,
+            rgba(255, 255, 255, 0) 85%,
+            rgba(255, 255, 255, 1) 100%
+          );
         }
 
         @keyframes logo-scroll {
