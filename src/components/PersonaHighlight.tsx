@@ -14,17 +14,17 @@ export default function PersonaHighlight() {
             priority={false}
           />
 
-          {/* Text card over image */}
-          <div className="pointer-events-none absolute inset-x-10 top-1/2 flex -translate-y-1/2 justify-center md:inset-x-auto md:left-10 md:top-10 md:translate-y-0 md:justify-start">
-            <div className="pointer-events-auto max-w-[260px] rounded-3xl bg-[rgba(7,21,36,0.88)] px-3 py-3 text-white text-[11px] shadow-[0_18px_45px_rgba(0,0,0,0.24)] scale-[0.65] sm:max-w-[440px] sm:px-8 sm:py-10 sm:text-base sm:scale-100">
+          {/* Text card over image (desktop / tablet) */}
+          <div className="pointer-events-none absolute inset-x-10 top-1/2 hidden -translate-y-1/2 justify-center md:inset-x-auto md:left-10 md:top-10 md:flex md:translate-y-0 md:justify-start">
+            <div className="pointer-events-auto max-w-[440px] rounded-3xl bg-[rgba(7,21,36,0.88)] px-8 py-10 text-white text-base shadow-[0_18px_45px_rgba(0,0,0,0.24)]">
               <div>
-                <p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-slate-100 sm:text-xs">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-100">
                   Built for every workflow
                 </p>
-                <h2 className="mt-1 text-base font-semibold leading-snug sm:mt-3 sm:text-3xl">
+                <h2 className="mt-2 text-2xl font-semibold leading-snug">
                   Perfect for One Person or an Entire Team
                 </h2>
-                <p className="mt-2 max-w-[36rem] text-[11px] leading-relaxed text-slate-100 sm:text-base">
+                <p className="mt-3 max-w-[36rem] text-sm leading-relaxed text-slate-100">
                   Whether you&apos;re working solo or collaborating with others,
                   MergifyPDF makes editing, organizing, and signing documents
                   fast, simple, and reliable.
@@ -32,6 +32,20 @@ export default function PersonaHighlight() {
               </div>
             </div>
           </div>
+        </div>
+        {/* Text card below image (mobile / vertical) */}
+        <div className="mt-4 w-full rounded-3xl bg-[rgba(7,21,36,0.88)] px-6 py-6 text-center text-white shadow-[0_18px_45px_rgba(0,0,0,0.24)] md:hidden">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-100">
+            Built for every workflow
+          </p>
+          <h2 className="mt-2 text-lg font-semibold leading-snug">
+            Perfect for One Person or an Entire Team
+          </h2>
+          <p className="mt-3 text-xs leading-relaxed text-slate-100">
+            Whether you&apos;re working solo or collaborating with others,
+            MergifyPDF makes editing, organizing, and signing documents fast,
+            simple, and reliable.
+          </p>
         </div>
       </div>
     </section>
