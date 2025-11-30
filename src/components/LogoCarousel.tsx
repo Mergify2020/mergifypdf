@@ -1,3 +1,5 @@
+ "use client";
+
 export default function LogoCarousel() {
   const logos = ["Netflix", "PepsiCo", "Kellogg's", "Kohl's", "Allstate", "Wayfair", "Facebook", "UPS", "FedEx"];
 
@@ -41,4 +43,3 @@ export default function LogoCarousel() {
     </section>
   );
 }
-
