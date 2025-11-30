@@ -38,28 +38,23 @@ export default function LogoCarousel() {
         <div className="mt-8">
           <div className="logo-marquee-mask">
             <div className="logo-marquee-row flex">
-              <div className="logo-track flex items-center gap-[48px]">
-                {logos.map((logo) => (
-                  <img
-                    key={logo.name}
-                    src={logo.url}
-                    alt={`${logo.name} logo`}
-                    className="h-10 w-auto flex-shrink-0"
-                    loading="lazy"
-                  />
-                ))}
-              </div>
-              <div className="logo-track flex items-center gap-[48px]" aria-hidden="true">
-                {logos.map((logo) => (
-                  <img
-                    key={`${logo.name}-duplicate`}
-                    src={logo.url}
-                    alt=""
-                    className="h-10 w-auto flex-shrink-0"
-                    loading="lazy"
-                  />
-                ))}
-              </div>
+              {[0, 1, 2].map((trackIndex) => (
+                <div
+                  key={trackIndex}
+                  className="logo-track flex items-center gap-[48px]"
+                  aria-hidden={trackIndex !== 0}
+                >
+                  {logos.map((logo) => (
+                    <img
+                      key={`${logo.name}-${trackIndex}`}
+                      src={logo.url}
+                      alt={trackIndex === 0 ? `${logo.name} logo` : ""}
+                      className="h-10 w-auto flex-shrink-0"
+                      loading="lazy"
+                    />
+                  ))}
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -80,7 +75,7 @@ export default function LogoCarousel() {
 
         .logo-marquee-row {
           width: max-content;
-          animation: logo-scroll 40s linear infinite;
+          animation: logo-scroll 42s linear infinite;
         }
 
         .logo-track {
@@ -91,7 +86,7 @@ export default function LogoCarousel() {
             transform: translateX(0);
           }
           100% {
-            transform: translateX(-50%);
+            transform: translateX(-33.3333%);
           }
         }
       `}</style>
