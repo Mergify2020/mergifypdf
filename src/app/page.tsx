@@ -53,7 +53,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
     <>
       <section className="w-full bg-gradient-to-r from-[#FDF2FF] via-[#EEF2FF] to-[#E0F7FF]">
         <div className="mx-auto w-full max-w-7xl px-6 py-10 sm:py-14 lg:py-16">
-          <div className="grid gap-12 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.1fr)] lg:items-center">
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.1fr)] lg:items-center lg:gap-12">
             <div className="space-y-6 text-center lg:text-left">
               <h1 className="text-3xl font-semibold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
                 <span className="block">The fastest way to edit, sign,</span>
@@ -65,7 +65,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
               <div className="mt-4 flex w-full justify-center lg:justify-start">
                 <UploadCta usedToday={usedToday} variant="hero" className="w-full max-w-md" />
               </div>
-              <div className="mt-14 flex flex-wrap items-center justify-center gap-3 text-sm text-slate-600 lg:justify-start">
+              <div className="mt-6 sm:mt-14 flex flex-wrap items-center justify-center gap-3 text-sm text-slate-600 lg:justify-start">
                 {["1 free upload per day", "Fast performance", "Simple to use"].map((badge) => (
                   <span
                     key={badge}
