@@ -71,17 +71,17 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
       <section className="w-full bg-gradient-to-r from-[#FDF2FF] via-[#EEF2FF] to-[#E0F7FF]">
         <div className="mx-auto w-full max-w-7xl px-6 py-10 sm:py-14 lg:py-16">
           <div className="relative grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.1fr)] lg:items-center lg:gap-12">
-            {/* Sparkle floating between headline + screenshot */}
+            {/* Sparkle floating between headline + screenshot / near picture */}
             <Sparkle
               gradientId="sparkle-middle"
-              className="pointer-events-none absolute right-[20%] top-4 hidden h-5 w-5 opacity-80 sm:h-6 sm:w-6 md:block md:h-8 md:w-8"
+              className="pointer-events-none absolute right-[14%] top-10 hidden h-6 w-6 opacity-90 sm:right-[16%] sm:top-8 sm:h-7 sm:w-7 md:block md:h-10 md:w-10"
             />
 
             <div className="relative z-10 space-y-6 text-center lg:text-left">
               {/* Sparkle above/left of headline in empty space */}
               <Sparkle
                 gradientId="sparkle-top-left"
-                className="pointer-events-none absolute -top-6 left-0 h-5 w-5 opacity-80 sm:-top-7 sm:left-2 sm:h-6 sm:w-6 md:-top-9 md:left-4 md:h-10 md:w-10"
+                className="pointer-events-none absolute -top-6 left-0 h-6 w-6 opacity-90 sm:-top-7 sm:left-2 sm:h-7 sm:w-7 md:-top-9 md:left-4 md:h-11 md:w-11"
               />
               <h1 className="text-3xl font-semibold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
                 <span className="block">The fastest way to edit, sign,</span>
@@ -108,7 +108,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
                 {/* Subtle sparkle near stats row */}
                 <Sparkle
                   gradientId="sparkle-stats"
-                  className="pointer-events-none absolute -left-4 top-2 h-4 w-4 opacity-30 sm:-left-5 sm:top-1 sm:h-5 sm:w-5 md:h-6 md:w-6"
+                  className="pointer-events-none absolute -left-4 top-1 h-4 w-4 opacity-70 sm:-left-5 sm:-top-1 sm:h-5 sm:w-5 md:h-7 md:w-7"
                 />
                 <HeroStats />
               </div>
