@@ -4,24 +4,19 @@ export default function PersonaHighlight() {
   return (
     <section className="bg-white">
       <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 lg:px-0 lg:py-20">
-        <div className="relative mx-auto w-full max-w-6xl">
-          {/* Background photo aligned to the right; slightly narrower to reduce visible white area on the left */}
-          <div className="flex justify-end">
-            <div className="relative h-[640px] w-[92%] shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
-              <Image
-                src="/hero-team4.svg"
-                alt="Team collaborating with documents in the MergifyPDF workspace"
-                fill
-                sizes="(min-width: 1024px) 100vw, 100vw"
-                className="object-cover object-[80%_45%]"
-                priority={false}
-              />
-            </div>
-          </div>
+        <div className="relative mx-auto w-full max-w-6xl overflow-hidden rounded-3xl shadow-xl">
+          <Image
+            src="/hero-team4.svg"
+            alt="Team collaborating with documents in the MergifyPDF workspace"
+            width={1440}
+            height={810}
+            className="h-[400px] w-full object-cover"
+            priority={false}
+          />
 
           {/* Floating text card */}
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center">
-            <div className="pointer-events-auto flex min-h-[520px] max-w-sm rounded-2xl bg-[#0D1B2A] px-8 py-16 text-white shadow-2xl sm:px-8 sm:py-16">
+            <div className="pointer-events-auto flex max-w-sm rounded-2xl bg-[#0D1B2A] px-8 py-10 text-white shadow-2xl sm:px-8 sm:py-12">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-300 sm:text-xs">
                   Built for real workflows
