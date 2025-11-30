@@ -67,36 +67,18 @@ export default function LogoCarousel() {
             </div>
           </div>
 
-          {/* Mobile: marquee carousel as well */}
+          {/* Mobile: static 3x4 logo grid */}
           <div className="block md:hidden">
-            <div className="logo-marquee-mask logo-carousel-mask">
-              <div className="logo-marquee-row logo-carousel flex items-center gap-[32px]">
-                <div className="logo-track logo-carousel-track flex items-center gap-[32px]">
-                  {logos.map((logo) => (
-                    <img
-                      key={`mobile-${logo.name}`}
-                      src={logo.url}
-                      alt={`${logo.name} logo`}
-                      className="logo-carousel-img h-7 w-auto flex-shrink-0"
-                      loading="lazy"
-                    />
-                  ))}
-                </div>
-                <div
-                  className="logo-track logo-carousel-track logo-carousel-track--dup flex items-center gap-[32px]"
-                  aria-hidden="true"
-                >
-                  {logos.map((logo) => (
-                    <img
-                      key={`mobile-${logo.name}-duplicate`}
-                      src={logo.url}
-                      alt=""
-                      className="logo-carousel-img h-7 w-auto flex-shrink-0"
-                      loading="lazy"
-                    />
-                  ))}
-                </div>
-              </div>
+            <div className="grid grid-cols-3 gap-x-10 gap-y-6 justify-items-center">
+              {logos.map((logo) => (
+                <img
+                  key={`mobile-${logo.name}`}
+                  src={logo.url}
+                  alt={`${logo.name} logo`}
+                  className="h-7 w-auto"
+                  loading="lazy"
+                />
+              ))}
             </div>
           </div>
         </div>
@@ -130,7 +112,7 @@ export default function LogoCarousel() {
           }
         }
 
-        /* Desktop & landscape: fade edges + CSS marquee */
+        /* Desktop: fade edges + CSS marquee */
         @media (min-width: 769px) {
           .logo-marquee-mask::before {
             content: "";
@@ -144,23 +126,6 @@ export default function LogoCarousel() {
               rgba(255, 255, 255, 0) 85%,
               rgba(255, 255, 255, 1) 100%
             );
-          }
-        }
-
-        /* Mobile: keep marquee, no masks/filters, slightly smaller logos */
-        @media (max-width: 768px) {
-          .logo-carousel-mask,
-          .logo-carousel {
-            mask-image: none !important;
-            -webkit-mask-image: none !important;
-            clip-path: none !important;
-            filter: none !important;
-          }
-
-          .logo-carousel-img {
-            height: 28px;
-            transform: none !important;
-            image-rendering: auto;
           }
         }
       `}</style>
