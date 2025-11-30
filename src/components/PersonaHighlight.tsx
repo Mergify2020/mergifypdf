@@ -14,19 +14,9 @@ export default function PersonaHighlight() {
             priority={false}
           />
 
-          {/* Soft left-to-right navy gradient overlay */}
-          <div
-            className="pointer-events-none absolute inset-0"
-            style={{
-              background:
-                "radial-gradient(circle at 15% 15%, rgba(7, 21, 36, 0.95) 0%, rgba(7, 21, 36, 0.75) 28%, rgba(7, 21, 36, 0.45) 48%, rgba(7, 21, 36, 0.2) 68%, rgba(7, 21, 36, 0.05) 82%, rgba(7, 21, 36, 0) 100%)",
-            }}
-            aria-hidden="true"
-          />
-
-          {/* Text over gradient */}
-          <div className="pointer-events-none absolute inset-0 flex items-start justify-start pt-3 pl-3 sm:pt-4 sm:pl-6">
-            <div className="pointer-events-auto flex max-w-xl md:max-w-2xl px-8 py-10 text-white sm:px-10 sm:py-12">
+          {/* Text card over image */}
+          <div className="pointer-events-none absolute inset-x-4 top-6 flex justify-center md:inset-x-auto md:left-10 md:top-10 md:justify-start">
+            <div className="pointer-events-auto max-w-[440px] rounded-3xl bg-[rgba(7,21,36,0.88)] px-8 py-7 text-white shadow-[0_18px_45px_rgba(0,0,0,0.24)]">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-100 sm:text-xs">
                   Built for every workflow
