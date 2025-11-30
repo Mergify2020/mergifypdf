@@ -19,13 +19,13 @@ export default function PersonaHighlight() {
             className="pointer-events-none absolute inset-0"
             style={{
               background:
-                "linear-gradient(to right, rgba(7, 21, 36, 0.7) 0%, rgba(7, 21, 36, 0.55) 18%, rgba(7, 21, 36, 0.35) 36%, rgba(7, 21, 36, 0.18) 54%, rgba(7, 21, 36, 0.06) 72%, rgba(7, 21, 36, 0) 100%)",
+                "linear-gradient(to right, rgba(7, 21, 36, 0.9) 0%, rgba(7, 21, 36, 0.7) 18%, rgba(7, 21, 36, 0.5) 36%, rgba(7, 21, 36, 0.28) 54%, rgba(7, 21, 36, 0.1) 72%, rgba(7, 21, 36, 0) 100%)",
             }}
             aria-hidden="true"
           />
 
           {/* Text over gradient */}
-          <div className="pointer-events-none absolute inset-0 flex items-start justify-start pt-4 pl-4 sm:pt-6 sm:pl-8">
+          <div className="pointer-events-none absolute inset-0 flex items-start justify-start pt-3 pl-3 sm:pt-4 sm:pl-6">
             <div className="pointer-events-auto flex max-w-md px-8 py-10 text-white sm:max-w-lg sm:px-10 sm:py-12">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-100 sm:text-xs">
