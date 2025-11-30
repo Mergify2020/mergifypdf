@@ -1,11 +1,15 @@
  "use client";
 
+import { useEffect, useRef } from "react";
+
 type Logo = {
   name: string;
   url: string;
 };
 
 export default function LogoCarousel() {
+  const carouselRef = useRef<HTMLDivElement | null>(null);
+
   const logos: Logo[] = [
     { name: "Netflix", url: "/netflix.png" },
     { name: "Target", url: "/target.png" },
@@ -21,7 +25,32 @@ export default function LogoCarousel() {
     { name: "State Farm", url: "/statefarm.png" },
   ];
 
-  const mobileLogos: Logo[] = logos.filter((logo) => logo.name !== "Wayfair");
+  // Mobile: scroll-based marquee using scrollLeft to avoid transform glitches
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.innerWidth > 768) return;
+
+    const container = carouselRef.current;
+    if (!container) return;
+
+    let frameId: number;
+    const step = 0.4; // pixels per frame for smooth, slow scroll
+
+    const tick = () => {
+      const maxScroll = container.scrollWidth / 2;
+      container.scrollLeft += step;
+      if (container.scrollLeft >= maxScroll) {
+        container.scrollLeft -= maxScroll;
+      }
+      frameId = requestAnimationFrame(tick);
+    };
+
+    frameId = requestAnimationFrame(tick);
+
+    return () => {
+      cancelAnimationFrame(frameId);
+    };
+  }, []);
 
   return (
     <section className="bg-white">
@@ -38,7 +67,7 @@ export default function LogoCarousel() {
         <div className="mt-8">
           {/* Desktop: marquee carousel */}
           <div className="hidden md:block">
-            <div className="logo-marquee-mask logo-carousel-mask">
+          <div ref={carouselRef} className="logo-marquee-mask logo-carousel-mask">
               <div className="logo-marquee-row logo-carousel flex items-center gap-[48px]">
                 <div className="logo-track logo-carousel-track flex items-center gap-[48px]">
                   {logos.map((logo) => (
@@ -69,10 +98,10 @@ export default function LogoCarousel() {
             </div>
           </div>
 
-          {/* Mobile: static logo grid (Wayfair removed) */}
+          {/* Mobile: static 3x4 logo grid */}
           <div className="block md:hidden">
-            <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-6">
-              {mobileLogos.map((logo) => (
+            <div className="grid grid-cols-3 gap-x-10 gap-y-6 justify-items-center">
+              {logos.map((logo) => (
                 <img
                   key={`mobile-${logo.name}`}
                   src={logo.url}
@@ -131,7 +160,7 @@ export default function LogoCarousel() {
           }
         }
 
-        /* Mobile: keep marquee but remove any masks/filters and normalize rendering */
+        /* Mobile: JS scroll marquee – disable CSS transforms on row only */
         @media (max-width: 768px) {
           .logo-carousel-mask,
           .logo-carousel {
@@ -139,6 +168,12 @@ export default function LogoCarousel() {
             -webkit-mask-image: none !important;
             clip-path: none !important;
             filter: none !important;
+          }
+
+          .logo-marquee-row.logo-carousel {
+            animation: none !important;
+            transform: none !important;
+            will-change: auto !important;
           }
 
           .logo-carousel-img {
