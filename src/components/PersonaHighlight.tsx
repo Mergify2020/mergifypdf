@@ -3,14 +3,14 @@ import Image from "next/image";
 export default function PersonaHighlight() {
   return (
     <section className="bg-white">
-      <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 lg:px-0 lg:py-20">
+      <div className="mx-auto max-w-6xl py-14 lg:py-20">
         <div className="relative mx-auto w-full max-w-6xl overflow-hidden rounded-3xl shadow-xl">
           <Image
             src="/hero-team4.svg"
             alt="Team collaborating with documents in the MergifyPDF workspace"
             width={1440}
             height={810}
-            className="h-[400px] w-full object-cover"
+            className="w-full h-auto"
             priority={false}
           />
 
