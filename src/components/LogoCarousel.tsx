@@ -35,31 +35,53 @@ export default function LogoCarousel() {
         </div>
 
         <div className="mt-8">
-          <div className="logo-marquee-mask">
-            <div className="logo-marquee-row flex items-center gap-[48px]">
-              {[...logos, ...logos].map((logo, index) => (
-                <img
-                  key={`${logo.name}-${index}`}
-                  src={logo.url}
-                  alt={index < logos.length ? `${logo.name} logo` : ""}
-                  className="h-10 w-auto flex-shrink-0"
-                  loading="lazy"
-                />
-              ))}
+          <div className="logo-marquee-mask logo-carousel-mask">
+            <div className="logo-marquee-row logo-carousel flex items-center gap-[48px]">
+              <div className="logo-track logo-carousel-track flex items-center gap-[48px]">
+                {logos.map((logo) => (
+                  <img
+                    key={logo.name}
+                    src={logo.url}
+                    alt={`${logo.name} logo`}
+                    className="logo-carousel-img h-10 w-auto flex-shrink-0"
+                    loading="lazy"
+                  />
+                ))}
+              </div>
+              <div
+                className="logo-track logo-carousel-track logo-carousel-track--dup flex items-center gap-[48px]"
+                aria-hidden="true"
+              >
+                {logos.map((logo) => (
+                  <img
+                    key={`${logo.name}-duplicate`}
+                    src={logo.url}
+                    alt=""
+                    className="logo-carousel-img h-10 w-auto flex-shrink-0"
+                    loading="lazy"
+                  />
+                ))}
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       <style jsx>{`
-        .logo-marquee-mask {
+        .logo-marquee-mask,
+        .logo-carousel-mask {
           overflow: hidden;
+          position: relative;
         }
 
-        .logo-marquee-row {
+        .logo-marquee-row,
+        .logo-carousel {
           width: max-content;
-          animation: logo-scroll 48s linear infinite;
-          will-change: transform;
+        }
+
+        .logo-track,
+        .logo-carousel-track {
+          flex-shrink: 0;
         }
 
         @keyframes logo-scroll {
@@ -68,6 +90,62 @@ export default function LogoCarousel() {
           }
           100% {
             transform: translateX(-50%);
+          }
+        }
+
+        @keyframes logoMarqueeMobile {
+          0% {
+            transform: translateX(0);
+          }
+          100% {
+            transform: translateX(-50%);
+          }
+        }
+
+        /* Desktop: marquee animation + fade edges */
+        @media (min-width: 769px) {
+          .logo-marquee-row.logo-carousel {
+            animation: logo-scroll 48s linear infinite;
+            will-change: transform;
+          }
+
+          .logo-marquee-mask::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            background: linear-gradient(
+              to right,
+              rgba(255, 255, 255, 1) 0%,
+              rgba(255, 255, 255, 0) 15%,
+              rgba(255, 255, 255, 0) 85%,
+              rgba(255, 255, 255, 1) 100%
+            );
+          }
+        }
+
+        /* Mobile: simpler animation, no masks or filters */
+        @media (max-width: 768px) {
+          .logo-carousel-mask,
+          .logo-carousel {
+            mask-image: none !important;
+            -webkit-mask-image: none !important;
+            clip-path: none !important;
+            filter: none !important;
+            mix-blend-mode: normal !important;
+          }
+
+          .logo-carousel-track {
+            animation: logoMarqueeMobile 30s linear infinite;
+            transform: translateX(0);
+            will-change: transform;
+          }
+
+          .logo-carousel-img {
+            height: 28px;
+            transform: none !important;
+            image-rendering: auto;
+            filter: none !important;
           }
         }
       `}</style>
