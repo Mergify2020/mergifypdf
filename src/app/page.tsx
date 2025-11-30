@@ -71,19 +71,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
       <section className="w-full bg-gradient-to-r from-[#FDF2FF] via-[#EEF2FF] to-[#E0F7FF]">
         <div className="mx-auto w-full max-w-7xl px-6 py-10 sm:py-14 lg:py-16">
           <div className="relative grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.1fr)] lg:items-center lg:gap-12">
-            {/* Sparkle A – top-left in gradient */}
-            <Sparkle
-              gradientId="sparkle-top-left"
-              className="pointer-events-none absolute left-2 -top-10 z-20 h-12 w-12 opacity-90 sm:left-4 -top-9 sm:h-14 sm:w-14 md:left-6 -top-8 md:h-16 md:w-16"
-            />
-
-            {/* Sparkle B – mid-gutter between text and screenshot */}
-            <Sparkle
-              gradientId="sparkle-mid-right"
-              className="pointer-events-none absolute left-[52%] top-[62%] z-20 h-7 w-7 -translate-y-1/2 opacity-85 sm:left-[54%] sm:top-[63%] sm:h-8 sm:w-8 md:left-[55%] md:top-[64%] md:h-9 md:w-9"
-            />
-
-            {/* Sparkle C – bottom-right accent in gradient */}
+            {/* Single sparkle at bottom-right of hero near screenshot */}
             <Sparkle
               gradientId="sparkle-right-bottom"
               className="pointer-events-none absolute bottom-4 right-4 z-20 h-12 w-12 opacity-70 sm:bottom-5 sm:right-6 sm:h-14 sm:w-14 md:bottom-7 md:right-10 md:h-16 md:w-16"
