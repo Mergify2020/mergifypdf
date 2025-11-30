@@ -4,13 +4,13 @@ export default function PersonaHighlight() {
   return (
     <section className="bg-white">
       <div className="mx-auto w-full max-w-7xl px-6 py-8 lg:py-12">
-        <div className="relative w-full overflow-hidden rounded-3xl shadow-xl">
+        <div className="relative w-full overflow-hidden rounded-none shadow-xl md:rounded-3xl">
           <Image
             src="/Hero-team10.svg"
             alt="Team collaborating with documents in the MergifyPDF workspace"
             width={1440}
             height={810}
-            className="w-full h-auto"
+            className="h-auto w-full rounded-t-3xl md:rounded-3xl"
             priority={false}
           />
 
@@ -34,7 +34,7 @@ export default function PersonaHighlight() {
           </div>
         </div>
         {/* Text card below image (mobile / vertical) */}
-        <div className="mt-4 w-full rounded-3xl bg-[rgba(7,21,36,0.88)] px-6 py-6 text-center text-white shadow-[0_18px_45px_rgba(0,0,0,0.24)] md:hidden">
+        <div className="mt-0 w-full rounded-b-3xl bg-[rgba(7,21,36,0.88)] px-6 py-6 text-center text-white shadow-[0_18px_45px_rgba(0,0,0,0.24)] md:hidden">
           <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-100">
             Built for every workflow
           </p>
