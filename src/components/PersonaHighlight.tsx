@@ -14,17 +14,27 @@ export default function PersonaHighlight() {
             priority={false}
           />
 
-          {/* Floating text box */}
+          {/* Soft left-to-right navy gradient overlay */}
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background:
+                "linear-gradient(to right, rgba(7, 21, 36, 0.6) 0%, rgba(7, 21, 36, 0.6) 20%, rgba(7, 21, 36, 0.0) 55%, rgba(7, 21, 36, 0.0) 100%)",
+            }}
+            aria-hidden="true"
+          />
+
+          {/* Text over gradient */}
           <div className="pointer-events-none absolute inset-0 flex items-start justify-start pt-4 pl-4 sm:pt-6 sm:pl-8">
-            <div className="pointer-events-auto flex max-w-md rounded-2xl bg-[#0D1B2A] px-8 py-10 text-white shadow-2xl sm:max-w-lg sm:px-10 sm:py-12">
+            <div className="pointer-events-auto flex max-w-md px-8 py-10 text-white sm:max-w-lg sm:px-10 sm:py-12">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-300 sm:text-xs">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-100 sm:text-xs">
                   Built for every workflow
                 </p>
                 <h2 className="mt-2 text-2xl font-semibold leading-snug sm:mt-3 sm:text-3xl">
                   Perfect for One Person or an Entire Team
                 </h2>
-                <p className="mt-3 text-sm leading-relaxed text-slate-300">
+                <p className="mt-3 text-sm leading-relaxed text-slate-100">
                   Whether you&apos;re working solo or collaborating with others,
                   MergifyPDF makes editing, organizing, and signing documents
                   fast, simple, and reliable.
