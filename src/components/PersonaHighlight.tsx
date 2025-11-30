@@ -16,12 +16,12 @@ export default function PersonaHighlight() {
 
           {/* Text card over image */}
           <div className="pointer-events-none absolute inset-x-4 top-6 flex justify-center md:inset-x-auto md:left-10 md:top-10 md:justify-start">
-            <div className="pointer-events-auto max-w-[440px] rounded-3xl bg-[rgba(7,21,36,0.88)] px-8 py-7 text-white shadow-[0_18px_45px_rgba(0,0,0,0.24)]">
+            <div className="pointer-events-auto max-w-[440px] rounded-3xl bg-[rgba(7,21,36,0.88)] px-8 py-9 text-white shadow-[0_18px_45px_rgba(0,0,0,0.24)] sm:py-10">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-100 sm:text-xs">
                   Built for every workflow
                 </p>
-                <h2 className="mt-2 text-2xl font-semibold leading-snug sm:mt-3 sm:text-3xl sm:whitespace-nowrap">
+                <h2 className="mt-2 text-2xl font-semibold leading-snug sm:mt-3 sm:text-3xl">
                   Perfect for One Person or an Entire Team
                 </h2>
                 <p className="mt-3 max-w-[36rem] text-sm leading-relaxed text-slate-100 sm:text-base">
