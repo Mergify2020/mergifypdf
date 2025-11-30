@@ -82,7 +82,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
               </p>
             </div>
 
-            <div className="mt-10 flex items-center justify-center lg:mt-0 lg:justify-end">
+            <div className="mt-4 sm:mt-8 flex items-center justify-center lg:mt-0 lg:justify-end">
               <Image
                 src="/visual-hero3.png"
                 alt="Preview of the MergifyPDF workspace"

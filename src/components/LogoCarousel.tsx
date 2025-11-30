@@ -29,7 +29,7 @@ export default function LogoCarousel() {
             Trusted by the world&apos;s top companies
           </h2>
           <p className="mt-2 text-sm text-slate-500">
-            Designed to make everyday work simpler, faster, and more efficient.
+            Designed to make everyday work simpler and efficient.
           </p>
         </div>
 
