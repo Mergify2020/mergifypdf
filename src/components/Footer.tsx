@@ -24,8 +24,8 @@ function TikTokIcon(props: IconProps) {
   return (
     <svg
       viewBox="0 0 24 24"
-      width={24}
-      height={24}
+      width={20}
+      height={20}
       aria-hidden="true"
       {...props}
     >
@@ -38,8 +38,8 @@ function ThreadsIcon(props: IconProps) {
   return (
     <svg
       viewBox="0 0 24 24"
-      width={24}
-      height={24}
+      width={20}
+      height={20}
       aria-hidden="true"
       {...props}
     >
@@ -52,8 +52,8 @@ function InstagramIcon(props: IconProps) {
   return (
     <svg
       viewBox="0 0 24 24"
-      width={24}
-      height={24}
+      width={20}
+      height={20}
       aria-hidden="true"
       {...props}
     >
@@ -66,8 +66,8 @@ function YoutubeIcon(props: IconProps) {
   return (
     <svg
       viewBox="0 0 24 24"
-      width={24}
-      height={24}
+      width={20}
+      height={20}
       aria-hidden="true"
       {...props}
     >
@@ -80,8 +80,8 @@ function XIcon(props: IconProps) {
   return (
     <svg
       viewBox="0 0 24 24"
-      width={24}
-      height={24}
+      width={20}
+      height={20}
       aria-hidden="true"
       {...props}
     >
