@@ -69,7 +69,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
                 {["1 free upload per day", "Fast performance", "Simple to use"].map((badge) => (
                   <span
                     key={badge}
-                    className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-4 py-1.5 text-slate-700 shadow-sm"
+                    className="press-bounce inline-flex cursor-default items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-4 py-1.5 text-slate-700 shadow-sm"
                   >
                     <span className="h-2 w-2 rounded-full bg-[#024d7c]" />
                     {badge}

@@ -1,5 +1,5 @@
 import React from "react";
-import { Instagram, Linkedin, Twitter } from "lucide-react";
+import { Instagram, Twitter } from "lucide-react";
 
 type IconProps = React.SVGProps<SVGSVGElement>;
 
@@ -20,10 +20,18 @@ function TikTokIcon(props: IconProps) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" {...props}>
       <path
-        d="M15 4v2.2c0 1.4 1.1 2.6 2.6 2.8L19 9m-9-5.5v11.2a2.3 2.3 0 0 1-2.2 2.4A2.3 2.3 0 0 1 5.5 15 2.3 2.3 0 0 1 8 12.7c.4 0 .8.1 1.1.3"
+        d="M10 4.5v9.3a2.4 2.4 0 1 1-2.4-2.4c.5 0 .9.1 1.3.3M13.2 4.5C13.5 6.3 14.8 7.5 16.6 7.8l.9.1"
         fill="none"
         stroke="currentColor"
-        strokeWidth={1.8}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M13.2 8.8V11c0 2.2-1.4 3.7-3.6 3.7"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
         strokeLinecap="round"
         strokeLinejoin="round"
       />
@@ -34,11 +42,19 @@ function TikTokIcon(props: IconProps) {
 function ThreadsIcon(props: IconProps) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" {...props}>
-      <path
-        d="M7 6.5c1.2-1.4 2.7-2 4.6-2 3.6 0 5.9 2.4 5.9 6.2 0 3.8-2.2 6.3-5.9 6.3-2.3 0-4-1.2-4.6-3m5.2-7.1c1.7.1 3 .9 3.4 2.8-.8-.4-1.6-.6-2.4-.7-.3-.9-1-1.5-2.1-1.5-1.6 0-2.5 1-2.5 2.4 0 1.3.9 2.3 2.4 2.5l1.1.2c.8.1 1.1.4 1.1 1 0 .8-.7 1.3-1.7 1.3-1.1 0-1.9-.5-2.3-1.5"
+      <circle
+        cx="12"
+        cy="12"
+        r="8"
         fill="none"
         stroke="currentColor"
-        strokeWidth={1.8}
+        strokeWidth={2}
+      />
+      <path
+        d="M9 8.4C9.6 7.7 10.5 7.4 11.6 7.4c2 0 3.4 1.2 3.4 3.2 0 2.2-1.4 3.6-3.4 3.6-1.3 0-2.3-.7-2.7-1.8m2.9-4.1c1.1.1 2 .6 2.2 1.9-.5-.3-1.1-.4-1.6-.5-.2-.6-.7-1-1.4-1-1 0-1.6.6-1.6 1.5 0 .8.5 1.4 1.5 1.6l.7.1c.6.1.8.4.8.8 0 .6-.5 1-1.2 1-0.8 0-1.4-.4-1.7-1"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
         strokeLinecap="round"
         strokeLinejoin="round"
       />
@@ -165,9 +181,6 @@ export default function Footer() {
               </SocialIcon>
               <SocialIcon label="MergifyPDF on X (Twitter)">
                 <Twitter className="h-5 w-5" strokeWidth={2.2} />
-              </SocialIcon>
-              <SocialIcon label="MergifyPDF on LinkedIn">
-                <Linkedin className="h-5 w-5" strokeWidth={2.2} />
               </SocialIcon>
             </div>
           </div>
