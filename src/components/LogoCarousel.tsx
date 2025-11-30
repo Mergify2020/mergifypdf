@@ -7,19 +7,18 @@ type Logo = {
 
 export default function LogoCarousel() {
   const logos: Logo[] = [
-    { name: "Netflix", url: "/netflix.svg" },
-    { name: "Target", url: "/target.svg" },
-    { name: "Walmart", url: "/walmart.svg" },
-    { name: "FedEx", url: "/fedex.svg" },
-    { name: "Wayfair", url: "/wayfair.svg" },
-    { name: "Toyota", url: "/totoya.svg" },
-    { name: "Honda", url: "/honda.svg" },
-    { name: "Verizon", url: "/verizon.svg" },
-    { name: "Bank of America", url: "/bankofamerica.svg" },
-    { name: "Chase", url: "/chasebank.svg" },
-    { name: "Nvidia", url: "/nvidia.svg" },
-    { name: "Allstate", url: "/allstate.svg" },
-    { name: "State Farm", url: "/statefarm.svg" },
+    { name: "Netflix", url: "/netflix.png" },
+    { name: "Target", url: "/target.png" },
+    { name: "Walmart", url: "/walmart.png" },
+    { name: "FedEx", url: "/fedex.png" },
+    { name: "Wayfair", url: "/wayfair.png" },
+    { name: "Toyota", url: "/toyota.png" },
+    { name: "Honda", url: "/honda.png" },
+    { name: "Verizon", url: "/verizon.png" },
+    { name: "Bank of America", url: "/bankofamerica.png" },
+    { name: "Chase", url: "/chasebank.png" },
+    { name: "Nvidia", url: "/nvidia.png" },
+    { name: "State Farm", url: "/statefarm.png" },
   ];
 
   return (
@@ -38,59 +37,29 @@ export default function LogoCarousel() {
           <div className="logo-marquee-mask logo-carousel-mask">
             <div className="logo-marquee-row logo-carousel flex items-center gap-[48px]">
               <div className="logo-track logo-carousel-track flex items-center gap-[48px]">
-                {logos.map((logo) =>
-                  logo.name === "Netflix" ? (
-                    <picture key={logo.name}>
-                      <source
-                        srcSet={logo.url}
-                        media="(min-width: 769px)"
-                      />
-                      <img
-                        src="/netflix.png"
-                        alt="Netflix logo"
-                        className="logo-carousel-img h-10 w-auto flex-shrink-0"
-                        loading="lazy"
-                      />
-                    </picture>
-                  ) : (
-                    <img
-                      key={logo.name}
-                      src={logo.url}
-                      alt={`${logo.name} logo`}
-                      className="logo-carousel-img h-10 w-auto flex-shrink-0"
-                      loading="lazy"
-                    />
-                  )
-                )}
+                {logos.map((logo) => (
+                  <img
+                    key={logo.name}
+                    src={logo.url}
+                    alt={`${logo.name} logo`}
+                    className="logo-carousel-img h-10 w-auto flex-shrink-0"
+                    loading="lazy"
+                  />
+                ))}
               </div>
               <div
                 className="logo-track logo-carousel-track logo-carousel-track--dup flex items-center gap-[48px]"
                 aria-hidden="true"
               >
-                {logos.map((logo) =>
-                  logo.name === "Netflix" ? (
-                    <picture key={`${logo.name}-duplicate`}>
-                      <source
-                        srcSet={logo.url}
-                        media="(min-width: 769px)"
-                      />
-                      <img
-                        src="/netflix.png"
-                        alt=""
-                        className="logo-carousel-img h-10 w-auto flex-shrink-0"
-                        loading="lazy"
-                      />
-                    </picture>
-                  ) : (
-                    <img
-                      key={`${logo.name}-duplicate`}
-                      src={logo.url}
-                      alt=""
-                      className="logo-carousel-img h-10 w-auto flex-shrink-0"
-                      loading="lazy"
-                    />
-                  )
-                )}
+                {logos.map((logo) => (
+                  <img
+                    key={`${logo.name}-duplicate`}
+                    src={logo.url}
+                    alt=""
+                    className="logo-carousel-img h-10 w-auto flex-shrink-0"
+                    loading="lazy"
+                  />
+                ))}
               </div>
             </div>
           </div>
