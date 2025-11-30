@@ -19,7 +19,7 @@ export default function PersonaHighlight() {
             className="pointer-events-none absolute inset-0"
             style={{
               background:
-                "linear-gradient(to right, rgba(7, 21, 36, 0.6) 0%, rgba(7, 21, 36, 0.6) 20%, rgba(7, 21, 36, 0.0) 55%, rgba(7, 21, 36, 0.0) 100%)",
+                "linear-gradient(to right, rgba(7, 21, 36, 0.7) 0%, rgba(7, 21, 36, 0.55) 18%, rgba(7, 21, 36, 0.35) 36%, rgba(7, 21, 36, 0.18) 54%, rgba(7, 21, 36, 0.06) 72%, rgba(7, 21, 36, 0) 100%)",
             }}
             aria-hidden="true"
           />
