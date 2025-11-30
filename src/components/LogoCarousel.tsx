@@ -111,7 +111,7 @@ export default function LogoCarousel() {
           }
         }
 
-        /* Mobile: disable masks & animation, static clean logos */
+        /* Mobile: keep marquee but remove any masks/filters and normalize rendering */
         @media (max-width: 768px) {
           .logo-carousel-mask,
           .logo-carousel {
@@ -119,25 +119,6 @@ export default function LogoCarousel() {
             -webkit-mask-image: none !important;
             clip-path: none !important;
             filter: none !important;
-          }
-
-          .logo-marquee-row.logo-carousel {
-            width: 100%;
-            animation: none !important;
-            transform: none !important;
-            will-change: auto !important;
-            justify-content: center;
-            flex-wrap: wrap;
-          }
-
-          .logo-carousel-track--dup {
-            display: none;
-          }
-
-          .logo-carousel-track {
-            animation: none !important;
-            transform: none !important;
-            will-change: auto !important;
           }
 
           .logo-carousel-img {
