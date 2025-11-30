@@ -1,15 +1,11 @@
  "use client";
 
-import { useEffect, useRef } from "react";
-
 type Logo = {
   name: string;
   url: string;
 };
 
 export default function LogoCarousel() {
-  const carouselRef = useRef<HTMLDivElement | null>(null);
-
   const logos: Logo[] = [
     { name: "Netflix", url: "/netflix.png" },
     { name: "Target", url: "/target.png" },
@@ -25,32 +21,6 @@ export default function LogoCarousel() {
     { name: "State Farm", url: "/statefarm.png" },
   ];
 
-  // Mobile: scroll-based marquee to avoid transform glitches
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const container = carouselRef.current;
-    if (!container) return;
-    if (window.innerWidth > 768) return;
-
-    let frameId: number;
-    const step = 0.4; // pixels per frame
-
-    const tick = () => {
-      const maxScroll = container.scrollWidth / 2;
-      container.scrollLeft += step;
-      if (container.scrollLeft >= maxScroll) {
-        container.scrollLeft -= maxScroll;
-      }
-      frameId = requestAnimationFrame(tick);
-    };
-
-    frameId = requestAnimationFrame(tick);
-
-    return () => {
-      cancelAnimationFrame(frameId);
-    };
-  }, []);
-
   return (
     <section className="bg-white">
       <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-0 lg:py-12">
@@ -64,7 +34,7 @@ export default function LogoCarousel() {
         </div>
 
         <div className="mt-8">
-          <div ref={carouselRef} className="logo-marquee-mask logo-carousel-mask">
+          <div className="logo-marquee-mask logo-carousel-mask">
             <div className="logo-marquee-row logo-carousel flex items-center gap-[48px]">
               <div className="logo-track logo-carousel-track flex items-center gap-[48px]">
                 {logos.map((logo) => (
@@ -141,7 +111,7 @@ export default function LogoCarousel() {
           }
         }
 
-        /* Mobile: JS scroll marquee, no masks or CSS transforms on row */
+        /* Mobile: keep marquee but remove any masks/filters and normalize rendering */
         @media (max-width: 768px) {
           .logo-carousel-mask,
           .logo-carousel {
@@ -149,12 +119,6 @@ export default function LogoCarousel() {
             -webkit-mask-image: none !important;
             clip-path: none !important;
             filter: none !important;
-          }
-
-          .logo-marquee-row.logo-carousel {
-            animation: none !important;
-            transform: none !important;
-            will-change: auto !important;
           }
 
           .logo-carousel-img {
