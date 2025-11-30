@@ -3,7 +3,7 @@ import Image from "next/image";
 export default function PersonaHighlight() {
   return (
     <section className="bg-white">
-      <div className="mx-auto max-w-6xl py-8 lg:py-12">
+      <div className="mx-auto w-full max-w-7xl px-6 py-8 lg:py-12">
         <div className="relative w-full overflow-hidden rounded-3xl shadow-xl">
           <Image
             src="/Hero-team10.svg"
@@ -16,7 +16,7 @@ export default function PersonaHighlight() {
 
           {/* Floating text card */}
           <div className="pointer-events-none absolute inset-0 flex items-start justify-start pt-4 pl-4 sm:pt-6 sm:pl-8">
-            <div className="pointer-events-auto flex max-w-sm rounded-2xl bg-[#0D1B2A] px-8 py-10 text-white shadow-2xl sm:px-8 sm:py-12">
+            <div className="pointer-events-auto flex max-w-md rounded-2xl bg-[#0D1B2A] px-8 py-10 text-white shadow-2xl sm:max-w-lg sm:px-10 sm:py-12">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-300 sm:text-xs">
                   Built for every workflow
