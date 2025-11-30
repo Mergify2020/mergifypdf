@@ -89,135 +89,132 @@ export default function LoginPage() {
     <>
       <main
         data-login-page
-        className="mx-auto flex min-h-[70vh] w-full max-w-7xl flex-col gap-8 px-4 py-10 sm:py-14 lg:flex-row lg:items-stretch"
+        className="relative flex min-h-[calc(100vh-76px)] w-full items-center justify-center overflow-hidden bg-gradient-to-br from-[#FDF2FF] via-[#EEF2FF] to-[#E0F7FF] px-4 py-8 sm:py-10"
       >
-        {/* Left visual column */}
-        <section className="relative hidden flex-1 overflow-hidden rounded-3xl bg-gradient-to-br from-[#FDF2FF] via-[#EEF2FF] to-[#E0F7FF] shadow-[0_24px_80px_rgba(15,23,42,0.15)] lg:flex">
-          {/* Decorative blobs only in this column */}
-          <div className="pointer-events-none absolute -top-32 -left-24 h-64 w-64 rounded-[999px] bg-gradient-to-br from-[#399BFF] via-[#6A4EE8] to-[#F044FF] opacity-25 blur-3xl" />
-          <div className="pointer-events-none absolute -top-24 right-[-40px] h-56 w-56 rounded-[999px] bg-gradient-to-bl from-[#6A4EE8] via-[#399BFF] to-[#F044FF] opacity-20 blur-3xl" />
-          <div className="pointer-events-none absolute bottom-[-80px] left-1/2 h-64 w-64 -translate-x-1/2 rounded-[999px] bg-gradient-to-tl from-[#399BFF] via-[#6A4EE8] to-[#F044FF] opacity-15 blur-3xl" />
+        {/* Background 3D blobs (not under the card content area) */}
+        <div className="pointer-events-none absolute -top-40 -left-36 h-80 w-80 rounded-[999px] bg-gradient-to-br from-[#399BFF] via-[#6A4EE8] to-[#F044FF] opacity-25 blur-3xl" />
+        <div className="pointer-events-none absolute -top-32 right-[-60px] h-72 w-72 rounded-[999px] bg-gradient-to-bl from-[#6A4EE8] via-[#399BFF] to-[#F044FF] opacity-20 blur-3xl" />
+        <div className="pointer-events-none absolute bottom-[-80px] left-1/2 h-80 w-80 -translate-x-1/2 rounded-[999px] bg-gradient-to-tl from-[#399BFF] via-[#6A4EE8] to-[#F044FF] opacity-15 blur-3xl" />
 
-          <div className="relative z-10 flex w-full flex-col items-center justify-center px-10 py-10 text-center">
-            <h2 className="text-xl font-semibold text-slate-900">
-              Securely access your workspace.
-            </h2>
-            <p className="mt-2 max-w-md text-sm text-slate-600">
-              Sign in to pick up where you left off, manage documents, and send
-              signatures in a few clicks.
-            </p>
-            <div className="mt-8 w-full max-w-md rounded-2xl bg-white/80 p-4 shadow-[0_18px_55px_rgba(15,23,42,0.18)] backdrop-blur">
-              <Image
-                src="/visual-hero3.png"
-                alt="Preview of the MergifyPDF editor"
-                width={640}
-                height={420}
-                className="h-auto w-full rounded-xl object-cover"
-                priority={false}
-              />
-            </div>
-          </div>
-        </section>
+        {/* Frosted-glass login card */}
+        <div
+          className="relative z-10 w-full max-w-5xl rounded-[26px] border border-white/25 bg-white/25 px-6 py-8 shadow-[0_30px_90px_rgba(15,23,42,0.35)] backdrop-blur-2xl sm:px-10 sm:py-10"
+          style={{ backdropFilter: "blur(20px)" }}
+        >
+          <h1 className="text-2xl font-semibold text-slate-900">Log in</h1>
+          <p className="mt-1 text-sm text-slate-700">
+            Use the account you created, or reset your password below.
+          </p>
 
-        {/* Right login column */}
-        <section className="flex flex-1 flex-col items-center justify-center lg:px-8">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-[0_18px_55px_rgba(15,23,42,0.12)] sm:p-8">
-            <h1 className="text-2xl font-semibold">Log in</h1>
-            <p className="mt-1 text-sm text-gray-600">
-              Use the account you created, or reset your password below.
-            </p>
+          <form
+            onSubmit={onSubmit}
+            className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:items-start"
+          >
+            {/* Left: fields */}
+            <div className="space-y-4">
+              <div>
+                <label className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-slate-700">
+                  Email
+                </label>
+                <input
+                  className="w-full rounded-full border border-white/60 bg-white/85 px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus-visible:border-[#024d7c] focus-visible:ring-2 focus-visible:ring-[#024d7c]/70"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (err) setErr(null);
+                  }}
+                  required
+                  autoComplete="email"
+                />
+              </div>
 
-            <form onSubmit={onSubmit} className="mt-6 space-y-3">
-              <input
-                className="w-full rounded border p-2 outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c] focus-visible:border-[#024d7c]"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  if (err) setErr(null);
-                }}
-                required
-                autoComplete="email"
-              />
-              <input
-                className="w-full rounded border p-2 outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c] focus-visible:border-[#024d7c]"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  if (err) setErr(null);
-                }}
-                required
-                autoComplete="current-password"
-              />
+              <div>
+                <label className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-slate-700">
+                  Password
+                </label>
+                <input
+                  className="w-full rounded-full border border-white/60 bg-white/85 px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus-visible:border-[#024d7c] focus-visible:ring-2 focus-visible:ring-[#024d7c]/70"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (err) setErr(null);
+                  }}
+                  required
+                  autoComplete="current-password"
+                />
+              </div>
 
               {err && <div className="text-sm text-red-600">{err}</div>}
-
-              <button
-                type="submit"
-                disabled={busy}
-                aria-disabled={busy}
-                className="w-full rounded bg-[#024d7c] py-2 font-medium text-white transition hover:bg-[#013a60] disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c] focus-visible:ring-offset-2"
-              >
-                {busy ? "Signing in…" : "Continue"}
-              </button>
-            </form>
-
-            {/* Divider */}
-            <div className="my-5 flex items-center gap-2 text-gray-400">
-              <div className="h-px flex-1 bg-gray-200" />
-              <span className="text-xs">or</span>
-              <div className="h-px flex-1 bg-gray-200" />
             </div>
 
-            {/* Google Sign In */}
-            <button
-              onClick={handleGoogleLogin}
-              disabled={busy}
-              aria-disabled={busy}
-              className="flex w-full items-center justify-center gap-3 rounded border border-gray-300 bg-white py-2 font-medium text-gray-700 shadow-sm transition hover:bg-gray-50"
-              aria-label="Continue with Google"
-            >
-              <img src="/google.svg" alt="Google logo" className="h-5 w-5" />
-              <span>Continue with Google</span>
-            </button>
+            {/* Right: actions */}
+            <div className="flex flex-col items-stretch justify-between gap-5">
+              <div className="space-y-3">
+                <button
+                  type="submit"
+                  disabled={busy}
+                  aria-disabled={busy}
+                  className="w-full rounded-full bg-[#024d7c] py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-[#013a60] hover:shadow-lg disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c]/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+                >
+                  {busy ? "Signing in…" : "Continue"}
+                </button>
 
-            <div className="mt-4 space-y-1 text-center text-xs text-gray-500">
-              <p>
-                <Link
-                  className="text-[#024d7c] underline hover:text-[#013a60]"
-                  href="/forgot-password"
+                <p className="text-center text-xs text-slate-700">
+                  or continue with
+                </p>
+
+                <button
+                  type="button"
+                  onClick={handleGoogleLogin}
+                  disabled={busy}
+                  aria-disabled={busy}
+                  className="flex w-full items-center justify-center gap-3 rounded-full border border-white/70 bg-white/85 px-4 py-2 text-sm font-medium text-slate-800 shadow-sm transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+                  aria-label="Continue with Google"
                 >
-                  Forgot your password?
-                </Link>
-              </p>
-              <p>
-                Don’t have an account?{" "}
-                <Link
-                  className="text-[#024d7c] underline hover:text-[#013a60]"
-                  href="/register"
-                >
-                  Create one
-                </Link>
-              </p>
+                  <img src="/google.svg" alt="Google logo" className="h-5 w-5" />
+                  <span>Continue with Google</span>
+                </button>
+              </div>
+
+              <div className="space-y-1 text-center text-xs text-slate-800 lg:text-left">
+                <p>
+                  <Link
+                    className="font-medium text-[#024d7c] underline-offset-2 hover:text-[#013a60] hover:underline"
+                    href="/forgot-password"
+                  >
+                    Forgot your password?
+                  </Link>
+                </p>
+                <p>
+                  Don&apos;t have an account?{" "}
+                  <Link
+                    className="font-medium text-[#024d7c] underline-offset-2 hover:text-[#013a60] hover:underline"
+                    href="/register"
+                  >
+                    Create one
+                  </Link>
+                </p>
+              </div>
             </div>
-          </div>
+          </form>
+        </div>
 
-          {/* Minimal footer below right column */}
-          <div className="mt-6 text-center text-[11px] text-slate-400 lg:text-right">
-            <span>© {new Date().getFullYear()} MergifyPDF</span>
-            <span className="mx-2">•</span>
-            <Link href="/terms-of-service" className="hover:text-slate-600">
-              Terms
-            </Link>
-            <span className="mx-2">•</span>
-            <Link href="/privacy-policy" className="hover:text-slate-600">
-              Privacy
-            </Link>
-          </div>
-        </section>
+        {/* Minimal footer at bottom center */}
+        <div className="pointer-events-auto absolute bottom-4 left-1/2 z-10 -translate-x-1/2 text-[11px] text-slate-200/90">
+          <span>© {new Date().getFullYear()} MergifyPDF</span>
+          <span className="mx-2">•</span>
+          <Link href="/terms-of-service" className="hover:text-white">
+            Terms
+          </Link>
+          <span className="mx-2">•</span>
+          <Link href="/privacy-policy" className="hover:text-white">
+            Privacy
+          </Link>
+        </div>
       </main>
 
       {/* Full-screen loading overlay */}
