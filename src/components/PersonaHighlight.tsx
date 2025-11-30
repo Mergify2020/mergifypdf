@@ -3,7 +3,7 @@ import Image from "next/image";
 export default function PersonaHighlight() {
   return (
     <section className="bg-white">
-      <div className="w-full py-14 lg:py-20">
+      <div className="mx-auto max-w-6xl py-14 lg:py-20">
         <div className="relative w-full overflow-hidden rounded-3xl shadow-xl">
           <Image
             src="/hero-team4.svg"
