@@ -71,11 +71,6 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
       <section className="w-full bg-gradient-to-r from-[#FDF2FF] via-[#EEF2FF] to-[#E0F7FF]">
         <div className="mx-auto w-full max-w-7xl px-6 py-10 sm:py-14 lg:py-16">
           <div className="relative grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.1fr)] lg:items-center lg:gap-12">
-            {/* Sparkle floating between headline + screenshot / near picture */}
-            <Sparkle
-              gradientId="sparkle-middle"
-              className="pointer-events-none absolute right-[14%] top-10 hidden h-6 w-6 opacity-90 sm:right-[16%] sm:top-8 sm:h-7 sm:w-7 md:block md:h-10 md:w-10 z-20"
-            />
             {/* Sparkle near bottom-right of hero background beside picture */}
             <Sparkle
               gradientId="sparkle-right-bottom"
