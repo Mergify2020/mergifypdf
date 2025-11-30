@@ -1,13 +1,15 @@
 import React from "react";
-import { Instagram, Twitter } from "lucide-react";
+import { Instagram, Twitter, Youtube } from "lucide-react";
 
 type IconProps = React.SVGProps<SVGSVGElement>;
 
-function SocialIcon(props: React.PropsWithChildren<{ label: string }>) {
-  const { label, children } = props;
+function SocialIcon(
+  props: React.PropsWithChildren<{ label: string; href?: string }>
+) {
+  const { label, href = "#", children } = props;
   return (
     <a
-      href="#"
+      href={href}
       aria-label={label}
       className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
     >
@@ -170,14 +172,26 @@ export default function Footer() {
             </div>
 
             <div className="flex items-center gap-3 text-slate-500">
-              <SocialIcon label="MergifyPDF on TikTok">
+              <SocialIcon
+                label="MergifyPDF on TikTok"
+                href="https://www.tiktok.com/@mergify.pdf"
+              >
                 <TikTokIcon className="h-5 w-5" />
               </SocialIcon>
-              <SocialIcon label="MergifyPDF on Threads">
+              <SocialIcon
+                label="MergifyPDF on Threads"
+                href="https://www.threads.com/@mergifypdf"
+              >
                 <ThreadsIcon className="h-5 w-5" />
               </SocialIcon>
-              <SocialIcon label="MergifyPDF on Instagram">
+              <SocialIcon
+                label="MergifyPDF on Instagram"
+                href="https://www.instagram.com/mergifypdf/"
+              >
                 <Instagram className="h-5 w-5" strokeWidth={2.2} />
+              </SocialIcon>
+              <SocialIcon label="MergifyPDF on YouTube">
+                <Youtube className="h-5 w-5" strokeWidth={2.2} />
               </SocialIcon>
               <SocialIcon label="MergifyPDF on X (Twitter)">
                 <Twitter className="h-5 w-5" strokeWidth={2.2} />
