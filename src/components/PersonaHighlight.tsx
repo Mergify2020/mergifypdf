@@ -15,7 +15,7 @@ export default function PersonaHighlight() {
           />
 
           {/* Text card over image */}
-          <div className="pointer-events-none absolute inset-x-4 top-6 flex justify-center md:inset-x-auto md:left-10 md:top-10 md:justify-start">
+          <div className="pointer-events-none absolute inset-x-4 top-1/2 flex -translate-y-1/2 justify-center md:inset-x-auto md:left-10 md:top-10 md:translate-y-0 md:justify-start">
             <div className="pointer-events-auto max-w-[440px] rounded-3xl bg-[rgba(7,21,36,0.88)] px-8 py-9 text-white shadow-[0_18px_45px_rgba(0,0,0,0.24)] sm:py-10">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-100 sm:text-xs">
