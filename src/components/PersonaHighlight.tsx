@@ -15,16 +15,16 @@ export default function PersonaHighlight() {
           />
 
           {/* Text card over image */}
-          <div className="pointer-events-none absolute inset-x-8 top-1/2 flex -translate-y-1/2 justify-center md:inset-x-auto md:left-10 md:top-10 md:translate-y-0 md:justify-start">
-            <div className="pointer-events-auto max-w-[300px] rounded-3xl bg-[rgba(7,21,36,0.88)] px-4 py-4 text-white text-xs shadow-[0_18px_45px_rgba(0,0,0,0.24)] scale-[0.75] sm:max-w-[440px] sm:px-8 sm:py-10 sm:text-base sm:scale-100">
+          <div className="pointer-events-none absolute inset-x-10 top-1/2 flex -translate-y-1/2 justify-center md:inset-x-auto md:left-10 md:top-10 md:translate-y-0 md:justify-start">
+            <div className="pointer-events-auto max-w-[260px] rounded-3xl bg-[rgba(7,21,36,0.88)] px-3 py-3 text-white text-[11px] shadow-[0_18px_45px_rgba(0,0,0,0.24)] scale-[0.65] sm:max-w-[440px] sm:px-8 sm:py-10 sm:text-base sm:scale-100">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-100 sm:text-xs">
+                <p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-slate-100 sm:text-xs">
                   Built for every workflow
                 </p>
-                <h2 className="mt-2 text-lg font-semibold leading-snug sm:mt-3 sm:text-3xl">
+                <h2 className="mt-1 text-base font-semibold leading-snug sm:mt-3 sm:text-3xl">
                   Perfect for One Person or an Entire Team
                 </h2>
-                <p className="mt-3 max-w-[36rem] text-xs leading-relaxed text-slate-100 sm:text-base">
+                <p className="mt-2 max-w-[36rem] text-[11px] leading-relaxed text-slate-100 sm:text-base">
                   Whether you&apos;re working solo or collaborating with others,
                   MergifyPDF makes editing, organizing, and signing documents
                   fast, simple, and reliable.
