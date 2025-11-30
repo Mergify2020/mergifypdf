@@ -77,8 +77,8 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
                 ))}
               </div>
               <HeroStats />
-              <p className="mt-3 text-xs text-slate-500 sm:text-sm">
-                Upgrade to get unlimited access to document editing and signing.
+              <p className="mt-3 text-xs font-semibold text-slate-500 sm:text-sm md:text-base">
+                * Upgrade to get unlimited access to document editing and signing.
               </p>
             </div>
 

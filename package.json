@@ -27,7 +27,8 @@
     "react-dom": "19.2.0",
     "react-dropzone": "^14.3.8",
     "react-qr-code": "^2.0.12",
-    "resend": "^6.4.0"
+    "resend": "^6.4.0",
+    "simple-icons": "^16.0.0"
   },
   "optionalDependencies": {
     "fontkit": "^2.0.2"

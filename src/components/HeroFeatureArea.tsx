@@ -75,7 +75,7 @@ export default function HeroFeatureArea() {
           ))}
         </div>
 
-        <p className="mt-4 text-center text-sm text-slate-500">
+        <p className="mt-4 text-center text-sm text-slate-500 md:text-base">
           Trusted by freelancers, students, and small businesses.
         </p>
       </div>

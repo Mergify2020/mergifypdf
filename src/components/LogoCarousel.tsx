@@ -25,10 +25,10 @@ export default function LogoCarousel() {
     <section className="bg-white">
       <div className="mx-auto w-full max-w-7xl px-6 py-10 lg:py-12">
         <div className="text-center">
-          <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
+          <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl md:text-3xl">
             Trusted by the world&apos;s top companies
           </h2>
-          <p className="mt-2 text-sm text-slate-500">
+          <p className="mt-2 text-sm text-slate-500 md:text-base">
             Designed to make everyday work simpler and efficient.
           </p>
         </div>
