@@ -66,7 +66,7 @@ export default function LogoCarousel() {
 
         .logo-marquee-row {
           width: max-content;
-          animation: logo-scroll 40s linear infinite;
+          animation: logo-scroll 48s linear infinite;
         }
 
         @keyframes logo-scroll {
