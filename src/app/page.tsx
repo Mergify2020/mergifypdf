@@ -71,10 +71,14 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
       <section className="w-full bg-gradient-to-r from-[#FDF2FF] via-[#EEF2FF] to-[#E0F7FF]">
         <div className="mx-auto w-full max-w-7xl px-6 py-10 sm:py-14 lg:py-16">
           <div className="relative grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.1fr)] lg:items-center lg:gap-12">
-            {/* Single sparkle at bottom-right of hero near screenshot */}
+            {/* Sparkles at bottom-right of hero near screenshot */}
             <Sparkle
               gradientId="sparkle-right-bottom"
               className="pointer-events-none absolute bottom-4 right-4 z-20 h-12 w-12 opacity-70 sm:bottom-5 sm:right-6 sm:h-14 sm:w-14 md:bottom-7 md:right-10 md:h-16 md:w-16"
+            />
+            <Sparkle
+              gradientId="sparkle-right-bottom-small"
+              className="pointer-events-none absolute bottom-3 right-1 z-20 h-6 w-6 opacity-80 sm:bottom-4 sm:right-3 sm:h-7 sm:w-7 md:bottom-6 md:right-6 md:h-8 md:w-8"
             />
 
             <div className="relative z-10 space-y-6 text-center lg:text-left">
