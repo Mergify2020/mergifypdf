@@ -15,8 +15,8 @@ export default function PersonaHighlight() {
           />
 
           {/* Floating text card */}
-          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center">
-            <div className="pointer-events-auto flex max-w-sm rounded-2xl bg-[#0D1B2A] px-8 py-10 text-white shadow-2xl sm:px-8 sm:py-12">
+          <div className="pointer-events-none absolute inset-0 flex items-start justify-start pt-8 sm:pt-10">
+            <div className="pointer-events-auto ml-6 flex max-w-sm rounded-2xl bg-[#0D1B2A] px-8 py-10 text-white shadow-2xl sm:ml-12 sm:px-8 sm:py-12">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-300 sm:text-xs">
                   Built for real workflows
