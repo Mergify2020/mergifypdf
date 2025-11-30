@@ -15,7 +15,6 @@ export default function LogoCarousel() {
     { name: "Wayfair", url: "/wayfair.svg" },
     { name: "Toyota", url: "/totoya.svg" },
     { name: "Honda", url: "/honda.svg" },
-    { name: "Kellogg's", url: "/kelloggs.svg" },
     { name: "Verizon", url: "/verizon.svg" },
     { name: "Bank of America", url: "/bankofamerica.svg" },
     { name: "Chase", url: "/chasebank.svg" },
@@ -29,10 +28,10 @@ export default function LogoCarousel() {
       <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-0 lg:py-12">
         <div className="text-center">
           <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
-            Join the world&apos;s largest companies
+            Trusted by the world&apos;s top companies
           </h2>
           <p className="mt-2 text-sm text-slate-500">
-            Employees at these companies use our products
+            These teams rely on MergifyPDF to work faster and smarter
           </p>
         </div>
 
@@ -44,7 +43,7 @@ export default function LogoCarousel() {
                   key={`${logo.name}-${index}`}
                   src={logo.url}
                   alt={`${logo.name} logo`}
-                  className="h-7 w-auto"
+                  className="h-10 w-auto"
                   loading="lazy"
                 />
               ))}
@@ -67,7 +66,7 @@ export default function LogoCarousel() {
         }
 
         .logo-marquee-row {
-          animation: logo-scroll 34s linear infinite;
+          animation: logo-scroll 38s linear infinite;
         }
 
         @keyframes logo-scroll {
