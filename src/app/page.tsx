@@ -74,7 +74,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
             {/* Sparkle A – top-left in gradient */}
             <Sparkle
               gradientId="sparkle-top-left"
-              className="pointer-events-none absolute left-2 top-4 z-20 h-12 w-12 opacity-90 sm:left-4 sm:top-6 sm:h-14 sm:w-14 md:left-6 md:top-6 md:h-16 md:w-16"
+              className="pointer-events-none absolute left-2 top-2 z-20 h-12 w-12 opacity-90 sm:left-4 sm:top-3 sm:h-14 sm:w-14 md:left-6 md:top-4 md:h-16 md:w-16"
             />
 
             {/* Sparkle B – mid-gutter between text and screenshot */}
