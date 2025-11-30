@@ -21,18 +21,20 @@ export default function PersonaHighlight() {
 
           {/* Floating text card */}
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center">
-            <div className="pointer-events-auto max-w-sm rounded-2xl bg-[#0D1B2A] px-8 py-16 text-white shadow-2xl sm:px-8 sm:py-16">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-300 sm:text-xs">
-                Built for real workflows
-              </p>
-              <h2 className="mt-2 text-2xl font-semibold leading-snug sm:mt-3 sm:text-3xl">
-                For Individuals, Freelancers, Realtors, and more!
-              </h2>
-              <p className="mt-3 text-sm leading-relaxed text-slate-300">
-                Whether you&apos;re closing deals, studying, or sending out
-                proposals, MergifyPDF keeps every document clean, organized, and
-                ready to sign.
-              </p>
+            <div className="pointer-events-auto flex min-h-[520px] max-w-sm rounded-2xl bg-[#0D1B2A] px-8 py-16 text-white shadow-2xl sm:px-8 sm:py-16">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-300 sm:text-xs">
+                  Built for real workflows
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold leading-snug sm:mt-3 sm:text-3xl">
+                  For Individuals, Freelancers, Realtors, and more!
+                </h2>
+                <p className="mt-3 text-sm leading-relaxed text-slate-300">
+                  Whether you&apos;re closing deals, studying, or sending out
+                  proposals, MergifyPDF keeps every document clean, organized,
+                  and ready to sign.
+                </p>
+              </div>
             </div>
           </div>
         </div>
