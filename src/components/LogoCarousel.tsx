@@ -1,15 +1,11 @@
  "use client";
 
-import { useEffect, useRef } from "react";
-
 type Logo = {
   name: string;
   url: string;
 };
 
 export default function LogoCarousel() {
-  const carouselRef = useRef<HTMLDivElement | null>(null);
-
   const logos: Logo[] = [
     { name: "Netflix", url: "/netflix.png" },
     { name: "Target", url: "/target.png" },
@@ -24,33 +20,6 @@ export default function LogoCarousel() {
     { name: "Nvidia", url: "/nvidia.png" },
     { name: "State Farm", url: "/statefarm.png" },
   ];
-
-  // Mobile: scroll-based marquee using scrollLeft to avoid transform glitches
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (window.innerWidth > 768) return;
-
-    const container = carouselRef.current;
-    if (!container) return;
-
-    let frameId: number;
-    const step = 0.4; // pixels per frame for smooth, slow scroll
-
-    const tick = () => {
-      const maxScroll = container.scrollWidth / 2;
-      container.scrollLeft += step;
-      if (container.scrollLeft >= maxScroll) {
-        container.scrollLeft -= maxScroll;
-      }
-      frameId = requestAnimationFrame(tick);
-    };
-
-    frameId = requestAnimationFrame(tick);
-
-    return () => {
-      cancelAnimationFrame(frameId);
-    };
-  }, []);
 
   return (
     <section className="bg-white">
@@ -67,7 +36,7 @@ export default function LogoCarousel() {
         <div className="mt-8">
           {/* Desktop: marquee carousel */}
           <div className="hidden md:block">
-          <div ref={carouselRef} className="logo-marquee-mask logo-carousel-mask">
+            <div className="logo-marquee-mask logo-carousel-mask">
               <div className="logo-marquee-row logo-carousel flex items-center gap-[48px]">
                 <div className="logo-track logo-carousel-track flex items-center gap-[48px]">
                   {logos.map((logo) => (
@@ -98,18 +67,36 @@ export default function LogoCarousel() {
             </div>
           </div>
 
-          {/* Mobile: static 3x4 logo grid */}
+          {/* Mobile: marquee carousel as well */}
           <div className="block md:hidden">
-            <div className="grid grid-cols-3 gap-x-10 gap-y-6 justify-items-center">
-              {logos.map((logo) => (
-                <img
-                  key={`mobile-${logo.name}`}
-                  src={logo.url}
-                  alt={`${logo.name} logo`}
-                  className="h-7 w-auto"
-                  loading="lazy"
-                />
-              ))}
+            <div className="logo-marquee-mask logo-carousel-mask">
+              <div className="logo-marquee-row logo-carousel flex items-center gap-[32px]">
+                <div className="logo-track logo-carousel-track flex items-center gap-[32px]">
+                  {logos.map((logo) => (
+                    <img
+                      key={`mobile-${logo.name}`}
+                      src={logo.url}
+                      alt={`${logo.name} logo`}
+                      className="logo-carousel-img h-7 w-auto flex-shrink-0"
+                      loading="lazy"
+                    />
+                  ))}
+                </div>
+                <div
+                  className="logo-track logo-carousel-track logo-carousel-track--dup flex items-center gap-[32px]"
+                  aria-hidden="true"
+                >
+                  {logos.map((logo) => (
+                    <img
+                      key={`mobile-${logo.name}-duplicate`}
+                      src={logo.url}
+                      alt=""
+                      className="logo-carousel-img h-7 w-auto flex-shrink-0"
+                      loading="lazy"
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -143,7 +130,7 @@ export default function LogoCarousel() {
           }
         }
 
-        /* Desktop: fade edges + CSS marquee */
+        /* Desktop & landscape: fade edges + CSS marquee */
         @media (min-width: 769px) {
           .logo-marquee-mask::before {
             content: "";
@@ -160,7 +147,7 @@ export default function LogoCarousel() {
           }
         }
 
-        /* Mobile: JS scroll marquee – disable CSS transforms on row only */
+        /* Mobile: keep marquee, no masks/filters, slightly smaller logos */
         @media (max-width: 768px) {
           .logo-carousel-mask,
           .logo-carousel {
@@ -168,12 +155,6 @@ export default function LogoCarousel() {
             -webkit-mask-image: none !important;
             clip-path: none !important;
             filter: none !important;
-          }
-
-          .logo-marquee-row.logo-carousel {
-            animation: none !important;
-            transform: none !important;
-            will-change: auto !important;
           }
 
           .logo-carousel-img {
