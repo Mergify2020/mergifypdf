@@ -74,12 +74,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
             {/* Sparkle floating between headline + screenshot */}
             <Sparkle
               gradientId="sparkle-middle"
-              className="pointer-events-none absolute right-[22%] top-6 hidden h-8 w-8 opacity-80 md:block md:h-11 md:w-11"
-            />
-            {/* Sparkle near bottom-right of hero background */}
-            <Sparkle
-              gradientId="sparkle-bottom"
-              className="pointer-events-none absolute bottom-2 right-4 h-4 w-4 opacity-70 sm:h-5 sm:w-5 md:h-7 md:w-7"
+              className="pointer-events-none absolute right-[20%] top-4 hidden h-5 w-5 opacity-80 sm:h-6 sm:w-6 md:block md:h-8 md:w-8"
             />
 
             <div className="relative z-10 space-y-6 text-center lg:text-left">
@@ -109,7 +104,14 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
                   </span>
                 ))}
               </div>
-              <HeroStats />
+              <div className="relative">
+                {/* Subtle sparkle near stats row */}
+                <Sparkle
+                  gradientId="sparkle-stats"
+                  className="pointer-events-none absolute -left-4 top-2 h-4 w-4 opacity-30 sm:-left-5 sm:top-1 sm:h-5 sm:w-5 md:h-6 md:w-6"
+                />
+                <HeroStats />
+              </div>
               <p className="mt-3 text-xs font-semibold text-slate-500 sm:text-sm md:text-base">
                 * Upgrade to get unlimited access to document editing and signing.
               </p>
