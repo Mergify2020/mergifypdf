@@ -38,26 +38,32 @@ export default function LogoCarousel() {
           <div className="logo-marquee-mask">
             <div className="logo-marquee-row flex">
               <div className="logo-track flex items-center gap-[48px]">
-                {logos.map((logo) => (
-                  <img
-                    key={logo.name}
-                    src={logo.url}
-                    alt={`${logo.name} logo`}
-                    className="h-10 w-auto flex-shrink-0"
-                    loading="lazy"
-                  />
-                ))}
+                {logos.map((logo, index) => {
+                  const isLast = index === logos.length - 1;
+                  return (
+                    <img
+                      key={logo.name}
+                      src={logo.url}
+                      alt={`${logo.name} logo`}
+                      className={"h-10 w-auto flex-shrink-0" + (isLast ? " mr-5" : "")}
+                      loading="lazy"
+                    />
+                  );
+                })}
               </div>
               <div className="logo-track flex items-center gap-[48px]" aria-hidden="true">
-                {logos.map((logo) => (
-                  <img
-                    key={`${logo.name}-duplicate`}
-                    src={logo.url}
-                    alt=""
-                    className="h-10 w-auto flex-shrink-0"
-                    loading="lazy"
-                  />
-                ))}
+                {logos.map((logo, index) => {
+                  const isLast = index === logos.length - 1;
+                  return (
+                    <img
+                      key={`${logo.name}-duplicate`}
+                      src={logo.url}
+                      alt=""
+                      className={"h-10 w-auto flex-shrink-0" + (isLast ? " mr-5" : "")}
+                      loading="lazy"
+                    />
+                  );
+                })}
               </div>
             </div>
           </div>
