@@ -11,6 +11,8 @@ function SocialIcon(
     <a
       href={href}
       aria-label={label}
+      target="_blank"
+      rel="noreferrer"
       className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
     >
       {children}
@@ -25,7 +27,7 @@ function TikTokIcon(props: IconProps) {
         d="M10 4.5v9.3a2.4 2.4 0 1 1-2.4-2.4c.5 0 .9.1 1.3.3M13.2 4.5C13.5 6.3 14.8 7.5 16.6 7.8l.9.1"
         fill="none"
         stroke="currentColor"
-        strokeWidth={2}
+        strokeWidth={2.2}
         strokeLinecap="round"
         strokeLinejoin="round"
       />
@@ -50,13 +52,13 @@ function ThreadsIcon(props: IconProps) {
         r="8"
         fill="none"
         stroke="currentColor"
-        strokeWidth={2}
+        strokeWidth={2.2}
       />
       <path
         d="M9 8.4C9.6 7.7 10.5 7.4 11.6 7.4c2 0 3.4 1.2 3.4 3.2 0 2.2-1.4 3.6-3.4 3.6-1.3 0-2.3-.7-2.7-1.8m2.9-4.1c1.1.1 2 .6 2.2 1.9-.5-.3-1.1-.4-1.6-.5-.2-.6-.7-1-1.4-1-1 0-1.6.6-1.6 1.5 0 .8.5 1.4 1.5 1.6l.7.1c.6.1.8.4.8.8 0 .6-.5 1-1.2 1-0.8 0-1.4-.4-1.7-1"
         fill="none"
         stroke="currentColor"
-        strokeWidth={2}
+        strokeWidth={2.2}
         strokeLinecap="round"
         strokeLinejoin="round"
       />
@@ -176,13 +178,13 @@ export default function Footer() {
                 label="MergifyPDF on TikTok"
                 href="https://www.tiktok.com/@mergify.pdf"
               >
-                <TikTokIcon className="h-5 w-5" />
+                <TikTokIcon className="h-6 w-6" />
               </SocialIcon>
               <SocialIcon
                 label="MergifyPDF on Threads"
                 href="https://www.threads.com/@mergifypdf"
               >
-                <ThreadsIcon className="h-5 w-5" />
+                <ThreadsIcon className="h-6 w-6" />
               </SocialIcon>
               <SocialIcon
                 label="MergifyPDF on Instagram"
@@ -191,9 +193,12 @@ export default function Footer() {
                 <Instagram className="h-5 w-5" strokeWidth={2.2} />
               </SocialIcon>
               <SocialIcon label="MergifyPDF on YouTube">
-                <Youtube className="h-5 w-5" strokeWidth={2.2} />
+                <Youtube className="h-6 w-6" strokeWidth={2.2} />
               </SocialIcon>
-              <SocialIcon label="MergifyPDF on X (Twitter)">
+              <SocialIcon
+                label="MergifyPDF on X (Twitter)"
+                href="https://x.com/MergifyPDF"
+              >
                 <Twitter className="h-5 w-5" strokeWidth={2.2} />
               </SocialIcon>
             </div>
