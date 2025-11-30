@@ -74,19 +74,19 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
             {/* Sparkle floating between headline + screenshot / near picture */}
             <Sparkle
               gradientId="sparkle-middle"
-              className="pointer-events-none absolute right-[14%] top-10 hidden h-6 w-6 opacity-90 sm:right-[16%] sm:top-8 sm:h-7 sm:w-7 md:block md:h-10 md:w-10"
+              className="pointer-events-none absolute right-[14%] top-10 hidden h-6 w-6 opacity-90 sm:right-[16%] sm:top-8 sm:h-7 sm:w-7 md:block md:h-10 md:w-10 z-20"
             />
             {/* Sparkle near bottom-right of hero background beside picture */}
             <Sparkle
               gradientId="sparkle-right-bottom"
-              className="pointer-events-none absolute bottom-6 right-10 h-5 w-5 opacity-80 sm:bottom-8 sm:right-12 sm:h-6 sm:w-6 md:h-9 md:w-9"
+              className="pointer-events-none absolute bottom-6 right-10 h-5 w-5 opacity-80 sm:bottom-8 sm:right-12 sm:h-6 sm:w-6 md:h-9 md:w-9 z-20"
             />
 
             <div className="relative z-10 space-y-6 text-center lg:text-left">
               {/* Sparkle above/left of headline in empty space */}
               <Sparkle
                 gradientId="sparkle-top-left"
-                className="pointer-events-none absolute -top-6 left-0 h-6 w-6 opacity-90 sm:-top-7 sm:left-2 sm:h-7 sm:w-7 md:-top-9 md:left-4 md:h-11 md:w-11"
+                className="pointer-events-none absolute -top-6 left-0 h-6 w-6 opacity-90 sm:-top-7 sm:left-2 sm:h-7 sm:w-7 md:-top-9 md:left-4 md:h-11 md:w-11 z-20"
               />
               <h1 className="text-3xl font-semibold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
                 <span className="block">The fastest way to edit, sign,</span>
@@ -113,7 +113,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
                 {/* Subtle sparkle near stats row */}
                 <Sparkle
                   gradientId="sparkle-stats"
-                  className="pointer-events-none absolute -left-4 top-1 h-4 w-4 opacity-70 sm:-left-5 sm:-top-1 sm:h-5 sm:w-5 md:h-7 md:w-7"
+                  className="pointer-events-none absolute -left-4 top-1 h-4 w-4 opacity-70 sm:-left-5 sm:-top-1 sm:h-5 sm:w-5 md:h-7 md:w-7 z-20"
                 />
                 <HeroStats />
               </div>
