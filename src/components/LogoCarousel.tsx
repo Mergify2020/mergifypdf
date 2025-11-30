@@ -7,15 +7,21 @@ type Logo = {
 
 export default function LogoCarousel() {
   const logos: Logo[] = [
-    { name: "Wayfair", url: "https://cdn.simpleicons.org/wayfair" },
-    { name: "Facebook", url: "https://cdn.simpleicons.org/facebook" },
-    { name: "UPS", url: "https://cdn.simpleicons.org/ups" },
-    { name: "FedEx", url: "https://cdn.simpleicons.org/fedex" },
-    { name: "Netflix", url: "https://cdn.simpleicons.org/netflix" },
-    { name: "PepsiCo", url: "https://cdn.simpleicons.org/pepsico" },
-    { name: "Kellogg's", url: "https://cdn.simpleicons.org/kelloggs" },
-    { name: "Kohl's", url: "https://cdn.simpleicons.org/kohls" },
-    { name: "Allstate", url: "https://cdn.simpleicons.org/allstate" },
+    { name: "Amazon", url: "/amazon.svg" },
+    { name: "Netflix", url: "/netflix.svg" },
+    { name: "Target", url: "/target.svg" },
+    { name: "Walmart", url: "/walmart.svg" },
+    { name: "FedEx", url: "/fedex.svg" },
+    { name: "Wayfair", url: "/wayfair.svg" },
+    { name: "Toyota", url: "/totoya.svg" },
+    { name: "Honda", url: "/honda.svg" },
+    { name: "Kellogg's", url: "/kelloggs.svg" },
+    { name: "Verizon", url: "/verizon.svg" },
+    { name: "Bank of America", url: "/bankofamerica.svg" },
+    { name: "Chase", url: "/chasebank.svg" },
+    { name: "Nvidia", url: "/nvidia.svg" },
+    { name: "Allstate", url: "/allstate.svg" },
+    { name: "State Farm", url: "/statefarm.svg" },
   ];
 
   return (
