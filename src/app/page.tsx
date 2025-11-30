@@ -38,6 +38,22 @@ const curatedProjects = [
   },
 ];
 
+function Sparkle({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className={className}
+      style={{ filter: "blur(1px)" }}
+    >
+      <path
+        fill="currentColor"
+        d="M12 3.5 13.6 9l5.4 1.6L13.6 12 12 18.5 10.4 12 5 10.6 10.4 9z"
+      />
+    </svg>
+  );
+}
+
 export default async function Home() {
   const session = await getServerSession(authOptions);
   if (session?.user) {
@@ -54,7 +70,10 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
       <section className="w-full bg-gradient-to-r from-[#FDF2FF] via-[#EEF2FF] to-[#E0F7FF]">
         <div className="mx-auto w-full max-w-7xl px-6 py-10 sm:py-14 lg:py-16">
           <div className="grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.1fr)] lg:items-center lg:gap-12">
-            <div className="space-y-6 text-center lg:text-left">
+            <div className="relative space-y-6 text-center lg:text-left">
+              {/* Sparkle accents around headline */}
+              <Sparkle className="pointer-events-none absolute -top-2 left-2 h-4 w-4 text-slate-900 opacity-10 sm:h-5 sm:w-5 md:h-7 md:w-7 md:opacity-20" />
+              <Sparkle className="pointer-events-none absolute top-10 right-4 h-5 w-5 text-slate-900 opacity-10 sm:h-6 sm:w-6 md:h-9 md:w-9 md:opacity-20" />
               <h1 className="text-3xl font-semibold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
                 <span className="block">The fastest way to edit, sign,</span>
                 <span className="block">and manage PDFs online.</span>
@@ -82,7 +101,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
               </p>
             </div>
 
-            <div className="mt-4 sm:mt-8 flex items-center justify-center lg:mt-0 lg:justify-end">
+            <div className="relative mt-4 flex items-center justify-center sm:mt-8 lg:mt-0 lg:justify-end">
               <Image
                 src="/visual-hero3.png"
                 alt="Preview of the MergifyPDF workspace"
@@ -91,6 +110,8 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
                 className="w-full max-w-xl rounded-xl object-cover shadow-[0_40px_120px_rgba(9,20,45,0.25)]"
                 priority
               />
+              {/* Tiny sparkle near bottom-left of image */}
+              <Sparkle className="pointer-events-none absolute bottom-3 left-6 h-3 w-3 text-slate-900 opacity-10 sm:h-4 sm:w-4 md:opacity-20" />
             </div>
           </div>
         </div>
