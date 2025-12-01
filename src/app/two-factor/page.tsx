@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 
 export default function TwoFactorPage() {
   const router = useRouter();
@@ -125,6 +125,38 @@ export default function TwoFactorPage() {
               className="h-8 w-auto"
             />
           </Link>
+          <div className="flex items-center gap-3">
+            {/* Pricing pill to match login header */}
+            <Link
+              href="/account?view=pricing"
+              className="inline-flex items-center rounded-full border-2 border-slate-300 bg-[#6A4EE8] px-7 py-2 text-xs font-semibold text-white shadow-md transition-all hover:-translate-y-0.5 hover:bg-[#5A3FD8] hover:shadow-lg"
+            >
+              Pricing
+            </Link>
+            {/* Log in button only (no sign up on 2FA screen) */}
+            <Link
+              href="/login"
+              className="hidden items-center rounded-full border border-slate-300 bg-transparent px-4 py-2 text-xs font-semibold text-slate-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-white/70 sm:inline-flex"
+            >
+              Log in
+            </Link>
+            {/* Mobile log in button */}
+            <Link
+              href="/login"
+              className="inline-flex items-center rounded-full border border-slate-300 bg-transparent px-4 py-2 text-xs font-semibold text-slate-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-white/70 sm:hidden"
+            >
+              Log in
+            </Link>
+            <button
+              type="button"
+              onClick={() => {
+                void signOut({ callbackUrl: "/login" });
+              }}
+              className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       </header>
 

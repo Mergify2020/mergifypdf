@@ -21,7 +21,7 @@ export async function middleware(req: NextRequest) {
   const secret = process.env.NEXTAUTH_SECRET;
   const token = (secret ? await getToken({ req, secret }) : null) as JWT | null;
 
-  const PUBLIC_PATHS = ["/login", "/register", "/forgot-password", "/reset-password"];
+  const PUBLIC_PATHS = ["/", "/login", "/register", "/forgot-password", "/reset-password"];
   const isPublicPath = PUBLIC_PATHS.includes(pathname);
   const isProtectedPath =
     !isPublicPath && !isTwoFactorPage && !isNextAuthApi && !pathname.startsWith("/api/");

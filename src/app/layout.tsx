@@ -1,6 +1,5 @@
 ﻿// src/app/layout.tsx
 import type { Metadata } from "next";
-import Link from "next/link";
 import Providers from "@/components/Providers";
 import WorkspaceSettingsMenu from "@/components/WorkspaceSettingsMenu";
 import { getServerSession } from "next-auth";
@@ -26,6 +25,8 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
+  const lockedByTwoFactor =
+    !!session?.user?.twoFactorEnabled && session.user.twoFactorPassed !== true;
 
   return (
     <html lang="en">
@@ -48,10 +49,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <header className="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/90 backdrop-blur">
             <div className="mx-auto flex h-[76px] w-full max-w-7xl items-center justify-between px-4 lg:px-6">
               <AppHeaderBrand />
-              {session?.user ? (
-                <WorkspaceSettingsMenu />
-              ) : (
+              {!session?.user || lockedByTwoFactor ? (
                 <HeaderAuthButtons />
+              ) : (
+                <WorkspaceSettingsMenu />
               )}
             </div>
           </header>

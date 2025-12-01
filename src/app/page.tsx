@@ -1,4 +1,3 @@
-import Link from "next/link";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
@@ -13,7 +12,6 @@ import ProjectsWorkspaceShelf from "@/components/ProjectsWorkspaceShelf";
 import StartProjectButton from "@/components/StartProjectButton";
 import ProjectsList from "@/components/ProjectsList";
 import MergifySignCard from "@/components/MergifySignCard";
-import { ArrowUpRight } from "lucide-react";
 
 const curatedProjects = [
   {
@@ -56,8 +54,28 @@ function Sparkle({ className, gradientId }: { className?: string; gradientId: st
   );
 }
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams?: { [key: string]: string | string[] | undefined };
+}) {
+  const landingParam = searchParams?.landing;
+  const landing =
+    typeof landingParam === "string"
+      ? landingParam
+      : Array.isArray(landingParam)
+        ? landingParam[0]
+        : undefined;
+
   const session = await getServerSession(authOptions);
+
+  // When explicitly requested, always show the marketing hero,
+  // even if the user already has an active session.
+  if (landing === "hero") {
+    const usedToday = await hasUsedToday();
+    return <MarketingLanding usedToday={usedToday} />;
+  }
+
   if (session?.user) {
     if (session.user.twoFactorEnabled && !session.user.twoFactorPassed) {
       redirect("/2fa");
