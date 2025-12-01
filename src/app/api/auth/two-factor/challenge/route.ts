@@ -8,9 +8,12 @@ function unauthorized() {
   return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 }
 
-export async function POST() {
+export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return unauthorized();
+
+  const body = await req.json().catch(() => ({} as Record<string, unknown>));
+  const force = body && body.force === true;
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
@@ -32,7 +35,7 @@ export async function POST() {
     );
   }
 
-  const result = await issueLoginTwoFactorCode(session.user.id, user.email);
+  const result = await issueLoginTwoFactorCode(session.user.id, user.email, force);
 
   if (!result.ok) {
     if (result.error === "EMAIL_MISSING") {
@@ -58,4 +61,3 @@ export async function POST() {
 
   return NextResponse.json({ ok: true });
 }
-

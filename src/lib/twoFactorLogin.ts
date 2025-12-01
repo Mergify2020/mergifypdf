@@ -11,9 +11,32 @@ type IssueResult =
 
 export async function issueLoginTwoFactorCode(
   userId: string,
-  email: string | null | undefined
+  email: string | null | undefined,
+  forceNew: boolean = false
 ): Promise<IssueResult> {
   const identifier = `${IDENTIFIER_PREFIX}${userId}`;
+
+  if (!forceNew) {
+    // If there's already an unexpired login 2FA code, reuse it instead of
+    // generating and emailing a new one. This prevents sending a new code
+    // every time the user reloads or revisits the 2FA screen.
+    const existing = await prisma.verificationToken.findFirst({
+      where: {
+        identifier,
+        expires: {
+          gt: new Date(),
+        },
+      },
+    });
+
+    if (existing) {
+      if (process.env.NODE_ENV !== "production") {
+        console.log(`[2fa-login] Reusing active code for ${email ?? "unknown"}`);
+      }
+      return { ok: true };
+    }
+  }
+
   const code = generateSixDigitCode();
   const hashed = hashVerificationCode(code);
   const expires = new Date(Date.now() + EXPIRATION_MINUTES * 60 * 1000);
@@ -77,4 +100,3 @@ export async function verifyLoginTwoFactorCode(
   await prisma.verificationToken.deleteMany({ where: { identifier } });
   return { ok: true };
 }
-

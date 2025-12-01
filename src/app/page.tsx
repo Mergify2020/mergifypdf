@@ -54,12 +54,16 @@ function Sparkle({ className, gradientId }: { className?: string; gradientId: st
   );
 }
 
-export default async function Home({
-  searchParams,
-}: {
-  searchParams?: { [key: string]: string | string[] | undefined };
-}) {
-  const landingParam = searchParams?.landing;
+type HomeProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default async function Home({ searchParams }: HomeProps) {
+  const resolved = (searchParams ? await searchParams : {}) as Record<
+    string,
+    string | string[] | undefined
+  >;
+  const landingParam = resolved.landing;
   const landing =
     typeof landingParam === "string"
       ? landingParam
