@@ -83,7 +83,7 @@ export async function POST(req: Request) {
     );
   }
 
-  decoded.twoFactorVerified = true;
+  decoded.twoFactorPassed = true;
 
   const newJwt = await encode({
     token: decoded,

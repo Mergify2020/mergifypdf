@@ -94,11 +94,11 @@ export const authOptions: NextAuthOptions = {
         token.twoFactorMethod = dbUser?.twoFactorMethod ?? null;
 
         if (account) {
-          // Fresh sign-in: require a 2FA challenge if enabled
-          token.twoFactorVerified = !twoFactorEnabled;
-        } else if (typeof token.twoFactorVerified !== "boolean") {
-          // Default for existing tokens
-          token.twoFactorVerified = !twoFactorEnabled;
+          // Fresh sign-in: always reset 2FA pass flag based on whether 2FA is enabled
+          token.twoFactorPassed = !twoFactorEnabled;
+        } else if (typeof token.twoFactorPassed !== "boolean") {
+          // Default for existing tokens without this flag yet
+          token.twoFactorPassed = !twoFactorEnabled;
         }
       }
 
@@ -124,13 +124,13 @@ export const authOptions: NextAuthOptions = {
 
         const twoFactorEnabled =
           typeof token.twoFactorEnabled === "boolean" ? token.twoFactorEnabled : false;
-        const twoFactorVerified =
-          typeof token.twoFactorVerified === "boolean"
-            ? token.twoFactorVerified
+        const twoFactorPassed =
+          typeof token.twoFactorPassed === "boolean"
+            ? token.twoFactorPassed
             : !twoFactorEnabled;
 
         session.user.twoFactorEnabled = twoFactorEnabled;
-        session.user.twoFactorVerified = twoFactorVerified;
+        session.user.twoFactorPassed = twoFactorPassed;
       }
       return session;
     },

@@ -17,8 +17,16 @@ export async function middleware(req: NextRequest) {
   const secret = process.env.NEXTAUTH_SECRET;
   const token = (secret ? await getToken({ req, secret }) : null) as JWT | null;
 
+  const PUBLIC_PATHS = ["/login", "/register", "/forgot-password", "/reset-password"];
+  const isPublicPath = PUBLIC_PATHS.includes(pathname);
+  const isProtectedPath = !isPublicPath && !isTwoFactorPage && !isNextAuthApi && !pathname.startsWith("/api/");
+
   if (!token) {
     if (isTwoFactorPage) {
+      const url = new URL("/login", req.url);
+      return NextResponse.redirect(url);
+    }
+    if (isProtectedPath) {
       const url = new URL("/login", req.url);
       return NextResponse.redirect(url);
     }
@@ -26,16 +34,22 @@ export async function middleware(req: NextRequest) {
   }
 
   const twoFactorEnabled = !!token.twoFactorEnabled || token.twoFactorMethod === "email";
-  const twoFactorVerified = token.twoFactorVerified === true;
+  const twoFactorPassed = token.twoFactorPassed === true;
 
-  if (twoFactorEnabled && !twoFactorVerified && !isTwoFactorPage) {
+  console.log("2FA check:", {
+    enabled: twoFactorEnabled,
+    passed: twoFactorPassed,
+    pathname,
+  });
+
+  if (twoFactorEnabled && !twoFactorPassed && !isTwoFactorPage) {
     const url = new URL("/two-factor", req.url);
     const callback = pathname + search;
     url.searchParams.set("callbackUrl", callback);
     return NextResponse.redirect(url);
   }
 
-  if (isTwoFactorPage && (!twoFactorEnabled || twoFactorVerified)) {
+  if (isTwoFactorPage && (!twoFactorEnabled || twoFactorPassed)) {
     const callback = req.nextUrl.searchParams.get("callbackUrl") || "/";
     const url = new URL(callback, req.url);
     return NextResponse.redirect(url);

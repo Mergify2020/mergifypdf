@@ -8,7 +8,7 @@ declare module "next-auth" {
       id?: string;
       image?: string | null;
       twoFactorEnabled?: boolean;
-      twoFactorVerified?: boolean;
+      twoFactorPassed?: boolean;
     };
   }
 }
@@ -18,7 +18,7 @@ declare module "next-auth/jwt" {
     authType?: "oauth" | "credentials";
     providers?: string[];
     twoFactorEnabled?: boolean;
-    twoFactorVerified?: boolean;
+    twoFactorPassed?: boolean;
     twoFactorMethod?: string | null;
   }
 }
