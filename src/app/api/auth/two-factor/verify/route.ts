@@ -61,7 +61,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const cookieName =
     process.env.NODE_ENV === "production"
       ? "__Secure-next-auth.session-token"
