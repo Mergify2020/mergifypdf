@@ -165,29 +165,77 @@ function ProjectsDashboard({ displayName }: { displayName: string }) {
   return (
     <div className="min-h-screen bg-[#F9FAFB] text-slate-900">
       <div className="mx-auto flex max-w-[1120px] flex-col gap-6 px-6 py-8">
-        <div className="rounded-[10px] border border-slate-200 bg-white p-6 shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
-          <header className="flex flex-col gap-4 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-1">
-              <h1 className="text-[24px] font-semibold text-[#111827] sm:text-[30px]">
-                Welcome back, {shortName}.
-              </h1>
-              <p className="text-sm text-slate-500">
-                Pick up where you left off, create a new document, or send one for signature.
-              </p>
-            </div>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <StartProjectButton />
-            </div>
-          </header>
-        </div>
+        {/* Top row: Welcome + Start project / Mergify Sign */}
+        <section className="grid gap-6 lg:grid-cols-2">
+          <div className="rounded-[10px] border border-slate-200 bg-white p-6 shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
+            <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-1">
+                <h1 className="text-[24px] font-semibold text-[#111827] sm:text-[30px]">
+                  Welcome back, {shortName}.
+                </h1>
+                <p className="text-sm text-slate-500">
+                  Pick up where you left off, create a new document, or send one for signature.
+                </p>
+              </div>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <StartProjectButton />
+              </div>
+            </header>
+          </div>
 
-        <ProjectsWorkspaceShelf />
+          <div className="rounded-[10px] border border-slate-200 bg-white p-0 shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
+            <MergifySignCard />
+          </div>
+        </section>
 
-        <section className="grid gap-6 lg:grid-cols-[2fr,1fr]">
+        {/* Middle row: Continue last project / Document templates */}
+        <section className="grid gap-6 lg:grid-cols-2">
+          <ProjectsWorkspaceShelf />
+
+          <div className="rounded-[10px] border border-slate-200 bg-white p-6 shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
+            <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#9CA3AF]">
+              Document templates
+            </p>
+            <h2 className="mt-1 text-lg font-semibold text-slate-900">
+              Reuse-ready documents for your workflows
+            </h2>
+            <p className="mt-2 text-sm text-slate-500">
+              W-9 forms, contracts, invoices, NDAs, and more. Save your most
+              used document structures and start from a polished base instead of a blank page.
+            </p>
+            <button
+              type="button"
+              className="mt-4 inline-flex items-center text-sm font-semibold text-[#024d7c] hover:text-[#013a60]"
+            >
+              Browse Templates
+              <span className="ml-1">→</span>
+            </button>
+          </div>
+        </section>
+
+        {/* Bottom row: Projects list / AI tools */}
+        <section className="grid gap-6 lg:grid-cols-2">
           <ProjectsList initialProjects={curatedProjects} />
 
-          <div className="space-y-4">
-            <MergifySignCard />
+          <div className="rounded-[10px] border border-slate-200 bg-white p-6 shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
+            <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#9CA3AF]">
+              AI tools (coming soon)
+            </p>
+            <h2 className="mt-1 text-lg font-semibold text-slate-900">
+              Let AI handle the busywork
+            </h2>
+            <p className="mt-2 text-sm text-slate-500">
+              We&apos;re building AI helpers that understand your PDFs and
+              handle the tedious parts for you.
+            </p>
+            <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-600">
+              <li>Summarize PDFs</li>
+              <li>Rewrite or simplify text</li>
+              <li>Smart form detection</li>
+            </ul>
+            <p className="mt-3 text-xs text-slate-400">
+              Watch this space — you&apos;ll see new AI tools appear here as they roll out.
+            </p>
           </div>
         </section>
 
