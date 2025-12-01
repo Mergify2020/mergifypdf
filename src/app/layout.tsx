@@ -1,11 +1,13 @@
 ﻿// src/app/layout.tsx
 import type { Metadata } from "next";
+import Link from "next/link";
 import Providers from "@/components/Providers";
+import WorkspaceSettingsMenu from "@/components/WorkspaceSettingsMenu";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import AppHeaderBrand from "@/components/AppHeaderBrand";
 import Footer from "@/components/Footer";
-import HeaderRight from "@/components/HeaderRight";
+import HeaderAuthButtons from "@/components/HeaderAuthButtons";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -46,7 +48,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <header className="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/90 backdrop-blur">
             <div className="mx-auto flex h-[76px] w-full max-w-7xl items-center justify-between px-4 lg:px-6">
               <AppHeaderBrand />
-              <HeaderRight />
+              {session?.user ? (
+                <WorkspaceSettingsMenu />
+              ) : (
+                <HeaderAuthButtons />
+              )}
             </div>
           </header>
           <main>{children}</main>

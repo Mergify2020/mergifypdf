@@ -7,21 +7,11 @@ import { usePathname } from "next/navigation";
 export default function AppHeaderBrand() {
   const pathname = usePathname();
   const isSignatureExperience = pathname?.startsWith("/signature-center") ?? false;
-  const isTwoFactorExperience =
-    pathname === "/2fa" || pathname === "/two-factor";
 
   if (isSignatureExperience) {
     return (
       <Link href="/" className="inline-flex items-center gap-2" aria-label="Back to dashboard">
         <Image src="/Mergify-Sign.svg" alt="Mergify Sign" width={152} height={32} priority />
-      </Link>
-    );
-  }
-
-  if (isTwoFactorExperience) {
-    return (
-      <Link href="/login" className="inline-flex items-center gap-2" aria-label="Back to login">
-        <Image src="/logo-wordmark2.svg" alt="MergifyPDF" width={160} height={40} priority />
       </Link>
     );
   }
