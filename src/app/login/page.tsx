@@ -100,7 +100,7 @@ export default function LoginPage() {
             className="object-cover"
             priority={false}
           />
-          <div className="absolute inset-0 bg-slate-950/80" />
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-950/45 via-slate-950/20 to-slate-950/10" />
         </div>
 
         {/* Layout container to keep card on the right, left side open */}
