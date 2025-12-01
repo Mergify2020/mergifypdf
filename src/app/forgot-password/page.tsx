@@ -39,8 +39,8 @@ export default function ForgotPasswordPage() {
       {/* Background image + overlay */}
       <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
         <img
-          src="/Hero-team10.svg"
-          alt="Team collaborating with documents in the MergifyPDF workspace"
+          src="/reset-back.svg"
+          alt="Password reset background"
           className="h-full w-full object-cover object-left sm:object-center"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-slate-950/65 via-slate-950/35 to-slate-950/15" />
