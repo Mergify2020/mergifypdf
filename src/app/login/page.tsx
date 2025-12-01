@@ -96,111 +96,116 @@ export default function LoginPage() {
         <div className="pointer-events-none absolute -top-32 right-[-60px] h-72 w-72 rounded-[999px] bg-gradient-to-bl from-[#6A4EE8] via-[#399BFF] to-[#F044FF] opacity-20 blur-3xl" />
         <div className="pointer-events-none absolute bottom-[-80px] left-1/2 h-80 w-80 -translate-x-1/2 rounded-[999px] bg-gradient-to-tl from-[#399BFF] via-[#6A4EE8] to-[#F044FF] opacity-15 blur-3xl" />
 
-        {/* Frosted-glass login card */}
-        <div
-          className="relative z-10 w-full max-w-5xl rounded-[26px] border border-white/25 bg-white/25 px-6 py-8 shadow-[0_30px_90px_rgba(15,23,42,0.35)] backdrop-blur-2xl sm:px-10 sm:py-10"
-          style={{ backdropFilter: "blur(20px)" }}
-        >
-          <h1 className="text-2xl font-semibold text-slate-900">Log in</h1>
-          <p className="mt-1 text-sm text-slate-700">
-            Use the account you created, or reset your password below.
-          </p>
+        {/* Layout container to keep card on the right, left side open */}
+        <div className="relative z-10 flex w-full max-w-6xl items-center justify-between">
+          <div className="hidden flex-1 lg:block" />
 
-          <form
-            onSubmit={onSubmit}
-            className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:items-start"
-          >
-            {/* Left: fields */}
-            <div className="space-y-4">
-              <div>
-                <label className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-slate-700">
-                  Email
-                </label>
-                <input
-                  className="w-full rounded-full border border-white/60 bg-white/85 px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus-visible:border-[#024d7c] focus-visible:ring-2 focus-visible:ring-[#024d7c]/70"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    if (err) setErr(null);
-                  }}
-                  required
-                  autoComplete="email"
-                />
-              </div>
+          {/* Frosted-glass login card on the right */}
+          <div className="flex w-full flex-1 justify-center lg:justify-end">
+            <div
+              className="w-full max-w-md rounded-[26px] border border-white/25 bg-white/25 px-6 py-8 shadow-[0_30px_90px_rgba(15,23,42,0.35)] backdrop-blur-2xl sm:px-8 sm:py-9"
+              style={{ backdropFilter: "blur(20px)" }}
+            >
+              <h1 className="text-2xl font-semibold text-slate-900">Log in</h1>
+              <p className="mt-1 text-sm text-slate-700">
+                Use the account you created, or reset your password below.
+              </p>
 
-              <div>
-                <label className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-slate-700">
-                  Password
-                </label>
-                <input
-                  className="w-full rounded-full border border-white/60 bg-white/85 px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus-visible:border-[#024d7c] focus-visible:ring-2 focus-visible:ring-[#024d7c]/70"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    if (err) setErr(null);
-                  }}
-                  required
-                  autoComplete="current-password"
-                />
-              </div>
+              <form
+                onSubmit={onSubmit}
+                className="mt-6 flex flex-col gap-6"
+              >
+                {/* Fields */}
+                <div className="space-y-4">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-slate-700">
+                      Email
+                    </label>
+                    <input
+                      className="w-full rounded-full border border-white/60 bg-white/85 px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus-visible:border-[#024d7c] focus-visible:ring-2 focus-visible:ring-[#024d7c]/70"
+                      type="email"
+                      placeholder="you@example.com"
+                      value={email}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        if (err) setErr(null);
+                      }}
+                      required
+                      autoComplete="email"
+                    />
+                  </div>
 
-              {err && <div className="text-sm text-red-600">{err}</div>}
-            </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-slate-700">
+                      Password
+                    </label>
+                    <input
+                      className="w-full rounded-full border border-white/60 bg-white/85 px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus-visible:border-[#024d7c] focus-visible:ring-2 focus-visible:ring-[#024d7c]/70"
+                      type="password"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        if (err) setErr(null);
+                      }}
+                      required
+                      autoComplete="current-password"
+                    />
+                  </div>
 
-            {/* Right: actions */}
-            <div className="flex flex-col items-stretch justify-between gap-5">
-              <div className="space-y-3">
-                <button
-                  type="submit"
-                  disabled={busy}
-                  aria-disabled={busy}
-                  className="w-full rounded-full bg-[#024d7c] py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-[#013a60] hover:shadow-lg disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c]/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
-                >
-                  {busy ? "Signing in…" : "Continue"}
-                </button>
+                  {err && <div className="text-sm text-red-600">{err}</div>}
+                </div>
 
-                <p className="text-center text-xs text-slate-700">
-                  or continue with
-                </p>
-
-                <button
-                  type="button"
-                  onClick={handleGoogleLogin}
-                  disabled={busy}
-                  aria-disabled={busy}
-                  className="flex w-full items-center justify-center gap-3 rounded-full border border-white/70 bg-white/85 px-4 py-2 text-sm font-medium text-slate-800 shadow-sm transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
-                  aria-label="Continue with Google"
-                >
-                  <img src="/google.svg" alt="Google logo" className="h-5 w-5" />
-                  <span>Continue with Google</span>
-                </button>
-              </div>
-
-              <div className="space-y-1 text-center text-xs text-slate-800 lg:text-left">
-                <p>
-                  <Link
-                    className="font-medium text-[#024d7c] underline-offset-2 hover:text-[#013a60] hover:underline"
-                    href="/forgot-password"
+                {/* Actions */}
+                <div className="space-y-4">
+                  <button
+                    type="submit"
+                    disabled={busy}
+                    aria-disabled={busy}
+                    className="w-full rounded-full bg-[#024d7c] py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-[#013a60] hover:shadow-lg disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c]/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
                   >
-                    Forgot your password?
-                  </Link>
-                </p>
-                <p>
-                  Don&apos;t have an account?{" "}
-                  <Link
-                    className="font-medium text-[#024d7c] underline-offset-2 hover:text-[#013a60] hover:underline"
-                    href="/register"
+                    {busy ? "Signing in…" : "Continue"}
+                  </button>
+
+                  <p className="text-center text-xs text-slate-700">
+                    or continue with
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={handleGoogleLogin}
+                    disabled={busy}
+                    aria-disabled={busy}
+                    className="flex w-full items-center justify-center gap-3 rounded-full border border-white/70 bg-white/85 px-4 py-2 text-sm font-medium text-slate-800 shadow-sm transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+                    aria-label="Continue with Google"
                   >
-                    Create one
-                  </Link>
-                </p>
-              </div>
+                    <img src="/google.svg" alt="Google logo" className="h-5 w-5" />
+                    <span>Continue with Google</span>
+                  </button>
+
+                  <div className="space-y-1 text-center text-xs text-slate-800">
+                    <p>
+                      <Link
+                        className="font-medium text-[#024d7c] underline-offset-2 hover:text-[#013a60] hover:underline"
+                        href="/forgot-password"
+                      >
+                        Forgot your password?
+                      </Link>
+                    </p>
+                    <p>
+                      Don&apos;t have an account?{" "}
+                      <Link
+                        className="font-medium text-[#024d7c] underline-offset-2 hover:text-[#013a60] hover:underline"
+                        href="/register"
+                      >
+                        Create one
+                      </Link>
+                    </p>
+                  </div>
+                </div>
+              </form>
             </div>
-          </form>
+          </div>
         </div>
 
         {/* Minimal footer at bottom center */}
