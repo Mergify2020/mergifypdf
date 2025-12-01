@@ -120,7 +120,7 @@ export default function RegisterPage() {
       {/* Background image + overlay */}
       <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
         <img
-          src="/purple-city.svg"
+          src="/girl-picture.svg"
           alt="MergifyPDF signup background"
           className="h-full w-full object-cover"
         />
