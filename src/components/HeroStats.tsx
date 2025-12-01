@@ -55,7 +55,7 @@ export default function HeroStats() {
   return (
     <div className="mt-6 flex justify-center lg:justify-start">
       <div className="grid w-full max-w-xl grid-cols-2 gap-2 sm:gap-3">
-        <div className="press-bounce relative overflow-hidden rounded-full bg-[#6A4EE8] px-4 py-1.5 text-center text-white shadow-md sm:px-6 sm:py-2">
+        <div className="relative overflow-hidden rounded-full bg-[#6A4EE8] px-4 py-1.5 text-center text-white shadow-md sm:px-6 sm:py-2">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-violet-100 sm:text-xs">
             Documents edited
           </p>
@@ -67,7 +67,7 @@ export default function HeroStats() {
           </div>
         </div>
 
-        <div className="press-bounce relative overflow-hidden rounded-full bg-[#6A4EE8] px-4 py-1.5 text-center text-white shadow-md sm:px-6 sm:py-2">
+        <div className="relative overflow-hidden rounded-full bg-[#6A4EE8] px-4 py-1.5 text-center text-white shadow-md sm:px-6 sm:py-2">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-violet-100 sm:text-xs">
             Documents signed
           </p>
