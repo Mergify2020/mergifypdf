@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import UploadCta from "@/components/UploadCta";
@@ -58,6 +59,9 @@ function Sparkle({ className, gradientId }: { className?: string; gradientId: st
 export default async function Home() {
   const session = await getServerSession(authOptions);
   if (session?.user) {
+    if (session.user.twoFactorEnabled && !session.user.twoFactorPassed) {
+      redirect("/2fa");
+    }
     return <ProjectsDashboard displayName={session.user.name ?? session.user.email ?? "Guest"} />;
   }
 
