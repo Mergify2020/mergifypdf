@@ -5,9 +5,9 @@ import Providers from "@/components/Providers";
 import WorkspaceSettingsMenu from "@/components/WorkspaceSettingsMenu";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
-import HeaderLoginButton from "@/components/HeaderLoginButton";
 import AppHeaderBrand from "@/components/AppHeaderBrand";
 import Footer from "@/components/Footer";
+import HeaderAuthButtons from "@/components/HeaderAuthButtons";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -51,21 +51,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               {session?.user ? (
                 <WorkspaceSettingsMenu />
               ) : (
-                <div className="flex items-center gap-3">
-                  <Link
-                    href="/account?view=pricing"
-                    className="inline-flex items-center rounded-full border-2 border-slate-300 bg-[#6A4EE8] px-7 py-2 text-xs font-semibold text-white shadow-md transition-all hover:-translate-y-0.5 hover:bg-[#5A3FD8] hover:shadow-lg"
-                  >
-                    Pricing
-                  </Link>
-                  <Link
-                    href="/register"
-                    className="inline-flex items-center rounded-full border border-slate-300 bg-transparent px-4 py-2 text-xs font-semibold text-slate-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-white/70"
-                  >
-                    Sign up
-                  </Link>
-                  <HeaderLoginButton />
-                </div>
+                <HeaderAuthButtons />
               )}
             </div>
           </header>
