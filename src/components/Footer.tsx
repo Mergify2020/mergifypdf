@@ -137,6 +137,12 @@ export default function Footer() {
               <a href="#" className="block text-sm text-slate-600 transition hover:text-slate-900">
                 Plans &amp; Pricing
               </a>
+              <a href="/register" className="block text-sm text-slate-600 transition hover:text-slate-900">
+                Sign Up
+              </a>
+              <a href="/login" className="block text-sm text-slate-600 transition hover:text-slate-900">
+                Log In
+              </a>
             </div>
           </div>
 
