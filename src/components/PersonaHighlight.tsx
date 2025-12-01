@@ -4,7 +4,7 @@ export default function PersonaHighlight() {
   return (
     <section className="bg-white">
       <div className="mx-auto w-full max-w-7xl px-6 pt-4 pb-8 lg:py-12">
-        <div className="relative w-full max-h-[650px] overflow-hidden rounded-none shadow-xl md:rounded-3xl">
+        <div className="relative w-full max-h-[700px] overflow-hidden rounded-none shadow-xl md:rounded-3xl">
           <Image
             src="/Hero-team10.svg"
             alt="Team collaborating with documents in the MergifyPDF workspace"
