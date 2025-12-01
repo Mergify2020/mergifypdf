@@ -72,7 +72,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
         <div className="mx-auto w-full max-w-7xl px-6 py-10 sm:py-14 lg:py-16">
           <div className="relative grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.1fr)] lg:items-center lg:gap-12">
             <div className="relative z-10 space-y-6 text-center lg:text-left">
-              <h1 className="text-3xl font-semibold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
+              <h1 className="text-3xl font-semibold leading-tight tracking-tight sm:text-4xl lg:text-4xl xl:text-5xl">
                 <span className="block md:whitespace-nowrap">
                   The fastest way to edit, sign,
                 </span>
