@@ -89,7 +89,7 @@ export default function LoginPage() {
     <>
       <main
         data-login-page
-        className="relative flex min-h-[calc(100vh-76px)] w-full items-center justify-center overflow-hidden bg-slate-950 px-4 py-4 sm:py-6"
+        className="relative flex min-h-[calc(100vh-76px)] w-full items-center justify-center overflow-hidden bg-slate-950 px-0 py-4 sm:py-6"
       >
         {/* Darkened hero team background, behind card but above base color */}
         <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
@@ -103,10 +103,10 @@ export default function LoginPage() {
           <div className="absolute inset-0 bg-gradient-to-r from-slate-950/55 via-slate-950/25 to-slate-950/5" />
         </div>
 
-        {/* Layout container to keep card on the left, right side open */}
-        <div className="relative z-10 flex w-full max-w-6xl items-center justify-between">
+        {/* Layout container to keep card on the left, aligned with header/footer grid */}
+        <div className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-4 lg:px-6">
           {/* Frosted-glass login card on the left */}
-          <div className="flex w-full flex-1 justify-center lg:justify-start">
+          <div className="flex w-full flex-1 justify-start">
             <div
               className="w-full max-w-md rounded-[26px] border border-white/60 bg-white/80 px-6 py-8 shadow-[0_24px_70px_rgba(15,23,42,0.55)] backdrop-blur-xl sm:px-8 sm:py-9"
               style={{ backdropFilter: "blur(20px)" }}
