@@ -100,7 +100,7 @@ export default function LoginPage() {
             className="object-cover"
             priority={false}
           />
-          <div className="absolute inset-0 bg-slate-950/30" />
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-950/55 via-slate-950/25 to-slate-950/5" />
         </div>
 
         {/* Layout container to keep card on the left, right side open */}
@@ -108,7 +108,7 @@ export default function LoginPage() {
           {/* Frosted-glass login card on the left */}
           <div className="flex w-full flex-1 justify-center lg:justify-start">
             <div
-              className="w-full max-w-md rounded-[26px] border border-white/25 bg-white/25 px-6 py-8 shadow-[0_30px_90px_rgba(15,23,42,0.35)] backdrop-blur-2xl sm:px-8 sm:py-9"
+              className="w-full max-w-md rounded-[26px] border border-white/60 bg-white/80 px-6 py-8 shadow-[0_24px_70px_rgba(15,23,42,0.55)] backdrop-blur-xl sm:px-8 sm:py-9"
               style={{ backdropFilter: "blur(20px)" }}
             >
               <h1 className="text-2xl font-semibold text-slate-900">Log in</h1>
