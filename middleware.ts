@@ -15,14 +15,7 @@ export async function middleware(req: NextRequest) {
   }
 
   const secret = process.env.NEXTAUTH_SECRET;
-  const cookieName =
-    process.env.NODE_ENV === "production"
-      ? "__Secure-mergifypdf.session-token"
-      : "mergifypdf.session-token";
-
-  const token = (secret
-    ? await getToken({ req, secret, cookieName })
-    : null) as JWT | null;
+  const token = (secret ? await getToken({ req, secret }) : null) as JWT | null;
 
   if (!token) {
     if (isTwoFactorPage) {

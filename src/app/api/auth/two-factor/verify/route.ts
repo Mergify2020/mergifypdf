@@ -64,8 +64,8 @@ export async function POST(req: Request) {
   const cookieStore = cookies();
   const cookieName =
     process.env.NODE_ENV === "production"
-      ? "__Secure-mergifypdf.session-token"
-      : "mergifypdf.session-token";
+      ? "__Secure-next-auth.session-token"
+      : "next-auth.session-token";
   const rawToken = cookieStore.get(cookieName)?.value;
 
   if (!rawToken) {
