@@ -93,8 +93,14 @@ export default function LoginPage() {
       >
         {/* Darkened hero team background */}
         <div className="pointer-events-none absolute inset-0 -z-10">
-          <div className="absolute inset-0 bg-[url('/Hero-team10.svg')] bg-cover bg-center" />
-          <div className="absolute inset-0 bg-slate-950/75" />
+          <Image
+            src="/Hero-team10.svg"
+            alt="Team collaborating in the MergifyPDF workspace"
+            fill
+            className="object-cover"
+            priority={false}
+          />
+          <div className="absolute inset-0 bg-slate-950/80" />
         </div>
 
         {/* Layout container to keep card on the right, left side open */}
