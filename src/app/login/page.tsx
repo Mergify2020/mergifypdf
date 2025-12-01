@@ -103,12 +103,10 @@ export default function LoginPage() {
           <div className="absolute inset-0 bg-slate-950/30" />
         </div>
 
-        {/* Layout container to keep card on the right, left side open */}
+        {/* Layout container to keep card on the left, right side open */}
         <div className="relative z-10 flex w-full max-w-6xl items-center justify-between">
-          <div className="hidden flex-1 lg:block" />
-
-          {/* Frosted-glass login card on the right */}
-          <div className="flex w-full flex-1 justify-center lg:justify-end">
+          {/* Frosted-glass login card on the left */}
+          <div className="flex w-full flex-1 justify-center lg:justify-start">
             <div
               className="w-full max-w-md rounded-[26px] border border-white/25 bg-white/25 px-6 py-8 shadow-[0_30px_90px_rgba(15,23,42,0.35)] backdrop-blur-2xl sm:px-8 sm:py-9"
               style={{ backdropFilter: "blur(20px)" }}
@@ -213,6 +211,7 @@ export default function LoginPage() {
               </form>
             </div>
           </div>
+          <div className="hidden flex-1 lg:block" />
         </div>
 
         {/* Minimal footer at bottom center */}
