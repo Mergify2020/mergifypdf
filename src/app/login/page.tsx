@@ -94,8 +94,8 @@ export default function LoginPage() {
         {/* Darkened hero team background, behind card but above base color */}
         <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
           <Image
-            src="/Hero-team10.svg"
-            alt="Team collaborating in the MergifyPDF workspace"
+            src="/login-picture.svg"
+            alt="MergifyPDF login background"
             fill
             className="object-cover"
             priority={false}
