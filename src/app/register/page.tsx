@@ -31,6 +31,17 @@ export default function RegisterPage() {
       return;
     }
 
+    const hasUppercase = /[A-Z]/.test(password);
+    const hasLowercase = /[a-z]/.test(password);
+    const hasSpecial = /[^A-Za-z0-9]/.test(password);
+
+    if (password.length < 8 || !hasUppercase || !hasLowercase || !hasSpecial) {
+      setErr(
+        "Password must be at least 8 characters and include uppercase, lowercase, and a special character."
+      );
+      return;
+    }
+
     setBusy(true);
 
     try {
@@ -167,7 +178,7 @@ export default function RegisterPage() {
             )}
             <h1 className="text-2xl font-semibold text-slate-900">Create your account</h1>
             <p className="mt-1 text-sm text-slate-700">
-              {step === "form" ? "Use email and a password." : "Verify your email."}
+              {step === "form" ? "Enter your email and create a password." : "Verify your email."}
             </p>
 
             {step === "form" ? (
@@ -206,11 +217,15 @@ export default function RegisterPage() {
                     <input
                       className="w-full rounded-full border border-white/60 bg-white/85 px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus-visible:border-[#024d7c] focus-visible:ring-2 focus-visible:ring-[#024d7c]/70"
                       type="password"
-                      placeholder="Create a password (min 8 characters)"
+                      placeholder="Create a password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       minLength={8}
                     />
+                    <p className="mt-1 text-xs text-slate-600">
+                      At least 8 characters, including uppercase, lowercase, and a special
+                      character.
+                    </p>
                   </div>
 
                   {err && <div className="text-sm text-red-600">{err}</div>}
@@ -225,10 +240,10 @@ export default function RegisterPage() {
                   </button>
                 </form>
 
-                <div className="my-5 flex items-center gap-2 text-gray-400">
-                  <div className="h-px flex-1 bg-gray-200" />
-                  <span className="text-xs uppercase">or</span>
-                  <div className="h-px flex-1 bg-gray-200" />
+                <div className="my-5 flex items-center gap-2 text-gray-700">
+                  <div className="h-[2px] flex-1 bg-gray-400" />
+                  <span className="text-xs uppercase tracking-wide text-black">OR</span>
+                  <div className="h-[2px] flex-1 bg-gray-400" />
                 </div>
 
                 <button
@@ -247,7 +262,7 @@ export default function RegisterPage() {
                   className="flex w-full items-center justify-center gap-3 rounded-full border border-white/70 bg-white/85 px-4 py-2 text-sm font-medium text-slate-800 shadow-sm transition hover:bg-white disabled:opacity-60"
                 >
                   <img src="/google.svg" alt="Google logo" className="h-5 w-5" />
-                  <span>Log in with Google</span>
+                  <span>Continue with Google</span>
                 </button>
               </>
             ) : (

@@ -43,14 +43,29 @@ export async function POST(req: Request) {
     }
 
     // 1) find user
+    const normalizedEmail = email.trim().toLowerCase();
     const user = await prisma.user.findUnique({
-      where: { email },
-      select: { id: true, email: true },
+      where: { email: normalizedEmail },
+      select: { id: true, email: true, password: true, emailVerified: true },
     });
 
     if (!user) {
-      // You asked to show this explicitly
-      return err("EMAIL_NOT_FOUND", "Email not registered. Please check the address or sign up.");
+      // Explicit message when no account exists for this email
+      return err("EMAIL_NOT_FOUND", "This email isn’t associated with an account.");
+    }
+
+    const oauthLinks = await prisma.account.count({
+      where: { userId: user.id, provider: { not: "credentials" } },
+    });
+
+    if (oauthLinks > 0) {
+      // Any account that uses Google / OAuth should reset via that provider, not here
+      return err("OAUTH_ONLY", "This account uses Google Sign-In.");
+    }
+
+    if (!user.password || !user.emailVerified) {
+      // No credentials password, or signup not completed with verification
+      return err("EMAIL_NOT_FOUND", "This email isn’t associated with an account.");
     }
 
     // 2) generate a token (string)

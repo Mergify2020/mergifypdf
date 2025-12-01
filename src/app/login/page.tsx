@@ -171,7 +171,11 @@ export default function LoginPage() {
                     {busy ? "Signing in…" : "Continue"}
                   </button>
 
-                  <p className="text-center text-sm font-medium text-slate-700">or</p>
+                  <div className="my-5 flex items-center gap-2 text-gray-700">
+                    <div className="h-[2px] flex-1 bg-gray-400" />
+                    <span className="text-xs uppercase tracking-wide text-black">OR</span>
+                    <div className="h-[2px] flex-1 bg-gray-400" />
+                  </div>
 
                   <button
                     type="button"

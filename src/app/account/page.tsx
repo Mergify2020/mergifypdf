@@ -99,13 +99,8 @@ function resizeRectByHandle(
   return clampRectToBounds(nextRect, bounds);
 }
 
-export default function AccountPage() {
+function AccountSettingsPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const view = searchParams.get("view");
-  if (view === "pricing") {
-    return <PricingPlans />;
-  }
   const { data: session } = useSession();
   const providers = session?.user?.providers ?? [];
   const hasCredentialsAccess = providers.length === 0 || providers.includes("credentials");
@@ -132,11 +127,14 @@ export default function AccountPage() {
   const [displayMeta, setDisplayMeta] = useState<DisplayMeta | null>(null);
   const [cropRect, setCropRect] = useState<CropRect | null>(null);
 
-  const [twoFactorMethod, setTwoFactorMethod] = useState<"email" | "sms" | null>(null);
+  const [twoFactorMethod, setTwoFactorMethod] = useState<"email" | null>(null);
   const [twoFactorModalMode, setTwoFactorModalMode] = useState<"enable" | "manage" | null>(null);
-  const [twoFactorSelection, setTwoFactorSelection] = useState<"email" | "sms">("email");
-  const [twoFactorPhone, setTwoFactorPhone] = useState("");
   const [confirmDisable2fa, setConfirmDisable2fa] = useState(false);
+  const [twoFactorStep, setTwoFactorStep] = useState<"select" | "verify">("select");
+  const [twoFactorCode, setTwoFactorCode] = useState("");
+  const [twoFactorBusy, setTwoFactorBusy] = useState(false);
+  const [twoFactorError, setTwoFactorError] = useState<string | null>(null);
+  const [twoFactorMessage, setTwoFactorMessage] = useState<string | null>(null);
 
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
@@ -152,6 +150,30 @@ export default function AccountPage() {
       setEmail(session.user.email);
     }
   }, [session?.user?.email]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadTwoFactor() {
+      if (!session?.user?.id) return;
+      try {
+        const response = await fetch("/api/account/two-factor");
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data?.ok || cancelled) return;
+        const enabled: boolean = !!data.enabled;
+        const method: "email" | null =
+          enabled && data.method === "email"
+            ? "email"
+            : null;
+        setTwoFactorMethod(method);
+      } catch {
+        // ignore; 2FA will appear as disabled
+      }
+    }
+    void loadTwoFactor();
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.id]);
 
   async function handleEmailSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -409,9 +431,16 @@ export default function AccountPage() {
     }
   }
 
+  function resetTwoFactorModalState() {
+    setTwoFactorStep("select");
+    setTwoFactorCode("");
+    setTwoFactorError(null);
+    setTwoFactorMessage(null);
+    setTwoFactorBusy(false);
+  }
+
   function openEnableTwoFactor() {
-    setTwoFactorSelection("email");
-    setTwoFactorPhone("");
+    resetTwoFactorModalState();
     setTwoFactorModalMode("enable");
   }
 
@@ -420,18 +449,137 @@ export default function AccountPage() {
       openEnableTwoFactor();
       return;
     }
-    setTwoFactorSelection(twoFactorMethod);
+    resetTwoFactorModalState();
     setTwoFactorModalMode("manage");
   }
 
-  function handleConfirmEnableTwoFactor() {
-    setTwoFactorMethod(twoFactorSelection);
-    setTwoFactorModalMode(null);
+  async function handleConfirmEnableTwoFactor() {
+    if (twoFactorModalMode === "manage") {
+      setTwoFactorBusy(true);
+      setTwoFactorError(null);
+      setTwoFactorMessage(null);
+      try {
+        const response = await fetch("/api/account/two-factor", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            method: "email",
+          }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data?.ok) {
+          const code = data?.code as string | undefined;
+          if (code === "PHONE_REQUIRED") {
+            setTwoFactorError("Enter a phone number to use SMS verification.");
+          } else if (code === "NOT_ENABLED") {
+            setTwoFactorError("Two-factor authentication is not enabled for this account.");
+          } else {
+            setTwoFactorError(data?.message ?? "Unable to save your 2FA settings.");
+          }
+          return;
+        }
+
+        setTwoFactorMethod("email");
+
+        resetTwoFactorModalState();
+        setTwoFactorModalMode(null);
+      } catch {
+        setTwoFactorError("Unable to save your 2FA settings. Please try again.");
+      } finally {
+        setTwoFactorBusy(false);
+      }
+      return;
+    }
+
+    if (twoFactorStep === "select") {
+      setTwoFactorBusy(true);
+      setTwoFactorError(null);
+      setTwoFactorMessage(null);
+      try {
+        const response = await fetch("/api/account/two-factor", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            method: "email",
+          }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data?.ok) {
+          const code = data?.code as string | undefined;
+          if (code === "PHONE_REQUIRED") {
+            setTwoFactorError("Enter a phone number to use SMS verification.");
+          } else if (code === "SMS_NOT_CONFIGURED") {
+            setTwoFactorError("SMS verification isn’t available right now. Choose email instead.");
+          } else if (code === "EMAIL_MISSING") {
+            setTwoFactorError("We could not find an email address for your account.");
+          } else {
+            setTwoFactorError(
+              data?.message ?? "We couldn’t send your verification code. Please try again."
+            );
+          }
+          return;
+        }
+        setTwoFactorStep("verify");
+        setTwoFactorCode("");
+        setTwoFactorMessage(
+          "We sent a 6-digit code to your email. Enter it below to turn on 2FA."
+        );
+      } catch {
+        setTwoFactorError("We couldn’t send your verification code. Please try again.");
+      } finally {
+        setTwoFactorBusy(false);
+      }
+      return;
+    }
+
+    if (twoFactorCode.trim().length !== 6) {
+      setTwoFactorError("Enter the 6-digit code.");
+      return;
+    }
+
+    setTwoFactorBusy(true);
+    setTwoFactorError(null);
+    try {
+      const response = await fetch("/api/account/two-factor/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          method: "email",
+          code: twoFactorCode.trim(),
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data?.ok) {
+        const code = data?.code as string | undefined;
+        if (code === "invalid_code") {
+          setTwoFactorError("That code doesn’t match. Try again.");
+        } else if (code === "expired") {
+          setTwoFactorError("That code has expired. Request a new one.");
+        } else {
+          setTwoFactorError(data?.message ?? "Verification failed. Please try again.");
+        }
+        return;
+      }
+
+      setTwoFactorMethod("email");
+      resetTwoFactorModalState();
+      setTwoFactorModalMode(null);
+    } catch {
+      setTwoFactorError("Verification failed. Please try again.");
+    } finally {
+      setTwoFactorBusy(false);
+    }
   }
 
-  function handleConfirmDisableTwoFactor() {
-    setTwoFactorMethod(null);
+  async function handleConfirmDisableTwoFactor() {
     setConfirmDisable2fa(false);
+    try {
+      await fetch("/api/account/two-factor", { method: "DELETE" });
+    } catch {
+      // ignore; best-effort
+    }
+    setTwoFactorMethod(null);
+    resetTwoFactorModalState();
     setTwoFactorModalMode(null);
   }
 
@@ -638,7 +786,7 @@ export default function AccountPage() {
               </p>
               {twoFactorMethod && (
                 <p className="mt-1 text-xs font-medium text-green-700">
-                  2FA enabled · {twoFactorMethod === "email" ? "Email verification" : "SMS verification"}
+                  2FA enabled · Email verification
                 </p>
               )}
             </div>
@@ -713,12 +861,15 @@ export default function AccountPage() {
                   {twoFactorModalMode === "enable" ? "Enable 2-factor authentication" : "Manage 2-factor authentication"}
                 </h2>
                 <p className="mt-1 text-sm text-slate-600">
-                  Choose how you&apos;d like to receive your verification codes.
+                  Choose how you&apos;d like to receive your verification codes, then confirm with a 6-digit code.
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => setTwoFactorModalMode(null)}
+                onClick={() => {
+                  resetTwoFactorModalState();
+                  setTwoFactorModalMode(null);
+                }}
                 className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
                 aria-label="Close 2FA dialog"
               >
@@ -731,7 +882,7 @@ export default function AccountPage() {
               onSubmit={(event) => {
                 event.preventDefault();
                 if (twoFactorModalMode === "enable" || twoFactorModalMode === "manage") {
-                  handleConfirmEnableTwoFactor();
+                  void handleConfirmEnableTwoFactor();
                 }
               }}
             >
@@ -741,8 +892,8 @@ export default function AccountPage() {
                   <input
                     type="radio"
                     className="mt-1"
-                    checked={twoFactorSelection === "email"}
-                    onChange={() => setTwoFactorSelection("email")}
+                    checked
+                    readOnly
                   />
                   <span>
                     <span className="font-medium">Email verification</span>
@@ -752,37 +903,33 @@ export default function AccountPage() {
                     </span>
                   </span>
                 </label>
-                <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm text-slate-800 hover:bg-slate-50">
-                  <input
-                    type="radio"
-                    className="mt-1"
-                    checked={twoFactorSelection === "sms"}
-                    onChange={() => setTwoFactorSelection("sms")}
-                  />
-                  <span>
-                    <span className="font-medium">Phone (SMS)</span>
-                    <br />
-                    <span className="text-xs text-slate-600">
-                      We&apos;ll text a code when you sign in.
-                    </span>
-                  </span>
-                </label>
               </fieldset>
 
-              {twoFactorSelection === "sms" && (
+              {twoFactorStep === "verify" && (
                 <div className="space-y-1">
-                  <label className="block text-sm font-medium text-slate-700" htmlFor="twofactor-phone">
-                    Phone number
+                  <label className="block text-sm font-medium text-slate-700" htmlFor="twofactor-code">
+                    Enter 6-digit code
                   </label>
                   <input
-                    id="twofactor-phone"
-                    type="tel"
-                    value={twoFactorPhone}
-                    onChange={(event) => setTwoFactorPhone(event.target.value)}
-                    placeholder="+1 (555) 123-4567"
-                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c]"
+                    id="twofactor-code"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="\d{6}"
+                    maxLength={6}
+                    value={twoFactorCode}
+                    onChange={(event) =>
+                      setTwoFactorCode(event.target.value.replace(/\D/g, "").slice(0, 6))
+                    }
+                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-center text-sm tracking-[6px] shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c]"
                   />
                 </div>
+              )}
+
+              {twoFactorError && (
+                <p className="text-sm text-rose-600">{twoFactorError}</p>
+              )}
+              {twoFactorMessage && (
+                <p className="text-sm text-green-700">{twoFactorMessage}</p>
               )}
 
               <div className="mt-4 flex items-center justify-between gap-3">
@@ -806,8 +953,15 @@ export default function AccountPage() {
                   <button
                     type="submit"
                     className="rounded-md bg-[#024d7c] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#013a60]"
+                    disabled={twoFactorBusy}
                   >
-                    {twoFactorModalMode === "enable" ? "Turn on 2FA" : "Save changes"}
+                    {twoFactorModalMode === "enable"
+                      ? twoFactorStep === "select"
+                        ? "Send code"
+                        : "Turn on 2FA"
+                      : twoFactorStep === "select"
+                        ? "Save changes"
+                        : "Confirm code"}
                   </button>
                 </div>
               </div>
@@ -1042,4 +1196,15 @@ export default function AccountPage() {
       ) : null}
     </main>
   );
+}
+
+export default function AccountPage() {
+  const searchParams = useSearchParams();
+  const view = searchParams.get("view");
+
+  if (view === "pricing") {
+    return <PricingPlans />;
+  }
+
+  return <AccountSettingsPage />;
 }

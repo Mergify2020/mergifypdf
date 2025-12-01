@@ -24,8 +24,20 @@ export default function ForgotPasswordPage() {
       });
       const data = await res.json().catch(() => ({}));
 
-      setMessage(data?.message ?? "Request processed.");
-      setIsError(!data?.ok);
+      const ok = !!data?.ok;
+      setIsError(!ok);
+      if (ok) {
+        setMessage("Reset link has been sent.");
+      } else {
+        const code = typeof data?.code === "string" ? data.code : null;
+        if (code === "EMAIL_NOT_FOUND") {
+          setMessage("This email isn’t associated with an account.");
+        } else if (code === "OAUTH_ONLY") {
+          setMessage("This account uses Google Sign-In.");
+        } else {
+          setMessage(data?.message ?? "Request processed.");
+        }
+      }
     } catch {
       setMessage("We couldn\u2019t process the reset right now. Please try again.");
       setIsError(true);
@@ -77,16 +89,10 @@ export default function ForgotPasswordPage() {
               {message && (
                 <div
                   className={`text-sm ${
-                    isError ? "text-red-600" : "text-green-600"
+                    isError ? "text-red-600" : "text-green-700"
                   }`}
                 >
                   {message}
-                </div>
-              )}
-
-              {!isError && status === "done" && (
-                <div className="text-xs text-slate-700">
-                  Please check your inbox (and spam folder) for your reset link.
                 </div>
               )}
 
@@ -99,10 +105,10 @@ export default function ForgotPasswordPage() {
               </button>
             </form>
 
-            <div className="my-5 flex items-center gap-2 text-gray-400">
-              <div className="h-px flex-1 bg-gray-200" />
-              <span className="text-xs uppercase">or</span>
-              <div className="h-px flex-1 bg-gray-200" />
+            <div className="my-5 flex items-center gap-2 text-gray-700">
+              <div className="h-[2px] flex-1 bg-gray-400" />
+              <span className="text-xs uppercase tracking-wide text-black">OR</span>
+              <div className="h-[2px] flex-1 bg-gray-400" />
             </div>
 
             <button
@@ -119,7 +125,7 @@ export default function ForgotPasswordPage() {
               className="flex w-full items-center justify-center gap-3 rounded-full border border-white/70 bg-white/85 px-4 py-2 text-sm font-medium text-slate-800 shadow-sm transition hover:bg-white disabled:opacity-60"
             >
               <img src="/google.svg" alt="Google logo" className="h-5 w-5" />
-              <span>Log in with Google</span>
+              <span>Continue with Google</span>
             </button>
 
             <div className="mt-4 text-center text-xs text-slate-800">

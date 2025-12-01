@@ -7,7 +7,7 @@ import bcrypt from "bcryptjs";
 
 type AuthType = "oauth" | "credentials";
 const cookieDomain = process.env.NEXTAUTH_COOKIE_DOMAIN ?? undefined;
-const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
+export const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -99,6 +99,25 @@ export const authOptions: NextAuthOptions = {
           : "credentials";
       }
 
+      if (account || user) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { twoFactorEnabled: true, twoFactorMethod: true },
+        });
+
+        const twoFactorEnabled = !!dbUser?.twoFactorEnabled;
+        token.twoFactorEnabled = twoFactorEnabled;
+        token.twoFactorMethod = dbUser?.twoFactorMethod ?? null;
+
+        if (account) {
+          // Fresh sign-in: require a 2FA challenge if enabled
+          token.twoFactorVerified = !twoFactorEnabled;
+        } else if (typeof token.twoFactorVerified !== "boolean") {
+          // Default for existing tokens
+          token.twoFactorVerified = !twoFactorEnabled;
+        }
+      }
+
       const nextEmail = profile?.email ?? user?.email ?? (token.email as string | undefined);
       if (nextEmail) token.email = nextEmail;
 
@@ -117,7 +136,17 @@ export const authOptions: NextAuthOptions = {
         if (token.email) session.user.email = token.email as string;
         if (token.name) session.user.name = token.name as string;
         if (token.sub) session.user.id = token.sub;
-        if (session.user) session.user.image = null;
+        session.user.image = null;
+
+        const twoFactorEnabled =
+          typeof token.twoFactorEnabled === "boolean" ? token.twoFactorEnabled : false;
+        const twoFactorVerified =
+          typeof token.twoFactorVerified === "boolean"
+            ? token.twoFactorVerified
+            : !twoFactorEnabled;
+
+        session.user.twoFactorEnabled = twoFactorEnabled;
+        session.user.twoFactorVerified = twoFactorVerified;
       }
       return session;
     },
