@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 
@@ -19,6 +19,7 @@ export default function RegisterPage() {
   const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [resendBusy, setResendBusy] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(25);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -46,16 +47,24 @@ export default function RegisterPage() {
       }
 
       setPendingEmail(email);
+      setResendCooldown(25);
       setStep("verify");
-      setInfo(
-        "We sent a 6-digit code to your email. Enter it below to finish signing up. If you don't see it right away, check your spam or promotions folder."
-      );
       setCode("");
     } catch (error) {
       setErr("Sign up failed. Please try again.");
     } finally {
       setBusy(false);
     }
+  }
+
+  function handleBackToForm() {
+    setStep("form");
+    setPassword("");
+    setCode("");
+    setErr(null);
+    setInfo(null);
+    setBusy(false);
+    setResendBusy(false);
   }
 
   async function onVerify(e: React.FormEvent) {
@@ -92,7 +101,7 @@ export default function RegisterPage() {
   }
 
   async function handleResend() {
-    if (!pendingEmail) return;
+    if (!pendingEmail || resendCooldown > 0) return;
     setResendBusy(true);
     setErr(null);
     setInfo(null);
@@ -112,8 +121,19 @@ export default function RegisterPage() {
       setErr("Unable to resend code right now.");
     } finally {
       setResendBusy(false);
+      setResendCooldown(25);
     }
   }
+
+  useEffect(() => {
+    if (step !== "verify" || resendCooldown <= 0) return;
+
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [step, resendCooldown]);
 
   return (
     <main className="relative flex min-h-[calc(100vh-76px)] w-full items-center justify-center overflow-hidden bg-white px-0 py-4 sm:py-6">
@@ -135,8 +155,20 @@ export default function RegisterPage() {
             className="w-full max-w-md rounded-[26px] border border-white/60 bg-white/80 px-6 py-8 shadow-[0_24px_70px_rgba(15,23,42,0.55)] backdrop-blur-xl sm:px-8 sm:py-9"
             style={{ backdropFilter: "blur(20px)" }}
           >
+            {step === "verify" && (
+              <button
+                type="button"
+                onClick={handleBackToForm}
+                className="mb-3 inline-flex items-center text-xs font-medium text-[#024d7c] hover:text-[#013a60]"
+              >
+                <span className="mr-1 text-base leading-none">&larr;</span>
+                Go back
+              </button>
+            )}
             <h1 className="text-2xl font-semibold text-slate-900">Create your account</h1>
-            <p className="mt-1 text-sm text-slate-700">Use email and a password.</p>
+            <p className="mt-1 text-sm text-slate-700">
+              {step === "form" ? "Use email and a password." : "Verify your email."}
+            </p>
 
             {step === "form" ? (
               <>
@@ -189,7 +221,7 @@ export default function RegisterPage() {
                     type="submit"
                     disabled={busy}
                   >
-                    {busy ? "Creating…" : "Create account"}
+                    {busy ? "Creating Account..." : "Create account"}
                   </button>
                 </form>
 
@@ -221,9 +253,8 @@ export default function RegisterPage() {
             ) : (
               <form onSubmit={onVerify} className="mt-6 space-y-3">
                 <p className="text-sm text-slate-800">
-                  Enter the 6-digit code we sent to{" "}
-                  <span className="font-medium">{pendingEmail}</span>. If it&apos;s not in your inbox
-                  within a minute, look in your spam or promotions folder.
+                  We sent a 6-digit code to{" "}
+                  <span className="font-medium">{pendingEmail}</span>. Enter it below.
                 </p>
                 <input
                   className="w-full rounded-full border border-white/60 bg-white/85 px-4 py-2.5 text-center text-lg tracking-[6px] outline-none transition focus-visible:border-[#024d7c] focus-visible:ring-2 focus-visible:ring-[#024d7c]/70"
@@ -243,15 +274,19 @@ export default function RegisterPage() {
                   type="submit"
                   disabled={busy || code.length !== 6}
                 >
-                  {busy ? "Verifying…" : "Verify code"}
+                  {busy ? "Confirming..." : "Confirm"}
                 </button>
                 <button
                   type="button"
                   className="w-full rounded-full border border-white/60 bg-white/80 px-4 py-2 text-sm text-slate-900 disabled:opacity-60"
                   onClick={handleResend}
-                  disabled={resendBusy}
+                  disabled={resendBusy || resendCooldown > 0}
                 >
-                  {resendBusy ? "Sending…" : "Resend code"}
+                  {resendBusy
+                    ? "Sending…"
+                    : resendCooldown > 0
+                      ? `Resend code in ${resendCooldown}s`
+                      : "Resend code"}
                 </button>
               </form>
             )}
