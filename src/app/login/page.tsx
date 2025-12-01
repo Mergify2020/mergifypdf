@@ -89,12 +89,13 @@ export default function LoginPage() {
     <>
       <main
         data-login-page
-        className="relative flex min-h-[calc(100vh-76px)] w-full items-center justify-center overflow-hidden bg-gradient-to-br from-[#FDF2FF] via-[#EEF2FF] to-[#E0F7FF] px-4 py-4 sm:py-6"
+        className="relative flex min-h-[calc(100vh-76px)] w-full items-center justify-center overflow-hidden bg-slate-950 px-4 py-4 sm:py-6"
       >
-        {/* Background 3D blobs (not under the card content area) */}
-        <div className="pointer-events-none absolute -top-40 -left-36 h-80 w-80 rounded-[999px] bg-gradient-to-br from-[#399BFF] via-[#6A4EE8] to-[#F044FF] opacity-25 blur-3xl" />
-        <div className="pointer-events-none absolute -top-32 right-[-60px] h-72 w-72 rounded-[999px] bg-gradient-to-bl from-[#6A4EE8] via-[#399BFF] to-[#F044FF] opacity-20 blur-3xl" />
-        <div className="pointer-events-none absolute bottom-[-80px] left-1/2 h-80 w-80 -translate-x-1/2 rounded-[999px] bg-gradient-to-tl from-[#399BFF] via-[#6A4EE8] to-[#F044FF] opacity-15 blur-3xl" />
+        {/* Darkened hero team background */}
+        <div className="pointer-events-none absolute inset-0 -z-10">
+          <div className="absolute inset-0 bg-[url('/Hero-team10.svg')] bg-cover bg-center" />
+          <div className="absolute inset-0 bg-slate-950/75" />
+        </div>
 
         {/* Layout container to keep card on the right, left side open */}
         <div className="relative z-10 flex w-full max-w-6xl items-center justify-between">
