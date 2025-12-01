@@ -44,6 +44,7 @@ export async function middleware(req: NextRequest) {
   // STEP 2: log the "session" state derived from the JWT
   console.log("SESSION STATE:", {
     isAuthenticated: true,
+    token,
     twoFactorEnabled,
     twoFactorPassed,
     pathname,
