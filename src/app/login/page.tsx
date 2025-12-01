@@ -89,7 +89,7 @@ export default function LoginPage() {
     <>
       <main
         data-login-page
-        className="relative flex min-h-[calc(100vh-76px)] w-full items-center justify-center overflow-hidden bg-gradient-to-br from-[#FDF2FF] via-[#EEF2FF] to-[#E0F7FF] px-4 py-8 sm:py-10"
+        className="relative flex min-h-[calc(100vh-76px)] w-full items-center justify-center overflow-hidden bg-gradient-to-br from-[#FDF2FF] via-[#EEF2FF] to-[#E0F7FF] px-4 py-4 sm:py-6"
       >
         {/* Background 3D blobs (not under the card content area) */}
         <div className="pointer-events-none absolute -top-40 -left-36 h-80 w-80 rounded-[999px] bg-gradient-to-br from-[#399BFF] via-[#6A4EE8] to-[#F044FF] opacity-25 blur-3xl" />
