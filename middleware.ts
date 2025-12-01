@@ -25,11 +25,8 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  const twoFactorEnabled = !!token.twoFactorEnabled;
-  const twoFactorVerified =
-    typeof token.twoFactorVerified === "boolean"
-      ? token.twoFactorVerified
-      : !twoFactorEnabled;
+  const twoFactorEnabled = !!token.twoFactorEnabled || token.twoFactorMethod === "email";
+  const twoFactorVerified = token.twoFactorVerified === true;
 
   if (twoFactorEnabled && !twoFactorVerified && !isTwoFactorPage) {
     const url = new URL("/two-factor", req.url);
