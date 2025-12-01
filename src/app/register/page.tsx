@@ -110,114 +110,157 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="mx-auto max-w-md p-6">
-      <h1 className="text-2xl font-semibold">Create your account</h1>
-      <p className="text-sm text-gray-600 mt-1">Use email and a password.</p>
+    <main className="relative flex min-h-[calc(100vh-76px)] w-full items-center justify-center overflow-hidden bg-white px-0 py-4 sm:py-6">
+      {/* Background image + overlay, matching login page */}
+      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+        <img
+          src="/login-picture.svg"
+          alt="MergifyPDF signup background"
+          className="h-full w-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950/55 via-slate-950/25 to-slate-950/5" />
+      </div>
 
-      {step === "form" ? (
-        <>
-          <form onSubmit={onSubmit} className="mt-6 space-y-3">
-            <input
-              className="w-full rounded border px-3 py-2"
-              type="text"
-              placeholder="Name (optional)"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-            <input
-              className="w-full rounded border px-3 py-2"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-            <input
-              className="w-full rounded border px-3 py-2"
-              type="password"
-              placeholder="Create a password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={8}
-            />
-            {err && <div className="text-sm text-red-600">{err}</div>}
-            {info && <div className="text-sm text-green-600">{info}</div>}
-            <button
-              className="w-full rounded bg-blue-600 px-4 py-2 text-white disabled:opacity-60"
-              type="submit"
-              disabled={busy}
-            >
-              {busy ? "Creating…" : "Create account"}
-            </button>
-          </form>
+      {/* Layout container similar to login page */}
+      <div className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-4 lg:px-6">
+        {/* Frosted-glass create-account card on the left */}
+        <div className="flex w-full flex-1 justify-start">
+          <div
+            className="w-full max-w-md rounded-[26px] border border-white/60 bg-white/80 px-6 py-8 shadow-[0_24px_70px_rgba(15,23,42,0.55)] backdrop-blur-xl sm:px-8 sm:py-9"
+            style={{ backdropFilter: "blur(20px)" }}
+          >
+            <h1 className="text-2xl font-semibold text-slate-900">Create your account</h1>
+            <p className="mt-1 text-sm text-slate-700">Use email and a password.</p>
 
-          <div className="my-5 flex items-center gap-2 text-gray-400">
-            <div className="flex-1 h-px bg-gray-200" />
-            <span className="text-xs uppercase">or</span>
-            <div className="flex-1 h-px bg-gray-200" />
+            {step === "form" ? (
+              <>
+                <form onSubmit={onSubmit} className="mt-6 space-y-4">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-700">
+                      Name (optional)
+                    </label>
+                    <input
+                      className="w-full rounded-full border border-white/60 bg-white/85 px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus-visible:border-[#024d7c] focus-visible:ring-2 focus-visible:ring-[#024d7c]/70"
+                      type="text"
+                      placeholder="Name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-700">
+                      Email
+                    </label>
+                    <input
+                      className="w-full rounded-full border border-white/60 bg-white/85 px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus-visible:border-[#024d7c] focus-visible:ring-2 focus-visible:ring-[#024d7c]/70"
+                      type="email"
+                      placeholder="you@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-700">
+                      Password
+                    </label>
+                    <input
+                      className="w-full rounded-full border border-white/60 bg-white/85 px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus-visible:border-[#024d7c] focus-visible:ring-2 focus-visible:ring-[#024d7c]/70"
+                      type="password"
+                      placeholder="Create a password (min 8 characters)"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      minLength={8}
+                    />
+                  </div>
+
+                  {err && <div className="text-sm text-red-600">{err}</div>}
+                  {info && <div className="text-sm text-green-600">{info}</div>}
+
+                  <button
+                    className="w-full rounded-full bg-[#024d7c] py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-[#013a60] disabled:opacity-60"
+                    type="submit"
+                    disabled={busy}
+                  >
+                    {busy ? "Creating…" : "Create account"}
+                  </button>
+                </form>
+
+                <div className="my-5 flex items-center gap-2 text-gray-400">
+                  <div className="h-px flex-1 bg-gray-200" />
+                  <span className="text-xs uppercase">or</span>
+                  <div className="h-px flex-1 bg-gray-200" />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      setBusy(true);
+                      await signIn("google", { callbackUrl: "/" });
+                    } catch {
+                      setBusy(false);
+                      setErr("Google login failed. Please try again.");
+                    }
+                  }}
+                  disabled={busy}
+                  aria-disabled={busy}
+                  className="flex w-full items-center justify-center gap-3 rounded-full border border-white/70 bg-white/85 px-4 py-2 text-sm font-medium text-slate-800 shadow-sm transition hover:bg-white disabled:opacity-60"
+                >
+                  <img src="/google.svg" alt="Google logo" className="h-5 w-5" />
+                  <span>Log in with Google</span>
+                </button>
+              </>
+            ) : (
+              <form onSubmit={onVerify} className="mt-6 space-y-3">
+                <p className="text-sm text-gray-100">
+                  Enter the 6-digit code we sent to{" "}
+                  <span className="font-medium">{pendingEmail}</span>. If it&apos;s not in your inbox
+                  within a minute, look in your spam or promotions folder.
+                </p>
+                <input
+                  className="w-full rounded-full border border-white/60 bg-white/85 px-4 py-2.5 text-center text-lg tracking-[6px] outline-none transition focus-visible:border-[#024d7c] focus-visible:ring-2 focus-visible:ring-[#024d7c]/70"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="\d{6}"
+                  maxLength={6}
+                  placeholder="______"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  required
+                />
+                {err && <div className="text-sm text-red-200">{err}</div>}
+                {info && <div className="text-sm text-green-200">{info}</div>}
+                <button
+                  className="w-full rounded-full bg-[#024d7c] py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                  type="submit"
+                  disabled={busy || code.length !== 6}
+                >
+                  {busy ? "Verifying…" : "Verify code"}
+                </button>
+                <button
+                  type="button"
+                  className="w-full rounded-full border border-white/60 bg-white/80 px-4 py-2 text-sm text-slate-900 disabled:opacity-60"
+                  onClick={handleResend}
+                  disabled={resendBusy}
+                >
+                  {resendBusy ? "Sending…" : "Resend code"}
+                </button>
+              </form>
+            )}
+
+            <div className="mt-4 text-center text-xs text-slate-800">
+              <a className="font-medium text-[#024d7c] underline-offset-2 hover:text-[#013a60] hover:underline" href="/login">
+                Already have an account? Log in
+              </a>
+            </div>
           </div>
+        </div>
 
-          <button
-            type="button"
-            onClick={async () => {
-              try {
-                setBusy(true);
-                await signIn("google", { callbackUrl: "/" });
-              } catch {
-                setBusy(false);
-                setErr("Google login failed. Please try again.");
-              }
-            }}
-            disabled={busy}
-            aria-disabled={busy}
-            className="flex w-full items-center justify-center gap-3 rounded border border-gray-300 bg-white py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:opacity-60"
-          >
-            <img src="/google.svg" alt="Google logo" className="h-5 w-5" />
-            <span>Log in with Google</span>
-          </button>
-        </>
-      ) : (
-        <form onSubmit={onVerify} className="mt-6 space-y-3">
-          <p className="text-sm text-gray-600">
-            Enter the 6-digit code we sent to <span className="font-medium">{pendingEmail}</span>. If
-            it&apos;s not in your inbox within a minute, look in your spam or promotions folder.
-          </p>
-          <input
-            className="w-full rounded border px-3 py-2 tracking-[6px] text-center text-lg"
-            type="text"
-            inputMode="numeric"
-            pattern="\d{6}"
-            maxLength={6}
-            placeholder="______"
-            value={code}
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-            required
-          />
-          {err && <div className="text-sm text-red-600">{err}</div>}
-          {info && <div className="text-sm text-green-600">{info}</div>}
-          <button
-            className="w-full rounded bg-blue-600 px-4 py-2 text-white disabled:opacity-60"
-            type="submit"
-            disabled={busy || code.length !== 6}
-          >
-            {busy ? "Verifying…" : "Verify code"}
-          </button>
-          <button
-            type="button"
-            className="w-full rounded border px-4 py-2 text-sm disabled:opacity-60"
-            onClick={handleResend}
-            disabled={resendBusy}
-          >
-            {resendBusy ? "Sending…" : "Resend code"}
-          </button>
-        </form>
-      )}
-
-      <div className="mt-4 text-sm">
-        <a className="underline" href="/login">
-          Already have an account? Log in
-        </a>
+        <div className="hidden flex-1 lg:block" />
       </div>
     </main>
   );
