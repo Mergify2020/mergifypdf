@@ -22,9 +22,15 @@ export default function RegisterPage() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setBusy(true);
     setErr(null);
     setInfo(null);
+
+    if (!name.trim() || !email.trim() || !password.trim()) {
+      setErr("Name, email, and password are required.");
+      return;
+    }
+
+    setBusy(true);
 
     try {
       const res = await fetch("/api/signup", {
@@ -111,10 +117,10 @@ export default function RegisterPage() {
 
   return (
     <main className="relative flex min-h-[calc(100vh-76px)] w-full items-center justify-center overflow-hidden bg-white px-0 py-4 sm:py-6">
-      {/* Background image + overlay, matching login page */}
+      {/* Background image + overlay */}
       <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
         <img
-          src="/login-picture.svg"
+          src="/purle-city.svg"
           alt="MergifyPDF signup background"
           className="h-full w-full object-cover"
         />
@@ -137,12 +143,12 @@ export default function RegisterPage() {
                 <form onSubmit={onSubmit} className="mt-6 space-y-4">
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-700">
-                      Name (optional)
+                      Name
                     </label>
                     <input
                       className="w-full rounded-full border border-white/60 bg-white/85 px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus-visible:border-[#024d7c] focus-visible:ring-2 focus-visible:ring-[#024d7c]/70"
                       type="text"
-                      placeholder="Name"
+                      placeholder="Your name"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                     />
@@ -158,7 +164,6 @@ export default function RegisterPage() {
                       placeholder="you@example.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      required
                     />
                   </div>
 
@@ -172,7 +177,6 @@ export default function RegisterPage() {
                       placeholder="Create a password (min 8 characters)"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      required
                       minLength={8}
                     />
                   </div>
@@ -253,8 +257,12 @@ export default function RegisterPage() {
             )}
 
             <div className="mt-4 text-center text-xs text-slate-800">
-              <a className="font-medium text-[#024d7c] underline-offset-2 hover:text-[#013a60] hover:underline" href="/login">
-                Already have an account? Log in
+              <span>Already have an account? </span>
+              <a
+                className="font-medium text-[#024d7c] underline-offset-2 hover:text-[#013a60] hover:underline"
+                href="/login"
+              >
+                Log in
               </a>
             </div>
           </div>

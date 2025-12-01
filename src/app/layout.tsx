@@ -58,6 +58,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   >
                     Pricing
                   </Link>
+                  <Link
+                    href="/register"
+                    className="inline-flex items-center rounded-full border border-slate-300 bg-transparent px-4 py-2 text-xs font-semibold text-slate-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-white/70"
+                  >
+                    Sign up
+                  </Link>
                   <HeaderLoginButton />
                 </div>
               )}
