@@ -91,8 +91,8 @@ export default function LoginPage() {
         data-login-page
         className="relative flex min-h-[calc(100vh-76px)] w-full items-center justify-center overflow-hidden bg-slate-950 px-4 py-4 sm:py-6"
       >
-        {/* Darkened hero team background */}
-        <div className="pointer-events-none absolute inset-0 -z-10">
+        {/* Darkened hero team background, behind card but above base color */}
+        <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
           <Image
             src="/Hero-team10.svg"
             alt="Team collaborating in the MergifyPDF workspace"
@@ -100,7 +100,7 @@ export default function LoginPage() {
             className="object-cover"
             priority={false}
           />
-          <div className="absolute inset-0 bg-gradient-to-br from-slate-950/45 via-slate-950/20 to-slate-950/10" />
+          <div className="absolute inset-0 bg-slate-950/30" />
         </div>
 
         {/* Layout container to keep card on the right, left side open */}
