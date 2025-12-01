@@ -213,19 +213,6 @@ export default function LoginPage() {
           </div>
           <div className="hidden flex-1 lg:block" />
         </div>
-
-        {/* Minimal footer at bottom center */}
-        <div className="pointer-events-auto absolute bottom-4 left-1/2 z-10 -translate-x-1/2 text-[11px] text-slate-200/90">
-          <span>© {new Date().getFullYear()} MergifyPDF</span>
-          <span className="mx-2">•</span>
-          <Link href="/terms-of-service" className="hover:text-white">
-            Terms
-          </Link>
-          <span className="mx-2">•</span>
-          <Link href="/privacy-policy" className="hover:text-white">
-            Privacy
-          </Link>
-        </div>
       </main>
 
       {/* Full-screen loading overlay */}
