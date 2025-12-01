@@ -220,7 +220,7 @@ export default function RegisterPage() {
               </>
             ) : (
               <form onSubmit={onVerify} className="mt-6 space-y-3">
-                <p className="text-sm text-gray-100">
+                <p className="text-sm text-slate-800">
                   Enter the 6-digit code we sent to{" "}
                   <span className="font-medium">{pendingEmail}</span>. If it&apos;s not in your inbox
                   within a minute, look in your spam or promotions folder.
@@ -236,8 +236,8 @@ export default function RegisterPage() {
                   onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
                   required
                 />
-                {err && <div className="text-sm text-red-200">{err}</div>}
-                {info && <div className="text-sm text-green-200">{info}</div>}
+                {err && <div className="text-sm text-red-600">{err}</div>}
+                {info && <div className="text-sm text-green-600">{info}</div>}
                 <button
                   className="w-full rounded-full bg-[#024d7c] py-2.5 text-sm font-semibold text-white disabled:opacity-60"
                   type="submit"
