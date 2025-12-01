@@ -34,101 +34,22 @@ export default function LogoCarousel() {
         </div>
 
         <div className="mt-8">
-          {/* Desktop: marquee carousel */}
-          <div className="hidden md:block">
-            <div className="logo-marquee-mask logo-carousel-mask">
-              <div className="logo-marquee-row logo-carousel flex items-center gap-[48px]">
-                <div className="logo-track logo-carousel-track flex items-center gap-[48px]">
-                  {logos.map((logo) => (
-                    <img
-                      key={logo.name}
-                      src={logo.url}
-                      alt={`${logo.name} logo`}
-                      className="logo-carousel-img h-10 w-auto flex-shrink-0"
-                      loading="lazy"
-                    />
-                  ))}
-                </div>
-                <div
-                  className="logo-track logo-carousel-track logo-carousel-track--dup flex items-center gap-[48px]"
-                  aria-hidden="true"
-                >
-                  {logos.map((logo) => (
-                    <img
-                      key={`${logo.name}-duplicate`}
-                      src={logo.url}
-                      alt=""
-                      className="logo-carousel-img h-10 w-auto flex-shrink-0"
-                      loading="lazy"
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Mobile: static 3x4 logo grid */}
-          <div className="block md:hidden">
-            <div className="grid grid-cols-3 gap-x-10 gap-y-6 justify-items-center">
-              {logos.map((logo) => (
-                <img
-                  key={`mobile-${logo.name}`}
-                  src={logo.url}
-                  alt={`${logo.name} logo`}
-                  className="h-7 w-auto"
-                  loading="lazy"
-                />
-              ))}
-            </div>
+          {/* Static responsive logo grid:
+              - Mobile: 3 columns × 4 rows
+              - Desktop / horizontal: 6 columns × 2 rows */}
+          <div className="grid grid-cols-3 justify-items-center gap-x-10 gap-y-6 md:grid-cols-6 md:gap-x-12 md:gap-y-8">
+            {logos.map((logo) => (
+              <img
+                key={logo.name}
+                src={logo.url}
+                alt={`${logo.name} logo`}
+                className="h-7 w-auto md:h-9"
+                loading="lazy"
+              />
+            ))}
           </div>
         </div>
       </div>
-
-      <style jsx>{`
-        .logo-marquee-mask,
-        .logo-carousel-mask {
-          overflow: hidden;
-          position: relative;
-        }
-
-        .logo-marquee-row,
-        .logo-carousel {
-          width: max-content;
-          animation: logo-scroll 60s linear infinite;
-          will-change: transform;
-        }
-
-        .logo-track,
-        .logo-carousel-track {
-          flex-shrink: 0;
-        }
-
-        @keyframes logo-scroll {
-          0% {
-            transform: translateX(0);
-          }
-          100% {
-            transform: translateX(-50%);
-          }
-        }
-
-        /* Desktop: fade edges + CSS marquee */
-        @media (min-width: 769px) {
-          .logo-marquee-mask::before {
-            content: "";
-            position: absolute;
-            inset: 0;
-            pointer-events: none;
-            background: linear-gradient(
-              to right,
-              rgba(255, 255, 255, 1) 0%,
-              rgba(255, 255, 255, 0) 15%,
-              rgba(255, 255, 255, 0) 85%,
-              rgba(255, 255, 255, 1) 100%
-            );
-          }
-        }
-      `}</style>
     </section>
   );
 }

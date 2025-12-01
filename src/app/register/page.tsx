@@ -122,7 +122,7 @@ export default function RegisterPage() {
         <img
           src="/Girl-picture.svg"
           alt="MergifyPDF signup background"
-          className="h-full w-full object-cover"
+          className="h-full w-full object-cover object-left sm:object-center"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-slate-950/55 via-slate-950/25 to-slate-950/5" />
       </div>

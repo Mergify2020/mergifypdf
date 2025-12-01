@@ -97,7 +97,7 @@ export default function LoginPage() {
             src="/login-picture.svg"
             alt="MergifyPDF login background"
             fill
-            className="object-cover"
+            className="object-cover object-left sm:object-center"
             priority={false}
           />
           <div className="absolute inset-0 bg-gradient-to-r from-slate-950/55 via-slate-950/25 to-slate-950/5" />
