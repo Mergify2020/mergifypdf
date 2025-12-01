@@ -124,7 +124,7 @@ export default function RegisterPage() {
           alt="MergifyPDF signup background"
           className="h-full w-full object-cover object-left sm:object-center"
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-950/55 via-slate-950/25 to-slate-950/5" />
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950/65 via-slate-950/35 to-slate-950/15" />
       </div>
 
       {/* Layout container similar to login page */}

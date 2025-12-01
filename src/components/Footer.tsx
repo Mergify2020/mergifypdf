@@ -1,4 +1,8 @@
+"use client";
+
 import React from "react";
+import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { siInstagram, siTiktok, siYoutube, siThreads, siX } from "simple-icons";
 
 type IconProps = React.SVGProps<SVGSVGElement>;
@@ -91,6 +95,8 @@ function XIcon(props: IconProps) {
 }
 
 export default function Footer() {
+  const { data: session } = useSession();
+
   return (
     <footer className="border-t border-slate-200 bg-[#F3F4F6] text-slate-600">
       <div className="mx-auto max-w-7xl px-6 py-12">
@@ -125,18 +131,24 @@ export default function Footer() {
           <div>
             <h3 className="text-sm font-semibold text-slate-900">Control Center</h3>
             <div className="mt-4 space-y-2">
-              <a href="#" className="block text-sm text-slate-600 transition hover:text-slate-900">
+              <Link
+                href={session?.user ? "/" : "/login"}
+                className="block text-sm text-slate-600 transition hover:text-slate-900"
+              >
                 Project Dashboard
-              </a>
-              <a href="#" className="block text-sm text-slate-600 transition hover:text-slate-900">
+              </Link>
+              <Link
+                href={session?.user ? "/signature-center" : "/login"}
+                className="block text-sm text-slate-600 transition hover:text-slate-900"
+              >
                 Signature Dashboard
-              </a>
-              <a href="#" className="block text-sm text-slate-600 transition hover:text-slate-900">
-                Team Dashboard (Coming 2026)
-              </a>
-              <a href="#" className="block text-sm text-slate-600 transition hover:text-slate-900">
+              </Link>
+              <Link
+                href="/account?view=pricing"
+                className="block text-sm text-slate-600 transition hover:text-slate-900"
+              >
                 Plans &amp; Pricing
-              </a>
+              </Link>
               <a href="/register" className="block text-sm text-slate-600 transition hover:text-slate-900">
                 Sign Up
               </a>
