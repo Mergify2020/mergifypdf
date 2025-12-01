@@ -73,8 +73,12 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
           <div className="relative grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.1fr)] lg:items-center lg:gap-12">
             <div className="relative z-10 space-y-6 text-center lg:text-left">
               <h1 className="text-3xl font-semibold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
-                <span className="block">The fastest way to edit, sign,</span>
-                <span className="block">and manage PDFs online.</span>
+                <span className="block md:whitespace-nowrap">
+                  The fastest way to edit, sign,
+                </span>
+                <span className="block md:whitespace-nowrap">
+                  and manage PDFs online.
+                </span>
               </h1>
               <p className="text-base text-gray-700 sm:text-lg">
                 Edit, manage, and sign your documents from anywhere with ease.

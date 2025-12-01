@@ -171,7 +171,7 @@ export default function LoginPage() {
                     {busy ? "Signing in…" : "Continue"}
                   </button>
 
-                  <p className="text-center text-xs text-slate-700">or</p>
+                  <p className="text-center text-sm font-medium text-slate-700">or</p>
 
                   <button
                     type="button"
