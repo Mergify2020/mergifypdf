@@ -111,10 +111,9 @@ export default function LoginPage() {
               className="w-full max-w-md rounded-[26px] border border-white/60 bg-white/80 px-6 py-8 shadow-[0_24px_70px_rgba(15,23,42,0.55)] backdrop-blur-xl sm:px-8 sm:py-9"
               style={{ backdropFilter: "blur(20px)" }}
             >
-              <h1 className="text-2xl font-semibold text-slate-900">Log in</h1>
-              <p className="mt-1 text-sm text-slate-700">
-                Use the account you created, or reset your password below.
-              </p>
+              <h1 className="text-2xl font-semibold text-slate-900">
+                Log in to your account
+              </h1>
 
               <form
                 onSubmit={onSubmit}
@@ -123,7 +122,7 @@ export default function LoginPage() {
                 {/* Fields */}
                 <div className="space-y-4">
                   <div>
-                    <label className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-slate-700">
+                    <label className="mb-1 block text-xs font-medium text-slate-700">
                       Email
                     </label>
                     <input
@@ -141,7 +140,7 @@ export default function LoginPage() {
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-slate-700">
+                    <label className="mb-1 block text-xs font-medium text-slate-700">
                       Password
                     </label>
                     <input
@@ -172,9 +171,7 @@ export default function LoginPage() {
                     {busy ? "Signing in…" : "Continue"}
                   </button>
 
-                  <p className="text-center text-xs text-slate-700">
-                    or continue with
-                  </p>
+                  <p className="text-center text-xs text-slate-700">or</p>
 
                   <button
                     type="button"
@@ -190,20 +187,20 @@ export default function LoginPage() {
 
                   <div className="space-y-1 text-center text-xs text-slate-800">
                     <p>
-                      <Link
-                        className="font-medium text-[#024d7c] underline-offset-2 hover:text-[#013a60] hover:underline"
-                        href="/forgot-password"
-                      >
-                        Forgot your password?
-                      </Link>
-                    </p>
-                    <p>
                       Don&apos;t have an account?{" "}
                       <Link
                         className="font-medium text-[#024d7c] underline-offset-2 hover:text-[#013a60] hover:underline"
                         href="/register"
                       >
                         Create one
+                      </Link>
+                    </p>
+                    <p>
+                      <Link
+                        className="font-medium text-[#024d7c] underline-offset-2 hover:text-[#013a60] hover:underline"
+                        href="/forgot-password"
+                      >
+                        Forgot your password?
                       </Link>
                     </p>
                   </div>
