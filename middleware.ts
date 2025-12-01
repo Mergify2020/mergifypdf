@@ -4,7 +4,7 @@ import { getToken } from "next-auth/jwt";
 import type { JWT } from "next-auth/jwt";
 
 export async function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
+  const { pathname, searchParams } = req.nextUrl;
 
   // STEP 1: verify middleware is actually running
   // This will appear in the server logs for every matched request.
@@ -20,6 +20,8 @@ export async function middleware(req: NextRequest) {
 
   const secret = process.env.NEXTAUTH_SECRET;
   const token = (secret ? await getToken({ req, secret }) : null) as JWT | null;
+
+  const landing = searchParams.get("landing");
 
   const PUBLIC_PATHS = ["/", "/login", "/register", "/forgot-password", "/reset-password"];
   const isPublicPath = PUBLIC_PATHS.includes(pathname);
@@ -51,14 +53,15 @@ export async function middleware(req: NextRequest) {
   });
 
   // STEP 3: enforce 2FA for any authenticated user with 2FA enabled
-  if (
-    twoFactorEnabled === true &&
-    twoFactorPassed !== true &&
-    !pathname.startsWith("/2fa") &&
-    !pathname.startsWith("/two-factor")
-  ) {
-    console.log("REDIRECTING TO 2FA");
-    return NextResponse.redirect(new URL("/2fa", req.url));
+  if (twoFactorEnabled === true && twoFactorPassed !== true) {
+    const isTwoFactorRoute =
+      pathname.startsWith("/2fa") || pathname.startsWith("/two-factor");
+    const isHeroLanding = pathname === "/" && landing === "hero";
+
+    if (!isTwoFactorRoute && !isHeroLanding) {
+      console.log("REDIRECTING TO 2FA");
+      return NextResponse.redirect(new URL("/2fa", req.url));
+    }
   }
 
   // If user is already fully verified (or 2FA disabled), allow access / fall through,

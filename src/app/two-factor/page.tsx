@@ -113,18 +113,21 @@ export default function TwoFactorPage() {
     <div className="fixed inset-0 z-[100] flex flex-col bg-white">
       <header className="flex h-[64px] items-center border-b border-slate-200 bg-white/95 px-4 shadow-sm">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between">
-          <Link
-            href="/login"
+          <button
+            type="button"
+            onClick={() => {
+              // Exiting 2FA via the logo should force a fresh login and show the hero.
+              void signOut({ callbackUrl: "/?landing=hero" });
+            }}
             className="inline-flex items-center gap-2"
-            aria-label="Back to login"
+            aria-label="Back to hero"
           >
-            {/* simple wordmark; reuse existing logo asset */}
             <img
               src="/logo-wordmark2.svg"
               alt="MergifyPDF"
               className="h-8 w-auto"
             />
-          </Link>
+          </button>
           <div className="flex items-center gap-3">
             {/* Pricing pill to match login header */}
             <Link
