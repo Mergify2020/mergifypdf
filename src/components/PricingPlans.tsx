@@ -5,7 +5,19 @@ import { Check, X } from "lucide-react";
 
 const tiers = [
   {
-    name: "Mergify Basic",
+    name: "Starter Plan",
+    price: "$0",
+    detail: "Current plan",
+    description: "For getting started with 1 free project per day.",
+    features: [
+      "1 PDF upload per day",
+      "Basic editing tools",
+      "Self-sign documents",
+      "Email support",
+    ],
+  },
+  {
+    name: "Essential Plus",
     price: "$8.95",
     originalPrice: "$11.99",
     detail: "Per user / month",
@@ -24,7 +36,7 @@ const tiers = [
     ],
   },
   {
-    name: "Mergify Sign Pro",
+    name: "Signature Pro",
     price: "$15.95",
     originalPrice: "$19.99",
     detail: "Per user / month",
@@ -41,7 +53,6 @@ const tiers = [
       "Audit log of signing events",
       "Branded emails (Your name via MergifyPDF)",
       "Automatic email reminders",
-      "Add more signatures anytime",
     ],
   },
 ];
@@ -80,86 +91,120 @@ const faqs = [
 
 export default function PricingPlans() {
   return (
-    <div className="pricing-gradient min-h-screen px-6 py-12 text-slate-100">
-      <div className="mx-auto max-w-6xl space-y-10 px-2">
+    <div className="pricing-gradient min-h-screen px-4 py-12 text-slate-100 lg:px-6">
+      <div className="mx-auto w-full max-w-7xl space-y-10 px-4 lg:px-6">
         <div className="text-center">
           <h1 className="text-4xl font-semibold tracking-tight text-white drop-shadow-[0_10px_35px_rgba(15,23,42,0.4)]">
             Choose the workspace built for your workflow.
           </h1>
         </div>
 
-        <div className="mx-auto grid max-w-5xl gap-6 md:grid-cols-2">
+        <div className="mx-auto grid max-w-6xl gap-6 md:grid-cols-3">
           {tiers.map((tier) => {
             const isPremium = Boolean(tier.badge);
+            const isFree = tier.name === "Starter Plan";
             return (
               <div
                 key={tier.name}
-                className={`relative flex h-full flex-col overflow-hidden rounded-2xl px-6 py-6 transition-transform duration-150 ${
+                className={`relative flex h-full flex-col overflow-hidden rounded-[24px] px-6 py-4 transition-transform duration-150 backdrop-blur-2xl ${
                   isPremium
-                    ? "border border-indigo-300 bg-white/95 shadow-[0_22px_60px_rgba(79,70,229,0.35)] md:scale-[1.03]"
-                    : "border border-slate-200 bg-white shadow-[0_14px_32px_rgba(15,23,42,0.18)]"
+                    ? "border border-white/80 bg-white/30 ring-1 ring-purple-300/60"
+                    : "border border-white/70 bg-white/20"
                 }`}
               >
                 <div className="relative z-10 flex h-full flex-col">
                   <div
-                    className={`relative overflow-hidden rounded-3xl px-5 py-4 ${
+                    className={`relative min-h-[180px] overflow-hidden rounded-[20px] px-5 py-3 backdrop-blur-xl ${
                       isPremium
-                        ? "border border-indigo-200 bg-gradient-to-br from-indigo-50 via-sky-50 to-purple-50 shadow-md"
-                        : "border border-slate-200 bg-white shadow-sm"
+                        ? "border border-white/80 bg-violet-100/70"
+                        : "border border-white/70 bg-violet-100/60"
                     }`}
                   >
-                  <div className="relative z-10">
-                    {tier.badge ? (
-                      <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-900/90 px-4 py-1 text-xs font-semibold uppercase tracking-wide text-white shadow-[0_4px_24px_rgba(0,0,0,0.25)]">
-                        <span className="h-2 w-2 rounded-full bg-white/90" />
-                        {tier.badge}
-                      </span>
-                    ) : null}
-                    <div className={tier.badge ? "" : "pt-2"}>
-                      <h2 className="text-3xl font-semibold leading-tight text-slate-900">
-                        {tier.name}
-                      </h2>
-                      <div className="mt-6">
-                        {tier.originalPrice ? (
-                          <div className="mb-1 flex items-baseline gap-2 text-sm">
-                            <span className="text-slate-400 line-through">
-                              {tier.originalPrice}
-                            </span>
-                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
-                              Save 25%
-                            </span>
-                          </div>
+                    <div className="relative z-10">
+                      <div className="mb-3 flex h-7 items-center">
+                        {tier.badge ? (
+                          <span className="inline-flex items-center gap-2 rounded-full bg-purple-600 px-5 py-1.5 text-xs font-semibold uppercase tracking-wide text-white shadow-md">
+                            <span className="h-2 w-2 rounded-full bg-white/90" />
+                            {tier.badge}
+                          </span>
                         ) : null}
-                        <p className="text-5xl font-semibold text-slate-900">{tier.price}</p>
-                        <p className="mt-2 text-sm text-slate-500">{tier.detail}</p>
-                        <p className="mt-3 text-sm text-slate-600">{tier.description}</p>
+                      </div>
+                      <div className="pt-1">
+                        <h2 className="text-2xl font-semibold leading-tight text-slate-900">
+                          {tier.name}
+                        </h2>
+                        <div className="mt-6">
+                          {tier.originalPrice ? (
+                            <div className="mb-1 flex items-baseline gap-2 text-sm">
+                              <span className="text-base font-semibold text-red-500 line-through">
+                                {tier.originalPrice}
+                              </span>
+                              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                                Save 25%
+                              </span>
+                            </div>
+                          ) : null}
+                          <div className="flex items-baseline gap-1">
+                            <p className="text-4xl font-semibold text-slate-900">{tier.price}</p>
+                            {!isFree ? (
+                              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                / Month
+                              </span>
+                            ) : null}
+                          </div>
+                          {isFree ? (
+                            <p className="mt-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+                              {tier.detail}
+                            </p>
+                          ) : null}
+                          <p className="mt-3 text-sm text-slate-600">{tier.description}</p>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-                <ul className="mt-8 flex-1 space-y-4 text-sm text-slate-600">
-                  {tier.features.map((feature) => {
-                    const isBold = feature === "Everything in Personal";
-                    return (
-                      <li key={feature} className="flex items-center gap-2">
-                        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100">
-                          <div className="h-1 w-3 rounded-full bg-slate-400" />
-                        </span>
-                        <span className={isBold ? "font-semibold text-slate-800" : undefined}>{feature}</span>
+                  <ul className="mt-4 flex-1 space-y-3 text-sm text-slate-800">
+                    {isPremium ? (
+                      <li className="text-xs font-semibold uppercase tracking-wide text-purple-700">
+                        Everything in Basic, plus:
                       </li>
-                    );
-                  })}
-                </ul>
-                <button
-                  type="button"
-                  disabled
-                  className="pointer-events-none mt-10 w-full rounded-full bg-black px-4 py-2.5 text-sm font-bold text-white shadow-[0_8px_26px_rgba(15,23,42,0.3)]"
-                >
-                  Upgrade
-                </button>
+                    ) : null}
+                    {tier.features.map((feature) => {
+                      if (isPremium && feature === "Everything in Basic") return null;
+                      return (
+                        <li key={feature} className="flex items-center gap-2">
+                          <span
+                            className={`inline-flex h-6 w-6 items-center justify-center rounded-full ${
+                              isPremium ? "bg-indigo-100" : "bg-slate-100"
+                            }`}
+                          >
+                            <div
+                              className={`h-1 w-3 rounded-full ${
+                                isPremium ? "bg-indigo-500" : "bg-slate-400"
+                              }`}
+                            />
+                          </span>
+                          <span className="font-semibold text-white">{feature}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  <button
+                    type="button"
+                    disabled
+                    className={`pointer-events-none mt-6 w-full rounded-full px-4 py-2.5 text-sm font-bold text-white shadow-lg transition-all duration-150 ${
+                      isFree
+                        ? "bg-emerald-500 shadow-[0_10px_30px_rgba(16,185,129,0.55)]"
+                        : isPremium || tier.name === "Essential Plus"
+                          ? "bg-gradient-to-r from-indigo-600 to-purple-600 hover:shadow-xl hover:scale-[1.01]"
+                          : "bg-black hover:opacity-90"
+                    }`}
+                  >
+                    {isFree ? "Current plan" : "Upgrade"}
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="mt-10 rounded-[40px] border border-slate-200 bg-white p-6 text-sm text-slate-900 shadow-[0_40px_120px_rgba(15,23,42,0.15)]">
