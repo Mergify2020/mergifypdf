@@ -120,9 +120,11 @@ export default function PricingPlans() {
                         {tier.name}
                       </h2>
                       <div className="mt-6">
-                        {("originalPrice" in tier && tier.originalPrice) ? (
+                        {tier.originalPrice ? (
                           <div className="mb-1 flex items-baseline gap-2 text-sm">
-                            <span className="text-slate-400 line-through">{(tier as any).originalPrice}</span>
+                            <span className="text-slate-400 line-through">
+                              {tier.originalPrice}
+                            </span>
                             <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
                               Save 25%
                             </span>
