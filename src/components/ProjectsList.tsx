@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight, Check } from "lucide-react";
+import { ArrowUpRight, Check, Folder, MoreVertical } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { sanitizeProjectName } from "@/lib/projectName";
 import {
@@ -69,6 +69,7 @@ export default function ProjectsList({ initialProjects }: Props) {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [storageReady, setStorageReady] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   const baseProjects = useMemo(() => initialProjects.filter((project) => !project.persisted), [initialProjects]);
 
@@ -189,8 +190,13 @@ export default function ProjectsList({ initialProjects }: Props) {
   function toggleSelectMode() {
     setSelectionMode((prev) => {
       if (prev) setSelected(new Set());
+      setOpenMenuId(null);
       return !prev;
     });
+  }
+
+  function toggleProjectMenu(projectId: string) {
+    setOpenMenuId((current) => (current === projectId ? null : projectId));
   }
 
   function toggleSelectProject(projectId: string) {
@@ -218,9 +224,14 @@ export default function ProjectsList({ initialProjects }: Props) {
 
   return (
     <>
-      <div className="rounded-[10px] border border-slate-200 bg-white p-6 shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
+      <div className="rounded-[10px] border border-slate-200 bg-white p-6 shadow-[0_4px_12px_rgba(15,23,42,0.04)] transition-all duration-150 hover:-translate-y-0.5 hover:shadow-lg">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <h2 className="text-[17px] font-semibold text-slate-900">Your projects</h2>
+          <h2 className="inline-flex items-center gap-2 text-[15px] font-semibold text-slate-900">
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
+              <Folder className="h-3.5 w-3.5" />
+              Your projects
+            </span>
+          </h2>
           <div className="flex items-center gap-3 text-sm">
             <button
               type="button"
@@ -266,7 +277,7 @@ export default function ProjectsList({ initialProjects }: Props) {
               return (
                 <div
                   key={project.id}
-                  className="group flex flex-col gap-3 py-3 first:pt-0 last:pb-0 md:grid md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_auto] md:items-center md:gap-4 md:px-1 hover:bg-[#F9FAFB]"
+                  className="group relative flex flex-col gap-3 py-3 first:pt-0 last:pb-0 md:grid md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_auto] md:items-center md:gap-4 md:px-1 border-b border-gray-100 last:border-b-0 hover:bg-gray-50"
                 >
                   <div className="flex items-center gap-3">
                     {selectionMode ? (
@@ -279,27 +290,57 @@ export default function ProjectsList({ initialProjects }: Props) {
                       >
                         {isSelected ? <Check className="h-4 w-4 text-white" /> : null}
                       </button>
-                    ) : null}
+                    ) : (
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => toggleProjectMenu(project.id)}
+                          className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                          aria-label="Project options"
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </button>
+                        {openMenuId === project.id ? (
+                          <div className="absolute left-0 top-9 z-20 w-52 rounded-xl border border-slate-200 bg-white py-2 text-sm shadow-lg">
+                            <div className="px-3 pb-1 text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">
+                              Project
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOpenMenuId(null);
+                                openRename(project);
+                              }}
+                              className="flex w-full items-center gap-2 px-3 py-2 text-left text-slate-700 hover:bg-slate-50"
+                            >
+                              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
+                                <path
+                                  d="M12 20h9"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                />
+                                <path
+                                  d="M16.5 3.5a2.121 2.121 0 013 3L7 19.5 3 21l1.5-4L16.5 3.5z"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
+                              Rename project
+                            </button>
+                            <div className="mt-1 border-t border-slate-100" />
+                            <div className="px-3 pt-2 text-xs text-slate-500">
+                              Updated {project.updated}
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
                     <p className="text-lg font-semibold text-slate-900">{project.title}</p>
-                    <button
-                      type="button"
-                      onClick={() => openRename(project)}
-                      className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
-                    >
-                      <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
-                        <path d="M12 20h9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                        <path
-                          d="M16.5 3.5a2.121 2.121 0 013 3L7 19.5 3 21l1.5-4L16.5 3.5z"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                      Edit
-                    </button>
                   </div>
-                  <p className="text-sm text-slate-500">Updated {project.updated}</p>
+                  <div className="hidden text-sm text-slate-500 md:block" />
                   <div className="flex flex-wrap justify-start gap-3 text-sm md:justify-end">
                     <button
                       type="button"

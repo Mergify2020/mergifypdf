@@ -1,0 +1,17 @@
+<svg width="88" height="32" viewBox="0 0 88 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0.75" y="0.75" width="86.5" height="30.5" rx="6.75" fill="white" stroke="#E5E7EB" stroke-width="1.5"/>
+  <rect x="1.5" y="1.5" width="85" height="29" rx="6" fill="url(#stripeGradient)"/>
+  <rect x="3" y="3" width="82" height="26" rx="5" fill="white"/>
+  <defs>
+    <linearGradient id="stripeGradient" x1="4" y1="3" x2="84" y2="29" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6366F1"/>
+      <stop offset="1" stop-color="#A855F7"/>
+    </linearGradient>
+  </defs>
+  <text x="50%" y="52%" dominant-baseline="middle" text-anchor="middle"
+        font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+        font-size="14" font-weight="700" fill="#4F46E5">
+    Stripe
+  </text>
+</svg>
+

@@ -1,11 +1,13 @@
 "use client";
 
+import Image from "next/image";
 import { Check, X } from "lucide-react";
 
 const tiers = [
   {
     name: "Mergify Basic",
     price: "$8.95",
+    originalPrice: "$11.99",
     detail: "Per user / month",
     accent: "from-[#FFB480] to-[#FF8A4E]",
     overlay: "from-orange-300/30 to-transparent",
@@ -24,6 +26,7 @@ const tiers = [
   {
     name: "Mergify Sign Pro",
     price: "$15.95",
+    originalPrice: "$19.99",
     detail: "Per user / month",
     accent: "from-[#A9C7FF] via-[#7BA8F4] to-[#4D74C8]",
     overlay: "from-sky-200/25 to-transparent",
@@ -39,25 +42,6 @@ const tiers = [
       "Branded emails (Your name via MergifyPDF)",
       "Automatic email reminders",
       "Add more signatures anytime",
-    ],
-  },
-  {
-    name: "Mergify Business",
-    price: "$39.95",
-    detail: "Per user / month • Coming 2026",
-    accent: "from-[#38D0A5] to-[#23B58A]",
-    overlay: "from-emerald-200/30 to-transparent",
-    button: "bg-[#23B58A]",
-    description: "For growing teams and organizations. (Coming 2026.)",
-    features: [
-      "Everything in Sign Pro",
-      "Unlimited signature requests",
-      "Add extra teammates",
-      "Multiple signers per document",
-      "Signing order (A → B → C)",
-      "Templates & reusable forms",
-      "Custom email branding",
-      "Priority support",
     ],
   },
 ];
@@ -96,40 +80,60 @@ const faqs = [
 
 export default function PricingPlans() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#f3f7ff] via-white to-white px-6 py-12 text-slate-900">
+    <div className="pricing-gradient min-h-screen px-6 py-12 text-slate-100">
       <div className="mx-auto max-w-6xl space-y-10 px-2">
         <div className="text-center">
-          <h1 className="text-4xl font-semibold tracking-tight text-slate-900 drop-shadow-[0_10px_35px_rgba(15,23,42,0.12)]">
+          <h1 className="text-4xl font-semibold tracking-tight text-white drop-shadow-[0_10px_35px_rgba(15,23,42,0.4)]">
             Choose the workspace built for your workflow.
           </h1>
         </div>
 
-        <div className="grid gap-8 lg:grid-cols-3">
-          {tiers.map((tier) => (
-            <div
-              key={tier.name}
-              className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white px-7 py-10 shadow-[0_18px_55px_rgba(15,23,42,0.18)]"
-            >
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white via-white/60 to-transparent" />
-              <div className="relative z-10 flex h-full flex-col">
-                <div className={`relative overflow-hidden rounded-3xl border border-white/40 bg-gradient-to-br ${tier.accent} p-6 text-white shadow-inner`}>
+        <div className="mx-auto grid max-w-5xl gap-6 md:grid-cols-2">
+          {tiers.map((tier) => {
+            const isPremium = Boolean(tier.badge);
+            return (
+              <div
+                key={tier.name}
+                className={`relative flex h-full flex-col overflow-hidden rounded-2xl px-6 py-6 transition-transform duration-150 ${
+                  isPremium
+                    ? "border border-indigo-300 bg-white/95 shadow-[0_22px_60px_rgba(79,70,229,0.35)] md:scale-[1.03]"
+                    : "border border-slate-200 bg-white shadow-[0_14px_32px_rgba(15,23,42,0.18)]"
+                }`}
+              >
+                <div className="relative z-10 flex h-full flex-col">
+                  <div
+                    className={`relative overflow-hidden rounded-3xl px-5 py-4 ${
+                      isPremium
+                        ? "border border-indigo-200 bg-gradient-to-br from-indigo-50 via-sky-50 to-purple-50 shadow-md"
+                        : "border border-slate-200 bg-white shadow-sm"
+                    }`}
+                  >
                   <div className="relative z-10">
                     {tier.badge ? (
-                      <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/40 bg-[#0f172a]/60 px-4 py-1 text-xs font-semibold uppercase tracking-wide text-white shadow-[0_4px_24px_rgba(0,0,0,0.25)]">
-                        <span className="h-2 w-2 rounded-full bg-white" />
+                      <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-900/90 px-4 py-1 text-xs font-semibold uppercase tracking-wide text-white shadow-[0_4px_24px_rgba(0,0,0,0.25)]">
+                        <span className="h-2 w-2 rounded-full bg-white/90" />
                         {tier.badge}
                       </span>
                     ) : null}
                     <div className={tier.badge ? "" : "pt-2"}>
-                      <h2 className="text-3xl font-semibold leading-tight">{tier.name}</h2>
+                      <h2 className="text-3xl font-semibold leading-tight text-slate-900">
+                        {tier.name}
+                      </h2>
                       <div className="mt-6">
-                      <p className="text-5xl font-semibold text-white">{tier.price}</p>
-                      <p className="mt-2 text-sm opacity-90">{tier.detail}</p>
-                      <p className="mt-3 text-sm text-white/70">{tier.description}</p>
+                        {("originalPrice" in tier && tier.originalPrice) ? (
+                          <div className="mb-1 flex items-baseline gap-2 text-sm">
+                            <span className="text-slate-400 line-through">{(tier as any).originalPrice}</span>
+                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                              Save 25%
+                            </span>
+                          </div>
+                        ) : null}
+                        <p className="text-5xl font-semibold text-slate-900">{tier.price}</p>
+                        <p className="mt-2 text-sm text-slate-500">{tier.detail}</p>
+                        <p className="mt-3 text-sm text-slate-600">{tier.description}</p>
                       </div>
                     </div>
                   </div>
-                  <div className={`pointer-events-none absolute inset-0 bg-gradient-to-b ${tier.overlay}`} />
                 </div>
                 <ul className="mt-8 flex-1 space-y-4 text-sm text-slate-600">
                   {tier.features.map((feature) => {
@@ -147,7 +151,7 @@ export default function PricingPlans() {
                 <button
                   type="button"
                   disabled
-                  className={`pointer-events-none mt-10 w-full rounded-full px-4 py-2.5 text-sm font-medium text-white shadow-[0_8px_26px_rgba(15,23,42,0.22)] ${tier.button}`}
+                  className="pointer-events-none mt-10 w-full rounded-full bg-black px-4 py-2.5 text-sm font-bold text-white shadow-[0_8px_26px_rgba(15,23,42,0.3)]"
                 >
                   Upgrade
                 </button>
