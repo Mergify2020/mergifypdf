@@ -7,15 +7,15 @@ import { Check, X } from "lucide-react";
 const tiers = [
   {
     name: "Starter Plan",
-    price: "$0",
-    detail: "Current plan",
+    price: "FREE",
+    detail: "",
     description: "",
     pricePanel: "bg-white/80",
     features: [
-      "1 PDF upload per day",
-      "Basic editing tools",
+      "1 document edit per day",
+      "Store up to 3 projects",
+      "Full document editing",
       "Self-sign documents",
-      "Email support",
     ],
   },
   {
@@ -29,13 +29,12 @@ const tiers = [
     pricePanel: "bg-white/80",
     description: "",
     features: [
-      "Unlimited PDF uploads",
-      "Unlimited edits + merges",
-      "Highlight & drawing tools",
-      "Upload and self-sign documents",
-      "Mobile signature capture (QR)",
-      "Cloud saves & resume project",
-      "Standard support",
+      "Unlimited document uploads",
+      "Unlimited project storage",
+      "Full document editing",
+      "Document templates",
+      "Self-sign documents",
+      "AI document tools",
     ],
   },
   {
@@ -50,13 +49,12 @@ const tiers = [
     description: "",
     pricePanel: "bg-white/80",
     features: [
-      "Everything in Basic",
-      "Send documents for signature",
+      "Everything in Essential Plus",
+      "Access to Mergify Sign dashboard",
       "10 signature requests per month",
-      "Signature tracking (opened, viewed, signed)",
-      "Audit log of signing events",
-      "Branded emails (Your name via MergifyPDF)",
+      "Multiple signers per document",
       "Automatic email reminders",
+      "Signer progress tracking",
     ],
   },
 ];
@@ -159,7 +157,7 @@ export default function PricingPlans() {
 
             const titleClass =
               tier.name === "Starter Plan"
-                ? "text-[2rem] md:text-[1.9rem] font-bold leading-snug text-slate-900"
+                ? "text-[2rem] md:text-[1.9rem] font-bold leading-snug text-[#6B7280]"
                 : tier.name === "Essential Plus"
                   ? "text-[2.2rem] md:text-[2.1rem] font-bold leading-snug bg-gradient-to-r from-sky-500 to-emerald-400 bg-clip-text text-transparent"
                   : "text-[2.2rem] md:text-[2.1rem] font-bold leading-snug bg-gradient-to-r from-purple-500 to-sky-500 bg-clip-text text-transparent";
@@ -192,23 +190,23 @@ export default function PricingPlans() {
                         </h2>
 		                          <div className="mt-6">
 	                            <div className="flex items-baseline gap-2">
-                              <p className="whitespace-nowrap text-[2.3rem] md:text-4xl font-semibold leading-tight text-slate-900">
+		                              <p className="whitespace-nowrap text-[2.3rem] md:text-4xl font-semibold leading-tight text-slate-900">
 	                                {showAnnual ? yearlyPrice : tier.price}
 	                              </p>
 	                            </div>
-                            <div className="mt-1 flex h-5 items-center gap-2">
-                              {!isFree && billingPeriod === "annual" && savingsLabel ? (
-                                <>
-                                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-emerald-700">
-                                    {savingsLabel}
-                                  </span>
-                                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                                    Compared to monthly
-                                  </span>
-                                </>
-                              ) : null}
-                            </div>
-	                          {isFree ? (
+	                            <div className="mt-1 flex h-5 items-center gap-2">
+	                              {!isFree && billingPeriod === "annual" && savingsLabel ? (
+	                                <>
+	                                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-emerald-700">
+	                                    {savingsLabel}
+	                                  </span>
+	                                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+	                                    Compared to monthly
+	                                  </span>
+	                                </>
+	                              ) : null}
+	                            </div>
+	                          {isFree && tier.detail ? (
 	                            <p className="mt-2 text-xs font-medium uppercase tracking-wide text-slate-600">
 	                              {tier.detail}
 	                            </p>
@@ -221,27 +219,32 @@ export default function PricingPlans() {
                     </div>
                   </div>
                   <ul className="mt-4 flex-1 space-y-3 text-sm text-slate-800">
-                    {isPremium ? (
-                      <li className="text-xs font-semibold uppercase tracking-wide text-purple-700">
-                        Everything in Basic, plus:
-                      </li>
-                    ) : null}
                     {tier.features.map((feature) => {
                       if (isPremium && feature === "Everything in Basic") return null;
                       return (
                         <li key={feature} className="flex items-center gap-2">
-                          <span
-                            className={`inline-flex h-6 w-6 items-center justify-center rounded-full ${
-                              isPremium ? "bg-white/40" : "bg-white/20"
-                            }`}
-                          >
-                            <div
-                              className={`h-1 w-3 rounded-full ${
-                                isPremium ? "bg-indigo-500" : "bg-slate-500"
-                              }`}
-                            />
+	                          <span
+	                            className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-sm"
+	                          >
+	                              <div
+	                                className={`h-1 w-3 rounded-full ${
+	                                  tier.name === "Starter Plan"
+	                                    ? "bg-[#9CA3AF]"
+	                                    : tier.name === "Essential Plus"
+	                                      ? "bg-sky-500"
+	                                      : "bg-indigo-500"
+	                                }`}
+	                              />
                           </span>
-                          <span className="font-semibold text-slate-900">{feature}</span>
+	                          {tier.name === "Signature Pro" && feature === "Everything in Essential Plus" ? (
+	                            <span className="inline-flex items-center rounded-full bg-white px-3 py-1">
+	                              <span className="bg-gradient-to-r from-sky-500 to-emerald-400 bg-clip-text text-sm font-semibold text-transparent">
+	                                {feature}
+	                              </span>
+	                            </span>
+		                          ) : (
+		                            <span className="font-semibold text-slate-900">{feature}</span>
+		                          )}
                         </li>
                       );
                     })}
@@ -250,16 +253,16 @@ export default function PricingPlans() {
 		                    type="button"
 		                    disabled
 		                    className={`pointer-events-none mt-6 w-full rounded-full border-4 border-white/90 px-4 py-2.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-all duration-150 ${
-		                      isFree
-		                        ? "border-transparent bg-emerald-500"
-		                        : isPremium
-		                          ? "bg-gradient-to-r from-purple-500 to-sky-500 hover:scale-[1.01]"
-		                          : tier.name === "Essential Plus"
-		                            ? "bg-gradient-to-r from-sky-500 to-emerald-400 hover:scale-[1.01]"
-		                            : "bg-black"
+			                      isFree
+			                        ? "border-transparent bg-[#374151]"
+			                        : isPremium
+			                          ? "bg-gradient-to-r from-purple-500 to-sky-500 hover:scale-[1.01]"
+			                          : tier.name === "Essential Plus"
+			                            ? "bg-gradient-to-r from-sky-500 to-emerald-400 hover:scale-[1.01]"
+			                            : "bg-black"
 		                    }`}
 		                  >
-                    {isFree ? "Current plan" : "Upgrade"}
+                    Select Plan
                   </button>
                 </div>
               </div>
@@ -267,24 +270,24 @@ export default function PricingPlans() {
           })}
         </div>
 
-        <div className="mt-16 frosted-card rounded-[40px] p-6 text-sm text-slate-900 lg:p-8">
-          <p className="mb-6 text-center text-3xl font-semibold tracking-tight text-slate-900">Compare plans</p>
+	        <div className="mt-16 frosted-card rounded-[40px] p-6 text-sm text-slate-900 lg:p-8">
+	          <p className="mb-6 text-center text-3xl font-semibold tracking-tight text-slate-900">Compare Our Plans</p>
           <div className="overflow-hidden rounded-3xl bg-white/75 shadow-inner">
             <table className="mx-auto w-full table-fixed text-xs sm:text-sm text-slate-800">
-              <thead className="bg-white text-[10px] sm:text-sm font-semibold uppercase tracking-[0.4em] text-slate-900 text-center sm:text-left">
+              <thead className="bg-black text-[10px] sm:text-sm font-semibold text-white text-center sm:text-left">
                 <tr>
-                  <th className="hidden px-5 py-4 text-left font-semibold text-slate-900 sm:table-cell">
-                    Feature
+                  <th className="hidden px-5 py-4 text-left text-[11px] sm:text-base font-semibold text-white sm:table-cell">
+                    Features
                   </th>
-                  <th className="w-1/3 px-3 py-4 text-center text-[11px] sm:w-auto sm:text-base font-bold tracking-normal text-slate-900">
+                  <th className="w-1/3 px-3 py-4 text-center text-[11px] sm:w-auto sm:text-base font-bold tracking-normal text-white">
                     <span className="block sm:inline">Starter</span>{" "}
                     <span className="block sm:inline">Plan</span>
                   </th>
-                  <th className="w-1/3 px-3 py-4 text-center text-[11px] sm:w-auto sm:text-base font-bold tracking-normal text-slate-900">
+                  <th className="w-1/3 px-3 py-4 text-center text-[11px] sm:w-auto sm:text-base font-bold tracking-normal text-white">
                     <span className="block sm:inline">Essential</span>{" "}
                     <span className="block sm:inline">Plus</span>
                   </th>
-                  <th className="w-1/3 px-3 py-4 text-center text-[11px] sm:w-auto sm:text-base font-bold tracking-normal text-slate-900">
+                  <th className="w-1/3 px-3 py-4 text-center text-[11px] sm:w-auto sm:text-base font-bold tracking-normal text-white">
                     <span className="block sm:inline">Signature</span>{" "}
                     <span className="block sm:inline">Pro</span>
                   </th>
@@ -292,15 +295,15 @@ export default function PricingPlans() {
               </thead>
               <tbody className="text-slate-700">
                 {[
-                  { feature: "Daily uploads", basic: "1/day", pro: "Unlimited", business: "Unlimited" },
-                  { feature: "Project storage", basic: "Up to 5 docs", pro: "Unlimited", business: "Unlimited" },
-                  { feature: "PDF Editing", basic: true, pro: true, business: true },
-                  { feature: "Self-sign documents", basic: true, pro: true, business: true },
+                  { feature: "Daily Uploads", basic: "1 Per Day", pro: "Unlimited", business: "Unlimited" },
+                  { feature: "Project Storage", basic: "5 Documents", pro: "Unlimited", business: "Unlimited" },
+                  { feature: "Document Editing", basic: true, pro: true, business: true },
+                  { feature: "Self-Sign Documents", basic: true, pro: true, business: true },
                   { feature: "Templates", basic: false, pro: true, business: true },
-                  { feature: "AI PDF Tools", basic: false, pro: true, business: true },
+                  { feature: "AI Document Tools", basic: false, pro: true, business: true },
                   { feature: "Access to Mergify Sign", basic: false, pro: false, business: true },
-                  { feature: "Outgoing signature requests", basic: false, pro: false, business: "10/month" },
-                  { feature: "Signature tracking", basic: false, pro: false, business: true },
+                  { feature: "Signature Tracking", basic: false, pro: false, business: true },
+                  { feature: "Outgoing Signature Requests", basic: false, pro: false, business: "10 Per Month" },
                 ].map((row) => (
                   <>
                     <tr key={`${row.feature}-label`} className="sm:hidden">
@@ -335,10 +338,10 @@ export default function PricingPlans() {
           </div>
         </div>
 
-        <div className="frosted-card rounded-[46px] p-8 text-slate-900">
-          <p className="mb-8 text-center text-3xl font-semibold tracking-tight text-slate-900">
-            Frequently asked questions
-          </p>
+	        <div className="frosted-card rounded-[46px] p-8 text-slate-900">
+	          <p className="mb-8 text-center text-3xl font-semibold tracking-tight text-slate-900">
+	            Frequently Asked Questions
+	          </p>
           <div className="grid gap-6 text-left md:grid-cols-2">
             {faqs.map((faq) => (
               <div
@@ -359,6 +362,13 @@ export default function PricingPlans() {
 
 function renderValue(value: boolean | string) {
   if (typeof value === "string") {
+    if (value === "Unlimited") {
+      return (
+        <span className="block bg-gradient-to-r from-purple-600 to-blue-700 bg-clip-text text-center font-semibold text-transparent">
+          {value}
+        </span>
+      );
+    }
     return <span className="block text-center text-slate-900">{value}</span>;
   }
   if (value) {
