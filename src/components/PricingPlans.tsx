@@ -138,7 +138,7 @@ export default function PricingPlans() {
           </div>
         </div>
 
-        <div className="mx-auto grid max-w-7xl gap-10 md:grid-cols-3">
+        <div className="mx-auto grid max-w-7xl gap-10 md:grid-cols-2 xl:grid-cols-3">
           {tiers.map((tier) => {
             const isPremium = Boolean(tier.badge);
             const isFree = tier.name === "Starter Plan";
@@ -192,7 +192,7 @@ export default function PricingPlans() {
                         </h2>
                           <div className="mt-6">
                             <div className="flex items-baseline gap-2">
-                              <p className="text-3xl md:text-4xl font-semibold leading-tight text-slate-900">
+                              <p className="whitespace-nowrap text-2xl sm:text-3xl md:text-4xl font-semibold leading-tight text-slate-900">
                                 {showAnnual ? yearlyPrice : tier.price}
                               </p>
                             </div>
