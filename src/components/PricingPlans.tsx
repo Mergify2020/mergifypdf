@@ -270,8 +270,8 @@ export default function PricingPlans() {
         <div className="mt-16 frosted-card rounded-[40px] p-6 text-sm text-slate-900 lg:p-8">
           <p className="mb-6 text-center text-3xl font-semibold tracking-tight text-slate-900">Compare plans</p>
           <div className="overflow-hidden rounded-3xl bg-white/75 shadow-inner">
-            <table className="w-full text-xs sm:text-sm text-slate-800">
-              <thead className="bg-white text-[10px] sm:text-sm font-semibold uppercase tracking-[0.4em] text-slate-900">
+            <table className="mx-auto w-full text-xs sm:text-sm text-slate-800">
+              <thead className="bg-white text-[10px] sm:text-sm font-semibold uppercase tracking-[0.4em] text-slate-900 text-center sm:text-left">
                 <tr>
                   <th className="hidden px-5 py-4 text-left font-semibold text-slate-900 sm:table-cell">
                     Feature
@@ -306,7 +306,7 @@ export default function PricingPlans() {
                   <>
                     <tr
                       key={`${row.feature}-values`}
-                      className="sm:border-b sm:border-slate-200 sm:last:border-0"
+                      className="text-center sm:text-left sm:border-b sm:border-slate-200 sm:last:border-0"
                     >
                       <td className="hidden px-5 py-5 text-xs sm:text-sm font-semibold text-slate-900 sm:table-cell">
                         {row.feature}
@@ -324,7 +324,7 @@ export default function PricingPlans() {
                     <tr key={`${row.feature}-label`} className="border-b border-slate-200 sm:hidden">
                       <td
                         colSpan={4}
-                        className="px-5 pb-4 pt-1 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-500"
+                        className="px-3 pb-4 pt-1 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-500"
                       >
                         {row.feature}
                       </td>
