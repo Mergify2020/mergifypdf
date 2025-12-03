@@ -307,7 +307,7 @@ export default function PricingPlans() {
                     <tr key={`${row.feature}-label`} className="sm:hidden">
                       <td
                         colSpan={4}
-                        className="px-3 pb-4 pt-1 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-500"
+                        className="px-3 pt-2 pb-1 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-500"
                       >
                         {row.feature}
                       </td>
@@ -319,13 +319,13 @@ export default function PricingPlans() {
                       <td className="hidden px-5 py-5 text-xs sm:text-sm font-semibold text-slate-900 sm:table-cell">
                         {row.feature}
                       </td>
-                      <td className="w-1/3 px-3 py-5 text-center text-xs sm:w-auto sm:text-sm font-semibold text-slate-900">
+                      <td className="w-1/3 px-3 py-3 sm:py-5 text-center text-xs sm:w-auto sm:text-sm font-semibold text-slate-900">
                         {renderValue((row as any).basic)}
                       </td>
-                      <td className="w-1/3 px-3 py-5 text-center text-xs sm:w-auto sm:text-sm font-semibold text-slate-900">
+                      <td className="w-1/3 px-3 py-3 sm:py-5 text-center text-xs sm:w-auto sm:text-sm font-semibold text-slate-900">
                         {renderValue((row as any).pro)}
                       </td>
-                      <td className="w-1/3 px-3 py-5 text-center text-xs sm:w-auto sm:text-sm font-semibold text-slate-900">
+                      <td className="w-1/3 px-3 py-3 sm:py-5 text-center text-xs sm:w-auto sm:text-sm font-semibold text-slate-900">
                         {renderValue((row as any).business)}
                       </td>
                     </tr>
