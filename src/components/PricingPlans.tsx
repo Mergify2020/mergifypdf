@@ -273,7 +273,9 @@ export default function PricingPlans() {
             <table className="w-full text-sm text-slate-800">
               <thead className="bg-white text-sm font-semibold uppercase tracking-[0.4em] text-slate-900">
                 <tr>
-                  <th className="px-5 py-4 text-left font-semibold text-slate-900">Feature</th>
+                  <th className="hidden px-5 py-4 text-left font-semibold text-slate-900 sm:table-cell">
+                    Feature
+                  </th>
                   <th className="px-5 py-4 text-center text-base font-bold tracking-normal text-slate-900">
                     Starter Plan
                   </th>
@@ -298,18 +300,33 @@ export default function PricingPlans() {
                   { feature: "Add teammates / team workspace", basic: false, pro: false, business: true },
                   { feature: "Templates & advanced workflows", basic: false, pro: false, business: true },
                 ].map((row) => (
-                  <tr key={row.feature} className="border-b border-slate-200 last:border-0">
-                    <td className="px-5 py-5 font-semibold text-slate-900">{row.feature}</td>
-                    <td className="px-5 py-5 text-center font-semibold text-slate-900">
-                      {renderValue((row as any).basic)}
-                    </td>
-                    <td className="px-5 py-5 text-center font-semibold text-slate-900">
-                      {renderValue((row as any).pro)}
-                    </td>
-                    <td className="px-5 py-5 text-center font-semibold text-slate-900">
-                      {renderValue((row as any).business)}
-                    </td>
-                  </tr>
+                  <>
+                    <tr
+                      key={`${row.feature}-values`}
+                      className="sm:border-b sm:border-slate-200 sm:last:border-0"
+                    >
+                      <td className="hidden px-5 py-5 font-semibold text-slate-900 sm:table-cell">
+                        {row.feature}
+                      </td>
+                      <td className="px-5 py-5 text-center font-semibold text-slate-900">
+                        {renderValue((row as any).basic)}
+                      </td>
+                      <td className="px-5 py-5 text-center font-semibold text-slate-900">
+                        {renderValue((row as any).pro)}
+                      </td>
+                      <td className="px-5 py-5 text-center font-semibold text-slate-900">
+                        {renderValue((row as any).business)}
+                      </td>
+                    </tr>
+                    <tr key={`${row.feature}-label`} className="border-b border-slate-200 sm:hidden">
+                      <td
+                        colSpan={4}
+                        className="px-5 pb-4 pt-1 text-center text-xs font-semibold uppercase tracking-wide text-slate-500"
+                      >
+                        {row.feature}
+                      </td>
+                    </tr>
+                  </>
                 ))}
               </tbody>
             </table>
