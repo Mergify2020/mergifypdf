@@ -97,16 +97,16 @@ export default function PricingPlans() {
   return (
     <div className="pricing-gradient min-h-screen px-4 py-12 text-slate-900 lg:px-6">
       <div className="mx-auto w-full max-w-7xl space-y-10 px-4 lg:px-6">
-        <div className="text-center">
+        <div className="text-center sm:flex sm:items-center sm:justify-between sm:text-left">
           <h1 className="text-4xl font-semibold tracking-tight text-slate-900 drop-shadow-[0_10px_35px_rgba(15,23,42,0.4)]">
             Choose the workspace built for your workflow.
           </h1>
-          <div className="mt-8 flex justify-center">
+          <div className="mt-8 flex justify-center sm:mt-0 sm:justify-end">
             <div className="inline-flex items-center rounded-full bg-white p-1.5 text-sm font-semibold shadow-sm">
               <button
                 type="button"
                 onClick={() => setBillingPeriod("monthly")}
-                className={`min-w-[112px] rounded-full px-5 py-2 transition-colors ${
+                className={`min-w-[112px] rounded-full px-5 py-2 whitespace-nowrap transition-colors ${
                   billingPeriod === "monthly"
                     ? "bg-black text-white shadow-sm"
                     : "text-slate-900 hover:text-slate-700"
@@ -117,7 +117,7 @@ export default function PricingPlans() {
               <button
                 type="button"
                 onClick={() => setBillingPeriod("annual")}
-                className={`min-w-[140px] rounded-full px-5 py-2 transition-colors ${
+                className={`min-w-[140px] rounded-full px-5 py-2 whitespace-nowrap transition-colors ${
                   billingPeriod === "annual"
                     ? "bg-black text-white shadow-sm"
                     : "text-slate-900 hover:text-slate-700"
