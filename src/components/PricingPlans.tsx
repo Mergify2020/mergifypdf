@@ -93,6 +93,67 @@ const faqs = [
 
 export default function PricingPlans() {
   const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("monthly");
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+
+  const PRICE_IDS: Record<
+    string,
+    {
+      monthly?: string;
+      annual?: string;
+    }
+  > = {
+    "Essential Plus": {
+      monthly: "price_1Sa3MPJCQrZL3P2hvT5zgJxa",
+      annual: "price_1Sa3NOJCQrZL3P2h4qkploLe",
+    },
+    "Signature Pro": {
+      monthly: "price_1Sa3L6JCQrZL3P2hcbGBWN7P",
+      annual: "price_1Sa3OSJCQrZL3P2hqw2zxi9w",
+    },
+  };
+
+  async function handleSelectPlan(tierName: string) {
+    if (tierName === "Starter Plan") {
+      window.location.href = "/account?view=pricing";
+      return;
+    }
+
+    const tierPrices = PRICE_IDS[tierName];
+    const priceId = tierPrices?.[billingPeriod];
+
+    if (!priceId) {
+      console.error("Missing Stripe price ID for tier", tierName, "and period", billingPeriod);
+      return;
+    }
+
+    try {
+      setLoadingPlan(tierName);
+      const res = await fetch("/api/billing/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ priceId }),
+      });
+
+      if (res.status === 401) {
+        window.location.href = "/login?callbackUrl=/account?view=pricing";
+        return;
+      }
+
+      if (!res.ok) {
+        console.error("Failed to create checkout session", await res.text());
+        return;
+      }
+
+      const data = (await res.json()) as { url?: string };
+      if (data?.url) {
+        window.location.href = data.url;
+      }
+    } catch (error) {
+      console.error("Error starting checkout", error);
+    } finally {
+      setLoadingPlan(null);
+    }
+  }
 
   return (
     <div className="pricing-gradient min-h-screen px-4 py-12 text-slate-900 lg:px-6">
@@ -249,21 +310,22 @@ export default function PricingPlans() {
                       );
                     })}
                   </ul>
-		                  <button
-		                    type="button"
-		                    disabled
-		                    className={`pointer-events-none mt-6 w-full rounded-full border-4 border-white/90 px-4 py-2.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-all duration-150 ${
-			                      isFree
-			                        ? "border-transparent bg-[#374151]"
-			                        : isPremium
-			                          ? "bg-gradient-to-r from-purple-500 to-sky-500 hover:scale-[1.01]"
-			                          : tier.name === "Essential Plus"
-			                            ? "bg-gradient-to-r from-sky-500 to-emerald-400 hover:scale-[1.01]"
-			                            : "bg-black"
-		                    }`}
-		                  >
-                    Select Plan
-                  </button>
+	                  <button
+	                    type="button"
+	                    disabled={loadingPlan === tier.name}
+	                    onClick={() => void handleSelectPlan(tier.name)}
+	                    className={`mt-6 w-full rounded-full border-4 border-white/90 px-4 py-2.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-all duration-150 ${
+	                      isFree
+	                        ? "border-transparent bg-[#374151]"
+	                        : isPremium
+	                          ? "bg-gradient-to-r from-purple-500 to-sky-500 hover:scale-[1.01]"
+	                          : tier.name === "Essential Plus"
+	                            ? "bg-gradient-to-r from-sky-500 to-emerald-400 hover:scale-[1.01]"
+	                            : "bg-black"
+	                    } ${loadingPlan === tier.name ? "opacity-70 cursor-not-allowed" : ""}`}
+	                  >
+                    {loadingPlan === tier.name ? "Redirecting..." : "Select Plan"}
+	                  </button>
                 </div>
               </div>
             );
