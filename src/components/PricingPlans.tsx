@@ -276,14 +276,17 @@ export default function PricingPlans() {
                   <th className="hidden px-5 py-4 text-left font-semibold text-slate-900 sm:table-cell">
                     Feature
                   </th>
-                  <th className="px-3 py-4 text-center text-xs sm:text-base font-bold tracking-normal text-slate-900 whitespace-nowrap">
-                    Starter Plan
+                  <th className="px-3 py-4 text-center text-[11px] sm:text-base font-bold tracking-normal text-slate-900">
+                    <span className="block sm:inline">Starter</span>{" "}
+                    <span className="block sm:inline">Plan</span>
                   </th>
-                  <th className="px-3 py-4 text-center text-xs sm:text-base font-bold tracking-normal text-slate-900 whitespace-nowrap">
-                    Essential Plus
+                  <th className="px-3 py-4 text-center text-[11px] sm:text-base font-bold tracking-normal text-slate-900">
+                    <span className="block sm:inline">Essential</span>{" "}
+                    <span className="block sm:inline">Plus</span>
                   </th>
-                  <th className="px-3 py-4 text-center text-xs sm:text-base font-bold tracking-normal text-slate-900 whitespace-nowrap">
-                    Signature Pro
+                  <th className="px-3 py-4 text-center text-[11px] sm:text-base font-bold tracking-normal text-slate-900">
+                    <span className="block sm:inline">Signature</span>{" "}
+                    <span className="block sm:inline">Pro</span>
                   </th>
                 </tr>
               </thead>
