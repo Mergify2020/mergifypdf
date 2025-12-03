@@ -1,14 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 export default function HeaderAuthButtons() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const isLoginPage = pathname === "/login";
   const isRegisterPage = pathname === "/register";
   const isHome = pathname === "/";
+  const isPricingPage = pathname === "/account" && searchParams.get("view") === "pricing";
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
@@ -32,13 +34,15 @@ export default function HeaderAuthButtons() {
 
   return (
     <div className="flex items-center gap-3">
-      {/* Pricing pill - always visible */}
-      <Link
-        href="/account?view=pricing"
-        className="inline-flex items-center rounded-full border-2 border-slate-300 bg-[#6A4EE8] px-7 py-2 text-xs font-semibold text-white shadow-md transition-all hover:-translate-y-0.5 hover:bg-[#5A3FD8] hover:shadow-lg"
-      >
-        Pricing
-      </Link>
+      {/* Pricing pill - hidden on pricing page */}
+      {!isPricingPage && (
+        <Link
+          href="/account?view=pricing"
+          className="inline-flex items-center rounded-full border-2 border-slate-300 bg-[#6A4EE8] px-7 py-2 text-xs font-semibold text-white shadow-md transition-all hover:-translate-y-0.5 hover:bg-[#5A3FD8] hover:shadow-lg"
+        >
+          Pricing
+        </Link>
+      )}
 
       {/* Desktop / tablet auth buttons */}
       <div className="hidden items-center gap-3 sm:flex">
