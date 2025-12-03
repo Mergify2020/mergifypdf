@@ -159,10 +159,10 @@ export default function PricingPlans() {
 
             const titleClass =
               tier.name === "Starter Plan"
-                ? "text-[1.6rem] md:text-[1.9rem] font-bold leading-snug text-slate-900"
+                ? "text-[2rem] md:text-[1.9rem] font-bold leading-snug text-slate-900"
                 : tier.name === "Essential Plus"
-                  ? "text-[1.7rem] md:text-[2.1rem] font-bold leading-snug bg-gradient-to-r from-sky-500 to-emerald-400 bg-clip-text text-transparent"
-                  : "text-[1.7rem] md:text-[2.1rem] font-bold leading-snug bg-gradient-to-r from-purple-500 to-sky-500 bg-clip-text text-transparent";
+                  ? "text-[2.2rem] md:text-[2.1rem] font-bold leading-snug bg-gradient-to-r from-sky-500 to-emerald-400 bg-clip-text text-transparent"
+                  : "text-[2.2rem] md:text-[2.1rem] font-bold leading-snug bg-gradient-to-r from-purple-500 to-sky-500 bg-clip-text text-transparent";
 
             return (
 	              <div
@@ -192,7 +192,7 @@ export default function PricingPlans() {
                         </h2>
 		                          <div className="mt-6">
 	                            <div className="flex items-baseline gap-2">
-	                              <p className="whitespace-nowrap text-2xl sm:text-3xl md:text-4xl font-semibold leading-tight text-slate-900">
+                              <p className="whitespace-nowrap text-[2.3rem] md:text-4xl font-semibold leading-tight text-slate-900">
 	                                {showAnnual ? yearlyPrice : tier.price}
 	                              </p>
 	                            </div>
