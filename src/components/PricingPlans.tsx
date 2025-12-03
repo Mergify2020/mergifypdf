@@ -270,21 +270,21 @@ export default function PricingPlans() {
         <div className="mt-16 frosted-card rounded-[40px] p-6 text-sm text-slate-900 lg:p-8">
           <p className="mb-6 text-center text-3xl font-semibold tracking-tight text-slate-900">Compare plans</p>
           <div className="overflow-hidden rounded-3xl bg-white/75 shadow-inner">
-            <table className="mx-auto w-full text-xs sm:text-sm text-slate-800">
+            <table className="mx-auto w-full table-fixed text-xs sm:text-sm text-slate-800">
               <thead className="bg-white text-[10px] sm:text-sm font-semibold uppercase tracking-[0.4em] text-slate-900 text-center sm:text-left">
                 <tr>
                   <th className="hidden px-5 py-4 text-left font-semibold text-slate-900 sm:table-cell">
                     Feature
                   </th>
-                  <th className="px-3 py-4 text-center text-[11px] sm:text-base font-bold tracking-normal text-slate-900">
+                  <th className="w-1/3 px-3 py-4 text-center text-[11px] sm:w-auto sm:text-base font-bold tracking-normal text-slate-900">
                     <span className="block sm:inline">Starter</span>{" "}
                     <span className="block sm:inline">Plan</span>
                   </th>
-                  <th className="px-3 py-4 text-center text-[11px] sm:text-base font-bold tracking-normal text-slate-900">
+                  <th className="w-1/3 px-3 py-4 text-center text-[11px] sm:w-auto sm:text-base font-bold tracking-normal text-slate-900">
                     <span className="block sm:inline">Essential</span>{" "}
                     <span className="block sm:inline">Plus</span>
                   </th>
-                  <th className="px-3 py-4 text-center text-[11px] sm:text-base font-bold tracking-normal text-slate-900">
+                  <th className="w-1/3 px-3 py-4 text-center text-[11px] sm:w-auto sm:text-base font-bold tracking-normal text-slate-900">
                     <span className="block sm:inline">Signature</span>{" "}
                     <span className="block sm:inline">Pro</span>
                   </th>
@@ -311,13 +311,13 @@ export default function PricingPlans() {
                       <td className="hidden px-5 py-5 text-xs sm:text-sm font-semibold text-slate-900 sm:table-cell">
                         {row.feature}
                       </td>
-                      <td className="px-3 py-5 text-center text-xs sm:text-sm font-semibold text-slate-900">
+                      <td className="w-1/3 px-3 py-5 text-center text-xs sm:w-auto sm:text-sm font-semibold text-slate-900">
                         {renderValue((row as any).basic)}
                       </td>
-                      <td className="px-3 py-5 text-center text-xs sm:text-sm font-semibold text-slate-900">
+                      <td className="w-1/3 px-3 py-5 text-center text-xs sm:w-auto sm:text-sm font-semibold text-slate-900">
                         {renderValue((row as any).pro)}
                       </td>
-                      <td className="px-3 py-5 text-center text-xs sm:text-sm font-semibold text-slate-900">
+                      <td className="w-1/3 px-3 py-5 text-center text-xs sm:w-auto sm:text-sm font-semibold text-slate-900">
                         {renderValue((row as any).business)}
                       </td>
                     </tr>
