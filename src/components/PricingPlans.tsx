@@ -304,9 +304,17 @@ export default function PricingPlans() {
                   { feature: "Templates & advanced workflows", basic: false, pro: false, business: true },
                 ].map((row) => (
                   <>
+                    <tr key={`${row.feature}-label`} className="sm:hidden">
+                      <td
+                        colSpan={4}
+                        className="px-3 pb-4 pt-1 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-500"
+                      >
+                        {row.feature}
+                      </td>
+                    </tr>
                     <tr
                       key={`${row.feature}-values`}
-                      className="text-center sm:text-left sm:border-b sm:border-slate-200 sm:last:border-0"
+                      className="text-center sm:text-left border-b border-slate-200 sm:last:border-0"
                     >
                       <td className="hidden px-5 py-5 text-xs sm:text-sm font-semibold text-slate-900 sm:table-cell">
                         {row.feature}
@@ -319,14 +327,6 @@ export default function PricingPlans() {
                       </td>
                       <td className="w-1/3 px-3 py-5 text-center text-xs sm:w-auto sm:text-sm font-semibold text-slate-900">
                         {renderValue((row as any).business)}
-                      </td>
-                    </tr>
-                    <tr key={`${row.feature}-label`} className="border-b border-slate-200 sm:hidden">
-                      <td
-                        colSpan={4}
-                        className="px-3 pb-4 pt-1 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-500"
-                      >
-                        {row.feature}
                       </td>
                     </tr>
                   </>
