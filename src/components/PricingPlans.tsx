@@ -18,8 +18,8 @@ const tiers = [
   },
   {
     name: "Essential Plus",
-    price: "$8.95",
-    originalPrice: "$11.99",
+    price: "$9.95/mo",
+    secondaryPrice: "$95/year — Save 20%",
     detail: "Per user / month",
     accent: "from-[#FFB480] to-[#FF8A4E]",
     overlay: "from-orange-300/30 to-transparent",
@@ -37,8 +37,8 @@ const tiers = [
   },
   {
     name: "Signature Pro",
-    price: "$15.95",
-    originalPrice: "$19.99",
+    price: "$14.95/mo",
+    secondaryPrice: "$149/year — Save 17%",
     detail: "Per user / month",
     accent: "from-[#A9C7FF] via-[#7BA8F4] to-[#4D74C8]",
     overlay: "from-sky-200/25 to-transparent",
@@ -91,10 +91,10 @@ const faqs = [
 
 export default function PricingPlans() {
   return (
-    <div className="pricing-gradient min-h-screen px-4 py-12 text-slate-100 lg:px-6">
+    <div className="pricing-gradient min-h-screen px-4 py-12 text-slate-900 lg:px-6">
       <div className="mx-auto w-full max-w-7xl space-y-10 px-4 lg:px-6">
         <div className="text-center">
-          <h1 className="text-4xl font-semibold tracking-tight text-white drop-shadow-[0_10px_35px_rgba(15,23,42,0.4)]">
+          <h1 className="text-4xl font-semibold tracking-tight text-slate-900 drop-shadow-[0_10px_35px_rgba(15,23,42,0.4)]">
             Choose the workspace built for your workflow.
           </h1>
         </div>
@@ -106,18 +106,14 @@ export default function PricingPlans() {
             return (
               <div
                 key={tier.name}
-                className={`relative flex h-full flex-col overflow-hidden rounded-[24px] px-6 py-4 transition-transform duration-150 backdrop-blur-2xl ${
-                  isPremium
-                    ? "border border-white/80 bg-white/30 ring-1 ring-purple-300/60"
-                    : "border border-white/70 bg-white/20"
+                className={`frosted-card flex h-full flex-col overflow-hidden rounded-[24px] px-6 py-4 transition-transform duration-150 ${
+                  isPremium ? "ring-1 ring-purple-200/60" : ""
                 }`}
               >
                 <div className="relative z-10 flex h-full flex-col">
                   <div
-                    className={`relative min-h-[180px] overflow-hidden rounded-[20px] px-5 py-3 backdrop-blur-xl ${
-                      isPremium
-                        ? "border border-white/80 bg-violet-100/70"
-                        : "border border-white/70 bg-violet-100/60"
+                    className={`frosted-card-inner relative min-h-[180px] overflow-hidden rounded-[20px] px-5 py-3 shadow-inner ${
+                      isPremium ? "ring-1 ring-white/40" : ""
                     }`}
                   >
                     <div className="relative z-10">
@@ -134,24 +130,12 @@ export default function PricingPlans() {
                           {tier.name}
                         </h2>
                         <div className="mt-6">
-                          {tier.originalPrice ? (
-                            <div className="mb-1 flex items-baseline gap-2 text-sm">
-                              <span className="text-base font-semibold text-red-500 line-through">
-                                {tier.originalPrice}
-                              </span>
-                              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
-                                Save 25%
-                              </span>
-                            </div>
-                          ) : null}
                           <div className="flex items-baseline gap-1">
                             <p className="text-4xl font-semibold text-slate-900">{tier.price}</p>
-                            {!isFree ? (
-                              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                / Month
-                              </span>
-                            ) : null}
                           </div>
+                          {tier.secondaryPrice ? (
+                            <p className="text-sm font-semibold text-slate-600">{tier.secondaryPrice}</p>
+                          ) : null}
                           {isFree ? (
                             <p className="mt-2 text-xs font-medium uppercase tracking-wide text-slate-500">
                               {tier.detail}
@@ -183,7 +167,7 @@ export default function PricingPlans() {
                               }`}
                             />
                           </span>
-                          <span className="font-semibold text-white">{feature}</span>
+                          <span className="font-semibold text-slate-900">{feature}</span>
                         </li>
                       );
                     })}
