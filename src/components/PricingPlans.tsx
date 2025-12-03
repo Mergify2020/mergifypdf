@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { useState } from "react";
 import { Check, X } from "lucide-react";
 
 const tiers = [
@@ -8,7 +9,7 @@ const tiers = [
     name: "Starter Plan",
     price: "$0",
     detail: "Current plan",
-    description: "For getting started with 1 free project per day.",
+    description: "",
     pricePanel: "bg-white/80",
     features: [
       "1 PDF upload per day",
@@ -19,14 +20,14 @@ const tiers = [
   },
   {
     name: "Essential Plus",
-    price: "$9.95/mo",
-    secondaryPrice: "$95/year — Save 20%",
+    price: "$9.95 / Month",
+    secondaryPrice: "$95 / Year — Save 20% Compared to Monthly",
     detail: "Per user / month",
     accent: "from-[#FFB480] to-[#FF8A4E]",
     overlay: "from-orange-300/30 to-transparent",
     button: "bg-[#FF8A4E]",
     pricePanel: "bg-white/80",
-    description: "For individuals, freelancers, students, and solos.",
+    description: "",
     features: [
       "Unlimited PDF uploads",
       "Unlimited edits + merges",
@@ -39,14 +40,14 @@ const tiers = [
   },
   {
     name: "Signature Pro",
-    price: "$14.95/mo",
-    secondaryPrice: "$149/year — Save 17%",
+    price: "$14.95 / Month",
+    secondaryPrice: "$149 / Year — Save 20% Compared to Monthly",
     detail: "Per user / month",
     accent: "from-[#A9C7FF] via-[#7BA8F4] to-[#4D74C8]",
     overlay: "from-sky-200/25 to-transparent",
     button: "bg-[#4D74C8]",
     badge: "MOST POPULAR",
-    description: "For professionals and small businesses who need clients to sign remotely.",
+    description: "",
     pricePanel: "bg-white/80",
     features: [
       "Everything in Basic",
@@ -93,6 +94,8 @@ const faqs = [
 ];
 
 export default function PricingPlans() {
+  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("monthly");
+
   return (
     <div className="pricing-gradient min-h-screen px-4 py-12 text-slate-900 lg:px-6">
       <div className="mx-auto w-full max-w-7xl space-y-10 px-4 lg:px-6">
@@ -100,12 +103,67 @@ export default function PricingPlans() {
           <h1 className="text-4xl font-semibold tracking-tight text-slate-900 drop-shadow-[0_10px_35px_rgba(15,23,42,0.4)]">
             Choose the workspace built for your workflow.
           </h1>
+          <div className="mt-8 flex justify-center">
+            <div className="inline-flex items-center rounded-full bg-white p-1.5 text-sm font-semibold shadow-sm">
+              <button
+                type="button"
+                onClick={() => setBillingPeriod("monthly")}
+                className={`min-w-[112px] rounded-full px-5 py-2 transition-colors ${
+                  billingPeriod === "monthly"
+                    ? "bg-black text-white shadow-sm"
+                    : "text-slate-900 hover:text-slate-700"
+                }`}
+              >
+                Monthly
+              </button>
+              <button
+                type="button"
+                onClick={() => setBillingPeriod("annual")}
+                className={`min-w-[140px] rounded-full px-5 py-2 transition-colors ${
+                  billingPeriod === "annual"
+                    ? "bg-black text-white shadow-sm"
+                    : "text-slate-900 hover:text-slate-700"
+                }`}
+              >
+                Annual ·{" "}
+                <span
+                  className={`font-semibold ${
+                    billingPeriod === "annual" ? "text-emerald-600" : "text-emerald-500"
+                  }`}
+                >
+                  SAVE 20%
+                </span>
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="mx-auto grid max-w-7xl gap-10 md:grid-cols-3">
           {tiers.map((tier) => {
             const isPremium = Boolean(tier.badge);
             const isFree = tier.name === "Starter Plan";
+            let yearlyPrice: string | null = null;
+            let savingsLabel: string | null = null;
+
+            if (tier.secondaryPrice) {
+              const [year, savings] = tier.secondaryPrice.split("—");
+              yearlyPrice = year?.trim() ?? null;
+              const rawSavings = savings?.trim() ?? null;
+              if (rawSavings) {
+                const [mainPart] = rawSavings.split("Compared");
+                savingsLabel = mainPart.trim().toUpperCase();
+              }
+            }
+
+            const showAnnual = !isFree && billingPeriod === "annual" && yearlyPrice;
+
+            const titleClass =
+              tier.name === "Starter Plan"
+                ? "text-[1.9rem] font-bold leading-snug text-slate-900"
+                : tier.name === "Essential Plus"
+                  ? "text-[2.1rem] font-bold leading-snug bg-gradient-to-r from-sky-500 to-emerald-400 bg-clip-text text-transparent"
+                  : "text-[2.1rem] font-bold leading-snug bg-gradient-to-r from-purple-500 to-sky-500 bg-clip-text text-transparent";
+
             return (
 	              <div
 	                key={tier.name}
@@ -115,7 +173,7 @@ export default function PricingPlans() {
 	              >
                 <div className="relative z-10 flex h-full flex-col">
 	                  <div
-	                    className={`relative min-h-[180px] overflow-hidden rounded-[20px] border border-white/50 bg-white/75 px-6 py-4 text-slate-900 shadow-[0_8px_24px_rgba(0,0,0,0.12)] backdrop-blur-md ${
+	                    className={`relative h-[220px] overflow-hidden rounded-[20px] border border-white/50 bg-white/75 px-6 py-4 text-slate-900 shadow-[0_8px_24px_rgba(0,0,0,0.12)] backdrop-blur-md ${
 	                      isPremium ? "ring-1 ring-white/60" : ""
 	                    }`}
 	                  >
@@ -128,25 +186,38 @@ export default function PricingPlans() {
                           </span>
                         ) : null}
                       </div>
-	                      <div className="pt-1">
-	                        <h2 className="text-[1.6rem] font-bold leading-snug text-slate-900">
+                      <div className="pt-1">
+                        <h2 className={titleClass}>
                           {tier.name}
                         </h2>
-                        <div className="mt-6">
-	                          <div className="flex items-baseline gap-1">
-	                            <p className="text-4xl font-semibold leading-tight text-slate-900">{tier.price}</p>
-	                          </div>
-	                          {tier.secondaryPrice ? (
-	                            <p className="text-sm font-semibold text-slate-700">{tier.secondaryPrice}</p>
-	                          ) : null}
+                          <div className="mt-6">
+                            <div className="flex items-baseline gap-2">
+                              <p className="text-4xl font-semibold leading-tight text-slate-900">
+                                {showAnnual ? yearlyPrice : tier.price}
+                              </p>
+                            </div>
+                            <div className="mt-1 flex h-5 items-center gap-2">
+                              {!isFree && billingPeriod === "annual" && savingsLabel ? (
+                                <>
+                                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-emerald-700">
+                                    {savingsLabel}
+                                  </span>
+                                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                    Compared to monthly
+                                  </span>
+                                </>
+                              ) : null}
+                            </div>
 	                          {isFree ? (
 	                            <p className="mt-2 text-xs font-medium uppercase tracking-wide text-slate-600">
 	                              {tier.detail}
 	                            </p>
 	                          ) : null}
-	                          <p className="mt-3 text-sm leading-snug text-slate-700">{tier.description}</p>
-                        </div>
-                      </div>
+	                          {tier.description ? (
+	                            <p className="mt-3 text-sm leading-snug text-slate-700">{tier.description}</p>
+	                          ) : null}
+	                        </div>
+	                      </div>
                     </div>
                   </div>
                   <ul className="mt-4 flex-1 space-y-3 text-sm text-slate-800">
@@ -175,17 +246,19 @@ export default function PricingPlans() {
                       );
                     })}
                   </ul>
-	                  <button
-	                    type="button"
-	                    disabled
-	                    className={`pointer-events-none mt-6 w-full rounded-full px-4 py-2.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-all duration-150 ${
-	                      isFree
-	                        ? "bg-emerald-500"
-	                        : isPremium || tier.name === "Essential Plus"
-	                          ? "bg-gradient-to-r from-indigo-600 to-purple-600 hover:scale-[1.01]"
-	                          : "bg-black"
-	                    }`}
-	                  >
+		                  <button
+		                    type="button"
+		                    disabled
+		                    className={`pointer-events-none mt-6 w-full rounded-full border-4 border-white/90 px-4 py-2.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-all duration-150 ${
+		                      isFree
+		                        ? "border-transparent bg-emerald-500"
+		                        : isPremium
+		                          ? "bg-gradient-to-r from-purple-500 to-sky-500 hover:scale-[1.01]"
+		                          : tier.name === "Essential Plus"
+		                            ? "bg-gradient-to-r from-sky-500 to-emerald-400 hover:scale-[1.01]"
+		                            : "bg-black"
+		                    }`}
+		                  >
                     {isFree ? "Current plan" : "Upgrade"}
                   </button>
                 </div>
@@ -194,7 +267,7 @@ export default function PricingPlans() {
           })}
         </div>
 
-        <div className="mt-10 frosted-card rounded-[40px] p-6 text-sm text-slate-900 lg:p-8">
+        <div className="mt-16 frosted-card rounded-[40px] p-6 text-sm text-slate-900 lg:p-8">
           <p className="mb-6 text-center text-3xl font-semibold tracking-tight text-slate-900">Compare plans</p>
           <div className="overflow-hidden rounded-3xl bg-white/75 shadow-inner">
             <table className="w-full text-sm text-slate-800">

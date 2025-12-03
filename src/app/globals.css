@@ -221,15 +221,13 @@ body {
 }
 
 .pricing-gradient {
-  background: radial-gradient(circle at top, #d3e8ff 0%, #c0dcff 30%, #a8ccff 60%, #8fb9ff 100%);
-  background-size: cover;
-  animation: none;
+  background-color: #e3edf9;
 }
 
 .frosted-card {
   position: relative;
   background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  border: 3px solid rgba(255, 255, 255, 0.55);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   backdrop-filter: blur(40px) saturate(140%);
   -webkit-backdrop-filter: blur(40px) saturate(140%);
