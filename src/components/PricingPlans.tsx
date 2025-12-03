@@ -190,12 +190,12 @@ export default function PricingPlans() {
                         <h2 className={titleClass}>
                           {tier.name}
                         </h2>
-                          <div className="mt-6">
-                            <div className="flex items-baseline gap-2">
-                              <p className="whitespace-nowrap text-2xl sm:text-3xl md:text-4xl font-semibold leading-tight text-slate-900">
-                                {showAnnual ? yearlyPrice : tier.price}
-                              </p>
-                            </div>
+		                          <div className="mt-6">
+	                            <div className="flex items-baseline gap-2">
+	                              <p className="whitespace-nowrap text-2xl sm:text-3xl md:text-4xl font-semibold leading-tight text-slate-900">
+	                                {showAnnual ? yearlyPrice : tier.price}
+	                              </p>
+	                            </div>
                             <div className="mt-1 flex h-5 items-center gap-2">
                               {!isFree && billingPeriod === "annual" && savingsLabel ? (
                                 <>
