@@ -270,19 +270,19 @@ export default function PricingPlans() {
         <div className="mt-16 frosted-card rounded-[40px] p-6 text-sm text-slate-900 lg:p-8">
           <p className="mb-6 text-center text-3xl font-semibold tracking-tight text-slate-900">Compare plans</p>
           <div className="overflow-hidden rounded-3xl bg-white/75 shadow-inner">
-            <table className="w-full text-sm text-slate-800">
-              <thead className="bg-white text-sm font-semibold uppercase tracking-[0.4em] text-slate-900">
+            <table className="w-full text-xs sm:text-sm text-slate-800">
+              <thead className="bg-white text-[10px] sm:text-sm font-semibold uppercase tracking-[0.4em] text-slate-900">
                 <tr>
                   <th className="hidden px-5 py-4 text-left font-semibold text-slate-900 sm:table-cell">
                     Feature
                   </th>
-                  <th className="px-5 py-4 text-center text-base font-bold tracking-normal text-slate-900">
+                  <th className="px-3 py-4 text-center text-xs sm:text-base font-bold tracking-normal text-slate-900 whitespace-nowrap">
                     Starter Plan
                   </th>
-                  <th className="px-5 py-4 text-center text-base font-bold tracking-normal text-slate-900">
+                  <th className="px-3 py-4 text-center text-xs sm:text-base font-bold tracking-normal text-slate-900 whitespace-nowrap">
                     Essential Plus
                   </th>
-                  <th className="px-5 py-4 text-center text-base font-bold tracking-normal text-slate-900">
+                  <th className="px-3 py-4 text-center text-xs sm:text-base font-bold tracking-normal text-slate-900 whitespace-nowrap">
                     Signature Pro
                   </th>
                 </tr>
@@ -305,23 +305,23 @@ export default function PricingPlans() {
                       key={`${row.feature}-values`}
                       className="sm:border-b sm:border-slate-200 sm:last:border-0"
                     >
-                      <td className="hidden px-5 py-5 font-semibold text-slate-900 sm:table-cell">
+                      <td className="hidden px-5 py-5 text-xs sm:text-sm font-semibold text-slate-900 sm:table-cell">
                         {row.feature}
                       </td>
-                      <td className="px-5 py-5 text-center font-semibold text-slate-900">
+                      <td className="px-3 py-5 text-center text-xs sm:text-sm font-semibold text-slate-900">
                         {renderValue((row as any).basic)}
                       </td>
-                      <td className="px-5 py-5 text-center font-semibold text-slate-900">
+                      <td className="px-3 py-5 text-center text-xs sm:text-sm font-semibold text-slate-900">
                         {renderValue((row as any).pro)}
                       </td>
-                      <td className="px-5 py-5 text-center font-semibold text-slate-900">
+                      <td className="px-3 py-5 text-center text-xs sm:text-sm font-semibold text-slate-900">
                         {renderValue((row as any).business)}
                       </td>
                     </tr>
                     <tr key={`${row.feature}-label`} className="border-b border-slate-200 sm:hidden">
                       <td
                         colSpan={4}
-                        className="px-5 pb-4 pt-1 text-center text-xs font-semibold uppercase tracking-wide text-slate-500"
+                        className="px-5 pb-4 pt-1 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-500"
                       >
                         {row.feature}
                       </td>
