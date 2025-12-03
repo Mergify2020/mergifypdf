@@ -292,16 +292,15 @@ export default function PricingPlans() {
               </thead>
               <tbody className="text-slate-700">
                 {[
-                  { feature: "Unlimited PDF uploads", basic: true, pro: true, business: true },
-                  { feature: "PDF editing (merge, split, reorder)", basic: true, pro: true, business: true },
+                  { feature: "Daily uploads", basic: "1/day", pro: "Unlimited", business: "Unlimited" },
+                  { feature: "Project storage", basic: "Up to 5 docs", pro: "Unlimited", business: "Unlimited" },
+                  { feature: "PDF Editing", basic: true, pro: true, business: true },
                   { feature: "Self-sign documents", basic: true, pro: true, business: true },
-                  { feature: "Send documents for signature", basic: false, pro: true, business: true },
-                  { feature: "Monthly remote signature limit", basic: "—", pro: "10 per month", business: "Unlimited" },
-                  { feature: "Signature tracking (opened / viewed / signed)", basic: false, pro: true, business: true },
-                  { feature: "Audit log (activity history)", basic: false, pro: true, business: true },
-                  { feature: "Branded emails", basic: false, pro: true, business: "✔ (custom branding)" },
-                  { feature: "Add teammates / team workspace", basic: false, pro: false, business: true },
-                  { feature: "Templates & advanced workflows", basic: false, pro: false, business: true },
+                  { feature: "Templates", basic: false, pro: true, business: true },
+                  { feature: "AI PDF Tools", basic: false, pro: true, business: true },
+                  { feature: "Access to Mergify Sign", basic: false, pro: false, business: true },
+                  { feature: "Outgoing signature requests", basic: false, pro: false, business: "10/month" },
+                  { feature: "Signature tracking", basic: false, pro: false, business: true },
                 ].map((row) => (
                   <>
                     <tr key={`${row.feature}-label`} className="sm:hidden">
