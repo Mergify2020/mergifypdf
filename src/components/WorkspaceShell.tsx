@@ -105,6 +105,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [compactSidebar, setCompactSidebar] = useState(false);
+  const [narrowSidebar, setNarrowSidebar] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const createRef = useRef<HTMLDivElement>(null);
   const avatarKey = session?.user?.email ?? session?.user?.id ?? null;
@@ -185,6 +186,21 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
     };
   }, []);
 
+  useEffect(() => {
+    const updateWidth = () => {
+      if (typeof window === "undefined") return;
+      setNarrowSidebar(window.innerWidth < 1280);
+    };
+
+    updateWidth();
+    window.addEventListener("resize", updateWidth);
+    return () => {
+      window.removeEventListener("resize", updateWidth);
+    };
+  }, []);
+
+  const sidebarCompact = compactSidebar || narrowSidebar;
+
   const renderItems = (
     items: SidebarItem[],
     {
@@ -200,23 +216,23 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
           ? pathname === "/"
           : pathname?.startsWith(href) || false);
       const iconWrapperBase = isExpanded
-        ? `flex ${compactSidebar ? "h-10 w-10" : "h-11 w-11"} items-center justify-center rounded-2xl transition`
-        : `flex ${compactSidebar ? "h-12" : "h-14"} w-full items-center justify-center rounded-2xl transition`;
+        ? `flex ${sidebarCompact ? "h-9 w-9 lg:h-11 lg:w-11" : "h-11 w-11"} items-center justify-center rounded-2xl transition`
+        : `flex ${sidebarCompact ? "h-11" : "h-13"} w-full items-center justify-center rounded-2xl transition`;
       const iconWrapperState = isActive
         ? "bg-sky-100 text-sky-600 shadow-inner"
         : "bg-transparent text-slate-500 group-hover:bg-slate-100/80";
       const iconWrapperClasses = `${iconWrapperBase} ${iconWrapperState}`;
       const iconSizeClasses = isExpanded
-        ? compactSidebar
-          ? "h-4 w-4"
-          : "h-5 w-5"
-        : compactSidebar
-          ? "h-5 w-5"
-          : "h-7 w-7";
-      const expandedLayoutClasses = compactSidebar
-        ? "items-center justify-start gap-2 px-3 py-1.5 text-left"
+        ? sidebarCompact
+          ? "h-6 w-6 lg:h-6.5 lg:w-6.5"
+          : "h-6.5 w-6.5"
+        : sidebarCompact
+          ? "h-6 w-6"
+          : "h-9 w-9";
+      const expandedLayoutClasses = sidebarCompact
+        ? "items-center justify-start gap-3 px-3 py-2 text-left text-[13px] lg:text-base"
         : "items-center justify-start gap-3 px-3 py-2 text-left";
-      const collapsedLayoutClasses = compactSidebar
+      const collapsedLayoutClasses = sidebarCompact
         ? "flex-col items-stretch justify-center gap-1.5 px-1 py-2.5 text-center"
         : "flex-col items-stretch justify-center gap-2 px-1 py-3 text-center";
 
@@ -240,12 +256,12 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
           } ${isExpanded ? expandedLayoutClasses : collapsedLayoutClasses}`}
         >
           <span className={iconWrapperClasses}>
-            <Icon className={`${iconSizeClasses} shrink-0`} aria-hidden />
+            <Icon className={`${iconSizeClasses} shrink-0 stroke-[1.5]`} aria-hidden />
           </span>
           {isExpanded ? (
             <span
               className={`inline-flex flex-1 overflow-hidden whitespace-nowrap text-sm transition-all duration-200 ease-in-out ${
-                isExpanded ? (compactSidebar ? "ml-1.5" : "ml-2") : "ml-0"
+                isExpanded ? (sidebarCompact ? "ml-1.5 lg:ml-2" : "ml-2") : "ml-0"
               } ${labelClassName ?? ""}`}
             >
               {label}
@@ -268,7 +284,11 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
       {/* Desktop sidebar */}
       <aside className="hidden md:flex fixed left-0 top-0 z-30 h-screen text-slate-800">
         <div className="relative flex h-full w-full">
-          <div className="flex h-full w-24 flex-col border-r border-white/40 bg-white/80 backdrop-blur-xl shadow-[0_25px_80px_rgba(15,23,42,0.25)]">
+          <div
+            className={`flex h-full ${sidebarCompact ? "w-20" : "w-24"} flex-col border-r border-white/40 bg-white/80 backdrop-blur-xl shadow-[0_25px_80px_rgba(15,23,42,0.25)] ${
+              sidebarCompact ? "z-10" : "z-20"
+            }`}
+          >
             <div className="flex flex-1 flex-col gap-4 overflow-y-auto overflow-x-hidden px-3 py-5">
               <div className="flex items-center justify-center">
               <button
@@ -285,10 +305,14 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
               <button
                 type="button"
                 onClick={() => setCreateOpen((prev) => !prev)}
-                className="flex w-full flex-col items-center gap-2 rounded-2xl bg-[#2f8df0] px-3 py-2.5 text-center text-sm font-semibold text-white shadow-lg transition hover:bg-[#2573c7]"
+                className={`flex w-full flex-col items-center gap-2 rounded-2xl bg-[#2f8df0] ${
+                  sidebarCompact ? "px-2.5 py-2" : "px-3 py-2.5"
+                } text-center text-sm font-semibold text-white shadow-lg transition hover:bg-[#2573c7]`}
               >
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white">
-                  <Plus className="h-5 w-5 stroke-[3]" />
+                <span
+                  className={`flex ${sidebarCompact ? "h-7 w-7 lg:h-8 lg:w-8" : "h-8 w-8"} items-center justify-center rounded-full bg-white/20 text-white`}
+                >
+                  <Plus className={`${sidebarCompact ? "h-4.5 w-4.5 lg:h-5 lg:w-5" : "h-5 w-5"} stroke-[3]`} />
                 </span>
                 <span className="text-[10px] font-bold uppercase text-white">Create</span>
               </button>
@@ -344,7 +368,11 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
               className="flex w-full items-center justify-center rounded-2xl px-3 py-2 transition hover:bg-white/70"
             >
               <span
-                className={`relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-[5px] ${
+                className={`relative flex ${
+                  sidebarCompact ? "h-13 w-13" : "h-16 w-16"
+                } shrink-0 items-center justify-center rounded-full ${
+                  sidebarCompact ? "border-[5px]" : "border-[6px]"
+                } ${
                   profileOpen ? "border-sky-300" : "border-transparent"
                 }`}
               >
@@ -353,11 +381,11 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                   <img
                     src={avatar}
                     alt="Your avatar"
-                    className="h-10 w-10 shrink-0 rounded-full object-cover"
+                    className={`${sidebarCompact ? "h-10 w-10" : "h-12 w-12"} shrink-0 rounded-full object-cover`}
                   />
                 ) : (
                   <span
-                    className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold uppercase text-white"
+                    className={`flex ${sidebarCompact ? "h-10 w-10 text-sm" : "h-12 w-12 text-base"} items-center justify-center rounded-full font-semibold uppercase text-white`}
                     style={{ backgroundColor: fallbackAvatar.color }}
                   >
                     {fallbackAvatar.initials}
@@ -458,9 +486,9 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
             </div>
           </div>
           <div
-            className={`pointer-events-none absolute left-[96px] top-0 hidden h-full w-[320px] bg-white/95 px-6 py-8 text-slate-800 shadow-[0_35px_90px_rgba(15,23,42,0.3)] transition-all duration-300 ${
-              expanded ? "translate-x-0 opacity-100 pointer-events-auto md:translate-x-0" : "-translate-x-4 opacity-0"
-            } md:flex`}
+            className={`pointer-events-none absolute ${sidebarCompact ? "left-[80px]" : "left-[96px]"} top-0 hidden h-full bg-white/95 px-4 py-6 text-slate-800 shadow-[0_35px_90px_rgba(15,23,42,0.3)] transition-all duration-300 ${
+              expanded ? "translate-x-0 opacity-100 pointer-events-auto" : "-translate-x-4 opacity-0"
+            } md:flex ${sidebarCompact ? "w-[240px]" : "w-[320px]"} z-0`}
           >
             <div className="flex w-full flex-col gap-6">
               <AppHeaderBrand />
