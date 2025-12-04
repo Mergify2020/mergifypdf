@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { CreditCard, LogOut, User } from "lucide-react";
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
+import { getAvatarFallback } from "@/lib/avatarFallback";
 
 export default function SettingsMenu() {
   const router = useRouter();
@@ -14,6 +15,10 @@ export default function SettingsMenu() {
   const [busy, setBusy] = useState(false);
   const avatarKey = session?.user?.email ?? session?.user?.id ?? null;
   const { avatar } = useAvatarPreference(avatarKey);
+  const fallback = getAvatarFallback(
+    avatarKey,
+    session?.user?.name ?? session?.user?.email ?? "User"
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -75,11 +80,17 @@ export default function SettingsMenu() {
         aria-expanded={open}
       >
         <span className="sr-only">Open profile menu</span>
-        <img
-          src={avatar || "/Defaultpfp.svg"}
-          alt="Your avatar"
-          className="h-9 w-9 rounded-full object-cover"
-        />
+        {avatar ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={avatar} alt="Your avatar" className="h-9 w-9 rounded-full object-cover" />
+        ) : (
+          <span
+            className="flex h-9 w-9 items-center justify-center rounded-full text-xs font-semibold uppercase text-white"
+            style={{ backgroundColor: fallback.color }}
+          >
+            {fallback.initials}
+          </span>
+        )}
       </button>
 
       <div
@@ -92,7 +103,17 @@ export default function SettingsMenu() {
       >
         <div className="space-y-4 text-sm text-slate-700">
             <div className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3">
-              <img src={avatar || "/Defaultpfp.svg"} alt="Your avatar" className="h-12 w-12 rounded-full object-cover" />
+              {avatar ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={avatar} alt="Your avatar" className="h-12 w-12 rounded-full object-cover" />
+              ) : (
+                <span
+                  className="flex h-12 w-12 items-center justify-center rounded-full text-base font-semibold uppercase text-white"
+                  style={{ backgroundColor: fallback.color }}
+                >
+                  {fallback.initials}
+                </span>
+              )}
               <div>
                 <p className="text-sm font-semibold text-slate-900">
                   {session?.user?.name ?? "Mergify user"}

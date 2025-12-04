@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { useEffect, useRef, useState } from "react";
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
+import { getAvatarFallback } from "@/lib/avatarFallback";
 import PricingPlans from "@/components/PricingPlans";
 
 const PREVIEW_STAGE_SIZE = 256; // matches Tailwind h-64
@@ -118,6 +119,10 @@ function AccountSettingsPage() {
   const [passwordBusy, setPasswordBusy] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
   const avatarKey = session?.user?.email ?? session?.user?.id ?? null;
+  const fallbackAvatar = getAvatarFallback(
+    avatarKey,
+    displayName || session?.user?.email || "User"
+  );
   const { avatar, setAvatar, clearAvatar } = useAvatarPreference(avatarKey);
   const [avatarMessage, setAvatarMessage] = useState<string | null>(null);
   const [avatarBusy, setAvatarBusy] = useState(false);
@@ -656,8 +661,12 @@ function AccountSettingsPage() {
               // eslint-disable-next-line @next/next/no-img-element
               <img src={avatar} alt="Profile preview" className="h-16 w-16 rounded-full object-cover" />
             ) : (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src="/Defaultpfp.svg" alt="Default avatar" className="h-16 w-16 rounded-full" />
+              <span
+                className="flex h-16 w-16 items-center justify-center rounded-full text-lg font-semibold uppercase text-white"
+                style={{ backgroundColor: fallbackAvatar.color }}
+              >
+                {fallbackAvatar.initials}
+              </span>
             )}
             <div>
               <p className="text-sm font-semibold text-gray-800">Profile photo</p>

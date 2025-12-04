@@ -1,7 +1,8 @@
 import Image from "next/image";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
-import { LayoutDashboard, FileText, Sparkles } from "lucide-react";
+import { LayoutDashboard, ArrowUpRight, Sparkles } from "lucide-react";
 import { authOptions } from "@/lib/authOptions";
 import UploadCta from "@/components/UploadCta";
 import HeroStats from "@/components/HeroStats";
@@ -11,32 +12,8 @@ import LogoCarousel from "@/components/LogoCarousel";
 import { hasUsedToday } from "@/lib/quota";
 import ProjectsWorkspaceShelf from "@/components/ProjectsWorkspaceShelf";
 import StartProjectButton from "@/components/StartProjectButton";
-import ProjectsList from "@/components/ProjectsList";
-import MergifySignCard from "@/components/MergifySignCard";
-
-const curatedProjects = [
-  {
-    id: "client-audit",
-    title: "Client Audit Packet",
-    subtitle: "Golden Rain Masonry • 36 pages",
-    status: "In review",
-    updated: "Today • 9:24 AM",
-  },
-  {
-    id: "vendor-lux",
-    title: "Vendor Renewal Agreement",
-    subtitle: "Pinnacol Assurance • 12 pages",
-    status: "Awaiting signature",
-    updated: "Yesterday • 4:08 PM",
-  },
-  {
-    id: "compliance-deck",
-    title: "Compliance Addendum",
-    subtitle: "MergifyPDF Studio • 8 pages",
-    status: "Draft",
-    updated: "Tuesday • 10:41 AM",
-  },
-];
+import DashboardInsightsColumn from "@/components/DashboardInsightsColumn";
+import { getAvatarFallback } from "@/lib/avatarFallback";
 
 function Sparkle({ className, gradientId }: { className?: string; gradientId: string }) {
   return (
@@ -172,16 +149,16 @@ function ProjectsDashboard({
   avatarUrl?: string | null;
 }) {
   const shortName = displayName.split(" ")[0] ?? "Guest";
-  const initial = shortName.charAt(0).toUpperCase();
+  const fallbackAvatar = getAvatarFallback(avatarUrl ?? displayName, displayName);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#F8FAFF] via-white to-white text-slate-900">
+    <div className="min-h-screen bg-gradient-to-b from-[#F5F7FB] via-[#F3F3F7] to-[#ECEEF3] text-slate-900">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-7 px-4 py-8 lg:px-6">
         {/* Welcome hero */}
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:shadow-lg sm:p-7">
           <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-4">
-              <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-slate-100 text-sm font-semibold text-slate-700">
+              <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full text-sm font-semibold text-white">
                 {avatarUrl ? (
                   <Image
                     src={avatarUrl}
@@ -191,7 +168,12 @@ function ProjectsDashboard({
                     className="h-full w-full rounded-full object-cover"
                   />
                 ) : (
-                  <span>{initial}</span>
+                  <span
+                    className="flex h-full w-full items-center justify-center"
+                    style={{ backgroundColor: fallbackAvatar.color }}
+                  >
+                    {fallbackAvatar.initials}
+                  </span>
                 )}
               </div>
               <div className="space-y-1">
@@ -210,77 +192,90 @@ function ProjectsDashboard({
           </header>
         </section>
 
-        {/* Main content: left = work, right = tools */}
-        <section className="grid gap-y-6 lg:grid-cols-[minmax(0,2.15fr)_minmax(0,1.5fr)] lg:gap-x-10">
-          {/* Left column: primary work area */}
+        <section className="grid gap-y-6 lg:grid-cols-[minmax(0,2.05fr)_minmax(0,1.3fr)] lg:gap-x-10">
           <div className="space-y-6">
-            <ProjectsWorkspaceShelf />
-            <ProjectsList initialProjects={curatedProjects} />
-          </div>
-
-          {/* Right column: tools & upcoming features */}
-          <div className="space-y-5">
-            <div className="rounded-2xl border border-[#E4D9FF] bg-white p-5 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:shadow-lg sm:p-6">
-              <MergifySignCard />
-            </div>
-
-            {/* Document templates */}
-            <div className="rounded-2xl border border-[#E7F1FF] bg-white p-5 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:shadow-lg sm:p-6">
-              <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                <FileText className="h-3.5 w-3.5" />
-                Document templates
-              </p>
-              <h2 className="mt-1 text-base font-semibold text-slate-900 sm:text-lg">
-                Reuse-ready documents for your workflows
+            <div className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm sm:p-7">
+              <p className="text-sm font-semibold text-slate-500">Get started</p>
+              <h2 className="mt-2 text-[28px] font-semibold text-slate-900 sm:text-[32px]">
+                What do you want to do today?
               </h2>
-              <p className="mt-2 text-sm text-slate-600">
-                W-9 forms, contracts, invoices, NDAs, and more. Save your most used document
-                structures and start from a polished base instead of a blank page.
+              <p className="mt-1 text-sm text-slate-500">
+                Upload a PDF, continue editing, or send documents out for signature.
               </p>
-              <button
-                type="button"
-                className="mt-4 inline-flex items-center text-sm font-semibold text-[#024d7c] hover:text-[#013a60]"
-              >
-                Browse Templates
-                <span className="ml-1">→</span>
-              </button>
+              <div className="mt-5 flex flex-wrap gap-3">
+                <Link
+                  href="/studio"
+                  className="inline-flex flex-1 min-w-[200px] items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 px-5 py-3 text-base font-semibold text-white shadow-lg transition hover:shadow-xl"
+                >
+                  Start a New Project
+                  <ArrowUpRight className="h-4 w-4" />
+                </Link>
+                <Link
+                  href="/signature-center"
+                  className="inline-flex flex-1 min-w-[200px] items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-base font-semibold text-slate-900 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300"
+                >
+                  Send a Signature Request
+                  <ArrowUpRight className="h-4 w-4" />
+                </Link>
+              </div>
             </div>
 
-            {/* AI tools (coming soon) */}
-            <div className="rounded-[20px] bg-gradient-to-br from-blue-100/40 via-purple-100/40 to-pink-100/40 p-[1px] shadow-md transition-all duration-150 hover:-translate-y-0.5 hover:shadow-lg">
-              <div className="rounded-[18px] bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-5 sm:p-6">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                      <Sparkles className="h-3.5 w-3.5" />
-                      AI tools (coming soon)
-                    </p>
-                    <h2 className="mt-2 text-lg font-semibold leading-snug text-slate-900">
-                      Let AI handle the busywork
-                    </h2>
-                  </div>
-                  <span className="mt-1 inline-flex items-center rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-medium text-sky-700">
-                    Preview
-                  </span>
+            <ProjectsWorkspaceShelf />
+
+            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Quick links
+                  </p>
+                  <h3 className="mt-2 text-xl font-semibold text-slate-900">Jump back in</h3>
                 </div>
-                <p className="mt-2 text-sm text-slate-700">
-                  We&apos;re building helpers that understand your PDFs so you can stay focused on the
-                  work that matters.
-                </p>
-                <ul className="mt-3 space-y-1.5 text-sm text-slate-800">
-                  <li>• Summarize PDFs</li>
-                  <li>• Rewrite or simplify text</li>
-                  <li>• Smart form detection</li>
-                </ul>
-                <p className="mt-4 text-xs text-slate-600">
-                  Watch this space — new AI features will roll out directly into your workspace.
-                </p>
+                <Link
+                  href="/projects"
+                  className="text-sm font-semibold text-sky-600 transition hover:text-sky-500"
+                >
+                  View all →
+                </Link>
+              </div>
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {[
+                  {
+                    title: "Your Projects",
+                    description: "Manage documents, uploads, and drafts.",
+                    href: "/projects",
+                  },
+                  {
+                    title: "Signature Dashboard",
+                    description: "Track requests, reminders, and completions.",
+                    href: "/signature-center",
+                  },
+                  {
+                    title: "Templates",
+                    description: "Reuse contracts, NDAs, and forms quickly.",
+                    href: "/signature-center",
+                  },
+                ].map((link) => (
+                  <Link
+                    key={link.title}
+                    href={link.href}
+                    className="group rounded-2xl border border-slate-200 bg-slate-50/70 p-4 transition hover:-translate-y-0.5 hover:bg-white hover:shadow-lg"
+                  >
+                    <p className="text-base font-semibold text-slate-900">{link.title}</p>
+                    <p className="mt-1 text-sm text-slate-600">{link.description}</p>
+                    <span className="mt-3 inline-flex items-center text-sm font-semibold text-sky-600">
+                      Open
+                      <ArrowUpRight className="ml-1 h-4 w-4 transition group-hover:translate-x-0.5" />
+                    </span>
+                  </Link>
+                ))}
               </div>
             </div>
           </div>
+
+          <DashboardInsightsColumn />
         </section>
 
-        <section className="pb-10" />
+        <section className="pb-8" />
       </div>
     </div>
   );
