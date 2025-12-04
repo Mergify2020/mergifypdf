@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
   BookOpen,
@@ -10,12 +10,12 @@ import {
   FileSignature,
   FileText,
   FolderKanban,
-  HelpCircle,
   Home,
   LogOut,
   Menu,
   PenSquare,
   Plus,
+  Settings,
   Trash2,
   User,
   type LucideIcon,
@@ -37,9 +37,9 @@ const navigationItems: SidebarItem[] = [
   { label: "Home", icon: Home, href: "/" },
   { label: "Projects", icon: FolderKanban, href: "/projects" },
   { label: "Signatures", icon: PenSquare, href: "/signature-center" },
-  { label: "Templates", icon: FileText, href: "/signature-center" },
-  { label: "Tutorials", icon: BookOpen, href: "/tutorials" },
-  { label: "Trash", icon: Trash2, href: "/projects?view=trash" },
+  { label: "Templates", icon: FileText, href: "/signature-center", disabled: true },
+  { label: "Tutorials", icon: BookOpen, href: "/tutorials", disabled: true },
+  { label: "Trash", icon: Trash2, href: "/projects?view=trash", disabled: true },
 ];
 
 const otherItems: SidebarItem[] = [];
@@ -51,10 +51,12 @@ interface WorkspaceShellProps {
 export default function WorkspaceShell({ children }: WorkspaceShellProps) {
   const router = useRouter();
   const { data: session } = useSession();
+  const pathname = usePathname();
   const [expanded, setExpanded] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [compactSidebar, setCompactSidebar] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const createRef = useRef<HTMLDivElement>(null);
   const avatarKey = session?.user?.email ?? session?.user?.id ?? null;
@@ -118,63 +120,118 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
     };
   }, [createOpen]);
 
+  useEffect(() => {
+    const updateCompact = () => {
+      if (typeof window === "undefined") return;
+      setCompactSidebar(window.innerHeight < 900);
+    };
+
+    updateCompact();
+    window.addEventListener("resize", updateCompact);
+    return () => {
+      window.removeEventListener("resize", updateCompact);
+    };
+  }, []);
+
   const renderItems = (
     items: SidebarItem[],
     {
       labelClassName,
     }: { labelClassName?: string } = {},
   ) =>
-    items.map(({ label, icon: Icon, href, disabled }) => (
-      <button
-        key={label}
-        type="button"
-        onClick={() => {
-          if (disabled) return;
-          router.push(href);
-          setMobileOpen(false);
-        }}
-        aria-label={label}
-        disabled={disabled}
-        className={`group flex w-full items-center gap-3 overflow-hidden rounded-xl px-3 py-2 text-left text-sm font-semibold transition ${
-          disabled ? "text-slate-400" : "text-slate-800 hover:bg-slate-100"
-        } ${expanded ? "justify-start" : "flex-col justify-center px-1 py-3 gap-1 text-center"}`}
-      >
-        <Icon className="h-6 w-6 shrink-0 text-slate-600" aria-hidden />
-        {expanded ? (
-          <span
-            className={`inline-flex flex-1 overflow-hidden whitespace-nowrap text-sm transition-all duration-200 ease-in-out ${
-              expanded ? "ml-2" : "ml-0"
-            } ${labelClassName ?? ""}`}
-          >
-            {label}
+    items.map(({ label, icon: Icon, href, disabled }) => {
+      const isActive =
+        !disabled &&
+        (href === "/"
+          ? pathname === "/"
+          : pathname?.startsWith(href) || false);
+      const iconWrapperBase = expanded
+        ? `flex ${compactSidebar ? "h-10 w-10" : "h-11 w-11"} items-center justify-center rounded-2xl transition`
+        : `flex ${compactSidebar ? "h-12" : "h-14"} w-full items-center justify-center rounded-2xl transition`;
+      const iconWrapperState = isActive
+        ? "bg-sky-100 text-sky-600 shadow-inner"
+        : "bg-transparent text-slate-500 group-hover:bg-slate-100/80";
+      const iconWrapperClasses = `${iconWrapperBase} ${iconWrapperState}`;
+      const iconSizeClasses = expanded
+        ? compactSidebar
+          ? "h-4 w-4"
+          : "h-5 w-5"
+        : compactSidebar
+          ? "h-5 w-5"
+          : "h-7 w-7";
+      const expandedLayoutClasses = compactSidebar
+        ? "items-center justify-start gap-2 px-3 py-1.5 text-left"
+        : "items-center justify-start gap-3 px-3 py-2 text-left";
+      const collapsedLayoutClasses = compactSidebar
+        ? "flex-col items-stretch justify-center gap-1.5 px-1 py-2.5 text-center"
+        : "flex-col items-stretch justify-center gap-2 px-1 py-3 text-center";
+
+      return (
+        <button
+          key={label}
+          type="button"
+          onClick={() => {
+            if (disabled) return;
+            router.push(href);
+            setMobileOpen(false);
+          }}
+          aria-label={label}
+          disabled={disabled}
+          className={`group flex w-full overflow-hidden rounded-xl text-sm font-semibold transition ${
+            disabled
+              ? "cursor-not-allowed text-slate-400"
+              : isActive
+                ? "text-sky-900"
+                : "text-slate-800"
+          } ${expanded ? expandedLayoutClasses : collapsedLayoutClasses}`}
+        >
+          <span className={iconWrapperClasses}>
+            <Icon className={`${iconSizeClasses} shrink-0`} aria-hidden />
           </span>
-        ) : (
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-            {label}
-          </span>
-        )}
-      </button>
-    ));
+          {expanded ? (
+            <span
+              className={`inline-flex flex-1 overflow-hidden whitespace-nowrap text-sm transition-all duration-200 ease-in-out ${
+                expanded ? (compactSidebar ? "ml-1.5" : "ml-2") : "ml-0"
+              } ${labelClassName ?? ""}`}
+            >
+              {label}
+            </span>
+          ) : (
+            <span
+              className={`text-[10px] font-semibold uppercase tracking-wide ${
+                isActive ? "text-sky-700" : "text-slate-500"
+              }`}
+            >
+              {label}
+            </span>
+          )}
+        </button>
+      );
+    });
 
   return (
     <div className="flex min-h-screen bg-white">
       {/* Desktop sidebar */}
       <aside
-        className={`hidden md:flex fixed left-0 top-0 z-30 h-screen flex-col border-r border-white/40 bg-white/80 text-slate-800 shadow-[0_25px_80px_rgba(15,23,42,0.25)] backdrop-blur-xl rounded-none overflow-hidden transition-all duration-300 ease-in-out ${
+        className={`hidden md:flex fixed left-0 top-0 z-30 h-screen flex-col border-r border-white/40 bg-white/80 text-slate-800 shadow-[0_25px_80px_rgba(15,23,42,0.25)] backdrop-blur-xl rounded-none overflow-visible transition-all duration-300 ease-in-out ${
           expanded ? "w-64" : "w-24"
         }`}
       >
-        <div className="flex flex-1 flex-col gap-4 overflow-hidden px-3 py-6">
+        <div
+          className={`flex flex-1 flex-col ${compactSidebar ? "gap-2.5" : "gap-3"} overflow-y-auto overflow-x-hidden px-3 ${
+            compactSidebar ? "py-2" : "py-3"
+          }`}
+        >
           <div
-            className={`px-2 ${expanded ? "flex items-center justify-between gap-4" : "flex flex-col items-center gap-3"}`}
+            className={`sticky top-2 z-10 px-2 ${
+              expanded ? "flex items-center justify-between gap-4" : "flex flex-col items-center gap-3"
+            }`}
           >
-            <div
-              className={`transition-all duration-300 ${
-                expanded ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-2 pointer-events-none"
-              }`}
-            >
-              <AppHeaderBrand />
-            </div>
+            {expanded ? (
+              <div className="transition-all duration-300 opacity-100 translate-x-0">
+                <AppHeaderBrand />
+              </div>
+            ) : null}
             <button
               type="button"
               onClick={() => setExpanded((prev) => !prev)}
@@ -185,16 +242,29 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
             </button>
           </div>
 
-          <div className={`px-3 ${expanded ? "mt-12 mb-6" : "flex justify-center mt-12 mb-6"}`} ref={createRef}>
+          <div
+            className={`sticky ${expanded ? "top-20" : "top-16"} px-3 ${
+              expanded
+                ? compactSidebar
+                  ? "mt-2 mb-1"
+                  : "mt-4 mb-2"
+                : `flex justify-center ${compactSidebar ? "mt-2 mb-1" : "mt-4 mb-2"}`
+            }`}
+            ref={createRef}
+          >
             <button
               type="button"
               onClick={() => setCreateOpen((prev) => !prev)}
-              className={`flex w-full items-center gap-3 rounded-2xl bg-gradient-to-r from-[#009dfd] via-[#1f65ff] to-[#8b5cf6] px-4 py-3 text-sm font-semibold text-white shadow-lg transition hover:opacity-90 ${
+              className={`flex w-full items-center gap-3 rounded-2xl bg-[#2f8df0] ${
+                compactSidebar ? "px-3 py-2.5" : "px-4 py-3"
+              } text-sm font-semibold text-white shadow-lg transition hover:bg-[#2573c7] ${
                 expanded ? "justify-start" : "flex-col text-center min-w-[72px]"
               }`}
             >
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-white">
-                <Plus className="h-6 w-6 stroke-[3]" />
+              <span
+                className={`flex ${compactSidebar ? "h-8 w-8" : "h-9 w-9"} items-center justify-center rounded-full bg-white/20 text-white`}
+              >
+                <Plus className={`${compactSidebar ? "h-5 w-5" : "h-6 w-6"} stroke-[3]`} />
               </span>
               {expanded ? (
                 <span>Create</span>
@@ -253,27 +323,33 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
           ) : null}
         </div>
 
-        <div ref={profileRef} className="relative px-3 pb-6">
+        <div ref={profileRef} className="relative z-50 px-3 pb-6">
           <button
             type="button"
             onClick={() => setProfileOpen((prev) => !prev)}
             className="flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left text-sm font-semibold text-slate-800 transition hover:bg-white/70"
           >
-            {avatar ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={avatar}
-                alt="Your avatar"
-                className="h-10 w-10 shrink-0 rounded-full object-cover"
-              />
-            ) : (
-              <span
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold uppercase text-white"
-                style={{ backgroundColor: fallbackAvatar.color }}
-              >
-                {fallbackAvatar.initials}
-              </span>
-            )}
+            <span
+              className={`relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-[5px] ${
+                profileOpen ? "border-sky-300" : "border-transparent"
+              }`}
+            >
+              {avatar ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={avatar}
+                  alt="Your avatar"
+                  className="h-10 w-10 shrink-0 rounded-full object-cover"
+                />
+              ) : (
+                <span
+                  className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold uppercase text-white"
+                  style={{ backgroundColor: fallbackAvatar.color }}
+                >
+                  {fallbackAvatar.initials}
+                </span>
+              )}
+            </span>
             <div
               className={`flex-1 text-sm transition-all duration-200 ${
                 expanded ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-1 pointer-events-none"
@@ -285,72 +361,79 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
           </button>
 
           <div
-            className={`absolute bottom-24 left-4 right-4 rounded-2xl border border-white/40 bg-white/90 p-3 text-sm text-slate-800 shadow-xl transition ${
+            className={`absolute bottom-6 left-full z-[60] ml-4 w-80 rounded-3xl border border-slate-100 bg-white p-4 text-sm text-slate-800 shadow-[0_30px_80px_rgba(15,23,42,0.35)] transition ${
               profileOpen ? "opacity-100 translate-y-0" : "pointer-events-none opacity-0 translate-y-2"
             }`}
           >
-            <button
-              type="button"
-              onClick={() => {
-                setProfileOpen(false);
-                router.push("#");
-              }}
-              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-slate-100"
-            >
-              <HelpCircle className="h-4 w-4 text-slate-500" aria-hidden />
-              <span>Help &amp; Support</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setProfileOpen(false);
-                router.push("#");
-              }}
-              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-slate-100"
-            >
-              <FileText className="h-4 w-4 text-slate-500" aria-hidden />
-              <span>Terms &amp; Conditions</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setProfileOpen(false);
-                router.push("/account");
-              }}
-              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-slate-100"
-            >
-              <User className="h-4 w-4 text-slate-500" aria-hidden />
-              <span>Profile / Account Settings</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setProfileOpen(false);
-                router.push("/account?view=pricing");
-              }}
-              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-slate-100"
-            >
-              <CreditCard className="h-4 w-4 text-slate-500" aria-hidden />
-              <span>Subscription &amp; Billing</span>
-            </button>
-            <button
-              type="button"
-              disabled={signingOut}
-              onClick={async () => {
-                if (signingOut) return;
-                setProfileOpen(false);
-                try {
-                  setSigningOut(true);
-                  await signOut({ callbackUrl: "/login" });
-                } finally {
-                  setSigningOut(false);
-                }
-              }}
-              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-red-600 transition hover:bg-red-50"
-            >
-              <LogOut className="h-4 w-4" aria-hidden />
-              <span>Logout</span>
-            </button>
+            <div className="flex items-center gap-3 rounded-2xl border border-slate-100 px-3 py-3">
+              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-50 text-slate-600">
+                {avatar ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={avatar} alt="Your avatar" className="h-10 w-10 rounded-full object-cover" />
+                ) : (
+                  <span
+                    className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold uppercase text-white"
+                    style={{ backgroundColor: fallbackAvatar.color }}
+                  >
+                    {fallbackAvatar.initials}
+                  </span>
+                )}
+              </span>
+              <div className="flex-1">
+                <p className="text-base font-semibold text-slate-900">{session?.user?.name ?? "Account"}</p>
+                {session?.user?.email ? (
+                  <p className="text-xs text-slate-500">{session.user.email}</p>
+                ) : null}
+              </div>
+            </div>
+            <div className="mt-4 space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setProfileOpen(false);
+                  router.push("/account");
+                }}
+                className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                <div className="flex items-center gap-3">
+                  <Settings className="h-5 w-5 text-slate-500" aria-hidden />
+                  <span>Settings</span>
+                </div>
+                <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setProfileOpen(false);
+                  router.push("/account?view=pricing");
+                }}
+                className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                <div className="flex items-center gap-3">
+                  <CreditCard className="h-5 w-5 text-slate-500" aria-hidden />
+                  <span>Plans &amp; Pricing</span>
+                </div>
+                <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
+              </button>
+              <button
+                type="button"
+                disabled={signingOut}
+                onClick={async () => {
+                  if (signingOut) return;
+                  setProfileOpen(false);
+                  try {
+                    setSigningOut(true);
+                    await signOut({ callbackUrl: "/login" });
+                  } finally {
+                    setSigningOut(false);
+                  }
+                }}
+                className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left font-semibold text-red-600 transition hover:bg-red-50"
+              >
+                <LogOut className="h-5 w-5" aria-hidden />
+                <span>Log out</span>
+              </button>
+            </div>
           </div>
         </div>
       </aside>
