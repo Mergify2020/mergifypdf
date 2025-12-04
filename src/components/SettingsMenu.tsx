@@ -3,14 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import {
-  CreditCard,
-  FolderKanban,
-  HelpCircle,
-  LogOut,
-  PenSquare,
-  User,
-} from "lucide-react";
+import { CreditCard, LogOut, User } from "lucide-react";
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
 
 export default function SettingsMenu() {
@@ -57,16 +50,6 @@ export default function SettingsMenu() {
   function handlePricing() {
     setOpen(false);
     router.push("/account?view=pricing");
-  }
-
-  function handleProjectsDashboard() {
-    setOpen(false);
-    router.push("/");
-  }
-
-  function handleSignatureDashboard() {
-    setOpen(false);
-    router.push("/signature-center");
   }
 
   async function handleSignOut() {
@@ -120,46 +103,7 @@ export default function SettingsMenu() {
               </div>
             </div>
 
-            <div className="flex flex-col gap-1">
-              <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                Profile
-              </p>
-              <button
-                type="button"
-                onClick={handleAccount}
-                className="group flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-800 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-800"
-              >
-                <User className="h-4 w-4 text-slate-500 transition-transform group-hover:translate-x-px" aria-hidden />
-                <span>Profile / Account Settings</span>
-              </button>
-            </div>
-
-            <div className="space-y-1 border-t border-slate-200 pt-3">
-              <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                Navigation
-              </p>
-              <button
-                type="button"
-                onClick={handleProjectsDashboard}
-                className="group flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-800 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-800"
-              >
-                <FolderKanban className="h-4 w-4 text-slate-500 transition-transform group-hover:translate-x-px" aria-hidden />
-                <span>Projects Dashboard</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleSignatureDashboard}
-                className="group flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-800 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-800"
-              >
-                <PenSquare className="h-4 w-4 text-slate-500 transition-transform group-hover:translate-x-px" aria-hidden />
-                <span>Signature Dashboard</span>
-              </button>
-            </div>
-
-            <div className="space-y-1 border-t border-slate-200 pt-3">
-              <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                Account
-              </p>
+            <div className="flex flex-col gap-1 border-t border-slate-200 pt-3">
               <button
                 type="button"
                 onClick={handlePricing}
@@ -167,14 +111,6 @@ export default function SettingsMenu() {
               >
                 <CreditCard className="h-4 w-4 text-slate-500 transition-transform group-hover:translate-x-px" aria-hidden />
                 <span>Subscription &amp; Billing</span>
-              </button>
-              <button
-                type="button"
-                disabled
-                className="group flex w-full cursor-default items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-400 transition hover:bg-slate-100"
-              >
-                <HelpCircle className="h-4 w-4 text-slate-400 transition-transform group-hover:translate-x-px" aria-hidden />
-                <span>Help &amp; Support</span>
               </button>
             </div>
 
@@ -189,14 +125,6 @@ export default function SettingsMenu() {
                 <LogOut className="h-4 w-4" aria-hidden />
                 <span>Log out</span>
               </button>
-              <div className="mt-3 flex justify-between px-1 text-[10px] tracking-[0.2px] text-slate-400 opacity-60">
-                <span className="rounded px-1 py-0.5 transition hover:bg-slate-100 hover:text-slate-900">
-                  Terms &amp; Conditions
-                </span>
-                <span className="rounded px-1 py-0.5 transition hover:bg-slate-100 hover:text-slate-900">
-                  Privacy Policy
-                </span>
-              </div>
             </div>
         </div>
       </div>

@@ -2,6 +2,7 @@
 import type { Metadata } from "next";
 import Providers from "@/components/Providers";
 import WorkspaceSettingsMenu from "@/components/WorkspaceSettingsMenu";
+import WorkspaceShell from "@/components/WorkspaceShell";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import AppHeaderBrand from "@/components/AppHeaderBrand";
@@ -28,6 +29,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const lockedByTwoFactor =
     !!session?.user?.twoFactorEnabled && session.user.twoFactorPassed !== true;
 
+  const authedWorkspace = session?.user && !lockedByTwoFactor;
+
   return (
     <html lang="en">
       <head>
@@ -46,18 +49,26 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
       <body className="min-h-screen bg-white text-gray-900">
         <Providers session={session}>
-          <header className="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/90 backdrop-blur">
-            <div className="mx-auto flex h-[76px] w-full max-w-7xl items-center justify-between px-4 lg:px-6">
-              <AppHeaderBrand />
-              {!session?.user || lockedByTwoFactor ? (
-                <HeaderAuthButtons />
-              ) : (
-                <WorkspaceSettingsMenu />
-              )}
-            </div>
-          </header>
-          <main>{children}</main>
-          <Footer />
+          {authedWorkspace ? (
+            <WorkspaceShell>{children}</WorkspaceShell>
+          ) : (
+            <>
+              <header className="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/90 backdrop-blur">
+                <div className="mx-auto flex h-[76px] w-full max-w-7xl items-center justify-between px-4 lg:px-6">
+                  <div className="flex items-center gap-3">
+                    <AppHeaderBrand />
+                  </div>
+                  {!session?.user || lockedByTwoFactor ? (
+                    <HeaderAuthButtons />
+                  ) : (
+                    <WorkspaceSettingsMenu />
+                  )}
+                </div>
+              </header>
+              <main className="page-fade-in">{children}</main>
+              <Footer />
+            </>
+          )}
         </Providers>
       </body>
     </html>

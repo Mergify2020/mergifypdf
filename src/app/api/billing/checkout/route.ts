@@ -3,9 +3,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { stripe } from "@/lib/stripe";
 
-const SUCCESS_URL = "https://mergifypdf.com/account?status=success";
-const CANCEL_URL = "https://mergifypdf.com/pricing?canceled=true";
-
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
 
@@ -27,12 +24,16 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const origin = req.nextUrl.origin;
+    const successUrl = `${origin}/account?status=success`;
+    const cancelUrl = `${origin}/account?view=pricing&canceled=true`;
+
     const checkoutSession = await stripe.checkout.sessions.create({
       mode: "subscription",
       payment_method_types: ["card"],
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: SUCCESS_URL,
-      cancel_url: CANCEL_URL,
+      success_url: successUrl,
+      cancel_url: cancelUrl,
       customer_email: session.user.email ?? undefined,
       allow_promotion_codes: true,
     });
@@ -47,4 +48,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Stripe checkout error" }, { status: 500 });
   }
 }
-

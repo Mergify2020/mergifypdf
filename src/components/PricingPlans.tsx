@@ -169,8 +169,8 @@ export default function PricingPlans() {
                 onClick={() => setBillingPeriod("monthly")}
                 className={`min-w-[112px] rounded-full px-5 py-2 whitespace-nowrap transition-colors ${
                   billingPeriod === "monthly"
-                    ? "bg-black text-white shadow-sm"
-                    : "text-slate-900 hover:text-slate-700"
+                    ? "bg-black text-white shadow-sm ring-2 ring-sky-400"
+                    : "text-slate-900 hover:text-slate-700 ring-0"
                 }`}
               >
                 Monthly
@@ -180,8 +180,8 @@ export default function PricingPlans() {
                 onClick={() => setBillingPeriod("annual")}
                 className={`min-w-[140px] rounded-full px-5 py-2 whitespace-nowrap transition-colors ${
                   billingPeriod === "annual"
-                    ? "bg-black text-white shadow-sm"
-                    : "text-slate-900 hover:text-slate-700"
+                    ? "bg-black text-white shadow-sm ring-2 ring-sky-400"
+                    : "text-slate-900 hover:text-slate-700 ring-0"
                 }`}
               >
                 Annual ·{" "}

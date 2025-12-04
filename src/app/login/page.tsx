@@ -29,6 +29,7 @@ export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryError = searchParams.get("error");
+  const callbackUrl = searchParams.get("callbackUrl") || "/";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -52,7 +53,7 @@ export default function LoginPage() {
         redirect: false,
         email: normalizedEmail,
         password,
-        callbackUrl: "/",
+        callbackUrl,
       });
 
       if (res?.error) {
@@ -66,7 +67,7 @@ export default function LoginPage() {
         return;
       }
 
-      window.location.assign("/");
+      window.location.assign(callbackUrl);
     } catch (error) {
       console.error(error);
       setErr("Unable to log in. Please try again.");
@@ -77,7 +78,7 @@ export default function LoginPage() {
   async function handleGoogleLogin() {
     try {
       setBusy(true);
-      await signIn("google", { callbackUrl: "/" });
+      await signIn("google", { callbackUrl });
       // No setBusy(false) here; page will unmount on redirect
     } catch {
       setBusy(false);
