@@ -22,7 +22,6 @@ import {
 } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 import AppHeaderBrand from "./AppHeaderBrand";
-import Footer from "./Footer";
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
 import { getAvatarFallback } from "@/lib/avatarFallback";
 
@@ -39,8 +38,57 @@ const navigationItems: SidebarItem[] = [
   { label: "Signatures", icon: PenSquare, href: "/signature-center" },
   { label: "Templates", icon: FileText, href: "/signature-center", disabled: true },
   { label: "Tutorials", icon: BookOpen, href: "/tutorials", disabled: true },
-  { label: "Trash", icon: Trash2, href: "/projects?view=trash", disabled: true },
 ];
+
+type SidebarPanel = {
+  title: string;
+  subtitle: string;
+  items: { label: string; description: string }[];
+  action?: { label: string; href: string };
+};
+
+const sidebarPanels: Record<string, SidebarPanel> = {
+  home: {
+    title: "Recent documents",
+    subtitle: "Quick access",
+    items: [
+      { label: "Welcome Deck", description: "Updated 1 day ago" },
+      { label: "Vendor Agreement FY25", description: "Edited 3 days ago" },
+      { label: "Mergify Sign brochure", description: "Shared last week" },
+    ],
+    action: { label: "View all projects", href: "/projects" },
+  },
+  projects: {
+    title: "Project shortcuts",
+    subtitle: "Your libraries",
+    items: [
+      { label: "Active workflows", description: "6 drafts in progress" },
+      { label: "Templates folder", description: "Re-usable layouts" },
+      { label: "Archive", description: "Completed agreements" },
+    ],
+    action: { label: "Go to projects", href: "/projects" },
+  },
+  signatures: {
+    title: "Signature center",
+    subtitle: "Requests overview",
+    items: [
+      { label: "Send a request", description: "Launch a new signature flow" },
+      { label: "Waiting on others", description: "3 recipients pending" },
+      { label: "Completed this week", description: "12 signed docs" },
+    ],
+    action: { label: "Open signature tools", href: "/signature-center" },
+  },
+  default: {
+    title: "Workspace tips",
+    subtitle: "Get started",
+    items: [
+      { label: "Upload PDFs", description: "Drag & drop files to merge" },
+      { label: "Reuse templates", description: "Start from saved layouts" },
+      { label: "Share securely", description: "Invite teammates to edit" },
+    ],
+    action: { label: "Explore dashboard", href: "/" },
+  },
+};
 
 const otherItems: SidebarItem[] = [];
 
@@ -67,12 +115,16 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
     session?.user?.name ?? session?.user?.email ?? "Account"
   );
 
-  const sectionLabelClasses = expanded
-    ? "opacity-100 translate-x-0"
-    : "opacity-0 translate-x-2 pointer-events-none";
-  const itemLabelClasses = expanded
-    ? "opacity-100 translate-x-0 max-w-full"
-    : "opacity-0 translate-x-2 max-w-0";
+  const itemLabelClasses = "opacity-100 translate-x-0 max-w-full";
+  const panelKey =
+    pathname === "/"
+      ? "home"
+      : pathname?.startsWith("/projects")
+        ? "projects"
+        : pathname?.startsWith("/signature-center")
+          ? "signatures"
+          : "default";
+  const activePanel = sidebarPanels[panelKey] ?? sidebarPanels.default;
 
   useEffect(() => {
     if (!profileOpen) return;
@@ -137,22 +189,24 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
     items: SidebarItem[],
     {
       labelClassName,
-    }: { labelClassName?: string } = {},
+      forceExpanded,
+    }: { labelClassName?: string; forceExpanded?: boolean } = {},
   ) =>
     items.map(({ label, icon: Icon, href, disabled }) => {
+      const isExpanded = forceExpanded ?? expanded;
       const isActive =
         !disabled &&
         (href === "/"
           ? pathname === "/"
           : pathname?.startsWith(href) || false);
-      const iconWrapperBase = expanded
+      const iconWrapperBase = isExpanded
         ? `flex ${compactSidebar ? "h-10 w-10" : "h-11 w-11"} items-center justify-center rounded-2xl transition`
         : `flex ${compactSidebar ? "h-12" : "h-14"} w-full items-center justify-center rounded-2xl transition`;
       const iconWrapperState = isActive
         ? "bg-sky-100 text-sky-600 shadow-inner"
         : "bg-transparent text-slate-500 group-hover:bg-slate-100/80";
       const iconWrapperClasses = `${iconWrapperBase} ${iconWrapperState}`;
-      const iconSizeClasses = expanded
+      const iconSizeClasses = isExpanded
         ? compactSidebar
           ? "h-4 w-4"
           : "h-5 w-5"
@@ -183,15 +237,15 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
               : isActive
                 ? "text-sky-900"
                 : "text-slate-800"
-          } ${expanded ? expandedLayoutClasses : collapsedLayoutClasses}`}
+          } ${isExpanded ? expandedLayoutClasses : collapsedLayoutClasses}`}
         >
           <span className={iconWrapperClasses}>
             <Icon className={`${iconSizeClasses} shrink-0`} aria-hidden />
           </span>
-          {expanded ? (
+          {isExpanded ? (
             <span
               className={`inline-flex flex-1 overflow-hidden whitespace-nowrap text-sm transition-all duration-200 ease-in-out ${
-                expanded ? (compactSidebar ? "ml-1.5" : "ml-2") : "ml-0"
+                isExpanded ? (compactSidebar ? "ml-1.5" : "ml-2") : "ml-0"
               } ${labelClassName ?? ""}`}
             >
               {label}
@@ -212,164 +266,95 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
   return (
     <div className="flex min-h-screen bg-white">
       {/* Desktop sidebar */}
-      <aside
-        className={`hidden md:flex fixed left-0 top-0 z-30 h-screen flex-col border-r border-white/40 bg-white/80 text-slate-800 shadow-[0_25px_80px_rgba(15,23,42,0.25)] backdrop-blur-xl rounded-none overflow-visible transition-all duration-300 ease-in-out ${
-          expanded ? "w-64" : "w-24"
-        }`}
-      >
-        <div
-          className={`flex flex-1 flex-col ${compactSidebar ? "gap-2.5" : "gap-3"} overflow-y-auto overflow-x-hidden px-3 ${
-            compactSidebar ? "py-2" : "py-3"
-          }`}
-        >
-          <div
-            className={`sticky top-2 z-10 px-2 ${
-              expanded ? "flex items-center justify-between gap-4" : "flex flex-col items-center gap-3"
-            }`}
-          >
-            {expanded ? (
-              <div className="transition-all duration-300 opacity-100 translate-x-0">
-                <AppHeaderBrand />
+      <aside className="hidden md:flex fixed left-0 top-0 z-30 h-screen text-slate-800">
+        <div className="relative flex h-full w-full">
+          <div className="flex h-full w-24 flex-col border-r border-white/40 bg-white/80 backdrop-blur-xl shadow-[0_25px_80px_rgba(15,23,42,0.25)]">
+            <div className="flex flex-1 flex-col gap-4 overflow-y-auto overflow-x-hidden px-3 py-5">
+              <div className="flex items-center justify-center">
+              <button
+                type="button"
+                onClick={() => setExpanded((prev) => !prev)}
+                className="relative z-10 flex h-9 w-9 items-center justify-center rounded-full bg-[#1e293b] text-white shadow-[0_8px_24px_rgba(10,37,64,0.35)] transition hover:bg-[#253248]"
+                aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
+              >
+                {expanded ? <ChevronLeft className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+              </button>
+            </div>
+
+            <div className="px-1" ref={createRef}>
+              <button
+                type="button"
+                onClick={() => setCreateOpen((prev) => !prev)}
+                className="flex w-full flex-col items-center gap-2 rounded-2xl bg-[#2f8df0] px-3 py-2.5 text-center text-sm font-semibold text-white shadow-lg transition hover:bg-[#2573c7]"
+              >
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white">
+                  <Plus className="h-5 w-5 stroke-[3]" />
+                </span>
+                <span className="text-[10px] font-bold uppercase text-white">Create</span>
+              </button>
+              <div
+                className={`relative transition ${
+                  createOpen ? "opacity-100" : "pointer-events-none opacity-0"
+                }`}
+              >
+                <div className="absolute left-full ml-4 top-1/2 -translate-y-1/2 w-56 rounded-2xl border border-white/40 bg-white/95 p-3 text-sm text-slate-800 shadow-xl">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      router.push("/studio");
+                      setCreateOpen(false);
+                    }}
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-slate-100"
+                  >
+                    <FileText className="h-4 w-4 text-slate-500" aria-hidden />
+                    <span>New Editing Project</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      router.push("/signature-center");
+                      setCreateOpen(false);
+                    }}
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-slate-100"
+                  >
+                    <FileSignature className="h-4 w-4 text-slate-500" aria-hidden />
+                    <span>New Signature Request</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <nav className="flex flex-col gap-1">
+              {renderItems(navigationItems, {
+                labelClassName: itemLabelClasses,
+                forceExpanded: false,
+              })}
+            </nav>
+
+            {otherItems.length > 0 ? (
+              <div className="flex flex-col gap-1 items-center">
+                {renderItems(otherItems, { labelClassName: itemLabelClasses, forceExpanded: false })}
               </div>
             ) : null}
-            <button
-              type="button"
-              onClick={() => setExpanded((prev) => !prev)}
-              className="relative z-10 flex h-9 w-9 items-center justify-center rounded-full bg-[#1e293b] text-white shadow-[0_8px_24px_rgba(10,37,64,0.35)] transition hover:bg-[#253248]"
-              aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
-            >
-              {expanded ? <ChevronLeft className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
-            </button>
           </div>
 
-          <div
-            className={`sticky ${expanded ? "top-20" : "top-16"} px-3 ${
-              expanded
-                ? compactSidebar
-                  ? "mt-2 mb-1"
-                  : "mt-4 mb-2"
-                : `flex justify-center ${compactSidebar ? "mt-2 mb-1" : "mt-4 mb-2"}`
-            }`}
-            ref={createRef}
-          >
+          <div ref={profileRef} className="relative z-50 px-3 pb-6">
             <button
               type="button"
-              onClick={() => setCreateOpen((prev) => !prev)}
-              className={`flex w-full items-center gap-3 rounded-2xl bg-[#2f8df0] ${
-                compactSidebar ? "px-3 py-2.5" : "px-4 py-3"
-              } text-sm font-semibold text-white shadow-lg transition hover:bg-[#2573c7] ${
-                expanded ? "justify-start" : "flex-col text-center min-w-[72px]"
-              }`}
+              onClick={() => setProfileOpen((prev) => !prev)}
+              className="flex w-full items-center justify-center rounded-2xl px-3 py-2 transition hover:bg-white/70"
             >
               <span
-                className={`flex ${compactSidebar ? "h-8 w-8" : "h-9 w-9"} items-center justify-center rounded-full bg-white/20 text-white`}
+                className={`relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-[5px] ${
+                  profileOpen ? "border-sky-300" : "border-transparent"
+                }`}
               >
-                <Plus className={`${compactSidebar ? "h-5 w-5" : "h-6 w-6"} stroke-[3]`} />
-              </span>
-              {expanded ? (
-                <span>Create</span>
-              ) : (
-                <span className="text-[10px] font-bold uppercase text-white">Create</span>
-              )}
-            </button>
-            <div
-              className={`relative transition ${
-                createOpen ? "opacity-100" : "pointer-events-none opacity-0"
-              }`}
-            >
-              <div className="absolute left-0 right-0 z-20 mt-3 rounded-2xl border border-white/40 bg-white/95 p-3 text-sm text-slate-800 shadow-xl">
-                <button
-                  type="button"
-                  onClick={() => {
-                    router.push("/studio");
-                    setCreateOpen(false);
-                  }}
-                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-slate-100"
-                >
-                  <FileText className="h-4 w-4 text-slate-500" aria-hidden />
-                  <span>New Editing Project</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    router.push("/signature-center");
-                    setCreateOpen(false);
-                  }}
-                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-slate-100"
-                >
-                  <FileSignature className="h-4 w-4 text-slate-500" aria-hidden />
-                  <span>New Signature Request</span>
-                </button>
-              </div>
-            </div>
-          </div>
-          <div className="px-3">
-            <p
-              className={`text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400 transition-transform duration-200 ${sectionLabelClasses}`}
-            >
-              Navigation
-            </p>
-          </div>
-          <nav className="flex flex-col gap-1">
-            {renderItems(navigationItems, {
-              labelClassName: itemLabelClasses,
-            })}
-          </nav>
-
-          {otherItems.length > 0 ? (
-            <div className={`flex flex-col gap-1 ${expanded ? "" : "items-center"}`}>
-              {renderItems(otherItems, { labelClassName: itemLabelClasses })}
-            </div>
-          ) : null}
-        </div>
-
-        <div ref={profileRef} className="relative z-50 px-3 pb-6">
-          <button
-            type="button"
-            onClick={() => setProfileOpen((prev) => !prev)}
-            className="flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left text-sm font-semibold text-slate-800 transition hover:bg-white/70"
-          >
-            <span
-              className={`relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-[5px] ${
-                profileOpen ? "border-sky-300" : "border-transparent"
-              }`}
-            >
-              {avatar ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={avatar}
-                  alt="Your avatar"
-                  className="h-10 w-10 shrink-0 rounded-full object-cover"
-                />
-              ) : (
-                <span
-                  className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold uppercase text-white"
-                  style={{ backgroundColor: fallbackAvatar.color }}
-                >
-                  {fallbackAvatar.initials}
-                </span>
-              )}
-            </span>
-            <div
-              className={`flex-1 text-sm transition-all duration-200 ${
-                expanded ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-1 pointer-events-none"
-              }`}
-            >
-              <p className="font-semibold">{session?.user?.name ?? "Account"}</p>
-              {session?.user?.email && <p className="text-xs text-slate-500">{session.user.email}</p>}
-            </div>
-          </button>
-
-          <div
-            className={`absolute bottom-6 left-full z-[60] ml-4 w-80 rounded-3xl border border-slate-100 bg-white p-4 text-sm text-slate-800 shadow-[0_30px_80px_rgba(15,23,42,0.35)] transition ${
-              profileOpen ? "opacity-100 translate-y-0" : "pointer-events-none opacity-0 translate-y-2"
-            }`}
-          >
-            <div className="flex items-center gap-3 rounded-2xl border border-slate-100 px-3 py-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-50 text-slate-600">
                 {avatar ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={avatar} alt="Your avatar" className="h-10 w-10 rounded-full object-cover" />
+                  <img
+                    src={avatar}
+                    alt="Your avatar"
+                    className="h-10 w-10 shrink-0 rounded-full object-cover"
+                  />
                 ) : (
                   <span
                     className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold uppercase text-white"
@@ -379,60 +364,129 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                   </span>
                 )}
               </span>
-              <div className="flex-1">
-                <p className="text-base font-semibold text-slate-900">{session?.user?.name ?? "Account"}</p>
-                {session?.user?.email ? (
-                  <p className="text-xs text-slate-500">{session.user.email}</p>
-                ) : null}
+            </button>
+
+              <div
+                className={`absolute bottom-6 left-full z-[60] ml-4 w-80 rounded-3xl border border-slate-100 bg-white p-4 text-sm text-slate-800 shadow-[0_30px_80px_rgba(15,23,42,0.35)] transition ${
+                  profileOpen ? "opacity-100 translate-y-0" : "pointer-events-none opacity-0 translate-y-2"
+                }`}
+              >
+                <div className="flex items-center gap-3 rounded-2xl border border-slate-100 px-3 py-3">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-50 text-slate-600">
+                    {avatar ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={avatar} alt="Your avatar" className="h-10 w-10 rounded-full object-cover" />
+                    ) : (
+                      <span
+                        className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold uppercase text-white"
+                        style={{ backgroundColor: fallbackAvatar.color }}
+                      >
+                        {fallbackAvatar.initials}
+                      </span>
+                    )}
+                  </span>
+                  <div className="flex-1">
+                    <p className="text-base font-semibold text-slate-900">{session?.user?.name ?? "Account"}</p>
+                    {session?.user?.email ? (
+                      <p className="text-xs text-slate-500">{session.user.email}</p>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="mt-4 space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProfileOpen(false);
+                      router.push("/account");
+                    }}
+                    className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left font-semibold text-slate-700 transition hover:bg-slate-50"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Settings className="h-5 w-5 text-slate-500" aria-hidden />
+                      <span>Settings</span>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProfileOpen(false);
+                      router.push("/account?view=pricing");
+                    }}
+                    className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left font-semibold text-slate-700 transition hover:bg-slate-50"
+                  >
+                    <div className="flex items-center gap-3">
+                      <CreditCard className="h-5 w-5 text-slate-500" aria-hidden />
+                      <span>Plans &amp; Pricing</span>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProfileOpen(false);
+                      router.push("/projects?view=trash");
+                    }}
+                    className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left font-semibold text-slate-700 transition hover:bg-slate-50"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Trash2 className="h-5 w-5 text-slate-500" aria-hidden />
+                      <span>Trash</span>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={signingOut}
+                    onClick={async () => {
+                      if (signingOut) return;
+                      setProfileOpen(false);
+                      try {
+                        setSigningOut(true);
+                        await signOut({ callbackUrl: "/login" });
+                      } finally {
+                        setSigningOut(false);
+                      }
+                    }}
+                    className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left font-semibold text-red-600 transition hover:bg-red-50"
+                  >
+                    <LogOut className="h-5 w-5" aria-hidden />
+                    <span>Log out</span>
+                  </button>
+                </div>
               </div>
             </div>
-            <div className="mt-4 space-y-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setProfileOpen(false);
-                  router.push("/account");
-                }}
-                className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left font-semibold text-slate-700 transition hover:bg-slate-50"
-              >
-                <div className="flex items-center gap-3">
-                  <Settings className="h-5 w-5 text-slate-500" aria-hidden />
-                  <span>Settings</span>
-                </div>
-                <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setProfileOpen(false);
-                  router.push("/account?view=pricing");
-                }}
-                className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left font-semibold text-slate-700 transition hover:bg-slate-50"
-              >
-                <div className="flex items-center gap-3">
-                  <CreditCard className="h-5 w-5 text-slate-500" aria-hidden />
-                  <span>Plans &amp; Pricing</span>
-                </div>
-                <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
-              </button>
-              <button
-                type="button"
-                disabled={signingOut}
-                onClick={async () => {
-                  if (signingOut) return;
-                  setProfileOpen(false);
-                  try {
-                    setSigningOut(true);
-                    await signOut({ callbackUrl: "/login" });
-                  } finally {
-                    setSigningOut(false);
-                  }
-                }}
-                className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left font-semibold text-red-600 transition hover:bg-red-50"
-              >
-                <LogOut className="h-5 w-5" aria-hidden />
-                <span>Log out</span>
-              </button>
+          </div>
+          <div
+            className={`pointer-events-none absolute left-[96px] top-0 hidden h-full w-[320px] bg-white/95 px-6 py-8 text-slate-800 shadow-[0_35px_90px_rgba(15,23,42,0.3)] transition-all duration-300 ${
+              expanded ? "translate-x-0 opacity-100 pointer-events-auto md:translate-x-0" : "-translate-x-4 opacity-0"
+            } md:flex`}
+          >
+            <div className="flex w-full flex-col gap-6">
+              <AppHeaderBrand />
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                  {activePanel.subtitle}
+                </p>
+                <h3 className="mt-2 text-lg font-semibold">{activePanel.title}</h3>
+              </div>
+              <ul className="space-y-3">
+                {activePanel.items.map((item) => (
+                  <li key={item.label} className="rounded-2xl border border-slate-100 bg-white px-3 py-2">
+                    <p className="text-sm font-semibold text-slate-800">{item.label}</p>
+                    <p className="text-xs text-slate-500">{item.description}</p>
+                  </li>
+                ))}
+              </ul>
+              {activePanel.action ? (
+                <button
+                  type="button"
+                  onClick={() => router.push(activePanel.action!.href)}
+                  className="text-sm font-semibold text-sky-600 transition hover:text-sky-700"
+                >
+                  {activePanel.action.label}
+                </button>
+              ) : null}
             </div>
           </div>
         </div>
@@ -455,12 +509,12 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
             </div>
 
             <div className="space-y-4">
-              <div>
-                <p className="pb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Navigation</p>
-                <nav className="flex flex-col gap-1">
-                  {renderItems(navigationItems, { labelClassName: "opacity-100 translate-x-0" })}
-                </nav>
-              </div>
+              <nav className="flex flex-col gap-1">
+                {renderItems(navigationItems, {
+                  labelClassName: "opacity-100 translate-x-0",
+                  forceExpanded: true,
+                })}
+              </nav>
 
               <div className="border-t border-slate-200 pt-4">
                 <p className="pb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Create</p>
@@ -511,7 +565,10 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                     Other
                   </p>
                   <div className="flex flex-col gap-1">
-                    {renderItems(otherItems, { labelClassName: "opacity-100 translate-x-0" })}
+                    {renderItems(otherItems, {
+                      labelClassName: "opacity-100 translate-x-0",
+                      forceExpanded: true,
+                    })}
                   </div>
                 </div>
               ) : null}
@@ -563,7 +620,11 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
         </>
       ) : null}
 
-      <div className={`flex min-h-screen w-full flex-col bg-white transition-all duration-300 ease-in-out ${expanded ? "md:ml-64" : "md:ml-24"}`}>
+      <div
+        className={`flex min-h-screen w-full flex-col bg-white transition-all duration-300 ease-in-out ${
+          expanded ? "md:ml-24 lg:ml-[416px]" : "md:ml-24 lg:ml-24"
+        }`}
+      >
         <header className="sticky top-0 z-20 w-full border-b border-slate-200 bg-white/90 backdrop-blur md:hidden">
           <div className="mx-auto flex h-[76px] w-full max-w-7xl items-center justify-between px-4 lg:px-6">
             <div className="flex items-center gap-3">
