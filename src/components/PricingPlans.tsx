@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Check, X } from "lucide-react";
 
 const tiers = [
@@ -367,7 +367,7 @@ export default function PricingPlans() {
                   { feature: "Signature Tracking", basic: false, pro: false, business: true },
                   { feature: "Outgoing Signature Requests", basic: false, pro: false, business: "10 Per Month" },
                 ].map((row) => (
-                  <>
+                  <Fragment key={row.feature}>
                     <tr key={`${row.feature}-label`} className="sm:hidden">
                       <td
                         colSpan={4}
@@ -393,7 +393,7 @@ export default function PricingPlans() {
                         {renderValue((row as any).business)}
                       </td>
                     </tr>
-                  </>
+                  </Fragment>
                 ))}
               </tbody>
             </table>
