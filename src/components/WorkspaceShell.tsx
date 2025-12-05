@@ -349,7 +349,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
           <div
             ref={profileRef}
             className={`relative z-50 px-3 pb-6 ${
-              sidebarCompact ? "mt-8 sticky bottom-1" : "mt-auto sticky bottom-4"
+              sidebarCompact ? "mt-10 sticky bottom-0" : "mt-auto sticky bottom-4"
             }`}
           >
               <button
