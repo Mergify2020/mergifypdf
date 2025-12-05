@@ -200,6 +200,10 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
   }, []);
 
   const sidebarCompact = compactSidebar || narrowSidebar;
+  const railWidthClass = sidebarCompact ? "w-[104px]" : "w-24";
+  const panelLeftClass = sidebarCompact ? "left-[104px]" : "left-[96px]";
+  const contentOffsetClass = sidebarCompact ? "md:ml-[104px]" : "md:ml-24";
+  const expandedDesktopContentOffset = expanded && !sidebarCompact ? "lg:ml-[416px]" : "";
 
   const renderItems = (
     items: SidebarItem[],
@@ -285,7 +289,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
       <aside className="hidden md:flex fixed left-0 top-0 z-30 h-screen text-slate-800">
         <div className="relative flex h-full w-full">
           <div
-            className={`flex h-full ${sidebarCompact ? "w-[96px]" : "w-24"} flex-col border-r border-white/40 bg-white/80 backdrop-blur-xl shadow-[0_25px_80px_rgba(15,23,42,0.25)] ${
+            className={`flex h-full ${railWidthClass} flex-col border-r border-white/40 bg-white/80 backdrop-blur-xl shadow-[0_25px_80px_rgba(15,23,42,0.25)] ${
               sidebarCompact ? "z-10" : "z-20"
             }`}
           >
@@ -301,7 +305,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
               </button>
             </div>
 
-            <div className="px-1" ref={createRef}>
+            <div className="px-1 mt-3 mb-3" ref={createRef}>
               <button
                 type="button"
                 onClick={() => setCreateOpen((prev) => !prev)}
@@ -457,7 +461,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
           </div>
           {expanded ? (
             <div
-              className={`absolute left-[96px] top-0 hidden h-full bg-white px-4 py-6 text-slate-800 shadow-[20px_0_60px_rgba(15,23,42,0.25)] lg:shadow-[0_35px_90px_rgba(15,23,42,0.3)] transition-all duration-300 ${
+              className={`absolute ${panelLeftClass} top-0 hidden h-full bg-white px-4 py-6 text-slate-800 shadow-[20px_0_60px_rgba(15,23,42,0.25)] lg:shadow-[0_35px_90px_rgba(15,23,42,0.3)] transition-all duration-300 ${
                 expanded ? "translate-x-0 opacity-100 pointer-events-auto" : "-translate-x-4 opacity-0"
               } md:flex ${sidebarCompact ? "w-[240px]" : "w-[320px]"} z-0`}
             >
@@ -621,15 +625,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
       ) : null}
 
       <div
-        className={`flex min-h-screen w-full flex-col bg-white transition-all duration-300 ease-in-out ${
-          expanded
-            ? sidebarCompact
-              ? "md:ml-[96px]"
-              : "md:ml-24 lg:ml-[416px]"
-            : sidebarCompact
-              ? "md:ml-[96px]"
-              : "md:ml-24"
-        }`}
+        className={`flex min-h-screen w-full flex-col bg-white transition-all duration-300 ease-in-out ${contentOffsetClass} ${expandedDesktopContentOffset}`}
       >
         <header className="sticky top-0 z-20 w-full border-b border-slate-200 bg-white/90 backdrop-blur md:hidden">
           <div className="mx-auto flex h-[76px] w-full max-w-7xl items-center justify-between px-4 lg:px-6">
