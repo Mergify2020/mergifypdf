@@ -8,6 +8,7 @@ import { authOptions } from "@/lib/authOptions";
 import AppHeaderBrand from "@/components/AppHeaderBrand";
 import Footer from "@/components/Footer";
 import HeaderAuthButtons from "@/components/HeaderAuthButtons";
+import HeroHeader from "@/components/HeroHeader";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -53,7 +54,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <WorkspaceShell>{children}</WorkspaceShell>
           ) : (
             <>
-              <header className="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/90 backdrop-blur">
+              <HeroHeader>
                 <div className="mx-auto flex h-[76px] w-full max-w-7xl items-center justify-between px-4 lg:px-6">
                   <div className="flex items-center gap-3">
                     <AppHeaderBrand />
@@ -64,7 +65,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                     <WorkspaceSettingsMenu />
                   )}
                 </div>
-              </header>
+              </HeroHeader>
               <main className="page-fade-in">{children}</main>
               <Footer />
             </>

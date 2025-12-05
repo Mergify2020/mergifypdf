@@ -32,6 +32,8 @@ export default function HeaderAuthButtons() {
     };
   }, [menuOpen]);
 
+  const gradientHero = isHome;
+
   return (
     <div className="flex items-center gap-3">
       {/* Pricing pill - hidden on pricing page */}
@@ -49,7 +51,9 @@ export default function HeaderAuthButtons() {
         {!isRegisterPage && (
           <Link
             href="/register"
-            className="inline-flex items-center rounded-full border border-slate-300 bg-transparent px-4 py-2 text-xs font-semibold text-slate-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-white/70"
+            className={`inline-flex items-center rounded-full border border-slate-300 px-4 py-2 text-xs font-semibold shadow-sm transition hover:-translate-y-0.5 ${
+              gradientHero ? "bg-white text-slate-900 hover:bg-white/90" : "bg-transparent text-slate-800 hover:bg-white/70"
+            }`}
           >
             Sign up
           </Link>
@@ -57,7 +61,9 @@ export default function HeaderAuthButtons() {
         {!isLoginPage && (
           <Link
             href="/login"
-            className="inline-flex items-center rounded-full border border-slate-300 bg-transparent px-4 py-2 text-xs font-semibold text-slate-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-white/70"
+            className={`inline-flex items-center rounded-full border border-slate-300 px-4 py-2 text-xs font-semibold shadow-sm transition hover:-translate-y-0.5 ${
+              gradientHero ? "bg-white text-slate-900 hover:bg-white/90" : "bg-transparent text-slate-800 hover:bg-white/70"
+            }`}
           >
             Log in
           </Link>
@@ -71,7 +77,9 @@ export default function HeaderAuthButtons() {
           <button
             type="button"
             onClick={() => setMenuOpen((open) => !open)}
-            className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white/90 text-slate-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-white"
+            className={`flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-slate-200 ${
+              gradientHero ? "bg-white text-slate-800" : "bg-white/90 text-slate-800"
+            } shadow-sm transition hover:-translate-y-0.5 hover:bg-white`}
             aria-label="Account menu"
             aria-expanded={menuOpen}
           >

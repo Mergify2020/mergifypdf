@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import {
   BookOpen,
   ChevronLeft,
@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 import AppHeaderBrand from "./AppHeaderBrand";
+import PageLoadingSkeleton from "./PageLoadingSkeleton";
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
 import { getAvatarFallback } from "@/lib/avatarFallback";
 
@@ -320,7 +321,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                 type="button"
                 onClick={() => setCreateOpen((prev) => !prev)}
                 className={`flex w-full flex-col items-center gap-2 rounded-2xl bg-[#2f8df0] ${
-                  sidebarCompact ? "px-2 py-1.5" : "px-3 py-2.5"
+                  sidebarCompact ? "px-2 py-2 lg:px-3 lg:py-2.5" : "px-3 py-3.5"
                 } text-center text-sm font-semibold text-white shadow-lg transition hover:bg-[#2573c7]`}
               >
                 <span
@@ -347,39 +348,41 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
 
           <div
             ref={profileRef}
-            className={`relative z-50 px-3 pb-6 ${
-              sidebarCompact ? "mt-1" : "mt-auto sticky bottom-4"
-            }`}
-          >
-            <button
+              className={`relative z-50 px-3 pb-6 ${
+                sidebarCompact ? "mt-1 sticky bottom-4" : "mt-auto sticky bottom-4"
+              }`}
+            >
+              <button
               type="button"
               onClick={() => setProfileOpen((prev) => !prev)}
               className="flex w-full items-center justify-center rounded-2xl px-3 py-2 transition hover:bg-white/70"
-            >
-              <span
-                className={`relative flex ${
-                  sidebarCompact ? "h-13 w-13" : "h-16 w-16"
-                } shrink-0 items-center justify-center rounded-full ${
-                  sidebarCompact ? "border-[5px]" : "border-[6px]"
-                } ${
-                  profileOpen ? "border-sky-300" : "border-transparent"
-                }`}
               >
-                {avatar ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={avatar}
-                    alt="Your avatar"
-                    className={`${sidebarCompact ? "h-10 w-10" : "h-12 w-12"} shrink-0 rounded-full object-cover`}
-                  />
-                ) : (
-                  <span
-                    className={`flex ${sidebarCompact ? "h-10 w-10 text-sm" : "h-12 w-12 text-base"} items-center justify-center rounded-full font-semibold uppercase text-white`}
-                    style={{ backgroundColor: fallbackAvatar.color }}
-                  >
-                    {fallbackAvatar.initials}
-                  </span>
-                )}
+                <span
+                  className={`relative flex ${
+                    sidebarCompact ? "h-[60px] w-[60px]" : "h-16 w-16"
+                  } shrink-0 items-center justify-center rounded-full ${
+                    sidebarCompact ? "border-[5px]" : "border-[6px]"
+                  } ${
+                    profileOpen ? "border-sky-300" : "border-transparent"
+                  }`}
+                >
+                  {avatar ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={avatar}
+                      alt="Your avatar"
+                      className={`${sidebarCompact ? "h-[48px] w-[48px]" : "h-12 w-12"} shrink-0 rounded-full object-cover`}
+                    />
+                  ) : (
+                    <span
+                      className={`flex ${
+                        sidebarCompact ? "h-[48px] w-[48px] text-sm" : "h-12 w-12 text-base"
+                      } items-center justify-center rounded-full font-semibold uppercase text-white`}
+                      style={{ backgroundColor: fallbackAvatar.color }}
+                    >
+                      {fallbackAvatar.initials}
+                    </span>
+                  )}
               </span>
             </button>
 
@@ -658,7 +661,9 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
           </div>
         </header>
 
-        <main className="page-fade-in flex-1">{children}</main>
+        <Suspense fallback={<PageLoadingSkeleton />}>
+          <main className="page-fade-in flex-1">{children}</main>
+        </Suspense>
       </div>
     </div>
   );
