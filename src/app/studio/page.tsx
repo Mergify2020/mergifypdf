@@ -1114,9 +1114,9 @@ function WorkspaceClient() {
 
     let cancelled = false;
 
-    async function hydrateAnnotations() {
+    async function hydrateAnnotations(targetProjectId: string) {
       try {
-        const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}`, {
+        const res = await fetch(`/api/projects/${encodeURIComponent(targetProjectId)}`, {
           cache: "no-store",
         });
         if (!res.ok) return;
@@ -1175,7 +1175,7 @@ function WorkspaceClient() {
       }
     }
 
-    void hydrateAnnotations();
+    void hydrateAnnotations(projectId);
 
     return () => {
       cancelled = true;
