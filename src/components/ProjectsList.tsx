@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { ArrowUpRight, Check, Folder, MoreVertical } from "lucide-react";
+import { ArrowUpRight, FileText, Folder, MoreVertical } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { sanitizeProjectName } from "@/lib/projectName";
 import {
@@ -18,6 +19,7 @@ type ProjectItem = {
   subtitle: string;
   status: string;
   updated: string;
+   preview?: string | null;
   updatedAt?: number;
   persisted?: boolean;
 };
@@ -66,8 +68,6 @@ export default function ProjectsList({ initialProjects }: Props) {
   const [renaming, setRenaming] = useState<{ id: string; value: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
-  const [selectionMode, setSelectionMode] = useState(false);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [storageReady, setStorageReady] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
@@ -187,39 +187,8 @@ export default function ProjectsList({ initialProjects }: Props) {
 
   const visibleProjects = showAll ? projects : projects.slice(0, 5);
 
-  function toggleSelectMode() {
-    setSelectionMode((prev) => {
-      if (prev) setSelected(new Set());
-      setOpenMenuId(null);
-      return !prev;
-    });
-  }
-
   function toggleProjectMenu(projectId: string) {
     setOpenMenuId((current) => (current === projectId ? null : projectId));
-  }
-
-  function toggleSelectProject(projectId: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(projectId)) {
-        next.delete(projectId);
-      } else {
-        next.add(projectId);
-      }
-      return next;
-    });
-  }
-
-  function handleDeleteSelected() {
-    if (selected.size === 0) return;
-    setProjects((prev) => {
-      const next = prev.filter((project) => !selected.has(project.id));
-      persistStoredProjects(next);
-      return next;
-    });
-    setSelected(new Set());
-    setSelectionMode(false);
   }
 
   return (
@@ -235,23 +204,6 @@ export default function ProjectsList({ initialProjects }: Props) {
           <div className="flex items-center gap-3 text-sm">
             <button
               type="button"
-              onClick={toggleSelectMode}
-              className="btn-secondary font-medium"
-            >
-              {selectionMode ? "Cancel" : "Select"}
-            </button>
-            {selectionMode && (
-              <button
-                type="button"
-                onClick={handleDeleteSelected}
-                disabled={selected.size === 0}
-                className="btn-secondary border-rose-200 text-rose-600 hover:border-rose-400 hover:text-rose-700"
-              >
-                Delete
-              </button>
-            )}
-            <button
-              type="button"
               onClick={() => setShowAll((prev) => !prev)}
               className="btn-secondary"
             >
@@ -260,117 +212,91 @@ export default function ProjectsList({ initialProjects }: Props) {
             </button>
           </div>
         </div>
-        <div
-          className={`mt-5 overflow-hidden transition-[max-height] duration-500 ${
-            showAll ? "max-h-[2400px]" : "max-h-[520px]"
-          }`}
-        >
-          <div className="border-t border-slate-200">
-            <div className="hidden grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_auto] items-center gap-4 px-1 pb-2 pt-3 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9CA3AF] md:grid">
-              <span>Project</span>
-              <span>Last updated</span>
-              <span className="text-right">Actions</span>
-            </div>
-            <div className="divide-y divide-slate-100">
-            {visibleProjects.map((project) => {
-              const isSelected = selected.has(project.id);
-              return (
-                <div
-                  key={project.id}
-                  className="group relative flex flex-col gap-3 py-3 first:pt-0 last:pb-0 md:grid md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_auto] md:items-center md:gap-4 md:px-1 border-b border-gray-100 last:border-b-0 hover:bg-gray-50"
-                >
-                  <div className="flex items-center gap-3">
-                    {selectionMode ? (
-                      <button
-                        type="button"
-                        onClick={() => toggleSelectProject(project.id)}
-                        className={`flex h-6 w-6 items-center justify-center rounded-full border ${
-                          isSelected ? "border-[#024d7c] bg-[#024d7c]" : "border-slate-300 bg-white"
-                        }`}
-                      >
-                        {isSelected ? <Check className="h-4 w-4 text-white" /> : null}
-                      </button>
+        <div className="mt-6 grid gap-6 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+          {visibleProjects.map((project) => {
+            return (
+              <div
+                key={project.id}
+                className="group relative flex flex-col overflow-hidden rounded-[28px] border border-white/70 bg-white/80 shadow-[0_25px_60px_rgba(15,23,42,0.15)] transition hover:-translate-y-1 hover:shadow-[0_30px_80px_rgba(15,23,42,0.2)]"
+              >
+                <div className="relative">
+                  <div className="relative h-[180px] w-full overflow-hidden rounded-[28px] bg-[#f5f7fa]">
+                    {project.preview ? (
+                      <Image
+                        src={project.preview}
+                        alt={project.title}
+                        fill
+                        className="h-full w-full object-cover"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 25vw"
+                      />
                     ) : (
-                      <div className="relative">
-                        <button
-                          type="button"
-                          onClick={() => toggleProjectMenu(project.id)}
-                          className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-                          aria-label="Project options"
-                        >
-                          <MoreVertical className="h-4 w-4" />
-                        </button>
-                        {openMenuId === project.id ? (
-                          <div className="absolute left-0 top-9 z-20 w-52 rounded-xl border border-slate-200 bg-white py-2 text-sm shadow-lg">
-                            <div className="px-3 pb-1 text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">
-                              Project
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setOpenMenuId(null);
-                                openRename(project);
-                              }}
-                              className="flex w-full items-center gap-2 px-3 py-2 text-left text-slate-700 hover:bg-slate-50"
-                            >
-                              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
-                                <path
-                                  d="M12 20h9"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                  strokeLinecap="round"
-                                />
-                                <path
-                                  d="M16.5 3.5a2.121 2.121 0 013 3L7 19.5 3 21l1.5-4L16.5 3.5z"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                />
-                              </svg>
-                              Rename project
-                            </button>
-                            <div className="mt-1 border-t border-slate-100" />
-                            <div className="px-3 pt-2 text-xs text-slate-500">
-                              Updated {project.updated}
-                            </div>
-                          </div>
-                        ) : null}
+                      <div className="flex h-full w-full items-center justify-center">
+                        <FileText className="h-10 w-10 text-slate-500 opacity-40" />
                       </div>
                     )}
-                    <p className="text-lg font-semibold text-slate-900">{project.title}</p>
                   </div>
-                  <div className="hidden text-sm text-slate-500 md:block" />
-                  <div className="flex flex-wrap justify-start gap-3 text-sm md:justify-end">
-                    <button
-                      type="button"
-                      className="btn-secondary gap-1 px-3 py-1"
-                    >
-                      Download
-                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
-                        <path
-                          d="M12 5v10m0 0l-4-4m4 4l4-4"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                        <path d="M5 19h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                      </svg>
-                    </button>
+                  <span className="absolute left-4 top-4 rounded-full bg-slate-900/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white shadow-lg">
+                    Private
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => toggleProjectMenu(project.id)}
+                    className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/80 text-slate-500 shadow-lg transition hover:bg-white"
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </button>
+                  {openMenuId === project.id ? (
+                    <div className="absolute right-4 top-16 z-20 w-52 rounded-2xl border border-slate-200 bg-white py-2 text-sm text-slate-800 shadow-2xl">
+                      <div className="px-3 pb-1 text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">
+                        Project
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOpenMenuId(null);
+                          openRename(project);
+                        }}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-slate-700 transition hover:bg-slate-50"
+                      >
+                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
+                          <path d="M12 20h9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                          <path
+                            d="M16.5 3.5a2.121 2.121 0 013 3L7 19.5 3 21l1.5-4L16.5 3.5z"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                        Rename project
+                      </button>
+                      <div className="mt-1 border-t border-slate-100" />
+                      <div className="px-3 pt-2 text-xs text-slate-500">Updated {project.updated}</div>
+                    </div>
+                  ) : null}
+                </div>
+                <div className="flex flex-1 flex-col px-6 pb-6 pt-5">
+                  <div className="space-y-1">
+                    <p className="text-lg font-semibold text-slate-900">{project.title}</p>
+                    <p className="text-sm text-slate-500">{project.subtitle}</p>
+                  </div>
+                  <div className="mt-auto flex items-center justify-between text-xs font-medium text-slate-500">
+                    <div className="flex flex-col text-[12px]">
+                      <span className="text-slate-400">Last updated</span>
+                      <span>{project.updated}</span>
+                    </div>
                     <Link
-                      href="/studio"
-                      className="btn-primary gap-1 px-3 py-1"
+                      href={project.persisted ? `/studio?project=${encodeURIComponent(project.id)}` : "/studio"}
+                      className="btn-primary gap-1 px-3 py-2 text-sm"
                     >
                       Open
                       <ArrowUpRight className="h-4 w-4" />
                     </Link>
                   </div>
                 </div>
-              );
-            })}
-            </div>
-          </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 

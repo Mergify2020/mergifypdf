@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
@@ -432,8 +432,10 @@ function hexToRgb(hex: string) {
 }
 
 function useProjects() {
+  const searchParams = useSearchParams();
+  const initialProjectId = typeof window !== "undefined" ? searchParams.get("project") : null;
   const [projects, setProjects] = useState<CloudProject[]>([]);
-  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(initialProjectId);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [savingProject, setSavingProject] = useState(false);
 
@@ -746,6 +748,7 @@ function SortableOrganizeTile({
 function WorkspaceClient() {
   const { data: authSession } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { saveProject, savingProject } = useProjects();
   const [showDownloadGate, setShowDownloadGate] = useState(false);
   const [showDelayOverlay, setShowDelayOverlay] = useState<"intro" | "progress" | null>(null);
@@ -870,7 +873,7 @@ function WorkspaceClient() {
   const customFontBytesRef = useRef<Map<string, Uint8Array>>(new Map());
   const pdfFontCacheRef = useRef<Map<string, PDFFont>>(new Map());
   const fontkitModuleRef = useRef<null | { default?: unknown }>(null);
-  const hasAutoSavedCloudProjectRef = useRef(false);
+  const hasHydratedCloudAnnotationsRef = useRef(false);
 
   function resolveFontVariant(bold: boolean, italic: boolean): TextFontVariant {
     if (bold && italic) return "boldItalic";
@@ -1029,6 +1032,7 @@ function WorkspaceClient() {
   const [projectNameDraft, setProjectNameDraft] = useState("Untitled Project");
   const [projectNameError, setProjectNameError] = useState<string | null>(null);
   const [organizeMode, setOrganizeMode] = useState(false);
+  const [firstPageThumb, setFirstPageThumb] = useState<string | null>(null);
 
   const addInputRef = useRef<HTMLInputElement>(null);
   const renderedSourcesRef = useRef(0);
@@ -1099,6 +1103,234 @@ function WorkspaceClient() {
     window.addEventListener("resize", updatePreviewHeightLimit);
     return () => window.removeEventListener("resize", updatePreviewHeightLimit);
   }, [updatePreviewHeightLimit]);
+
+  /** Rehydrate annotations from the cloud project when editing an existing one */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (hasHydratedCloudAnnotationsRef.current) return;
+    const projectId = searchParams.get("project");
+    if (!projectId) return;
+    if (pages.length === 0) return;
+
+    let cancelled = false;
+
+    async function hydrateAnnotations() {
+      try {
+        const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}`, {
+          cache: "no-store",
+        });
+        if (!res.ok) return;
+        const json = (await res.json().catch(() => null)) as {
+          project?: { data?: any };
+        } | null;
+        const project = json?.project;
+        if (!project || !project.data || cancelled) return;
+
+        const data = project.data as {
+          highlights?: Record<string, HighlightStroke[]>;
+          textAnnotations?: Record<string, TextAnnotation[]>;
+          signaturePlacements?: Record<string, SignaturePlacement[]>;
+          savedSignatures?: SavedSignature[];
+          pages?: {
+            id: string;
+            rotation?: number;
+          }[];
+        };
+
+        if (data.highlights) {
+          setHighlights(data.highlights);
+        }
+        if (data.textAnnotations) {
+          setTextAnnotations(data.textAnnotations);
+        }
+        if (data.signaturePlacements) {
+          setSignaturePlacements(data.signaturePlacements);
+        }
+        if (data.savedSignatures) {
+          setSavedSignatures(data.savedSignatures);
+        }
+        if (Array.isArray(data.pages) && data.pages.length > 0) {
+          const rotationById = new Map<string, number>();
+          data.pages.forEach((page) => {
+            if (page && typeof page.id === "string" && typeof page.rotation === "number") {
+              rotationById.set(page.id, page.rotation);
+            }
+          });
+          if (rotationById.size > 0) {
+            setPages((current) =>
+              current.map((page) =>
+                rotationById.has(page.id)
+                  ? { ...page, rotation: rotationById.get(page.id) ?? page.rotation }
+                  : page
+              )
+            );
+          }
+        }
+
+        if (!cancelled) {
+          hasHydratedCloudAnnotationsRef.current = true;
+        }
+      } catch {
+        // ignore cloud hydration failures; fall back to local state
+      }
+    }
+
+    void hydrateAnnotations();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pages.length, searchParams]);
+
+  /** Derive a small annotated thumbnail of the first page for project cards */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (pages.length === 0) {
+      setFirstPageThumb(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function generateThumb() {
+      const page = pages[0];
+      if (!page.preview) {
+        setFirstPageThumb(null);
+        return;
+      }
+
+      try {
+        const baseImage = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const img = new Image();
+          img.src = page.preview;
+          img.onload = () => resolve(img);
+          img.onerror = () => reject(new Error("Failed to load base preview image"));
+        });
+        if (cancelled) return;
+
+        const naturalWidth = page.width || baseImage.width || 612;
+        const naturalHeight = page.height || baseImage.height || naturalWidth * DEFAULT_ASPECT_RATIO;
+        const rotationDegrees = normalizeRotation(page.rotation);
+        const rotated = rotationDegrees % 180 !== 0;
+        const baseWidth = rotated ? naturalHeight : naturalWidth;
+        const baseHeight = rotated ? naturalWidth : naturalHeight;
+
+        const targetWidth = 480;
+        const scale = Math.min(1, targetWidth / baseWidth);
+        const outputWidth = baseWidth * scale;
+        const outputHeight = baseHeight * scale;
+
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(outputWidth));
+        canvas.height = Math.max(1, Math.round(outputHeight));
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.save();
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.rotate((rotationDegrees * Math.PI) / 180);
+
+        const drawWidth = naturalWidth * scale;
+        const drawHeight = naturalHeight * scale;
+        ctx.drawImage(baseImage, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+
+        const pageHighlights = highlights[page.id] ?? [];
+        if (pageHighlights.length > 0) {
+          const pageWidthPx = drawWidth;
+          const pageHeightPx = drawHeight;
+          ctx.lineCap = "round";
+          ctx.lineJoin = "round";
+          pageHighlights.forEach((stroke) => {
+            if (stroke.points.length < 2) return;
+            ctx.beginPath();
+            stroke.points.forEach((pt, index) => {
+              const x = (pt.x - 0.5) * pageWidthPx;
+              const y = (pt.y - 0.5) * pageHeightPx;
+              if (index === 0) {
+                ctx.moveTo(x, y);
+              } else {
+                ctx.lineTo(x, y);
+              }
+            });
+            ctx.strokeStyle = stroke.color;
+            ctx.globalAlpha = stroke.tool === "pencil" ? 1 : 0.25;
+            ctx.lineWidth = Math.max(1, stroke.thickness * pageWidthPx);
+            ctx.stroke();
+          });
+          ctx.globalAlpha = 1;
+        }
+
+        const pageTexts = textAnnotations[page.id] ?? [];
+        if (pageTexts.length > 0) {
+          const pageWidthPx = drawWidth;
+          const pageHeightPx = drawHeight;
+          ctx.fillStyle = "#111827";
+          pageTexts.forEach((annotation) => {
+            const content = annotation.text;
+            if (!content || content === TEXT_PLACEHOLDER) return;
+            const boxWidth = (annotation.width ?? 0.14) * pageWidthPx;
+            const padding = Math.min(6, boxWidth * 0.05);
+            const x = (annotation.x - 0.5) * pageWidthPx + padding;
+            const startY = (annotation.y - 0.5) * pageHeightPx + padding;
+            const fontSize = 10;
+            const lineHeight = fontSize * 1.3;
+            ctx.font = `${fontSize}px Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+            ctx.textBaseline = "top";
+            const lines = content.split(/\r?\n/).slice(0, 6);
+            let cursorY = startY;
+            lines.forEach((line) => {
+              const maxWidth = Math.max(10, boxWidth - padding * 2);
+              ctx.fillText(line, x, cursorY, maxWidth);
+              cursorY += lineHeight;
+            });
+          });
+        }
+
+        const pageSignatures = signaturePlacements[page.id] ?? [];
+        if (pageSignatures.length > 0) {
+          const placed = pageSignatures.filter((sig) => sig.status === "placed");
+          for (const sig of placed) {
+            if (!sig.dataUrl) continue;
+            const sigImage = await new Promise<HTMLImageElement>((resolve, reject) => {
+              const img = new Image();
+              img.src = sig.dataUrl;
+              img.onload = () => resolve(img);
+              img.onerror = () => reject(new Error("Failed to load signature image"));
+            });
+            if (cancelled) return;
+            const sigWidth = sig.width * drawWidth;
+            const sigHeight = sig.height * drawHeight;
+            const centerX = (sig.x - 0.5 + sig.width / 2) * drawWidth;
+            const centerY = (sig.y - 0.5 + sig.height / 2) * drawHeight;
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.rotate(((sig.rotation ?? 0) * Math.PI) / 180);
+            ctx.drawImage(sigImage, -sigWidth / 2, -sigHeight / 2, sigWidth, sigHeight);
+            ctx.restore();
+          }
+        }
+
+        ctx.restore();
+
+        if (!cancelled) {
+          setFirstPageThumb(canvas.toDataURL("image/png", PREVIEW_IMAGE_QUALITY));
+        }
+      } catch {
+        if (!cancelled) {
+          setFirstPageThumb(pages[0]?.thumb ?? null);
+        }
+      }
+    }
+
+    void generateThumb();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pages, highlights, textAnnotations, signaturePlacements]);
 
   /** Rehydrate any stored PDFs from IndexedDB so refreshes survive deployments */
   useEffect(() => {
@@ -2609,8 +2841,10 @@ function WorkspaceClient() {
 
   const buildCloudProjectData = useCallback(() => {
     if (!hasWorkspaceData) return null;
+    const cloudThumb = firstPageThumb ?? (pages.length > 0 ? pages[0]?.thumb ?? null : null);
     return {
       name: projectName,
+      firstPageThumb: cloudThumb,
       sources: sources.map((source) => ({
         id: source.storageId,
         name: source.name,
@@ -2632,9 +2866,10 @@ function WorkspaceClient() {
     };
   }, [
     hasWorkspaceData,
+    pages,
+    firstPageThumb,
     projectName,
     sources,
-    pages,
     highlights,
     textAnnotations,
     signaturePlacements,
@@ -2644,20 +2879,22 @@ function WorkspaceClient() {
   useEffect(() => {
     if (!authSession?.user) return;
     if (!hasWorkspaceData) return;
-    if (hasAutoSavedCloudProjectRef.current) return;
-    let cancelled = false;
     const ownerId = authSession.user.id ?? authSession.user.email ?? null;
-    const run = async () => {
+    if (!ownerId) return;
+
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
       const projectData = buildCloudProjectData();
-      if (!projectData) return;
-      const saved = await saveProject(projectName, projectData);
-      if (!saved || !ownerId || cancelled) return;
-      addRecentProject(ownerId, saved.name ?? projectName, saved.id);
-      hasAutoSavedCloudProjectRef.current = true;
-    };
-    void run();
+      if (!projectData || cancelled) return;
+      void saveProject(projectName, projectData).then((saved) => {
+        if (!saved || cancelled) return;
+        addRecentProject(ownerId, saved.name ?? projectName, saved.id);
+      });
+    }, 1500);
+
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
   }, [authSession?.user, buildCloudProjectData, hasWorkspaceData, projectName, saveProject]);
 

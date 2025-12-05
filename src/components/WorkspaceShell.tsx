@@ -10,14 +10,17 @@ import {
   FileSignature,
   FileText,
   FolderKanban,
+  Folders,
   Home,
   LogOut,
   Menu,
   PenSquare,
   Plus,
   Settings,
+  Star,
   Trash2,
   User,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
@@ -44,7 +47,7 @@ const navigationItems: SidebarItem[] = [
 type SidebarPanel = {
   title: string;
   subtitle: string;
-  items: { label: string; description: string }[];
+  items: { label: string; description?: string; icon?: LucideIcon; key?: string }[];
   action?: { label: string; href: string };
 };
 
@@ -60,14 +63,14 @@ const sidebarPanels: Record<string, SidebarPanel> = {
     action: { label: "View all projects", href: "/projects" },
   },
   projects: {
-    title: "Project shortcuts",
-    subtitle: "Your libraries",
+    title: "",
+    subtitle: "",
     items: [
-      { label: "Active workflows", description: "6 drafts in progress" },
-      { label: "Templates folder", description: "Re-usable layouts" },
-      { label: "Archive", description: "Completed agreements" },
+      { label: "All Projects", icon: Folders, key: "all" },
+      { label: "Your Projects", icon: User, key: "yours" },
+      { label: "Shared With You", icon: Users, key: "shared" },
+      { label: "Favorites", icon: Star, key: "favorites" },
     ],
-    action: { label: "Go to projects", href: "/projects" },
   },
   signatures: {
     title: "Signature center",
@@ -108,6 +111,8 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
   const [compactSidebar, setCompactSidebar] = useState(false);
   const [narrowSidebar, setNarrowSidebar] = useState(false);
   const [overlaySidebar, setOverlaySidebar] = useState(false);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
   const createRef = useRef<HTMLDivElement>(null);
   const avatarKey = session?.user?.email ?? session?.user?.id ?? null;
@@ -118,6 +123,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
     session?.user?.name ?? session?.user?.email ?? "Account"
   );
 
+  const [activeProjectsFilter, setActiveProjectsFilter] = useState("all");
   const itemLabelClasses = "opacity-100 translate-x-0 max-w-full";
   const panelKey =
     pathname === "/"
@@ -128,6 +134,8 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
           ? "signatures"
           : "default";
   const activePanel = sidebarPanels[panelKey] ?? sidebarPanels.default;
+  const simplePanelList =
+    activePanel.items.length > 0 && activePanel.items.every((item) => item.icon && !item.description);
 
   useEffect(() => {
     if (!profileOpen) return;
@@ -216,6 +224,27 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
       : "";
   const contentOffsetClass = `${baseContentOffsetClass} ${expandedContentOffsetClass}`.trim();
 
+  useEffect(() => {
+    if (!expanded || !shouldOverlay) return;
+
+    const handleClick = (event: MouseEvent) => {
+      if (!(event.target instanceof Node)) return;
+      if (sidebarRef.current?.contains(event.target) || panelRef.current?.contains(event.target)) {
+        return;
+      }
+      setExpanded(false);
+    };
+
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [expanded, shouldOverlay]);
+
+  useEffect(() => {
+    if (panelKey === "projects") {
+      setActiveProjectsFilter("all");
+    }
+  }, [panelKey]);
+
   const renderItems = (
     items: SidebarItem[],
     {
@@ -257,7 +286,11 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
           type="button"
           onClick={() => {
             if (disabled) return;
-            router.push(href);
+            if (label === "Projects") {
+              router.push("/projects/all");
+            } else {
+              router.push(href);
+            }
             setMobileOpen(false);
           }}
           aria-label={label}
@@ -277,7 +310,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
             <span
               className={`inline-flex flex-1 overflow-hidden whitespace-nowrap text-sm transition-all duration-200 ease-in-out ${
                 isExpanded ? (sidebarCompact ? "ml-1.5 lg:ml-2" : "ml-2") : "ml-0"
-              } ${labelClassName ?? ""}`}
+              } ${labelClassName ?? ""} font-semibold`}
             >
               {label}
             </span>
@@ -300,6 +333,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
       <aside className="hidden md:flex fixed left-0 top-0 z-30 h-screen text-slate-800">
         <div className="relative flex h-full w-full">
           <div
+            ref={sidebarRef}
             className={`flex h-full ${railWidthClass} flex-col border-r border-white/40 bg-white/80 backdrop-blur-xl shadow-[0_25px_80px_rgba(15,23,42,0.25)] ${
               sidebarCompact ? "z-10" : "z-20"
             }`}
@@ -329,9 +363,9 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                 >
                   <Plus className={`${sidebarCompact ? "h-4.5 w-4.5 lg:h-5 lg:w-5" : "h-5 w-5"} stroke-[3]`} />
                 </span>
-                <span className="text-[10px] font-bold uppercase text-white">Create</span>
-              </button>
-            </div>
+            <span className="text-[10px] font-bold uppercase text-white">Create</span>
+          </button>
+        </div>
             <nav className="flex flex-col gap-1">
               {renderItems(navigationItems, {
                 labelClassName: itemLabelClasses,
@@ -479,25 +513,67 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
           </div>
           {expanded ? (
             <div
-              className={`absolute ${panelLeftClass} top-0 hidden h-full bg-white px-4 py-6 text-slate-800 shadow-[20px_0_60px_rgba(15,23,42,0.25)] lg:shadow-[0_35px_90px_rgba(15,23,42,0.3)] transition-all duration-300 ${
-                expanded ? "translate-x-0 opacity-100 pointer-events-auto" : "-translate-x-4 opacity-0"
-              } md:flex ${sidebarCompact ? "w-[240px]" : "w-[320px]"} z-0`}
+              ref={panelRef}
+              className={`absolute ${panelLeftClass} top-0 hidden h-full bg-gradient-to-b from-white via-white/95 to-white/90 px-4 py-6 text-slate-800 shadow-[20px_0_60px_rgba(15,23,42,0.25)] lg:shadow-[0_35px_90px_rgba(15,23,42,0.3)] backdrop-blur-xl transition-[transform,opacity,filter] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform md:flex ${sidebarCompact ? "w-[240px]" : "w-[320px]"} z-0 ${
+                expanded ? "translate-x-0 opacity-100 blur-0 pointer-events-auto" : "-translate-x-10 opacity-0 blur-sm"
+              }`}
             >
               <div className="flex w-full flex-col gap-6">
                 <AppHeaderBrand />
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                    {activePanel.subtitle}
-                  </p>
-                  <h3 className="mt-2 text-lg font-semibold">{activePanel.title}</h3>
-                </div>
-                <ul className="space-y-3">
-                  {activePanel.items.map((item) => (
-                    <li key={item.label} className="rounded-2xl border border-slate-100 bg-white px-3 py-2">
-                      <p className="text-sm font-semibold text-slate-800">{item.label}</p>
-                      <p className="text-xs text-slate-500">{item.description}</p>
-                    </li>
-                  ))}
+                {activePanel.title ? (
+                  <div>
+                    {activePanel.subtitle ? (
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                        {activePanel.subtitle}
+                      </p>
+                    ) : null}
+                    <h3 className={`mt-2 text-lg font-semibold ${activePanel.subtitle ? "" : "mt-0"}`}>
+                      {activePanel.title}
+                    </h3>
+                  </div>
+                ) : null}
+                <ul className={simplePanelList ? "space-y-2" : "space-y-3"}>
+                  {activePanel.items.map((item) => {
+                    const ItemIcon = item.icon;
+                    if (simplePanelList && ItemIcon) {
+                      return (
+                        <li key={item.key ?? item.label}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newValue = item.key ?? item.label;
+                              setActiveProjectsFilter(newValue);
+                              if (newValue === "all") {
+                                router.push("/projects/all");
+                              }
+                            }}
+                            className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-[0.95rem] font-semibold transition ${
+                              activeProjectsFilter === (item.key ?? item.label)
+                                ? "bg-sky-50 text-sky-700 shadow-inner"
+                                : "text-slate-700 hover:bg-slate-50"
+                            }`}
+                          >
+                            <ItemIcon
+                              className={`h-6 w-6 ${
+                                activeProjectsFilter === (item.key ?? item.label) ? "text-sky-600" : "text-slate-500"
+                              }`}
+                              aria-hidden
+                            />
+                            <span className="text-[0.95rem]">{item.label}</span>
+                          </button>
+                        </li>
+                      );
+                    }
+
+                    return (
+                      <li key={item.label} className="rounded-2xl border border-slate-100 bg-white px-3 py-2">
+                        <p className="text-sm font-semibold text-slate-800">{item.label}</p>
+                        {item.description ? (
+                          <p className="text-xs text-slate-500">{item.description}</p>
+                        ) : null}
+                      </li>
+                    );
+                  })}
                 </ul>
                 {activePanel.action ? (
                   <button

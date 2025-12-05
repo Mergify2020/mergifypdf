@@ -1,0 +1,20 @@
+<svg width="640" height="360" viewBox="0 0 640 360" xmlns="http://www.w3.org/2000/svg">
+  <rect width="640" height="360" rx="48" fill="#F3F4F6"/>
+  <rect x="100" y="40" width="440" height="280" rx="26" fill="#fff"/>
+  <rect x="120" y="65" width="120" height="22" rx="11" fill="#0F172A" opacity="0.85"/>
+  <text x="140" y="82" font-size="14" font-family="Inter, Arial" fill="#fff">GR</text>
+  <rect x="260" y="65" width="100" height="22" rx="11" fill="#CBD5F5"/>
+  <text x="270" y="82" font-size="12" font-family="Inter, Arial" fill="#1F2937">AUDIT</text>
+  <text x="380" y="82" font-size="12" font-family="Inter, Arial" fill="#475569">INVOICE</text>
+  <rect x="120" y="110" width="400" height="14" rx="7" fill="#CBD5F5"/>
+  <rect x="120" y="135" width="360" height="12" rx="6" fill="#E5E7EB"/>
+  <rect x="120" y="160" width="400" height="80" rx="12" fill="#F8FAFC"/>
+  <rect x="140" y="175" width="160" height="12" rx="6" fill="#CBD5F5"/>
+  <rect x="140" y="200" width="120" height="10" rx="5" fill="#E2E8F0"/>
+  <rect x="330" y="175" width="160" height="12" rx="6" fill="#E2E8F0"/>
+  <rect x="330" y="200" width="140" height="10" rx="5" fill="#CBD5F5"/>
+  <rect x="120" y="255" width="400" height="60" rx="10" fill="#F8FAFC"/>
+  <rect x="140" y="270" width="260" height="12" rx="6" fill="#CBD5F5"/>
+  <rect x="140" y="295" width="200" height="10" rx="5" fill="#E2E8F0"/>
+  <rect x="360" y="295" width="120" height="10" rx="5" fill="#CBD5F5"/>
+</svg>

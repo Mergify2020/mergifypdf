@@ -1,0 +1,15 @@
+<svg width="640" height="360" viewBox="0 0 640 360" xmlns="http://www.w3.org/2000/svg">
+  <rect width="640" height="360" rx="48" fill="#F3F4F6"/>
+  <rect x="95" y="35" width="450" height="290" rx="30" fill="#fff"/>
+  <rect x="120" y="65" width="160" height="20" rx="10" fill="#0F172A" opacity="0.85"/>
+  <text x="140" y="80" font-size="12" font-family="Inter, Arial" fill="#fff">VENDOR RENEWAL</text>
+  <rect x="120" y="110" width="380" height="12" rx="6" fill="#E2E8F0"/>
+  <rect x="120" y="135" width="340" height="12" rx="6" fill="#E5E7EB"/>
+  <rect x="120" y="160" width="380" height="120" rx="16" fill="#F8FAFC"/>
+  <rect x="140" y="175" width="280" height="12" rx="6" fill="#CBD5F5"/>
+  <rect x="140" y="200" width="240" height="12" rx="6" fill="#E2E8F0"/>
+  <rect x="140" y="225" width="260" height="12" rx="6" fill="#CBD5F5"/>
+  <rect x="120" y="300" width="260" height="10" rx="5" fill="#CBD5F5"/>
+  <rect x="120" y="270" width="140" height="12" rx="6" fill="#94A3B8"/>
+  <rect x="280" y="270" width="120" height="12" rx="6" fill="#E2E8F0"/>
+</svg>
