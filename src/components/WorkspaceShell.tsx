@@ -106,6 +106,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
   const [createOpen, setCreateOpen] = useState(false);
   const [compactSidebar, setCompactSidebar] = useState(false);
   const [narrowSidebar, setNarrowSidebar] = useState(false);
+  const [overlaySidebar, setOverlaySidebar] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const createRef = useRef<HTMLDivElement>(null);
   const avatarKey = session?.user?.email ?? session?.user?.id ?? null;
@@ -189,7 +190,9 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
   useEffect(() => {
     const updateWidth = () => {
       if (typeof window === "undefined") return;
-      setNarrowSidebar(window.innerWidth < 1280);
+      const width = window.innerWidth;
+      setNarrowSidebar(width < 1280);
+      setOverlaySidebar(width < 1100);
     };
 
     updateWidth();
@@ -200,10 +203,17 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
   }, []);
 
   const sidebarCompact = compactSidebar || narrowSidebar;
+  const shouldOverlay = overlaySidebar;
   const railWidthClass = sidebarCompact ? "w-[104px]" : "w-24";
   const panelLeftClass = sidebarCompact ? "left-[104px]" : "left-[96px]";
-  const contentOffsetClass = sidebarCompact ? "md:ml-[104px]" : "md:ml-24";
-  const expandedDesktopContentOffset = expanded && !sidebarCompact ? "lg:ml-[416px]" : "";
+  const baseContentOffsetClass = sidebarCompact ? "md:ml-[104px]" : "md:ml-24";
+  const expandedContentOffsetClass =
+    expanded && !shouldOverlay
+      ? sidebarCompact
+        ? "lg:ml-[344px]"
+        : "lg:ml-[416px]"
+      : "";
+  const contentOffsetClass = `${baseContentOffsetClass} ${expandedContentOffsetClass}`.trim();
 
   const renderItems = (
     items: SidebarItem[],
@@ -335,7 +345,12 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
             ) : null}
           </div>
 
-          <div ref={profileRef} className="relative z-50 px-3 pb-6 mt-auto sticky bottom-4">
+          <div
+            ref={profileRef}
+            className={`relative z-50 px-3 pb-6 ${
+              sidebarCompact ? "mt-1" : "mt-auto sticky bottom-4"
+            }`}
+          >
             <button
               type="button"
               onClick={() => setProfileOpen((prev) => !prev)}
@@ -625,7 +640,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
       ) : null}
 
       <div
-        className={`flex min-h-screen w-full flex-col bg-white transition-all duration-300 ease-in-out ${contentOffsetClass} ${expandedDesktopContentOffset}`}
+        className={`flex min-h-screen w-full flex-col bg-white transition-all duration-300 ease-in-out ${contentOffsetClass}`}
       >
         <header className="sticky top-0 z-20 w-full border-b border-slate-200 bg-white/90 backdrop-blur md:hidden">
           <div className="mx-auto flex h-[76px] w-full max-w-7xl items-center justify-between px-4 lg:px-6">
