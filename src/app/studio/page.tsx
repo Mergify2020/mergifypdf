@@ -1201,7 +1201,7 @@ function WorkspaceClient() {
 
       try {
         const baseImage = await new Promise<HTMLImageElement>((resolve, reject) => {
-          const img = new Image();
+          const img = new window.Image();
           img.src = page.preview;
           img.onload = () => resolve(img);
           img.onerror = () => reject(new Error("Failed to load base preview image"));
@@ -1295,7 +1295,7 @@ function WorkspaceClient() {
           for (const sig of placed) {
             if (!sig.dataUrl) continue;
             const sigImage = await new Promise<HTMLImageElement>((resolve, reject) => {
-              const img = new Image();
+              const img = new window.Image();
               img.src = sig.dataUrl;
               img.onload = () => resolve(img);
               img.onerror = () => reject(new Error("Failed to load signature image"));
