@@ -230,7 +230,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
           ? "h-6 w-6"
           : "h-9 w-9";
       const expandedLayoutClasses = sidebarCompact
-        ? "items-center justify-start gap-3 px-3 py-2 text-left text-[13px] lg:text-base"
+        ? "items-center justify-start gap-2 px-2.5 py-1.5 text-left text-[11px]"
         : "items-center justify-start gap-3 px-3 py-2 text-left";
       const collapsedLayoutClasses = sidebarCompact
         ? "flex-col items-stretch justify-center gap-1.5 px-1 py-2.5 text-center"
@@ -285,11 +285,11 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
       <aside className="hidden md:flex fixed left-0 top-0 z-30 h-screen text-slate-800">
         <div className="relative flex h-full w-full">
           <div
-            className={`flex h-full ${sidebarCompact ? "w-20" : "w-24"} flex-col border-r border-white/40 bg-white/80 backdrop-blur-xl shadow-[0_25px_80px_rgba(15,23,42,0.25)] ${
+            className={`flex h-full ${sidebarCompact ? "w-[96px]" : "w-24"} flex-col border-r border-white/40 bg-white/80 backdrop-blur-xl shadow-[0_25px_80px_rgba(15,23,42,0.25)] ${
               sidebarCompact ? "z-10" : "z-20"
             }`}
           >
-            <div className="flex flex-1 flex-col gap-4 overflow-y-auto overflow-x-hidden px-3 py-5">
+            <div className="flex flex-1 flex-col gap-4 overflow-y-auto overflow-x-hidden px-2 lg:px-3 py-5">
               <div className="flex items-center justify-center">
               <button
                 type="button"
@@ -306,46 +306,16 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                 type="button"
                 onClick={() => setCreateOpen((prev) => !prev)}
                 className={`flex w-full flex-col items-center gap-2 rounded-2xl bg-[#2f8df0] ${
-                  sidebarCompact ? "px-2.5 py-2" : "px-3 py-2.5"
+                  sidebarCompact ? "px-2 py-1.5" : "px-3 py-2.5"
                 } text-center text-sm font-semibold text-white shadow-lg transition hover:bg-[#2573c7]`}
               >
                 <span
-                  className={`flex ${sidebarCompact ? "h-7 w-7 lg:h-8 lg:w-8" : "h-8 w-8"} items-center justify-center rounded-full bg-white/20 text-white`}
+                  className={`flex ${sidebarCompact ? "h-6 w-6 lg:h-8 lg:w-8" : "h-8 w-8"} items-center justify-center rounded-full bg-white/20 text-white`}
                 >
                   <Plus className={`${sidebarCompact ? "h-4.5 w-4.5 lg:h-5 lg:w-5" : "h-5 w-5"} stroke-[3]`} />
                 </span>
                 <span className="text-[10px] font-bold uppercase text-white">Create</span>
               </button>
-              <div
-                className={`relative transition ${
-                  createOpen ? "opacity-100" : "pointer-events-none opacity-0"
-                }`}
-              >
-                <div className="absolute left-full ml-4 top-1/2 -translate-y-1/2 w-56 rounded-2xl border border-white/40 bg-white/95 p-3 text-sm text-slate-800 shadow-xl">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      router.push("/studio");
-                      setCreateOpen(false);
-                    }}
-                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-slate-100"
-                  >
-                    <FileText className="h-4 w-4 text-slate-500" aria-hidden />
-                    <span>New Editing Project</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      router.push("/signature-center");
-                      setCreateOpen(false);
-                    }}
-                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-slate-100"
-                  >
-                    <FileSignature className="h-4 w-4 text-slate-500" aria-hidden />
-                    <span>New Signature Request</span>
-                  </button>
-                </div>
-              </div>
             </div>
             <nav className="flex flex-col gap-1">
               {renderItems(navigationItems, {
@@ -361,7 +331,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
             ) : null}
           </div>
 
-          <div ref={profileRef} className="relative z-50 px-3 pb-6">
+          <div ref={profileRef} className="relative z-50 px-3 pb-6 mt-auto sticky bottom-4">
             <button
               type="button"
               onClick={() => setProfileOpen((prev) => !prev)}
@@ -485,38 +455,40 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
               </div>
             </div>
           </div>
-          <div
-            className={`pointer-events-none absolute ${sidebarCompact ? "left-[80px]" : "left-[96px]"} top-0 hidden h-full bg-white/95 px-4 py-6 text-slate-800 shadow-[0_35px_90px_rgba(15,23,42,0.3)] transition-all duration-300 ${
-              expanded ? "translate-x-0 opacity-100 pointer-events-auto" : "-translate-x-4 opacity-0"
-            } md:flex ${sidebarCompact ? "w-[240px]" : "w-[320px]"} z-0`}
-          >
-            <div className="flex w-full flex-col gap-6">
-              <AppHeaderBrand />
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                  {activePanel.subtitle}
-                </p>
-                <h3 className="mt-2 text-lg font-semibold">{activePanel.title}</h3>
+          {expanded ? (
+            <div
+              className={`absolute left-[96px] top-0 hidden h-full bg-white px-4 py-6 text-slate-800 shadow-[20px_0_60px_rgba(15,23,42,0.25)] lg:shadow-[0_35px_90px_rgba(15,23,42,0.3)] transition-all duration-300 ${
+                expanded ? "translate-x-0 opacity-100 pointer-events-auto" : "-translate-x-4 opacity-0"
+              } md:flex ${sidebarCompact ? "w-[240px]" : "w-[320px]"} z-0`}
+            >
+              <div className="flex w-full flex-col gap-6">
+                <AppHeaderBrand />
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    {activePanel.subtitle}
+                  </p>
+                  <h3 className="mt-2 text-lg font-semibold">{activePanel.title}</h3>
+                </div>
+                <ul className="space-y-3">
+                  {activePanel.items.map((item) => (
+                    <li key={item.label} className="rounded-2xl border border-slate-100 bg-white px-3 py-2">
+                      <p className="text-sm font-semibold text-slate-800">{item.label}</p>
+                      <p className="text-xs text-slate-500">{item.description}</p>
+                    </li>
+                  ))}
+                </ul>
+                {activePanel.action ? (
+                  <button
+                    type="button"
+                    onClick={() => router.push(activePanel.action!.href)}
+                    className="text-sm font-semibold text-sky-600 transition hover:text-sky-700"
+                  >
+                    {activePanel.action.label}
+                  </button>
+                ) : null}
               </div>
-              <ul className="space-y-3">
-                {activePanel.items.map((item) => (
-                  <li key={item.label} className="rounded-2xl border border-slate-100 bg-white px-3 py-2">
-                    <p className="text-sm font-semibold text-slate-800">{item.label}</p>
-                    <p className="text-xs text-slate-500">{item.description}</p>
-                  </li>
-                ))}
-              </ul>
-              {activePanel.action ? (
-                <button
-                  type="button"
-                  onClick={() => router.push(activePanel.action!.href)}
-                  className="text-sm font-semibold text-sky-600 transition hover:text-sky-700"
-                >
-                  {activePanel.action.label}
-                </button>
-              ) : null}
             </div>
-          </div>
+          ) : null}
         </div>
       </aside>
 
@@ -650,7 +622,13 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
 
       <div
         className={`flex min-h-screen w-full flex-col bg-white transition-all duration-300 ease-in-out ${
-          expanded ? "md:ml-24 lg:ml-[416px]" : "md:ml-24 lg:ml-24"
+          expanded
+            ? sidebarCompact
+              ? "md:ml-[96px]"
+              : "md:ml-24 lg:ml-[416px]"
+            : sidebarCompact
+              ? "md:ml-[96px]"
+              : "md:ml-24"
         }`}
       >
         <header className="sticky top-0 z-20 w-full border-b border-slate-200 bg-white/90 backdrop-blur md:hidden">
