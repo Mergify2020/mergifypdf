@@ -348,10 +348,10 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
 
           <div
             ref={profileRef}
-              className={`relative z-50 px-3 pb-6 ${
-                sidebarCompact ? "mt-1 sticky bottom-4" : "mt-auto sticky bottom-4"
-              }`}
-            >
+            className={`relative z-50 px-3 pb-6 ${
+              sidebarCompact ? "mt-3 sticky bottom-4" : "mt-auto sticky bottom-4"
+            }`}
+          >
               <button
               type="button"
               onClick={() => setProfileOpen((prev) => !prev)}
