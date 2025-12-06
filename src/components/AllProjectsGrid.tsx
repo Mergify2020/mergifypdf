@@ -80,8 +80,8 @@ export default function AllProjectsGrid({ projects }: Props) {
           animationFrameRef.current = requestAnimationFrame(() => {
             setIsSliding(true);
           });
-        }, 1700);
-      }, 700);
+        }, 1200);
+      }, 150);
     },
     [stopSlideshow],
   );
@@ -190,7 +190,7 @@ export default function AllProjectsGrid({ projects }: Props) {
                           alt={project.title}
                           width={800}
                           height={1100}
-                          className={`absolute inset-x-0 top-0 w-full h-auto object-contain object-[50%_0] filter drop-shadow-[0_18px_40px_rgba(15,23,42,0.28)] transition-transform duration-[1250ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                          className={`absolute inset-x-0 top-0 w-full h-auto object-contain object-[50%_0] filter drop-shadow-[0_18px_40px_rgba(15,23,42,0.28)] transition-transform duration-[650ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
                             isHovering && isSliding
                               ? "translate-x-[calc(-100%_-_50px)]"
                               : "translate-x-0"
@@ -212,7 +212,7 @@ export default function AllProjectsGrid({ projects }: Props) {
                         alt={project.title}
                         width={800}
                         height={1100}
-                        className={`absolute inset-x-0 top-0 w-full h-auto object-contain object-[50%_0] filter drop-shadow-[0_18px_40px_rgba(15,23,42,0.28)] transition-transform duration-[1250ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                        className={`absolute inset-x-0 top-0 w-full h-auto object-contain object-[50%_0] filter drop-shadow-[0_18px_40px_rgba(15,23,42,0.28)] transition-transform duration-[650ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
                           previousPreview && isHovering && allThumbs.length > 1
                             ? isSliding
                               ? "translate-x-0"
