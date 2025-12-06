@@ -281,7 +281,10 @@ type HighlightColorKey = keyof typeof HIGHLIGHT_COLORS;
 
   const HIGHLIGHT_CURSOR =
     "data:image/svg+xml;utf8,%3Csvg width='32' height='32' viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 24 L24 2 L30 8 L10 28 L3 29 Z' fill='%23024d7c'/%3E%3Crect x='5' y='25' width='10' height='3' fill='%23ffd43b'/%3E%3C/svg%3E";
-const PREVIEW_BASE_SCALE = 3;
+// Render PDF pages at a higher base scale so
+// previews stay razor sharp even when downscaled
+// into small project cards and slideshows.
+const PREVIEW_BASE_SCALE = 4;
 const MAX_DEVICE_PIXEL_RATIO = 4;
 const TEXT_PLACEHOLDER = "Type here";
 const THUMB_MAX_WIDTH = 200;
@@ -1215,7 +1218,10 @@ function WorkspaceClient() {
         const baseWidth = rotated ? naturalHeight : naturalWidth;
         const baseHeight = rotated ? naturalWidth : naturalHeight;
 
-        const targetWidth = 480;
+        // Render a high-resolution thumbnail for project cards.
+        // Target ~2–3x the typical display width so the
+        // image can scale down sharply without blurring.
+        const targetWidth = 900;
         const scale = Math.min(1, targetWidth / baseWidth);
         const outputWidth = baseWidth * scale;
         const outputHeight = baseHeight * scale;
@@ -2841,10 +2847,18 @@ function WorkspaceClient() {
 
   const buildCloudProjectData = useCallback(() => {
     if (!hasWorkspaceData) return null;
-    const cloudThumb = firstPageThumb ?? (pages.length > 0 ? pages[0]?.thumb ?? null : null);
+    // Prefer the higher-resolution preview image for cards.
+    const cloudThumb =
+      firstPageThumb ??
+      (pages.length > 0 ? pages[0]?.preview ?? pages[0]?.thumb ?? null : null);
+    const pageThumbs = pages
+      .map((page) => page.preview ?? page.thumb)
+      .filter((src): src is string => typeof src === "string" && src.length > 0)
+      .slice(0, 24);
     return {
       name: projectName,
       firstPageThumb: cloudThumb,
+      pageThumbs,
       sources: sources.map((source) => ({
         id: source.storageId,
         name: source.name,

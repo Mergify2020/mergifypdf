@@ -69,7 +69,7 @@ const sidebarPanels: Record<string, SidebarPanel> = {
       { label: "All Projects", icon: Folders, key: "all" },
       { label: "Your Projects", icon: User, key: "yours" },
       { label: "Shared With You", icon: Users, key: "shared" },
-      { label: "Favorites", icon: Star, key: "favorites" },
+      { label: "Starred", icon: Star, key: "favorites" },
     ],
   },
   signatures: {
@@ -201,7 +201,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
       if (typeof window === "undefined") return;
       const width = window.innerWidth;
       setNarrowSidebar(width < 1280);
-      setOverlaySidebar(width < 1100);
+      setOverlaySidebar(width < 1400);
     };
 
     updateWidth();
@@ -222,7 +222,8 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
         ? "lg:ml-[344px]"
         : "lg:ml-[416px]"
       : "";
-  const contentOffsetClass = `${baseContentOffsetClass} ${expandedContentOffsetClass}`.trim();
+  const sidebarExpandedClass = expanded && !shouldOverlay ? "with-sidebar-panel" : "";
+  const contentOffsetClass = `${baseContentOffsetClass} ${expandedContentOffsetClass} ${sidebarExpandedClass}`.trim();
 
   useEffect(() => {
     if (!expanded || !shouldOverlay) return;
@@ -354,9 +355,9 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
               <button
                 type="button"
                 onClick={() => setCreateOpen((prev) => !prev)}
-                className={`flex w-full flex-col items-center gap-2 rounded-2xl bg-[#2f8df0] ${
+                className={`flex w-full flex-col items-center gap-2 rounded-2xl bg-[#4C6FFF] ${
                   sidebarCompact ? "px-2 py-2 lg:px-3 lg:py-2.5" : "px-3 py-3.5"
-                } text-center text-sm font-semibold text-white shadow-lg transition hover:bg-[#2573c7]`}
+                } text-center text-sm font-semibold text-white shadow-lg transition hover:bg-[#3A54D6]`}
               >
                 <span
                   className={`flex ${sidebarCompact ? "h-6 w-6 lg:h-8 lg:w-8" : "h-8 w-8"} items-center justify-center rounded-full bg-white/20 text-white`}
@@ -545,6 +546,8 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                               setActiveProjectsFilter(newValue);
                               if (newValue === "all") {
                                 router.push("/projects/all");
+                              } else if (newValue === "favorites") {
+                                router.push("/projects/starred");
                               }
                             }}
                             className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-[0.95rem] font-semibold transition ${

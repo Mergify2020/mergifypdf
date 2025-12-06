@@ -290,3 +290,17 @@ body {
 }
 
 /* (workspace sidebar layout rules were removed; main content stays centered) */
+
+/* When the desktop sidebar panel is open and pushing content,
+   reduce the projects grid column count so previews stay large. */
+@media (min-width: 1280px) {
+  .with-sidebar-panel .projects-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (min-width: 1536px) {
+  .with-sidebar-panel .projects-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  }
+}

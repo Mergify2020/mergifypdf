@@ -217,18 +217,23 @@ export default function ProjectsList({ initialProjects }: Props) {
             return (
               <div
                 key={project.id}
-                className="group relative flex flex-col overflow-hidden rounded-[28px] border border-white/70 bg-white/80 shadow-[0_25px_60px_rgba(15,23,42,0.15)] transition hover:-translate-y-1 hover:shadow-[0_30px_80px_rgba(15,23,42,0.2)]"
+                className="group relative flex flex-col overflow-hidden rounded-[28px] border border-white/70 bg-white/80 transition hover:-translate-y-1"
               >
                 <div className="relative">
-                  <div className="relative h-[180px] w-full overflow-hidden rounded-[28px] bg-[#f5f7fa]">
+                  <div className="relative w-full aspect-[1.23/1] overflow-hidden rounded-[16px] bg-[#EEF1F5] border border-[rgba(0,0,0,0.06)]">
                     {project.preview ? (
-                      <Image
-                        src={project.preview}
-                        alt={project.title}
-                        fill
-                        className="h-full w-full object-cover"
-                        sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 25vw"
-                      />
+                      <div className="relative h-full w-full px-3 pt-4 pb-0">
+                        <div className="flex h-full w-full items-start justify-center bg-white shadow-[0_10px_30px_rgba(15,23,42,0.16)] overflow-hidden">
+                          <Image
+                            src={project.preview}
+                            alt={project.title}
+                            width={800}
+                            height={1100}
+                            className="max-w-full h-auto object-contain object-[50%_0]"
+                            sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 25vw"
+                          />
+                        </div>
+                      </div>
                     ) : (
                       <div className="flex h-full w-full items-center justify-center">
                         <FileText className="h-10 w-10 text-slate-500 opacity-40" />
