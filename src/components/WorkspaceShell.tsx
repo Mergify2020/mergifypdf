@@ -544,10 +544,11 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                             onClick={() => {
                               const newValue = item.key ?? item.label;
                               setActiveProjectsFilter(newValue);
-                              if (newValue === "all") {
+                              const onProjectsRoute = pathname?.startsWith("/projects") ?? false;
+                              if (!onProjectsRoute) {
                                 router.push("/projects/all");
-                              } else if (newValue === "favorites") {
-                                router.push("/projects/starred");
+                              } else if (newValue === "all" && pathname !== "/projects/all") {
+                                router.push("/projects/all");
                               }
                             }}
                             className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-[0.95rem] font-semibold transition ${
