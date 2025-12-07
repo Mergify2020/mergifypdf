@@ -24,11 +24,13 @@ export async function POST(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  const payload = (existing.data as Record<string, unknown> | null) ?? {};
+  payload.trashed = true;
+
   const updated = await prisma.project.update({
     where: { id: existing.id },
-    data: { trashed: true },
+    data: { data: payload },
   });
 
   return NextResponse.json({ project: updated });
 }
-

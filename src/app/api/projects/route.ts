@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
   // Lightweight summary payload used by the All Projects grid.
   if (summary === "1") {
     const projects = await prisma.project.findMany({
-      where: { userId, trashed },
+      where: { userId },
       orderBy: { updatedAt: "desc" },
       take: 80,
       select: {
@@ -52,22 +52,35 @@ export async function GET(request: NextRequest) {
         updatedAt: true,
         previewUrl: true,
         pagesCount: true,
+        data: true,
       },
     });
 
-    const shaped = projects.map((project) => ({
-      id: project.id,
-      name: project.name,
-      updatedAt: project.updatedAt,
-      previewUrl: project.previewUrl ?? null,
-      pagesCount: project.pagesCount ?? 0,
-    }));
+    const shaped = projects
+      .map((project) => {
+        const payload = project.data as
+          | {
+              trashed?: boolean;
+            }
+          | null;
+        const isTrashed = payload?.trashed === true;
+        if (trashed && !isTrashed) return null;
+        if (!trashed && isTrashed) return null;
+        return {
+          id: project.id,
+          name: project.name,
+          updatedAt: project.updatedAt,
+          previewUrl: project.previewUrl ?? null,
+          pagesCount: project.pagesCount ?? 0,
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null);
 
     return NextResponse.json({ projects: shaped });
   }
 
   const projects = await prisma.project.findMany({
-    where: { userId, trashed: false },
+    where: { userId },
     orderBy: { createdAt: "desc" },
   });
 
