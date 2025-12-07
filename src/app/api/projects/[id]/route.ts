@@ -3,6 +3,32 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
 
+function derivePreviewMeta(data: unknown): { previewUrl: string | null; pagesCount: number } {
+  let previewUrl: string | null = null;
+  let pagesCount = 0;
+
+  if (data && typeof data === "object") {
+    const payload = data as any;
+
+    if (typeof payload.previewUrl === "string" && payload.previewUrl.length > 0) {
+      previewUrl = payload.previewUrl;
+    } else if (
+      typeof payload.firstPageThumb === "string" &&
+      payload.firstPageThumb.length > 0
+    ) {
+      previewUrl = payload.firstPageThumb;
+    }
+
+    if (typeof payload.pagesCount === "number" && Number.isFinite(payload.pagesCount)) {
+      pagesCount = payload.pagesCount;
+    } else if (Array.isArray(payload.pages)) {
+      pagesCount = payload.pages.length;
+    }
+  }
+
+  return { previewUrl, pagesCount };
+}
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -41,6 +67,9 @@ export async function PUT(
   const userId = session.user.id;
   const { name, data } = await req.json();
 
+  const nextData = data ?? existing.data;
+  const { previewUrl, pagesCount } = derivePreviewMeta(nextData);
+
   const existing = await prisma.project.findFirst({
     where: { id, userId },
   });
@@ -53,7 +82,9 @@ export async function PUT(
     where: { id: existing.id },
     data: {
       name: name ?? existing.name,
-      data: data ?? existing.data,
+      data: nextData,
+      previewUrl,
+      pagesCount,
     },
   });
 

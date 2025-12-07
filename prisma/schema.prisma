@@ -73,7 +73,10 @@ model Project {
   userId    String
   user      User     @relation(fields: [userId], references: [id])
   name      String
-  data      Json
+  data       Json
+  previewUrl String?
+  pagesCount Int?     @default(0)
+  trashed   Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

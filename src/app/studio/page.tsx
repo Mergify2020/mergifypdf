@@ -146,6 +146,8 @@ type CloudProject = {
   data: unknown;
   createdAt?: string | number;
   updatedAt?: string | number;
+  previewUrl?: string | null;
+  pagesCount?: number | null;
 };
 
 const TYPED_SIGNATURE_STYLES = [
@@ -2858,6 +2860,8 @@ function WorkspaceClient() {
     return {
       name: projectName,
       firstPageThumb: cloudThumb,
+      previewUrl: cloudThumb,
+      pagesCount: pages.length,
       pageThumbs,
       sources: sources.map((source) => ({
         id: source.storageId,

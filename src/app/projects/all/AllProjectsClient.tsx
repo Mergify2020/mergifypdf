@@ -8,7 +8,8 @@ type ApiProject = {
   id: string;
   name: string | null;
   updatedAt: string | number | Date;
-  data: unknown;
+  previewUrl?: string | null;
+  pagesCount?: number | null;
 };
 
 function formatUpdatedLabel(date: Date) {
@@ -32,9 +33,8 @@ type ProjectCard = {
   id: string;
   title: string;
   updated: string;
-  preview?: string | null;
+  previewUrl?: string | null;
   pagesCount?: number;
-  pageThumbs?: string[];
 };
 
 let cachedProjects: ProjectCard[] | null = null;
@@ -54,7 +54,7 @@ export default function AllProjectsClient() {
 
     const load = async () => {
       try {
-        const res = await fetch("/api/projects", { cache: "no-store" });
+        const res = await fetch("/api/projects?summary=1", { cache: "no-store" });
         if (!res.ok) return;
         const data = (await res.json()) as { projects?: ApiProject[] };
         if (!Array.isArray(data.projects) || cancelled) return;
@@ -63,31 +63,12 @@ export default function AllProjectsClient() {
           const updatedAt =
             project.updatedAt instanceof Date ? project.updatedAt : new Date(project.updatedAt);
 
-          const payload = project.data as
-            | {
-                firstPageThumb?: string | null;
-                pages?: { id: string }[];
-                pageThumbs?: string[];
-              }
-            | null;
-
-          const preview =
-            payload && typeof payload.firstPageThumb === "string" && payload.firstPageThumb.length > 0
-              ? payload.firstPageThumb
-              : undefined;
-          const pagesCount = Array.isArray(payload?.pages) ? payload.pages.length : undefined;
-          const pageThumbs =
-            Array.isArray(payload?.pageThumbs) && payload.pageThumbs.length > 0
-              ? payload.pageThumbs.filter((thumb) => typeof thumb === "string" && thumb.length > 0)
-              : undefined;
-
           return {
             id: project.id,
             title: project.name?.trim() || "Untitled project",
             updated: formatUpdatedLabel(updatedAt),
-            preview,
-            pagesCount,
-            pageThumbs,
+            previewUrl: project.previewUrl ?? null,
+            pagesCount: project.pagesCount ?? 0,
           };
         });
 
@@ -112,6 +93,21 @@ export default function AllProjectsClient() {
       <LogoMerge size={72} />
     </div>
   ) : (
-    <AllProjectsGrid projects={projects} />
+    <div className="min-h-screen bg-[#F9FAFC] px-2 pb-0 pt-10 sm:px-4 sm:pt-12 lg:px-6 lg:pt-14">
+      <div className="mx-auto w-full pb-16">
+        <h1 className="mt-2 text-center text-4xl font-semibold text-slate-900 sm:mt-4 sm:text-5xl">
+          All Projects
+        </h1>
+        <AllProjectsGrid
+          projects={projects}
+          onProjectTrashed={(id) => {
+            setProjects((prev) => prev.filter((project) => project.id !== id));
+            if (cachedProjects) {
+              cachedProjects = cachedProjects.filter((project) => project.id !== id);
+            }
+          }}
+        />
+      </div>
+    </div>
   );
 }

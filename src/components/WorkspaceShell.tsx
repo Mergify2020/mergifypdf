@@ -24,10 +24,68 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
+import { PROJECT_NAME_STORAGE_KEY, sanitizeProjectName } from "@/lib/projectName";
+import { addRecentProject } from "@/lib/recentProjects";
 import AppHeaderBrand from "./AppHeaderBrand";
 import PageLoadingSkeleton from "./PageLoadingSkeleton";
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
 import { getAvatarFallback } from "@/lib/avatarFallback";
+
+const WORKSPACE_META_KEY = "mpdf:files";
+const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
+const WORKSPACE_DB_NAME = "mpdf-file-store";
+const WORKSPACE_DB_STORE = "files";
+
+function clearIndexedDb(): Promise<void> {
+  if (typeof window === "undefined" || !("indexedDB" in window)) return Promise.resolve();
+  return new Promise((resolve) => {
+    const request = indexedDB.open(WORKSPACE_DB_NAME, 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(WORKSPACE_DB_STORE)) {
+        db.createObjectStore(WORKSPACE_DB_STORE);
+      }
+    };
+    request.onerror = () => resolve();
+    request.onsuccess = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(WORKSPACE_DB_STORE)) {
+        db.close();
+        resolve();
+        return;
+      }
+      const tx = db.transaction(WORKSPACE_DB_STORE, "readwrite");
+      tx.oncomplete = () => {
+        db.close();
+        resolve();
+      };
+      tx.onerror = () => {
+        db.close();
+        resolve();
+      };
+      tx.objectStore(WORKSPACE_DB_STORE).clear();
+    };
+  });
+}
+
+async function resetWorkspaceStorage() {
+  try {
+    window.localStorage?.removeItem(WORKSPACE_META_KEY);
+  } catch {
+    // ignore
+  }
+  try {
+    window.sessionStorage?.removeItem(WORKSPACE_META_KEY);
+  } catch {
+    // ignore
+  }
+  try {
+    window.localStorage?.removeItem(WORKSPACE_HIGHLIGHTS_KEY);
+  } catch {
+    // ignore
+  }
+  await clearIndexedDb();
+}
 
 type SidebarItem = {
   label: string;
@@ -108,6 +166,9 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [createValue, setCreateValue] = useState("");
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [createBusy, setCreateBusy] = useState(false);
   const [compactSidebar, setCompactSidebar] = useState(false);
   const [narrowSidebar, setNarrowSidebar] = useState(false);
   const [overlaySidebar, setOverlaySidebar] = useState(false);
@@ -122,6 +183,38 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
     avatarKey,
     session?.user?.name ?? session?.user?.email ?? "Account"
   );
+
+  function openCreateModal() {
+    setCreateValue("");
+    setCreateError(null);
+    setCreateBusy(false);
+    setCreateOpen(true);
+  }
+
+  function closeCreateModal() {
+    if (createBusy) return;
+    setCreateOpen(false);
+  }
+
+  async function handleCreateStart() {
+    if (!createValue.trim()) {
+      setCreateError("Please name your project.");
+      return;
+    }
+    const clean = sanitizeProjectName(createValue);
+    try {
+      window.localStorage?.setItem(PROJECT_NAME_STORAGE_KEY, clean);
+    } catch {
+      // ignore storage failures
+    }
+    setCreateBusy(true);
+    await resetWorkspaceStorage();
+    const ownerId = session?.user?.id ?? session?.user?.email ?? null;
+    addRecentProject(ownerId, clean);
+    setCreateBusy(false);
+    setCreateOpen(false);
+    router.push("/studio");
+  }
 
   const [activeProjectsFilter, setActiveProjectsFilter] = useState("all");
   const itemLabelClasses = "opacity-100 translate-x-0 max-w-full";
@@ -164,24 +257,24 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
     if (!createOpen) return;
 
     function handleClick(event: MouseEvent) {
-      if (!createRef.current?.contains(event.target as Node)) {
+      if (!createRef.current?.contains(event.target as Node) && !createBusy) {
         setCreateOpen(false);
       }
     }
 
     function handleKey(event: KeyboardEvent) {
-      if (event.key === "Escape") {
+      if (event.key === "Escape" && !createBusy) {
         setCreateOpen(false);
       }
     }
 
-    document.addEventListener("mousedown", handleClick);
-    document.addEventListener("keydown", handleKey);
-    return () => {
-      document.removeEventListener("mousedown", handleClick);
-      document.removeEventListener("keydown", handleKey);
-    };
-  }, [createOpen]);
+      document.addEventListener("mousedown", handleClick);
+      document.addEventListener("keydown", handleKey);
+      return () => {
+        document.removeEventListener("mousedown", handleClick);
+        document.removeEventListener("keydown", handleKey);
+      };
+  }, [createOpen, createBusy]);
 
   useEffect(() => {
     const updateCompact = () => {
@@ -329,6 +422,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
     });
 
   return (
+    <>
     <div className="flex min-h-screen bg-white">
       {/* Desktop sidebar */}
       <aside className="hidden md:flex fixed left-0 top-0 z-30 h-screen text-slate-800">
@@ -351,10 +445,10 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
               </button>
             </div>
 
-            <div className="px-1 mt-3 mb-3" ref={createRef}>
+            <div className="px-1 mt-3 mb-3">
               <button
                 type="button"
-                onClick={() => setCreateOpen((prev) => !prev)}
+                onClick={openCreateModal}
                 className={`flex w-full flex-col items-center gap-2 rounded-2xl bg-[#4C6FFF] ${
                   sidebarCompact ? "px-2 py-2 lg:px-3 lg:py-2.5" : "px-3 py-3.5"
                 } text-center text-sm font-semibold text-white shadow-lg transition hover:bg-[#3A54D6]`}
@@ -480,7 +574,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                     type="button"
                     onClick={() => {
                       setProfileOpen(false);
-                      router.push("/projects?view=trash");
+                      router.push("/projects/trash");
                     }}
                     className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left font-semibold text-slate-700 transition hover:bg-slate-50"
                   >
@@ -746,5 +840,77 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
         </Suspense>
       </div>
     </div>
+
+      {createOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm"
+            onClick={closeCreateModal}
+          />
+          <div
+            ref={createRef}
+            className="page-fade-in relative z-10 w-full max-w-3xl rounded-2xl border border-white/60 bg-white/35 bg-gradient-to-b from-white/90 via-white/70 to-white/40 p-1.5 text-slate-900 shadow-[0_22px_60px_rgba(15,23,42,0.22)] backdrop-blur-lg sm:p-2"
+          >
+            <form
+              className="overflow-hidden rounded-[18px] bg-white/85 px-6 pt-8 pb-6 shadow-[0_0_0_1px_rgba(148,163,184,0.14)] sm:px-10 sm:pt-10 sm:pb-8"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleCreateStart();
+              }}
+            >
+              <h2 className="text-[23px] font-semibold tracking-tight text-slate-900 sm:text-[26px]">
+                Create a new project
+              </h2>
+              <p className="mt-3 text-sm text-slate-600">
+                Give your project a name to get started.
+              </p>
+              <div className="mt-6 space-y-2">
+                <input
+                  type="text"
+                  autoFocus
+                  value={createValue}
+                  onChange={(event) => {
+                    setCreateValue(event.target.value);
+                    if (createError) setCreateError(null);
+                  }}
+                  className="w-full rounded-xl border border-slate-200/80 bg-white px-4 py-3 text-base text-slate-900 outline-none placeholder:text-slate-500 shadow-[0_1px_0_rgba(15,23,42,0.06)] focus:border-sky-300 focus:shadow-[0_0_0_1px_rgba(56,189,248,0.35)] focus:ring-2 focus:ring-sky-100"
+                  placeholder="Name your project"
+                />
+                {createError ? <p className="text-sm text-rose-500">{createError}</p> : null}
+              </div>
+              <div className="mt-6 rounded-t-none rounded-b-[18px] bg-slate-50/80 px-1.5 pt-3">
+                <div className="flex justify-end gap-3 text-sm">
+                  <button
+                    type="button"
+                    onClick={closeCreateModal}
+                    className="px-2 py-2 text-slate-500 transition hover:text-slate-900"
+                    disabled={createBusy}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="inline-flex items-center rounded-full bg-gradient-to-r from-sky-500 to-sky-600 px-5 py-2 font-semibold text-white transition hover:-translate-y-0.5 hover:from-sky-600 hover:to-sky-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:translate-y-0 disabled:opacity-60"
+                    disabled={createBusy}
+                  >
+                    {createBusy ? (
+                      <span className="flex items-center gap-2">
+                        <span
+                          className="h-4 w-4 animate-spin rounded-full border-2 border-white/60 border-t-white"
+                          aria-hidden
+                        />
+                        <span>Preparing…</span>
+                      </span>
+                    ) : (
+                      "Start project"
+                    )}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }

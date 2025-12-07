@@ -1,5 +1,6 @@
 ﻿// src/app/layout.tsx
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import Providers from "@/components/Providers";
 import WorkspaceSettingsMenu from "@/components/WorkspaceSettingsMenu";
 import WorkspaceShell from "@/components/WorkspaceShell";
@@ -10,6 +11,11 @@ import Footer from "@/components/Footer";
 import HeaderAuthButtons from "@/components/HeaderAuthButtons";
 import HeroHeader from "@/components/HeroHeader";
 import "./globals.css";
+
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "MergifyPDF",
@@ -33,7 +39,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const authedWorkspace = session?.user && !lockedByTwoFactor;
 
   return (
-    <html lang="en">
+    <html lang="en" className={inter.className}>
       <head>
         {/* Force light UI */}
         <meta name="color-scheme" content="light" />
