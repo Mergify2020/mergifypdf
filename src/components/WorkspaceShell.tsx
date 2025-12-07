@@ -381,11 +381,11 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
       const iconWrapperClasses = `${iconWrapperBase} ${iconWrapperState}`;
       const iconSizeClasses = isExpanded
         ? sidebarCompact
-          ? "h-6 w-6 lg:h-6.5 lg:w-6.5"
-          : "h-6.5 w-6.5"
+          ? "h-7 w-7 lg:h-8 lg:w-8"
+          : "h-8 w-8"
         : sidebarCompact
           ? "h-6 w-6"
-          : "h-9 w-9";
+          : "h-7 w-7";
       const expandedLayoutClasses = sidebarCompact
         ? "items-center justify-start gap-2 px-2.5 py-1.5 text-left text-[11px]"
         : "items-center justify-start gap-3 px-3 py-2 text-left";

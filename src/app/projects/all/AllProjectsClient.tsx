@@ -97,28 +97,7 @@ export default function AllProjectsClient() {
   }, []);
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-[#F9FAFC] px-2 pb-0 pt-10 sm:px-4 sm:pt-12 lg:px-6 lg:pt-14">
-        <div className="mx-auto w-full pb-16">
-          <h1 className="mt-2 text-center text-4xl font-semibold text-slate-900 sm:mt-4 sm:text-5xl">
-            All Projects
-          </h1>
-          <div className="projects-grid mt-10 grid grid-cols-2 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 sm:gap-8 lg:gap-10">
-            {Array.from({ length: 12 }).map((_, index) => (
-              <div key={index} className="group flex flex-col text-left">
-                <div className="relative rounded-[10px] bg-[#F9FAFC]">
-                  <div className="m-[3px] w-[calc(100%-6px)] aspect-[1.23/1] rounded-[10px] bg-slate-200/70 animate-pulse" />
-                </div>
-                <div className="mt-4 space-y-2">
-                  <div className="h-4 w-3/4 rounded-full bg-slate-200/80 animate-pulse" />
-                  <div className="h-3 w-1/2 rounded-full bg-slate-200/60 animate-pulse" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   if (!loading && projects.length === 0) {
