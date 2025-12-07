@@ -67,9 +67,6 @@ export async function PUT(
   const userId = session.user.id;
   const { name, data } = await req.json();
 
-  const nextData = data ?? existing.data;
-  const { previewUrl, pagesCount } = derivePreviewMeta(nextData);
-
   const existing = await prisma.project.findFirst({
     where: { id, userId },
   });
@@ -77,6 +74,9 @@ export async function PUT(
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+
+  const nextData = data ?? existing.data;
+  const { previewUrl, pagesCount } = derivePreviewMeta(nextData);
 
   const updated = await prisma.project.update({
     where: { id: existing.id },
