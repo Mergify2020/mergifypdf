@@ -24,8 +24,10 @@ export async function POST(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const payload = (existing.data as Record<string, unknown> | null) ?? {};
-  payload.trashed = true;
+  const payload = {
+    ...(existing.data as any),
+    trashed: true,
+  } as any;
 
   const updated = await prisma.project.update({
     where: { id: existing.id },
