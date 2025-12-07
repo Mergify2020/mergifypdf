@@ -7,7 +7,15 @@ import { usePathname } from "next/navigation";
 export default function AppHeaderBrand() {
   const pathname = usePathname();
   const isSignatureExperience = pathname?.startsWith("/signature-center") ?? false;
-  const isLoginPage = pathname === "/login";
+  const isPricingPage = pathname === "/pricing";
+  const isAccountSettings = pathname?.startsWith("/account") ?? false;
+  const isProjectsPage = pathname?.startsWith("/projects") ?? false;
+
+  const baseWidth = 160;
+  const baseHeight = 40;
+  const scale = isPricingPage || isAccountSettings || isProjectsPage ? 1.35 : 1;
+  const logoWidth = Math.round(baseWidth * scale);
+  const logoHeight = Math.round(baseHeight * scale);
 
   if (isSignatureExperience) {
     return (
@@ -17,23 +25,9 @@ export default function AppHeaderBrand() {
     );
   }
 
-  if (isLoginPage) {
-    // On the login page, always send users to the marketing hero,
-    // even if they already have an active session.
-    return (
-      <Link
-        href="/?landing=hero"
-        className="inline-flex items-center gap-2"
-        aria-label="Back to hero"
-      >
-        <Image src="/logo-wordmark2.svg" alt="MergifyPDF" width={160} height={40} priority />
-      </Link>
-    );
-  }
-
   return (
     <Link href="/" className="inline-flex items-center gap-2" aria-label="Back to dashboard">
-      <Image src="/logo-wordmark2.svg" alt="MergifyPDF" width={160} height={40} priority />
+      <Image src="/logo-wordmark2.svg" alt="MergifyPDF" width={logoWidth} height={logoHeight} priority />
     </Link>
   );
 }

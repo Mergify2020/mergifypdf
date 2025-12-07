@@ -2,7 +2,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import Providers from "@/components/Providers";
-import WorkspaceSettingsMenu from "@/components/WorkspaceSettingsMenu";
 import WorkspaceShell from "@/components/WorkspaceShell";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
@@ -10,6 +9,7 @@ import AppHeaderBrand from "@/components/AppHeaderBrand";
 import Footer from "@/components/Footer";
 import HeaderAuthButtons from "@/components/HeaderAuthButtons";
 import HeroHeader from "@/components/HeroHeader";
+import WorkspaceSettingsMenu from "@/components/WorkspaceSettingsMenu";
 import "./globals.css";
 
 const inter = Inter({
@@ -37,6 +37,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     !!session?.user?.twoFactorEnabled && session.user.twoFactorPassed !== true;
 
   const authedWorkspace = session?.user && !lockedByTwoFactor;
+  const useWorkspaceShell = authedWorkspace;
 
   return (
     <html lang="en" className={inter.className}>
@@ -56,7 +57,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
       <body className="min-h-screen bg-white text-gray-900">
         <Providers session={session}>
-          {authedWorkspace ? (
+          {useWorkspaceShell ? (
             <WorkspaceShell>{children}</WorkspaceShell>
           ) : (
             <>

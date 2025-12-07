@@ -144,7 +144,7 @@ export default function Footer() {
                 Signature Dashboard
               </Link>
               <Link
-                href="/account?view=pricing"
+                href="/pricing"
                 className="block text-sm text-slate-600 transition hover:text-slate-900"
               >
                 Plans &amp; Pricing

@@ -20,7 +20,7 @@ export default function UploadCta({ usedToday, variant = "default", className }:
 
   async function handleClick() {
     if (alreadyUsed) {
-      router.push("/account?view=pricing");
+      router.push("/pricing");
       return;
     }
 
@@ -35,7 +35,7 @@ export default function UploadCta({ usedToday, variant = "default", className }:
       if (res.status === 403) {
         setAlreadyUsed(true);
         setBusy(false);
-        router.push("/account?view=pricing");
+        router.push("/pricing");
         return;
       }
     } catch (err) {

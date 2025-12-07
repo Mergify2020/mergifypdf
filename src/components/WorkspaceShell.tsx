@@ -27,6 +27,8 @@ import { useSession, signOut } from "next-auth/react";
 import { PROJECT_NAME_STORAGE_KEY, sanitizeProjectName } from "@/lib/projectName";
 import { addRecentProject } from "@/lib/recentProjects";
 import AppHeaderBrand from "./AppHeaderBrand";
+import SettingsMenu from "./SettingsMenu";
+import HeroHeader from "./HeroHeader";
 import PageLoadingSkeleton from "./PageLoadingSkeleton";
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
 import { getAvatarFallback } from "@/lib/avatarFallback";
@@ -230,6 +232,10 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
   const simplePanelList =
     activePanel.items.length > 0 && activePanel.items.every((item) => item.icon && !item.description);
 
+  const isPricingRoute = pathname === "/pricing";
+  const isAccountRoute = pathname?.startsWith("/account");
+  const isProjectsPanel = panelKey === "projects";
+
   useEffect(() => {
     if (!profileOpen) return;
 
@@ -252,6 +258,19 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
       document.removeEventListener("keydown", handleKey);
     };
   }, [profileOpen]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handler = () => {
+      openCreateModal();
+    };
+
+    (window as any).addEventListener("open-create-project", handler);
+    return () => {
+      (window as any).removeEventListener("open-create-project", handler);
+    };
+  }, []);
 
   useEffect(() => {
     if (!createOpen) return;
@@ -421,7 +440,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
       );
     });
 
-  return (
+  const workspaceShell = (
     <>
     <div className="flex min-h-screen bg-white">
       {/* Desktop sidebar */}
@@ -542,66 +561,118 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                   </div>
                 </div>
                 <div className="mt-4 space-y-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setProfileOpen(false);
-                      router.push("/account");
-                    }}
-                    className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left font-semibold text-slate-700 transition hover:bg-slate-50"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Settings className="h-5 w-5 text-slate-500" aria-hidden />
-                      <span>Settings</span>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setProfileOpen(false);
-                      router.push("/account?view=pricing");
-                    }}
-                    className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left font-semibold text-slate-700 transition hover:bg-slate-50"
-                  >
-                    <div className="flex items-center gap-3">
-                      <CreditCard className="h-5 w-5 text-slate-500" aria-hidden />
-                      <span>Plans &amp; Pricing</span>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setProfileOpen(false);
-                      router.push("/projects/trash");
-                    }}
-                    className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left font-semibold text-slate-700 transition hover:bg-slate-50"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Trash2 className="h-5 w-5 text-slate-500" aria-hidden />
-                      <span>Trash</span>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
-                  </button>
-                  <button
-                    type="button"
-                    disabled={signingOut}
-                    onClick={async () => {
-                      if (signingOut) return;
-                      setProfileOpen(false);
-                      try {
-                        setSigningOut(true);
-                        await signOut({ callbackUrl: "/login" });
-                      } finally {
-                        setSigningOut(false);
-                      }
-                    }}
-                    className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left font-semibold text-red-600 transition hover:bg-red-50"
-                  >
-                    <LogOut className="h-5 w-5" aria-hidden />
-                    <span>Log out</span>
-                  </button>
+                  {isAccountRoute ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileOpen(false);
+                          router.push("/account");
+                        }}
+                        className="flex w-full items-center justify-between rounded-2xl bg-slate-100 px-4 py-3.5 text-left text-2xl font-semibold text-slate-800"
+                      >
+                        <div className="flex items-center gap-3">
+                          <User className="h-6 w-6 text-slate-600" aria-hidden />
+                          <span>Your profile</span>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileOpen(false);
+                          router.push("/pricing");
+                        }}
+                        className="flex w-full items-center justify-between rounded-2xl px-4 py-3.5 text-left text-2xl font-semibold text-slate-800 transition hover:bg-slate-50"
+                      >
+                        <div className="flex items-center gap-3">
+                          <CreditCard className="h-6 w-6 text-slate-500" aria-hidden />
+                          <span>Plans &amp; Pricing</span>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={signingOut}
+                        onClick={async () => {
+                          if (signingOut) return;
+                          setProfileOpen(false);
+                          try {
+                            setSigningOut(true);
+                            await signOut({ callbackUrl: "/login" });
+                          } finally {
+                            setSigningOut(false);
+                          }
+                        }}
+                        className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-left text-2xl font-semibold text-red-600 transition hover:bg-red-50"
+                      >
+                        <LogOut className="h-6 w-6" aria-hidden />
+                        <span>Log out</span>
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileOpen(false);
+                          router.push("/account");
+                        }}
+                        className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left font-semibold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Settings className="h-5 w-5 text-slate-500" aria-hidden />
+                          <span>Settings</span>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileOpen(false);
+                          router.push("/pricing");
+                        }}
+                        className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left font-semibold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        <div className="flex items-center gap-3">
+                          <CreditCard className="h-5 w-5 text-slate-500" aria-hidden />
+                          <span>Plans &amp; Pricing</span>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileOpen(false);
+                          router.push("/projects/trash");
+                        }}
+                        className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left font-semibold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Trash2 className="h-5 w-5 text-slate-500" aria-hidden />
+                          <span>Trash</span>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={signingOut}
+                        onClick={async () => {
+                          if (signingOut) return;
+                          setProfileOpen(false);
+                          try {
+                            setSigningOut(true);
+                            await signOut({ callbackUrl: "/login" });
+                          } finally {
+                            setSigningOut(false);
+                          }
+                        }}
+                        className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left font-semibold text-red-600 transition hover:bg-red-50"
+                      >
+                        <LogOut className="h-5 w-5" aria-hidden />
+                        <span>Log out</span>
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -609,79 +680,137 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
           {expanded ? (
             <div
               ref={panelRef}
-              className={`absolute ${panelLeftClass} top-0 hidden h-full bg-gradient-to-b from-white via-white/95 to-white/90 px-4 py-6 text-slate-800 shadow-[20px_0_60px_rgba(15,23,42,0.25)] lg:shadow-[0_35px_90px_rgba(15,23,42,0.3)] backdrop-blur-xl transition-[transform,opacity,filter] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform md:flex ${sidebarCompact ? "w-[240px]" : "w-[320px]"} z-0 ${
+              className={`absolute ${panelLeftClass} top-0 hidden h-full ${
+                isAccountRoute ? "bg-slate-50" : "bg-gradient-to-b from-white via-white/95 to-white/90"
+              } px-4 py-6 text-slate-800 backdrop-blur-xl transition-[transform,opacity,filter] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform md:flex ${sidebarCompact ? "w-[240px]" : "w-[320px]"} z-0 ${
                 expanded ? "translate-x-0 opacity-100 blur-0 pointer-events-auto" : "-translate-x-10 opacity-0 blur-sm"
               }`}
             >
               <div className="flex w-full flex-col gap-6">
                 <AppHeaderBrand />
-                {activePanel.title ? (
-                  <div>
-                    {activePanel.subtitle ? (
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                        {activePanel.subtitle}
-                      </p>
-                    ) : null}
-                    <h3 className={`mt-2 text-lg font-semibold ${activePanel.subtitle ? "" : "mt-0"}`}>
-                      {activePanel.title}
-                    </h3>
+                {isAccountRoute ? (
+                  <div className="space-y-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setExpanded(false);
+                        setProfileOpen(false);
+                        router.push("/account");
+                      }}
+                      className="flex w-full items-center gap-3 rounded-2xl bg-slate-100 px-3 py-2.5 text-base font-semibold text-slate-800 sm:text-lg lg:text-xl"
+                    >
+                      <User className="h-5 w-5 text-slate-600 sm:h-6 sm:w-6" aria-hidden />
+                      <span>Your profile</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setExpanded(false);
+                        setProfileOpen(false);
+                        router.push("/pricing");
+                      }}
+                      className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-base font-semibold text-slate-800 transition hover:bg-slate-100 sm:text-lg lg:text-xl"
+                    >
+                      <CreditCard className="h-5 w-5 text-slate-600 sm:h-6 sm:w-6" aria-hidden />
+                      <span>Plans &amp; Pricing</span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={signingOut}
+                      onClick={async () => {
+                        if (signingOut) return;
+                        setExpanded(false);
+                        setProfileOpen(false);
+                        try {
+                          setSigningOut(true);
+                          await signOut({ callbackUrl: "/login" });
+                        } finally {
+                          setSigningOut(false);
+                        }
+                      }}
+                      className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-base font-semibold text-red-600 transition hover:bg-red-50 sm:text-lg lg:text-xl"
+                    >
+                      <LogOut className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden />
+                      <span>Log out</span>
+                    </button>
                   </div>
-                ) : null}
-                <ul className={simplePanelList ? "space-y-2" : "space-y-3"}>
-                  {activePanel.items.map((item) => {
-                    const ItemIcon = item.icon;
-                    if (simplePanelList && ItemIcon) {
-                      return (
-                        <li key={item.key ?? item.label}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const newValue = item.key ?? item.label;
-                              setActiveProjectsFilter(newValue);
-                              const onProjectsRoute = pathname?.startsWith("/projects") ?? false;
-                              if (!onProjectsRoute) {
-                                router.push("/projects/all");
-                              } else if (newValue === "all" && pathname !== "/projects/all") {
-                                router.push("/projects/all");
-                              }
-                            }}
-                            className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-[0.95rem] font-semibold transition ${
-                              activeProjectsFilter === (item.key ?? item.label)
-                                ? "bg-sky-50 text-sky-700 shadow-inner"
-                                : "text-slate-700 hover:bg-slate-50"
-                            }`}
-                          >
-                            <ItemIcon
-                              className={`h-6 w-6 ${
-                                activeProjectsFilter === (item.key ?? item.label) ? "text-sky-600" : "text-slate-500"
-                              }`}
-                              aria-hidden
-                            />
-                            <span className="text-[0.95rem]">{item.label}</span>
-                          </button>
-                        </li>
-                      );
-                    }
-
-                    return (
-                      <li key={item.label} className="rounded-2xl border border-slate-100 bg-white px-3 py-2">
-                        <p className="text-sm font-semibold text-slate-800">{item.label}</p>
-                        {item.description ? (
-                          <p className="text-xs text-slate-500">{item.description}</p>
+                ) : (
+                  <>
+                    {activePanel.title ? (
+                      <div>
+                        {activePanel.subtitle ? (
+                          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                            {activePanel.subtitle}
+                          </p>
                         ) : null}
-                      </li>
-                    );
-                  })}
-                </ul>
-                {activePanel.action ? (
-                  <button
-                    type="button"
-                    onClick={() => router.push(activePanel.action!.href)}
-                    className="text-sm font-semibold text-sky-600 transition hover:text-sky-700"
-                  >
-                    {activePanel.action.label}
-                  </button>
-                ) : null}
+                        <h3 className={`mt-2 text-lg font-semibold ${activePanel.subtitle ? "" : "mt-0"}`}>
+                          {activePanel.title}
+                        </h3>
+                      </div>
+                    ) : null}
+                    <ul className={simplePanelList ? "space-y-2" : "space-y-3"}>
+                      {activePanel.items.map((item) => {
+                        const ItemIcon = item.icon;
+                        if (simplePanelList && ItemIcon) {
+                          return (
+                            <li key={item.key ?? item.label}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newValue = item.key ?? item.label;
+                                  setActiveProjectsFilter(newValue);
+                                  const onProjectsRoute = pathname?.startsWith("/projects") ?? false;
+                                  if (!onProjectsRoute) {
+                                    router.push("/projects/all");
+                                  } else if (newValue === "all" && pathname !== "/projects/all") {
+                                    router.push("/projects/all");
+                                  }
+                                }}
+                                className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 ${
+                                  isProjectsPanel ? "text-base sm:text-lg" : "text-[0.95rem]"
+                                } font-semibold transition ${
+                                  activeProjectsFilter === (item.key ?? item.label)
+                                    ? "bg-sky-50 text-sky-700 shadow-inner"
+                                    : "text-slate-700 hover:bg-slate-50"
+                                }`}
+                              >
+                                <ItemIcon
+                                  className={`${
+                                    isProjectsPanel ? "h-7 w-7 sm:h-8 sm:w-8" : "h-6 w-6"
+                                  } ${
+                                    activeProjectsFilter === (item.key ?? item.label) ? "text-sky-600" : "text-slate-500"
+                                  }`}
+                                  aria-hidden
+                                />
+                                <span className={isProjectsPanel ? "text-base sm:text-lg" : "text-[0.95rem]"}>
+                                  {item.label}
+                                </span>
+                              </button>
+                            </li>
+                          );
+                        }
+
+                        return (
+                          <li key={item.label} className="rounded-2xl border border-slate-100 bg-white px-3 py-2">
+                            <p className="text-sm font-semibold text-slate-800">{item.label}</p>
+                            {item.description ? (
+                              <p className="text-xs text-slate-500">{item.description}</p>
+                            ) : null}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    {activePanel.action ? (
+                      <button
+                        type="button"
+                        onClick={() => router.push(activePanel.action!.href)}
+                        className="text-sm font-semibold text-sky-600 transition hover:text-sky-700"
+                      >
+                        {activePanel.action.label}
+                      </button>
+                    ) : null}
+                  </>
+                )}
               </div>
             </div>
           ) : null}
@@ -785,7 +914,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                   type="button"
                   onClick={() => {
                     setMobileOpen(false);
-                    router.push("/account?view=pricing");
+                    router.push("/pricing");
                   }}
                   className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-slate-100"
                 >
@@ -913,4 +1042,22 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
       ) : null}
     </>
   );
+
+  const pricingShell = (
+    <div className="min-h-screen bg-[#e3edf9] text-slate-900">
+      <HeroHeader>
+        <div className="mx-auto flex h-[76px] w-full max-w-7xl items-center justify-between px-4 lg:px-6">
+          <div className="flex items-center gap-3">
+            <AppHeaderBrand />
+          </div>
+          <div className="flex items-center gap-3">
+            <SettingsMenu variant="pricing" />
+          </div>
+        </div>
+      </HeroHeader>
+      <main className="page-fade-in">{children}</main>
+    </div>
+  );
+
+  return isPricingRoute ? pricingShell : workspaceShell;
 }

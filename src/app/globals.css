@@ -236,6 +236,12 @@ body {
   -webkit-backdrop-filter: blur(24px);
 }
 
+.text-outline-white {
+  -webkit-text-stroke: 1px rgba(255, 255, 255, 0.95);
+  paint-order: stroke fill;
+}
+
+
 @keyframes press-bounce {
   0% {
     transform: scale(1);

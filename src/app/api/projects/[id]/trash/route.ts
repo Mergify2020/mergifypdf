@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 
 export async function POST(
   _req: NextRequest,
@@ -24,10 +25,11 @@ export async function POST(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const payload = {
-    ...(existing.data as any),
+  const baseData = (existing.data ?? {}) as Prisma.InputJsonObject;
+  const payload: Prisma.InputJsonObject = {
+    ...baseData,
     trashed: true,
-  } as any;
+  };
 
   const updated = await prisma.project.update({
     where: { id: existing.id },

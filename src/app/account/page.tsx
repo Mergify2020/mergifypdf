@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { User, Mail, Lock, Shield, Trash2 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { useEffect, useRef, useState } from "react";
@@ -634,17 +634,23 @@ function AccountSettingsPage() {
   }
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-12">
-      <div className="mb-6 text-sm text-gray-500">
-        <Link className="underline decoration-[#024d7c]" href="/">
-          Back to Studio
-        </Link>
-      </div>
+    <main className="w-full bg-slate-50 px-10 py-12">
+      <div className="rounded-3xl border border-gray-200 bg-white/95 p-6 shadow-md sm:p-8 lg:p-10">
+        <div className="mx-auto max-w-3xl">
+          <div className="text-center">
+            <h1 className="text-3xl font-semibold tracking-tight text-gray-900">Account settings</h1>
+            <p className="mt-2 text-sm text-gray-600">
+              Manage your profile, security, and preferences.
+            </p>
+          </div>
 
-      <h1 className="text-3xl font-semibold tracking-tight">Account settings</h1>
-
-      <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold">Profile</h2>
+          <section className="mt-8">
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600">
+              <User className="h-4 w-4" aria-hidden />
+            </span>
+            <h2 className="text-lg font-semibold">Profile</h2>
+          </div>
         <dl className="mt-4 space-y-3">
           <div>
             <dt className="text-sm font-medium text-gray-700">Name</dt>
@@ -698,11 +704,16 @@ function AccountSettingsPage() {
           </div>
         </div>
         {avatarMessage && <p className="mt-2 text-sm text-gray-600">{avatarMessage}</p>}
-      </div>
+        </section>
 
-      {canManageEmail && (
-        <section className="mt-8 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold">Change email</h2>
+        {canManageEmail && (
+        <section className="mt-10 border-t border-gray-200 pt-8">
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-500/10 text-orange-500">
+              <Mail className="h-4 w-4" aria-hidden />
+            </span>
+            <h2 className="text-lg font-semibold">Change email</h2>
+          </div>
           <>
             <p className="mt-1 text-sm text-gray-600">
               We will send confirmations to this email address.
@@ -731,11 +742,16 @@ function AccountSettingsPage() {
             </form>
           </>
         </section>
-      )}
+        )}
 
-      {canChangePassword && (
-        <section className="mt-8 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold">Change password</h2>
+        {canChangePassword && (
+        <section className="mt-10 border-t border-gray-200 pt-8">
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-yellow-400/15 text-yellow-500">
+              <Lock className="h-4 w-4" aria-hidden />
+            </span>
+            <h2 className="text-lg font-semibold">Change password</h2>
+          </div>
           <>
             <p className="mt-1 text-sm text-gray-600">
               Choose a new password that you have not used elsewhere.
@@ -781,10 +797,15 @@ function AccountSettingsPage() {
             </form>
           </>
         </section>
-      )}
+        )}
 
-      <section className="mt-8 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold">Security</h2>
+        <section className="mt-10 border-t border-gray-200 pt-8">
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-600">
+              <Shield className="h-4 w-4" aria-hidden />
+            </span>
+            <h2 className="text-lg font-semibold">Security</h2>
+          </div>
         <p className="mt-1 text-sm text-gray-600">Keep your MergifyPDF account secure.</p>
         <div className="mt-4 flex flex-col gap-3 rounded-lg border border-gray-200 bg-gray-50/80 p-4">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
@@ -820,10 +841,15 @@ function AccountSettingsPage() {
             </div>
           </div>
         </div>
-      </section>
+        </section>
 
-      <section className="mt-8 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold">Data &amp; Privacy</h2>
+        <section className="mt-10 border-t border-gray-200 pt-8">
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500/10 text-rose-500">
+              <Trash2 className="h-4 w-4" aria-hidden />
+            </span>
+            <h2 className="text-lg font-semibold">Data &amp; Privacy</h2>
+          </div>
         <p className="mt-1 text-sm text-gray-600">
           Control how your data and account are handled.
         </p>
@@ -859,7 +885,9 @@ function AccountSettingsPage() {
             </div>
           )}
         </div>
-      </section>
+        </section>
+        </div>
+      </div>
 
       {twoFactorModalMode && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/60 px-4 py-8">

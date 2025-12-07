@@ -25,8 +25,8 @@ export async function POST(req: NextRequest) {
 
   try {
     const origin = req.nextUrl.origin;
-    const successUrl = `${origin}/account?status=success`;
-    const cancelUrl = `${origin}/account?view=pricing&canceled=true`;
+    const successUrl = `${origin}/pricing?status=success`;
+    const cancelUrl = `${origin}/pricing?canceled=true`;
 
     const checkoutSession = await stripe.checkout.sessions.create({
       mode: "subscription",

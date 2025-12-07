@@ -114,7 +114,7 @@ export default function PricingPlans() {
 
   async function handleSelectPlan(tierName: string) {
     if (tierName === "Starter Plan") {
-      window.location.href = "/account?view=pricing";
+      window.location.href = "/pricing";
       return;
     }
 
@@ -135,7 +135,7 @@ export default function PricingPlans() {
       });
 
       if (res.status === 401) {
-        window.location.href = "/login?callbackUrl=/account?view=pricing";
+        window.location.href = "/login?callbackUrl=/pricing";
         return;
       }
 
@@ -159,18 +159,21 @@ export default function PricingPlans() {
     <div className="pricing-gradient min-h-screen px-4 py-12 text-slate-900 lg:px-6">
       <div className="mx-auto w-full max-w-7xl space-y-10 px-4 lg:px-6">
         <div className="text-center sm:flex sm:items-center sm:justify-between sm:text-left">
-          <h1 className="text-4xl font-semibold tracking-tight text-slate-900 drop-shadow-[0_10px_35px_rgba(15,23,42,0.4)]">
-            Choose the workspace built for your workflow.
+          <h1 className="text-4xl font-semibold tracking-tight">
+            <span className="bg-gradient-to-r from-sky-700 via-sky-500 to-indigo-500 bg-clip-text text-transparent">
+              Choose the workspace built for your workflow.
+            </span>
           </h1>
           <div className="mt-8 flex justify-center sm:mt-0 sm:justify-end">
-            <div className="inline-flex items-center rounded-full bg-white p-1.5 text-sm font-semibold shadow-sm">
+            <div className="inline-flex items-center rounded-full bg-gradient-to-r from-sky-400 via-sky-600 to-indigo-500 p-[3px] text-sm font-semibold shadow-sm">
+              <div className="inline-flex items-center rounded-full bg-white px-1.5 py-1.5">
               <button
                 type="button"
                 onClick={() => setBillingPeriod("monthly")}
                 className={`min-w-[112px] rounded-full px-5 py-2 whitespace-nowrap transition-colors ${
                   billingPeriod === "monthly"
-                    ? "bg-black text-white shadow-sm ring-2 ring-sky-400"
-                    : "text-slate-900 hover:text-slate-700 ring-0"
+                    ? "bg-black text-white shadow-sm"
+                    : "text-slate-900 hover:text-slate-700"
                 }`}
               >
                 Monthly
@@ -180,8 +183,8 @@ export default function PricingPlans() {
                 onClick={() => setBillingPeriod("annual")}
                 className={`min-w-[140px] rounded-full px-5 py-2 whitespace-nowrap transition-colors ${
                   billingPeriod === "annual"
-                    ? "bg-black text-white shadow-sm ring-2 ring-sky-400"
-                    : "text-slate-900 hover:text-slate-700 ring-0"
+                    ? "bg-black text-white shadow-sm"
+                    : "text-slate-900 hover:text-slate-700"
                 }`}
               >
                 Annual ·{" "}
@@ -193,6 +196,7 @@ export default function PricingPlans() {
                   SAVE 20%
                 </span>
               </button>
+              </div>
             </div>
           </div>
         </div>
@@ -284,23 +288,25 @@ export default function PricingPlans() {
                       if (isPremium && feature === "Everything in Basic") return null;
                       return (
                         <li key={feature} className="flex items-center gap-2">
-	                          <span
-	                            className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-sm"
-	                          >
-	                              <div
-	                                className={`h-1 w-3 rounded-full ${
+                          <span
+                            className="inline-flex h-6 w-6 flex-none items-center justify-center rounded-full bg-white shadow-sm"
+                          >
+                            <div
+                              className={`h-1 w-3 flex-none rounded-full ${
 	                                  tier.name === "Starter Plan"
 	                                    ? "bg-[#9CA3AF]"
 	                                    : tier.name === "Essential Plus"
 	                                      ? "bg-sky-500"
 	                                      : "bg-indigo-500"
 	                                }`}
-	                              />
+                            />
                           </span>
 	                          {tier.name === "Signature Pro" && feature === "Everything in Essential Plus" ? (
-	                            <span className="inline-flex items-center rounded-full bg-white px-3 py-1">
-	                              <span className="bg-gradient-to-r from-sky-500 to-emerald-400 bg-clip-text text-sm font-semibold text-transparent">
-	                                {feature}
+	                            <span className="inline-flex items-center rounded-full bg-gradient-to-r from-sky-500 to-emerald-400 p-[1.5px]">
+	                              <span className="inline-flex items-center rounded-full bg-white px-3 py-1">
+	                                <span className="bg-gradient-to-r from-sky-500 to-emerald-400 bg-clip-text text-sm font-semibold text-transparent">
+	                                  {feature}
+	                                </span>
 	                              </span>
 	                            </span>
 		                          ) : (
@@ -310,11 +316,11 @@ export default function PricingPlans() {
                       );
                     })}
                   </ul>
-	                  <button
-	                    type="button"
-	                    disabled={loadingPlan === tier.name}
-	                    onClick={() => void handleSelectPlan(tier.name)}
-	                    className={`mt-6 w-full rounded-full border-4 border-white/90 px-4 py-2.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-all duration-150 ${
+                  <button
+                    type="button"
+                    disabled={loadingPlan === tier.name}
+                    onClick={() => void handleSelectPlan(tier.name)}
+                    className={`mt-6 w-full rounded-full border-4 border-white/90 px-4 py-2.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-all duration-150 ${
 	                      isFree
 	                        ? "border-transparent bg-[#374151]"
 	                        : isPremium
@@ -322,10 +328,23 @@ export default function PricingPlans() {
 	                          : tier.name === "Essential Plus"
 	                            ? "bg-gradient-to-r from-sky-500 to-emerald-400 hover:scale-[1.01]"
 	                            : "bg-black"
-	                    } ${loadingPlan === tier.name ? "opacity-70 cursor-not-allowed" : ""}`}
-	                  >
+                    } ${loadingPlan === tier.name ? "opacity-70 cursor-not-allowed" : ""}`}
+                  >
                     {loadingPlan === tier.name ? "Redirecting..." : "Select Plan"}
-	                  </button>
+                  </button>
+                  <div className="mt-2 flex h-6 sm:h-7 justify-center">
+                    {!isFree && (
+                      <div className="inline-flex items-center gap-2 text-[11px] font-semibold text-slate-900 opacity-80">
+                        <span className="tracking-[0.18em] uppercase">Payments secured by</span>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src="/stripe-logo.png"
+                          alt="Stripe"
+                          className="h-6 sm:h-7 w-auto rounded-md opacity-90 transition-opacity hover:opacity-100"
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             );

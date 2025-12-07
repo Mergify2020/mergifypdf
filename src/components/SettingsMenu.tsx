@@ -7,7 +7,11 @@ import { CreditCard, LogOut, User } from "lucide-react";
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
 import { getAvatarFallback } from "@/lib/avatarFallback";
 
-export default function SettingsMenu() {
+type SettingsMenuProps = {
+  variant?: "default" | "pricing";
+};
+
+export default function SettingsMenu({ variant = "default" }: SettingsMenuProps) {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
   const { data: session } = useSession();
@@ -19,6 +23,9 @@ export default function SettingsMenu() {
     avatarKey,
     session?.user?.name ?? session?.user?.email ?? "User"
   );
+
+  const outerSizeClass = variant === "pricing" ? "h-12 w-12" : "h-10 w-10";
+  const innerSizeClass = variant === "pricing" ? "h-11 w-11" : "h-9 w-9";
 
   useEffect(() => {
     if (!open) return;
@@ -54,7 +61,7 @@ export default function SettingsMenu() {
 
   function handlePricing() {
     setOpen(false);
-    router.push("/account?view=pricing");
+    router.push("/pricing");
   }
 
   async function handleSignOut() {
@@ -75,17 +82,17 @@ export default function SettingsMenu() {
       <button
         type="button"
         onClick={handleToggle}
-        className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white shadow-md transition hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-800 active:scale-95 active:shadow-sm"
+        className={`flex items-center justify-center rounded-full border border-slate-200 bg-white shadow-md transition hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-800 active:scale-95 active:shadow-sm ${outerSizeClass}`}
         aria-haspopup="menu"
         aria-expanded={open}
       >
         <span className="sr-only">Open profile menu</span>
         {avatar ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={avatar} alt="Your avatar" className="h-9 w-9 rounded-full object-cover" />
+          <img src={avatar} alt="Your avatar" className={`${innerSizeClass} rounded-full object-cover`} />
         ) : (
           <span
-            className="flex h-9 w-9 items-center justify-center rounded-full text-xs font-semibold uppercase text-white"
+            className={`flex items-center justify-center rounded-full text-xs font-semibold uppercase text-white ${innerSizeClass}`}
             style={{ backgroundColor: fallback.color }}
           >
             {fallback.initials}

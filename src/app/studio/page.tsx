@@ -3667,7 +3667,7 @@ function WorkspaceClient() {
 
   function handleDownloadGateUpgrade() {
     setShowDownloadGate(false);
-    router.push("/account?view=pricing");
+    router.push("/pricing");
   }
 
   function handleDownloadGateBypass() {
