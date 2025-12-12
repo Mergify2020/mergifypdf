@@ -60,10 +60,14 @@ export default async function Home({
     if (session.user.twoFactorEnabled && !session.user.twoFactorPassed) {
       redirect("/2fa");
     }
+    const userId = session.user.id;
+    if (!userId) {
+      redirect("/login");
+    }
     return (
       <ProjectsDashboard
         displayName={session.user.name ?? session.user.email ?? "Guest"}
-        userId={session.user.id}
+        userId={userId}
       />
     );
   }
