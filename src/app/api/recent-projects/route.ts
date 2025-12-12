@@ -71,7 +71,8 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   if (!redis) {
-    return NextResponse.json({ ok: false }, { status: 503 });
+    // Redis is optional; local storage remains the source of truth in dev.
+    return NextResponse.json({ ok: true, stored: false });
   }
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== "object") {
@@ -85,4 +86,3 @@ export async function PUT(request: Request) {
     return NextResponse.json({ ok: false }, { status: 500 });
   }
 }
-

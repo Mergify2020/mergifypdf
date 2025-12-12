@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
-import { LayoutDashboard, ArrowUpRight, Sparkles } from "lucide-react";
+import { Search, SlidersHorizontal } from "lucide-react";
 import { authOptions } from "@/lib/authOptions";
 import UploadCta from "@/components/UploadCta";
 import HeroStats from "@/components/HeroStats";
@@ -10,10 +10,9 @@ import HeroFeatureArea from "@/components/HeroFeatureArea";
 import PersonaHighlight from "@/components/PersonaHighlight";
 import LogoCarousel from "@/components/LogoCarousel";
 import { hasUsedToday } from "@/lib/quota";
-import ProjectsWorkspaceShelf from "@/components/ProjectsWorkspaceShelf";
+import RecentProjectsRow from "@/components/RecentProjectsRow";
 import StartProjectButton from "@/components/StartProjectButton";
-import DashboardInsightsColumn from "@/components/DashboardInsightsColumn";
-import { getAvatarFallback } from "@/lib/avatarFallback";
+import { prisma } from "@/lib/prisma";
 
 function Sparkle({ className, gradientId }: { className?: string; gradientId: string }) {
   return (
@@ -64,7 +63,7 @@ export default async function Home({
     return (
       <ProjectsDashboard
         displayName={session.user.name ?? session.user.email ?? "Guest"}
-        avatarUrl={session.user.image ?? null}
+        userId={session.user.id}
       />
     );
   }
@@ -141,142 +140,107 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
   );
 }
 
-function ProjectsDashboard({
-  displayName,
-  avatarUrl,
-}: {
-  displayName: string;
-  avatarUrl?: string | null;
-}) {
-  const shortName = displayName.split(" ")[0] ?? "Guest";
-  const fallbackAvatar = getAvatarFallback(avatarUrl ?? displayName, displayName);
+async function ProjectsDashboard({ displayName, userId }: { displayName: string; userId: string }) {
+  const firstName = displayName.split(" ")[0] ?? "there";
+  const shapedRecent = await prisma.$queryRaw<
+    { id: string; name: string; updatedAt: Date; previewUrl: string | null }[]
+  >`
+    SELECT id, name, "updatedAt", "previewUrl"
+    FROM "Project"
+    WHERE "userId" = ${userId}
+      AND COALESCE((data->>'trashed')::boolean, false) = false
+    ORDER BY "updatedAt" DESC
+    LIMIT 6
+  `;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#F5F7FB] via-[#F3F3F7] to-[#ECEEF3] text-slate-900">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-7 px-4 py-8 lg:px-6">
-        {/* Welcome hero */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:shadow-lg sm:p-7">
-          <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full text-sm font-semibold text-white">
-                {avatarUrl ? (
-                  <Image
-                    src={avatarUrl}
-                    alt={shortName}
-                    width={40}
-                    height={40}
-                    className="h-full w-full rounded-full object-cover"
-                  />
-                ) : (
-                  <span
-                    className="flex h-full w-full items-center justify-center"
-                    style={{ backgroundColor: fallbackAvatar.color }}
-                  >
-                    {fallbackAvatar.initials}
-                  </span>
-                )}
-              </div>
-              <div className="space-y-1">
-                <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  <LayoutDashboard className="h-3.5 w-3.5" />
-                  Dashboard
-                </p>
-                <h1 className="text-[24px] font-semibold text-[#111827] sm:text-[30px]">
-                  Welcome back, {shortName}.
-                </h1>
-              </div>
-            </div>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <StartProjectButton />
-            </div>
-          </header>
-        </section>
-
-        <section className="grid gap-y-6 lg:grid-cols-[minmax(0,2.05fr)_minmax(0,1.3fr)] lg:gap-x-10">
-          <div className="space-y-6">
-            <div className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm sm:p-7">
-              <p className="text-sm font-semibold text-slate-500">Get started</p>
-              <h2 className="mt-2 text-[28px] font-semibold text-slate-900 sm:text-[32px]">
-                What do you want to do today?
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Upload a PDF, continue editing, or send documents out for signature.
-              </p>
-              <div className="mt-5 flex flex-wrap gap-3">
-                <Link
-                  href="/studio"
-                  className="inline-flex flex-1 min-w-[200px] items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 px-5 py-3 text-base font-semibold text-white shadow-lg transition hover:shadow-xl"
-                >
-                  Start a New Project
-                  <ArrowUpRight className="h-4 w-4" />
-                </Link>
-                <Link
-                  href="/signature-center"
-                  className="inline-flex flex-1 min-w-[200px] items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-base font-semibold text-slate-900 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300"
-                >
-                  Send a Signature Request
-                  <ArrowUpRight className="h-4 w-4" />
-                </Link>
-              </div>
-            </div>
-
-            <ProjectsWorkspaceShelf />
-
-            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Quick links
-                  </p>
-                  <h3 className="mt-2 text-xl font-semibold text-slate-900">Jump back in</h3>
+    <main className="min-h-screen w-full bg-slate-100 px-2 py-4 sm:px-4 sm:py-6 lg:px-6 lg:py-8">
+      <div
+        className="mx-auto mb-6 flex min-h-[calc(100vh-4rem)] w-full flex-col rounded-[32px] border border-white/70 bg-white px-4 pb-12 pt-14 sm:mb-8 sm:px-6 lg:px-10"
+        style={{
+          backgroundImage:
+            "linear-gradient(to bottom, rgba(0, 157, 253, 0.28) 0%, rgba(0, 157, 253, 0.18) 22%, rgba(255, 255, 255, 0) 70%)",
+          backgroundRepeat: "no-repeat",
+          backgroundSize: "100% 420px",
+        }}
+      >
+        <div className="w-full">
+          <section>
+            <header className="flex flex-col items-center justify-center text-center">
+              <p className="text-xl font-semibold text-[#013d63]">Welcome back, {firstName}.</p>
+              <h1 className="mt-2 text-[36px] sm:text-[44px] lg:text-[58px] font-medium tracking-tight text-[#013d63]">
+                What will you work on today?
+              </h1>
+            </header>
+            <div className="mt-10 flex justify-center">
+              <div className="w-full max-w-4xl rounded-[42px] border-[3px] border-[#0f6fb8] bg-white/95 px-5 py-3 text-[#013d63] shadow-[0_8px_20px_rgba(15,111,184,0.16)]">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="flex flex-col items-center gap-2 sm:pr-5">
+                    <div className="text-center">
+                      <h3 className="text-base font-semibold text-[#013d63]">Start a new project</h3>
+                    </div>
+                    <StartProjectButton
+                      variant="custom"
+                      className="inline-flex h-9 w-full max-w-xs items-center justify-center rounded-[10px] bg-[#019dfd] px-6 text-sm font-semibold text-white shadow-[0_3px_9px_rgba(0,157,253,0.25)] transition hover:-translate-y-0.5 hover:bg-[#0185d6]"
+                    />
+                  </div>
+                  <div className="flex flex-col items-center gap-2 pt-3 sm:border-l sm:border-slate-300 sm:pl-5 sm:pt-0">
+                    <div className="text-center">
+                      <h3 className="text-base font-semibold text-[#013d63]">Send a Signature Request</h3>
+                    </div>
+                    <Link
+                      href="/signature-center"
+                      className="inline-flex h-9 w-full max-w-xs items-center justify-center rounded-[10px] bg-[#6A4EE8] px-6 text-sm font-semibold text-white shadow-[0_3px_9px_rgba(0,157,253,0.25)] transition hover:-translate-y-0.5 hover:bg-[#5C3EDB]"
+                    >
+                      Go to Signature Dashboard
+                    </Link>
+                  </div>
                 </div>
-                <Link
-                  href="/projects"
-                  className="text-sm font-semibold text-sky-600 transition hover:text-sky-500"
-                >
-                  View all →
-                </Link>
-              </div>
-              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {[
-                  {
-                    title: "Your Projects",
-                    description: "Manage documents, uploads, and drafts.",
-                    href: "/projects",
-                  },
-                  {
-                    title: "Signature Dashboard",
-                    description: "Track requests, reminders, and completions.",
-                    href: "/signature-center",
-                  },
-                  {
-                    title: "Templates",
-                    description: "Reuse contracts, NDAs, and forms quickly.",
-                    href: "/signature-center",
-                  },
-                ].map((link) => (
-                  <Link
-                    key={link.title}
-                    href={link.href}
-                    className="group rounded-2xl border border-slate-200 bg-slate-50/70 p-4 transition hover:-translate-y-0.5 hover:bg-white hover:shadow-lg"
-                  >
-                    <p className="text-base font-semibold text-slate-900">{link.title}</p>
-                    <p className="mt-1 text-sm text-slate-600">{link.description}</p>
-                    <span className="mt-3 inline-flex items-center text-sm font-semibold text-sky-600">
-                      Open
-                      <ArrowUpRight className="ml-1 h-4 w-4 transition group-hover:translate-x-0.5" />
-                    </span>
-                  </Link>
-                ))}
               </div>
             </div>
-          </div>
+            <div className="mt-5 flex justify-center">
+              <div className="w-full max-w-4xl">
+                <div className="flex items-center rounded-[999px] border-[3px] border-[#0f6fb8] bg-white px-6 py-[18px] text-base text-[#013d63] shadow-[0_8px_25px_rgba(15,111,184,0.25)]">
+                  <Search className="h-5 w-5 text-sky-500 sm:h-6 sm:w-6" aria-hidden />
+                  <input
+                    type="text"
+                    placeholder="Search projects and documents"
+                    className="ml-4 flex-1 border-none bg-transparent text-base text-[#013d63] placeholder:text-slate-400 focus:outline-none focus:ring-0 sm:text-lg"
+                  />
+                  <button
+                    type="button"
+                    className="ml-4 hidden rounded-full border border-[#013d63]/20 bg-white px-4 py-2 text-sm font-semibold text-[#013d63] shadow-[0_4px_14px_rgba(1,61,99,0.2)] transition hover:bg-[#013d63] hover:text-white sm:inline-flex sm:items-center sm:gap-2"
+                  >
+                    <SlidersHorizontal className="h-4 w-4" aria-hidden />
+                    <span>Filters</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
 
-          <DashboardInsightsColumn />
-        </section>
-
-        <section className="pb-8" />
+          <section className="mt-7 w-full">
+            <div className="pt-10">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900 sm:text-xl">Recent projects</h2>
+                </div>
+              </div>
+              <div className="mt-6">
+                <RecentProjectsRow initialProjects={shapedRecent} />
+              </div>
+              <div className="mt-6 flex justify-center">
+                <Link
+                  href="/projects/all"
+                  className="inline-flex h-10 items-center justify-center rounded-[12px] bg-[#019dfd] px-6 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(0,157,253,0.25)] transition hover:-translate-y-0.5 hover:bg-[#0185d6]"
+                >
+                  View all projects
+                </Link>
+              </div>
+            </div>
+          </section>
+        </div>
       </div>
-    </div>
+    </main>
   );
 }

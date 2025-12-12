@@ -13,6 +13,7 @@ const WORKSPACE_DB_STORE = "files";
 
 type Props = {
   className?: string;
+  variant?: "default" | "custom";
 };
 
 function clearIndexedDb(): Promise<void> {
@@ -66,7 +67,7 @@ async function resetWorkspaceStorage() {
   await clearIndexedDb();
 }
 
-export default function StartProjectButton({ className }: Props) {
+export default function StartProjectButton({ className, variant = "default" }: Props) {
   const router = useRouter();
   const { data: session } = useSession();
   const [open, setOpen] = useState(false);
@@ -110,7 +111,7 @@ export default function StartProjectButton({ className }: Props) {
       <button
         type="button"
         onClick={launchModal}
-        className={`btn-primary px-8 text-base ${className ?? ""}`}
+        className={`${variant === "custom" ? "" : "btn-primary px-8 text-base"} ${className ?? ""}`}
       >
         Start a new project
         <svg className="ml-2 h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">

@@ -3,6 +3,27 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
 
+async function ensureDbConnection() {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await prisma.$connect();
+      return;
+    } catch (err: any) {
+      const code = err?.code;
+      if (code === "P1017" || code === "P1001") {
+        try {
+          await prisma.$disconnect();
+        } catch {
+          // ignore
+        }
+        await new Promise((resolve) => setTimeout(resolve, 150 * (attempt + 1)));
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
 function derivePreviewMeta(data: unknown): { previewUrl: string | null; pagesCount: number } {
   let previewUrl: string | null = null;
   let pagesCount = 0;
@@ -35,6 +56,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  try {
+    await ensureDbConnection();
+  } catch {
+    return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
+  }
+
   const userId = session.user.id;
   const summary = request.nextUrl.searchParams.get("summary");
   const trashedParam = request.nextUrl.searchParams.get("trashed");
@@ -42,41 +69,47 @@ export async function GET(request: NextRequest) {
 
   // Lightweight summary payload used by the All Projects grid.
   if (summary === "1") {
-    const projects = await prisma.project.findMany({
-      where: { userId },
-      orderBy: { updatedAt: "desc" },
-      take: 80,
-      select: {
-        id: true,
-        name: true,
-        updatedAt: true,
-        previewUrl: true,
-        pagesCount: true,
-        data: true,
-      },
+    const projects = trashed
+      ? await prisma.$queryRaw<
+          {
+            id: string;
+            name: string;
+            updatedAt: Date;
+            previewUrl: string | null;
+            pagesCount: number | null;
+          }[]
+        >`
+          SELECT id, name, "updatedAt", "previewUrl", "pagesCount"
+          FROM "Project"
+          WHERE "userId" = ${userId}
+            AND COALESCE((data->>'trashed')::boolean, false) = true
+          ORDER BY "updatedAt" DESC
+          LIMIT 60
+        `
+      : await prisma.$queryRaw<
+          {
+            id: string;
+            name: string;
+            updatedAt: Date;
+            previewUrl: string | null;
+            pagesCount: number | null;
+          }[]
+        >`
+          SELECT id, name, "updatedAt", "previewUrl", "pagesCount"
+          FROM "Project"
+          WHERE "userId" = ${userId}
+            AND COALESCE((data->>'trashed')::boolean, false) = false
+          ORDER BY "updatedAt" DESC
+          LIMIT 60
+        `;
+
+    return NextResponse.json({
+      projects: projects.map((project) => ({
+        ...project,
+        previewUrl: project.previewUrl ?? null,
+        pagesCount: project.pagesCount ?? 0,
+      })),
     });
-
-    const shaped = projects
-      .map((project) => {
-        const payload = project.data as
-          | {
-              trashed?: boolean;
-            }
-          | null;
-        const isTrashed = payload?.trashed === true;
-        if (trashed && !isTrashed) return null;
-        if (!trashed && isTrashed) return null;
-        return {
-          id: project.id,
-          name: project.name,
-          updatedAt: project.updatedAt,
-          previewUrl: project.previewUrl ?? null,
-          pagesCount: project.pagesCount ?? 0,
-        };
-      })
-      .filter((item): item is NonNullable<typeof item> => item !== null);
-
-    return NextResponse.json({ projects: shaped });
   }
 
   const projects = await prisma.project.findMany({
@@ -93,6 +126,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  try {
+    await ensureDbConnection();
+  } catch {
+    return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
+  }
+
   const userId = session.user.id;
 
   const body = await req.json().catch(() => ({}));
@@ -106,15 +145,33 @@ export async function POST(req: Request) {
     );
   }
 
-  const project = await prisma.project.create({
-    data: {
-      name,
-      data,
-      previewUrl,
-      pagesCount,
-      userId,
-    },
-  });
+  let project;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      project = await prisma.project.create({
+        data: {
+          name,
+          data,
+          previewUrl,
+          pagesCount,
+          userId,
+        },
+      });
+      break;
+    } catch (err: any) {
+      const code = err?.code;
+      if (attempt === 0 && (code === "P1017" || code === "P1001")) {
+        try {
+          await prisma.$disconnect();
+        } catch {
+          // ignore
+        }
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        continue;
+      }
+      throw err;
+    }
+  }
 
   return NextResponse.json({ project });
 }

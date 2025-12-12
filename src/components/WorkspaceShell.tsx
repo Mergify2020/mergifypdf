@@ -114,7 +114,7 @@ type SidebarPanel = {
 const sidebarPanels: Record<string, SidebarPanel> = {
   home: {
     title: "Recent documents",
-    subtitle: "Quick access",
+    subtitle: "",
     items: [
       { label: "Welcome Deck", description: "Updated 1 day ago" },
       { label: "Vendor Agreement FY25", description: "Edited 3 days ago" },
@@ -325,13 +325,13 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
 
   const sidebarCompact = compactSidebar || narrowSidebar;
   const shouldOverlay = overlaySidebar;
-  const railWidthClass = sidebarCompact ? "w-[104px]" : "w-24";
-  const panelLeftClass = sidebarCompact ? "left-[104px]" : "left-[96px]";
-  const baseContentOffsetClass = sidebarCompact ? "md:ml-[104px]" : "md:ml-24";
+  const railWidthClass = sidebarCompact ? "w-28" : "w-28";
+  const panelLeftClass = sidebarCompact ? "left-28" : "left-28";
+  const baseContentOffsetClass = sidebarCompact ? "md:ml-28" : "md:ml-28";
   const expandedContentOffsetClass =
     expanded && !shouldOverlay
       ? sidebarCompact
-        ? "lg:ml-[344px]"
+        ? "lg:ml-[452px]"
         : "lg:ml-[416px]"
       : "";
   const sidebarExpandedClass = expanded && !shouldOverlay ? "with-sidebar-panel" : "";
@@ -358,6 +358,57 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
     }
   }, [panelKey]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handler = () => {
+      setExpanded(true);
+    };
+
+    (window as any).addEventListener("open-account-panel", handler);
+    return () => {
+      (window as any).removeEventListener("open-account-panel", handler);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isAccountRoute || typeof window === "undefined") return;
+    try {
+      const shouldOpen = window.localStorage?.getItem("mpdf:open-account-panel");
+      if (shouldOpen === "1") {
+        setExpanded(true);
+        window.localStorage.removeItem("mpdf:open-account-panel");
+      }
+    } catch {
+      // ignore storage read errors
+    }
+  }, [isAccountRoute]);
+
+  const openBillingPortal = async () => {
+    try {
+      const res = await fetch("/api/billing-portal", {
+        method: "POST",
+      });
+
+      if (!res.ok) {
+        // eslint-disable-next-line no-console
+        console.error("Failed to load portal");
+        return;
+      }
+
+      const { url } = (await res.json()) as { url?: string };
+      if (url) {
+        window.location.href = url;
+      }
+    } catch {
+      // eslint-disable-next-line no-console
+      console.error("Unexpected error loading billing portal");
+    } finally {
+      setProfileOpen(false);
+      setExpanded(false);
+    }
+  };
+
   const renderItems = (
     items: SidebarItem[],
     {
@@ -373,22 +424,22 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
           ? pathname === "/"
           : pathname?.startsWith(href) || false);
       const iconWrapperBase = isExpanded
-        ? `flex ${sidebarCompact ? "h-9 w-9 lg:h-11 lg:w-11" : "h-11 w-11"} items-center justify-center rounded-2xl transition`
+        ? "flex w-full items-center justify-start rounded-2xl transition"
         : `flex ${sidebarCompact ? "h-11" : "h-13"} w-full items-center justify-center rounded-2xl transition`;
       const iconWrapperState = isActive
-        ? "bg-sky-100 text-sky-600 shadow-inner"
-        : "bg-transparent text-slate-500 group-hover:bg-slate-100/80";
+        ? "text-sky-600"
+        : "text-slate-500";
       const iconWrapperClasses = `${iconWrapperBase} ${iconWrapperState}`;
       const iconSizeClasses = isExpanded
         ? sidebarCompact
           ? "h-7 w-7 lg:h-8 lg:w-8"
-          : "h-8 w-8"
+          : "h-8 w-8 xl:h-9 xl:w-9"
         : sidebarCompact
           ? "h-6 w-6"
-          : "h-7 w-7";
+          : "h-8 w-8 lg:h-9 lg:w-9";
       const expandedLayoutClasses = sidebarCompact
-        ? "items-center justify-start gap-2 px-2.5 py-1.5 text-left text-[11px]"
-        : "items-center justify-start gap-3 px-3 py-2 text-left";
+        ? "items-center justify-start gap-2 px-1 py-1.5 text-left text-[11px]"
+        : "items-center justify-start gap-2 px-1 py-2 text-left";
       const collapsedLayoutClasses = sidebarCompact
         ? "flex-col items-stretch justify-center gap-1.5 px-1 py-2.5 text-center"
         : "flex-col items-stretch justify-center gap-2 px-1 py-3 text-center";
@@ -408,12 +459,12 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
           }}
           aria-label={label}
           disabled={disabled}
-          className={`group flex w-full overflow-hidden rounded-xl text-sm font-semibold transition ${
+          className={`group flex w-full overflow-hidden rounded-xl text-sm lg:text-base xl:text-lg font-semibold transition-transform transition-shadow duration-150 ease-out ${
             disabled
-              ? "cursor-not-allowed text-slate-400"
+              ? "cursor-not-allowed text-slate-400 hover:bg-slate-100 hover:-translate-y-0.5 hover:shadow-md"
               : isActive
-                ? "text-sky-900"
-                : "text-slate-800"
+                ? "text-sky-900 bg-sky-100 hover:-translate-y-0.5 hover:shadow-md"
+                : "text-[#013D63] hover:bg-slate-100 hover:-translate-y-0.5 hover:shadow-md"
           } ${isExpanded ? expandedLayoutClasses : collapsedLayoutClasses}`}
         >
           <span className={iconWrapperClasses}>
@@ -421,7 +472,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
           </span>
           {isExpanded ? (
             <span
-              className={`inline-flex flex-1 overflow-hidden whitespace-nowrap text-sm transition-all duration-200 ease-in-out ${
+              className={`inline-flex flex-1 whitespace-nowrap overflow-hidden text-ellipsis text-sm lg:text-base xl:text-lg transition-all duration-200 ease-in-out ${
                 isExpanded ? (sidebarCompact ? "ml-1.5 lg:ml-2" : "ml-2") : "ml-0"
               } ${labelClassName ?? ""} font-semibold`}
             >
@@ -429,7 +480,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
             </span>
           ) : (
             <span
-              className={`text-[10px] font-semibold uppercase tracking-wide ${
+              className={`text-[11px] sm:text-xs lg:text-sm font-semibold tracking-wide ${
                 isActive ? "text-sky-700" : "text-slate-500"
               }`}
             >
@@ -442,7 +493,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
 
   const workspaceShell = (
     <>
-    <div className="flex min-h-screen bg-white">
+    <div className="flex min-h-screen bg-slate-100">
       {/* Desktop sidebar */}
       <aside className="hidden md:flex fixed left-0 top-0 z-30 h-screen text-slate-800">
         <div className="relative flex h-full w-full">
@@ -452,7 +503,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
               sidebarCompact ? "z-10" : "z-20"
             }`}
           >
-            <div className="flex flex-1 flex-col gap-4 overflow-y-auto overflow-x-hidden px-2 lg:px-3 py-5">
+            <div className="flex flex-1 flex-col gap-4 overflow-y-auto overflow-x-hidden px-1 lg:px-2 py-5">
               <div className="flex items-center justify-center">
               <button
                 type="button"
@@ -460,7 +511,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                 className="relative z-10 flex h-9 w-9 items-center justify-center rounded-full bg-[#1e293b] text-white shadow-[0_8px_24px_rgba(10,37,64,0.35)] transition hover:bg-[#253248]"
                 aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
               >
-                {expanded ? <ChevronLeft className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+                {expanded ? <ChevronLeft className="h-6 w-6" /> : <ChevronRight className="h-6 w-6" />}
               </button>
             </div>
 
@@ -468,16 +519,20 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
               <button
                 type="button"
                 onClick={openCreateModal}
-                className={`flex w-full flex-col items-center gap-2 rounded-2xl bg-[#4C6FFF] ${
-                  sidebarCompact ? "px-2 py-2 lg:px-3 lg:py-2.5" : "px-3 py-3.5"
-                } text-center text-sm font-semibold text-white shadow-lg transition hover:bg-[#3A54D6]`}
+                className={`flex w-full flex-col items-center gap-2 rounded-2xl border-[3px] border-[#51bdff] bg-[#008ade] ${
+                  sidebarCompact ? "px-2 py-3 lg:px-3 lg:py-3.5" : "px-3 py-4"
+                } text-center text-base font-semibold text-white shadow-[0_14px_40px_rgba(15,23,42,0.45)] transition-transform transition-shadow duration-150 ease-out hover:-translate-y-0.5 hover:shadow-[0_18px_50px_rgba(15,23,42,0.6)] hover:bg-[#007fcd]`}
               >
                 <span
                   className={`flex ${sidebarCompact ? "h-6 w-6 lg:h-8 lg:w-8" : "h-8 w-8"} items-center justify-center rounded-full bg-white/20 text-white`}
                 >
                   <Plus className={`${sidebarCompact ? "h-4.5 w-4.5 lg:h-5 lg:w-5" : "h-5 w-5"} stroke-[3]`} />
                 </span>
-            <span className="text-[10px] font-bold uppercase text-white">Create</span>
+                <span className="text-[11px] sm:text-xs lg:text-sm font-semibold leading-tight text-white">
+                  New
+                  <br />
+                  Project
+                </span>
           </button>
         </div>
             <nav className="flex flex-col gap-1">
@@ -507,7 +562,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
               >
                 <span
                   className={`relative flex ${
-                    sidebarCompact ? "h-[60px] w-[60px]" : "h-16 w-16"
+                    sidebarCompact ? "h-[72px] w-[72px]" : "h-20 w-20"
                   } shrink-0 items-center justify-center rounded-full ${
                     sidebarCompact ? "border-[5px]" : "border-[6px]"
                   } ${
@@ -519,12 +574,12 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                     <img
                       src={avatar}
                       alt="Your avatar"
-                      className={`${sidebarCompact ? "h-[48px] w-[48px]" : "h-12 w-12"} shrink-0 rounded-full object-cover`}
+                      className={`${sidebarCompact ? "h-[58px] w-[58px]" : "h-16 w-16"} shrink-0 rounded-full object-cover`}
                     />
                   ) : (
                     <span
                       className={`flex ${
-                        sidebarCompact ? "h-[48px] w-[48px] text-sm" : "h-12 w-12 text-base"
+                        sidebarCompact ? "h-[58px] w-[58px] text-sm" : "h-16 w-16 text-base"
                       } items-center justify-center rounded-full font-semibold uppercase text-white`}
                       style={{ backgroundColor: fallbackAvatar.color }}
                     >
@@ -539,7 +594,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                   profileOpen ? "opacity-100 translate-y-0" : "pointer-events-none opacity-0 translate-y-2"
                 }`}
               >
-                <div className="flex items-center gap-3 rounded-2xl border border-slate-100 px-3 py-3">
+                <div className="flex items-center gap-3 rounded-2xl border-[3px] border-slate-300 px-3 py-3">
                   <span className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-50 text-slate-600">
                     {avatar ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -554,9 +609,9 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                     )}
                   </span>
                   <div className="flex-1">
-                    <p className="text-base font-semibold text-slate-900">{session?.user?.name ?? "Account"}</p>
+                    <p className="text-lg font-semibold text-slate-900">{session?.user?.name ?? "Account"}</p>
                     {session?.user?.email ? (
-                      <p className="text-xs text-slate-500">{session.user.email}</p>
+                      <p className="text-sm text-slate-500">{session.user.email}</p>
                     ) : null}
                   </div>
                 </div>
@@ -566,6 +621,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                       <button
                         type="button"
                         onClick={() => {
+                          setExpanded(true);
                           setProfileOpen(false);
                           router.push("/account");
                         }}
@@ -573,20 +629,48 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                       >
                         <div className="flex items-center gap-3">
                           <User className="h-6 w-6 text-slate-600" aria-hidden />
-                          <span>Your profile</span>
+                          <span>Account</span>
                         </div>
+                        <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
                       </button>
                       <button
                         type="button"
                         onClick={() => {
-                          setProfileOpen(false);
-                          router.push("/pricing");
+                          void openBillingPortal();
                         }}
                         className="flex w-full items-center justify-between rounded-2xl px-4 py-3.5 text-left text-2xl font-semibold text-slate-800 transition hover:bg-slate-50"
                       >
                         <div className="flex items-center gap-3">
                           <CreditCard className="h-6 w-6 text-slate-500" aria-hidden />
+                          <span>Billing portal</span>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                      onClick={() => {
+                        setProfileOpen(false);
+                        router.push("/pricing");
+                      }}
+                      className="flex w-full items-center justify-between rounded-2xl px-4 py-3.5 text-left text-2xl font-semibold text-slate-800 transition hover:bg-slate-50"
+                    >
+                      <div className="flex items-center gap-3">
+                          <FileText className="h-6 w-6 text-slate-500" aria-hidden />
                           <span>Plans &amp; Pricing</span>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileOpen(false);
+                          router.push("/projects/trash");
+                        }}
+                        className="flex w-full items-center justify-between rounded-2xl px-4 py-3.5 text-left text-2xl font-semibold text-slate-800 transition hover:bg-slate-50"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Trash2 className="h-6 w-6 text-slate-500" aria-hidden />
+                          <span>Trash</span>
                         </div>
                         <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
                       </button>
@@ -617,11 +701,24 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                           setProfileOpen(false);
                           router.push("/account");
                         }}
-                        className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left font-semibold text-slate-700 transition hover:bg-slate-50"
+                        className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-2xl font-semibold text-slate-700 transition hover:bg-slate-50"
                       >
                         <div className="flex items-center gap-3">
-                          <Settings className="h-5 w-5 text-slate-500" aria-hidden />
-                          <span>Settings</span>
+                          <User className="h-5 w-5 text-slate-500" aria-hidden />
+                          <span>Account</span>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void openBillingPortal();
+                        }}
+                        className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-2xl font-semibold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        <div className="flex items-center gap-3">
+                          <CreditCard className="h-5 w-5 text-slate-500" aria-hidden />
+                          <span>Billing portal</span>
                         </div>
                         <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
                       </button>
@@ -631,10 +728,10 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                           setProfileOpen(false);
                           router.push("/pricing");
                         }}
-                        className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left font-semibold text-slate-700 transition hover:bg-slate-50"
+                        className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-2xl font-semibold text-slate-700 transition hover:bg-slate-50"
                       >
                         <div className="flex items-center gap-3">
-                          <CreditCard className="h-5 w-5 text-slate-500" aria-hidden />
+                          <FileText className="h-5 w-5 text-slate-500" aria-hidden />
                           <span>Plans &amp; Pricing</span>
                         </div>
                         <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
@@ -645,7 +742,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                           setProfileOpen(false);
                           router.push("/projects/trash");
                         }}
-                        className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left font-semibold text-slate-700 transition hover:bg-slate-50"
+                        className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-2xl font-semibold text-slate-700 transition hover:bg-slate-50"
                       >
                         <div className="flex items-center gap-3">
                           <Trash2 className="h-5 w-5 text-slate-500" aria-hidden />
@@ -666,9 +763,9 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                             setSigningOut(false);
                           }
                         }}
-                        className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left font-semibold text-red-600 transition hover:bg-red-50"
+                        className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-2xl font-semibold text-red-600 transition hover:bg-red-50"
                       >
-                        <LogOut className="h-5 w-5" aria-hidden />
+                        <LogOut className="h-6 w-6" aria-hidden />
                         <span>Log out</span>
                       </button>
                     </>
@@ -680,9 +777,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
           {expanded ? (
             <div
               ref={panelRef}
-              className={`absolute ${panelLeftClass} top-0 hidden h-full ${
-                isAccountRoute ? "bg-slate-50" : "bg-gradient-to-b from-white via-white/95 to-white/90"
-              } px-4 py-6 text-slate-800 backdrop-blur-xl transition-[transform,opacity,filter] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform md:flex ${sidebarCompact ? "w-[240px]" : "w-[320px]"} z-0 ${
+              className={`absolute ${panelLeftClass} top-0 hidden h-full bg-slate-100 px-4 py-6 text-slate-800 backdrop-blur-xl transition-[transform,opacity,filter] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform md:flex ${sidebarCompact ? "w-[240px]" : "w-[320px]"} z-0 ${
                 expanded ? "translate-x-0 opacity-100 blur-0 pointer-events-auto" : "-translate-x-10 opacity-0 blur-sm"
               }`}
             >
@@ -697,10 +792,20 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                         setProfileOpen(false);
                         router.push("/account");
                       }}
-                      className="flex w-full items-center gap-3 rounded-2xl bg-slate-100 px-3 py-2.5 text-base font-semibold text-slate-800 sm:text-lg lg:text-xl"
+                      className="flex w-full items-center gap-3 rounded-2xl bg-slate-100 px-4 py-3.5 text-left text-2xl font-semibold text-slate-800"
                     >
-                      <User className="h-5 w-5 text-slate-600 sm:h-6 sm:w-6" aria-hidden />
-                      <span>Your profile</span>
+                      <User className="h-6 w-6 text-slate-600" aria-hidden />
+                      <span>Account</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void openBillingPortal();
+                      }}
+                      className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-left text-2xl font-semibold text-slate-800 transition hover:bg-slate-50"
+                    >
+                      <CreditCard className="h-6 w-6 text-slate-600" aria-hidden />
+                      <span>Billing portal</span>
                     </button>
                     <button
                       type="button"
@@ -709,10 +814,22 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                         setProfileOpen(false);
                         router.push("/pricing");
                       }}
-                      className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-base font-semibold text-slate-800 transition hover:bg-slate-100 sm:text-lg lg:text-xl"
+                      className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-left text-2xl font-semibold text-slate-800 transition hover:bg-slate-50"
                     >
-                      <CreditCard className="h-5 w-5 text-slate-600 sm:h-6 sm:w-6" aria-hidden />
+                      <FileText className="h-6 w-6 text-slate-600" aria-hidden />
                       <span>Plans &amp; Pricing</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setExpanded(false);
+                        setProfileOpen(false);
+                        router.push("/projects/trash");
+                      }}
+                      className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-left text-2xl font-semibold text-slate-800 transition hover:bg-slate-50"
+                    >
+                      <Trash2 className="h-6 w-6 text-slate-600" aria-hidden />
+                      <span>Trash</span>
                     </button>
                     <button
                       type="button"
@@ -728,9 +845,9 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                           setSigningOut(false);
                         }
                       }}
-                      className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-base font-semibold text-red-600 transition hover:bg-red-50 sm:text-lg lg:text-xl"
+                      className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-left text-2xl font-semibold text-red-600 transition hover:bg-red-50"
                     >
-                      <LogOut className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden />
+                      <LogOut className="h-6 w-6" aria-hidden />
                       <span>Log out</span>
                     </button>
                   </div>
@@ -791,7 +908,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                         }
 
                         return (
-                          <li key={item.label} className="rounded-2xl border border-slate-100 bg-white px-3 py-2">
+                          <li key={item.label} className="px-1 py-1">
                             <p className="text-sm font-semibold text-slate-800">{item.label}</p>
                             {item.description ? (
                               <p className="text-xs text-slate-500">{item.description}</p>
