@@ -13,6 +13,7 @@ import { hasUsedToday } from "@/lib/quota";
 import RecentProjectsRow from "@/components/RecentProjectsRow";
 import StartProjectButton from "@/components/StartProjectButton";
 import { prisma } from "@/lib/prisma";
+import ProjectsSummarySeed from "@/components/ProjectsSummarySeed";
 
 function Sparkle({ className, gradientId }: { className?: string; gradientId: string }) {
   return (
@@ -146,19 +147,30 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
 
 async function ProjectsDashboard({ displayName, userId }: { displayName: string; userId: string }) {
   const firstName = displayName.split(" ")[0] ?? "there";
-  const shapedRecent = await prisma.$queryRaw<
-    { id: string; name: string; updatedAt: Date; previewUrl: string | null }[]
+  const shapedProjects = await prisma.$queryRaw<
+    { id: string; name: string; updatedAt: Date; pagesCount: number | null; hasPreview: boolean }[]
   >`
-    SELECT id, name, "updatedAt", "previewUrl"
+    SELECT id, name, "updatedAt", "pagesCount", ("previewUrl" IS NOT NULL) as "hasPreview"
     FROM "Project"
     WHERE "userId" = ${userId}
       AND COALESCE((data->>'trashed')::boolean, false) = false
     ORDER BY "updatedAt" DESC
-    LIMIT 6
+    LIMIT 60
   `;
+  const summaryProjects = shapedProjects.map((project) => ({
+    id: project.id,
+    name: project.name,
+    updatedAt: project.updatedAt,
+    pagesCount: project.pagesCount ?? 0,
+    previewUrl: project.hasPreview
+      ? `/api/projects/${encodeURIComponent(project.id)}/thumbnail?v=${project.updatedAt.getTime()}`
+      : null,
+  }));
+  const recentProjects = summaryProjects.slice(0, 6);
 
   return (
     <main className="min-h-screen w-full bg-slate-100 px-2 py-4 sm:px-4 sm:py-6 lg:px-6 lg:py-8">
+      <ProjectsSummarySeed projects={summaryProjects} />
       <div
         className="mx-auto mb-6 flex min-h-[calc(100vh-4rem)] w-full flex-col rounded-[32px] border border-white/70 bg-white px-4 pb-12 pt-14 sm:mb-8 sm:px-6 lg:px-10"
         style={{
@@ -177,7 +189,7 @@ async function ProjectsDashboard({ displayName, userId }: { displayName: string;
               </h1>
             </header>
             <div className="mt-10 flex justify-center">
-              <div className="w-full max-w-4xl rounded-[42px] border-[3px] border-[#0f6fb8] bg-white/95 px-5 py-3 text-[#013d63] shadow-[0_8px_20px_rgba(15,111,184,0.16)]">
+              <div className="w-full max-w-4xl rounded-[42px] border border-[#0f6fb8] bg-white/95 px-5 py-3 text-[#013d63] shadow-[0_8px_20px_rgba(15,111,184,0.16)]">
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="flex flex-col items-center gap-2 sm:pr-5">
                     <div className="text-center">
@@ -204,7 +216,7 @@ async function ProjectsDashboard({ displayName, userId }: { displayName: string;
             </div>
             <div className="mt-5 flex justify-center">
               <div className="w-full max-w-4xl">
-                <div className="flex items-center rounded-[999px] border-[3px] border-[#0f6fb8] bg-white px-6 py-[18px] text-base text-[#013d63] shadow-[0_8px_25px_rgba(15,111,184,0.25)]">
+                <div className="flex items-center rounded-[999px] border border-[#0f6fb8] bg-white px-6 py-[18px] text-base text-[#013d63] shadow-[0_8px_25px_rgba(15,111,184,0.25)]">
                   <Search className="h-5 w-5 text-sky-500 sm:h-6 sm:w-6" aria-hidden />
                   <input
                     type="text"
@@ -231,7 +243,7 @@ async function ProjectsDashboard({ displayName, userId }: { displayName: string;
                 </div>
               </div>
               <div className="mt-6">
-                <RecentProjectsRow initialProjects={shapedRecent} />
+                <RecentProjectsRow initialProjects={recentProjects} />
               </div>
               <div className="mt-6 flex justify-center">
                 <Link

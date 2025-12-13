@@ -315,6 +315,15 @@ const TILE_VARIANTS = {
   visible: { opacity: 1, y: 0 },
 };
 
+function toCardPreviewDataUrl(canvas: HTMLCanvasElement) {
+  try {
+    const webp = canvas.toDataURL("image/webp", PREVIEW_IMAGE_QUALITY);
+    if (webp.startsWith("data:image/webp")) return webp;
+  } catch {
+  }
+  return canvas.toDataURL("image/png", PREVIEW_IMAGE_QUALITY);
+}
+
 type StoredSourceMeta = { id: string; name?: string; size?: number; updatedAt?: number };
 type FileStoreEntry = { blob: Blob; name?: string; size?: number; updatedAt: number };
 
@@ -562,7 +571,7 @@ function cloneHighlightMap(map: Record<string, HighlightStroke[]>): Record<strin
 
 function createThumbnailDataUrl(canvas: HTMLCanvasElement) {
   if (canvas.width <= THUMB_MAX_WIDTH) {
-    return canvas.toDataURL("image/png", PREVIEW_IMAGE_QUALITY);
+    return toCardPreviewDataUrl(canvas);
   }
   const ratio = THUMB_MAX_WIDTH / canvas.width;
   const thumbCanvas = document.createElement("canvas");
@@ -572,7 +581,7 @@ function createThumbnailDataUrl(canvas: HTMLCanvasElement) {
   thumbCtx.imageSmoothingEnabled = true;
   thumbCtx.imageSmoothingQuality = "high";
   thumbCtx.drawImage(canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
-  return thumbCanvas.toDataURL("image/png", PREVIEW_IMAGE_QUALITY);
+  return toCardPreviewDataUrl(thumbCanvas);
 }
 
 function getAspectPadding(width?: number, height?: number) {
@@ -754,7 +763,7 @@ function WorkspaceClient() {
   const { data: authSession } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { saveProject, savingProject } = useProjects();
+  const { saveProject, savingProject, currentProjectId } = useProjects();
   const [showDownloadGate, setShowDownloadGate] = useState(false);
   const [showDelayOverlay, setShowDelayOverlay] = useState<"intro" | "progress" | null>(null);
   const [sources, setSources] = useState<SourceRef[]>([]);
@@ -1038,6 +1047,7 @@ function WorkspaceClient() {
   const [projectNameError, setProjectNameError] = useState<string | null>(null);
   const [organizeMode, setOrganizeMode] = useState(false);
   const [firstPageThumb, setFirstPageThumb] = useState<string | null>(null);
+  const lastPersistedThumbRef = useRef<string | null>(null);
 
   const addInputRef = useRef<HTMLInputElement>(null);
   const renderedSourcesRef = useRef(0);
@@ -1223,8 +1233,8 @@ function WorkspaceClient() {
         // Render a high-resolution thumbnail for project cards.
         // Target ~2–3x the typical display width so the
         // image can scale down sharply without blurring.
-        const targetWidth = 900;
-        const scale = Math.min(1, targetWidth / baseWidth);
+        const targetWidth = 1100;
+        const scale = Math.min(1.25, targetWidth / baseWidth);
         const outputWidth = baseWidth * scale;
         const outputHeight = baseHeight * scale;
 
@@ -1324,7 +1334,7 @@ function WorkspaceClient() {
         ctx.restore();
 
         if (!cancelled) {
-          setFirstPageThumb(canvas.toDataURL("image/png", PREVIEW_IMAGE_QUALITY));
+          setFirstPageThumb(toCardPreviewDataUrl(canvas));
         }
       } catch {
         if (!cancelled) {
@@ -1623,7 +1633,7 @@ function WorkspaceClient() {
             ctx.imageSmoothingQuality = "high";
             await page.render(renderContext).promise;
 
-            const previewData = canvas.toDataURL("image/png", PREVIEW_IMAGE_QUALITY);
+            const previewData = toCardPreviewDataUrl(canvas);
             const thumbData = createThumbnailDataUrl(canvas);
 
             const pageId = buildPageId(src.storageId, p - 1);
@@ -2893,6 +2903,15 @@ function WorkspaceClient() {
     signaturePlacements,
     savedSignatures,
   ]);
+
+  useEffect(() => {
+    if (!currentProjectId || !firstPageThumb) return;
+    if (lastPersistedThumbRef.current === firstPageThumb) return;
+    const payload = buildCloudProjectData();
+    if (!payload) return;
+    lastPersistedThumbRef.current = firstPageThumb;
+    void saveProject(projectName, payload);
+  }, [buildCloudProjectData, currentProjectId, firstPageThumb, projectName, saveProject]);
 
   useEffect(() => {
     if (!authSession?.user) return;

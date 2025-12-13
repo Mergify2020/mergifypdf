@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import AllProjectsGrid from "@/components/AllProjectsGrid";
+import { getProjectsSummaryCache, type ProjectsSummaryProject } from "@/lib/projectsSummaryCache";
 
 type ApiProject = {
   id: string;
@@ -40,41 +40,45 @@ type ProjectCard = {
 
 let cachedProjects: ProjectCard[] | null = null;
 
+function mapSummaryProjects(projects: ProjectsSummaryProject[]): ProjectCard[] {
+  return projects.map((project) => {
+    const updatedAt =
+      project.updatedAt instanceof Date ? project.updatedAt : new Date(project.updatedAt);
+
+    return {
+      id: project.id,
+      title: project.name?.trim() || "Untitled project",
+      updated: formatUpdatedLabel(updatedAt),
+      previewUrl: project.previewUrl ?? null,
+      pagesCount: project.pagesCount ?? 0,
+    };
+  });
+}
+
 export default function AllProjectsClient() {
-  const router = useRouter();
-  const [projects, setProjects] = useState<ProjectCard[]>(() => cachedProjects ?? []);
-  const [loading, setLoading] = useState(() => !cachedProjects || cachedProjects.length === 0);
+  const cachedSummary = getProjectsSummaryCache();
+  const initialProjects = cachedProjects ?? (cachedSummary ? mapSummaryProjects(cachedSummary) : []);
+  if (!cachedProjects && cachedSummary) {
+    cachedProjects = initialProjects;
+  }
+
+  const [projects, setProjects] = useState<ProjectCard[]>(initialProjects);
+  const [loading, setLoading] = useState(() => initialProjects.length === 0);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (cachedProjects && cachedProjects.length > 0) {
-      // Already have projects cached for this session; no need to refetch
-      // just for navigation between tabs/routes.
-      setLoading(false);
-      return;
-    }
+    if (cachedProjects && cachedProjects.length > 0) return;
 
     let cancelled = false;
 
     const load = async () => {
       try {
-        const res = await fetch("/api/projects?summary=1", { cache: "no-store" });
+        const res = await fetch("/api/projects?summary=1", { cache: "force-cache" });
         if (!res.ok) return;
         const data = (await res.json()) as { projects?: ApiProject[] };
         if (!Array.isArray(data.projects) || cancelled) return;
 
-        const mapped = data.projects.map((project) => {
-          const updatedAt =
-            project.updatedAt instanceof Date ? project.updatedAt : new Date(project.updatedAt);
-
-          return {
-            id: project.id,
-            title: project.name?.trim() || "Untitled project",
-            updated: formatUpdatedLabel(updatedAt),
-            previewUrl: project.previewUrl ?? null,
-            pagesCount: project.pagesCount ?? 0,
-          };
-        });
+        const mapped = mapSummaryProjects(data.projects as ProjectsSummaryProject[]);
 
         if (!cancelled) {
           cachedProjects = mapped;
@@ -97,7 +101,32 @@ export default function AllProjectsClient() {
   }, []);
 
   if (loading) {
-    return null;
+    return (
+      <div className="min-h-screen bg-[#F9FAFC] px-2 pb-0 pt-10 sm:px-4 sm:pt-12 lg:px-6 lg:pt-14">
+        <div className="mx-auto w-full pb-16">
+          <h1 className="mt-2 text-center text-4xl font-semibold text-slate-900 sm:mt-4 sm:text-5xl">
+            All Projects
+          </h1>
+          <div className="projects-grid mt-10 grid grid-cols-2 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 sm:gap-8 lg:gap-10">
+            {Array.from({ length: 18 }).map((_, index) => (
+              <div
+                // eslint-disable-next-line react/no-array-index-key
+                key={index}
+                className="rounded-[10px] bg-white/60 p-3 shadow-sm ring-1 ring-slate-200/60"
+              >
+                <div className="relative m-[3px] w-[calc(100%-6px)] aspect-[1.23/1] overflow-hidden rounded-[10px] bg-[#EEF1F5] border border-[rgba(0,0,0,0.06)]">
+                  <div className="absolute inset-0 skeleton-shimmer" />
+                </div>
+                <div className="mt-4 space-y-2">
+                  <div className="h-4 w-3/4 rounded-full skeleton-shimmer" />
+                  <div className="h-3.5 w-1/2 rounded-full skeleton-shimmer" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (!loading && projects.length === 0) {

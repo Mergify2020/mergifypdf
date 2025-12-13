@@ -18,7 +18,7 @@ export async function GET(
 
   const project = await prisma.project.findFirst({
     where: { id, userId },
-    select: { data: true },
+    select: { previewUrl: true, data: true },
   });
 
   if (!project) {
@@ -33,6 +33,10 @@ export async function GET(
     | null;
 
   const dataUrl =
+    (project.previewUrl &&
+      typeof project.previewUrl === "string" &&
+      project.previewUrl.length > 0 &&
+      project.previewUrl) ||
     (payload?.firstPageThumb &&
       typeof payload.firstPageThumb === "string" &&
       payload.firstPageThumb.length > 0 &&
@@ -58,8 +62,7 @@ export async function GET(
     status: 200,
     headers: {
       "Content-Type": mime,
-      "Cache-Control": "public, max-age=31536000, immutable",
+      "Cache-Control": "private, max-age=31536000, immutable",
     },
   });
 }
-

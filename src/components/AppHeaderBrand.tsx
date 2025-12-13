@@ -4,7 +4,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-export default function AppHeaderBrand() {
+type Props = {
+  variant?: "default" | "sidebarPanel";
+};
+
+export default function AppHeaderBrand({ variant = "default" }: Props) {
   const pathname = usePathname();
   const isSignatureExperience = pathname?.startsWith("/signature-center") ?? false;
   const isPricingPage = pathname === "/pricing";
@@ -13,14 +17,21 @@ export default function AppHeaderBrand() {
 
   const baseWidth = 160;
   const baseHeight = 40;
-  const scale = isPricingPage || isAccountSettings || isProjectsPage ? 1.35 : 1;
+  const autoScale = isPricingPage || isAccountSettings || isProjectsPage ? 1.35 : 1;
+  const scale = variant === "sidebarPanel" ? 1.35 : autoScale;
   const logoWidth = Math.round(baseWidth * scale);
   const logoHeight = Math.round(baseHeight * scale);
 
   if (isSignatureExperience) {
     return (
       <Link href="/" className="inline-flex items-center gap-2" aria-label="Back to dashboard">
-        <Image src="/Mergify-Sign.svg" alt="Mergify Sign" width={152} height={32} priority />
+        <Image
+          src="/Mergify-Sign.svg"
+          alt="Mergify Sign"
+          width={Math.round(152 * scale)}
+          height={Math.round(32 * scale)}
+          priority
+        />
       </Link>
     );
   }

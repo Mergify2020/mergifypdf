@@ -106,9 +106,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       projects: projects.map((project) => ({
         ...project,
-        previewUrl: project.previewUrl ?? null,
+        previewUrl: project.previewUrl
+          ? `/api/projects/${encodeURIComponent(project.id)}/thumbnail?v=${project.updatedAt.getTime()}`
+          : null,
         pagesCount: project.pagesCount ?? 0,
       })),
+    }, {
+      headers: {
+        // User-specific; allow short-lived browser caching to speed app navigation.
+        "Cache-Control": "private, max-age=30, stale-while-revalidate=300",
+      },
     });
   }
 

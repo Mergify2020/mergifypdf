@@ -48,6 +48,7 @@ export function saveRecentProjects(ownerId: string | null | undefined, projects:
 }
 
 export function addRecentProject(ownerId: string | null | undefined, title: string, id?: string) {
+  const normalizedTitle = title.trim().toLowerCase();
   const entry: RecentProjectEntry = {
     id:
       id ??
@@ -55,7 +56,14 @@ export function addRecentProject(ownerId: string | null | undefined, title: stri
     title,
     updatedAt: Date.now(),
   };
-  const existing = loadRecentProjects(ownerId).filter((project) => project.id !== entry.id);
+  const existing = loadRecentProjects(ownerId).filter((project) => {
+    if (project.id === entry.id) return false;
+    // If we later learn the real project id, drop any placeholder entries with the same title.
+    if (id && project.title.trim().toLowerCase() === normalizedTitle) return false;
+    // Also avoid duplicate titles in recents.
+    if (project.title.trim().toLowerCase() === normalizedTitle) return false;
+    return true;
+  });
   existing.unshift(entry);
   saveRecentProjects(ownerId, existing.slice(0, 50));
 }

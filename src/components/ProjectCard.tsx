@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, Star, MoreHorizontal, ExternalLink, Copy, Link2, Trash2 } from "lucide-react";
 
@@ -18,6 +18,8 @@ type ProjectCardProps = {
   isSelected: boolean;
   hasSelection: boolean;
   onToggleSelected: (id: string) => void;
+  imageLoading?: "eager" | "lazy";
+  imagePriority?: boolean;
 };
 
 export default function ProjectCard({
@@ -25,6 +27,8 @@ export default function ProjectCard({
   isSelected,
   hasSelection,
   onToggleSelected,
+  imageLoading = "lazy",
+  imagePriority = false,
   onTrashed,
 }: ProjectCardProps & { onTrashed?: (id: string) => void }) {
   const [starred, setStarred] = useState(false);
@@ -49,8 +53,16 @@ export default function ProjectCard({
      return () => {
        document.removeEventListener("mousedown", handleGlobalMouseDown);
      };
-   }, [menuOpen]);
+  }, [menuOpen]);
   const activePreview = project.previewUrl ?? null;
+  const [previewLoaded, setPreviewLoaded] = useState(false);
+  const lastPreviewRef = useRef<string | null>(activePreview);
+
+  useLayoutEffect(() => {
+    if (lastPreviewRef.current === activePreview) return;
+    lastPreviewRef.current = activePreview;
+    setPreviewLoaded(false);
+  }, [activePreview]);
 
   const cardClasses = [
     "relative rounded-[10px] bg-[#F9FAFC] transition",
@@ -246,10 +258,24 @@ export default function ProjectCard({
               <img
                 src={activePreview}
                 alt={project.title}
-                loading="lazy"
+                loading={imageLoading}
+                fetchPriority={imagePriority ? "high" : "auto"}
                 decoding="async"
-                className="w-full h-full object-contain"
+                className={`h-full w-full object-cover object-top transition-opacity ${
+                  previewLoaded ? "opacity-100" : "opacity-0"
+                }`}
+                onLoad={() => setPreviewLoaded(true)}
+                onError={() => setPreviewLoaded(true)}
+                ref={(node) => {
+                  if (!node) return;
+                  if (node.complete && node.naturalWidth > 0) {
+                    setPreviewLoaded(true);
+                  }
+                }}
               />
+              {!previewLoaded ? (
+                <div className="pointer-events-none absolute inset-0 rounded-[10px] skeleton-shimmer opacity-90" />
+              ) : null}
             </div>
           ) : (
             <div className="flex h-full w-full items-center justify-center text-4xl font-semibold text-slate-500 transition-colors duration-150 group-hover:text-slate-600">

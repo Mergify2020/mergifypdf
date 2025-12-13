@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import {
@@ -25,13 +26,19 @@ import {
 } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 import { PROJECT_NAME_STORAGE_KEY, sanitizeProjectName } from "@/lib/projectName";
-import { addRecentProject } from "@/lib/recentProjects";
+import { addRecentProject, loadRecentProjects, RECENT_PROJECTS_EVENT } from "@/lib/recentProjects";
 import AppHeaderBrand from "./AppHeaderBrand";
 import SettingsMenu from "./SettingsMenu";
 import HeroHeader from "./HeroHeader";
 import PageLoadingSkeleton from "./PageLoadingSkeleton";
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
 import { getAvatarFallback } from "@/lib/avatarFallback";
+import {
+  getProjectsSummaryCache,
+  setProjectsSummaryCache,
+  type ProjectsSummaryProject,
+} from "@/lib/projectsSummaryCache";
+import { preloadImageUrls } from "@/lib/preloadImageUrls";
 
 const WORKSPACE_META_KEY = "mpdf:files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
@@ -107,20 +114,22 @@ const navigationItems: SidebarItem[] = [
 type SidebarPanel = {
   title: string;
   subtitle: string;
-  items: { label: string; description?: string; icon?: LucideIcon; key?: string }[];
+  items: {
+    label: string;
+    description?: string;
+    icon?: LucideIcon;
+    key?: string;
+    previewUrl?: string | null;
+  }[];
   action?: { label: string; href: string };
 };
 
 const sidebarPanels: Record<string, SidebarPanel> = {
   home: {
-    title: "Recent documents",
+    title: "Recent Projects",
     subtitle: "",
-    items: [
-      { label: "Welcome Deck", description: "Updated 1 day ago" },
-      { label: "Vendor Agreement FY25", description: "Edited 3 days ago" },
-      { label: "Mergify Sign brochure", description: "Shared last week" },
-    ],
-    action: { label: "View all projects", href: "/projects" },
+    items: [],
+    action: { label: "See All", href: "/projects/all" },
   },
   projects: {
     title: "",
@@ -164,6 +173,9 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
   const router = useRouter();
   const { data: session } = useSession();
   const pathname = usePathname();
+  const [homeRecentProjects, setHomeRecentProjects] = useState<
+    { id?: string; title: string; updatedAt?: number; previewUrl?: string | null }[]
+  >([]);
   const [expanded, setExpanded] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -235,6 +247,126 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
   const isPricingRoute = pathname === "/pricing";
   const isAccountRoute = pathname?.startsWith("/account");
   const isProjectsPanel = panelKey === "projects";
+  const isHomePanel = panelKey === "home";
+  const PanelTitleIcon: LucideIcon | null =
+    panelKey === "home"
+      ? FolderKanban
+      : panelKey === "projects"
+        ? Folders
+        : panelKey === "signatures"
+          ? PenSquare
+          : BookOpen;
+
+  useEffect(() => {
+    router.prefetch("/");
+    router.prefetch("/projects/all");
+  }, [router]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (getProjectsSummaryCache()) return;
+
+    let cancelled = false;
+    const warm = async () => {
+      try {
+        const res = await fetch("/api/projects?summary=1", { cache: "force-cache" });
+        if (!res.ok) return;
+        const data = (await res.json()) as { projects?: ProjectsSummaryProject[] };
+        if (!Array.isArray(data.projects) || cancelled) return;
+        setProjectsSummaryCache(data.projects);
+        preloadImageUrls(
+          data.projects
+            .map((project) => project.previewUrl)
+            .filter((url): url is string => typeof url === "string" && url.length > 0)
+            .slice(0, 12),
+        );
+      } catch {
+        // ignore warmup failures
+      }
+    };
+    void warm();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const ownerKey = session?.user?.id ?? session?.user?.email ?? null;
+    if (!ownerKey) {
+      setHomeRecentProjects([]);
+      return;
+    }
+
+    const hydrateFromAccountProjects = async () => {
+      try {
+        const res = await fetch("/api/projects?summary=1", { cache: "force-cache" });
+        if (!res.ok) return false;
+        const data = (await res.json()) as {
+          projects?: {
+            id: string;
+            name: string;
+            updatedAt: string | Date;
+            previewUrl?: string | null;
+            pagesCount?: number | null;
+          }[];
+        };
+        if (!Array.isArray(data.projects)) return false;
+        setProjectsSummaryCache(data.projects);
+        preloadImageUrls(
+          data.projects
+            .map((project) => project.previewUrl)
+            .filter((url): url is string => typeof url === "string" && url.length > 0)
+            .slice(0, 12),
+        );
+        setHomeRecentProjects(
+          data.projects.map((project) => ({
+            id: project.id,
+            title: project.name?.trim() || "Untitled project",
+            updatedAt: new Date(project.updatedAt).getTime(),
+            previewUrl: project.previewUrl ?? null,
+          })),
+        );
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    void hydrateFromAccountProjects().then((ok) => {
+      if (!ok) {
+        const local = loadRecentProjects(ownerKey);
+        setHomeRecentProjects(
+          local.map((entry) => ({
+            id: entry.id,
+            title: entry.title,
+            updatedAt: entry.updatedAt,
+            previewUrl: null,
+          })),
+        );
+      }
+    });
+    return;
+  }, [session?.user?.email, session?.user?.id]);
+
+  const activePanelItems: SidebarPanel["items"] =
+    panelKey === "home"
+      ? (() => {
+          const sorted = [...homeRecentProjects].sort(
+            (a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0),
+          );
+          const mapped = sorted
+            .map((entry) => ({
+              key: entry.id,
+              label: entry.title?.trim() || "Untitled project",
+              previewUrl: entry.previewUrl ?? null,
+            }))
+            .filter((entry) => entry.label.length > 0)
+            .slice(0, 5);
+          return mapped.length > 0 ? mapped : [{ label: "No projects yet" }];
+        })()
+      : activePanel.items;
 
   useEffect(() => {
     if (!profileOpen) return;
@@ -444,29 +576,17 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
         ? "flex-col items-stretch justify-center gap-1.5 px-1 py-2.5 text-center"
         : "flex-col items-stretch justify-center gap-2 px-1 py-3 text-center";
 
-      return (
-        <button
-          key={label}
-          type="button"
-          onClick={() => {
-            if (disabled) return;
-            if (label === "Projects") {
-              router.push("/projects/all");
-            } else {
-              router.push(href);
-            }
-            setMobileOpen(false);
-          }}
-          aria-label={label}
-          disabled={disabled}
-          className={`group flex w-full overflow-hidden rounded-xl text-sm lg:text-base xl:text-lg font-semibold transition-transform transition-shadow duration-150 ease-out ${
-            disabled
-              ? "cursor-not-allowed text-slate-400 hover:bg-slate-100 hover:-translate-y-0.5 hover:shadow-md"
-              : isActive
-                ? "text-sky-900 bg-sky-100 hover:-translate-y-0.5 hover:shadow-md"
-                : "text-[#013D63] hover:bg-slate-100 hover:-translate-y-0.5 hover:shadow-md"
-          } ${isExpanded ? expandedLayoutClasses : collapsedLayoutClasses}`}
-        >
+      const targetHref = label === "Projects" ? "/projects/all" : href;
+      const itemClasses = `group flex w-full overflow-hidden rounded-xl text-sm lg:text-base xl:text-lg font-semibold transition-transform transition-shadow duration-150 ease-out ${
+        disabled
+          ? "cursor-not-allowed text-slate-400 hover:bg-slate-100 hover:-translate-y-0.5 hover:shadow-md"
+          : isActive
+            ? "text-sky-900 bg-sky-100 hover:-translate-y-0.5 hover:shadow-md"
+            : "text-[#013D63] hover:bg-slate-100 hover:-translate-y-0.5 hover:shadow-md"
+      } ${isExpanded ? expandedLayoutClasses : collapsedLayoutClasses}`;
+
+      const content = (
+        <>
           <span className={iconWrapperClasses}>
             <Icon className={`${iconSizeClasses} shrink-0 stroke-[1.5]`} aria-hidden />
           </span>
@@ -487,7 +607,30 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
               {label}
             </span>
           )}
-        </button>
+        </>
+      );
+
+      if (disabled) {
+        return (
+          <button key={label} type="button" aria-label={label} disabled className={itemClasses}>
+            {content}
+          </button>
+        );
+      }
+
+      return (
+        <Link
+          key={label}
+          href={targetHref}
+          prefetch
+          onClick={() => {
+            setMobileOpen(false);
+          }}
+          aria-label={label}
+          className={itemClasses}
+        >
+          {content}
+        </Link>
       );
     });
 
@@ -782,7 +925,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
               }`}
             >
               <div className="flex w-full flex-col gap-6">
-                <AppHeaderBrand />
+                <AppHeaderBrand variant="sidebarPanel" />
                 {isAccountRoute ? (
                   <div className="space-y-3">
                     <button
@@ -860,13 +1003,22 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                             {activePanel.subtitle}
                           </p>
                         ) : null}
-                        <h3 className={`mt-2 text-lg font-semibold ${activePanel.subtitle ? "" : "mt-0"}`}>
+                        <h3
+                          className={`mt-2 flex items-center gap-2 text-lg font-semibold sm:text-xl ${
+                            activePanel.subtitle ? "" : "mt-0"
+                          }`}
+                        >
+                          {PanelTitleIcon ? (
+                            <span className="inline-flex h-7 w-7 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
+                              <PanelTitleIcon className="h-4 w-4" aria-hidden />
+                            </span>
+                          ) : null}
                           {activePanel.title}
                         </h3>
                       </div>
                     ) : null}
                     <ul className={simplePanelList ? "space-y-2" : "space-y-3"}>
-                      {activePanel.items.map((item) => {
+                      {activePanelItems.map((item) => {
                         const ItemIcon = item.icon;
                         if (simplePanelList && ItemIcon) {
                           return (
@@ -908,8 +1060,36 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                         }
 
                         return (
-                          <li key={item.label} className="px-1 py-1">
-                            <p className="text-sm font-semibold text-slate-800">{item.label}</p>
+                          <li key={item.key ?? item.label} className="px-1 py-1">
+                            <p
+                              className={`font-semibold text-slate-800 ${
+                                isHomePanel ? "text-lg sm:text-xl" : "text-sm"
+                              }`}
+                            >
+                              <span className={isHomePanel ? "flex min-w-0 items-center gap-4" : ""}>
+                                {isHomePanel ? (
+                                  <span className="relative inline-flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white text-slate-500 shadow-sm ring-1 ring-slate-200">
+                                    {item.previewUrl ? (
+                                      // eslint-disable-next-line @next/next/no-img-element
+                                      <img
+                                        src={item.previewUrl}
+                                        alt={item.label}
+                                        loading="lazy"
+                                        decoding="async"
+                                        className="h-full w-full object-cover object-top"
+                                      />
+                                    ) : item.label === "No projects yet" ? (
+                                      <span className="text-xs font-semibold" aria-hidden>
+                                        —
+                                      </span>
+                                    ) : (
+                                      <FileText className="h-6 w-6 opacity-60" aria-hidden />
+                                    )}
+                                  </span>
+                                ) : null}
+                                <span className={isHomePanel ? "truncate" : ""}>{item.label}</span>
+                              </span>
+                            </p>
                             {item.description ? (
                               <p className="text-xs text-slate-500">{item.description}</p>
                             ) : null}
@@ -921,7 +1101,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                       <button
                         type="button"
                         onClick={() => router.push(activePanel.action!.href)}
-                        className="text-sm font-semibold text-sky-600 transition hover:text-sky-700"
+                        className="text-lg font-semibold text-sky-600 transition hover:text-sky-700 sm:text-xl"
                       >
                         {activePanel.action.label}
                       </button>

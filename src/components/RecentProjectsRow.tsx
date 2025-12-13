@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
+import ProjectCard from "./ProjectCard";
 
 type SummaryProject = {
   id: string;
@@ -27,13 +27,14 @@ type Props = {
 
 export default function RecentProjectsRow({ initialProjects }: Props) {
   const [projects, setProjects] = useState<SummaryProject[]>(initialProjects ?? []);
+  const [selected, setSelected] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (initialProjects && initialProjects.length) return;
     let cancelled = false;
     const load = async () => {
       try {
-        const res = await fetch("/api/projects?summary=1", { cache: "no-store" });
+        const res = await fetch("/api/projects?summary=1", { cache: "force-cache" });
         if (!res.ok) return;
         const data = (await res.json()) as { projects?: SummaryProject[] };
         if (!data.projects || !Array.isArray(data.projects)) return;
@@ -54,42 +55,33 @@ export default function RecentProjectsRow({ initialProjects }: Props) {
   }
 
   const displayProjects = projects.slice(0, 6);
+  const mapped = displayProjects.map((project) => ({
+    id: project.id,
+    title: project.name?.trim() || "Untitled project",
+    updated: `Edited ${formatUpdatedLabel(project.updatedAt)}`,
+    previewUrl: project.previewUrl ?? null,
+    pagesCount: 0,
+  }));
+  const hasSelection = Object.values(selected).some(Boolean);
 
   return (
-    <div className="flex flex-wrap justify-start gap-6">
-      {displayProjects.map((project) => (
-        <Link
-          key={project.id}
-          href={`/studio?project=${encodeURIComponent(project.id)}`}
-          className="group flex w-full min-w-[260px] max-w-full flex-1 flex-col rounded-[16px] border border-[#e1e7f0] bg-white/90 p-4 text-left text-slate-900 shadow-[0_2px_10px_rgba(0,0,0,0.04)] transition hover:-translate-y-1 hover:border-[#cfd8e6] hover:bg-white hover:shadow-[0_8px_30px_rgba(15,23,42,0.12)] sm:min-w-[280px] lg:min-w-[300px] lg:max-w-[320px]"
-        >
-          <div className="relative w-full overflow-hidden rounded-[14px] border border-[rgba(0,0,0,0.06)] bg-[#EEF1F5]">
-            <div className="relative h-40 w-full p-3">
-              {project.previewUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={project.previewUrl}
-                  alt={project.name}
-                  loading="lazy"
-                  decoding="async"
-                  className="h-full w-full object-contain"
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-4xl font-semibold text-slate-500 transition-colors duration-150 group-hover:text-slate-600">
-                  {(project.name || "Untitled project").charAt(0)}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <p className="mt-4 line-clamp-1 text-base font-semibold text-slate-900">
-            {project.name || "Untitled project"}
-          </p>
-          <p className="mt-2 text-sm text-slate-500">
-            Edited {formatUpdatedLabel(project.updatedAt)}
-          </p>
-        </Link>
-      ))}
+    <div className="projects-grid mt-2 grid w-full grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-5">
+      {mapped.map((project, index) => {
+        const isSelected = !!selected[project.id];
+        return (
+          <ProjectCard
+            key={project.id}
+            project={project}
+            isSelected={isSelected}
+            hasSelection={hasSelection}
+            onToggleSelected={(id) =>
+              setSelected((prev) => ({ ...prev, [id]: !prev[id] }))
+            }
+            imageLoading={index < 6 ? "eager" : "lazy"}
+            imagePriority={index < 2}
+          />
+        );
+      })}
     </div>
   );
 }

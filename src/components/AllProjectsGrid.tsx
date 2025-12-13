@@ -31,7 +31,7 @@ export default function AllProjectsGrid({ projects, onProjectTrashed }: GridProp
 
   return (
     <div className="projects-grid mt-10 grid grid-cols-2 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 sm:gap-8 lg:gap-10">
-      {projects.map((project) => {
+      {projects.map((project, index) => {
         const isSelected = !!selected[project.id];
         return (
           <ProjectCard
@@ -40,6 +40,8 @@ export default function AllProjectsGrid({ projects, onProjectTrashed }: GridProp
             isSelected={isSelected}
             hasSelection={hasSelection}
             onToggleSelected={toggleSelected}
+            imageLoading={index < 12 ? "eager" : "lazy"}
+            imagePriority={index < 6}
             onTrashed={onProjectTrashed}
           />
         );
