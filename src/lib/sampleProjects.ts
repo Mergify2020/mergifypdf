@@ -4,7 +4,7 @@ export const curatedProjects = [
     title: "Client Audit Packet",
     subtitle: "Golden Rain Masonry • 36 pages",
     status: "In review",
-    updated: "Today • 9:24 AM",
+    updated: "Edited 12 min ago",
     preview: "/projects/sample-preview-1.svg",
   },
   {
@@ -12,7 +12,7 @@ export const curatedProjects = [
     title: "Vendor Renewal Agreement",
     subtitle: "Pinnacol Assurance • 12 pages",
     status: "Awaiting signature",
-    updated: "Yesterday • 4:08 PM",
+    updated: "Edited 3 hours ago",
     preview: "/projects/sample-preview-2.svg",
   },
   {
@@ -20,7 +20,7 @@ export const curatedProjects = [
     title: "Compliance Addendum",
     subtitle: "MergifyPDF Studio • 8 pages",
     status: "Draft",
-    updated: "Tuesday • 10:41 AM",
+    updated: "Edited Oct 3",
     preview: "/projects/sample-preview-3.svg",
   },
 ];

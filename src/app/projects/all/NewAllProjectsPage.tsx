@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatProjectLastEdited } from "@/lib/formatProjectLastEdited";
 
 type ApiProject = {
   id: string;
@@ -16,30 +17,6 @@ type ProjectCard = {
   updatedLabel: string;
   previewUrl: string | null;
 };
-
-function formatUpdatedLabel(value: string | number | Date): string {
-  const target = value instanceof Date ? value : new Date(value);
-  const now = new Date();
-  const today = now.toDateString();
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-
-  let dayLabel: string;
-  if (target.toDateString() === today) {
-    dayLabel = "Today";
-  } else if (target.toDateString() === yesterday.toDateString()) {
-    dayLabel = "Yesterday";
-  } else {
-    dayLabel = target.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-  }
-
-  const timeLabel = target.toLocaleTimeString(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-
-  return `Edited ${dayLabel} • ${timeLabel}`;
-}
 
 export default function NewAllProjectsPage() {
   const [projects, setProjects] = useState<ProjectCard[]>([]);
@@ -58,7 +35,7 @@ export default function NewAllProjectsPage() {
         const mapped: ProjectCard[] = data.projects.map((project) => ({
           id: project.id,
           title: project.name?.trim() || "Untitled project",
-          updatedLabel: formatUpdatedLabel(project.updatedAt),
+          updatedLabel: formatProjectLastEdited(project.updatedAt),
           previewUrl: project.previewUrl ?? null,
         }));
 
@@ -93,8 +70,7 @@ export default function NewAllProjectsPage() {
           <div className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 sm:gap-6 lg:gap-8">
             {Array.from({ length: 12 }).map((_, index) => (
               <div
-                // eslint-disable-next-line react/no-array-index-key
-                key={index}
+                key={`all-projects-loading-${index}`}
                 className="animate-pulse rounded-2xl border border-slate-200 bg-white p-3"
               >
                 <div className="aspect-[1.23/1] rounded-xl bg-slate-100" />
@@ -165,4 +141,3 @@ function ProjectCardView({ project }: { project: ProjectCard }) {
     </a>
   );
 }
-

@@ -389,11 +389,16 @@ function getSessionStorage(): Storage | null {
   }
 }
 
-function persistSourceMetadata(list: SourceRef[]) {
+function workspaceFilesKey(projectId: string | null) {
+  return projectId ? `${WORKSPACE_SESSION_KEY}:${projectId}` : WORKSPACE_SESSION_KEY;
+}
+
+function persistSourceMetadata(list: SourceRef[], projectId: string | null) {
   const storage = getLocalStorage();
   if (!storage) return;
+  const key = workspaceFilesKey(projectId);
   if (list.length === 0) {
-    storage.removeItem(WORKSPACE_SESSION_KEY);
+    storage.removeItem(key);
     return;
   }
   const payload = list.map(({ storageId, name, size, updatedAt }) => ({
@@ -403,7 +408,7 @@ function persistSourceMetadata(list: SourceRef[]) {
     updatedAt,
   }));
   try {
-    storage.setItem(WORKSPACE_SESSION_KEY, JSON.stringify(payload));
+    storage.setItem(key, JSON.stringify(payload));
   } catch (err) {
     console.error("Failed to persist workspace metadata", err);
   }
@@ -447,11 +452,19 @@ function hexToRgb(hex: string) {
 
 function useProjects() {
   const searchParams = useSearchParams();
-  const initialProjectId = typeof window !== "undefined" ? searchParams.get("project") : null;
+  const router = useRouter();
+  const projectParam = typeof window !== "undefined" ? searchParams.get("project") : null;
+  const initialProjectId = projectParam;
   const [projects, setProjects] = useState<CloudProject[]>([]);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(initialProjectId);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [savingProject, setSavingProject] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!projectParam) return;
+    setCurrentProjectId((prev) => (prev === projectParam ? prev : projectParam));
+  }, [projectParam]);
 
   useEffect(() => {
     let cancelled = false;
@@ -528,6 +541,7 @@ function useProjects() {
             } as CloudProject);
           setProjects((prev) => [created, ...prev]);
           setCurrentProjectId(created.id);
+          router.replace(`/studio?project=${encodeURIComponent(created.id)}`);
           return created;
         }
       } catch {
@@ -537,7 +551,7 @@ function useProjects() {
       }
       return null;
     },
-    [currentProjectId]
+    [currentProjectId, router]
   );
 
   return {
@@ -764,6 +778,7 @@ function WorkspaceClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { saveProject, savingProject, currentProjectId } = useProjects();
+  const projectParam = searchParams.get("project");
   const [showDownloadGate, setShowDownloadGate] = useState(false);
   const [showDelayOverlay, setShowDelayOverlay] = useState<"intro" | "progress" | null>(null);
   const [sources, setSources] = useState<SourceRef[]>([]);
@@ -1356,22 +1371,90 @@ function WorkspaceClient() {
     let cancelled = false;
 
     async function hydrateFromStorage() {
+      hasHydratedSources.current = false;
+      setSources([]);
       const local = getLocalStorage();
       const session = getSessionStorage();
+      const projectId = projectParam ?? currentProjectId ?? null;
+      const key = workspaceFilesKey(projectId);
       let raw: string | null = null;
-      if (local) raw = local.getItem(WORKSPACE_SESSION_KEY);
+      if (local) raw = local.getItem(key);
       if (!raw && session) {
-        raw = session.getItem(WORKSPACE_SESSION_KEY);
+        raw = session.getItem(key);
         if (raw && local) {
           try {
-            local.setItem(WORKSPACE_SESSION_KEY, raw);
+            local.setItem(key, raw);
           } catch {
             // ignore
           }
         }
-        session?.removeItem(WORKSPACE_SESSION_KEY);
+        session?.removeItem(key);
       }
       if (!raw) {
+        // If this is a saved cloud project, try to hydrate the source list
+        // from the cloud project data (files still live in IndexedDB).
+        if (projectId) {
+          try {
+            const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}`, { cache: "no-store" });
+            if (res.ok) {
+              const json = (await res.json().catch(() => null)) as { project?: { data?: unknown } } | null;
+              const cloudData = json?.project?.data;
+              const cloudSources =
+                cloudData && typeof cloudData === "object" && "sources" in cloudData
+                  ? (cloudData as { sources?: unknown }).sources
+                  : null;
+              if (Array.isArray(cloudSources) && cloudSources.length > 0) {
+                const restored: SourceRef[] = [];
+                for (const entry of cloudSources) {
+                  if (!entry || typeof entry !== "object") continue;
+                  const id =
+                    "id" in entry && typeof (entry as { id?: unknown }).id === "string"
+                      ? (entry as { id: string }).id
+                      : null;
+                  if (!id) continue;
+                  try {
+                    const stored = await readFileBlob(id);
+                    const blobRecord = stored?.blob instanceof Blob ? stored.blob : null;
+                    if (!blobRecord) continue;
+                    const objectUrl = URL.createObjectURL(blobRecord);
+                    restored.push({
+                      storageId: id,
+                      url: objectUrl,
+                      name:
+                        ("name" in entry && typeof (entry as { name?: unknown }).name === "string"
+                          ? (entry as { name: string }).name
+                          : null) ??
+                        stored?.name ??
+                        "Document.pdf",
+                      size:
+                        ("size" in entry && typeof (entry as { size?: unknown }).size === "number"
+                          ? (entry as { size: number }).size
+                          : null) ??
+                        stored?.size ??
+                        blobRecord.size ??
+                        0,
+                      updatedAt:
+                        ("updatedAt" in entry && typeof (entry as { updatedAt?: unknown }).updatedAt === "number"
+                          ? (entry as { updatedAt: number }).updatedAt
+                          : null) ??
+                        stored?.updatedAt ??
+                        Date.now(),
+                    });
+                  } catch (err) {
+                    console.error("Failed to restore stored PDF", err);
+                  }
+                }
+                if (!cancelled && restored.length > 0) {
+                  setSources(restored);
+                  persistSourceMetadata(restored, projectId);
+                  setError(null);
+                }
+              }
+            }
+          } catch {
+            // ignore cloud hydration failures; fall back to empty state
+          }
+        }
         hasHydratedSources.current = true;
         return;
       }
@@ -1379,7 +1462,7 @@ function WorkspaceClient() {
       try {
         const parsed = JSON.parse(raw) as StoredSourceMeta[];
         if (!Array.isArray(parsed)) {
-          local?.removeItem(WORKSPACE_SESSION_KEY);
+          local?.removeItem(key);
           hasHydratedSources.current = true;
           return;
         }
@@ -1408,15 +1491,15 @@ function WorkspaceClient() {
 
         if (!cancelled) {
           if (restored.length > 0) {
-            setSources((prev) => (prev.length > 0 ? prev : restored));
+            setSources(restored);
           } else {
-            local?.removeItem(WORKSPACE_SESSION_KEY);
+            local?.removeItem(key);
             setError("We couldn't restore your previous workspace. Please re-upload your PDFs.");
           }
         }
       } catch (err) {
         console.error("Failed to parse stored workspace", err);
-        local?.removeItem(WORKSPACE_SESSION_KEY);
+        local?.removeItem(key);
       } finally {
         if (!cancelled) {
           hasHydratedSources.current = true;
@@ -1428,13 +1511,14 @@ function WorkspaceClient() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [currentProjectId, projectParam]);
 
   /** Persist source metadata whenever it changes (after hydration) */
   useEffect(() => {
     if (!hasHydratedSources.current || typeof window === "undefined") return;
-    persistSourceMetadata(sources);
-  }, [sources]);
+    const projectId = projectParam ?? currentProjectId ?? null;
+    persistSourceMetadata(sources, projectId);
+  }, [sources, currentProjectId, projectParam]);
 
   /** Revoke object URLs we no longer need to avoid memory leaks */
   useEffect(() => {

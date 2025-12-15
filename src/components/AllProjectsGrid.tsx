@@ -14,13 +14,29 @@ type Project = {
 
 type Props = {
   projects: Project[];
+  onProjectRenamed?: (id: string, title: string) => void;
+  onProjectCopied?: (
+    project: {
+      id: string;
+      name?: string | null;
+      updatedAt?: string | number | Date;
+      previewUrl?: string | null;
+      pagesCount?: number | null;
+    },
+    sourceId: string,
+  ) => void;
 };
 
 type GridProps = Props & {
   onProjectTrashed?: (id: string) => void;
 };
 
-export default function AllProjectsGrid({ projects, onProjectTrashed }: GridProps) {
+export default function AllProjectsGrid({
+  projects,
+  onProjectTrashed,
+  onProjectRenamed,
+  onProjectCopied,
+}: GridProps) {
   const [selected, setSelected] = useState<Record<string, boolean>>({});
 
   const hasSelection = Object.values(selected).some(Boolean);
@@ -30,7 +46,7 @@ export default function AllProjectsGrid({ projects, onProjectTrashed }: GridProp
   }, []);
 
   return (
-    <div className="projects-grid mt-10 grid grid-cols-2 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 sm:gap-8 lg:gap-10">
+    <div className="projects-grid mt-10 grid w-full grid-cols-[repeat(auto-fill,minmax(max(300px,calc(100%/6)),1fr))] gap-5 sm:gap-6">
       {projects.map((project, index) => {
         const isSelected = !!selected[project.id];
         return (
@@ -43,6 +59,8 @@ export default function AllProjectsGrid({ projects, onProjectTrashed }: GridProp
             imageLoading={index < 12 ? "eager" : "lazy"}
             imagePriority={index < 6}
             onTrashed={onProjectTrashed}
+            onRenamed={onProjectRenamed}
+            onCopied={onProjectCopied}
           />
         );
       })}

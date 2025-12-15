@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   BookOpen,
   ChevronLeft,
@@ -26,7 +27,7 @@ import {
 } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 import { PROJECT_NAME_STORAGE_KEY, sanitizeProjectName } from "@/lib/projectName";
-import { addRecentProject, loadRecentProjects, RECENT_PROJECTS_EVENT } from "@/lib/recentProjects";
+import { addRecentProject, loadRecentProjects, RECENT_PROJECTS_EVENT, saveRecentProjects } from "@/lib/recentProjects";
 import AppHeaderBrand from "./AppHeaderBrand";
 import SettingsMenu from "./SettingsMenu";
 import HeroHeader from "./HeroHeader";
@@ -35,6 +36,8 @@ import { useAvatarPreference } from "@/lib/useAvatarPreference";
 import { getAvatarFallback } from "@/lib/avatarFallback";
 import {
   getProjectsSummaryCache,
+  PROJECTS_SUMMARY_EVENT,
+  refreshProjectsSummary,
   setProjectsSummaryCache,
   type ProjectsSummaryProject,
 } from "@/lib/projectsSummaryCache";
@@ -42,40 +45,6 @@ import { preloadImageUrls } from "@/lib/preloadImageUrls";
 
 const WORKSPACE_META_KEY = "mpdf:files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
-const WORKSPACE_DB_NAME = "mpdf-file-store";
-const WORKSPACE_DB_STORE = "files";
-
-function clearIndexedDb(): Promise<void> {
-  if (typeof window === "undefined" || !("indexedDB" in window)) return Promise.resolve();
-  return new Promise((resolve) => {
-    const request = indexedDB.open(WORKSPACE_DB_NAME, 1);
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(WORKSPACE_DB_STORE)) {
-        db.createObjectStore(WORKSPACE_DB_STORE);
-      }
-    };
-    request.onerror = () => resolve();
-    request.onsuccess = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(WORKSPACE_DB_STORE)) {
-        db.close();
-        resolve();
-        return;
-      }
-      const tx = db.transaction(WORKSPACE_DB_STORE, "readwrite");
-      tx.oncomplete = () => {
-        db.close();
-        resolve();
-      };
-      tx.onerror = () => {
-        db.close();
-        resolve();
-      };
-      tx.objectStore(WORKSPACE_DB_STORE).clear();
-    };
-  });
-}
 
 async function resetWorkspaceStorage() {
   try {
@@ -93,7 +62,6 @@ async function resetWorkspaceStorage() {
   } catch {
     // ignore
   }
-  await clearIndexedDb();
 }
 
 type SidebarItem = {
@@ -120,6 +88,7 @@ type SidebarPanel = {
     icon?: LucideIcon;
     key?: string;
     previewUrl?: string | null;
+    hidePreview?: boolean;
   }[];
   action?: { label: string; href: string };
 };
@@ -179,6 +148,9 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
   const [expanded, setExpanded] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [profileMenuPosition, setProfileMenuPosition] = useState<{ left: number; bottom: number } | null>(
+    null,
+  );
   const [createOpen, setCreateOpen] = useState(false);
   const [createValue, setCreateValue] = useState("");
   const [createError, setCreateError] = useState<string | null>(null);
@@ -189,6 +161,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
   const sidebarRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
   const createRef = useRef<HTMLDivElement>(null);
   const avatarKey = session?.user?.email ?? session?.user?.id ?? null;
   const { avatar } = useAvatarPreference(avatarKey);
@@ -224,10 +197,32 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
     setCreateBusy(true);
     await resetWorkspaceStorage();
     const ownerId = session?.user?.id ?? session?.user?.email ?? null;
-    addRecentProject(ownerId, clean);
-    setCreateBusy(false);
-    setCreateOpen(false);
-    router.push("/studio");
+    try {
+      const res = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: clean, data: { pages: [], sources: [], pagesCount: 0 } }),
+      });
+      if (!res.ok) {
+        setCreateError("Could not create that project. Please try again.");
+        setCreateBusy(false);
+        return;
+      }
+      const json = (await res.json().catch(() => null)) as { project?: { id?: string } } | null;
+      const id = json?.project?.id;
+      if (!id) {
+        setCreateError("Could not create that project. Please try again.");
+        setCreateBusy(false);
+        return;
+      }
+      addRecentProject(ownerId, clean, id);
+      setCreateBusy(false);
+      setCreateOpen(false);
+      router.push(`/studio?project=${encodeURIComponent(id)}`);
+    } catch {
+      setCreateError("Could not create that project. Please try again.");
+      setCreateBusy(false);
+    }
   }
 
   const [activeProjectsFilter, setActiveProjectsFilter] = useState("all");
@@ -264,7 +259,9 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (getProjectsSummaryCache()) return;
+    const ownerKey = session?.user?.id ?? session?.user?.email ?? null;
+    if (!ownerKey) return;
+    if (getProjectsSummaryCache(ownerKey)) return;
 
     let cancelled = false;
     const warm = async () => {
@@ -273,7 +270,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
         if (!res.ok) return;
         const data = (await res.json()) as { projects?: ProjectsSummaryProject[] };
         if (!Array.isArray(data.projects) || cancelled) return;
-        setProjectsSummaryCache(data.projects);
+        setProjectsSummaryCache(ownerKey, data.projects);
         preloadImageUrls(
           data.projects
             .map((project) => project.previewUrl)
@@ -288,7 +285,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [session?.user?.email, session?.user?.id]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -299,55 +296,123 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
       return;
     }
 
-    const hydrateFromAccountProjects = async () => {
-      try {
-        const res = await fetch("/api/projects?summary=1", { cache: "force-cache" });
-        if (!res.ok) return false;
-        const data = (await res.json()) as {
-          projects?: {
-            id: string;
-            name: string;
-            updatedAt: string | Date;
-            previewUrl?: string | null;
-            pagesCount?: number | null;
-          }[];
-        };
-        if (!Array.isArray(data.projects)) return false;
-        setProjectsSummaryCache(data.projects);
+    const sync = () => {
+      const summary = getProjectsSummaryCache(ownerKey) ?? [];
+      const recentEntries = loadRecentProjects(ownerKey)
+        .slice()
+        .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+
+      const merged = recentEntries
+        .map((entry) => {
+          const match = summary.find((project) => project.id === entry.id);
+          const title = match?.name?.trim() || entry.title?.trim() || "Untitled project";
+          const updatedAt = match
+            ? new Date(match.updatedAt).getTime()
+            : entry.updatedAt ?? Date.now();
+          return {
+            id: entry.id,
+            title,
+            updatedAt,
+            previewUrl: match?.previewUrl ?? null,
+          };
+        })
+        .filter((entry) => Boolean(entry.id) && entry.title.length > 0);
+
+      if (merged.length > 0) {
+        setHomeRecentProjects(merged);
+        return;
+      }
+
+      const fallback = summary
+        .slice()
+        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+        .slice(0, 5)
+        .map((project) => ({
+          id: project.id,
+          title: project.name?.trim() || "Untitled project",
+          updatedAt: new Date(project.updatedAt).getTime(),
+          previewUrl: project.previewUrl ?? null,
+        }));
+      setHomeRecentProjects(fallback);
+    };
+
+    const recentEventKey = `${RECENT_PROJECTS_EVENT}:${ownerKey ?? "anon"}`;
+    const summaryEventKey = `${PROJECTS_SUMMARY_EVENT}:${ownerKey ?? "anon"}`;
+    window.addEventListener(recentEventKey, sync);
+    window.addEventListener(summaryEventKey, sync);
+
+    const reconcileRecents = (projects: ProjectsSummaryProject[]) => {
+      const existing = loadRecentProjects(ownerKey);
+      if (existing.length === 0) return;
+
+      const allowed = new Set(projects.map((project) => project.id));
+      if (allowed.size === 0) {
+        saveRecentProjects(ownerKey, []);
+        return;
+      }
+
+      const nameById = new Map(
+        projects.map((project) => [project.id, project.name?.trim() || "Untitled project"] as const),
+      );
+      const next = existing
+        .filter((entry) => allowed.has(entry.id))
+        .map((entry) => ({ ...entry, title: nameById.get(entry.id) ?? entry.title }));
+
+      if (next.length !== existing.length || next.some((entry, index) => entry.title !== existing[index]?.title)) {
+        saveRecentProjects(ownerKey, next);
+      }
+    };
+
+    const refreshAndSync = async () => {
+      const projects = await refreshProjectsSummary(ownerKey, "no-store");
+      if (projects) {
+        reconcileRecents(projects);
+      }
+      if (projects && projects.length > 0) {
         preloadImageUrls(
-          data.projects
+          projects
             .map((project) => project.previewUrl)
             .filter((url): url is string => typeof url === "string" && url.length > 0)
             .slice(0, 12),
         );
-        setHomeRecentProjects(
-          data.projects.map((project) => ({
-            id: project.id,
-            title: project.name?.trim() || "Untitled project",
-            updatedAt: new Date(project.updatedAt).getTime(),
-            previewUrl: project.previewUrl ?? null,
-          })),
-        );
-        return true;
-      } catch {
-        return false;
+      }
+      sync();
+    };
+
+    const handleFocus = () => {
+      void refreshAndSync();
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void refreshAndSync();
       }
     };
 
-    void hydrateFromAccountProjects().then((ok) => {
-      if (!ok) {
-        const local = loadRecentProjects(ownerKey);
-        setHomeRecentProjects(
-          local.map((entry) => ({
-            id: entry.id,
-            title: entry.title,
-            updatedAt: entry.updatedAt,
-            previewUrl: null,
-          })),
+    sync();
+    void refreshProjectsSummary(ownerKey, "force-cache").then((projects) => {
+      if (projects) {
+        reconcileRecents(projects);
+      }
+      if (projects && projects.length > 0) {
+        preloadImageUrls(
+          projects
+            .map((project) => project.previewUrl)
+            .filter((url): url is string => typeof url === "string" && url.length > 0)
+            .slice(0, 12),
         );
       }
+      sync();
     });
-    return;
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      window.removeEventListener(recentEventKey, sync);
+      window.removeEventListener(summaryEventKey, sync);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, [session?.user?.email, session?.user?.id]);
 
   const activePanelItems: SidebarPanel["items"] =
@@ -364,7 +429,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
             }))
             .filter((entry) => entry.label.length > 0)
             .slice(0, 5);
-          return mapped.length > 0 ? mapped : [{ label: "No projects yet" }];
+          return mapped.length > 0 ? mapped : [{ label: "No projects yet", hidePreview: true }];
         })()
       : activePanel.items;
 
@@ -372,7 +437,8 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
     if (!profileOpen) return;
 
     function handleClick(event: MouseEvent) {
-      if (!profileRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (!profileRef.current?.contains(target) && !profileMenuRef.current?.contains(target)) {
         setProfileOpen(false);
       }
     }
@@ -390,6 +456,38 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
       document.removeEventListener("keydown", handleKey);
     };
   }, [profileOpen]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!profileOpen) {
+      setProfileMenuPosition(null);
+      return;
+    }
+
+    let raf = 0;
+
+    const update = () => {
+      if (raf) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const anchor = profileRef.current;
+        if (!anchor) return;
+        const rect = anchor.getBoundingClientRect();
+        const left = Math.round(rect.right + 16);
+        const bottom = Math.round(window.innerHeight - (rect.bottom - 24));
+        setProfileMenuPosition({ left, bottom });
+      });
+    };
+
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+
+    return () => {
+      window.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [profileOpen, compactSidebar, narrowSidebar]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -445,7 +543,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
       if (typeof window === "undefined") return;
       const width = window.innerWidth;
       setNarrowSidebar(width < 1280);
-      setOverlaySidebar(width < 1400);
+      setOverlaySidebar(width < 1024);
     };
 
     updateWidth();
@@ -459,12 +557,12 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
   const shouldOverlay = overlaySidebar;
   const railWidthClass = sidebarCompact ? "w-28" : "w-28";
   const panelLeftClass = sidebarCompact ? "left-28" : "left-28";
-  const baseContentOffsetClass = sidebarCompact ? "md:ml-28" : "md:ml-28";
+  const baseContentOffsetClass = sidebarCompact ? "md:pl-28" : "md:pl-28";
   const expandedContentOffsetClass =
     expanded && !shouldOverlay
       ? sidebarCompact
-        ? "lg:ml-[452px]"
-        : "lg:ml-[416px]"
+        ? "md:pl-[352px]"
+        : "md:pl-[432px]"
       : "";
   const sidebarExpandedClass = expanded && !shouldOverlay ? "with-sidebar-panel" : "";
   const contentOffsetClass = `${baseContentOffsetClass} ${expandedContentOffsetClass} ${sidebarExpandedClass}`.trim();
@@ -634,15 +732,60 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
       );
     });
 
+  const renderMobileNavItems = (items: SidebarItem[]) =>
+    items.map(({ label, icon: Icon, href, disabled }) => {
+      const isActive =
+        !disabled &&
+        (href === "/"
+          ? pathname === "/"
+          : pathname?.startsWith(href) || false);
+      const targetHref = label === "Projects" ? "/projects/all" : href;
+      const baseClasses =
+        "flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-semibold transition";
+      const stateClasses = disabled
+        ? "cursor-not-allowed text-slate-400"
+        : isActive
+          ? "bg-sky-100 text-sky-900"
+          : "text-[#013D63] hover:bg-slate-100";
+
+      const content = (
+        <>
+          <Icon className="h-6 w-6 shrink-0 stroke-[1.5]" aria-hidden />
+          <span className="truncate whitespace-nowrap">{label}</span>
+        </>
+      );
+
+      if (disabled) {
+        return (
+          <button key={label} type="button" aria-label={label} disabled className={`${baseClasses} ${stateClasses}`}>
+            {content}
+          </button>
+        );
+      }
+
+      return (
+        <Link
+          key={label}
+          href={targetHref}
+          prefetch
+          onClick={() => setMobileOpen(false)}
+          aria-label={label}
+          className={`${baseClasses} ${stateClasses}`}
+        >
+          {content}
+        </Link>
+      );
+    });
+
   const workspaceShell = (
     <>
     <div className="flex min-h-screen bg-slate-100">
       {/* Desktop sidebar */}
-      <aside className="hidden md:flex fixed left-0 top-0 z-30 h-screen text-slate-800">
+      <aside className="hidden md:flex fixed left-0 top-0 z-50 lg:z-30 h-screen text-slate-800">
         <div className="relative flex h-full w-full">
           <div
             ref={sidebarRef}
-            className={`flex h-full ${railWidthClass} flex-col border-r border-white/40 bg-white/80 backdrop-blur-xl shadow-[0_25px_80px_rgba(15,23,42,0.25)] ${
+            className={`flex h-full ${railWidthClass} flex-col border-r border-slate-200 bg-white shadow-[0_25px_80px_rgba(15,23,42,0.25)] ${
               sidebarCompact ? "z-10" : "z-20"
             }`}
           >
@@ -732,11 +875,16 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
               </span>
             </button>
 
-              <div
-                className={`absolute bottom-6 left-full z-[60] ml-4 w-80 rounded-3xl border border-slate-100 bg-white p-4 text-sm text-slate-800 shadow-[0_30px_80px_rgba(15,23,42,0.35)] transition ${
-                  profileOpen ? "opacity-100 translate-y-0" : "pointer-events-none opacity-0 translate-y-2"
-                }`}
-              >
+            {typeof document !== "undefined" && profileOpen && profileMenuPosition
+              ? createPortal(
+                  <div
+                    ref={profileMenuRef}
+                    className="fixed z-[60] w-80 rounded-3xl border border-slate-100 bg-white p-4 text-sm text-slate-800 shadow-[0_30px_80px_rgba(15,23,42,0.35)]"
+                    style={{ left: profileMenuPosition.left, bottom: profileMenuPosition.bottom }}
+                    onMouseDown={(event) => {
+                      event.stopPropagation();
+                    }}
+                  >
                 <div className="flex items-center gap-3 rounded-2xl border-[3px] border-slate-300 px-3 py-3">
                   <span className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-50 text-slate-600">
                     {avatar ? (
@@ -914,14 +1062,20 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                     </>
                   )}
                 </div>
-              </div>
+                  </div>,
+                  document.body,
+                )
+              : null}
             </div>
           </div>
           {expanded ? (
             <div
               ref={panelRef}
-              className={`absolute ${panelLeftClass} top-0 hidden h-full bg-slate-100 px-4 py-6 text-slate-800 backdrop-blur-xl transition-[transform,opacity,filter] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform md:flex ${sidebarCompact ? "w-[240px]" : "w-[320px]"} z-0 ${
-                expanded ? "translate-x-0 opacity-100 blur-0 pointer-events-auto" : "-translate-x-10 opacity-0 blur-sm"
+              data-workspace-secondary-panel="true"
+              className={`absolute ${panelLeftClass} top-0 hidden h-full border-l border-slate-200 ${
+                shouldOverlay ? "bg-white" : "bg-slate-100"
+              } px-4 py-6 text-slate-800 shadow-[12px_0_36px_rgba(15,23,42,0.10)] transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform md:flex ${sidebarCompact ? "w-[240px]" : "w-[320px]"} z-0 ${
+                expanded ? "translate-x-0 opacity-100 pointer-events-auto" : "-translate-x-10 opacity-0 pointer-events-none"
               }`}
             >
               <div className="flex w-full flex-col gap-6">
@@ -1006,9 +1160,9 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                         <h3
                           className={`mt-2 flex items-center gap-2 text-lg font-semibold sm:text-xl ${
                             activePanel.subtitle ? "" : "mt-0"
-                          }`}
+                          } ${panelKey === "home" ? "text-slate-500" : "text-slate-800"}`}
                         >
-                          {PanelTitleIcon ? (
+                          {PanelTitleIcon && panelKey !== "home" ? (
                             <span className="inline-flex h-7 w-7 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
                               <PanelTitleIcon className="h-4 w-4" aria-hidden />
                             </span>
@@ -1017,7 +1171,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                         </h3>
                       </div>
                     ) : null}
-                    <ul className={simplePanelList ? "space-y-2" : "space-y-3"}>
+                    <ul className={isHomePanel ? "space-y-1" : simplePanelList ? "space-y-2" : "space-y-3"}>
                       {activePanelItems.map((item) => {
                         const ItemIcon = item.icon;
                         if (simplePanelList && ItemIcon) {
@@ -1059,38 +1213,67 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                           );
                         }
 
-                        return (
-                          <li key={item.key ?? item.label} className="px-1 py-1">
-                            <p
-                              className={`font-semibold text-slate-800 ${
-                                isHomePanel ? "text-lg sm:text-xl" : "text-sm"
-                              }`}
-                            >
-                              <span className={isHomePanel ? "flex min-w-0 items-center gap-4" : ""}>
-                                {isHomePanel ? (
-                                  <span className="relative inline-flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white text-slate-500 shadow-sm ring-1 ring-slate-200">
-                                    {item.previewUrl ? (
-                                      // eslint-disable-next-line @next/next/no-img-element
-                                      <img
-                                        src={item.previewUrl}
-                                        alt={item.label}
-                                        loading="lazy"
-                                        decoding="async"
-                                        className="h-full w-full object-cover object-top"
-                                      />
-                                    ) : item.label === "No projects yet" ? (
-                                      <span className="text-xs font-semibold" aria-hidden>
-                                        —
-                                      </span>
-                                    ) : (
-                                      <FileText className="h-6 w-6 opacity-60" aria-hidden />
-                                    )}
-                                  </span>
-                                ) : null}
-                                <span className={isHomePanel ? "truncate" : ""}>{item.label}</span>
-                              </span>
-                            </p>
-                            {item.description ? (
+	                        return (
+	                          <li key={item.key ?? item.label} className="px-0 py-0">
+	                            {isHomePanel && typeof item.key === "string" && item.key.length > 0 ? (
+	                              <button
+	                                type="button"
+	                                onClick={() => {
+	                                  router.push(`/studio?project=${encodeURIComponent(item.key as string)}`);
+	                                  if (shouldOverlay) {
+	                                    setExpanded(false);
+	                                  }
+	                                }}
+	                                className="flex w-full min-w-0 items-center gap-3 rounded-2xl px-1 py-0.5 text-left transition hover:bg-white/60"
+	                              >
+	                                <span className="relative inline-flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white text-slate-500 shadow-sm ring-1 ring-slate-200">
+	                                  {item.previewUrl ? (
+	                                    // eslint-disable-next-line @next/next/no-img-element
+	                                    <img
+	                                      src={item.previewUrl}
+	                                      alt={item.label}
+	                                      loading="lazy"
+	                                      decoding="async"
+	                                      className="h-full w-full object-cover object-top"
+	                                    />
+	                                  ) : (
+	                                    <FileText className="h-6 w-6 opacity-60" aria-hidden />
+	                                  )}
+	                                </span>
+	                                <span className="min-w-0">
+	                                  <span className="block truncate text-lg font-semibold text-slate-800 sm:text-xl">
+	                                    {item.label}
+	                                  </span>
+	                                </span>
+	                              </button>
+	                            ) : (
+	                              <p
+	                                className={`font-semibold text-slate-800 ${
+	                                  isHomePanel ? "text-lg sm:text-xl" : "text-sm"
+	                                }`}
+	                              >
+	                                <span className={isHomePanel ? "flex min-w-0 items-center gap-4" : ""}>
+	                                  {isHomePanel && !item.hidePreview ? (
+	                                    <span className="relative inline-flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white text-slate-500 shadow-sm ring-1 ring-slate-200">
+	                                      {item.previewUrl ? (
+	                                        // eslint-disable-next-line @next/next/no-img-element
+	                                        <img
+	                                          src={item.previewUrl}
+	                                          alt={item.label}
+	                                          loading="lazy"
+	                                          decoding="async"
+	                                          className="h-full w-full object-cover object-top"
+	                                        />
+	                                      ) : (
+	                                        <FileText className="h-6 w-6 opacity-60" aria-hidden />
+	                                      )}
+	                                    </span>
+	                                  ) : null}
+	                                  <span className={isHomePanel ? "truncate" : ""}>{item.label}</span>
+	                                </span>
+	                              </p>
+	                            )}
+	                            {item.description ? (
                               <p className="text-xs text-slate-500">{item.description}</p>
                             ) : null}
                           </li>
@@ -1119,12 +1302,12 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
         <>
           <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={() => setMobileOpen(false)} />
           <aside className="fixed inset-y-0 left-0 z-50 w-72 overflow-y-auto border-r border-slate-200 bg-white p-6 shadow-2xl transition-transform duration-300 md:hidden">
-            <div className="mb-6 flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Workspace</p>
+            <div className="mb-6 flex items-center justify-end">
               <button
                 type="button"
                 onClick={() => setMobileOpen(false)}
-                className="rounded-full border border-slate-200 p-2 text-slate-600"
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-[#1e293b] p-2 text-white shadow-[0_8px_24px_rgba(10,37,64,0.35)] transition hover:bg-[#253248]"
+                aria-label="Close menu"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
@@ -1132,54 +1315,120 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
 
             <div className="space-y-4">
               <nav className="flex flex-col gap-1">
-                {renderItems(navigationItems, {
-                  labelClassName: "opacity-100 translate-x-0",
-                  forceExpanded: true,
-                })}
+                {renderMobileNavItems(navigationItems)}
               </nav>
-
-              <div className="border-t border-slate-200 pt-4">
-                <p className="pb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Create</p>
-                <div className="flex flex-col gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMobileOpen(false);
-                      router.push("/studio");
-                    }}
-                    className="flex w-full items-center gap-3 rounded-2xl border border-[#009dfd] bg-[#e6f6ff] px-3 py-2 text-sm font-semibold text-[#013d63]"
-                  >
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#009dfd] text-white">
-                      <Plus className="h-4 w-4" />
-                    </span>
-                    New Editing Project
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMobileOpen(false);
-                      router.push("/signature-center");
-                    }}
-                    className="flex w-full items-center gap-3 rounded-2xl border border-[#009dfd] bg-[#e6f6ff] px-3 py-2 text-sm font-semibold text-[#013d63]"
-                  >
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#009dfd] text-white">
-                      <Plus className="h-4 w-4" />
-                    </span>
-                    New Signature Request
-                  </button>
-                </div>
-              </div>
 
               <button
                 type="button"
                 onClick={() => {
                   setMobileOpen(false);
-                  router.push("/studio");
+                  openCreateModal();
                 }}
-                className="w-full rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 py-3 text-center text-sm font-semibold text-white shadow-lg transition hover:shadow-xl"
+                className="w-full rounded-2xl border-[3px] border-[#51bdff] bg-[#008ade] py-3 text-center text-sm font-semibold text-white shadow-[0_14px_40px_rgba(15,23,42,0.25)] transition hover:bg-[#007fcd] hover:shadow-[0_18px_50px_rgba(15,23,42,0.32)]"
               >
                 Start New Project
               </button>
+
+              <div className="border-t border-slate-200 pt-4">
+                {activePanel.title ? (
+                  <div className="pb-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                      {activePanel.subtitle}
+                    </p>
+                    <p className="mt-2 text-base font-semibold text-slate-800">{activePanel.title}</p>
+                  </div>
+                ) : null}
+
+                <div className={isHomePanel ? "space-y-1" : simplePanelList ? "space-y-1" : "space-y-2"}>
+                  {activePanelItems.map((item) => {
+                    const ItemIcon = item.icon;
+                    if (simplePanelList && ItemIcon) {
+                      return (
+                        <button
+                          key={item.key ?? item.label}
+                          type="button"
+                          onClick={() => {
+                            const newValue = item.key ?? item.label;
+                            setActiveProjectsFilter(newValue);
+                            setMobileOpen(false);
+                            const onProjectsRoute = pathname?.startsWith("/projects") ?? false;
+                            if (!onProjectsRoute) {
+                              router.push("/projects/all");
+                            } else if (newValue === "all" && pathname !== "/projects/all") {
+                              router.push("/projects/all");
+                            }
+                          }}
+                          className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-sm font-semibold transition ${
+                            activeProjectsFilter === (item.key ?? item.label)
+                              ? "bg-sky-50 text-sky-700"
+                              : "text-slate-700 hover:bg-slate-50"
+                          }`}
+                        >
+                          <ItemIcon
+                            className={`h-5 w-5 ${
+                              activeProjectsFilter === (item.key ?? item.label) ? "text-sky-600" : "text-slate-500"
+                            }`}
+                            aria-hidden
+                          />
+                          <span className="truncate">{item.label}</span>
+                        </button>
+                      );
+                    }
+
+                    if (isHomePanel && typeof item.key === "string" && item.key.length > 0) {
+                      return (
+                        <button
+                          key={item.key}
+                          type="button"
+                          onClick={() => {
+                            setMobileOpen(false);
+                            router.push(`/studio?project=${encodeURIComponent(item.key as string)}`);
+                          }}
+                          className="flex w-full min-w-0 items-center gap-3 rounded-2xl px-1 py-1 text-left transition hover:bg-slate-50"
+                        >
+                          <span className="relative inline-flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white text-slate-500 shadow-sm ring-1 ring-slate-200">
+                            {item.previewUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={item.previewUrl}
+                                alt={item.label}
+                                loading="lazy"
+                                decoding="async"
+                                className="h-full w-full object-cover object-top"
+                              />
+                            ) : (
+                              <FileText className="h-5 w-5 opacity-60" aria-hidden />
+                            )}
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-semibold text-slate-800">{item.label}</span>
+                          </span>
+                        </button>
+                      );
+                    }
+
+                    return (
+                      <div key={item.key ?? item.label} className="rounded-2xl px-3 py-2">
+                        <p className="text-sm font-semibold text-slate-800">{item.label}</p>
+                        {item.description ? <p className="text-xs text-slate-500">{item.description}</p> : null}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {activePanel.action ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileOpen(false);
+                      router.push(activePanel.action!.href);
+                    }}
+                    className="mt-3 w-full text-center text-sm font-semibold text-sky-600 transition hover:text-sky-700"
+                  >
+                    {activePanel.action.label}
+                  </button>
+                ) : null}
+              </div>
 
               {otherItems.length > 0 ? (
                 <div className="border-t border-slate-200 pt-4">
@@ -1187,10 +1436,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                     Other
                   </p>
                   <div className="flex flex-col gap-1">
-                    {renderItems(otherItems, {
-                      labelClassName: "opacity-100 translate-x-0",
-                      forceExpanded: true,
-                    })}
+                    {renderMobileNavItems(otherItems)}
                   </div>
                 </div>
               ) : null}
@@ -1202,10 +1448,21 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                     setMobileOpen(false);
                     router.push("/account");
                   }}
-                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-slate-100"
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold transition hover:bg-slate-100"
                 >
-                  <User className="h-4 w-4 text-slate-500" aria-hidden />
+                  <User className="h-6 w-6 text-slate-500" aria-hidden />
                   <span>Profile / Account Settings</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileOpen(false);
+                    void openBillingPortal();
+                  }}
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold transition hover:bg-slate-100"
+                >
+                  <CreditCard className="h-6 w-6 text-slate-500" aria-hidden />
+                  <span>Billing portal</span>
                 </button>
                 <button
                   type="button"
@@ -1213,10 +1470,21 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                     setMobileOpen(false);
                     router.push("/pricing");
                   }}
-                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-slate-100"
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold transition hover:bg-slate-100"
                 >
-                  <CreditCard className="h-4 w-4 text-slate-500" aria-hidden />
-                  <span>Subscription &amp; Billing</span>
+                  <FileText className="h-6 w-6 text-slate-500" aria-hidden />
+                  <span>Plans &amp; Pricing</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileOpen(false);
+                    router.push("/projects/trash");
+                  }}
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold transition hover:bg-slate-100"
+                >
+                  <Trash2 className="h-6 w-6 text-slate-500" aria-hidden />
+                  <span>Trash</span>
                 </button>
                 <button
                   type="button"
@@ -1231,9 +1499,9 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                       setSigningOut(false);
                     }
                   }}
-                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-red-600 transition hover:bg-red-50"
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-red-600 transition hover:bg-red-50"
                 >
-                  <LogOut className="h-4 w-4" aria-hidden />
+                  <LogOut className="h-6 w-6" aria-hidden />
                   <span>Logout</span>
                 </button>
               </div>
@@ -1246,23 +1514,43 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
         className={`flex min-h-screen w-full flex-col bg-white transition-all duration-300 ease-in-out ${contentOffsetClass}`}
       >
         <header className="sticky top-0 z-20 w-full border-b border-slate-200 bg-white/90 backdrop-blur md:hidden">
-          <div className="mx-auto flex h-[76px] w-full max-w-7xl items-center justify-between px-4 lg:px-6">
-            <div className="flex items-center gap-3">
+          <div className="mx-auto flex h-[76px] w-full max-w-7xl items-center justify-between px-3 lg:px-6">
+            <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setMobileOpen(true)}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-800 shadow-md transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-800 md:hidden"
+                onClick={() => {
+                  setMobileOpen(true);
+                }}
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-transparent text-slate-900 shadow-none transition hover:bg-slate-100 active:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-800 focus:ring-offset-2 md:hidden"
               >
-                <Menu className="h-5 w-5" />
+                <Menu className="h-7 w-7" />
                 <span className="sr-only">Open workspace menu</span>
               </button>
               <AppHeaderBrand />
+            </div>
+            <div className="relative flex items-center">
+              <div
+                className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-white shadow-md"
+                aria-label="Account avatar"
+              >
+                {avatar ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={avatar} alt="Your avatar" className="h-full w-full rounded-full object-cover" />
+                ) : (
+                  <span
+                    className="flex h-full w-full items-center justify-center rounded-full text-sm font-semibold uppercase text-white"
+                    style={{ backgroundColor: fallbackAvatar.color }}
+                  >
+                    {fallbackAvatar.initials}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </header>
 
         <Suspense fallback={<PageLoadingSkeleton />}>
-          <main className="page-fade-in flex-1">{children}</main>
+          <main className="page-fade-in relative z-0 flex-1 lg:z-40">{children}</main>
         </Suspense>
       </div>
     </div>
@@ -1275,10 +1563,10 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
           />
           <div
             ref={createRef}
-            className="page-fade-in relative z-10 w-full max-w-3xl rounded-2xl border border-white/60 bg-white/35 bg-gradient-to-b from-white/90 via-white/70 to-white/40 p-1.5 text-slate-900 shadow-[0_22px_60px_rgba(15,23,42,0.22)] backdrop-blur-lg sm:p-2"
+            className="page-fade-in relative z-10 w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-1.5 text-slate-900 shadow-[0_22px_60px_rgba(15,23,42,0.22)] sm:p-2"
           >
             <form
-              className="overflow-hidden rounded-[18px] bg-white/85 px-6 pt-8 pb-6 shadow-[0_0_0_1px_rgba(148,163,184,0.14)] sm:px-10 sm:pt-10 sm:pb-8"
+              className="overflow-hidden rounded-[18px] bg-white px-6 pt-8 pb-6 sm:px-10 sm:pt-10 sm:pb-8"
               onSubmit={(event) => {
                 event.preventDefault();
                 void handleCreateStart();
@@ -1352,7 +1640,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
           </div>
         </div>
       </HeroHeader>
-      <main className="page-fade-in">{children}</main>
+      <main className="page-fade-in relative z-0 lg:z-40">{children}</main>
     </div>
   );
 

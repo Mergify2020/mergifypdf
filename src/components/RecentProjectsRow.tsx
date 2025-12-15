@@ -2,30 +2,30 @@
 
 import { useEffect, useState } from "react";
 import ProjectCard from "./ProjectCard";
+import { matchesSearch } from "@/lib/search";
+import { formatProjectLastEdited } from "@/lib/formatProjectLastEdited";
 
 type SummaryProject = {
   id: string;
   name: string;
   updatedAt: string | Date;
   previewUrl?: string | null;
+  pagesCount?: number | null;
 };
-
-function formatUpdatedLabel(value: string | Date) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Recently updated";
-  return date.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 type Props = {
   initialProjects?: SummaryProject[];
+  query?: string;
+  ownerFilter?: "any" | "shared" | "you";
+  sortOption?: "activity" | "az" | "za";
 };
 
-export default function RecentProjectsRow({ initialProjects }: Props) {
+export default function RecentProjectsRow({
+  initialProjects,
+  query = "",
+  ownerFilter = "any",
+  sortOption = "activity",
+}: Props) {
   const [projects, setProjects] = useState<SummaryProject[]>(initialProjects ?? []);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
 
@@ -48,24 +48,72 @@ export default function RecentProjectsRow({ initialProjects }: Props) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [initialProjects]);
 
   if (!projects.length) {
-    return null;
+    return (
+      <div className="mt-6 flex min-h-[260px] w-full flex-col items-center justify-center rounded-[24px] border-[3px] border-dashed border-slate-200 bg-white/70 px-8 py-12 text-center shadow-sm">
+        <p className="text-lg font-semibold text-slate-900 sm:text-xl">No projects yet</p>
+        <p className="mt-2 max-w-sm text-sm text-slate-600 sm:text-base">Start a new project to see it here.</p>
+      </div>
+    );
   }
 
-  const displayProjects = projects.slice(0, 6);
+  const trimmed = query.trim();
+  const visibleProjects =
+    ownerFilter === "shared" ? [] : projects;
+  const filteredProjects = trimmed
+    ? visibleProjects.filter((project) => matchesSearch(project.name?.trim() || "Untitled project", trimmed))
+    : visibleProjects;
+  const sortedProjects = [...filteredProjects].sort((a, b) => {
+    if (sortOption === "activity") {
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    }
+    const aName = (a.name ?? "").trim().toLowerCase();
+    const bName = (b.name ?? "").trim().toLowerCase();
+    const cmp = aName.localeCompare(bName);
+    return sortOption === "az" ? cmp : -cmp;
+  });
+  const displayProjects = sortedProjects.slice(0, trimmed ? 24 : 6);
   const mapped = displayProjects.map((project) => ({
     id: project.id,
     title: project.name?.trim() || "Untitled project",
-    updated: `Edited ${formatUpdatedLabel(project.updatedAt)}`,
+    updated: formatProjectLastEdited(project.updatedAt),
     previewUrl: project.previewUrl ?? null,
-    pagesCount: 0,
+    pagesCount: project.pagesCount ?? 0,
   }));
   const hasSelection = Object.values(selected).some(Boolean);
 
+  if (trimmed && mapped.length === 0) {
+    return (
+      <div className="relative">
+        <div
+          aria-hidden="true"
+          className="projects-grid mt-2 grid w-full grid-cols-[repeat(auto-fill,minmax(max(300px,calc(100%/6)),1fr))] gap-5"
+        >
+          {Array.from({ length: 6 }).map((_, index) => (
+            <div key={`home-empty-project-${index}`} className="invisible flex flex-col text-left">
+              <div className="relative rounded-[10px] bg-[#F9FAFC]">
+                <div className="relative m-[3px] aspect-[1.23/1] w-[calc(100%-6px)] overflow-hidden rounded-[10px] border border-[rgba(0,0,0,0.06)] bg-[#EEF1F5]" />
+              </div>
+              <div className="mt-2 space-y-0.5">
+                <div className="h-7 w-2/3 rounded-full bg-slate-100" />
+                <div className="h-5 w-1/2 rounded-full bg-slate-100" />
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="pointer-events-none absolute inset-0 flex items-start justify-center pt-10">
+          <p className="rounded-full bg-white/85 px-5 py-2 text-sm font-semibold text-slate-500 shadow-sm backdrop-blur sm:text-base">
+            No projects match &quot;{trimmed}&quot;.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="projects-grid mt-2 grid w-full grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-5">
+    <div className="projects-grid mt-2 grid w-full grid-cols-[repeat(auto-fill,minmax(max(300px,calc(100%/6)),1fr))] gap-5">
       {mapped.map((project, index) => {
         const isSelected = !!selected[project.id];
         return (
@@ -79,6 +127,31 @@ export default function RecentProjectsRow({ initialProjects }: Props) {
             }
             imageLoading={index < 6 ? "eager" : "lazy"}
             imagePriority={index < 2}
+            onRenamed={(id, title) => {
+              setProjects((prev) =>
+                prev.map((entry) => (entry.id === id ? { ...entry, name: title } : entry))
+              );
+            }}
+            onCopied={(duplicated, sourceId) => {
+              const nextId = duplicated.id;
+              const nextName = duplicated.name?.trim() || "Untitled project";
+              const nextUpdatedAt = duplicated.updatedAt ?? new Date();
+              setProjects((prev) => {
+                const nextEntry: SummaryProject = {
+                  id: nextId,
+                  name: nextName,
+                  updatedAt: nextUpdatedAt,
+                  previewUrl: duplicated.previewUrl ?? null,
+                  pagesCount: duplicated.pagesCount ?? 0,
+                };
+                const withoutNew = prev.filter((entry) => entry.id !== nextId);
+                const sourceIndex = withoutNew.findIndex((entry) => entry.id === sourceId);
+                if (sourceIndex === -1) return [nextEntry, ...withoutNew];
+                const next = [...withoutNew];
+                next.splice(sourceIndex + 1, 0, nextEntry);
+                return next;
+              });
+            }}
           />
         );
       })}

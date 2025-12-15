@@ -3,50 +3,17 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useSession } from "next-auth/react";
+import { Plus } from "lucide-react";
 import { PROJECT_NAME_STORAGE_KEY, sanitizeProjectName } from "@/lib/projectName";
 import { addRecentProject } from "@/lib/recentProjects";
 
 const WORKSPACE_META_KEY = "mpdf:files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
-const WORKSPACE_DB_NAME = "mpdf-file-store";
-const WORKSPACE_DB_STORE = "files";
 
 type Props = {
   className?: string;
   variant?: "default" | "custom";
 };
-
-function clearIndexedDb(): Promise<void> {
-  if (typeof window === "undefined" || !("indexedDB" in window)) return Promise.resolve();
-  return new Promise((resolve) => {
-    const request = indexedDB.open(WORKSPACE_DB_NAME, 1);
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(WORKSPACE_DB_STORE)) {
-        db.createObjectStore(WORKSPACE_DB_STORE);
-      }
-    };
-    request.onerror = () => resolve();
-    request.onsuccess = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(WORKSPACE_DB_STORE)) {
-        db.close();
-        resolve();
-        return;
-      }
-      const tx = db.transaction(WORKSPACE_DB_STORE, "readwrite");
-      tx.oncomplete = () => {
-        db.close();
-        resolve();
-      };
-      tx.onerror = () => {
-        db.close();
-        resolve();
-      };
-      tx.objectStore(WORKSPACE_DB_STORE).clear();
-    };
-  });
-}
 
 async function resetWorkspaceStorage() {
   try {
@@ -64,7 +31,6 @@ async function resetWorkspaceStorage() {
   } catch {
     // ignore
   }
-  await clearIndexedDb();
 }
 
 export default function StartProjectButton({ className, variant = "default" }: Props) {
@@ -100,10 +66,32 @@ export default function StartProjectButton({ className, variant = "default" }: P
     setBusy(true);
     await resetWorkspaceStorage();
     const ownerId = session?.user?.id ?? session?.user?.email ?? null;
-    addRecentProject(ownerId, clean);
-    setBusy(false);
-    setOpen(false);
-    router.push("/studio");
+    try {
+      const res = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: clean, data: { pages: [], sources: [], pagesCount: 0 } }),
+      });
+      if (!res.ok) {
+        setError("Could not create that project. Please try again.");
+        setBusy(false);
+        return;
+      }
+      const json = (await res.json().catch(() => null)) as { project?: { id?: string } } | null;
+      const id = json?.project?.id;
+      if (!id) {
+        setError("Could not create that project. Please try again.");
+        setBusy(false);
+        return;
+      }
+      addRecentProject(ownerId, clean, id);
+      setBusy(false);
+      setOpen(false);
+      router.push(`/studio?project=${encodeURIComponent(id)}`);
+    } catch {
+      setError("Could not create that project. Please try again.");
+      setBusy(false);
+    }
   }
 
   return (
@@ -114,10 +102,7 @@ export default function StartProjectButton({ className, variant = "default" }: P
         className={`${variant === "custom" ? "" : "btn-primary px-8 text-base"} ${className ?? ""}`}
       >
         Start a new project
-        <svg className="ml-2 h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <path d="M7 17 17 7" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M8 7h9v9" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <Plus className="ml-2 h-5 w-5" aria-hidden />
       </button>
 
       {open ? (

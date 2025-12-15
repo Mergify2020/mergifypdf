@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowUpRight, FileText, Folder, MoreVertical } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { sanitizeProjectName } from "@/lib/projectName";
+import { formatProjectLastEdited } from "@/lib/formatProjectLastEdited";
 import {
   RECENT_PROJECTS_EVENT,
   RecentProjectEntry,
@@ -28,24 +29,6 @@ type Props = {
   initialProjects: ProjectItem[];
 };
 
-function formatUpdatedLabel(timestamp?: number) {
-  if (!timestamp) return "moments ago";
-  const target = new Date(timestamp);
-  const today = new Date();
-  const yesterday = new Date();
-  yesterday.setDate(today.getDate() - 1);
-  let dayLabel: string;
-  if (target.toDateString() === today.toDateString()) {
-    dayLabel = "Today";
-  } else if (target.toDateString() === yesterday.toDateString()) {
-    dayLabel = "Yesterday";
-  } else {
-    dayLabel = target.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-  }
-  const timeLabel = target.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-  return `${dayLabel} • ${timeLabel}`;
-}
-
 function convertStoredEntry(entry: RecentProjectEntry): ProjectItem {
   return {
     id: entry.id,
@@ -53,7 +36,7 @@ function convertStoredEntry(entry: RecentProjectEntry): ProjectItem {
     subtitle: "Workspace project",
     status: "In progress",
     updatedAt: entry.updatedAt,
-    updated: formatUpdatedLabel(entry.updatedAt),
+    updated: formatProjectLastEdited(entry.updatedAt),
     persisted: true,
   };
 }
@@ -174,7 +157,7 @@ export default function ProjectsList({ initialProjects }: Props) {
             ...project,
             title: clean,
             updatedAt,
-            updated: formatUpdatedLabel(updatedAt),
+            updated: formatProjectLastEdited(updatedAt),
           };
         }
         return { ...project, title: clean };
@@ -276,7 +259,7 @@ export default function ProjectsList({ initialProjects }: Props) {
                         Rename project
                       </button>
                       <div className="mt-1 border-t border-slate-100" />
-                      <div className="px-3 pt-2 text-xs text-slate-500">Updated {project.updated}</div>
+                      <div className="px-3 pt-2 text-xs text-slate-500">{project.updated}</div>
                     </div>
                   ) : null}
                 </div>
@@ -287,7 +270,7 @@ export default function ProjectsList({ initialProjects }: Props) {
                   </div>
                   <div className="mt-auto flex items-center justify-between text-xs font-medium text-slate-500">
                     <div className="flex flex-col text-[12px]">
-                      <span className="text-slate-400">Last updated</span>
+                      <span className="text-slate-400">Last edited</span>
                       <span>{project.updated}</span>
                     </div>
                     <Link

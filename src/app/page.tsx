@@ -1,8 +1,6 @@
 import Image from "next/image";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
-import { Search, SlidersHorizontal } from "lucide-react";
 import { authOptions } from "@/lib/authOptions";
 import UploadCta from "@/components/UploadCta";
 import HeroStats from "@/components/HeroStats";
@@ -10,10 +8,10 @@ import HeroFeatureArea from "@/components/HeroFeatureArea";
 import PersonaHighlight from "@/components/PersonaHighlight";
 import LogoCarousel from "@/components/LogoCarousel";
 import { hasUsedToday } from "@/lib/quota";
-import RecentProjectsRow from "@/components/RecentProjectsRow";
-import StartProjectButton from "@/components/StartProjectButton";
 import { prisma } from "@/lib/prisma";
 import ProjectsSummarySeed from "@/components/ProjectsSummarySeed";
+import ContainerShadowOverlay from "@/components/ContainerShadowOverlay";
+import HomeProjectsSearch from "@/components/HomeProjectsSearch";
 
 function Sparkle({ className, gradientId }: { className?: string; gradientId: string }) {
   return (
@@ -80,7 +78,7 @@ export default async function Home({
 function MarketingLanding({ usedToday }: { usedToday: boolean }) {
   return (
     <>
-      <section className="w-full bg-gradient-to-r from-[#FDF2FF] via-[#EEF2FF] to-[#E0F7FF]">
+      <section className="w-full bg-gradient-to-r from-[rgba(0,138,222,0.10)] via-[rgba(81,189,255,0.16)] to-[rgba(0,138,222,0.08)]">
         <div className="mx-auto w-full max-w-7xl px-6 py-10 sm:py-14 lg:py-16">
           <div className="relative grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.1fr)] lg:items-center lg:gap-12">
             <div className="relative z-10 space-y-6 text-center lg:text-left">
@@ -166,97 +164,28 @@ async function ProjectsDashboard({ displayName, userId }: { displayName: string;
       ? `/api/projects/${encodeURIComponent(project.id)}/thumbnail?v=${project.updatedAt.getTime()}`
       : null,
   }));
-  const recentProjects = summaryProjects.slice(0, 6);
-
   return (
     <main className="min-h-screen w-full bg-slate-100 px-2 py-4 sm:px-4 sm:py-6 lg:px-6 lg:py-8">
-      <ProjectsSummarySeed projects={summaryProjects} />
+      <ProjectsSummarySeed projects={summaryProjects} ownerKey={userId} />
       <div
-        className="mx-auto mb-6 flex min-h-[calc(100vh-4rem)] w-full flex-col rounded-[32px] border border-white/70 bg-white px-4 pb-12 pt-14 sm:mb-8 sm:px-6 lg:px-10"
+        id="home-projects-container"
+        className="relative z-40 mx-auto mb-6 flex min-h-[calc(100vh-4rem)] w-full flex-col rounded-[32px] border border-slate-200/70 bg-white px-4 pb-12 pt-14 shadow-[0_18px_50px_rgba(15,23,42,0.10)] data-[shadow-overlay=true]:border-transparent data-[shadow-overlay=true]:shadow-none sm:mb-8 sm:px-6 lg:px-10"
         style={{
           backgroundImage:
-            "linear-gradient(to bottom, rgba(0, 157, 253, 0.28) 0%, rgba(0, 157, 253, 0.18) 22%, rgba(255, 255, 255, 0) 70%)",
+            "linear-gradient(to bottom, rgba(81, 189, 255, 0.55) 0%, rgba(0, 138, 222, 0.35) 26%, rgba(255, 255, 255, 0) 72%)",
           backgroundRepeat: "no-repeat",
           backgroundSize: "100% 420px",
         }}
       >
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 left-0 w-10 rounded-l-[32px] bg-gradient-to-r from-slate-900/5 to-transparent"
+        />
         <div className="w-full">
-          <section>
-            <header className="flex flex-col items-center justify-center text-center">
-              <p className="text-xl font-semibold text-[#013d63]">Welcome back, {firstName}.</p>
-              <h1 className="mt-2 text-[36px] sm:text-[44px] lg:text-[58px] font-medium tracking-tight text-[#013d63]">
-                What will you work on today?
-              </h1>
-            </header>
-            <div className="mt-10 flex justify-center">
-              <div className="w-full max-w-4xl rounded-[42px] border border-[#0f6fb8] bg-white/95 px-5 py-3 text-[#013d63] shadow-[0_8px_20px_rgba(15,111,184,0.16)]">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="flex flex-col items-center gap-2 sm:pr-5">
-                    <div className="text-center">
-                      <h3 className="text-base font-semibold text-[#013d63]">Start a new project</h3>
-                    </div>
-                    <StartProjectButton
-                      variant="custom"
-                      className="inline-flex h-9 w-full max-w-xs items-center justify-center rounded-[10px] bg-[#019dfd] px-6 text-sm font-semibold text-white shadow-[0_3px_9px_rgba(0,157,253,0.25)] transition hover:-translate-y-0.5 hover:bg-[#0185d6]"
-                    />
-                  </div>
-                  <div className="flex flex-col items-center gap-2 pt-3 sm:border-l sm:border-slate-300 sm:pl-5 sm:pt-0">
-                    <div className="text-center">
-                      <h3 className="text-base font-semibold text-[#013d63]">Send a Signature Request</h3>
-                    </div>
-                    <Link
-                      href="/signature-center"
-                      className="inline-flex h-9 w-full max-w-xs items-center justify-center rounded-[10px] bg-[#6A4EE8] px-6 text-sm font-semibold text-white shadow-[0_3px_9px_rgba(0,157,253,0.25)] transition hover:-translate-y-0.5 hover:bg-[#5C3EDB]"
-                    >
-                      Go to Signature Dashboard
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="mt-5 flex justify-center">
-              <div className="w-full max-w-4xl">
-                <div className="flex items-center rounded-[999px] border border-[#0f6fb8] bg-white px-6 py-[18px] text-base text-[#013d63] shadow-[0_8px_25px_rgba(15,111,184,0.25)]">
-                  <Search className="h-5 w-5 text-sky-500 sm:h-6 sm:w-6" aria-hidden />
-                  <input
-                    type="text"
-                    placeholder="Search projects and documents"
-                    className="ml-4 flex-1 border-none bg-transparent text-base text-[#013d63] placeholder:text-slate-400 focus:outline-none focus:ring-0 sm:text-lg"
-                  />
-                  <button
-                    type="button"
-                    className="ml-4 hidden rounded-full border border-[#013d63]/20 bg-white px-4 py-2 text-sm font-semibold text-[#013d63] shadow-[0_4px_14px_rgba(1,61,99,0.2)] transition hover:bg-[#013d63] hover:text-white sm:inline-flex sm:items-center sm:gap-2"
-                  >
-                    <SlidersHorizontal className="h-4 w-4" aria-hidden />
-                    <span>Filters</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section className="mt-7 w-full">
-            <div className="pt-10">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-900 sm:text-xl">Recent projects</h2>
-                </div>
-              </div>
-              <div className="mt-6">
-                <RecentProjectsRow initialProjects={recentProjects} />
-              </div>
-              <div className="mt-6 flex justify-center">
-                <Link
-                  href="/projects/all"
-                  className="inline-flex h-10 items-center justify-center rounded-[12px] bg-[#019dfd] px-6 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(0,157,253,0.25)] transition hover:-translate-y-0.5 hover:bg-[#0185d6]"
-                >
-                  View all projects
-                </Link>
-              </div>
-            </div>
-          </section>
+          <HomeProjectsSearch firstName={firstName} accountName={displayName} projects={summaryProjects} />
         </div>
       </div>
+      <ContainerShadowOverlay targetId="home-projects-container" overlayZIndex={45} />
     </main>
   );
 }

@@ -1,9 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
-import { Check, Star, MoreHorizontal, ExternalLink, Copy, Link2, Trash2 } from "lucide-react";
+import { Check, Star, MoreHorizontal, ExternalLink, Copy, Link2, Trash2, Pencil } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { refreshProjectsSummary } from "@/lib/projectsSummaryCache";
+import { removeRecentProject, updateRecentProjectTitle } from "@/lib/recentProjects";
+import { sanitizeProjectName } from "@/lib/projectName";
 
 type Project = {
   id: string;
@@ -18,6 +22,17 @@ type ProjectCardProps = {
   isSelected: boolean;
   hasSelection: boolean;
   onToggleSelected: (id: string) => void;
+  onRenamed?: (id: string, title: string) => void;
+  onCopied?: (
+    project: {
+      id: string;
+      name?: string | null;
+      updatedAt?: string | number | Date;
+      previewUrl?: string | null;
+      pagesCount?: number | null;
+    },
+    sourceId: string,
+  ) => void;
   imageLoading?: "eager" | "lazy";
   imagePriority?: boolean;
 };
@@ -27,42 +42,41 @@ export default function ProjectCard({
   isSelected,
   hasSelection,
   onToggleSelected,
+  onRenamed,
+  onCopied,
   imageLoading = "lazy",
   imagePriority = false,
   onTrashed,
 }: ProjectCardProps & { onTrashed?: (id: string) => void }) {
+  const { data: session } = useSession();
+  const ownerKey = session?.user?.id ?? session?.user?.email ?? null;
   const [starred, setStarred] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const cardRef = useRef<HTMLDivElement | null>(null);
-  const [isMounted, setIsMounted] = useState(false);
+  const previewKey = project.previewUrl ?? "none";
+  const [loadedPreviewKey, setLoadedPreviewKey] = useState("");
+  const previewLoaded = loadedPreviewKey === previewKey;
+  const [renaming, setRenaming] = useState(false);
+  const [draftName, setDraftName] = useState("");
+  const [renameBusy, setRenameBusy] = useState(false);
+  const [renameError, setRenameError] = useState<string | null>(null);
 
   useEffect(() => {
-    setIsMounted(true);
-  }, []);
+    if (!menuOpen) return;
 
-   useEffect(() => {
-     if (!menuOpen) return;
+    function handleGlobalMouseDown() {
+      setMenuOpen(false);
+      setMenuPosition(null);
+    }
 
-     function handleGlobalMouseDown() {
-       setMenuOpen(false);
-       setMenuPosition(null);
-     }
-
-     document.addEventListener("mousedown", handleGlobalMouseDown);
-     return () => {
-       document.removeEventListener("mousedown", handleGlobalMouseDown);
-     };
+    document.addEventListener("mousedown", handleGlobalMouseDown);
+    return () => {
+      document.removeEventListener("mousedown", handleGlobalMouseDown);
+    };
   }, [menuOpen]);
-  const activePreview = project.previewUrl ?? null;
-  const [previewLoaded, setPreviewLoaded] = useState(false);
-  const lastPreviewRef = useRef<string | null>(activePreview);
 
-  useLayoutEffect(() => {
-    if (lastPreviewRef.current === activePreview) return;
-    lastPreviewRef.current = activePreview;
-    setPreviewLoaded(false);
-  }, [activePreview]);
+  const activePreview = project.previewUrl ?? null;
 
   const cardClasses = [
     "relative rounded-[10px] bg-[#F9FAFC] transition",
@@ -72,7 +86,7 @@ export default function ProjectCard({
     .join(" ");
 
   const checkboxClasses = [
-    "absolute left-3 top-3 z-10 flex h-7 w-7 items-center justify-center rounded-[8px] border-[2px] text-xs font-semibold shadow-md transition-transform transition-opacity duration-150 xl:h-8 xl:w-8",
+    "absolute left-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-[12px] border-[3px] text-xs font-semibold shadow-md transition-transform transition-opacity duration-150 xl:h-10 xl:w-10",
     isSelected
       ? "bg-[#4C6FFF] border-[#4C6FFF] text-white opacity-100 scale-100"
       : [
@@ -91,7 +105,76 @@ export default function ProjectCard({
     .filter(Boolean)
     .join(" ");
   const actionButtonBase =
-    "flex h-9 w-9 items-center justify-center text-sm hover:bg-slate-100/80 transition xl:h-10 xl:w-10";
+    "flex h-11 w-11 items-center justify-center text-sm hover:bg-slate-100/80 transition xl:h-12 xl:w-12";
+
+  const startRenaming = (event: { preventDefault: () => void; stopPropagation: () => void }) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (renameBusy) return;
+    setDraftName(project.title);
+    setRenameError(null);
+    setRenaming(true);
+  };
+
+  const cancelRenaming = () => {
+    if (renameBusy) return;
+    setRenaming(false);
+    setDraftName("");
+    setRenameError(null);
+  };
+
+  const submitRename = async () => {
+    if (renameBusy) return;
+    const next = sanitizeProjectName(draftName);
+    if (!next || next === project.title) {
+      cancelRenaming();
+      return;
+    }
+
+    setRenameBusy(true);
+    try {
+      setRenameError(null);
+      const previousTitle = project.title;
+      onRenamed?.(project.id, next);
+
+      const res = await fetch(`/api/projects/${encodeURIComponent(project.id)}`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: next }),
+      });
+      if (!res.ok) {
+        onRenamed?.(project.id, previousTitle);
+        if (res.status === 404) {
+          setRenameError("Couldn’t save — project not found. Refreshing…");
+          void refreshProjectsSummary(ownerKey, "no-store");
+        } else {
+          setRenameError("Couldn’t save. Try again.");
+        }
+        return;
+      }
+      updateRecentProjectTitle(ownerKey, project.id, next);
+      void refreshProjectsSummary(ownerKey, "force-cache");
+      setRenaming(false);
+      setDraftName("");
+    } finally {
+      setRenameBusy(false);
+    }
+  };
+
+  const handleRenameKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      cancelRenaming();
+      return;
+    }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      event.stopPropagation();
+      void submitRename();
+    }
+  };
 
   return (
     <Link
@@ -99,6 +182,12 @@ export default function ProjectCard({
       className="group flex flex-col text-left transition hover:-translate-y-1"
       aria-disabled={hasSelection}
       onClick={(event) => {
+        if (renaming) {
+          event.preventDefault();
+          event.stopPropagation();
+          void submitRename();
+          return;
+        }
         if (hasSelection) {
           event.preventDefault();
           event.stopPropagation();
@@ -119,7 +208,7 @@ export default function ProjectCard({
           aria-label={isSelected ? "Deselect project" : "Select project"}
         >
           {isSelected ? (
-            <Check className="h-4 w-4" strokeWidth={3} aria-hidden />
+            <Check className="h-6 w-6" strokeWidth={3} aria-hidden />
           ) : null}
         </button>
         {!hasSelection && (
@@ -137,12 +226,12 @@ export default function ProjectCard({
                 aria-label={starred ? "Unstar project" : "Star project"}
               >
                 <Star
-                  className={`h-4 w-4 ${starred ? "fill-current" : ""}`}
+                  className={`h-6 w-6 ${starred ? "fill-current" : ""}`}
                   strokeWidth={2.4}
                   aria-hidden
                 />
               </button>
-              <div className="h-4 w-px bg-slate-200/80" aria-hidden />
+              <div className="h-6 w-px bg-slate-200/80" aria-hidden />
               <button
                 type="button"
                 className={actionButtonBase}
@@ -155,96 +244,149 @@ export default function ProjectCard({
                     setMenuPosition(null);
                   } else if (cardRef.current && typeof window !== "undefined") {
                     const rect = cardRef.current.getBoundingClientRect();
+                    const menuWidth = 320;
+                    const margin = 16;
+                    const overlap = 24;
+                    const centerY = rect.top + rect.height / 2;
+                    const top = Math.min(Math.max(centerY, margin), window.innerHeight - margin);
+                    const clampLeft = (value: number) =>
+                      Math.min(Math.max(value, margin), window.innerWidth - menuWidth - margin);
+                    const preferredLeft = rect.right - overlap;
+                    const left =
+                      preferredLeft + menuWidth + margin > window.innerWidth
+                        ? clampLeft(rect.left + overlap - menuWidth)
+                        : clampLeft(preferredLeft);
                     setMenuPosition({
-                      top: rect.top + rect.height / 2,
-                      left: rect.right + 16,
+                      top,
+                      left,
                     });
                   }
                 }}
                 aria-label="Project actions"
               >
-                <MoreHorizontal className="h-4 w-4" strokeWidth={2.4} aria-hidden />
+                <MoreHorizontal className="h-6 w-6" strokeWidth={2.4} aria-hidden />
               </button>
             </div>
-            {isMounted &&
+            {typeof document !== "undefined" &&
               menuOpen &&
               menuPosition &&
               createPortal(
                 <div
-                  className="fixed z-[9999] w-72 -translate-y-1/2 rounded-[18px] border border-slate-200/70 bg-white/95 py-2 text-sm shadow-[0_18px_40px_rgba(15,23,42,0.22)]"
+                  role="menu"
+                  aria-label="Project actions"
+                  className="fixed z-[9999] w-80 -translate-y-1/2 overflow-hidden rounded-3xl border border-slate-200 bg-white text-sm text-slate-800 shadow-[0_24px_70px_rgba(15,23,42,0.20)]"
                   onMouseDown={(event) => {
                     // Prevent the global outside-click handler from firing for clicks inside the menu
                     event.stopPropagation();
                   }}
                   style={{ top: menuPosition.top, left: menuPosition.left }}
                 >
-                  <div className="px-4 pb-2">
-                    <p className="truncate text-sm font-semibold text-slate-900">
-                      {project.title}
-                    </p>
-                    <p className="mt-0.5 text-xs text-slate-500">
-                      {project.updated}
-                    </p>
+                  <div className="p-4 pb-3">
+                    <p className="truncate text-base font-semibold text-slate-900">{project.title}</p>
+                    <p className="mt-1 text-xs font-medium text-slate-500">{project.updated}</p>
                   </div>
-                  <div className="my-1 h-px bg-slate-100/90" />
+                  <div className="h-px bg-slate-100" />
                   <button
                     type="button"
-                  className="flex w-full items-center gap-3 px-4 py-2.5 text-slate-800 transition hover:bg-slate-50/80"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    setMenuOpen(false);
-                    setMenuPosition(null);
-                  }}
+                    role="menuitem"
+                    className="mx-3 mt-2 flex w-[calc(100%-1.5rem)] items-center gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-slate-50"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setMenuOpen(false);
+                      setMenuPosition(null);
+                    }}
                   >
-                    <ExternalLink className="h-4 w-4 text-slate-500" aria-hidden />
-                    <span>Open in new tab</span>
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-slate-700">
+                      <ExternalLink className="h-5 w-5" aria-hidden />
+                    </span>
+                    <span className="text-base font-medium text-slate-900">Open in new tab</span>
                   </button>
                   <button
                     type="button"
-                  className="flex w-full items-center gap-3 px-4 py-2.5 text-slate-800 transition hover:bg-slate-50/80"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    setMenuOpen(false);
-                    setMenuPosition(null);
-                  }}
+                    role="menuitem"
+                    className="mx-3 flex w-[calc(100%-1.5rem)] items-center gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-slate-50"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setMenuOpen(false);
+                      setMenuPosition(null);
+                      void (async () => {
+                        try {
+                          const res = await fetch(
+                            `/api/projects/${encodeURIComponent(project.id)}/copy`,
+                            { method: "POST" }
+                          );
+                          if (!res.ok) return;
+                          const json = (await res.json().catch(() => null)) as
+                            | {
+                                project?: {
+                                  id?: string;
+                                  name?: string | null;
+                                  updatedAt?: string | number | Date;
+                                  previewUrl?: string | null;
+                                  pagesCount?: number | null;
+                                };
+                              }
+                            | null;
+                          const duplicated = json?.project;
+                          if (!duplicated?.id) return;
+                          onCopied?.(duplicated, project.id);
+                          void refreshProjectsSummary(ownerKey, "force-cache");
+                        } catch {
+                          // ignore
+                        }
+                      })();
+                    }}
                   >
-                    <Copy className="h-4 w-4 text-slate-500" aria-hidden />
-                    <span>Make a copy</span>
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-slate-700">
+                      <Copy className="h-5 w-5" aria-hidden />
+                    </span>
+                    <span className="text-base font-medium text-slate-900">Make a copy</span>
                   </button>
                   <button
                     type="button"
-                  className="flex w-full items-center gap-3 px-4 py-2.5 text-slate-800 transition hover:bg-slate-50/80"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    setMenuOpen(false);
-                    setMenuPosition(null);
-                  }}
+                    role="menuitem"
+                    className="mx-3 flex w-[calc(100%-1.5rem)] items-center gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-slate-50"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setMenuOpen(false);
+                      setMenuPosition(null);
+                    }}
                   >
-                    <Link2 className="h-4 w-4 text-slate-500" aria-hidden />
-                    <span>Copy link</span>
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-slate-700">
+                      <Link2 className="h-5 w-5" aria-hidden />
+                    </span>
+                    <span className="text-base font-medium text-slate-900">Copy link</span>
                   </button>
-                  <div className="my-1 h-px bg-slate-100/90" />
+                  <div className="mx-3 my-2 h-px bg-slate-100" />
                   <button
                     type="button"
-                  className="flex w-full items-center gap-3 px-4 py-2.5 text-rose-600 transition hover:bg-rose-50/80"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    setMenuOpen(false);
-                    setMenuPosition(null);
-                    void fetch(`/api/projects/${encodeURIComponent(project.id)}/trash`, {
-                      method: "POST",
-                    }).catch(() => {});
-                    if (onTrashed) {
-                      onTrashed(project.id);
-                    }
-                  }}
+                    role="menuitem"
+                    className="mx-3 mb-2 flex w-[calc(100%-1.5rem)] items-center gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-rose-50"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setMenuOpen(false);
+                      setMenuPosition(null);
+                      void fetch(`/api/projects/${encodeURIComponent(project.id)}/trash`, {
+                        method: "POST",
+                      })
+                        .then(() => {
+                          removeRecentProject(ownerKey, project.id);
+                          return refreshProjectsSummary(ownerKey, "force-cache");
+                        })
+                        .catch(() => {});
+                      if (onTrashed) {
+                        onTrashed(project.id);
+                      }
+                    }}
                   >
-                    <Trash2 className="h-4 w-4" aria-hidden />
-                    <span>Move to trash</span>
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-rose-100 text-rose-700">
+                      <Trash2 className="h-5 w-5" aria-hidden />
+                    </span>
+                    <span className="text-base font-semibold text-rose-700">Move to trash</span>
                   </button>
                 </div>,
                 document.body
@@ -252,27 +394,37 @@ export default function ProjectCard({
           </>
         )}
         <div className="relative m-[3px] w-[calc(100%-6px)] aspect-[1.23/1] overflow-hidden rounded-[10px] bg-[#EEF1F5] border border-[rgba(0,0,0,0.06)] transition-colors group-hover:bg-[#E3E8EF]">
+          {typeof project.pagesCount === "number" && project.pagesCount > 0 ? (
+            <div className="pointer-events-none absolute bottom-3 right-3 z-10 rounded-full bg-black/60 px-4 py-2.5 text-sm font-semibold leading-none text-white opacity-0 shadow-sm backdrop-blur-sm transition-opacity group-hover:opacity-100">
+              {project.pagesCount} {project.pagesCount === 1 ? "page" : "pages"}
+            </div>
+          ) : null}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 z-[5] bg-black/[0.03] opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+          />
           {activePreview ? (
             <div className="relative h-full w-full p-2 sm:p-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={activePreview}
-                alt={project.title}
-                loading={imageLoading}
-                fetchPriority={imagePriority ? "high" : "auto"}
-                decoding="async"
-                className={`h-full w-full object-cover object-top transition-opacity ${
-                  previewLoaded ? "opacity-100" : "opacity-0"
-                }`}
-                onLoad={() => setPreviewLoaded(true)}
-                onError={() => setPreviewLoaded(true)}
-                ref={(node) => {
-                  if (!node) return;
-                  if (node.complete && node.naturalWidth > 0) {
-                    setPreviewLoaded(true);
-                  }
-                }}
-              />
+	                key={previewKey}
+	                src={activePreview}
+	                alt={project.title}
+	                loading={imageLoading}
+	                fetchPriority={imagePriority ? "high" : "auto"}
+	                decoding="async"
+	                className={`h-full w-full object-cover object-top transition-opacity ${
+	                  previewLoaded ? "opacity-100" : "opacity-0"
+	                }`}
+	                onLoad={() => setLoadedPreviewKey(previewKey)}
+	                onError={() => setLoadedPreviewKey(previewKey)}
+	                ref={(node) => {
+	                  if (!node) return;
+	                  if (node.complete && node.naturalWidth > 0) {
+	                    setLoadedPreviewKey(previewKey);
+	                  }
+	                }}
+	              />
               {!previewLoaded ? (
                 <div className="pointer-events-none absolute inset-0 rounded-[10px] skeleton-shimmer opacity-90" />
               ) : null}
@@ -284,9 +436,56 @@ export default function ProjectCard({
           )}
         </div>
       </div>
-      <div className="mt-4 space-y-0.5">
-        <p className="text-lg font-semibold text-slate-900">{project.title}</p>
-        <p className="text-sm text-slate-500">Edited {project.updated}</p>
+      <div className="mt-2 space-y-0.5">
+        {renaming ? (
+          <input
+            value={draftName}
+            autoFocus
+            disabled={renameBusy}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+            onMouseDown={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+            onChange={(event) => {
+              setDraftName(event.target.value);
+              if (renameError) setRenameError(null);
+            }}
+            onKeyDown={handleRenameKeyDown}
+            onBlur={() => {
+              void submitRename();
+            }}
+            className="w-full rounded-lg border-[3px] border-[#019dfd] bg-white px-2 py-1 text-lg font-semibold text-slate-900 shadow-sm outline-none focus:border-[#019dfd] focus:ring-0 disabled:opacity-70"
+          />
+        ) : (
+          <div className="group/title flex items-center gap-2">
+            <button
+              type="button"
+              onClick={startRenaming}
+              className="min-w-0 flex-1 truncate py-1.5 text-left text-lg font-semibold text-slate-900"
+              aria-label="Rename project"
+            >
+              {project.title}
+            </button>
+            {!hasSelection ? (
+              <button
+                type="button"
+                onClick={startRenaming}
+                aria-label="Rename project"
+                className="inline-flex items-center justify-center text-black opacity-0 transition-opacity group-hover/title:opacity-100"
+              >
+                <Pencil className="h-5 w-5" aria-hidden />
+              </button>
+            ) : null}
+          </div>
+        )}
+        {renameError ? (
+          <p className="text-xs font-semibold text-rose-600">{renameError}</p>
+        ) : null}
+        <p className="text-sm text-slate-500">{project.updated}</p>
       </div>
     </Link>
   );

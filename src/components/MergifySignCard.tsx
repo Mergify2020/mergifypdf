@@ -60,7 +60,7 @@ export default function MergifySignCard() {
           type="button"
           onClick={handleOpenClick}
           disabled={isOpening}
-          className="mt-2 inline-flex h-11 items-center justify-center rounded-[8px] bg-[#6A4EE8] px-6 text-sm font-semibold text-white shadow-md transition-colors hover:bg-[#5C3EDB] disabled:cursor-not-allowed disabled:opacity-80"
+          className="mt-2 inline-flex h-11 items-center justify-center whitespace-nowrap rounded-[8px] bg-[#6A4EE8] px-6 text-sm font-semibold text-white shadow-md transition-colors hover:bg-[#5C3EDB] disabled:cursor-not-allowed disabled:opacity-80"
         >
           {isOpening ? (
             <>

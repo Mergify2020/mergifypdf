@@ -67,3 +67,20 @@ export function addRecentProject(ownerId: string | null | undefined, title: stri
   existing.unshift(entry);
   saveRecentProjects(ownerId, existing.slice(0, 50));
 }
+
+export function updateRecentProjectTitle(ownerId: string | null | undefined, id: string, title: string) {
+  if (!id) return;
+  const existing = loadRecentProjects(ownerId);
+  if (existing.length === 0) return;
+  const next = existing.map((entry) => (entry.id === id ? { ...entry, title } : entry));
+  saveRecentProjects(ownerId, next);
+}
+
+export function removeRecentProject(ownerId: string | null | undefined, id: string) {
+  if (!id) return;
+  const existing = loadRecentProjects(ownerId);
+  if (existing.length === 0) return;
+  const next = existing.filter((entry) => entry.id !== id);
+  if (next.length === existing.length) return;
+  saveRecentProjects(ownerId, next);
+}

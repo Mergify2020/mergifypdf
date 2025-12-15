@@ -4,23 +4,7 @@ import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
 import { curatedProjects } from "@/lib/sampleProjects";
 import AllProjectsGrid from "@/components/AllProjectsGrid";
-
-function formatUpdatedLabel(date: Date) {
-  const target = date;
-  const today = new Date();
-  const yesterday = new Date();
-  yesterday.setDate(today.getDate() - 1);
-  let dayLabel: string;
-  if (target.toDateString() === today.toDateString()) {
-    dayLabel = "Today";
-  } else if (target.toDateString() === yesterday.toDateString()) {
-    dayLabel = "Yesterday";
-  } else {
-    dayLabel = target.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-  }
-  const timeLabel = target.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-  return `${dayLabel} • ${timeLabel}`;
-}
+import { formatProjectLastEdited } from "@/lib/formatProjectLastEdited";
 
 export default async function StarredProjectsPage() {
   const session = await getServerSession(authOptions);
@@ -73,7 +57,7 @@ export default async function StarredProjectsPage() {
           return {
             id: project.id,
             title: project.name?.trim() || "Untitled project",
-            updated: formatUpdatedLabel(project.updatedAt),
+            updated: formatProjectLastEdited(project.updatedAt),
             preview,
             pagesCount,
             pageThumbs,
@@ -92,4 +76,3 @@ export default async function StarredProjectsPage() {
     </div>
   );
 }
-
