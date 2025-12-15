@@ -135,7 +135,9 @@ export default function RecentProjectsRow({
             onCopied={(duplicated, sourceId) => {
               const nextId = duplicated.id;
               const nextName = duplicated.name?.trim() || "Untitled project";
-              const nextUpdatedAt = duplicated.updatedAt ?? new Date();
+              const updatedAtValue = duplicated.updatedAt ?? new Date();
+              const nextUpdatedAt =
+                updatedAtValue instanceof Date ? updatedAtValue : new Date(updatedAtValue);
               setProjects((prev) => {
                 const nextEntry: SummaryProject = {
                   id: nextId,

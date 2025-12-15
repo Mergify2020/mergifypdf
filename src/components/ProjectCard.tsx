@@ -331,7 +331,7 @@ export default function ProjectCard({
                             | null;
                           const duplicated = json?.project;
                           if (!duplicated?.id) return;
-                          onCopied?.(duplicated, project.id);
+                          onCopied?.({ ...duplicated, id: duplicated.id }, project.id);
                           void refreshProjectsSummary(ownerKey, "force-cache");
                         } catch {
                           // ignore

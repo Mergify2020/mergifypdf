@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 async function ensureDbConnection() {
   for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -133,7 +134,9 @@ export async function PUT(
         })
       : (() => {
           const existingWithData = existing as typeof existing & { data: unknown };
-          const nextData = data ?? existingWithData.data;
+          const nextData = (data ?? existingWithData.data) as
+            | Prisma.InputJsonValue
+            | Prisma.NullTypes.JsonNull;
           const { previewUrl, pagesCount } = derivePreviewMeta(nextData);
           return prisma.project.update({
             where: { id: existing.id },

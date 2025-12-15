@@ -243,7 +243,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
   const isAccountRoute = pathname?.startsWith("/account");
   const isProjectsPanel = panelKey === "projects";
   const isHomePanel = panelKey === "home";
-  const PanelTitleIcon: LucideIcon | null =
+  const PanelTitleIcon: LucideIcon =
     panelKey === "home"
       ? FolderKanban
       : panelKey === "projects"
@@ -1162,7 +1162,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                             activePanel.subtitle ? "" : "mt-0"
                           } ${panelKey === "home" ? "text-slate-500" : "text-slate-800"}`}
                         >
-                          {PanelTitleIcon && panelKey !== "home" ? (
+                          {panelKey !== "home" ? (
                             <span className="inline-flex h-7 w-7 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
                               <PanelTitleIcon className="h-4 w-4" aria-hidden />
                             </span>

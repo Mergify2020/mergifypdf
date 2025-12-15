@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 async function ensureDbConnection() {
   for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -25,14 +26,17 @@ async function ensureDbConnection() {
   }
 }
 
-function withoutTrashedFlag(data: unknown): unknown {
-  if (!data || typeof data !== "object") return data;
-  if (Array.isArray(data)) return data;
-  const record = data as Record<string, unknown>;
-  if (!("trashed" in record)) return record;
-  const { trashed, ...rest } = record;
-  void trashed;
-  return rest;
+function withoutTrashedFlag(data: Prisma.JsonValue): Prisma.InputJsonValue | Prisma.NullTypes.JsonNull {
+  if (data === null) return Prisma.JsonNull;
+  if (Array.isArray(data)) return data as Prisma.InputJsonArray;
+  if (typeof data !== "object") return data as Prisma.InputJsonValue;
+
+  const record = data as Record<string, Prisma.JsonValue>;
+  if (!Object.prototype.hasOwnProperty.call(record, "trashed")) return data as Prisma.InputJsonObject;
+
+  const { trashed: _trashed, ...rest } = record;
+  void _trashed;
+  return rest as Prisma.InputJsonObject;
 }
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
