@@ -52,7 +52,7 @@ export default function RecentProjectsRow({
 
   if (!projects.length) {
     return (
-      <div className="mt-6 flex min-h-[260px] w-full flex-col items-center justify-center rounded-[24px] border-[3px] border-dashed border-slate-200 bg-white/70 px-8 py-12 text-center shadow-sm">
+      <div className="mt-6 flex min-h-[260px] w-full flex-col items-center justify-center rounded-[24px] border-[3px] border-dashed border-[#51bdff] bg-white/70 px-8 py-12 text-center shadow-sm">
         <p className="text-lg font-semibold text-slate-900 sm:text-xl">No projects yet</p>
         <p className="mt-2 max-w-sm text-sm text-slate-600 sm:text-base">Start a new project to see it here.</p>
       </div>

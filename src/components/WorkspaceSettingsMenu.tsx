@@ -1,7 +1,7 @@
 "use client";
 
-import SettingsMenu from "./SettingsMenu";
+import SettingsMenu, { type SettingsMenuProps } from "./SettingsMenu";
 
-export default function WorkspaceSettingsMenu() {
-  return <SettingsMenu />;
+export default function WorkspaceSettingsMenu(props: SettingsMenuProps) {
+  return <SettingsMenu {...props} />;
 }

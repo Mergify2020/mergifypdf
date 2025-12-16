@@ -90,7 +90,7 @@ export default function HomeProjectsSearch({ firstName, accountName, projects }:
 
   return (
     <>
-      <section className="pt-10 lg:pt-14">
+      <section className="pt-0 sm:pt-6 lg:pt-10">
         <div className="flex w-full flex-col items-center">
           <div className="home-hero-header flex w-full max-w-4xl flex-col items-center text-center">
             <p className="text-2xl font-normal text-[#013d63] sm:text-3xl">Welcome back, {firstName}.</p>
@@ -127,9 +127,9 @@ export default function HomeProjectsSearch({ firstName, accountName, projects }:
             </div>
           </div>
 
-          <div className="mt-[50px] w-full max-w-4xl">
+          <div className="mt-8 w-full max-w-4xl sm:mt-10">
             <div
-              className="flex cursor-text items-center rounded-[999px] border-[3px] border-slate-300 bg-white px-6 py-5 text-lg text-slate-800 shadow-sm transition hover:border-[#51bdff] hover:bg-slate-50"
+              className="flex cursor-text items-center rounded-[999px] border-[3px] border-slate-300 bg-white px-4 py-3 text-slate-800 shadow-sm transition hover:border-[#51bdff] hover:bg-slate-50 sm:px-6 sm:py-5"
               onMouseDown={(event) => {
                 const target = event.target;
                 if (target instanceof HTMLInputElement) return;
@@ -140,22 +140,22 @@ export default function HomeProjectsSearch({ firstName, accountName, projects }:
                 searchInputRef.current?.focus();
               }}
             >
-              <Search className="h-6 w-6 text-[#008ade] sm:h-7 sm:w-7" aria-hidden />
+              <Search className="h-5 w-5 text-[#008ade] sm:h-7 sm:w-7" aria-hidden />
               <input
                 ref={searchInputRef}
                 type="text"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search projects and documents"
-                className="ml-4 flex-1 border-none bg-transparent text-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-0 sm:text-xl"
+                className="ml-3 min-w-0 flex-1 border-none bg-transparent text-base text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-0 sm:ml-4 sm:text-xl"
               />
             </div>
           </div>
         </div>
       </section>
 
-      <section className="mt-7 w-full">
-        <div className="pt-10">
+      <section className="mt-1 w-full sm:mt-4">
+        <div className="pt-1 sm:pt-3 lg:pt-2">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <h2 className="text-lg font-semibold text-slate-900 sm:text-xl">
               {query.trim() ? "Search results" : "Recent projects"}

@@ -26,11 +26,16 @@ import {
   Undo2,
   Eraser,
   Pencil,
-  RotateCcw,
-  Move,
-  ChevronDown,
-  Signature as SignatureIcon,
-  UploadCloud,
+	  RotateCcw,
+	  Move,
+	  ChevronDown,
+	  ChevronLeft,
+	  ChevronRight,
+	  MoreHorizontal,
+	  Copy,
+	  ListOrdered,
+	  Signature as SignatureIcon,
+	  UploadCloud,
   X,
   Mail,
 } from "lucide-react";
@@ -52,6 +57,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import WorkspaceSettingsMenu from "@/components/WorkspaceSettingsMenu";
 import HeaderLoginButton from "@/components/HeaderLoginButton";
+import LoadingOverlay from "@/components/LoadingOverlay";
 import { addRecentProject } from "@/lib/recentProjects";
 import { PROJECT_NAME_STORAGE_KEY, projectNameToFile, sanitizeProjectName } from "@/lib/projectName";
 import { PENDING_UPLOAD_STORAGE_KEY } from "@/lib/pendingUpload";
@@ -298,9 +304,10 @@ const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
 const WORKSPACE_SIGNATURES_KEY = "mpdf:signatures";
 const DEFAULT_ASPECT_RATIO = 792 / 612; // fallback letter portrait
 const SOFT_EASE: [number, number, number, number] = [0.4, 0, 0.2, 1];
-const BASE_ZOOM_MULTIPLIER = 1; // true 100% baseline
-const MAX_ZOOM_MULTIPLIER = 2.5; // cap matches previous 250% even when UI shows 300%
-const ZOOM_LEVELS = [0.5, 0.75, 1, 1.5, 2, 3];
+const ZOOM_MIN_PERCENT = 50;
+const ZOOM_MAX_PERCENT = 300;
+const ZOOM_STEP_PERCENT = 25;
+const MAX_ZOOM_MULTIPLIER = ZOOM_MAX_PERCENT / 100;
 const VIEW_TRANSITION = { duration: 0.2, ease: SOFT_EASE };
 const GRID_VARIANTS = {
   hidden: { opacity: 0, scale: 0.97 },
@@ -638,7 +645,7 @@ function SortableThumb({
   const scaleFix = isQuarterTurn ? Math.min(ratio, 1 / ratio) : 1;
 
   return (
-    <li ref={setNodeRef} style={style} className="w-full" {...attributes}>
+    <li ref={setNodeRef} style={style} className="flex w-full justify-center" {...attributes}>
       <div
         role="button"
         tabIndex={0}
@@ -649,22 +656,35 @@ function SortableThumb({
             onSelect();
           }
         }}
-        className={`group relative mb-4 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-all duration-150 hover:-translate-y-[1px] hover:shadow-md cursor-pointer ${
-          selected ? "border-[#0052ff] ring-2 ring-[#0052ff33]" : ""
-        }`}
+        className="group relative w-full max-w-[200px] cursor-pointer select-none"
         {...listeners}
       >
-        <span className="absolute left-2 top-2 rounded-full bg-white/90 px-2 py-0.5 text-[11px] font-medium text-slate-700 shadow-sm">
-          Page {index + 1}
-        </span>
         <div className="relative w-full" style={{ paddingBottom: getAspectPadding(item.width, item.height) }}>
-          <div className="absolute inset-0 flex items-center justify-center overflow-hidden group">
-            <div
-              className="flex h-full w-full items-center justify-center"
-              style={{ transform: `rotate(${rotationDegrees}deg) scale(${scaleFix})`, transformOrigin: "center" }}
-            >
+          <div
+	            className={`absolute inset-0 flex items-center justify-center overflow-hidden rounded-none border bg-white shadow-sm transition ${
+	              selected
+	                ? "border-[3px] border-[#51bdff] shadow-[0_14px_26px_rgba(81,189,255,0.25)]"
+	                : "border-slate-200 hover:border-slate-300"
+	            }`}
+	          >
+	            <span
+	              className={`absolute left-0 top-0 z-10 flex h-7 w-7 items-center justify-center rounded-none text-xs font-semibold tabular-nums ${
+	                selected ? "bg-[#51bdff] text-slate-900" : "bg-slate-200 text-slate-700"
+	              }`}
+	            >
+	              {index + 1}
+	            </span>
+	            <div
+	              className="z-0 flex h-full w-full items-center justify-center"
+	              style={{ transform: `rotate(${rotationDegrees}deg) scale(${scaleFix})`, transformOrigin: "center" }}
+	            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={item.thumb} alt={`Page ${index + 1}`} className="block h-full w-full object-contain" draggable={false} />
+              <img
+                src={item.thumb}
+                alt={`Page ${index + 1}`}
+                className="block h-full w-full object-contain"
+                draggable={false}
+              />
             </div>
           </div>
         </div>
@@ -788,14 +808,19 @@ function WorkspaceClient() {
   const [error, setError] = useState<string | null>(null);
   const [activePageId, setActivePageId] = useState<string | null>(null);
   const [activePageIndexState, setActivePageIndex] = useState(0);
-  const [shouldCenterOnChange, setShouldCenterOnChange] = useState(false);
-  const [zoomPercent, setZoomPercent] = useState(125);
-  const [baseScale, setBaseScale] = useState(1);
-  const [userAdjustedZoom, setUserAdjustedZoom] = useState(false);
-  const scrollRatioRef = useRef<{ x: number; y: number }>({ x: 0.5, y: 0 });
-  const [previewHeightLimit, setPreviewHeightLimit] = useState<number | null>(null);
-  const [highlightMode, setHighlightMode] = useState(false);
-  const [highlightColor, setHighlightColor] = useState<HighlightColorKey>("yellow");
+  const [pageNumberDraft, setPageNumberDraft] = useState("");
+  const [pageActionMenuId, setPageActionMenuId] = useState<string | null>(null);
+	  const [shouldCenterOnChange, setShouldCenterOnChange] = useState(false);
+	  const [zoomPercent, setZoomPercent] = useState(100);
+	  const [baseScale, setBaseScale] = useState(1);
+	  const [userAdjustedZoom, setUserAdjustedZoom] = useState(false);
+	  const [showPageOrderPanel, setShowPageOrderPanel] = useState(true);
+	  const pageNavigationLockRef = useRef<{ until: number; targetId: string } | null>(null);
+	  const scrollRatioRef = useRef<{ x: number; y: number }>({ x: 0.5, y: 0 });
+	  const restoreScrollOnNextZoomRef = useRef(false);
+	  const [previewHeightLimit, setPreviewHeightLimit] = useState<number | null>(null);
+	  const [highlightMode, setHighlightMode] = useState(false);
+	  const [highlightColor, setHighlightColor] = useState<HighlightColorKey>("yellow");
   const [highlightThickness, setHighlightThickness] = useState(14);
   const [pencilMode, setPencilMode] = useState(false);
   const [pencilThickness, setPencilThickness] = useState(4);
@@ -1074,6 +1099,7 @@ function WorkspaceClient() {
   const objectUrlCacheRef = useRef<Map<string, string>>(new Map());
   const hasHydratedHighlights = useRef(false);
   const hasHydratedSignatures = useRef(false);
+  const pendingInsertedPageRef = useRef<{ afterId: string; newId: string } | null>(null);
   const updatePreviewHeightLimit = useCallback(() => {
     if (typeof window === "undefined") return;
     const container = previewContainerRef.current;
@@ -1101,6 +1127,8 @@ function WorkspaceClient() {
   const toolButtonActive = "border-transparent bg-[#024d7c] text-white shadow-sm";
   const controlButtonClass =
     "flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,0.08)] transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-40";
+  const bottomBarButtonClass =
+    "flex h-11 w-11 items-center justify-center rounded-full border border-[#1f2937] bg-[#1f2937] text-white shadow-[0_12px_26px_rgba(15,23,42,0.20)] transition hover:bg-[#111827] hover:shadow-[0_16px_34px_rgba(15,23,42,0.24)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1f2937]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f3f6fb]";
   const signatureTabBase =
     "inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-[0_6px_14px_rgba(15,23,42,0.06)] transition hover:border-[#024d7c]/40 hover:text-[#024d7c]";
   const signatureTabActive = "border-[#024d7c] bg-[#024d7c] text-white shadow-[0_10px_24px_rgba(2,77,124,0.2)]";
@@ -1675,7 +1703,8 @@ function WorkspaceClient() {
 
     let cancelled = false;
     async function renderNewSources() {
-      setLoading(true);
+      const shouldShowLoading = pages.length === 0;
+      if (shouldShowLoading) setLoading(true);
       setError(null);
       const next: PageItem[] = [];
       const startIdx = renderedSourcesRef.current;
@@ -1685,8 +1714,10 @@ function WorkspaceClient() {
         const pdfjsLib = (await import("pdfjs-dist")) as typeof import("pdfjs-dist") & {
           GlobalWorkerOptions: { workerSrc: string };
         };
-        pdfjsLib.GlobalWorkerOptions.workerSrc =
-          "https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+        pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+          "pdfjs-dist/build/pdf.worker.min.js",
+          import.meta.url,
+        ).toString();
 
         const pixelRatio = getDevicePixelRatio();
         const previewScale = PREVIEW_BASE_SCALE;
@@ -1694,7 +1725,13 @@ function WorkspaceClient() {
         // Only render thumbnails for sources we haven't seen yet
         for (let s = startIdx; s < sources.length; s++) {
           const src = sources[s];
-          const pdf = await pdfjsLib.getDocument(src.url).promise;
+          let pdf: any;
+          try {
+            pdf = await pdfjsLib.getDocument({ url: src.url } as any).promise;
+          } catch (err) {
+            console.warn("pdfjs getDocument failed, retrying without worker", err);
+            pdf = await pdfjsLib.getDocument({ url: src.url, disableWorker: true } as any).promise;
+          }
           for (let p = 1; p <= pdf.numPages; p++) {
             if (cancelled) return;
             const page = await pdf.getPage(p);
@@ -1735,14 +1772,21 @@ function WorkspaceClient() {
         }
 
         if (!cancelled) {
-          setPages((prev) => [...prev, ...next]);
+          setPages((prev) => {
+            if (prev.length === 0) return [...prev, ...next];
+            const nextById = new Map(next.map((item) => [item.id, item]));
+            const merged = prev.map((item) => nextById.get(item.id) ?? item);
+            const existingIds = new Set(prev.map((item) => item.id));
+            const appended = next.filter((item) => !existingIds.has(item.id));
+            return appended.length ? [...merged, ...appended] : merged;
+          });
           renderedSourcesRef.current = sources.length;
         }
       } catch (e) {
         console.error(e);
         if (!cancelled) setError("Could not render previews (file may be encrypted or corrupted).");
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled && pages.length === 0) setLoading(false);
       }
     }
 
@@ -1757,6 +1801,7 @@ function WorkspaceClient() {
       setActivePageId(null);
       setOrganizeMode(false);
       setActivePageIndex(0);
+      setPageNumberDraft("");
       return;
     }
     const hasValidId = activePageId && pages.some((p) => p.id === activePageId);
@@ -1770,6 +1815,59 @@ function WorkspaceClient() {
       setActivePageIndex(idx);
     }
   }, [pages, activePageId, activePageIndexState]);
+
+  useEffect(() => {
+    if (pages.length === 0) return;
+    const idx = activePageIndexState >= 0 && activePageIndexState < pages.length ? activePageIndexState : 0;
+    setPageNumberDraft(String(idx + 1));
+  }, [activePageIndexState, pages.length]);
+
+  useEffect(() => {
+    if (!pageActionMenuId) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!(event.target instanceof Node)) return;
+      if ((event.target as HTMLElement).closest("[data-page-actions-menu]")) return;
+      setPageActionMenuId(null);
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPageActionMenuId(null);
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [pageActionMenuId]);
+
+  useEffect(() => {
+    const pending = pendingInsertedPageRef.current;
+    if (!pending) return;
+    const { afterId, newId } = pending;
+    const newIndex = pages.findIndex((p) => p.id === newId);
+    if (newIndex === -1) return;
+    const afterIndex = pages.findIndex((p) => p.id === afterId);
+    if (afterIndex === -1) {
+      pendingInsertedPageRef.current = null;
+      return;
+    }
+
+    pendingInsertedPageRef.current = null;
+    setPages((prev) => {
+      const fromIndex = prev.findIndex((p) => p.id === newId);
+      const toIndex = prev.findIndex((p) => p.id === afterId);
+      if (fromIndex === -1 || toIndex === -1) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex + 1, 0, moved);
+      return next;
+    });
+    setActivePageId(newId);
+    setShouldCenterOnChange(true);
+  }, [pages]);
 
   useEffect(() => {
     if (pages.length === 0) {
@@ -1809,6 +1907,11 @@ function WorkspaceClient() {
         if (visible.length > 0) {
           const id = visible[0].target.getAttribute("data-page-id");
           if (id) {
+            const lock = pageNavigationLockRef.current;
+            if (lock && Date.now() < lock.until) {
+              if (id !== lock.targetId) return;
+              pageNavigationLockRef.current = null;
+            }
             setActivePageId((prev) => (prev === id ? prev : id));
           }
         }
@@ -1901,8 +2004,134 @@ function WorkspaceClient() {
     setShouldCenterOnChange(true);
     const page = pages[index];
     if (page) {
+      pageNavigationLockRef.current = { until: Date.now() + 700, targetId: page.id };
       setActivePageId(page.id);
     }
+  }
+
+  async function handleAddBlankPageAfter(pageId: string) {
+    const storageId = crypto.randomUUID();
+    const doc = await PDFDocument.create();
+    doc.addPage([612, 792]);
+    const bytes = await doc.save();
+    const blob = new Blob([bytes as unknown as BlobPart], { type: "application/pdf" });
+    await storeFileBlob(storageId, blob, "Blank page.pdf", blob.size);
+    const objectUrl = URL.createObjectURL(blob);
+    const newPageId = buildPageId(storageId, 0);
+    const pixelRatio = getDevicePixelRatio();
+    const viewportWidth = Math.floor(612 * PREVIEW_BASE_SCALE * pixelRatio);
+    const viewportHeight = Math.floor(792 * PREVIEW_BASE_SCALE * pixelRatio);
+    const canvas = document.createElement("canvas");
+    canvas.width = viewportWidth;
+    canvas.height = viewportHeight;
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = "rgba(148,163,184,0.85)";
+      ctx.lineWidth = Math.max(2, Math.floor(2 * pixelRatio));
+      ctx.strokeRect(
+        ctx.lineWidth,
+        ctx.lineWidth,
+        canvas.width - ctx.lineWidth * 2,
+        canvas.height - ctx.lineWidth * 2,
+      );
+    }
+    const previewData = toCardPreviewDataUrl(canvas);
+    const thumbData = createThumbnailDataUrl(canvas);
+
+    let newSrcIdx = sources.length;
+    setSources((prev) => {
+      newSrcIdx = prev.length;
+      return [...prev, { storageId, url: objectUrl, name: "Blank page.pdf", size: blob.size, updatedAt: Date.now() }];
+    });
+
+    let insertedIndex = 0;
+    setPages((prev) => {
+      const afterIndex = prev.findIndex((p) => p.id === pageId);
+      const next = [...prev];
+      const newPage: PageItem = {
+        id: newPageId,
+        srcIdx: newSrcIdx,
+        pageIdx: 0,
+        thumb: thumbData,
+        preview: previewData,
+        rotation: 0,
+        width: viewportWidth,
+        height: viewportHeight,
+      };
+      if (afterIndex === -1) next.push(newPage);
+      else next.splice(afterIndex + 1, 0, newPage);
+      insertedIndex = afterIndex === -1 ? next.length - 1 : afterIndex + 1;
+      return next;
+    });
+
+    setActivePageId(newPageId);
+    setActivePageIndex(insertedIndex);
+    setShouldCenterOnChange(true);
+  }
+
+  async function handleDuplicatePage(page: PageItem) {
+    const src = sources[page.srcIdx];
+    if (!src) return;
+    const stored = await readFileBlob(src.storageId);
+    const originalBlob = stored?.blob instanceof Blob ? stored.blob : null;
+    if (!originalBlob) return;
+    const ab = await originalBlob.arrayBuffer();
+    const sourceDoc = await PDFDocument.load(new Uint8Array(ab));
+    const out = await PDFDocument.create();
+    const [copied] = await out.copyPages(sourceDoc, [page.pageIdx]);
+    out.addPage(copied);
+    const bytes = await out.save();
+    const storageId = crypto.randomUUID();
+    const blob = new Blob([bytes as unknown as BlobPart], { type: "application/pdf" });
+    const name = `Page ${page.pageIdx + 1}.pdf`;
+    await storeFileBlob(storageId, blob, name, blob.size);
+    const objectUrl = URL.createObjectURL(blob);
+    const newPageId = buildPageId(storageId, 0);
+
+    let newSrcIdx = sources.length;
+    setSources((prev) => {
+      newSrcIdx = prev.length;
+      return [...prev, { storageId, url: objectUrl, name, size: blob.size, updatedAt: Date.now() }];
+    });
+
+    let insertedIndex = 0;
+    setPages((prev) => {
+      const afterIndex = prev.findIndex((p) => p.id === page.id);
+      const next = [...prev];
+      const newPage: PageItem = {
+        id: newPageId,
+        srcIdx: newSrcIdx,
+        pageIdx: 0,
+        thumb: page.thumb,
+        preview: page.preview,
+        rotation: page.rotation,
+        width: page.width,
+        height: page.height,
+      };
+      if (afterIndex === -1) next.push(newPage);
+      else next.splice(afterIndex + 1, 0, newPage);
+      insertedIndex = afterIndex === -1 ? next.length - 1 : afterIndex + 1;
+      return next;
+    });
+
+    setActivePageId(newPageId);
+    setActivePageIndex(insertedIndex);
+    setShouldCenterOnChange(true);
+  }
+
+  function commitPageNumberDraft() {
+    if (pages.length === 0) return;
+    const parsed = Number.parseInt(pageNumberDraft, 10);
+    if (!Number.isFinite(parsed)) {
+      const idx = activePageIndexState >= 0 && activePageIndexState < pages.length ? activePageIndexState : 0;
+      setPageNumberDraft(String(idx + 1));
+      return;
+    }
+    const clamped = clamp(parsed, 1, Math.max(1, pages.length));
+    setPageNumberDraft(String(clamped));
+    handleSelectPage(clamped - 1);
   }
 
   function registerPreviewRef(id: string) {
@@ -1927,17 +2156,22 @@ function WorkspaceClient() {
     const rotationDegrees = normalizeRotation(page.rotation);
     const naturalWidth = page.width || 612;
     const naturalHeight = page.height || naturalWidth * DEFAULT_ASPECT_RATIO;
-    const rotated = rotationDegrees % 180 !== 0;
-    const baseWidth = rotated ? naturalHeight : naturalWidth;
-    const baseHeight = rotated ? naturalWidth : naturalHeight;
     const effectiveScale = baseScale * zoomMultiplier;
-    const fittedWidth = baseWidth * effectiveScale;
-    const fittedHeight = baseHeight * effectiveScale;
-    const heightLimit =
-      zoomPercent > 125 && previewHeightLimit ? previewHeightLimit * 1.08 : null; // allow a bit more than the sidebar to avoid early clipping
-    const displayHeight =
-      heightLimit && heightLimit > 0 ? Math.min(fittedHeight, heightLimit) : fittedHeight;
-    const clipped = heightLimit != null && displayHeight < fittedHeight;
+    const contentWidth = naturalWidth * effectiveScale;
+    const contentHeight = naturalHeight * effectiveScale;
+    const rotated = rotationDegrees % 180 !== 0;
+    const fittedWidth = rotated ? contentHeight : contentWidth;
+    const fittedHeight = rotated ? contentWidth : contentHeight;
+    const displayHeight = fittedHeight;
+    const clipped = false;
+    const rotationTransform =
+      rotationDegrees === 90
+        ? `translateX(${contentHeight}px) rotate(90deg)`
+        : rotationDegrees === 180
+          ? `translateX(${contentWidth}px) translateY(${contentHeight}px) rotate(180deg)`
+          : rotationDegrees === 270
+            ? `translateY(${contentWidth}px) rotate(270deg)`
+            : "none";
     return (
       <div
         key={page.id}
@@ -1945,14 +2179,98 @@ function WorkspaceClient() {
         ref={registerPreviewRef(page.id)}
         className="mx-auto w-fit opacity-0 scale-[0.98] animate-[page-enter_0.15s_ease-out_forwards]"
       >
+        <div className="mx-auto mb-2 flex items-center" style={{ width: fittedWidth }}>
+          <div className="w-24 text-lg font-semibold text-slate-500">#{idx + 1}</div>
+          <div className="flex flex-1 justify-center">
+            <div className="group relative">
+              <button
+                type="button"
+                aria-label="Add blank page"
+                className="inline-flex items-center justify-center rounded-xl p-2 text-slate-600 transition hover:bg-white hover:shadow-sm hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void handleAddBlankPageAfter(page.id);
+                }}
+              >
+                <Plus className="h-6 w-6" />
+                <span className="sr-only">Add blank page</span>
+              </button>
+              <div className="pointer-events-none absolute left-1/2 top-full z-40 mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+                Add blank page
+              </div>
+            </div>
+          </div>
+          <div className="relative flex w-24 justify-end" data-page-actions-menu>
+            <button
+              type="button"
+              aria-label="Page actions"
+              className="inline-flex items-center justify-center rounded-xl p-2 text-slate-600 transition hover:bg-white hover:shadow-sm hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60"
+              onClick={(event) => {
+                event.stopPropagation();
+                setPageActionMenuId((current) => (current === page.id ? null : page.id));
+              }}
+            >
+              <MoreHorizontal className="h-6 w-6" />
+            </button>
+            {pageActionMenuId === page.id ? (
+              <div className="absolute right-0 top-11 z-40 w-52 rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_18px_45px_rgba(15,23,42,0.20)]">
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
+                  onClick={() => {
+                    setPageActionMenuId(null);
+                    handleRotatePage(page.id);
+                  }}
+                >
+                  <RotateCcw className="h-4 w-4 text-slate-500" aria-hidden />
+                  Rotate
+                </button>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
+                  onClick={() => {
+                    setPageActionMenuId(null);
+                    void handleDuplicatePage(page);
+                  }}
+                >
+                  <Copy className="h-4 w-4 text-slate-500" aria-hidden />
+                  Duplicate
+                </button>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-rose-600 transition hover:bg-rose-50"
+                  onClick={() => {
+                    setPageActionMenuId(null);
+                    handleDeletePage(page.id);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden />
+                  Delete
+                </button>
+                <div className="my-2 h-px bg-slate-200" />
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
+                  onClick={() => {
+                    setPageActionMenuId(null);
+                    setOrganizeMode(true);
+                  }}
+                >
+                  <ListOrdered className="h-4 w-4 text-slate-500" aria-hidden />
+                  Rearrange pages
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </div>
         <div
           className={`relative bg-white shadow-[0_12px_30px_rgba(15,23,42,0.18)] transition ${
             idx === activePageIndex ? "shadow-brand/30" : ""
           }`}
-          style={{
-            width: fittedWidth,
-            height: displayHeight,
-            overflow: clipped ? "hidden" : undefined,
+            style={{
+              width: fittedWidth,
+              height: displayHeight,
+            overflow: undefined,
           }}
           onClick={() => handleSelectPage(idx)}
         >
@@ -1962,33 +2280,33 @@ function WorkspaceClient() {
           >
             <div
               className="absolute left-0 top-0 bg-white"
-            style={{
-              width: fittedWidth,
-              height: fittedHeight,
-              transform: `rotate(${rotationDegrees}deg)`,
-              transformOrigin: "top right",
-              cursor: deleteMode
-                ? ("url('/icons/eraser.svg') 4 4, auto" as CSSProperties["cursor"])
-                : activeDrawingTool === "highlight"
-                ? (`url(${HIGHLIGHT_CURSOR}) 4 24, crosshair` as CSSProperties["cursor"])
-                : activeDrawingTool === "pencil"
-                ? ("crosshair" as CSSProperties["cursor"])
-                : activeDrawingTool === "text"
-                ? ("text" as CSSProperties["cursor"])
-                : undefined,
-            }}
-            onMouseDown={(event) => {
-              if (deleteMode) {
-                setIsErasing(true);
-                event.preventDefault();
-              }
-              handleMarkupPointerDown(page.id, event);
-            }}
-            onMouseMove={(event) => handleMarkupPointerMove(page.id, event)}
-            onMouseUp={() => {
-              setIsErasing(false);
-              handleMarkupPointerUp(page.id);
-            }}
+              style={{
+                width: contentWidth,
+                height: contentHeight,
+                transform: rotationTransform,
+                transformOrigin: "top left",
+                cursor: deleteMode
+                  ? ("url('/icons/eraser.svg') 4 4, auto" as CSSProperties["cursor"])
+                  : activeDrawingTool === "highlight"
+                    ? (`url(${HIGHLIGHT_CURSOR}) 4 24, crosshair` as CSSProperties["cursor"])
+                    : activeDrawingTool === "pencil"
+                      ? ("crosshair" as CSSProperties["cursor"])
+                      : activeDrawingTool === "text"
+                        ? ("text" as CSSProperties["cursor"])
+                        : undefined,
+              }}
+              onMouseDown={(event) => {
+                if (deleteMode) {
+                  setIsErasing(true);
+                  event.preventDefault();
+                }
+                handleMarkupPointerDown(page.id, event);
+              }}
+              onMouseMove={(event) => handleMarkupPointerMove(page.id, event)}
+              onMouseUp={() => {
+                setIsErasing(false);
+                handleMarkupPointerUp(page.id);
+              }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -2883,12 +3201,9 @@ function WorkspaceClient() {
 
   const itemsIds = useMemo(() => pages.map((p) => p.id), [pages]);
   const downloadDisabled = busy || pages.length === 0;
-  const activePageIndex = activePageIndexState >= 0 && activePageIndexState < pages.length ? activePageIndexState : -1;
-  const zoomMultiplier = clamp(
-    (zoomPercent / 100) * (MAX_ZOOM_MULTIPLIER / 3), // 300% label maps to 250% effective
-    0.8,
-    MAX_ZOOM_MULTIPLIER
-  );
+	  const activePageIndex = activePageIndexState >= 0 && activePageIndexState < pages.length ? activePageIndexState : -1;
+	  // 100% = "fit whole page". Other % scale from that baseline.
+	  const zoomMultiplier = clamp(zoomPercent / 100, ZOOM_MIN_PERCENT / 100, MAX_ZOOM_MULTIPLIER);
   const zoomLabel = `${Math.round(zoomPercent)}%`;
   const highlightButtonDisabled = pages.length === 0 || loading;
   const highlightColorEntries = Object.entries(
@@ -3019,25 +3334,44 @@ function WorkspaceClient() {
     };
   }, [authSession?.user, buildCloudProjectData, hasWorkspaceData, projectName, saveProject]);
 
-  const computeBaseScale = useCallback(() => {
-    const container = previewContainerRef.current;
-    if (!container || pages.length === 0) return;
-    const targetIndex = activePageIndex >= 0 ? activePageIndex : 0;
-    const targetPage = pages[targetIndex];
-    const naturalWidth = targetPage?.width || 612;
-    const naturalHeight = targetPage?.height || naturalWidth * DEFAULT_ASPECT_RATIO;
-    const rotation = normalizeRotation(targetPage?.rotation ?? 0);
-    const rotated = rotation % 180 !== 0;
-    const baseWidth = rotated ? naturalHeight : naturalWidth;
-    const baseHeight = rotated ? naturalWidth : naturalHeight;
-    const availableWidth = Math.max(container.clientWidth, 200);
-    const availableHeight = Math.max(container.clientHeight, 200);
-    const fitScale = Math.max(
-      0.2,
-      Math.min(availableWidth / baseWidth, availableHeight / baseHeight, 1) * 0.85 // start smaller so ~75% height is visible at 100%
-    );
-    setBaseScale((prev) => (Math.abs(prev - fitScale) > 0.001 ? fitScale : prev));
-  }, [activePageIndex, pages]);
+		  const computeBaseScale = useCallback(() => {
+		    const container = previewContainerRef.current;
+		    if (!container || pages.length === 0) return;
+		    const targetIndex = activePageIndex >= 0 ? activePageIndex : 0;
+		    const targetPage = pages[targetIndex];
+		    const naturalWidth = targetPage?.width || 612;
+		    const naturalHeight = targetPage?.height || naturalWidth * DEFAULT_ASPECT_RATIO;
+		    // Rotation should not affect zoom/fit scaling. A rotated page is still the same page,
+		    // just turned; users can pan/scroll to see it rather than the app re-zooming.
+		    const baseWidth = naturalWidth;
+		    const baseHeight = naturalHeight;
+
+		    const fitPadding = 0.98; // breathing room around the page
+		    const horizontalGutter = 72; // ~36px per side
+		    const verticalGutter = 40; // slight top/bottom breathing room
+
+		    const availableWidth = Math.max(container.clientWidth - horizontalGutter, 200);
+		    const availableHeight = Math.max(container.clientHeight - verticalGutter, 200);
+
+		    // Baseline: 100% shows the whole page.
+		    const fitWholePageScale = Math.max(
+		      0.2,
+		      Math.min(availableWidth / baseWidth, availableHeight / baseHeight) * fitPadding,
+		    );
+
+		    // Default zoom: fit-to-width (still leaving side space).
+		    const fitWidthScale = Math.max(0.2, (availableWidth / baseWidth) * fitPadding);
+		    const desiredZoomPercent = clamp(
+		      Math.round((fitWidthScale / fitWholePageScale) * 100),
+		      ZOOM_MIN_PERCENT,
+		      ZOOM_MAX_PERCENT,
+		    );
+
+		    if (!userAdjustedZoom) {
+		      setZoomPercent((prev) => (prev === desiredZoomPercent ? prev : desiredZoomPercent));
+		    }
+		    setBaseScale((prev) => (Math.abs(prev - fitWholePageScale) > 0.001 ? fitWholePageScale : prev));
+		  }, [activePageIndex, pages, userAdjustedZoom]);
 
   useEffect(() => {
     if (!shouldCenterOnChange) return;
@@ -3073,13 +3407,13 @@ function WorkspaceClient() {
     return () => window.removeEventListener("resize", handleResize);
   }, [computeBaseScale, userAdjustedZoom]);
 
-  const setZoomWithScrollPreserved = useCallback(
-    (nextPercent: number) => {
-      const clamped = clamp(nextPercent, 100, 300);
-      const container = previewContainerRef.current;
-      if (container) {
-        const maxX = Math.max(1, container.scrollWidth);
-        const maxY = Math.max(1, container.scrollHeight - container.clientHeight);
+	  const setZoomWithScrollPreserved = useCallback(
+	    (nextPercent: number) => {
+	      const clamped = clamp(nextPercent, ZOOM_MIN_PERCENT, ZOOM_MAX_PERCENT);
+	      const container = previewContainerRef.current;
+	      if (container) {
+	        const maxX = Math.max(1, container.scrollWidth);
+	        const maxY = Math.max(1, container.scrollHeight - container.clientHeight);
         scrollRatioRef.current = {
           x: clamp(
             (container.scrollLeft + container.clientWidth / 2) / maxX,
@@ -3089,15 +3423,18 @@ function WorkspaceClient() {
           y: maxY > 0 ? clamp(container.scrollTop / maxY, 0, 1) : 0,
         };
       }
-      setUserAdjustedZoom(true);
-      setZoomPercent(clamped);
-    },
-    []
-  );
+	      setUserAdjustedZoom(true);
+	      restoreScrollOnNextZoomRef.current = true;
+	      setZoomPercent(clamped);
+	    },
+	    []
+	  );
 
   useEffect(() => {
     const container = previewContainerRef.current;
     if (!container) return;
+    if (!restoreScrollOnNextZoomRef.current) return;
+    restoreScrollOnNextZoomRef.current = false;
     const { x, y } = scrollRatioRef.current;
     requestAnimationFrame(() => {
       const maxX = Math.max(0, container.scrollWidth - container.clientWidth);
@@ -3106,7 +3443,7 @@ function WorkspaceClient() {
       container.scrollLeft = clamp(targetLeft, 0, maxX);
       container.scrollTop = clamp(maxY * y, 0, maxY);
     });
-  }, [zoomPercent, baseScale]);
+  }, [zoomPercent]);
 
   function handleMarkupPointerDown(pageId: string, event: ReactMouseEvent<HTMLDivElement>) {
     if (pendingSignatureForPlacement) {
@@ -4054,17 +4391,26 @@ function WorkspaceClient() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col bg-[#f3f6fb]">
+    <main className="flex h-screen flex-col overflow-hidden bg-[#f3f6fb]">
       <header className="sticky top-0 z-40 border-b border-slate-100 bg-white/90 backdrop-blur shadow-[0_1px_4px_rgba(15,23,42,0.06)]">
         <div className="mx-auto flex h-16 w-full max-w-[1400px] items-center justify-between px-4 lg:px-6">
           <Link href="/" className="inline-flex items-center gap-2" aria-label="Back to workspace">
             <Image src="/logo-wordmark2.svg" alt="MergifyPDF" width={160} height={40} priority />
           </Link>
-          {authSession?.user ? <WorkspaceSettingsMenu /> : <HeaderLoginButton />}
-        </div>
-        
-        <div className="mx-auto w-full px-4 pb-4 lg:px-10">
-          <div className="w-full max-w-[1400px] mx-auto rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+		          <div className="flex items-center gap-2">
+		            <button
+		              className={`${buttonPrimary} px-5 py-2`}
+		              onClick={() => handleDownload()}
+		              disabled={downloadDisabled}
+		            >
+		              {busy ? "Building..." : "Download pages"}
+		            </button>
+		            {!authSession?.user ? <HeaderLoginButton /> : null}
+		          </div>
+		        </div>
+	        
+	        <div className="mx-auto w-full px-4 pb-4 lg:px-10">
+	          <div className="w-full max-w-[1400px] mx-auto rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
             <div className="flex w-full flex-wrap items-center gap-3 lg:gap-4">
               <div className="flex items-center gap-2 min-w-[260px]">
                 {projectNameEditing ? (
@@ -4113,56 +4459,7 @@ function WorkspaceClient() {
                 </button>
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-slate-600">Zoom</span>
-                <button
-                  type="button"
-                  aria-label="Zoom out"
-                  className={controlButtonClass}
-                  onClick={() => setZoomWithScrollPreserved(zoomPercent - 25)}
-                  disabled={zoomPercent <= 100}
-                >
-                  <Minus className="h-4 w-4" />
-                </button>
-                <input
-                  type="range"
-                  min={100}
-                  max={300}
-                  step={25}
-                  value={zoomPercent}
-                  onChange={(e) => setZoomWithScrollPreserved(Number(e.target.value))}
-                  className="horizontal-slider w-32"
-                />
-                <span className="min-w-[44px] text-right text-sm font-semibold text-slate-800">{zoomLabel}</span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  aria-label="Previous page"
-                  className={controlButtonClass}
-                  onClick={() => handlePageStep(-1)}
-                  disabled={activePageIndex <= 0}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                    <path d="M14 6l-6 6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-                <div className="text-xs font-semibold text-slate-700">
-                  Page {activePageIndex >= 0 ? activePageIndex + 1 : 0} / {pages.length || 0}
-                </div>
-                <button
-                  type="button"
-                  aria-label="Next page"
-                  className={controlButtonClass}
-                  onClick={() => handlePageStep(1)}
-                  disabled={activePageIndex === pages.length - 1 || pages.length === 0}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                    <path d="M10 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-              </div>
+              {/* Zoom + page controls moved to bottom bar */}
 
               <div className="flex flex-wrap items-center gap-2">
                 <button
@@ -4288,33 +4585,43 @@ function WorkspaceClient() {
                 </button>
               </div>
 
-              <div className="ml-auto flex items-center gap-2">
-                <button
-                  className={`${buttonPrimary} px-5 py-2`}
-                  onClick={() => handleDownload()}
-                  disabled={downloadDisabled}
-                >
-                  {busy ? "Building..." : "Download pages"}
-                </button>
-                <button
-                  type="button"
-                  className={`${buttonNeutral} px-5 py-2`}
-                  onClick={() => void handleSaveProject()}
+		              <div className="ml-auto flex items-center gap-2">
+		                <button
+		                  type="button"
+		                  className={`${buttonNeutral} px-5 py-2`}
+		                  onClick={() => void handleSaveProject()}
                   disabled={!hasWorkspaceData || savingProject}
                 >
                   {savingProject ? "Saving…" : "Save project"}
                 </button>
-                <button
-                  className={`${buttonNeutral} px-5 py-2`}
-                  onClick={handleAddClick}
-                  disabled={pages.length === 0}
-                >
-                  Add pages
-                </button>
-                <input
-                  ref={addInputRef}
-                  type="file"
-                  accept="application/pdf"
+	                <button
+	                  className={`${buttonNeutral} px-5 py-2`}
+	                  onClick={handleAddClick}
+	                  disabled={pages.length === 0}
+	                >
+	                  Add pages
+	                </button>
+	                <div className="group relative">
+	                  <button
+	                    type="button"
+	                    onClick={() => setShowPageOrderPanel((prev) => !prev)}
+	                    className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#024d7c] text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#013d63] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#51bdff]/40 focus-visible:ring-offset-2"
+	                    aria-label={showPageOrderPanel ? "Close sidebar" : "Open sidebar"}
+	                  >
+	                    {showPageOrderPanel ? (
+	                      <ChevronRight className="h-5 w-5" aria-hidden />
+	                    ) : (
+	                      <ChevronLeft className="h-5 w-5" aria-hidden />
+	                    )}
+	                  </button>
+	                  <div className="pointer-events-none absolute right-0 top-full z-50 mt-2 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+	                    {showPageOrderPanel ? "Close sidebar" : "Open sidebar"}
+	                  </div>
+	                </div>
+	                <input
+	                  ref={addInputRef}
+	                  type="file"
+	                  accept="application/pdf"
                   multiple
                   className="hidden"
                   onChange={handleAddChange}
@@ -4402,24 +4709,25 @@ function WorkspaceClient() {
         </div>
       </header>
 
-      <div className="flex-1 min-h-0 overflow-hidden">
-          <div className="flex h-full min-h-0 flex-col gap-6 overflow-hidden">
+	      <div className="flex-1 min-h-0 overflow-hidden">
+	          <div className="flex h-full min-h-0 flex-col gap-6 overflow-hidden">
             {error && (
               <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">
                 {error}
               </div>
             )}
 
-            {loading && (
-              <div className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-gray-600 shadow-sm">
-                Rendering previews...
-              </div>
-            )}
-
-            <div className="flex-1 min-h-0 overflow-hidden">
-              <AnimatePresence mode="wait">
-                {organizeMode && !loading && pages.length > 0 ? (
-                  <motion.div
+	            <div className="relative flex-1 min-h-0 overflow-hidden">
+		            <LoadingOverlay
+		              open={loading}
+		              label="Loading your project..."
+		              variant="container"
+		              zIndexClassName="z-50"
+		              backdropClassName="bg-slate-50/90"
+		            />
+	              <AnimatePresence mode="wait">
+	                {organizeMode && !loading && pages.length > 0 ? (
+	                  <motion.div
                     key="manage-view"
                     initial={{ opacity: 0, scale: 0.97 }}
                     animate={{ opacity: 1, scale: 1 }}
@@ -4468,71 +4776,85 @@ function WorkspaceClient() {
                   </motion.div>
                 ) : null}
 
-                {!organizeMode && !loading && pages.length > 0 ? (
-                  <motion.div
-                    key="preview-view"
-                    initial={{ opacity: 0.95, scale: 0.97 }}
-                    animate={{ opacity: 1, scale: 1 }}
+	                {!organizeMode && pages.length > 0 ? (
+	                  <motion.div
+	                    key="preview-view"
+	                    initial={{ opacity: 0.95, scale: 0.97 }}
+	                    animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.97 }}
                   transition={VIEW_TRANSITION}
-                  className="editor-shell mx-auto flex h-full min-h-0 w-full flex-1 flex-col gap-6 overflow-hidden px-4 lg:px-6"
+		                  className="editor-shell mx-auto flex h-full min-h-0 w-full flex-1 flex-col gap-6 overflow-hidden px-0"
                 >
-                    <div className="flex h-full min-h-0 w-full">
-                      <div className="flex-1 min-h-0 overflow-hidden">
-                        <div
-                          ref={viewerScrollRef}
-                          className={`viewer-scroll relative flex h-full w-full overflow-auto ${deleteMode ? "eraser-cursor" : ""}`}
-                          style={{ scrollbarGutter: "stable both-edges" }}
-                        >
-                          <div className="relative mx-auto flex min-w-full items-start justify-center gap-6 pr-4">
-                            <div className="flex w-fit justify-center">
-                              <div id="pdf-viewport" className="origin-top flex w-fit flex-col gap-8">
-                                {activePageIndex >= 0 && pages[activePageIndex]
-                                  ? renderPreviewPage(pages[activePageIndex], activePageIndex)
-                                  : null}
-                              </div>
-                            </div>
-
-                            <aside className="w-[260px] shrink-0">
-                              <div className="flex h-full flex-col rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
-                                <div className="flex flex-col gap-1">
-                                  <p className="text-sm font-semibold text-white">Page order</p>
-                                  <p className="text-xs text-slate-300">Tap to focus or drag to reorder</p>
-                                </div>
-                                <DndContext
-                                  sensors={sensors}
-                                  collisionDetection={closestCenter}
-                                  onDragEnd={handleDragEnd}
-                                >
-                                  <SortableContext items={itemsIds} strategy={verticalListSortingStrategy}>
-                                    <ul className="mt-4 flex max-h-[70vh] flex-col gap-3 overflow-y-auto pr-1">
-                                      {pages.map((p, i) => (
-                                        <SortableThumb
-                                          key={p.id}
-                                          item={p}
-                                          index={i}
-                                          selected={p.id === activePageId}
-                                          onSelect={() => handleSelectPage(i)}
-                                        />
-                                      ))}
-                                    </ul>
-                                  </SortableContext>
-                                </DndContext>
-                              </div>
-                            </aside>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </motion.div>
-                ) : null}
+		                    <div className="flex h-full min-h-0 w-full items-stretch gap-0">
+	                      <div className="min-w-0 flex-1 min-h-0 overflow-hidden">
+			                        <div
+			                          ref={viewerScrollRef}
+			                          className={`viewer-scroll relative flex h-full w-full overflow-auto pb-16 ${deleteMode ? "eraser-cursor" : ""}`}
+			                          style={{ scrollbarGutter: "stable" }}
+			                        >
+                          {null}
+		                          <div className="relative mx-auto flex min-w-full items-start justify-center">
+		                            <div className="flex w-fit justify-center">
+		                              <div id="pdf-viewport" className="origin-top flex w-fit flex-col gap-8">
+		                                {pages.map((page, index) => renderPreviewPage(page, index))}
+		                                <div className="h-8" aria-hidden />
+	                              </div>
+	                            </div>
+	                          </div>
+	                        </div>
+	                      </div>
+	
+		                      {showPageOrderPanel ? (
+		                        <aside className="flex w-[300px] shrink-0 flex-col">
+		                          <div className="flex min-h-0 flex-1 flex-col border-l border-slate-200 bg-white">
+		                            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+		                              <p className="text-sm font-semibold text-slate-600">{pages.length} pages</p>
+		                              <div className="flex items-center gap-2">
+		                                <button
+		                                  type="button"
+		                                  onClick={() => setOrganizeMode(true)}
+		                                  disabled={pages.length === 0 || organizeMode}
+		                                  className="text-sm font-semibold text-[#024d7c] transition hover:text-[#013d63] disabled:opacity-50"
+		                                >
+		                                  Manage pages
+		                                </button>
+		                              </div>
+		                            </div>
+		                          <p className="px-4 pt-3 text-xs text-slate-500">Drag to reorder pages</p>
+		                          <div className="mt-3 min-h-0 flex-1 overflow-y-auto border-r border-slate-200 pl-4 pr-0 pb-6">
+		                            <DndContext
+		                              sensors={sensors}
+		                              collisionDetection={closestCenter}
+	                              onDragEnd={handleDragEnd}
+	                            >
+	                              <SortableContext items={itemsIds} strategy={verticalListSortingStrategy}>
+		                                <ul className="flex flex-col gap-3">
+		                                  {pages.map((p, i) => (
+		                                    <SortableThumb
+		                                      key={p.id}
+	                                      item={p}
+	                                      index={i}
+	                                      selected={p.id === activePageId}
+	                                      onSelect={() => handleSelectPage(i)}
+	                                    />
+	                                  ))}
+	                                </ul>
+		                              </SortableContext>
+		                            </DndContext>
+		                          </div>
+		                        </div>
+		                      </aside>
+		                      ) : null}
+		                    </div>
+	                  </motion.div>
+	                ) : null}
               </AnimatePresence>
 
-              {!loading && pages.length === 0 && (
-                <div className="rounded-3xl border border-dashed border-slate-200 bg-white/80 p-12 text-center shadow-sm">
-                  <p className="text-base font-semibold text-gray-800">No pages yet</p>
-                  <p className="mt-2 text-sm text-gray-500">
-                    Bring your PDFs into the workspace — we&apos;ll show a live preview as soon as they finish uploading.
+	              {!loading && pages.length === 0 && (
+	                <div className="rounded-3xl border border-dashed border-slate-200 bg-white/80 p-12 text-center shadow-sm">
+	                  <p className="text-base font-semibold text-gray-800">No pages yet</p>
+	                  <p className="mt-2 text-sm text-gray-500">
+	                    Bring your PDFs into the workspace — we&apos;ll show a live preview as soon as they finish uploading.
                   </p>
                   <button
                     type="button"
@@ -5202,56 +5524,145 @@ function WorkspaceClient() {
           </div>
         </div>
       ) : null}
-      <style jsx global>{`
-        .horizontal-slider {
-          -webkit-appearance: none;
-          appearance: none;
-          height: 4px;
-          border-radius: 9999px;
-          background-color: #e5e7eb;
-          cursor: pointer;
-        }
-        .horizontal-slider::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          appearance: none;
-          width: 12px;
-          height: 12px;
-          border-radius: 9999px;
-          background-color: #111827;
-          border: none;
-          margin-top: -4px;
-        }
-        .horizontal-slider::-moz-range-thumb {
-          width: 12px;
-          height: 12px;
-          border-radius: 9999px;
-          background-color: #111827;
-          border: none;
-        }
-        .horizontal-slider::-moz-range-track {
-          height: 4px;
-          border-radius: 9999px;
-          background-color: #e5e7eb;
-        }
+
+	      <div className="shrink-0 border-t border-slate-200 bg-white/85 shadow-[0_-18px_40px_rgba(15,23,42,0.12)] backdrop-blur-md">
+	        <div className="flex w-full justify-end px-4 py-3 lg:px-8">
+	          <div className="flex flex-wrap items-center justify-end gap-3">
+		            <div className="flex items-center gap-5">
+		              <span className="text-base font-semibold text-slate-800">Zoom</span>
+		              <div className="flex items-center gap-1.5">
+			                <input
+			                  type="range"
+			                  min={ZOOM_MIN_PERCENT}
+			                  max={ZOOM_MAX_PERCENT}
+			                  step={ZOOM_STEP_PERCENT}
+			                  value={zoomPercent}
+			                  onChange={(e) => setZoomWithScrollPreserved(Number(e.target.value))}
+		                  disabled={pages.length === 0}
+		                  className="horizontal-slider w-44 sm:w-72"
+		                />
+		                <span className="w-[52px] text-right text-base font-semibold tabular-nums text-slate-900">
+		                  {zoomLabel}
+		                </span>
+		              </div>
+		            </div>
+
+	            <div className="hidden h-10 w-px bg-slate-200 sm:block" aria-hidden />
+
+		            <div className="flex items-center gap-3">
+		              <button
+		                type="button"
+		                aria-label="Previous page"
+		                className={bottomBarButtonClass}
+	                onClick={() => handlePageStep(-1)}
+	                disabled={activePageIndex <= 0}
+	              >
+		                <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+	                  <path
+	                    d="M14 6l-6 6 6 6"
+	                    stroke="currentColor"
+	                    strokeWidth="2"
+	                    strokeLinecap="round"
+	                    strokeLinejoin="round"
+	                  />
+	                </svg>
+	              </button>
+	              <div className="flex items-center gap-2 text-base font-semibold text-slate-900">
+	                <input
+	                  value={pageNumberDraft}
+	                  onChange={(event) => {
+	                    const next = event.target.value.replace(/[^\d]/g, "");
+	                    setPageNumberDraft(next);
+	                  }}
+	                  onBlur={commitPageNumberDraft}
+	                  onKeyDown={(event) => {
+	                    if (event.key === "Enter") {
+	                      event.currentTarget.blur();
+	                      return;
+	                    }
+	                    if (event.key === "Escape") {
+	                      const idx =
+	                        activePageIndexState >= 0 && activePageIndexState < pages.length ? activePageIndexState : 0;
+	                      setPageNumberDraft(String(idx + 1));
+	                      event.currentTarget.blur();
+	                    }
+	                  }}
+	                  inputMode="numeric"
+	                  pattern="[0-9]*"
+	                  disabled={pages.length === 0}
+	                  className="h-10 w-16 rounded-full border border-slate-200 bg-white px-2 text-center text-base font-semibold tabular-nums text-slate-900 shadow-sm outline-none transition focus:border-[#51bdff] focus:ring-2 focus:ring-[#51bdff]/30 disabled:opacity-60"
+	                  aria-label="Page number"
+	                />
+	                <span className="text-slate-400">/</span>
+	                <span className="tabular-nums text-slate-700">{pages.length || 0}</span>
+	              </div>
+	              <button
+	                type="button"
+	                aria-label="Next page"
+	                className={bottomBarButtonClass}
+	                onClick={() => handlePageStep(1)}
+	                disabled={activePageIndex === pages.length - 1 || pages.length === 0}
+	              >
+		                <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+	                  <path
+	                    d="M10 6l6 6-6 6"
+	                    stroke="currentColor"
+	                    strokeWidth="2"
+	                    strokeLinecap="round"
+	                    strokeLinejoin="round"
+	                  />
+	                </svg>
+		              </button>
+		            </div>
+
+			          </div>
+			        </div>
+			      </div>
+
+	      <style jsx global>{`
+	        .horizontal-slider {
+	          -webkit-appearance: none;
+	          appearance: none;
+	          height: 16px;
+	          background: transparent;
+	          cursor: pointer;
+	        }
+	        .horizontal-slider::-webkit-slider-runnable-track {
+	          height: 8px;
+	          border-radius: 9999px;
+	          background-color: #cbd5e1;
+	        }
+	        .horizontal-slider::-webkit-slider-thumb {
+	          -webkit-appearance: none;
+	          appearance: none;
+	          width: 16px;
+	          height: 16px;
+	          border-radius: 9999px;
+	          background-color: #111827;
+	          border: none;
+	          box-shadow: 0 10px 18px rgba(15, 23, 42, 0.22);
+	          margin-top: -4px;
+	        }
+	        .horizontal-slider::-moz-range-thumb {
+	          width: 16px;
+	          height: 16px;
+	          border-radius: 9999px;
+	          background-color: #111827;
+	          border: none;
+	          box-shadow: 0 10px 18px rgba(15, 23, 42, 0.22);
+	        }
+	        .horizontal-slider::-moz-range-track {
+	          height: 8px;
+	          border-radius: 9999px;
+	          background-color: #cbd5e1;
+	        }
         .eraser-cursor,
         .eraser-cursor * {
           cursor: url("/icons/eraser.svg") 4 4, auto !important;
         }
-        .viewer-scroll {
-          overflow: auto;
-          scrollbar-width: auto;
-        }
-        .viewer-scroll::-webkit-scrollbar {
-          width: 12px;
-          height: 12px;
-        }
-        .viewer-scroll::-webkit-scrollbar-thumb {
-          background-color: #94a3b8;
-          border-radius: 9999px;
-        }
-        .viewer-scroll::-webkit-scrollbar-track {
-          background-color: #e5e7eb;
-        }
+	        .viewer-scroll {
+	          overflow: auto;
+	        }
         body.studio-page > header {
           display: none !important;
         }

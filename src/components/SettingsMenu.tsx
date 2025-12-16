@@ -7,11 +7,12 @@ import { CreditCard, LogOut, User } from "lucide-react";
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
 import { getAvatarFallback } from "@/lib/avatarFallback";
 
-type SettingsMenuProps = {
+export type SettingsMenuProps = {
   variant?: "default" | "pricing";
+  trigger?: "avatar" | "icon";
 };
 
-export default function SettingsMenu({ variant = "default" }: SettingsMenuProps) {
+export default function SettingsMenu({ variant = "default", trigger = "avatar" }: SettingsMenuProps) {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
   const { data: session } = useSession();
@@ -87,7 +88,9 @@ export default function SettingsMenu({ variant = "default" }: SettingsMenuProps)
         aria-expanded={open}
       >
         <span className="sr-only">Open profile menu</span>
-        {avatar ? (
+        {trigger === "icon" ? (
+          <User className="h-5 w-5 text-slate-700" aria-hidden />
+        ) : avatar ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={avatar} alt="Your avatar" className={`${innerSizeClass} rounded-full object-cover`} />
         ) : (

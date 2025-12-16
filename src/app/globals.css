@@ -280,12 +280,12 @@ body {
 }
 
 .all-projects-title {
-  font-size: clamp(32px, 5.5vw, 64px);
+  font-size: clamp(26px, 4.5vw, 52px);
 }
 
 @supports (font-size: 1cqw) {
   .all-projects-title {
-    font-size: clamp(32px, 7cqw, 64px);
+    font-size: clamp(26px, 6cqw, 52px);
   }
 }
 

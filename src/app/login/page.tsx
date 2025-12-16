@@ -6,7 +6,7 @@ import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import LogoMerge from "@/components/LogoMerge";
+import LoadingOverlay from "@/components/LoadingOverlay";
 
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
   CredentialsSignin: "Invalid email or password.",
@@ -217,17 +217,11 @@ export default function LoginPage() {
         </div>
       </main>
 
-      {/* Full-screen loading overlay */}
-      {busy && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-white/90 backdrop-blur">
-          <div className="flex flex-col items-center gap-3">
-            <LogoMerge size={72} />
-            <p className="text-sm text-gray-600">
-              {err ? "Please try again…" : "Signing you in…"}
-            </p>
-          </div>
-        </div>
-      )}
+      <LoadingOverlay
+        open={busy}
+        label={err ? "Please try again…" : "Signing you in…"}
+        zIndexClassName="z-[1000]"
+      />
     </>
   );
 }

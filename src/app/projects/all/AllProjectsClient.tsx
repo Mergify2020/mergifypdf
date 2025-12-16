@@ -55,7 +55,6 @@ export default function AllProjectsClient() {
   // Read caches only after mount.
   const [projects, setProjects] = useState<ProjectCard[]>([]);
   const [loading, setLoading] = useState(true);
-  const [overlayPanelOffset, setOverlayPanelOffset] = useState(0);
   const [query, setQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [sortOption, setSortOption] = useState<"activity" | "az" | "za">("activity");
@@ -138,38 +137,6 @@ export default function AllProjectsClient() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const media = window.matchMedia("(max-width: 1399px)");
-
-    const updateOffset = () => {
-      if (!media.matches) {
-        setOverlayPanelOffset(0);
-        return;
-      }
-
-      const panel = document.querySelector<HTMLElement>('[data-workspace-secondary-panel="true"]');
-      if (!panel) {
-        setOverlayPanelOffset(0);
-        return;
-      }
-
-      const width = Math.round(panel.getBoundingClientRect().width);
-      setOverlayPanelOffset(width > 0 ? width : 0);
-    };
-
-    const observer = new MutationObserver(updateOffset);
-    observer.observe(document.body, { childList: true, subtree: true });
-    media.addEventListener("change", updateOffset);
-    updateOffset();
-
-    return () => {
-      observer.disconnect();
-      media.removeEventListener("change", updateOffset);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
     let cancelled = false;
 
     const load = async () => {
@@ -214,11 +181,10 @@ export default function AllProjectsClient() {
   if (loading) {
     return (
       <main className="min-h-screen w-full bg-slate-100 px-2 py-4 sm:px-4 sm:py-6 lg:px-6 lg:py-8">
-        <div style={overlayPanelOffset > 0 ? { paddingLeft: `${overlayPanelOffset}px` } : undefined}>
-          <div
-            id="all-projects-container"
-            className="relative z-40 mx-auto mb-6 flex min-h-[calc(100vh-4rem)] w-full flex-col rounded-[32px] border border-slate-200/70 bg-white px-4 pb-12 pt-14 shadow-[0_18px_50px_rgba(15,23,42,0.10)] data-[shadow-overlay=true]:border-transparent data-[shadow-overlay=true]:shadow-none sm:mb-8 sm:px-6 lg:px-10"
-          >
+        <div
+          id="all-projects-container"
+          className="relative z-40 mx-auto mb-6 flex min-h-[calc(100vh-4rem)] w-full flex-col rounded-[32px] border border-slate-200/70 bg-white px-4 pb-12 pt-14 shadow-[0_18px_50px_rgba(15,23,42,0.10)] data-[shadow-overlay=true]:border-transparent data-[shadow-overlay=true]:shadow-none sm:mb-8 sm:px-6 lg:px-10"
+        >
             <div
               aria-hidden="true"
               className="pointer-events-none absolute inset-y-0 left-0 w-10 rounded-l-[32px] bg-gradient-to-r from-slate-900/5 to-transparent"
@@ -231,7 +197,7 @@ export default function AllProjectsClient() {
             <div className="mt-5 flex justify-center">
               <div className="w-full max-w-4xl">
                 <div
-                  className="flex cursor-text items-center rounded-[999px] border-[3px] border-slate-300 bg-white px-6 py-5 text-lg text-slate-800 shadow-sm transition hover:border-[#51bdff] hover:bg-slate-50"
+                  className="flex cursor-text items-center rounded-[999px] border-[3px] border-slate-300 bg-white px-4 py-3 text-slate-800 shadow-sm transition hover:border-[#51bdff] hover:bg-slate-50 sm:px-6 sm:py-5"
                   onMouseDown={(event) => {
                     const target = event.target;
                     if (target instanceof HTMLInputElement) return;
@@ -246,7 +212,7 @@ export default function AllProjectsClient() {
                     onChange={(event) => setQuery(event.target.value)}
                     disabled
                     placeholder="Search projects and documents"
-                    className="ml-4 flex-1 border-none bg-transparent text-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-0 sm:text-xl disabled:cursor-not-allowed disabled:opacity-70"
+                    className="ml-3 min-w-0 flex-1 border-none bg-transparent text-base text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-0 sm:ml-4 sm:text-xl disabled:cursor-not-allowed disabled:opacity-70"
                   />
                 </div>
               </div>
@@ -448,8 +414,7 @@ export default function AllProjectsClient() {
               ))}
             </div>
           </div>
-          <ContainerShadowOverlay targetId="all-projects-container" />
-        </div>
+        <ContainerShadowOverlay targetId="all-projects-container" overlayZIndex={45} />
       </main>
     );
   }
@@ -457,24 +422,23 @@ export default function AllProjectsClient() {
   if (!loading && projects.length === 0) {
     return (
       <main className="min-h-screen w-full bg-slate-100 px-2 py-4 sm:px-4 sm:py-6 lg:px-6 lg:py-8">
-        <div style={overlayPanelOffset > 0 ? { paddingLeft: `${overlayPanelOffset}px` } : undefined}>
+        <div
+          id="all-projects-container"
+          className="relative z-40 mx-auto mb-6 flex min-h-[calc(100vh-4rem)] w-full flex-col rounded-[32px] border border-slate-200/70 bg-white px-4 pb-12 pt-14 shadow-[0_18px_50px_rgba(15,23,42,0.10)] data-[shadow-overlay=true]:border-transparent data-[shadow-overlay=true]:shadow-none sm:mb-8 sm:px-6 lg:px-10"
+        >
           <div
-            id="all-projects-container"
-            className="relative z-40 mx-auto mb-6 flex min-h-[calc(100vh-4rem)] w-full flex-col rounded-[32px] border border-slate-200/70 bg-white px-4 pb-12 pt-14 shadow-[0_18px_50px_rgba(15,23,42,0.10)] data-[shadow-overlay=true]:border-transparent data-[shadow-overlay=true]:shadow-none sm:mb-8 sm:px-6 lg:px-10"
-          >
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-y-0 left-0 w-10 rounded-l-[32px] bg-gradient-to-r from-slate-900/5 to-transparent"
-            />
-            <div className="home-hero-header">
-              <h1 className="all-projects-title text-center font-semibold tracking-tight text-[#013d63]">
-                All Projects
-              </h1>
-            </div>
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 left-0 w-10 rounded-l-[32px] bg-gradient-to-r from-slate-900/5 to-transparent"
+          />
+          <div className="home-hero-header">
+            <h1 className="all-projects-title text-center font-semibold tracking-tight text-[#013d63]">
+              All Projects
+            </h1>
+          </div>
             <div className="mt-5 flex justify-center">
               <div className="w-full max-w-4xl">
                 <div
-                  className="flex cursor-text items-center rounded-[999px] border-[3px] border-slate-300 bg-white px-6 py-5 text-lg text-slate-800 shadow-sm transition hover:border-[#51bdff] hover:bg-slate-50"
+                  className="flex cursor-text items-center rounded-[999px] border-[3px] border-slate-300 bg-white px-4 py-3 text-slate-800 shadow-sm transition hover:border-[#51bdff] hover:bg-slate-50 sm:px-6 sm:py-5"
                   onMouseDown={(event) => {
                     const target = event.target;
                     if (target instanceof HTMLInputElement) return;
@@ -492,7 +456,7 @@ export default function AllProjectsClient() {
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                     placeholder="Search projects and documents"
-                    className="ml-4 flex-1 border-none bg-transparent text-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-0 sm:text-xl"
+                    className="ml-3 min-w-0 flex-1 border-none bg-transparent text-base text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-0 sm:ml-4 sm:text-xl"
                   />
                 </div>
               </div>
@@ -678,30 +642,28 @@ export default function AllProjectsClient() {
               </div>
             </div>
 
-            <div className="mt-6">
-              <div className="flex min-h-[260px] w-full flex-col items-center justify-center rounded-[24px] border-[3px] border-dashed border-slate-200 bg-white/70 px-8 py-12 text-center shadow-sm">
-                <p className="text-lg font-semibold text-slate-900 sm:text-xl">No projects yet</p>
-                <p className="mt-2 max-w-sm text-sm text-slate-600 sm:text-base">Start a new project to see it here.</p>
-                <StartProjectButton
-                  variant="custom"
-                  className="mt-8 inline-flex h-10 w-full max-w-xs items-center justify-center whitespace-nowrap rounded-[12px] border-[3px] border-[#51bdff] bg-[#008ade] px-4 text-xs font-semibold text-white shadow-[0_14px_40px_rgba(15,23,42,0.25)] transition hover:-translate-y-0.5 hover:bg-[#007fcd] hover:shadow-[0_18px_50px_rgba(15,23,42,0.32)] sm:px-6 sm:text-sm xl:text-base"
+	            <div className="mt-6">
+	              <div className="flex min-h-[260px] w-full flex-col items-center justify-center rounded-[24px] border-[3px] border-dashed border-[#51bdff] bg-white/70 px-8 py-12 text-center shadow-sm">
+	                <p className="text-lg font-semibold text-slate-900 sm:text-xl">No projects yet</p>
+	                <p className="mt-2 max-w-sm text-sm text-slate-600 sm:text-base">Start a new project to see it here.</p>
+	                <StartProjectButton
+	                  variant="custom"
+                  className="mt-8 inline-flex h-12 w-full max-w-sm items-center justify-center whitespace-nowrap rounded-[14px] border-[3px] border-[#51bdff] bg-[#008ade] px-6 text-sm font-semibold text-white shadow-[0_14px_40px_rgba(15,23,42,0.25)] transition hover:-translate-y-0.5 hover:bg-[#007fcd] hover:shadow-[0_18px_50px_rgba(15,23,42,0.32)] sm:h-14 sm:px-8 sm:text-base xl:text-lg"
                 />
               </div>
             </div>
           </div>
-          <ContainerShadowOverlay targetId="all-projects-container" />
-        </div>
+        <ContainerShadowOverlay targetId="all-projects-container" overlayZIndex={45} />
       </main>
     );
   }
 
   return (
     <main className="min-h-screen w-full bg-slate-100 px-2 py-4 sm:px-4 sm:py-6 lg:px-6 lg:py-8">
-      <div style={overlayPanelOffset > 0 ? { paddingLeft: `${overlayPanelOffset}px` } : undefined}>
-        <div
-          id="all-projects-container"
-          className="relative z-40 mx-auto mb-6 flex min-h-[calc(100vh-4rem)] w-full flex-col rounded-[32px] border border-slate-200/70 bg-white px-4 pb-12 pt-14 shadow-[0_18px_50px_rgba(15,23,42,0.10)] data-[shadow-overlay=true]:border-transparent data-[shadow-overlay=true]:shadow-none sm:mb-8 sm:px-6 lg:px-10"
-        >
+      <div
+        id="all-projects-container"
+        className="relative z-40 mx-auto mb-6 flex min-h-[calc(100vh-4rem)] w-full flex-col rounded-[32px] border border-slate-200/70 bg-white px-4 pb-12 pt-14 shadow-[0_18px_50px_rgba(15,23,42,0.10)] data-[shadow-overlay=true]:border-transparent data-[shadow-overlay=true]:shadow-none sm:mb-8 sm:px-6 lg:px-10"
+      >
           <div
             aria-hidden="true"
             className="pointer-events-none absolute inset-y-0 left-0 w-10 rounded-l-[32px] bg-gradient-to-r from-slate-900/5 to-transparent"
@@ -714,7 +676,7 @@ export default function AllProjectsClient() {
           <div className="mt-5 flex justify-center">
             <div className="w-full max-w-4xl">
               <div
-                className="flex cursor-text items-center rounded-[999px] border-[3px] border-slate-300 bg-white px-6 py-5 text-lg text-slate-800 shadow-sm transition hover:border-[#51bdff] hover:bg-slate-50"
+                className="flex cursor-text items-center rounded-[999px] border-[3px] border-slate-300 bg-white px-4 py-3 text-slate-800 shadow-sm transition hover:border-[#51bdff] hover:bg-slate-50 sm:px-6 sm:py-5"
                 onMouseDown={(event) => {
                   const target = event.target;
                   if (target instanceof HTMLInputElement) return;
@@ -732,7 +694,7 @@ export default function AllProjectsClient() {
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Search projects and documents"
-                  className="ml-4 flex-1 border-none bg-transparent text-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-0 sm:text-xl"
+                  className="ml-3 min-w-0 flex-1 border-none bg-transparent text-base text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-0 sm:ml-4 sm:text-xl"
                 />
               </div>
             </div>
@@ -957,8 +919,7 @@ export default function AllProjectsClient() {
             </p>
           ) : null}
         </div>
-        <ContainerShadowOverlay targetId="all-projects-container" />
-      </div>
+      <ContainerShadowOverlay targetId="all-projects-container" overlayZIndex={45} />
     </main>
   );
 }

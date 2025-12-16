@@ -48,7 +48,8 @@ export default function ContainerShadowOverlay({
       if (raf) cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
         const panel = document.querySelector<HTMLElement>('[data-workspace-secondary-panel="true"]');
-        const shouldEnable = Boolean(media?.matches) && Boolean(panel && isVisiblePanel(panel));
+        const modalOpen = document.body?.dataset?.modalOpen === "true";
+        const shouldEnable = !modalOpen && Boolean(media?.matches) && Boolean(panel && isVisiblePanel(panel));
 
         if (shouldEnable) {
           target.dataset.shadowOverlay = "true";
@@ -108,4 +109,3 @@ export default function ContainerShadowOverlay({
     document.body,
   );
 }
-

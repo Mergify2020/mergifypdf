@@ -169,7 +169,7 @@ async function ProjectsDashboard({ displayName, userId }: { displayName: string;
       <ProjectsSummarySeed projects={summaryProjects} ownerKey={userId} />
       <div
         id="home-projects-container"
-        className="relative z-40 mx-auto mb-6 flex min-h-[calc(100vh-4rem)] w-full flex-col rounded-[32px] border border-slate-200/70 bg-white px-4 pb-12 pt-14 shadow-[0_18px_50px_rgba(15,23,42,0.10)] data-[shadow-overlay=true]:border-transparent data-[shadow-overlay=true]:shadow-none sm:mb-8 sm:px-6 lg:px-10"
+        className="relative z-40 mx-auto mb-6 flex min-h-[calc(100vh-4rem)] w-full flex-col rounded-[32px] border border-slate-200/70 bg-white px-4 pb-12 pt-6 shadow-[0_18px_50px_rgba(15,23,42,0.10)] data-[shadow-overlay=true]:border-transparent data-[shadow-overlay=true]:shadow-none sm:mb-8 sm:px-6 sm:pt-10 lg:px-10 lg:pt-14"
         style={{
           backgroundImage:
             "linear-gradient(to bottom, rgba(81, 189, 255, 0.55) 0%, rgba(0, 138, 222, 0.35) 26%, rgba(255, 255, 255, 0) 72%)",
