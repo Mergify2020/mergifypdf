@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
@@ -26,12 +26,15 @@ import {
   Undo2,
   Eraser,
   Pencil,
-	  RotateCcw,
-	  Move,
-	  ChevronDown,
-	  ChevronLeft,
-	  ChevronRight,
-	  MoreHorizontal,
+  RotateCcw,
+  Move,
+  ChevronUp,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  PanelRightClose,
+  PanelRightOpen,
+  MoreHorizontal,
 	  Copy,
 	  ListOrdered,
 	  Signature as SignatureIcon,
@@ -56,7 +59,6 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import WorkspaceSettingsMenu from "@/components/WorkspaceSettingsMenu";
-import HeaderLoginButton from "@/components/HeaderLoginButton";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import { addRecentProject } from "@/lib/recentProjects";
 import { PROJECT_NAME_STORAGE_KEY, projectNameToFile, sanitizeProjectName } from "@/lib/projectName";
@@ -624,11 +626,19 @@ function SortableThumb({
   index,
   selected,
   onSelect,
+  onMoveUp,
+  onMoveDown,
+  onDelete,
+  disableMoveDown,
 }: {
   item: PageItem;
   index: number;
   selected: boolean;
   onSelect: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  onDelete: () => void;
+  disableMoveDown: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
@@ -644,10 +654,10 @@ function SortableThumb({
   const ratio = item.width && item.height ? item.width / item.height : 1;
   const scaleFix = isQuarterTurn ? Math.min(ratio, 1 / ratio) : 1;
 
-  return (
-    <li ref={setNodeRef} style={style} className="flex w-full justify-center" {...attributes}>
-      <div
-        role="button"
+	  return (
+	    <li ref={setNodeRef} style={style} className="flex w-full justify-center" {...attributes}>
+	      <div
+	        role="button"
         tabIndex={0}
         onClick={onSelect}
         onKeyDown={(event) => {
@@ -656,16 +666,16 @@ function SortableThumb({
             onSelect();
           }
         }}
-        className="group relative w-full max-w-[200px] cursor-pointer select-none"
-        {...listeners}
-      >
-        <div className="relative w-full" style={{ paddingBottom: getAspectPadding(item.width, item.height) }}>
-          <div
-	            className={`absolute inset-0 flex items-center justify-center overflow-hidden rounded-none border bg-white shadow-sm transition ${
-	              selected
-	                ? "border-[3px] border-[#51bdff] shadow-[0_14px_26px_rgba(81,189,255,0.25)]"
-	                : "border-slate-200 hover:border-slate-300"
-	            }`}
+	        className="group relative w-full max-w-[200px] cursor-pointer select-none"
+	        {...listeners}
+	      >
+	        <div className="relative w-full" style={{ paddingBottom: getAspectPadding(item.width, item.height) }}>
+	          <div
+		            className={`absolute inset-0 flex items-center justify-center overflow-hidden rounded-none border bg-white shadow-[0_8px_18px_rgba(15,23,42,0.10)] transition ${
+		              selected
+		                ? "border-[3px] border-[#51bdff] shadow-[0_12px_26px_rgba(15,23,42,0.14)]"
+		                : "border-slate-200 hover:border-slate-300"
+		            }`}
 	          >
 	            <span
 	              className={`absolute left-0 top-0 z-10 flex h-7 w-7 items-center justify-center rounded-none text-xs font-semibold tabular-nums ${
@@ -678,19 +688,75 @@ function SortableThumb({
 	              className="z-0 flex h-full w-full items-center justify-center"
 	              style={{ transform: `rotate(${rotationDegrees}deg) scale(${scaleFix})`, transformOrigin: "center" }}
 	            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={item.thumb}
-                alt={`Page ${index + 1}`}
-                className="block h-full w-full object-contain"
-                draggable={false}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-    </li>
-  );
+	              {/* eslint-disable-next-line @next/next/no-img-element */}
+	              <img
+	                src={item.thumb}
+	                alt={`Page ${index + 1}`}
+	                className="block h-full w-full object-contain"
+	                draggable={false}
+	              />
+	            </div>
+	            <div className="pointer-events-none absolute inset-x-2 bottom-2 z-20 flex justify-center opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+	              <div className="flex items-center gap-1 rounded-md border border-slate-400 bg-white/95 p-1 shadow-[0_10px_24px_rgba(15,23,42,0.16)] backdrop-blur">
+	                <button
+	                  type="button"
+	                  onPointerDown={(event) => event.stopPropagation()}
+	                  onClick={(event) => {
+	                    event.stopPropagation();
+	                    onMoveUp();
+	                  }}
+	                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-600 transition hover:bg-slate-200 hover:text-slate-900 disabled:opacity-40"
+	                  aria-label="Move page up"
+	                  disabled={index === 0}
+	                >
+	                  <ChevronUp className="h-4 w-4" aria-hidden />
+	                </button>
+	                <div className="h-6 w-px bg-slate-400" aria-hidden />
+	                <button
+	                  type="button"
+	                  onPointerDown={(event) => event.stopPropagation()}
+	                  onClick={(event) => {
+	                    event.stopPropagation();
+	                    onMoveDown();
+	                  }}
+	                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-600 transition hover:bg-slate-200 hover:text-slate-900 disabled:opacity-40"
+	                  aria-label="Move page down"
+	                  disabled={disableMoveDown}
+	                >
+	                  <ChevronDown className="h-4 w-4" aria-hidden />
+	                </button>
+	                <div className="h-6 w-px bg-slate-400" aria-hidden />
+	                <button
+	                  type="button"
+	                  onPointerDown={(event) => event.stopPropagation()}
+	                  onClick={(event) => {
+	                    event.stopPropagation();
+	                    onDelete();
+	                  }}
+	                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-rose-600 transition hover:bg-rose-50 hover:text-rose-700"
+	                  aria-label="Delete page"
+	                >
+	                  <Trash2 className="h-4 w-4" aria-hidden />
+	                </button>
+	                <div className="h-6 w-px bg-slate-400" aria-hidden />
+	                <button
+	                  type="button"
+	                  onPointerDown={(event) => event.stopPropagation()}
+	                  onClick={(event) => {
+	                    event.stopPropagation();
+	                  }}
+	                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-600 transition hover:bg-slate-200 hover:text-slate-900"
+	                  aria-label="More page actions"
+	                >
+	                  <MoreHorizontal className="h-4 w-4" aria-hidden />
+	                </button>
+	              </div>
+	            </div>
+	          </div>
+	        </div>
+	      </div>
+	    </li>
+	  );
 }
 
 function SortableOrganizeTile({
@@ -2071,6 +2137,69 @@ function WorkspaceClient() {
     setShouldCenterOnChange(true);
   }
 
+  async function handleAddBlankPageBefore(pageId: string) {
+    const storageId = crypto.randomUUID();
+    const doc = await PDFDocument.create();
+    doc.addPage([612, 792]);
+    const bytes = await doc.save();
+    const blob = new Blob([bytes as unknown as BlobPart], { type: "application/pdf" });
+    await storeFileBlob(storageId, blob, "Blank page.pdf", blob.size);
+    const objectUrl = URL.createObjectURL(blob);
+    const newPageId = buildPageId(storageId, 0);
+    const pixelRatio = getDevicePixelRatio();
+    const viewportWidth = Math.floor(612 * PREVIEW_BASE_SCALE * pixelRatio);
+    const viewportHeight = Math.floor(792 * PREVIEW_BASE_SCALE * pixelRatio);
+    const canvas = document.createElement("canvas");
+    canvas.width = viewportWidth;
+    canvas.height = viewportHeight;
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = "rgba(148,163,184,0.85)";
+      ctx.lineWidth = Math.max(2, Math.floor(2 * pixelRatio));
+      ctx.strokeRect(
+        ctx.lineWidth,
+        ctx.lineWidth,
+        canvas.width - ctx.lineWidth * 2,
+        canvas.height - ctx.lineWidth * 2,
+      );
+    }
+    const previewData = toCardPreviewDataUrl(canvas);
+    const thumbData = createThumbnailDataUrl(canvas);
+
+    let newSrcIdx = sources.length;
+    setSources((prev) => {
+      newSrcIdx = prev.length;
+      return [...prev, { storageId, url: objectUrl, name: "Blank page.pdf", size: blob.size, updatedAt: Date.now() }];
+    });
+
+    let insertedIndex = 0;
+    setPages((prev) => {
+      const beforeIndex = prev.findIndex((p) => p.id === pageId);
+      const next = [...prev];
+      const newPage: PageItem = {
+        id: newPageId,
+        srcIdx: newSrcIdx,
+        pageIdx: 0,
+        thumb: thumbData,
+        preview: previewData,
+        rotation: 0,
+        width: viewportWidth,
+        height: viewportHeight,
+      };
+      if (beforeIndex === -1) next.unshift(newPage);
+      else next.splice(beforeIndex, 0, newPage);
+      insertedIndex = beforeIndex === -1 ? 0 : beforeIndex;
+      return next;
+    });
+
+    pageNavigationLockRef.current = { until: Date.now() + 700, targetId: newPageId };
+    setActivePageId(newPageId);
+    setActivePageIndex(insertedIndex);
+    setShouldCenterOnChange(true);
+  }
+
   async function handleDuplicatePage(page: PageItem) {
     const src = sources[page.srcIdx];
     if (!src) return;
@@ -2187,11 +2316,11 @@ function WorkspaceClient() {
                 type="button"
                 aria-label="Add blank page"
                 className="inline-flex items-center justify-center rounded-xl p-2 text-slate-600 transition hover:bg-white hover:shadow-sm hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  void handleAddBlankPageAfter(page.id);
-                }}
-              >
+	                onClick={(event) => {
+	                  event.stopPropagation();
+	                  void handleAddBlankPageBefore(page.id);
+	                }}
+	              >
                 <Plus className="h-6 w-6" />
                 <span className="sr-only">Add blank page</span>
               </button>
@@ -3373,13 +3502,14 @@ function WorkspaceClient() {
 		    setBaseScale((prev) => (Math.abs(prev - fitWholePageScale) > 0.001 ? fitWholePageScale : prev));
 		  }, [activePageIndex, pages, userAdjustedZoom]);
 
-  useEffect(() => {
-    if (!shouldCenterOnChange) return;
-    const container = previewContainerRef.current;
-    const target = activePageIndex >= 0 ? pageRefs.current[activePageIndex] : null;
-    if (!container || !target) return;
-    const targetRect = target.getBoundingClientRect();
-    const containerRect = container.getBoundingClientRect();
+	  useEffect(() => {
+	    if (!shouldCenterOnChange) return;
+	    const container = previewContainerRef.current;
+	    const targetId = activePageId || pages[activePageIndex]?.id || null;
+	    const target = targetId ? previewNodeMap.current.get(targetId) ?? null : null;
+	    if (!container || !target) return;
+	    const targetRect = target.getBoundingClientRect();
+	    const containerRect = container.getBoundingClientRect();
     const scrollTop =
       container.scrollTop +
       (targetRect.top - containerRect.top) +
@@ -3390,13 +3520,13 @@ function WorkspaceClient() {
       (targetRect.left - containerRect.left) +
       targetRect.width / 2 -
       container.clientWidth / 2;
-    container.scrollTo({
-      top: Math.max(0, scrollTop),
-      left: Math.max(0, scrollLeft),
-      behavior: "smooth",
-    });
-    setShouldCenterOnChange(false);
-  }, [activePageIndex, zoomMultiplier, baseScale, shouldCenterOnChange]);
+	    container.scrollTo({
+	      top: Math.max(0, scrollTop),
+	      left: Math.max(0, scrollLeft),
+	      behavior: "smooth",
+	    });
+	    setShouldCenterOnChange(false);
+	  }, [activePageId, activePageIndex, baseScale, pages, shouldCenterOnChange, zoomMultiplier]);
 
   useEffect(() => {
     function handleResize() {
@@ -4150,9 +4280,18 @@ function WorkspaceClient() {
     );
   }
 
-  function handleDeletePage(pageId: string) {
-    setPages((prev) => prev.filter((page) => page.id !== pageId));
-  }
+	  function handleDeletePage(pageId: string) {
+	    setPages((prev) => prev.filter((page) => page.id !== pageId));
+	  }
+
+	  function moveThumbPage(fromIndex: number, delta: 1 | -1) {
+	    setPages((prev) => {
+	      if (prev.length === 0) return prev;
+	      const toIndex = clamp(fromIndex + delta, 0, prev.length - 1);
+	      if (toIndex === fromIndex) return prev;
+	      return arrayMove(prev, fromIndex, toIndex);
+	    });
+	  }
 
   useEffect(() => {
     if (userAdjustedZoom) return; // preserve manual zoom after user interaction
@@ -4392,75 +4531,86 @@ function WorkspaceClient() {
 
   return (
     <main className="flex h-screen flex-col overflow-hidden bg-[#f3f6fb]">
-      <header className="sticky top-0 z-40 border-b border-slate-100 bg-white/90 backdrop-blur shadow-[0_1px_4px_rgba(15,23,42,0.06)]">
-        <div className="mx-auto flex h-16 w-full max-w-[1400px] items-center justify-between px-4 lg:px-6">
-          <Link href="/" className="inline-flex items-center gap-2" aria-label="Back to workspace">
-            <Image src="/logo-wordmark2.svg" alt="MergifyPDF" width={160} height={40} priority />
-          </Link>
-		          <div className="flex items-center gap-2">
-		            <button
-		              className={`${buttonPrimary} px-5 py-2`}
-		              onClick={() => handleDownload()}
-		              disabled={downloadDisabled}
-		            >
-		              {busy ? "Building..." : "Download pages"}
-		            </button>
-		            {!authSession?.user ? <HeaderLoginButton /> : null}
-		          </div>
-		        </div>
-	        
-	        <div className="mx-auto w-full px-4 pb-4 lg:px-10">
-	          <div className="w-full max-w-[1400px] mx-auto rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-            <div className="flex w-full flex-wrap items-center gap-3 lg:gap-4">
-              <div className="flex items-center gap-2 min-w-[260px]">
+      <header className="sticky top-0 z-40 border-b border-slate-100 bg-white shadow-[0_1px_4px_rgba(15,23,42,0.06)]">
+        {/* Top row (white) */}
+        <div className="w-full border-b border-slate-100 bg-white">
+          <div className="flex h-16 w-full items-center gap-4 px-4 lg:px-6">
+            <Link href="/" className="inline-flex items-center gap-2" aria-label="Back to workspace">
+              <Image src="/logo-wordmark2.svg" alt="MergifyPDF" width={160} height={40} priority />
+            </Link>
+
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <div className="flex min-w-0 flex-1 items-center gap-2">
                 {projectNameEditing ? (
-                  <input
-                    className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 pr-9 text-sm font-semibold text-slate-900 shadow-inner outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200/70"
-                    value={projectNameDraft}
-                    onChange={(event) => {
-                      setProjectNameDraft(event.target.value);
-                      if (projectNameError) setProjectNameError(null);
-                    }}
-                    placeholder="Name your project"
-                  />
+                  <div className="relative w-full max-w-[320px] sm:max-w-[420px] md:max-w-[520px]">
+                    <input
+                      className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 pr-10 text-sm font-semibold text-slate-900 shadow-inner outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200/70"
+                      value={projectNameDraft}
+                      onChange={(event) => {
+                        setProjectNameDraft(event.target.value);
+                        if (projectNameError) setProjectNameError(null);
+                      }}
+                      onBlur={() => {
+                        handleProjectNameSave();
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          handleProjectNameSave();
+                          (event.currentTarget as HTMLInputElement).blur();
+                        }
+                        if (event.key === "Escape") {
+                          event.preventDefault();
+                          handleProjectNameCancel();
+                        }
+                      }}
+                      placeholder="Name your project"
+                      autoFocus
+                    />
+                    <Pencil
+                      className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                      aria-hidden
+                    />
+                  </div>
                 ) : (
-                  <input
-                    className="h-10 w-full cursor-text rounded-lg border border-slate-200 bg-white px-3 pr-9 text-sm font-semibold text-slate-900 shadow-inner outline-none transition hover:border-slate-300 focus:border-slate-400 focus:ring-2 focus:ring-slate-200/70"
-                    value={projectName}
-                    readOnly
-                    aria-readonly="true"
+                  <button
+                    type="button"
                     onClick={() => {
                       setProjectNameDraft(projectName);
                       setProjectNameError(null);
                       setProjectNameEditing(true);
                     }}
-                  />
+                    className="group inline-flex w-full max-w-[320px] min-w-0 items-center gap-2 text-left text-sm font-semibold text-slate-900 outline-none transition hover:text-slate-950 focus-visible:ring-2 focus-visible:ring-slate-300/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white sm:max-w-[420px] md:max-w-[520px]"
+                    aria-label="Edit project name"
+                  >
+                    <span className="block truncate">{projectName || "Untitled project"}</span>
+                    <Pencil className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:text-slate-600" aria-hidden />
+                  </button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setProjectNameDraft(projectName);
-                    setProjectNameError(null);
-                    setProjectNameEditing(true);
-                  }}
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
-                  aria-label="Edit project name"
-                >
-                  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
-                    <path d="M12 20h9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                    <path
-                      d="M16.5 3.5a2.121 2.121 0 013 3L7 19.5 3 21l1.5-4L16.5 3.5z"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </button>
               </div>
 
-              {/* Zoom + page controls moved to bottom bar */}
+              <div className="flex shrink-0 items-center gap-2">
+                <button className={`${buttonNeutral} px-5 py-2`} onClick={handleAddClick} disabled={pages.length === 0}>
+                  Add pages
+                </button>
+	                <button className={`${buttonPrimary} px-5 py-2`} onClick={() => handleDownload()} disabled={downloadDisabled}>
+	                  {busy ? "Building..." : "Download pages"}
+	                </button>
+              </div>
+            </div>
+          </div>
 
+          {projectNameError ? (
+            <div className="w-full px-4 pb-3 text-sm text-rose-500 lg:px-6">
+              {projectNameError}
+            </div>
+          ) : null}
+        </div>
+
+        {/* Bottom row (tools) */}
+        <div className="w-full border-b border-slate-900/10 bg-slate-800 shadow-[0_10px_30px_rgba(15,23,42,0.12)]">
+          <div className="w-full px-4 py-3 lg:px-6">
+            <div className="flex w-full flex-wrap items-center gap-3 lg:gap-4">
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
@@ -4565,10 +4715,10 @@ function WorkspaceClient() {
                 </button>
               </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  className={`${toolButtonBase} ${toolButtonInactive}`}
-                  onClick={handleUndoHighlight}
+	              <div className="flex items-center gap-2">
+	                <button
+	                  className={`${toolButtonBase} ${toolButtonInactive}`}
+	                  onClick={handleUndoHighlight}
                   disabled={!hasUndoHistory}
                 >
                   <Undo2 className="h-4 w-4" />
@@ -4581,61 +4731,26 @@ function WorkspaceClient() {
                   disabled={!hasAnyAnnotations && !deleteMode}
                 >
                   <Eraser className="h-4 w-4" />
-                  Eraser
-                </button>
-              </div>
-
-		              <div className="ml-auto flex items-center gap-2">
-		                <button
-		                  type="button"
-		                  className={`${buttonNeutral} px-5 py-2`}
-		                  onClick={() => void handleSaveProject()}
-                  disabled={!hasWorkspaceData || savingProject}
-                >
-                  {savingProject ? "Saving…" : "Save project"}
-                </button>
-	                <button
-	                  className={`${buttonNeutral} px-5 py-2`}
-	                  onClick={handleAddClick}
-	                  disabled={pages.length === 0}
-	                >
-	                  Add pages
+	                  Eraser
 	                </button>
-	                <div className="group relative">
-	                  <button
-	                    type="button"
-	                    onClick={() => setShowPageOrderPanel((prev) => !prev)}
-	                    className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#024d7c] text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#013d63] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#51bdff]/40 focus-visible:ring-offset-2"
-	                    aria-label={showPageOrderPanel ? "Close sidebar" : "Open sidebar"}
-	                  >
-	                    {showPageOrderPanel ? (
-	                      <ChevronRight className="h-5 w-5" aria-hidden />
-	                    ) : (
-	                      <ChevronLeft className="h-5 w-5" aria-hidden />
-	                    )}
-	                  </button>
-	                  <div className="pointer-events-none absolute right-0 top-full z-50 mt-2 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
-	                    {showPageOrderPanel ? "Close sidebar" : "Open sidebar"}
-	                  </div>
-	                </div>
-	                <input
-	                  ref={addInputRef}
-	                  type="file"
-	                  accept="application/pdf"
-                  multiple
-                  className="hidden"
-                  onChange={handleAddChange}
-                />
-              </div>
-            </div>
-            {projectNameError ? (
-              <div className="px-1 pb-1 text-sm text-rose-500">{projectNameError}</div>
-            ) : null}
+	              </div>
 
-            {highlightActive || pencilActive ? (
-              <div className="mt-3 rounded-2xl border border-slate-200 bg-white px-4 py-2 shadow-sm">
-                <div className="flex flex-wrap items-center gap-4">
-                  {highlightActive ? (
+              <input
+                ref={addInputRef}
+                type="file"
+                accept="application/pdf"
+                multiple
+                className="hidden"
+                onChange={handleAddChange}
+              />
+            </div>
+          </div>
+        </div>
+
+	            {highlightActive || pencilActive ? (
+	              <div className="mt-3 rounded-2xl border border-slate-200 bg-white px-4 py-2 shadow-sm">
+	                <div className="flex flex-wrap items-center gap-4">
+	                  {highlightActive ? (
                     <>
                       <div className="flex items-center gap-2">
                         {highlightColorEntries.map(([key, value]) => (
@@ -4705,8 +4820,6 @@ function WorkspaceClient() {
                 </div>
               </div>
             ) : null}
-          </div>
-        </div>
       </header>
 
 	      <div className="flex-1 min-h-0 overflow-hidden">
@@ -4806,8 +4919,8 @@ function WorkspaceClient() {
 	
 		                      {showPageOrderPanel ? (
 		                        <aside className="flex w-[300px] shrink-0 flex-col">
-		                          <div className="flex min-h-0 flex-1 flex-col border-l border-slate-200 bg-white">
-		                            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+		                          <div className="flex min-h-0 flex-1 flex-col border-l border-slate-200 bg-[#f8fafc]">
+		                            <div className="flex h-[52px] items-center justify-between border-b border-slate-200 bg-white px-4">
 		                              <p className="text-sm font-semibold text-slate-600">{pages.length} pages</p>
 		                              <div className="flex items-center gap-2">
 		                                <button
@@ -4820,31 +4933,117 @@ function WorkspaceClient() {
 		                                </button>
 		                              </div>
 		                            </div>
-		                          <p className="px-4 pt-3 text-xs text-slate-500">Drag to reorder pages</p>
-		                          <div className="mt-3 min-h-0 flex-1 overflow-y-auto border-r border-slate-200 pl-4 pr-0 pb-6">
+                          {null}
+                          <div className="thumbs-scroll min-h-0 flex-1 overflow-y-auto border-t border-slate-200 pl-4 pr-0">
 		                            <DndContext
 		                              sensors={sensors}
 		                              collisionDetection={closestCenter}
 	                              onDragEnd={handleDragEnd}
 	                            >
-	                              <SortableContext items={itemsIds} strategy={verticalListSortingStrategy}>
-		                                <ul className="flex flex-col gap-3">
+		                              <SortableContext items={itemsIds} strategy={verticalListSortingStrategy}>
+		                                <ul className="flex flex-col py-0">
+		                                  {pages.length > 0 ? (
+		                                    <li className="group relative flex h-12 items-center justify-center">
+			                                      <div className="pointer-events-none flex w-full items-center justify-center gap-3 px-2 opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+		                                        <div className="h-0.5 flex-1 bg-[#024d7c]/70" aria-hidden />
+		                                        <button
+		                                          type="button"
+		                                          onClick={() => void handleAddBlankPageBefore(pages[0].id)}
+		                                          className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#024d7c] text-white shadow-sm transition hover:bg-[#013d63] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#51bdff]/40 focus-visible:ring-offset-2"
+		                                          aria-label="Add blank page"
+		                                        >
+		                                          <Plus className="h-4 w-4" aria-hidden />
+		                                        </button>
+		                                        <div className="h-0.5 flex-1 bg-[#024d7c]/70" aria-hidden />
+		                                      </div>
+			                                      <div className="pointer-events-none absolute left-1/2 top-full z-40 mt-1 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg group-hover:opacity-100 group-focus-within:opacity-100">
+		                                        Add blank page
+		                                      </div>
+		                                    </li>
+		                                  ) : null}
 		                                  {pages.map((p, i) => (
-		                                    <SortableThumb
-		                                      key={p.id}
-	                                      item={p}
-	                                      index={i}
-	                                      selected={p.id === activePageId}
-	                                      onSelect={() => handleSelectPage(i)}
-	                                    />
-	                                  ))}
-	                                </ul>
+		                                    <Fragment key={p.id}>
+		                                      <SortableThumb
+		                                        item={p}
+		                                        index={i}
+		                                        selected={p.id === activePageId}
+		                                        onSelect={() => handleSelectPage(i)}
+		                                        onMoveUp={() => moveThumbPage(i, -1)}
+		                                        onMoveDown={() => moveThumbPage(i, 1)}
+		                                        onDelete={() => handleDeletePage(p.id)}
+		                                        disableMoveDown={i === pages.length - 1}
+		                                      />
+		                                      {i < pages.length - 1 ? (
+		                                        <li className="group relative flex h-12 items-center justify-center">
+			                                          <div className="pointer-events-none flex w-full items-center justify-center gap-3 px-2 opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+		                                            <div className="h-0.5 flex-1 bg-[#024d7c]/70" aria-hidden />
+		                                            <button
+		                                              type="button"
+		                                              onClick={() => void handleAddBlankPageAfter(p.id)}
+		                                              className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#024d7c] text-white shadow-sm transition hover:bg-[#013d63] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#51bdff]/40 focus-visible:ring-offset-2"
+		                                              aria-label="Add blank page"
+		                                            >
+		                                              <Plus className="h-4 w-4" aria-hidden />
+		                                            </button>
+		                                            <div className="h-0.5 flex-1 bg-[#024d7c]/70" aria-hidden />
+		                                          </div>
+			                                          <div className="pointer-events-none absolute left-1/2 top-full z-40 mt-1 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg group-hover:opacity-100 group-focus-within:opacity-100">
+		                                            Add blank page
+		                                          </div>
+		                                        </li>
+		                                      ) : null}
+		                                    </Fragment>
+		                                  ))}
+		                                  {pages.length > 0 ? (
+		                                    <li className="group relative flex h-12 items-center justify-center">
+			                                      <div className="pointer-events-none flex w-full items-center justify-center gap-3 px-2 opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+		                                        <div className="h-0.5 flex-1 bg-[#024d7c]/70" aria-hidden />
+		                                        <button
+		                                          type="button"
+		                                          onClick={() => void handleAddBlankPageAfter(pages[pages.length - 1].id)}
+		                                          className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#024d7c] text-white shadow-sm transition hover:bg-[#013d63] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#51bdff]/40 focus-visible:ring-offset-2"
+		                                          aria-label="Add blank page"
+		                                        >
+		                                          <Plus className="h-4 w-4" aria-hidden />
+		                                        </button>
+		                                        <div className="h-0.5 flex-1 bg-[#024d7c]/70" aria-hidden />
+		                                      </div>
+			                                      <div className="pointer-events-none absolute left-1/2 bottom-full z-40 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg group-hover:opacity-100 group-focus-within:opacity-100">
+		                                        Add blank page
+		                                      </div>
+		                                    </li>
+		                                  ) : null}
+		                                </ul>
 		                              </SortableContext>
 		                            </DndContext>
 		                          </div>
+		                          </div>
+		                        </aside>
+		                      ) : null}
+
+		                      <aside className="flex w-14 shrink-0 flex-col border-l border-slate-200 bg-white">
+		                        <div className="flex flex-1 flex-col items-center">
+		                          <div className="flex h-[52px] w-full items-center justify-center">
+		                            <div className="group relative">
+		                            <button
+		                              type="button"
+		                              onClick={() => setShowPageOrderPanel((prev) => !prev)}
+		                              className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60"
+		                              aria-label={showPageOrderPanel ? "Close sidebar" : "Open sidebar"}
+		                            >
+		                              {showPageOrderPanel ? (
+		                                <PanelRightClose className="h-7 w-7" aria-hidden />
+		                              ) : (
+		                                <PanelRightOpen className="h-7 w-7" aria-hidden />
+		                              )}
+		                            </button>
+		                            <div className="pointer-events-none absolute right-0 top-full z-50 mt-2 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100">
+		                              {showPageOrderPanel ? "Close sidebar" : "Open sidebar"}
+		                            </div>
+		                            </div>
+		                          </div>
 		                        </div>
 		                      </aside>
-		                      ) : null}
 		                    </div>
 	                  </motion.div>
 	                ) : null}
@@ -5660,9 +5859,36 @@ function WorkspaceClient() {
         .eraser-cursor * {
           cursor: url("/icons/eraser.svg") 4 4, auto !important;
         }
-	        .viewer-scroll {
-	          overflow: auto;
-	        }
+        .viewer-scroll {
+          overflow: auto;
+        }
+        .thumbs-scroll::-webkit-scrollbar-track {
+          background: #ffffff;
+        }
+        .thumbs-scroll::-webkit-scrollbar-thumb {
+          border: 3px solid #ffffff;
+        }
+        .thumbs-scroll {
+          scrollbar-color: rgba(100, 116, 139, 0.85) #ffffff;
+        }
+        /* Make scrollbar gutters/tracks white across Studio */
+        body.studio-page * {
+          scrollbar-color: rgba(100, 116, 139, 0.85) #ffffff;
+        }
+        body.studio-page ::-webkit-scrollbar {
+          background: #ffffff;
+        }
+        body.studio-page ::-webkit-scrollbar-track {
+          background: #ffffff;
+        }
+        body.studio-page ::-webkit-scrollbar-corner {
+          background: #ffffff;
+        }
+        body.studio-page ::-webkit-scrollbar-thumb {
+          background-color: rgba(100, 116, 139, 0.85);
+          border: 3px solid #ffffff;
+          border-radius: 9999px;
+        }
         body.studio-page > header {
           display: none !important;
         }
