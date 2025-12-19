@@ -3,7 +3,12 @@
 import { Fragment, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
-import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
+import type {
+  CSSProperties,
+  MouseEvent as ReactMouseEvent,
+  PointerEvent as ReactPointerEvent,
+  SVGProps,
+} from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
@@ -12,7 +17,6 @@ import {
   PDFDocument,
   rgb,
   LineCapStyle,
-  LineJoinStyle,
   degrees,
   StandardFonts,
   type PDFFont,
@@ -24,11 +28,20 @@ import {
   Plus,
   Trash2,
   Undo2,
-  Eraser,
-  Pencil,
-  RotateCcw,
-  Move,
-  ChevronUp,
+  Redo2,
+  Shapes,
+  MousePointer2,
+	  ArrowRight,
+	  Check,
+	  Circle,
+	  Triangle,
+	  Square,
+	  Eraser,
+	  Pencil,
+	  PencilLine,
+	  RotateCcw,
+	  Move,
+	  ChevronUp,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -75,13 +88,26 @@ type PageItem = {
   width: number;
   height: number;
 };
-type Point = { x: number; y: number };
-type DrawingTool = "highlight" | "pencil" | "text";
+type Point = { x: number; y: number; move?: boolean };
+type DrawingTool = "highlight" | "pen" | "pencil" | "text";
+type HeaderMode = "default" | "pen" | "highlight" | "shapes";
+type ShapeType = "line" | "arrow" | "check" | "x" | "rect" | "ellipse" | "triangle";
+type ShapeAnnotation = {
+  id: string;
+  type: ShapeType;
+  pageId: string;
+  start: Point;
+  end: Point;
+  color: string;
+  thickness: number;
+};
 type HighlightStroke = {
   id: string;
   tool: DrawingTool;
   points: Point[];
   color: string;
+  opacity?: number;
+  seed?: number;
   thickness: number;
 };
 type DraftHighlight = {
@@ -89,12 +115,23 @@ type DraftHighlight = {
   pageId: string;
   points: Point[];
   color: string;
+  opacity?: number;
+  seed?: number;
   thickness: number;
 };
 type HighlightHistoryEntry =
   | { type: "add"; pageId: string; highlight: HighlightStroke }
   | { type: "delete"; pageId: string; highlight: HighlightStroke }
-  | { type: "clear"; previous: Record<string, HighlightStroke[]> };
+  | { type: "addShape"; pageId: string; shape: ShapeAnnotation }
+  | { type: "deleteShape"; pageId: string; shape: ShapeAnnotation }
+  | {
+      type: "clear";
+      previous: {
+        highlights: Record<string, HighlightStroke[]>;
+        shapes: Record<string, ShapeAnnotation[]>;
+        textAnnotations: Record<string, TextAnnotation[]>;
+      };
+    };
 
 type Project = {
   id: string;
@@ -285,7 +322,7 @@ const HIGHLIGHT_COLORS = {
   blue: "#9ad9ff",
   pink: "#ffc5f1",
 } as const;
-const PENCIL_COLOR = "#111827";
+const PEN_COLOR = "#111827";
 
 type HighlightColorKey = keyof typeof HIGHLIGHT_COLORS;
 
@@ -592,6 +629,25 @@ function cloneHighlightMap(map: Record<string, HighlightStroke[]>): Record<strin
   );
 }
 
+function cloneShapeMap(map: Record<string, ShapeAnnotation[]>): Record<string, ShapeAnnotation[]> {
+  return Object.fromEntries(
+    Object.entries(map).map(([pageId, list]) => [
+      pageId,
+      list.map((shape) => ({
+        ...shape,
+        start: { ...shape.start },
+        end: { ...shape.end },
+      })),
+    ])
+  );
+}
+
+function cloneTextAnnotationMap(map: Record<string, TextAnnotation[]>): Record<string, TextAnnotation[]> {
+  return Object.fromEntries(
+    Object.entries(map).map(([pageId, list]) => [pageId, list.map((annotation) => ({ ...annotation }))])
+  );
+}
+
 function createThumbnailDataUrl(canvas: HTMLCanvasElement) {
   if (canvas.width <= THUMB_MAX_WIDTH) {
     return toCardPreviewDataUrl(canvas);
@@ -617,6 +673,239 @@ function getAspectPadding(width?: number, height?: number) {
 function normalizeRotation(rotation?: number) {
   const value = rotation ?? 0;
   return ((value % 360) + 360) % 360;
+}
+
+function smoothStrokePoints(points: Point[], tool: Exclude<DrawingTool, "text">): Point[] {
+  if (points.length < 3) return points;
+  const baseIterations = 1;
+  const iterations = points.length > 180 ? 1 : baseIterations;
+
+  const segments: Point[][] = [];
+  let currentSegment: Point[] = [];
+  points.forEach((pt, idx) => {
+    if (idx === 0 || pt.move) {
+      if (currentSegment.length > 0) segments.push(currentSegment);
+      currentSegment = [{ x: pt.x, y: pt.y }];
+      return;
+    }
+    currentSegment.push({ x: pt.x, y: pt.y });
+  });
+  if (currentSegment.length > 0) segments.push(currentSegment);
+
+  const smoothSegment = (segment: Point[]) => {
+    if (segment.length < 3) return segment;
+    let current = segment;
+    for (let it = 0; it < iterations; it++) {
+      const next: Point[] = [current[0]];
+      for (let i = 0; i < current.length - 1; i++) {
+        const p0 = current[i];
+        const p1 = current[i + 1];
+        next.push(
+          { x: 0.75 * p0.x + 0.25 * p1.x, y: 0.75 * p0.y + 0.25 * p1.y },
+          { x: 0.25 * p0.x + 0.75 * p1.x, y: 0.25 * p0.y + 0.75 * p1.y }
+        );
+      }
+      next.push(current[current.length - 1]);
+      current = next;
+    }
+    return current;
+  };
+
+  const smoothedSegments = segments.map(smoothSegment);
+  const result: Point[] = [];
+  smoothedSegments.forEach((segment, idx) => {
+    segment.forEach((pt, ptIdx) => {
+      result.push({ ...pt, move: idx > 0 && ptIdx === 0 ? true : undefined });
+    });
+  });
+  return result;
+}
+
+function snapHighlightSegments(points: Point[]) {
+  if (points.length < 3) return points;
+  const result: Point[] = [];
+  let segment: Point[] = [];
+  const flush = () => {
+    if (segment.length === 0) return;
+    const xs = segment.map((p) => p.x);
+    const ys = segment.map((p) => p.y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+    const dx = maxX - minX;
+    const dy = maxY - minY;
+    if (dx > 0.08 && dy < dx * 0.12) {
+      const yAvg = ys.reduce((sum, y) => sum + y, 0) / ys.length;
+      segment.forEach((p) => result.push({ ...p, y: yAvg }));
+    } else {
+      segment.forEach((p) => result.push(p));
+    }
+    segment = [];
+  };
+  points.forEach((pt, idx) => {
+    if (idx === 0 || pt.move) {
+      flush();
+      segment = [{ ...pt }];
+      return;
+    }
+    segment.push({ ...pt });
+  });
+  flush();
+  return result;
+}
+
+function pointsToSvgPath(points: Point[]) {
+  if (points.length === 0) return "";
+  let d = "";
+  points.forEach((pt, idx) => {
+    const x = pt.x * 1000;
+    const y = pt.y * 1000;
+    if (idx === 0 || pt.move) d += `M ${x} ${y} `;
+    else d += `L ${x} ${y} `;
+  });
+  return d.trim();
+}
+
+function shapeBounds(shape: Pick<ShapeAnnotation, "start" | "end">) {
+  const minX = Math.min(shape.start.x, shape.end.x);
+  const maxX = Math.max(shape.start.x, shape.end.x);
+  const minY = Math.min(shape.start.y, shape.end.y);
+  const maxY = Math.max(shape.start.y, shape.end.y);
+  return { minX, maxX, minY, maxY, w: maxX - minX, h: maxY - minY };
+}
+
+function shapeToSvgElements(
+  shape: Pick<ShapeAnnotation, "type" | "start" | "end">,
+  opts: { stroke: string; strokeWidth: number; strokeOpacity?: number; interactiveProps?: SVGProps<SVGElement> }
+) {
+  const strokeOpacity = opts.strokeOpacity ?? 1;
+  const common = {
+    stroke: opts.stroke,
+    strokeWidth: opts.strokeWidth,
+    strokeOpacity,
+    fill: "none" as const,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+  };
+  const x1 = shape.start.x * 1000;
+  const y1 = shape.start.y * 1000;
+  const x2 = shape.end.x * 1000;
+  const y2 = shape.end.y * 1000;
+
+  const makeArrowHead = () => {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const len = Math.max(1e-6, Math.sqrt(dx * dx + dy * dy));
+    const headLen = clamp(len * 0.16, 22, 44);
+    const angle = Math.atan2(dy, dx);
+    const left = angle + (Math.PI * 5) / 6;
+    const right = angle - (Math.PI * 5) / 6;
+    return {
+      lx: x2 + Math.cos(left) * headLen,
+      ly: y2 + Math.sin(left) * headLen,
+      rx: x2 + Math.cos(right) * headLen,
+      ry: y2 + Math.sin(right) * headLen,
+    };
+  };
+
+  const { minX, minY, w, h } = shapeBounds(shape);
+  const minXPx = minX * 1000;
+  const minYPx = minY * 1000;
+  const wPx = Math.max(1, w * 1000);
+  const hPx = Math.max(1, h * 1000);
+
+	switch (shape.type) {
+	    case "line":
+	      return <line x1={x1} y1={y1} x2={x2} y2={y2} {...common} {...(opts.interactiveProps as any)} />;
+	    case "arrow": {
+      const head = makeArrowHead();
+      return (
+        <g {...(opts.interactiveProps as any)}>
+          <line x1={x1} y1={y1} x2={x2} y2={y2} {...common} />
+          <line x1={x2} y1={y2} x2={head.lx} y2={head.ly} {...common} />
+          <line x1={x2} y1={y2} x2={head.rx} y2={head.ry} {...common} />
+        </g>
+      );
+    }
+    case "rect":
+      return <rect x={minXPx} y={minYPx} width={wPx} height={hPx} rx={0} {...common} {...(opts.interactiveProps as any)} />;
+	    case "ellipse":
+	      return (
+	        <ellipse
+	          cx={minXPx + wPx / 2}
+	          cy={minYPx + hPx / 2}
+	          rx={wPx / 2}
+	          ry={hPx / 2}
+	          {...common}
+	          {...(opts.interactiveProps as any)}
+	        />
+	      );
+	    case "triangle": {
+	      const top = { x: minXPx + wPx / 2, y: minYPx };
+	      const left = { x: minXPx, y: minYPx + hPx };
+	      const right = { x: minXPx + wPx, y: minYPx + hPx };
+	      return (
+	        <polygon
+	          points={`${top.x},${top.y} ${right.x},${right.y} ${left.x},${left.y}`}
+	          {...common}
+	          {...(opts.interactiveProps as any)}
+	        />
+	      );
+	    }
+	    case "x":
+	      return (
+	        <g {...(opts.interactiveProps as any)}>
+	          <line x1={minXPx} y1={minYPx} x2={minXPx + wPx} y2={minYPx + hPx} {...common} />
+          <line x1={minXPx + wPx} y1={minYPx} x2={minXPx} y2={minYPx + hPx} {...common} />
+        </g>
+      );
+    case "check": {
+      const p1 = { x: minXPx + wPx * 0.18, y: minYPx + hPx * 0.55 };
+      const p2 = { x: minXPx + wPx * 0.42, y: minYPx + hPx * 0.78 };
+      const p3 = { x: minXPx + wPx * 0.82, y: minYPx + hPx * 0.26 };
+      return (
+        <polyline
+          points={`${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y}`}
+          {...common}
+          {...(opts.interactiveProps as any)}
+        />
+      );
+    }
+    default:
+      return null;
+  }
+}
+
+function intersectUnitSquareBoundary(
+  from: Point,
+  to: Point,
+  preferMaxT: boolean
+): { x: number; y: number } | null {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const candidates: Array<{ t: number; x: number; y: number }> = [];
+
+  const pushIfValid = (t: number) => {
+    if (!Number.isFinite(t) || t < 0 || t > 1) return;
+    const x = from.x + dx * t;
+    const y = from.y + dy * t;
+    if (x < -1e-6 || x > 1 + 1e-6 || y < -1e-6 || y > 1 + 1e-6) return;
+    candidates.push({ t, x: clamp(x, 0, 1), y: clamp(y, 0, 1) });
+  };
+
+  if (dx !== 0) {
+    pushIfValid((0 - from.x) / dx);
+    pushIfValid((1 - from.x) / dx);
+  }
+  if (dy !== 0) {
+    pushIfValid((0 - from.y) / dy);
+    pushIfValid((1 - from.y) / dy);
+  }
+
+  if (candidates.length === 0) return null;
+  candidates.sort((a, b) => (preferMaxT ? b.t - a.t : a.t - b.t));
+  return { x: candidates[0].x, y: candidates[0].y };
 }
 
 
@@ -876,20 +1165,30 @@ function WorkspaceClient() {
   const [activePageIndexState, setActivePageIndex] = useState(0);
   const [pageNumberDraft, setPageNumberDraft] = useState("");
   const [pageActionMenuId, setPageActionMenuId] = useState<string | null>(null);
-	  const [shouldCenterOnChange, setShouldCenterOnChange] = useState(false);
-	  const [zoomPercent, setZoomPercent] = useState(100);
-	  const [baseScale, setBaseScale] = useState(1);
-	  const [userAdjustedZoom, setUserAdjustedZoom] = useState(false);
-	  const [showPageOrderPanel, setShowPageOrderPanel] = useState(true);
-	  const pageNavigationLockRef = useRef<{ until: number; targetId: string } | null>(null);
-	  const scrollRatioRef = useRef<{ x: number; y: number }>({ x: 0.5, y: 0 });
-	  const restoreScrollOnNextZoomRef = useRef(false);
-	  const [previewHeightLimit, setPreviewHeightLimit] = useState<number | null>(null);
-	  const [highlightMode, setHighlightMode] = useState(false);
-	  const [highlightColor, setHighlightColor] = useState<HighlightColorKey>("yellow");
+		  const [shouldCenterOnChange, setShouldCenterOnChange] = useState(false);
+		  const [zoomPercent, setZoomPercent] = useState(100);
+		  const [baseScale, setBaseScale] = useState(1);
+		  const [userAdjustedZoom, setUserAdjustedZoom] = useState(false);
+  const [showPageOrderPanel, setShowPageOrderPanel] = useState(true);
+  const pageNavigationLockRef = useRef<{ until: number; targetId: string } | null>(null);
+  const scrollRatioRef = useRef<{ x: number; y: number }>({ x: 0.5, y: 0 });
+  const restoreScrollOnNextZoomRef = useRef(false);
+  const [previewHeightLimit, setPreviewHeightLimit] = useState<number | null>(null);
+  const [highlightMode, setHighlightMode] = useState(false);
+  const [highlightColor, setHighlightColor] = useState<HighlightColorKey>("yellow");
   const [highlightThickness, setHighlightThickness] = useState(14);
-  const [pencilMode, setPencilMode] = useState(false);
-  const [pencilThickness, setPencilThickness] = useState(4);
+  const [highlightOpacity, setHighlightOpacity] = useState(0.35);
+  const [penMode, setPenMode] = useState(false);
+  const [penThickness, setPenThickness] = useState(3);
+  const [penColor, setPenColor] = useState(PEN_COLOR);
+  const [selectMode, setSelectMode] = useState(true);
+  const [shapeMode, setShapeMode] = useState(false);
+  const [shapeType, setShapeType] = useState<ShapeType>("arrow");
+  const [shapeThickness, setShapeThickness] = useState(3);
+  const [shapeColor, setShapeColor] = useState(PEN_COLOR);
+  const [headerMode, setHeaderMode] = useState<HeaderMode>("default");
+  const [toolbarPreviewMode, setToolbarPreviewMode] = useState<Exclude<HeaderMode, "default"> | null>(null);
+  const toolPreviewTimerRef = useRef<number | null>(null);
   const [textMode, setTextMode] = useState(false);
   const [signaturePanelMode, setSignaturePanelMode] = useState<SignaturePanelMode>("none");
   const [savedSignatures, setSavedSignatures] = useState<SavedSignature[]>([]);
@@ -953,7 +1252,19 @@ function WorkspaceClient() {
   const [textFont, setTextFont] = useState<TextFont>("Inter");
   const [textSize, setTextSize] = useState(12);
   const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]>([]);
+  const [redoHighlightHistory, setRedoHighlightHistory] = useState<HighlightHistoryEntry[]>([]);
+  const [shapesByPage, setShapesByPage] = useState<Record<string, ShapeAnnotation[]>>({});
+  const [draftShape, setDraftShape] = useState<{
+    pageId: string;
+    type: ShapeType;
+    start: Point;
+    end: Point;
+    color: string;
+    thickness: number;
+  } | null>(null);
   const [draftHighlight, setDraftHighlight] = useState<DraftHighlight | null>(null);
+  const strokeOutsidePageRef = useRef(false);
+  const lastOutsideRawRef = useRef<{ x: number; y: number } | null>(null);
   const [draggingText, setDraggingText] = useState<{
     pageId: string;
     id: string;
@@ -1176,8 +1487,6 @@ function WorkspaceClient() {
   }, []);
   const MIN_HIGHLIGHT_THICKNESS = 6;
   const MAX_HIGHLIGHT_THICKNESS = 32;
-  const MIN_PENCIL_THICKNESS = 1;
-  const MAX_PENCIL_THICKNESS = 10;
   const toolSwitchBase = "flex items-center gap-2 px-4 py-2 text-sm font-semibold transition";
   const toolSwitchActive = "bg-[#024d7c] text-white shadow-sm";
   const toolSwitchInactive = "bg-white text-slate-700 hover:bg-slate-50";
@@ -1187,14 +1496,20 @@ function WorkspaceClient() {
     `${buttonBase} border border-slate-200 bg-white text-slate-800 shadow-[0_4px_14px_rgba(15,23,42,0.12)] hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50`;
   const buttonPrimary =
     `${buttonBase} bg-[#024d7c] text-white shadow-md shadow-[#012a44]/30 hover:-translate-y-0.5 hover:bg-[#013d63]`;
-  const toolButtonBase = "inline-flex h-10 items-center gap-2 rounded-lg border px-4 text-sm font-semibold transition";
-  const toolButtonInactive =
-    "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50";
-  const toolButtonActive = "border-transparent bg-[#024d7c] text-white shadow-sm";
+	  const toolButtonBase =
+	    "inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#009DFD]/25 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F1F5F9] disabled:cursor-not-allowed";
+	  const toolIconButton =
+	    "justify-center px-1.5";
+	  const toolButtonInactiveNeutral =
+	    "border-transparent bg-[#F1F5F9] text-[#475569] shadow-none hover:bg-[#E5E7EB] hover:text-[#475569] hover:shadow-[0_1px_2px_rgba(0,0,0,0.06)]";
+	  const toolButtonInactiveBlack =
+	    "border-transparent bg-[#F1F5F9] text-black shadow-none hover:bg-[#E5E7EB] hover:text-black hover:shadow-[0_1px_2px_rgba(0,0,0,0.06)]";
+	  const toolButtonActive =
+	    "border-transparent bg-[#024d7c] text-white shadow-md shadow-[#012a44]/25 hover:bg-[#013d63] hover:shadow-md";
   const controlButtonClass =
     "flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,0.08)] transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-40";
   const bottomBarButtonClass =
-    "flex h-11 w-11 items-center justify-center rounded-full border border-[#1f2937] bg-[#1f2937] text-white shadow-[0_12px_26px_rgba(15,23,42,0.20)] transition hover:bg-[#111827] hover:shadow-[0_16px_34px_rgba(15,23,42,0.24)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1f2937]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f3f6fb]";
+    "flex h-9 w-9 items-center justify-center rounded-full border border-[#1f2937] bg-[#1f2937] text-white shadow-[0_8px_18px_rgba(15,23,42,0.16)] transition hover:bg-[#111827] hover:shadow-[0_12px_24px_rgba(15,23,42,0.20)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1f2937]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f3f6fb]";
   const signatureTabBase =
     "inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-[0_6px_14px_rgba(15,23,42,0.06)] transition hover:border-[#024d7c]/40 hover:text-[#024d7c]";
   const signatureTabActive = "border-[#024d7c] bg-[#024d7c] text-white shadow-[0_10px_24px_rgba(2,77,124,0.2)]";
@@ -1250,23 +1565,27 @@ function WorkspaceClient() {
         const project = json?.project;
         if (!project || !project.data || cancelled) return;
 
-        const data = project.data as {
-          highlights?: Record<string, HighlightStroke[]>;
-          textAnnotations?: Record<string, TextAnnotation[]>;
-          signaturePlacements?: Record<string, SignaturePlacement[]>;
-          savedSignatures?: SavedSignature[];
-          pages?: {
+	        const data = project.data as {
+	          highlights?: Record<string, HighlightStroke[]>;
+	          shapesByPage?: Record<string, ShapeAnnotation[]>;
+	          textAnnotations?: Record<string, TextAnnotation[]>;
+	          signaturePlacements?: Record<string, SignaturePlacement[]>;
+	          savedSignatures?: SavedSignature[];
+	          pages?: {
             id: string;
             rotation?: number;
           }[];
         };
 
-        if (data.highlights) {
-          setHighlights(data.highlights);
-        }
-        if (data.textAnnotations) {
-          setTextAnnotations(data.textAnnotations);
-        }
+	        if (data.highlights) {
+	          setHighlights(data.highlights);
+	        }
+	        if (data.shapesByPage) {
+	          setShapesByPage(data.shapesByPage);
+	        }
+	        if (data.textAnnotations) {
+	          setTextAnnotations(data.textAnnotations);
+	        }
         if (data.signaturePlacements) {
           setSignaturePlacements(data.signaturePlacements);
         }
@@ -1364,31 +1683,117 @@ function WorkspaceClient() {
         const drawHeight = naturalHeight * scale;
         ctx.drawImage(baseImage, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
 
-        const pageHighlights = highlights[page.id] ?? [];
-        if (pageHighlights.length > 0) {
-          const pageWidthPx = drawWidth;
-          const pageHeightPx = drawHeight;
-          ctx.lineCap = "round";
-          ctx.lineJoin = "round";
-          pageHighlights.forEach((stroke) => {
+	        const pageHighlights = highlights[page.id] ?? [];
+	        if (pageHighlights.length > 0) {
+	          const pageWidthPx = drawWidth;
+	          const pageHeightPx = drawHeight;
+	          pageHighlights.forEach((stroke) => {
             if (stroke.points.length < 2) return;
+            ctx.lineCap = stroke.tool === "highlight" ? "butt" : "round";
+            ctx.lineJoin = stroke.tool === "highlight" ? "miter" : "round";
             ctx.beginPath();
             stroke.points.forEach((pt, index) => {
               const x = (pt.x - 0.5) * pageWidthPx;
               const y = (pt.y - 0.5) * pageHeightPx;
-              if (index === 0) {
+              if (index === 0 || pt.move) {
                 ctx.moveTo(x, y);
               } else {
                 ctx.lineTo(x, y);
               }
             });
             ctx.strokeStyle = stroke.color;
-            ctx.globalAlpha = stroke.tool === "pencil" ? 1 : 0.25;
-            ctx.lineWidth = Math.max(1, stroke.thickness * pageWidthPx);
+            const effectiveTool = stroke.tool === "pencil" ? "pen" : stroke.tool;
+            ctx.globalAlpha = effectiveTool === "highlight" ? stroke.opacity ?? 0.35 : 1;
+            const widthFactor = stroke.tool === "highlight" ? 1.2 : 1;
+            ctx.lineWidth = Math.max(1, stroke.thickness * pageWidthPx * widthFactor);
             ctx.stroke();
           });
-          ctx.globalAlpha = 1;
-        }
+	          ctx.globalAlpha = 1;
+	        }
+
+	        const pageShapes = shapesByPage[page.id] ?? [];
+	        if (pageShapes.length > 0) {
+	          const pageWidthPx = drawWidth;
+	          const pageHeightPx = drawHeight;
+	          pageShapes.forEach((shape) => {
+	            const thickness = Math.max(1, shape.thickness * pageWidthPx);
+	            const x1 = (shape.start.x - 0.5) * pageWidthPx;
+	            const y1 = (shape.start.y - 0.5) * pageHeightPx;
+	            const x2 = (shape.end.x - 0.5) * pageWidthPx;
+	            const y2 = (shape.end.y - 0.5) * pageHeightPx;
+	            const minX = Math.min(x1, x2);
+	            const maxX = Math.max(x1, x2);
+	            const minY = Math.min(y1, y2);
+	            const maxY = Math.max(y1, y2);
+	            const w = Math.max(1, maxX - minX);
+	            const h = Math.max(1, maxY - minY);
+
+	            ctx.save();
+	            ctx.strokeStyle = shape.color;
+	            ctx.lineWidth = thickness;
+	            ctx.lineCap = "round";
+	            ctx.lineJoin = "round";
+	            ctx.beginPath();
+
+	            const drawLine = (ax: number, ay: number, bx: number, by: number) => {
+	              ctx.moveTo(ax, ay);
+	              ctx.lineTo(bx, by);
+	            };
+
+	            const drawArrowHead = (ax: number, ay: number, bx: number, by: number) => {
+	              const dx = bx - ax;
+	              const dy = by - ay;
+	              const len = Math.max(1e-6, Math.sqrt(dx * dx + dy * dy));
+	              const headLen = clamp(len * 0.16, 10, 26);
+	              const angle = Math.atan2(dy, dx);
+	              const left = angle + (Math.PI * 5) / 6;
+	              const right = angle - (Math.PI * 5) / 6;
+	              drawLine(bx, by, bx + Math.cos(left) * headLen, by + Math.sin(left) * headLen);
+	              drawLine(bx, by, bx + Math.cos(right) * headLen, by + Math.sin(right) * headLen);
+	            };
+
+		            switch (shape.type) {
+		              case "line":
+		                drawLine(x1, y1, x2, y2);
+		                break;
+		              case "arrow":
+		                drawLine(x1, y1, x2, y2);
+		                drawArrowHead(x1, y1, x2, y2);
+		                break;
+		              case "rect":
+		                ctx.rect(minX, minY, w, h);
+		                break;
+		              case "ellipse":
+		                ctx.ellipse(minX + w / 2, minY + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+		                break;
+		              case "triangle": {
+		                const top = { x: minX + w / 2, y: minY };
+		                const left = { x: minX, y: minY + h };
+		                const right = { x: minX + w, y: minY + h };
+		                drawLine(top.x, top.y, right.x, right.y);
+		                drawLine(right.x, right.y, left.x, left.y);
+		                drawLine(left.x, left.y, top.x, top.y);
+		                break;
+		              }
+		              case "x":
+		                drawLine(minX, minY, maxX, maxY);
+		                drawLine(maxX, minY, minX, maxY);
+		                break;
+	              case "check": {
+	                const p1 = { x: minX + w * 0.18, y: minY + h * 0.55 };
+	                const p2 = { x: minX + w * 0.42, y: minY + h * 0.78 };
+	                const p3 = { x: minX + w * 0.82, y: minY + h * 0.26 };
+	                drawLine(p1.x, p1.y, p2.x, p2.y);
+	                drawLine(p2.x, p2.y, p3.x, p3.y);
+	                break;
+	              }
+	              default:
+	                break;
+	            }
+	            ctx.stroke();
+	            ctx.restore();
+	          });
+	        }
 
         const pageTexts = textAnnotations[page.id] ?? [];
         if (pageTexts.length > 0) {
@@ -1793,10 +2198,22 @@ function WorkspaceClient() {
           const src = sources[s];
           let pdf: any;
           try {
-            pdf = await pdfjsLib.getDocument({ url: src.url } as any).promise;
+            // Use `data` instead of `url` so the worker doesn't try to fetch `blob:` URLs,
+            // which can intermittently fail with "Unexpected server response (0)".
+            const stored = await readFileBlob(src.storageId);
+            const blob = stored?.blob instanceof Blob ? stored.blob : null;
+            const bytes = blob
+              ? new Uint8Array(await blob.arrayBuffer())
+              : new Uint8Array(await (await fetch(src.url)).arrayBuffer());
+            pdf = await pdfjsLib.getDocument({ data: bytes } as any).promise;
           } catch (err) {
             console.warn("pdfjs getDocument failed, retrying without worker", err);
-            pdf = await pdfjsLib.getDocument({ url: src.url, disableWorker: true } as any).promise;
+            const stored = await readFileBlob(src.storageId);
+            const blob = stored?.blob instanceof Blob ? stored.blob : null;
+            const bytes = blob
+              ? new Uint8Array(await blob.arrayBuffer())
+              : new Uint8Array(await (await fetch(src.url)).arrayBuffer());
+            pdf = await pdfjsLib.getDocument({ data: bytes, disableWorker: true } as any).promise;
           }
           for (let p = 1; p <= pdf.numPages; p++) {
             if (cancelled) return;
@@ -1940,6 +2357,8 @@ function WorkspaceClient() {
       if (sources.length === 0) {
         setHighlights({});
         setHighlightHistory([]);
+        setRedoHighlightHistory([]);
+        setShapesByPage({});
       }
       return;
     }
@@ -1956,9 +2375,20 @@ function WorkspaceClient() {
       return next;
     });
 
-    setHighlightHistory((prev) =>
-      prev.filter((entry) => (entry.type === "clear" ? true : allowed.has(entry.pageId)))
-    );
+    setShapesByPage((prev) => {
+      const next: Record<string, ShapeAnnotation[]> = {};
+      allowed.forEach((id) => {
+        if (prev[id]) next[id] = prev[id];
+      });
+      if (Object.keys(prev).length === Object.keys(next).length) {
+        return prev;
+      }
+      return next;
+    });
+
+    const filterAllowed = (entry: HighlightHistoryEntry) => (entry.type === "clear" ? true : allowed.has(entry.pageId));
+    setHighlightHistory((prev) => prev.filter(filterAllowed));
+    setRedoHighlightHistory((prev) => prev.filter(filterAllowed));
   }, [pages, sources.length]);
 
   useEffect(() => {
@@ -2401,38 +2831,50 @@ function WorkspaceClient() {
               height: displayHeight,
             overflow: undefined,
           }}
-          onClick={() => handleSelectPage(idx)}
+          onClick={(event) => {
+            if (activeDrawingTool || deleteMode) {
+              event.stopPropagation();
+              return;
+            }
+            handleSelectPage(idx);
+          }}
         >
           <div
             className="absolute inset-0 flex items-start justify-center overflow-visible"
             style={{ width: "100%", height: "100%" }}
           >
             <div
-              className="absolute left-0 top-0 bg-white"
-              style={{
-                width: contentWidth,
-                height: contentHeight,
-                transform: rotationTransform,
-                transformOrigin: "top left",
-                cursor: deleteMode
-                  ? ("url('/icons/eraser.svg') 4 4, auto" as CSSProperties["cursor"])
-                  : activeDrawingTool === "highlight"
-                    ? (`url(${HIGHLIGHT_CURSOR}) 4 24, crosshair` as CSSProperties["cursor"])
-                    : activeDrawingTool === "pencil"
-                      ? ("crosshair" as CSSProperties["cursor"])
-                      : activeDrawingTool === "text"
-                        ? ("text" as CSSProperties["cursor"])
-                        : undefined,
-              }}
-              onMouseDown={(event) => {
+	              className="absolute left-0 top-0 bg-white"
+	              style={{
+	                width: contentWidth,
+	                height: contentHeight,
+	                transform: rotationTransform,
+	                transformOrigin: "top left",
+	                cursor: deleteMode
+	                  ? ("url('/icons/eraser.svg') 4 4, auto" as CSSProperties["cursor"])
+	                  : activeDrawingTool === "highlight"
+	                    ? (`url(${HIGHLIGHT_CURSOR}) 4 24, crosshair` as CSSProperties["cursor"])
+	                    : activeDrawingTool === "shape"
+	                      ? ("crosshair" as CSSProperties["cursor"])
+	                    : activeDrawingTool === "pen"
+	                      ? ("crosshair" as CSSProperties["cursor"])
+	                      : activeDrawingTool === "text"
+	                        ? ("text" as CSSProperties["cursor"])
+	                        : undefined,
+	              }}
+              onPointerDown={(event) => {
                 if (deleteMode) {
                   setIsErasing(true);
                   event.preventDefault();
                 }
                 handleMarkupPointerDown(page.id, event);
               }}
-              onMouseMove={(event) => handleMarkupPointerMove(page.id, event)}
-              onMouseUp={() => {
+              onPointerMove={(event) => handleMarkupPointerMove(page.id, event)}
+              onPointerUp={() => {
+                setIsErasing(false);
+                handleMarkupPointerUp(page.id);
+              }}
+              onPointerCancel={() => {
                 setIsErasing(false);
                 handleMarkupPointerUp(page.id);
               }}
@@ -2450,12 +2892,13 @@ function WorkspaceClient() {
                 viewBox="0 0 1000 1000"
                 preserveAspectRatio="none"
               >
-                {deleteMode
-                  ? pageHighlights.map((stroke) =>
+                {deleteMode ? (
+                  <>
+                    {pageHighlights.map((stroke) =>
                       stroke.points.length > 1 ? (
-                        <polyline
+                        <path
                           key={`${stroke.id}-hit`}
-                          points={stroke.points.map((pt) => `${pt.x * 1000},${pt.y * 1000}`).join(" ")}
+                          d={pointsToSvgPath(stroke.points)}
                           fill="none"
                           stroke="transparent"
                           strokeWidth={Math.max(12, stroke.thickness * 3000)}
@@ -2485,24 +2928,74 @@ function WorkspaceClient() {
                           }}
                         />
                       ) : null
-                    )
-                  : null}
-                {pageHighlights.map((stroke) =>
-                  stroke.points.length > 1 ? (
-                    <polyline
+                    )}
+                    {(shapesByPage[page.id] ?? []).map((shape) => {
+                      const baseWidth = Math.max(12, shape.thickness * 3000);
+                      const hitProps: SVGProps<SVGElement> = {
+                        style: {
+                          pointerEvents: "stroke",
+                          cursor: "url('/icons/eraser.svg') 4 4, auto" as CSSProperties["cursor"],
+                        },
+                        onPointerDown: (event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          setIsErasing(true);
+                          handleDeleteShape(page.id, shape.id);
+                        },
+                        onPointerMove: (event) => {
+                          if (!isErasing) return;
+                          event.preventDefault();
+                          event.stopPropagation();
+                          handleDeleteShape(page.id, shape.id);
+                        },
+                        onPointerEnter: (event) => {
+                          if (!isErasing) return;
+                          event.preventDefault();
+                          event.stopPropagation();
+                          handleDeleteShape(page.id, shape.id);
+                        },
+                      };
+                      return (
+                        <Fragment key={`${shape.id}-hit`}>
+                          {shapeToSvgElements(shape, {
+                            stroke: "transparent",
+                            strokeWidth: baseWidth,
+                            interactiveProps: hitProps,
+                          })}
+                        </Fragment>
+                      );
+                    })}
+                  </>
+                ) : null}
+                {pageHighlights.map((stroke) => {
+                  if (stroke.points.length <= 1) return null;
+                  const effectiveTool = stroke.tool === "pencil" ? "pen" : stroke.tool;
+                  const baseWidth = Math.max(1, stroke.thickness * 1000);
+                  const isHighlight = effectiveTool === "highlight";
+                  const cap = isHighlight ? "butt" : "round";
+                  const join = isHighlight ? "miter" : "round";
+                  const opacity = isHighlight ? stroke.opacity ?? 0.35 : 1;
+                  const commonProps = {
+                    d: pointsToSvgPath(stroke.points),
+                    fill: "none" as const,
+                    stroke: stroke.color,
+                    strokeLinecap: cap as any,
+                    strokeLinejoin: join as any,
+                    style: {
+                      pointerEvents: deleteMode ? ("stroke" as const) : ("none" as const),
+                      cursor: deleteMode
+                        ? ("url('/icons/eraser.svg') 4 4, auto" as CSSProperties["cursor"])
+                        : "default",
+                      mixBlendMode: isHighlight ? ("multiply" as const) : undefined,
+                    },
+                  };
+
+                  return (
+                    <path
                       key={stroke.id}
-                      points={stroke.points.map((pt) => `${pt.x * 1000},${pt.y * 1000}`).join(" ")}
-                      fill="none"
-                      stroke={stroke.color}
-                  strokeWidth={Math.max(1, stroke.thickness * 1000)}
-                  strokeLinecap="round"
-                  strokeOpacity={stroke.tool === "pencil" ? 1 : 0.25}
-                  style={{
-                        pointerEvents: deleteMode ? "stroke" : "none",
-                        cursor: deleteMode
-                          ? ("url('/icons/eraser.svg') 4 4, auto" as CSSProperties["cursor"])
-                          : "default",
-                      }}
+                      {...commonProps}
+                      strokeWidth={isHighlight ? baseWidth * 1.2 : baseWidth}
+                      strokeOpacity={opacity}
                       onPointerDown={(event) => {
                         if (!deleteMode) return;
                         event.preventDefault();
@@ -2516,20 +3009,54 @@ function WorkspaceClient() {
                         event.stopPropagation();
                         handleDeleteStroke(page.id, stroke.id);
                       }}
-                  />
-                ) : null
-              )}
-                {draftHighlight?.pageId === page.id && draftHighlight.points.length > 1 ? (
-                  <polyline
-                    aria-hidden
-                    points={draftHighlight.points.map((pt) => `${pt.x * 1000},${pt.y * 1000}`).join(" ")}
-                    fill="none"
-                    stroke={draftHighlight.color}
-                    strokeWidth={Math.max(1, draftHighlight.thickness * 1000)}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeOpacity={draftHighlight.tool === "pencil" ? 1 : 0.25}
-                  />
+                    />
+                  );
+                })}
+
+                {(shapesByPage[page.id] ?? []).map((shape) => {
+                  const baseWidth = Math.max(1, shape.thickness * 1000);
+                  return (
+                    <Fragment key={shape.id}>
+                      {shapeToSvgElements(shape, { stroke: shape.color, strokeWidth: baseWidth })}
+                    </Fragment>
+                  );
+                })}
+
+                {draftHighlight?.pageId === page.id && draftHighlight.points.length > 1 ? (() => {
+                  const tool = draftHighlight.tool === "pencil" ? "pen" : draftHighlight.tool;
+                  const points =
+                    tool === "highlight"
+                      ? snapHighlightSegments(smoothStrokePoints(draftHighlight.points, tool))
+                      : smoothStrokePoints(draftHighlight.points, tool);
+                  const d = pointsToSvgPath(points);
+                  const baseWidth = Math.max(1, draftHighlight.thickness * 1000);
+                  const isHighlight = tool === "highlight";
+                  const cap = isHighlight ? "butt" : "round";
+                  const join = isHighlight ? "miter" : "round";
+                  const style: CSSProperties = { mixBlendMode: isHighlight ? ("multiply" as any) : undefined };
+                  const opacity = isHighlight ? draftHighlight.opacity ?? 0.35 : 1;
+                  return (
+                    <path
+                      aria-hidden
+                      d={d}
+                      fill="none"
+                      stroke={draftHighlight.color}
+                      strokeWidth={isHighlight ? baseWidth * 1.2 : baseWidth}
+                      strokeLinecap={cap as any}
+                      strokeLinejoin={join as any}
+                      strokeOpacity={opacity}
+                      style={style}
+                    />
+                  );
+                })() : null}
+
+                {draftShape?.pageId === page.id ? (
+                  <Fragment>
+                    {shapeToSvgElements(draftShape, {
+                      stroke: draftShape.color,
+                      strokeWidth: Math.max(1, draftShape.thickness * 1000),
+                    })}
+                  </Fragment>
                 ) : null}
               </svg>
               {draftTextBox && draftTextBox.pageId === page.id ? (
@@ -2783,6 +3310,27 @@ function WorkspaceClient() {
             </div>
           </div>
         </div>
+        {idx === pages.length - 1 ? (
+          <div className="mx-auto mt-2 flex items-center justify-center" style={{ width: fittedWidth }}>
+            <div className="group relative">
+              <button
+                type="button"
+                aria-label="Add blank page"
+                className="inline-flex items-center justify-center rounded-xl p-2 text-slate-600 transition hover:bg-white hover:shadow-sm hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void handleAddBlankPageAfter(page.id);
+                }}
+              >
+                <Plus className="h-6 w-6" />
+                <span className="sr-only">Add blank page</span>
+              </button>
+              <div className="pointer-events-none absolute left-1/2 bottom-full z-40 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+                Add blank page
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     );
   };
@@ -2792,11 +3340,15 @@ function WorkspaceClient() {
       if (!stroke || cancel || stroke.points.length < 2) {
         return;
       }
+      const smoothedRaw = smoothStrokePoints(stroke.points, stroke.tool);
+      const smoothed = stroke.tool === "highlight" ? snapHighlightSegments(smoothedRaw) : smoothedRaw;
       const highlight: HighlightStroke = {
         id: crypto.randomUUID(),
         tool: stroke.tool,
-        points: stroke.points.map((pt) => ({ ...pt })),
+        points: smoothed.map((pt) => ({ ...pt })),
         color: stroke.color,
+        opacity: stroke.opacity,
+        seed: stroke.seed,
         thickness: stroke.thickness,
       };
       setHighlights((existing) => {
@@ -2805,46 +3357,42 @@ function WorkspaceClient() {
         return { ...existing, [stroke.pageId]: nextList };
       });
       setHighlightHistory((prev) => [...prev, { type: "add", pageId: stroke.pageId, highlight: cloneStroke(highlight) }]);
+      setRedoHighlightHistory([]);
     },
     []
   );
 
   useEffect(() => {
-    if (!draftHighlight || typeof window === "undefined") return;
-    function handleWindowUp() {
-      setDraftHighlight((current) => {
-        if (!current) return null;
-        commitDraftHighlight(current);
-        return null;
-      });
-    }
-    window.addEventListener("mouseup", handleWindowUp);
-    return () => window.removeEventListener("mouseup", handleWindowUp);
-  }, [draftHighlight, commitDraftHighlight]);
-
-  useEffect(() => {
-    if (deleteMode) {
-      setHighlightMode(false);
-      setPencilMode(false);
-      setTextMode(false);
-      setDraftHighlight(null);
-    }
+	      if (deleteMode) {
+	        setDraftHighlight(null);
+	        setDraftShape(null);
+	      }
   }, [deleteMode]);
 
-  function getPointerPoint(event: ReactMouseEvent<HTMLDivElement>) {
+  function getPointerPoint(
+    event: { clientX: number; clientY: number; currentTarget: HTMLDivElement },
+    options?: { clampToBounds?: boolean; requireInside?: boolean }
+  ) {
     const rect = event.currentTarget.getBoundingClientRect();
     if (!rect.width || !rect.height) return null;
+    const clampToBounds = options?.clampToBounds ?? true;
+    const requireInside = options?.requireInside ?? clampToBounds;
+    const xRaw = (event.clientX - rect.left) / rect.width;
+    const yRaw = (event.clientY - rect.top) / rect.height;
+    const inside = !(xRaw < 0 || xRaw > 1 || yRaw < 0 || yRaw > 1);
+    if (requireInside && !inside) return null;
     return {
-      x: clamp((event.clientX - rect.left) / rect.width, 0, 1),
-      y: clamp((event.clientY - rect.top) / rect.height, 0, 1),
+      x: clampToBounds ? clamp(xRaw, 0, 1) : xRaw,
+      y: clampToBounds ? clamp(yRaw, 0, 1) : yRaw,
+      inside,
       rectWidth: rect.width,
     };
   }
 
   function getActiveTool(): DrawingTool | null {
     if (highlightMode) return "highlight";
-    if (pencilMode) return "pencil";
     if (textMode) return "text";
+    if (penMode) return "pen";
     return null;
   }
 
@@ -2971,8 +3519,8 @@ function WorkspaceClient() {
     setActiveSignaturePlacementId(null);
     setDeleteMode(false);
     setHighlightMode(false);
-    setPencilMode(false);
     setTextMode(false);
+    setPenMode(false);
   }, []);
 
   const placeSignatureAtPoint = useCallback(
@@ -3343,26 +3891,100 @@ function WorkspaceClient() {
     []
   );
   const highlightButtonOn = highlightMode && !highlightButtonDisabled;
-  const pencilButtonOn = pencilMode && !highlightButtonDisabled;
+  const selectButtonOn = selectMode && !highlightButtonDisabled;
   const textButtonOn = textMode && !highlightButtonDisabled;
   const signatureButtonOn = signaturePanelMode !== "none" || showSignatureHub;
   const highlightActive = highlightButtonOn && !deleteMode;
-  const pencilActive = pencilButtonOn && !deleteMode;
+  const selectActive = selectButtonOn && !deleteMode;
   const textActive = textButtonOn && !deleteMode;
   const mobileCaptureLink = useMemo(
     () => (typeof window !== "undefined" ? `${window.location.origin}/sign-on-mobile` : "https://mergifypdf.com/sign-on-mobile"),
     []
   );
-  const activeDrawingTool: DrawingTool | null = highlightActive
-    ? "highlight"
-    : pencilActive
-    ? "pencil"
+	  const shapeButtonOn = shapeMode && !highlightButtonDisabled;
+	  const shapeActive = shapeButtonOn && !deleteMode;
+	  const drawButtonOn = penMode && !highlightButtonDisabled && !deleteMode;
+	  const highlightButtonVisualOn = highlightButtonOn && !deleteMode;
+	  const shapeButtonVisualOn = shapeButtonOn && !deleteMode;
+	  const showToolOptionsBar = !highlightButtonDisabled && !selectMode && (shapeMode || highlightMode || penMode || textMode);
+	  const activeDrawingTool: (DrawingTool | "shape") | null = highlightActive
+	    ? "highlight"
+	    : selectActive
+	    ? null
+    : shapeActive
+    ? "shape"
     : textActive
     ? "text"
+    : penMode && !deleteMode && !highlightButtonDisabled
+    ? "pen"
     : null;
+
+  const clearToolPreviewTimer = useCallback(() => {
+    if (toolPreviewTimerRef.current) {
+      window.clearTimeout(toolPreviewTimerRef.current);
+      toolPreviewTimerRef.current = null;
+    }
+  }, []);
+
+  const enterToolMode = useCallback(
+    (mode: Exclude<HeaderMode, "default">) => {
+      clearToolPreviewTimer();
+      setToolbarPreviewMode(null);
+      setHeaderMode(mode);
+      setRedoHighlightHistory([]);
+      setSelectMode(false);
+      setOrganizeMode(false);
+      setShowSignatureHub(false);
+      setSignaturePanelMode("none");
+      setPendingSignatureForPlacement(null);
+      setDeleteMode(false);
+      setTextMode(false);
+      setDraftHighlight(null);
+      setDraftShape(null);
+      setHighlightMode(mode === "highlight");
+      setPenMode(mode === "pen");
+      setShapeMode(mode === "shapes");
+    },
+    [clearToolPreviewTimer]
+  );
+
+	  const enterToolModeWithPreview = useCallback(
+	    (mode: Exclude<HeaderMode, "default">) => {
+	      clearToolPreviewTimer();
+        setSelectMode(false);
+        setDeleteMode(false);
+	      setToolbarPreviewMode(mode);
+	      toolPreviewTimerRef.current = window.setTimeout(() => {
+	        toolPreviewTimerRef.current = null;
+	        enterToolMode(mode);
+	      }, 180);
+	    },
+	    [clearToolPreviewTimer, enterToolMode]
+	  );
+
+		  const exitToolMode = useCallback(() => {
+        clearToolPreviewTimer();
+        setToolbarPreviewMode(null);
+		    setHeaderMode("default");
+        setSelectMode(true);
+		    setHighlightMode(false);
+        setShapeMode(false);
+		    setTextMode(false);
+		    setDraftHighlight(null);
+        setDraftShape(null);
+		    setShowSignatureHub(false);
+		    setSignaturePanelMode("none");
+		    setPendingSignatureForPlacement(null);
+		    setDeleteMode(false);
+		    setPenMode(false);
+		  }, [clearToolPreviewTimer]);
   const highlightCount = useMemo(
     () => Object.values(highlights).reduce((sum, list) => sum + list.length, 0),
     [highlights]
+  );
+  const shapeCount = useMemo(
+    () => Object.values(shapesByPage).reduce((sum, list) => sum + (list?.length ?? 0), 0),
+    [shapesByPage]
   );
   const textAnnotationCount = useMemo(
     () => Object.values(textAnnotations).reduce((sum, list) => sum + (list?.length ?? 0), 0),
@@ -3373,16 +3995,18 @@ function WorkspaceClient() {
     [signaturePlacements]
   );
   const hasAnyTextAnnotations = textAnnotationCount > 0;
-  const hasAnyAnnotations = highlightCount > 0 || hasAnyTextAnnotations || signaturePlacementCount > 0;
+  const hasAnyAnnotations = highlightCount > 0 || shapeCount > 0 || hasAnyTextAnnotations || signaturePlacementCount > 0;
   useEffect(() => {
     updatePreviewHeightLimit();
   }, [updatePreviewHeightLimit, pages.length, activePageIndex]);
   const hasWorkspaceData =
     pages.length > 0 ||
     highlightCount > 0 ||
+    shapeCount > 0 ||
     textAnnotationCount > 0 ||
     signaturePlacementCount > 0 ||
     !!draftHighlight ||
+    !!draftShape ||
     !!draftTextBox;
 
   const buildCloudProjectData = useCallback(() => {
@@ -3395,8 +4019,8 @@ function WorkspaceClient() {
       .map((page) => page.preview ?? page.thumb)
       .filter((src): src is string => typeof src === "string" && src.length > 0)
       .slice(0, 24);
-    return {
-      name: projectName,
+	      return {
+	      name: projectName,
       firstPageThumb: cloudThumb,
       previewUrl: cloudThumb,
       pagesCount: pages.length,
@@ -3407,30 +4031,32 @@ function WorkspaceClient() {
         size: source.size,
         updatedAt: source.updatedAt,
       })),
-      pages: pages.map((page) => ({
-        id: page.id,
-        srcIdx: page.srcIdx,
-        pageIdx: page.pageIdx,
-        rotation: page.rotation,
-        width: page.width,
-        height: page.height,
-      })),
-      highlights,
-      textAnnotations,
-      signaturePlacements,
-      savedSignatures,
-    };
-  }, [
-    hasWorkspaceData,
-    pages,
-    firstPageThumb,
-    projectName,
-    sources,
-    highlights,
-    textAnnotations,
-    signaturePlacements,
-    savedSignatures,
-  ]);
+	      pages: pages.map((page) => ({
+	        id: page.id,
+	        srcIdx: page.srcIdx,
+	        pageIdx: page.pageIdx,
+	        rotation: page.rotation,
+	        width: page.width,
+	        height: page.height,
+	      })),
+	      highlights,
+	      shapesByPage,
+	      textAnnotations,
+	      signaturePlacements,
+	      savedSignatures,
+	    };
+	  }, [
+	    hasWorkspaceData,
+	    pages,
+	    firstPageThumb,
+	    projectName,
+	    sources,
+	    highlights,
+	    shapesByPage,
+	    textAnnotations,
+	    signaturePlacements,
+	    savedSignatures,
+	  ]);
 
   useEffect(() => {
     if (!currentProjectId || !firstPageThumb) return;
@@ -3575,9 +4201,61 @@ function WorkspaceClient() {
     });
   }, [zoomPercent]);
 
-  function handleMarkupPointerDown(pageId: string, event: ReactMouseEvent<HTMLDivElement>) {
+  function handleShapePointerDown(pageId: string, event: ReactPointerEvent<HTMLDivElement>) {
+    const point = getPointerPoint(event, { requireInside: true, clampToBounds: true });
+    if (!point) return;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    setDraftShape({
+      pageId,
+      type: shapeType,
+      start: { x: point.x, y: point.y },
+      end: { x: point.x, y: point.y },
+      color: shapeColor,
+      thickness: shapeThickness / point.rectWidth,
+    });
+    event.preventDefault();
+  }
+
+  function handleShapePointerMove(pageId: string, event: ReactPointerEvent<HTMLDivElement>) {
+    if (!draftShape || draftShape.pageId !== pageId) return;
+    const point = getPointerPoint(event, { requireInside: false, clampToBounds: true });
+    if (!point) return;
+    setDraftShape((prev) => (prev && prev.pageId === pageId ? { ...prev, end: { x: point.x, y: point.y } } : prev));
+    event.preventDefault();
+  }
+
+  function handleShapePointerUp(pageId: string) {
+    if (!draftShape || draftShape.pageId !== pageId) return;
+    const { w, h } = shapeBounds(draftShape);
+    if (Math.max(w, h) < 0.01) {
+      setDraftShape(null);
+      return;
+    }
+    const shape: ShapeAnnotation = {
+      id: crypto.randomUUID(),
+      type: draftShape.type,
+      pageId,
+      start: { ...draftShape.start },
+      end: { ...draftShape.end },
+      color: draftShape.color,
+      thickness: draftShape.thickness,
+    };
+    setShapesByPage((prev) => {
+      const list = prev[pageId] ? [...prev[pageId]] : [];
+      list.push(shape);
+      return { ...prev, [pageId]: list };
+    });
+    setHighlightHistory((prev) => [
+      ...prev,
+      { type: "addShape", pageId, shape: { ...shape, start: { ...shape.start }, end: { ...shape.end } } },
+    ]);
+    setRedoHighlightHistory([]);
+    setDraftShape(null);
+  }
+
+  function handleMarkupPointerDown(pageId: string, event: ReactPointerEvent<HTMLDivElement>) {
     if (pendingSignatureForPlacement) {
-      const point = getPointerPoint(event);
+      const point = getPointerPoint(event, { requireInside: true, clampToBounds: true });
       if (point) {
         placeSignatureAtPoint(pendingSignatureForPlacement, pageId, point);
       }
@@ -3588,9 +4266,13 @@ function WorkspaceClient() {
       clearTextFocus();
     }
     if (deleteMode) return;
+    if (shapeMode) {
+      handleShapePointerDown(pageId, event);
+      return;
+    }
     const tool = getActiveTool();
     if (!tool) return;
-    const point = getPointerPoint(event);
+    const point = getPointerPoint(event, { requireInside: true, clampToBounds: true });
     if (!point) return;
     if (tool === "text") {
       setDraftTextBox({
@@ -3603,29 +4285,91 @@ function WorkspaceClient() {
       event.preventDefault();
       return;
     }
-    const baseThickness = tool === "highlight" ? highlightThickness : pencilThickness;
+    strokeOutsidePageRef.current = false;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    const baseThickness = tool === "highlight" ? highlightThickness : penThickness;
     setDraftHighlight({
       tool,
       pageId,
       points: [{ x: point.x, y: point.y }],
-      color: tool === "highlight" ? HIGHLIGHT_COLORS[highlightColor] : PENCIL_COLOR,
+      color:
+        tool === "highlight"
+          ? HIGHLIGHT_COLORS[highlightColor]
+          : penColor,
+      opacity: tool === "highlight" ? highlightOpacity : 1,
       thickness: baseThickness / point.rectWidth,
     });
     event.preventDefault();
   }
 
-  function handleMarkupPointerMove(pageId: string, event: ReactMouseEvent<HTMLDivElement>) {
+  function handleMarkupPointerMove(pageId: string, event: ReactPointerEvent<HTMLDivElement>) {
     if (deleteMode) return;
+    if (shapeMode) {
+      handleShapePointerMove(pageId, event);
+      return;
+    }
     if (getActiveTool() === "text") {
       if (!draftTextBox || draftTextBox.pageId !== pageId) return;
-      const point = getPointerPoint(event);
+      const point = getPointerPoint(event, { requireInside: true, clampToBounds: true });
       if (!point) return;
       setDraftTextBox((prev) => (prev ? { ...prev, currentX: point.x, currentY: point.y } : prev));
       event.preventDefault();
       return;
     }
-    const point = getPointerPoint(event);
+    const point = getPointerPoint(event, { clampToBounds: false, requireInside: false });
     if (!point) return;
+    if (!point.inside) {
+      lastOutsideRawRef.current = { x: point.x, y: point.y };
+      if (!strokeOutsidePageRef.current) {
+        strokeOutsidePageRef.current = true;
+        setDraftHighlight((prev) => {
+          if (!prev || prev.pageId !== pageId) return prev;
+          const nextPoints = [...prev.points];
+          for (let i = nextPoints.length - 1; i >= 0; i--) {
+            const candidate = nextPoints[i];
+            if (candidate && !candidate.move) {
+              const boundary = intersectUnitSquareBoundary(candidate, point, false);
+              if (boundary) {
+                const last = nextPoints[nextPoints.length - 1];
+                const eps = 0.0005;
+                if (!last || Math.abs(last.x - boundary.x) > eps || Math.abs(last.y - boundary.y) > eps) {
+                  nextPoints.push({ x: boundary.x, y: boundary.y });
+                }
+              }
+              break;
+            }
+          }
+          return { ...prev, points: nextPoints };
+        });
+      }
+      return;
+    }
+
+    if (strokeOutsidePageRef.current) {
+      strokeOutsidePageRef.current = false;
+      const outside = lastOutsideRawRef.current;
+      lastOutsideRawRef.current = null;
+      setDraftHighlight((prev) => {
+        if (!prev || prev.pageId !== pageId) return prev;
+        const nextPoints = [...prev.points];
+        const boundary = outside ? intersectUnitSquareBoundary(outside, point, true) : null;
+        nextPoints.push({
+          x: boundary?.x ?? clamp(point.x, 0, 1),
+          y: boundary?.y ?? clamp(point.y, 0, 1),
+          move: true,
+        });
+        nextPoints.push({ x: point.x, y: point.y });
+	      return {
+	        ...prev,
+	        points: nextPoints,
+	        thickness:
+	          (prev.tool === "highlight" ? highlightThickness : penThickness) / point.rectWidth,
+	      };
+	    });
+    event.preventDefault();
+    return;
+  }
+
     setDraftHighlight((prev) => {
       if (!prev || prev.pageId !== pageId) return prev;
       const nextPoints = [...prev.points];
@@ -3633,13 +4377,13 @@ function WorkspaceClient() {
       if (!last || pointDistance(last, { x: point.x, y: point.y }) > 0.004) {
         nextPoints.push({ x: point.x, y: point.y });
       }
-      return {
-        ...prev,
-        points: nextPoints,
-        thickness:
-          (prev.tool === "highlight" ? highlightThickness : pencilThickness) / point.rectWidth,
-      };
-    });
+	      return {
+	        ...prev,
+	        points: nextPoints,
+	        thickness:
+	          (prev.tool === "highlight" ? highlightThickness : penThickness) / point.rectWidth,
+	      };
+	    });
     if (draftHighlight?.pageId === pageId) {
       event.preventDefault();
     }
@@ -3647,6 +4391,10 @@ function WorkspaceClient() {
 
   function handleMarkupPointerUp(pageId: string) {
     if (deleteMode) return;
+    if (shapeMode) {
+      handleShapePointerUp(pageId);
+      return;
+    }
     if (getActiveTool() === "text") {
       if (draftTextBox && draftTextBox.pageId === pageId) {
         const widthDelta = Math.abs(draftTextBox.currentX - draftTextBox.startX);
@@ -3686,6 +4434,8 @@ function WorkspaceClient() {
       }
       return;
     }
+    strokeOutsidePageRef.current = false;
+    lastOutsideRawRef.current = null;
     setDraftHighlight((prev) => {
       if (!prev || prev.pageId !== pageId) return prev;
       commitDraftHighlight(prev);
@@ -4139,43 +4889,149 @@ function WorkspaceClient() {
           return embeddedFallback;
         }
       }
-      for (const p of pages) {
-        const srcDoc = docCache.get(p.srcIdx)!;
-        const [copied] = await out.copyPages(srcDoc, [p.pageIdx]);
-        copied.setRotation(degrees(p.rotation ?? 0));
-        const pageHighlights = highlights[p.id] ?? [];
-        const pageTexts = textAnnotations[p.id] ?? [];
-        if (pageHighlights.length > 0) {
-          const { width: pageWidth, height: pageHeight } = copied.getSize();
-          pageHighlights.forEach((stroke) => {
-            const colorValue = hexToRgb(stroke.color);
-            if (!colorValue) return;
-            for (let i = 1; i < stroke.points.length; i++) {
-              const start = stroke.points[i - 1];
-              const end = stroke.points[i];
-              const opacity = stroke.tool === "pencil" ? 1 : 0.25;
-              copied.drawLine({
-                start: {
-                  x: start.x * pageWidth,
-                  y: pageHeight - start.y * pageHeight,
-                },
-                end: {
-                  x: end.x * pageWidth,
-                  y: pageHeight - end.y * pageHeight,
-                },
-                thickness: Math.max(1, stroke.thickness * pageWidth),
-                color: rgb(colorValue.r, colorValue.g, colorValue.b),
-                opacity,
-                lineCap: LineCapStyle.Round,
-              });
-            }
-          });
-        }
-        if (pageTexts.length > 0) {
-          const font = await getDownloadFont();
-          const { width: pageWidth, height: pageHeight } = copied.getSize();
-          const fontSize = textSize;
-          const lineHeight = fontSize * 1.3;
+	      for (const p of pages) {
+	        const srcDoc = docCache.get(p.srcIdx)!;
+	        const [copied] = await out.copyPages(srcDoc, [p.pageIdx]);
+	        copied.setRotation(degrees(p.rotation ?? 0));
+	        const pageHighlights = highlights[p.id] ?? [];
+	        const pageShapes = shapesByPage[p.id] ?? [];
+	        const pageTexts = textAnnotations[p.id] ?? [];
+	          if (pageHighlights.length > 0) {
+	            const { width: pageWidth, height: pageHeight } = copied.getSize();
+	            pageHighlights.forEach((stroke) => {
+	              const colorValue = hexToRgb(stroke.color);
+	              if (!colorValue) return;
+	              const baseThickness = Math.max(1, stroke.thickness * pageWidth);
+	              const tool = stroke.tool === "pencil" ? "pen" : stroke.tool;
+	              const cap =
+	                tool === "highlight"
+	                  ? LineCapStyle.Butt
+	                  : LineCapStyle.Round;
+	              const baseOpacity = tool === "highlight" ? (stroke.opacity ?? 0.35) : 1;
+	              const widthFactor = tool === "highlight" ? 1.2 : 1;
+	              for (let i = 1; i < stroke.points.length; i++) {
+	                const start = stroke.points[i - 1];
+	                const end = stroke.points[i];
+	                if (end.move) continue;
+	                const x1 = start.x * pageWidth;
+	                const y1 = pageHeight - start.y * pageHeight;
+	                const x2 = end.x * pageWidth;
+	                const y2 = pageHeight - end.y * pageHeight;
+
+	                copied.drawLine({
+	                  start: { x: x1, y: y1 },
+	                  end: { x: x2, y: y2 },
+	                  thickness: baseThickness * widthFactor,
+	                  color: rgb(colorValue.r, colorValue.g, colorValue.b),
+	                  opacity: baseOpacity,
+	                  lineCap: cap,
+	                });
+	              }
+	            });
+	          }
+          if (pageShapes.length > 0) {
+            const { width: pageWidth, height: pageHeight } = copied.getSize();
+            const unitToPdf = (pt: Point) => ({
+              x: pt.x * pageWidth,
+              y: pageHeight - pt.y * pageHeight,
+            });
+            pageShapes.forEach((shape) => {
+              const colorValue = hexToRgb(shape.color);
+              if (!colorValue) return;
+              const thickness = Math.max(1, shape.thickness * pageWidth);
+              const start = unitToPdf(shape.start);
+              const end = unitToPdf(shape.end);
+              const minX = Math.min(start.x, end.x);
+              const maxX = Math.max(start.x, end.x);
+              const minY = Math.min(start.y, end.y);
+              const maxY = Math.max(start.y, end.y);
+              const w = Math.max(1, maxX - minX);
+              const h = Math.max(1, maxY - minY);
+              const strokeColor = rgb(colorValue.r, colorValue.g, colorValue.b);
+              const drawLineSegment = (a: { x: number; y: number }, b: { x: number; y: number }) => {
+                copied.drawLine({
+                  start: a,
+                  end: b,
+                  thickness,
+                  color: strokeColor,
+                  opacity: 1,
+                  lineCap: LineCapStyle.Round,
+                });
+              };
+              const drawArrowHead = (a: { x: number; y: number }, b: { x: number; y: number }) => {
+                const dx = b.x - a.x;
+                const dy = b.y - a.y;
+                const len = Math.max(1e-6, Math.sqrt(dx * dx + dy * dy));
+                const headLen = clamp(len * 0.16, 14, 32);
+                const angle = Math.atan2(dy, dx);
+                const left = angle + (Math.PI * 5) / 6;
+                const right = angle - (Math.PI * 5) / 6;
+                drawLineSegment(b, { x: b.x + Math.cos(left) * headLen, y: b.y + Math.sin(left) * headLen });
+                drawLineSegment(b, { x: b.x + Math.cos(right) * headLen, y: b.y + Math.sin(right) * headLen });
+              };
+	              switch (shape.type) {
+	                case "line":
+	                  drawLineSegment(start, end);
+	                  break;
+	                case "arrow":
+	                  drawLineSegment(start, end);
+	                  drawArrowHead(start, end);
+	                  break;
+	                case "rect":
+	                  copied.drawRectangle({
+	                    x: minX,
+	                    y: minY,
+	                    width: w,
+	                    height: h,
+	                    borderWidth: thickness,
+	                    borderColor: strokeColor,
+	                    borderOpacity: 1,
+	                    borderLineCap: LineCapStyle.Round,
+	                  });
+	                  break;
+	                case "ellipse":
+	                  copied.drawEllipse({
+	                    x: minX + w / 2,
+	                    y: minY + h / 2,
+	                    xScale: w / 2,
+	                    yScale: h / 2,
+	                    borderWidth: thickness,
+	                    borderColor: strokeColor,
+	                    borderOpacity: 1,
+	                    borderLineCap: LineCapStyle.Round,
+	                  });
+	                  break;
+	                case "triangle": {
+	                  const top = { x: minX + w / 2, y: maxY };
+	                  const left = { x: minX, y: minY };
+	                  const right = { x: maxX, y: minY };
+	                  drawLineSegment(top, right);
+	                  drawLineSegment(right, left);
+	                  drawLineSegment(left, top);
+	                  break;
+	                }
+	                case "x":
+	                  drawLineSegment({ x: minX, y: minY }, { x: maxX, y: maxY });
+	                  drawLineSegment({ x: maxX, y: minY }, { x: minX, y: maxY });
+	                  break;
+                case "check": {
+                  const p1 = { x: minX + w * 0.18, y: minY + h * 0.55 };
+                  const p2 = { x: minX + w * 0.42, y: minY + h * 0.78 };
+                  const p3 = { x: minX + w * 0.82, y: minY + h * 0.26 };
+                  drawLineSegment(p1, p2);
+                  drawLineSegment(p2, p3);
+                  break;
+                }
+                default:
+                  break;
+              }
+            });
+          }
+	        if (pageTexts.length > 0) {
+	          const font = await getDownloadFont();
+	          const { width: pageWidth, height: pageHeight } = copied.getSize();
+	          const fontSize = textSize;
+	          const lineHeight = fontSize * 1.3;
           const textColor = rgb(0.13, 0.15, 0.18);
           pageTexts.forEach((annotation) => {
             const content = annotation.text;
@@ -4325,38 +5181,19 @@ function WorkspaceClient() {
   }, [hasWorkspaceData]);
 
   useEffect(() => {
-    if (typeof document === "undefined") return;
-    if (!activeDrawingTool && !deleteMode) {
-      document.body.style.cursor = "";
-      return;
-    }
-    const previous = document.body.style.cursor;
-    if (deleteMode) {
-      document.body.style.cursor = "url('/icons/eraser.svg') 4 4, auto";
-    } else {
-      document.body.style.cursor =
-        activeDrawingTool === "highlight"
-          ? `url(${HIGHLIGHT_CURSOR}) 4 24, crosshair`
-          : activeDrawingTool === "pencil"
-          ? "crosshair"
-          : "text";
-    }
-    return () => {
-      document.body.style.cursor = previous;
-    };
-  }, [activeDrawingTool, deleteMode]);
-  useEffect(() => {
-    if (!highlightMode && !pencilMode) {
+    if (!highlightMode && !penMode) {
       setDraftHighlight(null);
     }
-  }, [highlightMode, pencilMode]);
+  }, [highlightMode, penMode]);
   const hasAnyHighlights = Object.values(highlights).some((list) => list && list.length > 0);
+  const hasAnyShapes = Object.values(shapesByPage).some((list) => list && list.length > 0);
   const hasUndoHistory = highlightHistory.length > 0;
+  const hasRedoHistory = redoHighlightHistory.length > 0;
   useEffect(() => {
-    if (!hasAnyHighlights && deleteMode) {
+    if (!hasAnyHighlights && !hasAnyShapes && deleteMode) {
       setDeleteMode(false);
     }
-  }, [hasAnyHighlights, deleteMode]);
+  }, [hasAnyHighlights, hasAnyShapes, deleteMode]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -4437,42 +5274,122 @@ function WorkspaceClient() {
     setHighlightThickness((prev) => clamp(prev + delta, MIN_HIGHLIGHT_THICKNESS, MAX_HIGHLIGHT_THICKNESS));
   }
 
-  function adjustPencilThickness(delta: number) {
-    setPencilThickness((prev) => clamp(prev + delta, MIN_PENCIL_THICKNESS, MAX_PENCIL_THICKNESS));
-  }
-
   function handleUndoHighlight() {
     setHighlightHistory((prev) => {
       if (prev.length === 0) return prev;
       const last = prev[prev.length - 1];
-      setHighlights((map) => {
-        switch (last.type) {
-          case "add": {
-            const list = map[last.pageId];
-            if (!list) return map;
-            const filtered = list.filter((stroke) => stroke.id !== last.highlight.id);
-            if (filtered.length === list.length) return map;
-            const next = { ...map };
-            if (filtered.length > 0) {
-              next[last.pageId] = filtered;
-            } else {
-              delete next[last.pageId];
-            }
-            return next;
+      setRedoHighlightHistory((redoPrev) => [...redoPrev, last]);
+      if (last.type === "add") {
+        setHighlights((map) => {
+          const list = map[last.pageId];
+          if (!list) return map;
+          const filtered = list.filter((stroke) => stroke.id !== last.highlight.id);
+          if (filtered.length === list.length) return map;
+          const next = { ...map };
+          if (filtered.length > 0) {
+            next[last.pageId] = filtered;
+          } else {
+            delete next[last.pageId];
           }
-          case "delete": {
-            const next = { ...map };
-            const list = next[last.pageId] ? [...next[last.pageId]] : [];
-            list.push(cloneStroke(last.highlight));
-            next[last.pageId] = list;
-            return next;
+          return next;
+        });
+      } else if (last.type === "delete") {
+        setHighlights((map) => {
+          const next = { ...map };
+          const list = next[last.pageId] ? [...next[last.pageId]] : [];
+          list.push(cloneStroke(last.highlight));
+          next[last.pageId] = list;
+          return next;
+        });
+      } else if (last.type === "addShape") {
+        setShapesByPage((map) => {
+          const list = map[last.pageId];
+          if (!list) return map;
+          const filtered = list.filter((shape) => shape.id !== last.shape.id);
+          if (filtered.length === list.length) return map;
+          const next = { ...map };
+          if (filtered.length > 0) {
+            next[last.pageId] = filtered;
+          } else {
+            delete next[last.pageId];
           }
-          case "clear":
-            return cloneHighlightMap(last.previous);
-          default:
-            return map;
-        }
-      });
+          return next;
+        });
+      } else if (last.type === "deleteShape") {
+        setShapesByPage((map) => {
+          const next = { ...map };
+          const list = next[last.pageId] ? [...next[last.pageId]] : [];
+          list.push({ ...last.shape, start: { ...last.shape.start }, end: { ...last.shape.end } });
+          next[last.pageId] = list;
+          return next;
+        });
+      } else if (last.type === "clear") {
+        setHighlights(cloneHighlightMap(last.previous.highlights));
+        setShapesByPage(cloneShapeMap(last.previous.shapes));
+        setTextAnnotations(cloneTextAnnotationMap(last.previous.textAnnotations));
+        setFocusedTextId(null);
+        setDraftTextBox(null);
+      }
+      return prev.slice(0, -1);
+    });
+  }
+
+  function handleRedoHighlight() {
+    setRedoHighlightHistory((prev) => {
+      if (prev.length === 0) return prev;
+      const last = prev[prev.length - 1];
+      if (last.type === "add") {
+        setHighlights((map) => {
+          const next = { ...map };
+          const list = next[last.pageId] ? [...next[last.pageId]] : [];
+          list.push(cloneStroke(last.highlight));
+          next[last.pageId] = list;
+          return next;
+        });
+      } else if (last.type === "delete") {
+        setHighlights((map) => {
+          const list = map[last.pageId];
+          if (!list) return map;
+          const filtered = list.filter((stroke) => stroke.id !== last.highlight.id);
+          if (filtered.length === list.length) return map;
+          const next = { ...map };
+          if (filtered.length > 0) {
+            next[last.pageId] = filtered;
+          } else {
+            delete next[last.pageId];
+          }
+          return next;
+        });
+      } else if (last.type === "addShape") {
+        setShapesByPage((map) => {
+          const next = { ...map };
+          const list = next[last.pageId] ? [...next[last.pageId]] : [];
+          list.push({ ...last.shape, start: { ...last.shape.start }, end: { ...last.shape.end } });
+          next[last.pageId] = list;
+          return next;
+        });
+      } else if (last.type === "deleteShape") {
+        setShapesByPage((map) => {
+          const list = map[last.pageId];
+          if (!list) return map;
+          const filtered = list.filter((shape) => shape.id !== last.shape.id);
+          if (filtered.length === list.length) return map;
+          const next = { ...map };
+          if (filtered.length > 0) {
+            next[last.pageId] = filtered;
+          } else {
+            delete next[last.pageId];
+          }
+          return next;
+        });
+      } else if (last.type === "clear") {
+        setHighlights({});
+        setShapesByPage({});
+        setTextAnnotations({});
+        setFocusedTextId(null);
+        setDraftTextBox(null);
+      }
+      setHighlightHistory((historyPrev) => [...historyPrev, last]);
       return prev.slice(0, -1);
     });
   }
@@ -4480,15 +5397,24 @@ function WorkspaceClient() {
   function handleClearHighlights() {
     if (!hasAnyAnnotations) return;
     setDraftHighlight(null);
+    setDraftShape(null);
     setDeleteMode(false);
     setIsErasing(false);
-    setHighlights((current) => {
-      const snapshot = cloneHighlightMap(current);
-      if (Object.keys(current).length > 0) {
-        setHighlightHistory((prev) => [...prev, { type: "clear", previous: snapshot }]);
-      }
-      return {};
-    });
+    const snapshot = {
+      highlights: cloneHighlightMap(highlights),
+      shapes: cloneShapeMap(shapesByPage),
+      textAnnotations: cloneTextAnnotationMap(textAnnotations),
+    };
+    if (
+      Object.keys(snapshot.highlights).length > 0 ||
+      Object.keys(snapshot.shapes).length > 0 ||
+      Object.keys(snapshot.textAnnotations).length > 0
+    ) {
+      setHighlightHistory((prev) => [...prev, { type: "clear", previous: snapshot }]);
+      setRedoHighlightHistory([]);
+    }
+    setHighlights({});
+    setShapesByPage({});
     setDraftTextBox(null);
     setTextAnnotations({});
     setFocusedTextId(null);
@@ -4513,17 +5439,46 @@ function WorkspaceClient() {
     });
     if (removed) {
       setHighlightHistory((prev) => [...prev, { type: "delete", pageId, highlight: cloneStroke(removed!) }]);
+      setRedoHighlightHistory([]);
+    }
+  }
+
+  function handleDeleteShape(pageId: string, shapeId: string) {
+    let removed: ShapeAnnotation | null = null;
+    setShapesByPage((map) => {
+      const list = map[pageId];
+      if (!list) return map;
+      const index = list.findIndex((shape) => shape.id === shapeId);
+      if (index === -1) return map;
+      removed = list[index];
+      const filtered = list.slice(0, index).concat(list.slice(index + 1));
+      const next = { ...map };
+      if (filtered.length > 0) {
+        next[pageId] = filtered;
+      } else {
+        delete next[pageId];
+      }
+      return next;
+    });
+    if (removed) {
+      setHighlightHistory((prev) => [
+        ...prev,
+        {
+          type: "deleteShape",
+          pageId,
+          shape: { ...removed!, start: { ...removed!.start }, end: { ...removed!.end } },
+        },
+      ]);
+      setRedoHighlightHistory([]);
     }
   }
 
   function handleToggleDeleteMode() {
-    if (!hasAnyHighlights && !deleteMode) return;
     setDeleteMode((prev) => {
       const next = !prev;
       if (next) {
-        setHighlightMode(false);
-        setPencilMode(false);
         setDraftHighlight(null);
+        setDraftShape(null);
       }
       return next;
     });
@@ -4531,10 +5486,10 @@ function WorkspaceClient() {
 
   return (
     <main className="flex h-screen flex-col overflow-hidden bg-[#f3f6fb]">
-      <header className="sticky top-0 z-40 border-b border-slate-100 bg-white shadow-[0_1px_4px_rgba(15,23,42,0.06)]">
-        {/* Top row (white) */}
+      <header className="sticky top-0 z-40 border-b border-slate-200/60 bg-white shadow-[0_1px_4px_rgba(15,23,42,0.06)]">
+        {/* Top row */}
         <div className="w-full border-b border-slate-100 bg-white">
-          <div className="flex h-16 w-full items-center gap-4 px-4 lg:px-6">
+          <div className="flex h-14 w-full items-center gap-4 px-4 lg:px-6">
             <Link href="/" className="inline-flex items-center gap-2" aria-label="Back to workspace">
               <Image src="/logo-wordmark2.svg" alt="MergifyPDF" width={160} height={40} priority />
             </Link>
@@ -4608,136 +5563,228 @@ function WorkspaceClient() {
         </div>
 
         {/* Bottom row (tools) */}
-        <div className="w-full border-b border-slate-900/10 bg-slate-800 shadow-[0_10px_30px_rgba(15,23,42,0.12)]">
-          <div className="w-full px-4 py-3 lg:px-6">
-            <div className="flex w-full flex-wrap items-center gap-3 lg:gap-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  disabled={highlightButtonDisabled}
-                  aria-pressed={highlightButtonOn}
-                  className={`${toolButtonBase} ${highlightButtonOn ? toolButtonActive : toolButtonInactive}`}
-                  onClick={() =>
-                    setHighlightMode((prev) => {
-                      setShowSignatureHub(false);
-                      setSignaturePanelMode("none");
-                      setPendingSignatureForPlacement(null);
-                      const next = !prev;
-                      if (next) {
-                        setDeleteMode(false);
-                        setPencilMode(false);
-                        setTextMode(false);
-                      }
-                      return next;
-                    })
-                  }
-                >
-                  <Highlighter className="h-4 w-4" />
-                  Highlight
-                </button>
-                <button
-                  type="button"
-                  disabled={highlightButtonDisabled}
-                  aria-pressed={pencilButtonOn}
-                  className={`${toolButtonBase} ${pencilButtonOn ? toolButtonActive : toolButtonInactive}`}
-                  onClick={() =>
-                    setPencilMode((prev) => {
-                      setShowSignatureHub(false);
-                      setSignaturePanelMode("none");
-                      setPendingSignatureForPlacement(null);
-                      const next = !prev;
-                      if (next) {
-                        setDeleteMode(false);
-                        setHighlightMode(false);
-                        setTextMode(false);
-                      }
-                      return next;
-                    })
-                  }
-                >
-                  <Pencil className="h-4 w-4" />
-                  Pencil
-                </button>
-                <button
-                  type="button"
-                  disabled={highlightButtonDisabled}
-                  aria-pressed={textButtonOn}
-                  className={`${toolButtonBase} ${textButtonOn ? toolButtonActive : toolButtonInactive}`}
-                  onClick={() =>
-                    setTextMode((prev) => {
-                      setShowSignatureHub(false);
-                      setSignaturePanelMode("none");
-                      setPendingSignatureForPlacement(null);
-                      const next = !prev;
-                      if (next) {
-                        setDeleteMode(false);
-                        setHighlightMode(false);
-                        setPencilMode(false);
-                        setDraftHighlight(null);
-                      }
-                      return next;
-                    })
-                  }
-                >
-                  Text
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={signatureButtonOn}
-                  className={`${toolButtonBase} ${signatureButtonOn ? toolButtonActive : toolButtonInactive}`}
-                  onClick={() => {
-                    setShowSignatureHub(true);
-                    setSignatureHubStep("gallery");
-                    setSignaturePanelMode("none");
-                    setPendingSignatureForPlacement(null);
-                    setHighlightMode(false);
-                    setPencilMode(false);
-                    setTextMode(false);
-                    setDeleteMode(false);
-                  }}
-                >
-                  <SignatureIcon className="h-4 w-4" />
-                  Signature
-                  {savedSignatures.length > 0 ? (
-                    <span className="inline-flex min-w-[18px] items-center justify-center rounded-full bg-white/80 px-1 text-[0.65rem] font-bold text-[#024d7c]">
-                      {savedSignatures.length}
-                    </span>
-                  ) : null}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setOrganizeMode(true)}
-                  disabled={pages.length === 0 || organizeMode}
-                  aria-pressed={organizeMode}
-                  className={`${toolButtonBase} ${organizeMode ? toolButtonActive : toolButtonInactive}`}
-                >
-                  Manage pages
-                </button>
-              </div>
+        <div className="w-full border-b border-slate-200/60 bg-[#F1F5F9] shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
+	          <div className="w-full px-0.5 py-0.5 lg:px-6">
+	            <div className="relative h-10">
+	              <div className={`absolute inset-0 flex w-full items-center gap-3 lg:gap-4 ${loading ? "pointer-events-none" : ""}`}>
+	                <div className="tools-scroll flex min-w-0 flex-1 overflow-x-auto">
+	                  <div className="flex items-center gap-0 rounded-xl bg-[#F1F5F9] px-0.5 py-0 ring-1 ring-slate-200/80">
+	                  <button
+	                    type="button"
+	                    className={`${toolButtonBase} ${toolIconButton} ${toolButtonInactiveBlack}`}
+	                    disabled={loading}
+	                    aria-disabled={!hasUndoHistory}
+	                    aria-label="Undo"
+	                    title="Undo"
+	                    onClick={() => {
+	                      if (loading) return;
+	                      if (!hasUndoHistory) return;
+	                      handleUndoHighlight();
+	                    }}
+	                  >
+	                    <Undo2 className="h-5 w-5" />
+	                  </button>
 
-	              <div className="flex items-center gap-2">
-	                <button
-	                  className={`${toolButtonBase} ${toolButtonInactive}`}
-	                  onClick={handleUndoHighlight}
-                  disabled={!hasUndoHistory}
-                >
-                  <Undo2 className="h-4 w-4" />
-                  Undo
-                </button>
-                <button
-                  className={`${toolButtonBase} ${deleteMode ? toolButtonActive : toolButtonInactive}`}
-                  onClick={handleToggleDeleteMode}
-                  aria-pressed={deleteMode}
-                  disabled={!hasAnyAnnotations && !deleteMode}
-                >
-                  <Eraser className="h-4 w-4" />
-	                  Eraser
-	                </button>
+	                  <button
+	                    type="button"
+	                    className={`${toolButtonBase} ${toolIconButton} ${toolButtonInactiveBlack}`}
+	                    disabled={loading}
+	                    aria-disabled={!hasRedoHistory}
+	                    aria-label="Redo"
+	                    title="Redo"
+	                    onClick={() => {
+	                      if (loading) return;
+	                      if (!hasRedoHistory) return;
+	                      handleRedoHighlight();
+	                    }}
+	                  >
+	                    <Redo2 className="h-5 w-5" />
+	                  </button>
+
+	                  <div className="mx-1 h-6 w-px bg-slate-300/90" aria-hidden />
+
+	                  <button
+	                    type="button"
+	                    disabled={loading}
+	                    aria-pressed={selectButtonOn}
+	                    className={`${toolButtonBase} ${selectButtonOn ? toolButtonActive : toolButtonInactiveBlack}`}
+	                    onClick={() => {
+	                      if (loading) return;
+	                      setSelectMode(true);
+	                      setPenMode(false);
+	                      setShapeMode(false);
+	                      setHighlightMode(false);
+	                      setTextMode(false);
+	                      setDeleteMode(false);
+	                      setDraftHighlight(null);
+	                      setDraftShape(null);
+	                      setDraftTextBox(null);
+	                      setShowSignatureHub(false);
+	                      setSignaturePanelMode("none");
+	                      setPendingSignatureForPlacement(null);
+	                    }}
+	                  >
+	                    <MousePointer2 className="h-5 w-5" />
+	                    Select
+	                  </button>
+
+	                  <div className="mx-1 h-6 w-px bg-slate-300/90" aria-hidden />
+
+	                  <button
+	                    type="button"
+	                    disabled={highlightButtonDisabled}
+	                    aria-pressed={drawButtonOn}
+	                    className={`${toolButtonBase} ${drawButtonOn ? toolButtonActive : toolButtonInactiveBlack}`}
+	                    onClick={() => {
+	                      if (highlightButtonDisabled) return;
+	                      setSelectMode(false);
+	                      setDeleteMode(false);
+	                      setPenMode(true);
+	                      setHighlightMode(false);
+	                      setShapeMode(false);
+	                      setTextMode(false);
+	                      setDraftHighlight(null);
+	                      setDraftShape(null);
+	                      setDraftTextBox(null);
+	                      setShowSignatureHub(false);
+	                      setSignaturePanelMode("none");
+	                      setPendingSignatureForPlacement(null);
+	                    }}
+	                  >
+	                    <PencilLine className="h-5 w-5" />
+	                    Draw
+	                  </button>
+
+	                  <div className="mx-1 h-6 w-px bg-slate-300/90" aria-hidden />
+
+	                  <button
+	                    type="button"
+	                    disabled={highlightButtonDisabled}
+	                    aria-pressed={highlightButtonVisualOn}
+	                    className={`${toolButtonBase} ${highlightButtonVisualOn ? toolButtonActive : toolButtonInactiveBlack}`}
+	                    onClick={() => {
+	                      if (highlightButtonDisabled) return;
+	                      setSelectMode(false);
+	                      setDeleteMode(false);
+	                      setHighlightMode(true);
+	                      setPenMode(false);
+	                      setShapeMode(false);
+	                      setTextMode(false);
+	                      setDraftHighlight(null);
+	                      setDraftShape(null);
+	                      setDraftTextBox(null);
+	                      setShowSignatureHub(false);
+	                      setSignaturePanelMode("none");
+	                      setPendingSignatureForPlacement(null);
+	                    }}
+	                  >
+	                    <Highlighter className="h-5 w-5" />
+	                    Highlight
+	                  </button>
+
+	                  <div className="mx-1 h-6 w-px bg-slate-300/90" aria-hidden />
+
+	                  <button
+	                    type="button"
+	                    disabled={highlightButtonDisabled}
+	                    aria-pressed={shapeButtonVisualOn}
+	                    className={`${toolButtonBase} ${shapeButtonVisualOn ? toolButtonActive : toolButtonInactiveBlack}`}
+	                    onClick={() => {
+	                      if (highlightButtonDisabled) return;
+	                      setSelectMode(false);
+	                      setDeleteMode(false);
+	                      setShapeMode(true);
+	                      setPenMode(false);
+	                      setHighlightMode(false);
+	                      setTextMode(false);
+	                      setDraftHighlight(null);
+	                      setDraftShape(null);
+	                      setDraftTextBox(null);
+	                      setShowSignatureHub(false);
+	                      setSignaturePanelMode("none");
+	                      setPendingSignatureForPlacement(null);
+	                    }}
+	                  >
+	                    <Shapes className="h-5 w-5" />
+	                    Shapes
+	                  </button>
+
+	                  <div className="mx-1 h-6 w-px bg-slate-300/90" aria-hidden />
+
+	                  <button
+	                    type="button"
+	                    disabled={highlightButtonDisabled}
+	                    aria-pressed={textButtonOn}
+	                    className={`${toolButtonBase} ${textButtonOn ? toolButtonActive : toolButtonInactiveBlack}`}
+	                    onClick={() => {
+	                      if (highlightButtonDisabled) return;
+	                      setSelectMode(false);
+	                      setDeleteMode(false);
+	                      setTextMode(true);
+	                      setPenMode(false);
+	                      setHighlightMode(false);
+	                      setShapeMode(false);
+	                      setDraftHighlight(null);
+	                      setDraftShape(null);
+	                      setDraftTextBox(null);
+	                      setShowSignatureHub(false);
+	                      setSignaturePanelMode("none");
+	                      setPendingSignatureForPlacement(null);
+	                    }}
+	                  >
+	                    Text
+	                  </button>
+
+	                  <div className="mx-1 h-6 w-px bg-slate-300/90" aria-hidden />
+
+	                  <button
+	                    disabled={loading}
+	                    className={`${toolButtonBase} ${deleteMode ? toolButtonActive : toolButtonInactiveBlack}`}
+	                    onClick={handleToggleDeleteMode}
+	                    aria-pressed={deleteMode}
+	                    aria-disabled={!hasAnyAnnotations && !deleteMode}
+	                  >
+	                    <Eraser className="h-5 w-5" />
+	                    Eraser
+	                  </button>
+
+	                  <button
+	                    type="button"
+	                    disabled={loading}
+	                    aria-pressed={signatureButtonOn}
+	                    className={`${toolButtonBase} ${signatureButtonOn ? toolButtonActive : toolButtonInactiveBlack}`}
+	                    onClick={() => {
+	                      if (loading) return;
+	                      setSelectMode(false);
+	                      setDeleteMode(false);
+	                      setPenMode(false);
+	                      setShapeMode(false);
+	                      setDraftShape(null);
+	                      setShowSignatureHub(true);
+	                      setSignatureHubStep("gallery");
+	                      setSignaturePanelMode("none");
+	                      setPendingSignatureForPlacement(null);
+	                      setHighlightMode(false);
+	                      setTextMode(false);
+	                    }}
+	                  >
+	                    <SignatureIcon className="h-5 w-5" />
+	                    Sign
+	                    {savedSignatures.length > 0 ? (
+	                      <span className="inline-flex min-w-[18px] items-center justify-center rounded-full bg-white/80 px-1 text-[0.65rem] font-bold text-[#024d7c]">
+	                        {savedSignatures.length}
+	                      </span>
+	                    ) : null}
+	                  </button>
+	                  </div>
+	                </div>
+
+	                <div className="flex shrink-0 items-center gap-0" />
 	              </div>
 
-              <input
-                ref={addInputRef}
-                type="file"
+	              <input
+	                ref={addInputRef}
+	                type="file"
                 accept="application/pdf"
                 multiple
                 className="hidden"
@@ -4747,79 +5794,6 @@ function WorkspaceClient() {
           </div>
         </div>
 
-	            {highlightActive || pencilActive ? (
-	              <div className="mt-3 rounded-2xl border border-slate-200 bg-white px-4 py-2 shadow-sm">
-	                <div className="flex flex-wrap items-center gap-4">
-	                  {highlightActive ? (
-                    <>
-                      <div className="flex items-center gap-2">
-                        {highlightColorEntries.map(([key, value]) => (
-                          <button
-                            key={key}
-                            type="button"
-                            onClick={() => setHighlightColor(key)}
-                            className={`flex h-8 w-8 items-center justify-center rounded-full border transition ${
-                              highlightColor === key
-                                ? "border-[#024d7c] ring-2 ring-[#024d7c]/30"
-                                : "border-white/30 hover:border-slate-300"
-                            }`}
-                            style={{ backgroundColor: value }}
-                            aria-label={`Use ${key} highlighter`}
-                          />
-                        ))}
-                      </div>
-                      <div className="flex items-center gap-2 rounded-full border border-slate-300 bg-white/80 px-3 py-1.5 text-[0.65rem] font-semibold uppercase tracking-wide text-slate-600 shadow-sm">
-                        <button
-                          type="button"
-                          onClick={() => adjustHighlightThickness(-2)}
-                          disabled={highlightThickness <= MIN_HIGHLIGHT_THICKNESS}
-                          className="rounded-full border border-transparent p-1 transition hover:border-slate-200 hover:bg-white disabled:opacity-40"
-                        >
-                          <Minus className="h-3.5 w-3.5" />
-                        </button>
-                        <span>{Math.round(highlightThickness)} px</span>
-                        <button
-                          type="button"
-                          onClick={() => adjustHighlightThickness(2)}
-                          disabled={highlightThickness >= MAX_HIGHLIGHT_THICKNESS}
-                          className="rounded-full border border-transparent p-1 transition hover:border-slate-200 hover:bg-white disabled:opacity-40"
-                        >
-                          <Plus className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </>
-                  ) : null}
-
-                  {pencilActive ? (
-                    <>
-                      <div className="flex items-center gap-2 rounded-full border border-slate-300 bg-white/80 px-3 py-1.5 text-[0.65rem] font-semibold uppercase tracking-wide text-slate-600 shadow-sm">
-                        <span className="text-[0.6rem] font-semibold uppercase tracking-wide text-slate-500">Streak</span>
-                        <button
-                          type="button"
-                          onClick={() => adjustPencilThickness(-1)}
-                          disabled={pencilThickness <= MIN_PENCIL_THICKNESS}
-                          className="rounded-full border border-transparent p-1 transition hover:border-slate-200 hover:bg-white disabled:opacity-40"
-                        >
-                          <Minus className="h-3.5 w-3.5" />
-                        </button>
-                        <span>{Math.round(pencilThickness)} px</span>
-                        <button
-                          type="button"
-                          onClick={() => adjustPencilThickness(1)}
-                          disabled={pencilThickness >= MAX_PENCIL_THICKNESS}
-                          className="rounded-full border border-transparent p-1 transition hover:border-slate-200 hover:bg-white disabled:opacity-40"
-                        >
-                          <Plus className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                      <span className="text-[0.6rem] font-semibold uppercase tracking-wide text-slate-500">
-                        Ink color: black
-                      </span>
-                    </>
-                  ) : null}
-                </div>
-              </div>
-            ) : null}
       </header>
 
 	      <div className="flex-1 min-h-0 overflow-hidden">
@@ -4896,50 +5870,292 @@ function WorkspaceClient() {
 	                    animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.97 }}
                   transition={VIEW_TRANSITION}
-		                  className="editor-shell mx-auto flex h-full min-h-0 w-full flex-1 flex-col gap-6 overflow-hidden px-0"
+			                  className="editor-shell mx-auto flex h-full min-h-0 w-full flex-1 flex-col gap-6 overflow-hidden px-0"
                 >
-		                    <div className="flex h-full min-h-0 w-full items-stretch gap-0">
-	                      <div className="min-w-0 flex-1 min-h-0 overflow-hidden">
-			                        <div
-			                          ref={viewerScrollRef}
-			                          className={`viewer-scroll relative flex h-full w-full overflow-auto pb-16 ${deleteMode ? "eraser-cursor" : ""}`}
-			                          style={{ scrollbarGutter: "stable" }}
-			                        >
-                          {null}
-		                          <div className="relative mx-auto flex min-w-full items-start justify-center">
-		                            <div className="flex w-fit justify-center">
-		                              <div id="pdf-viewport" className="origin-top flex w-fit flex-col gap-8">
-		                                {pages.map((page, index) => renderPreviewPage(page, index))}
-		                                <div className="h-8" aria-hidden />
-	                              </div>
-	                            </div>
-	                          </div>
-	                        </div>
-	                      </div>
-	
-		                      {showPageOrderPanel ? (
-		                        <aside className="flex w-[300px] shrink-0 flex-col">
-		                          <div className="flex min-h-0 flex-1 flex-col border-l border-slate-200 bg-[#f8fafc]">
-		                            <div className="flex h-[52px] items-center justify-between border-b border-slate-200 bg-white px-4">
-		                              <p className="text-sm font-semibold text-slate-600">{pages.length} pages</p>
-		                              <div className="flex items-center gap-2">
-		                                <button
-		                                  type="button"
-		                                  onClick={() => setOrganizeMode(true)}
-		                                  disabled={pages.length === 0 || organizeMode}
-		                                  className="text-sm font-semibold text-[#024d7c] transition hover:text-[#013d63] disabled:opacity-50"
-		                                >
-		                                  Manage pages
-		                                </button>
-		                              </div>
-		                            </div>
-                          {null}
-                          <div className="thumbs-scroll min-h-0 flex-1 overflow-y-auto border-t border-slate-200 pl-4 pr-0">
-		                            <DndContext
-		                              sensors={sensors}
-		                              collisionDetection={closestCenter}
-	                              onDragEnd={handleDragEnd}
-	                            >
+				                    <div className="flex h-full min-h-0 w-full items-stretch gap-0 overflow-hidden">
+				                      <div className="flex min-w-0 flex-1 min-h-0 flex-col overflow-hidden">
+				                        <AnimatePresence initial={false}>
+				                          {showToolOptionsBar ? (
+				                            <motion.div
+				                              key="tool-options-bar"
+				                              initial={{ height: 0, opacity: 0, y: -6 }}
+				                              animate={{ height: 45, opacity: 1, y: 0 }}
+				                              exit={{ height: 0, opacity: 0, y: -6 }}
+				                              transition={{ duration: 0.18, ease: SOFT_EASE }}
+				                              className="min-w-0 overflow-hidden"
+				                            >
+				                              <div className="flex h-[45px] min-w-0 items-center border-b border-slate-200 bg-white px-4">
+					                            {shapeMode ? (
+					                              <div
+					                                className={`tools-scroll flex min-w-0 items-center gap-2 overflow-x-auto ${
+					                                  loading ? "pointer-events-none" : ""
+				                                }`}
+				                                aria-label="Shape options"
+				                              >
+				                                <div className="flex items-center gap-2">
+				                                  <span className="text-xs font-semibold text-slate-600">Shape</span>
+				                                  <div className="flex items-center gap-1.5">
+				                                    {[
+				                                      { type: "line" as const, label: "Line", icon: Minus },
+				                                      { type: "arrow" as const, label: "Arrow", icon: ArrowRight },
+				                                      { type: "rect" as const, label: "Square", icon: Square },
+				                                      { type: "ellipse" as const, label: "Circle", icon: Circle },
+				                                      { type: "triangle" as const, label: "Triangle", icon: Triangle },
+				                                      { type: "check" as const, label: "Check", icon: Check },
+				                                      { type: "x" as const, label: "X", icon: X },
+				                                    ].map((item) => {
+				                                      const Icon = item.icon;
+				                                      const selected = shapeType === item.type;
+				                                      return (
+				                                        <button
+				                                          key={item.type}
+				                                          type="button"
+				                                          onClick={() => setShapeType(item.type)}
+				                                          className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border transition ${
+				                                            selected
+				                                              ? "border-slate-200 bg-white text-slate-900 shadow-[0_6px_16px_rgba(15,23,42,0.10)]"
+				                                              : "border-transparent text-slate-600 hover:bg-white/80 hover:text-slate-900"
+				                                          }`}
+				                                          aria-label={item.label}
+				                                        >
+				                                          <Icon className="h-4 w-4" aria-hidden />
+				                                        </button>
+				                                      );
+				                                    })}
+				                                  </div>
+				                                </div>
+				
+				                                <div className="hidden h-8 w-px bg-slate-200/70 sm:block" aria-hidden />
+				
+				                                <div className="flex items-center gap-2">
+				                                  <span className="text-xs font-semibold text-slate-600">Color</span>
+				                                  <label className="relative h-8 w-8 cursor-pointer rounded-full border border-slate-200 bg-white shadow-sm">
+				                                    <span
+				                                      className="absolute inset-1 rounded-full"
+				                                      style={{ backgroundColor: shapeColor }}
+				                                      aria-hidden
+				                                    />
+				                                    <input
+				                                      type="color"
+				                                      value={shapeColor}
+				                                      onChange={(event) => setShapeColor(event.target.value)}
+				                                      className="absolute inset-0 cursor-pointer opacity-0"
+				                                      aria-label="Shape color"
+				                                    />
+				                                  </label>
+				                                </div>
+				
+				                                <div className="hidden h-8 w-px bg-slate-200/70 sm:block" aria-hidden />
+				
+				                                <div className="flex items-center gap-2">
+				                                  <span className="text-xs font-semibold text-slate-600">Thickness</span>
+				                                  <input
+				                                    type="range"
+				                                    min={1}
+				                                    max={10}
+				                                    step={1}
+				                                    value={shapeThickness}
+				                                    onChange={(event) => setShapeThickness(Number(event.target.value))}
+				                                    className="h-2 w-28 cursor-pointer accent-[#024d7c]"
+				                                    aria-label="Shape thickness"
+				                                  />
+				                                  <span className="w-12 text-right text-xs font-semibold tabular-nums text-slate-700">
+				                                    {Math.round(shapeThickness)}px
+				                                  </span>
+				                                </div>
+				                              </div>
+				                            ) : highlightMode ? (
+				                              <div
+				                                className={`tools-scroll flex min-w-0 items-center gap-2 overflow-x-auto ${
+				                                  loading ? "pointer-events-none" : ""
+				                                }`}
+				                                aria-label="Highlight options"
+				                              >
+				                                <div className="flex items-center gap-1.5">
+				                                  {highlightColorEntries.map(([key, value]) => (
+				                                    <button
+				                                      key={key}
+				                                      type="button"
+				                                      onClick={() => setHighlightColor(key)}
+				                                      className={`h-7 w-7 rounded-full border transition ${
+				                                        highlightColor === key
+				                                          ? "border-[#024d7c] ring-2 ring-[#024d7c]/25"
+				                                          : "border-white/30 hover:border-slate-300"
+				                                      }`}
+				                                      style={{ backgroundColor: value }}
+				                                      aria-label={`Use ${key} highlight`}
+				                                    />
+				                                  ))}
+				                                </div>
+				
+				                                <div className="hidden h-8 w-px bg-slate-200/70 sm:block" aria-hidden />
+				
+				                                <div className="flex items-center gap-2">
+				                                  <span className="text-xs font-semibold text-slate-600">Thickness</span>
+				                                  <input
+				                                    type="range"
+				                                    min={MIN_HIGHLIGHT_THICKNESS}
+				                                    max={MAX_HIGHLIGHT_THICKNESS}
+				                                    step={1}
+				                                    value={highlightThickness}
+				                                    onChange={(event) => setHighlightThickness(Number(event.target.value))}
+				                                    className="h-2 w-28 cursor-pointer accent-[#024d7c]"
+				                                    aria-label="Highlight thickness"
+				                                  />
+				                                  <span className="w-12 text-right text-xs font-semibold tabular-nums text-slate-700">
+				                                    {Math.round(highlightThickness)}px
+				                                  </span>
+				                                </div>
+				
+				                                <div className="hidden h-8 w-px bg-slate-200/70 sm:block" aria-hidden />
+				
+				                                <div className="flex items-center gap-2">
+				                                  <span className="text-xs font-semibold text-slate-600">Opacity</span>
+				                                  <input
+				                                    type="range"
+				                                    min={0.15}
+				                                    max={0.6}
+				                                    step={0.05}
+				                                    value={highlightOpacity}
+				                                    onChange={(event) => setHighlightOpacity(Number(event.target.value))}
+				                                    className="h-2 w-24 cursor-pointer accent-[#024d7c]"
+				                                    aria-label="Highlight opacity"
+				                                  />
+				                                  <span className="w-10 text-right text-xs font-semibold tabular-nums text-slate-700">
+				                                    {Math.round(highlightOpacity * 100)}%
+				                                  </span>
+				                                </div>
+				                              </div>
+				                            ) : penMode ? (
+				                              <div
+				                                className={`tools-scroll flex min-w-0 items-center gap-2 overflow-x-auto ${
+				                                  loading ? "pointer-events-none" : ""
+				                                }`}
+				                                aria-label="Draw options"
+				                              >
+				                                <div className="flex items-center gap-2">
+				                                  <span className="text-xs font-semibold text-slate-600">Color</span>
+				                                  <label className="relative h-8 w-8 cursor-pointer rounded-full border border-slate-200 bg-white shadow-sm">
+				                                    <span
+				                                      className="absolute inset-1 rounded-full"
+				                                      style={{ backgroundColor: penColor }}
+				                                      aria-hidden
+				                                    />
+				                                    <input
+				                                      type="color"
+				                                      value={penColor}
+				                                      onChange={(event) => setPenColor(event.target.value)}
+				                                      className="absolute inset-0 cursor-pointer opacity-0"
+				                                      aria-label="Stroke color"
+				                                    />
+				                                  </label>
+				                                </div>
+				
+				                                <div className="hidden h-8 w-px bg-slate-200/70 sm:block" aria-hidden />
+				
+				                                <div className="flex items-center gap-2">
+				                                  <span className="text-xs font-semibold text-slate-600">Thickness</span>
+				                                  <input
+				                                    type="range"
+				                                    min={1}
+				                                    max={10}
+				                                    step={1}
+				                                    value={penThickness}
+				                                    onChange={(event) => setPenThickness(Number(event.target.value))}
+				                                    className="h-2 w-28 cursor-pointer accent-[#024d7c]"
+				                                    aria-label="Stroke thickness"
+				                                  />
+				                                  <span className="w-12 text-right text-xs font-semibold tabular-nums text-slate-700">
+				                                    {Math.round(penThickness)}px
+				                                  </span>
+				                                </div>
+				                              </div>
+				                            ) : (
+				                              <div
+				                                className={`tools-scroll flex min-w-0 items-center gap-2 overflow-x-auto ${
+				                                  loading ? "pointer-events-none" : ""
+				                                }`}
+				                                aria-label="Text options"
+				                              >
+				                                <div className="flex items-center gap-2">
+				                                  <span className="text-xs font-semibold text-slate-600">Font</span>
+				                                  <select
+				                                    value={textFont}
+				                                    onChange={(event) => setTextFont(event.target.value as TextFont)}
+				                                    className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm outline-none transition focus:border-slate-300"
+				                                    aria-label="Text font"
+				                                  >
+				                                    {textFontEntries.map(([key, option]) => (
+				                                      <option key={key} value={key}>
+				                                        {option.label}
+				                                      </option>
+				                                    ))}
+				                                  </select>
+				                                </div>
+				
+				                                <div className="hidden h-8 w-px bg-slate-200/70 sm:block" aria-hidden />
+				
+				                                <div className="flex items-center gap-2">
+				                                  <span className="text-xs font-semibold text-slate-600">Size</span>
+				                                  <input
+				                                    type="range"
+				                                    min={8}
+				                                    max={48}
+				                                    step={1}
+				                                    value={textSize}
+				                                    onChange={(event) => setTextSize(Number(event.target.value))}
+				                                    className="h-2 w-28 cursor-pointer accent-[#024d7c]"
+				                                    aria-label="Text size"
+				                                  />
+				                                  <span className="w-12 text-right text-xs font-semibold tabular-nums text-slate-700">
+				                                    {Math.round(textSize)}px
+				                                  </span>
+				                                </div>
+				                              </div>
+				                            )}
+				                              </div>
+				                            </motion.div>
+				                          ) : null}
+				                        </AnimatePresence>
+			
+				                        <div className="min-w-0 flex-1 min-h-0 overflow-hidden">
+				                          <div
+				                            ref={viewerScrollRef}
+				                            className="viewer-scroll relative flex h-full w-full overflow-auto pb-16"
+				                            style={{ scrollbarGutter: "stable" }}
+				                          >
+				                            {null}
+				                            <div className="relative w-full min-w-0 text-center">
+				                              <div id="pdf-viewport" className="inline-flex origin-top flex-col gap-8">
+				                                {pages.map((page, index) => renderPreviewPage(page, index))}
+				                                <div className="h-8" aria-hidden />
+				                              </div>
+				                            </div>
+				                          </div>
+				                        </div>
+				                      </div>
+			
+				                      <div className="flex shrink-0 items-stretch border-l border-slate-200">
+				                          {showPageOrderPanel ? (
+				                            <aside className="flex w-[280px] shrink-0 flex-col">
+				                              <div className="flex min-h-0 flex-1 flex-col bg-[#f8fafc]">
+				                                <div className="flex h-[45px] items-center justify-between border-b border-slate-200 bg-white px-4">
+				                                  <p className="text-sm font-semibold text-slate-600">{pages.length} pages</p>
+				                                  <button
+				                                    type="button"
+				                                    onClick={() => setOrganizeMode(true)}
+				                                    disabled={pages.length === 0 || organizeMode}
+				                                    className="rounded-lg px-2.5 py-1.5 text-sm font-semibold text-[#024d7c] transition hover:bg-slate-100 hover:text-[#013d63] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#51bdff]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:opacity-50"
+				                                  >
+				                                    Manage pages
+				                                  </button>
+				                                </div>
+				                                <div className="thumbs-scroll min-h-0 flex-1 overflow-y-auto pl-4 pr-0">
+				                            <DndContext
+				                              sensors={sensors}
+				                              collisionDetection={closestCenter}
+		                              onDragEnd={handleDragEnd}
+		                            >
 		                              <SortableContext items={itemsIds} strategy={verticalListSortingStrategy}>
 		                                <ul className="flex flex-col py-0">
 		                                  {pages.length > 0 ? (
@@ -5013,40 +6229,41 @@ function WorkspaceClient() {
 		                                      </div>
 		                                    </li>
 		                                  ) : null}
-		                                </ul>
-		                              </SortableContext>
-		                            </DndContext>
-		                          </div>
-		                          </div>
-		                        </aside>
-		                      ) : null}
+			                                </ul>
+			                              </SortableContext>
+			                            </DndContext>
+			                                  </div>
+			                                </div>
+				                            </aside>
+					                          ) : null}
 
-		                      <aside className="flex w-14 shrink-0 flex-col border-l border-slate-200 bg-white">
-		                        <div className="flex flex-1 flex-col items-center">
-		                          <div className="flex h-[52px] w-full items-center justify-center">
-		                            <div className="group relative">
-		                            <button
-		                              type="button"
-		                              onClick={() => setShowPageOrderPanel((prev) => !prev)}
-		                              className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60"
-		                              aria-label={showPageOrderPanel ? "Close sidebar" : "Open sidebar"}
-		                            >
-		                              {showPageOrderPanel ? (
-		                                <PanelRightClose className="h-7 w-7" aria-hidden />
-		                              ) : (
-		                                <PanelRightOpen className="h-7 w-7" aria-hidden />
-		                              )}
-		                            </button>
-		                            <div className="pointer-events-none absolute right-0 top-full z-50 mt-2 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100">
-		                              {showPageOrderPanel ? "Close sidebar" : "Open sidebar"}
-		                            </div>
-		                            </div>
-		                          </div>
-		                        </div>
-		                      </aside>
-		                    </div>
-	                  </motion.div>
-	                ) : null}
+				                          <aside
+				                            className={`flex w-14 shrink-0 flex-col bg-white ${showPageOrderPanel ? "border-l border-slate-200" : ""}`}
+				                          >
+				                            <div className="flex h-[45px] w-full items-center justify-center border-b border-slate-200">
+				                              <div className="group relative">
+				                                <button
+				                                  type="button"
+				                                  onClick={() => setShowPageOrderPanel((prev) => !prev)}
+				                                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60"
+				                                  aria-label={showPageOrderPanel ? "Close sidebar" : "Open sidebar"}
+				                                >
+				                                  {showPageOrderPanel ? (
+				                                    <PanelRightClose className="h-6 w-6" aria-hidden />
+				                                  ) : (
+				                                    <PanelRightOpen className="h-6 w-6" aria-hidden />
+				                                  )}
+				                                </button>
+				                                <div className="pointer-events-none absolute right-0 top-full z-50 mt-2 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100">
+				                                  {showPageOrderPanel ? "Close sidebar" : "Open sidebar"}
+				                                </div>
+				                              </div>
+				                            </div>
+				                          </aside>
+				                        </div>
+				                    </div>
+		                  </motion.div>
+		                ) : null}
               </AnimatePresence>
 
 	              {!loading && pages.length === 0 && (
@@ -5756,7 +6973,7 @@ function WorkspaceClient() {
 	                onClick={() => handlePageStep(-1)}
 	                disabled={activePageIndex <= 0}
 	              >
-		                <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+			                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
 	                  <path
 	                    d="M14 6l-6 6 6 6"
 	                    stroke="currentColor"
@@ -5802,7 +7019,7 @@ function WorkspaceClient() {
 	                onClick={() => handlePageStep(1)}
 	                disabled={activePageIndex === pages.length - 1 || pages.length === 0}
 	              >
-		                <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+			                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
 	                  <path
 	                    d="M10 6l6 6-6 6"
 	                    stroke="currentColor"
@@ -5855,10 +7072,6 @@ function WorkspaceClient() {
 	          border-radius: 9999px;
 	          background-color: #cbd5e1;
 	        }
-        .eraser-cursor,
-        .eraser-cursor * {
-          cursor: url("/icons/eraser.svg") 4 4, auto !important;
-        }
         .viewer-scroll {
           overflow: auto;
         }
@@ -5870,6 +7083,12 @@ function WorkspaceClient() {
         }
         .thumbs-scroll {
           scrollbar-color: rgba(100, 116, 139, 0.85) #ffffff;
+        }
+        .tools-scroll::-webkit-scrollbar {
+          height: 0px;
+        }
+        .tools-scroll {
+          scrollbar-width: none;
         }
         /* Make scrollbar gutters/tracks white across Studio */
         body.studio-page * {
