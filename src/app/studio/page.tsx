@@ -30,6 +30,9 @@ import {
   Undo2,
   Redo2,
   Shapes,
+  Image as ImageIcon,
+  Pin,
+  Type,
   MousePointer2,
 	  ArrowRight,
 	  Check,
@@ -315,6 +318,7 @@ const TEXT_FONT_OPTIONS: Record<TextFont, FontOption> = {
     },
   },
 };
+
 
 const HIGHLIGHT_COLORS = {
   yellow: "#fff266",
@@ -1245,6 +1249,10 @@ function WorkspaceClient() {
   const [uploadName, setUploadName] = useState("");
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showImageUploadModal, setShowImageUploadModal] = useState(false);
+  const [imageUploadPreview, setImageUploadPreview] = useState<string | null>(null);
+  const [imageUploadName, setImageUploadName] = useState("");
+  const [imageUploadError, setImageUploadError] = useState<string | null>(null);
   const [highlights, setHighlights] = useState<Record<string, HighlightStroke[]>>({});
   const [textAnnotations, setTextAnnotations] = useState<Record<string, TextAnnotation[]>>({});
   const [textBold, setTextBold] = useState(false);
@@ -1496,14 +1504,14 @@ function WorkspaceClient() {
     `${buttonBase} border border-slate-200 bg-white text-slate-800 shadow-[0_4px_14px_rgba(15,23,42,0.12)] hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50`;
   const buttonPrimary =
     `${buttonBase} bg-[#024d7c] text-white shadow-md shadow-[#012a44]/30 hover:-translate-y-0.5 hover:bg-[#013d63]`;
-	  const toolButtonBase =
-	    "inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#009DFD]/25 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F1F5F9] disabled:cursor-not-allowed";
+  const toolButtonBase =
+    "inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#009DFD]/25 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F1F5F9] disabled:cursor-not-allowed";
 	  const toolIconButton =
 	    "justify-center px-1.5";
 	  const toolButtonInactiveNeutral =
 	    "border-transparent bg-[#F1F5F9] text-[#475569] shadow-none hover:bg-[#E5E7EB] hover:text-[#475569] hover:shadow-[0_1px_2px_rgba(0,0,0,0.06)]";
-	  const toolButtonInactiveBlack =
-	    "border-transparent bg-[#F1F5F9] text-black shadow-none hover:bg-[#E5E7EB] hover:text-black hover:shadow-[0_1px_2px_rgba(0,0,0,0.06)]";
+  const toolButtonInactiveBlack =
+    "border-transparent bg-[#F1F5F9] text-[#1f2937] shadow-none hover:bg-[#E5E7EB] hover:text-[#111827] hover:shadow-[0_1px_2px_rgba(0,0,0,0.06)]";
 	  const toolButtonActive =
 	    "border-transparent bg-[#024d7c] text-white shadow-md shadow-[#012a44]/25 hover:bg-[#013d63] hover:shadow-md";
   const controlButtonClass =
@@ -3994,6 +4002,15 @@ function WorkspaceClient() {
     () => Object.values(signaturePlacements).reduce((sum, list) => sum + (list?.length ?? 0), 0),
     [signaturePlacements]
   );
+  const imagePlacementCount = useMemo(() => {
+    return Object.values(signaturePlacements).reduce((sum, list) => {
+      if (!list) return sum;
+      return (
+        sum +
+        list.reduce((innerSum, item) => (item.signatureId.startsWith("image-") ? innerSum + 1 : innerSum), 0)
+      );
+    }, 0);
+  }, [signaturePlacements]);
   const hasAnyTextAnnotations = textAnnotationCount > 0;
   const hasAnyAnnotations = highlightCount > 0 || shapeCount > 0 || hasAnyTextAnnotations || signaturePlacementCount > 0;
   useEffect(() => {
@@ -4609,6 +4626,35 @@ function WorkspaceClient() {
     uploadPreview,
   ]);
 
+  const handleSaveUploadedImage = useCallback(async () => {
+    if (!imageUploadPreview) {
+      setImageUploadError("Upload an image file first.");
+      return;
+    }
+    const { width, height } = await loadImageDimensions(imageUploadPreview);
+    const imageId =
+      typeof crypto !== "undefined" && "randomUUID" in crypto ? `image-${crypto.randomUUID()}` : `image-${Date.now()}`;
+    const signatureLike: SavedSignature = {
+      id: imageId,
+      name: imageUploadName.trim() || `Image ${imagePlacementCount + 1}`,
+      dataUrl: imageUploadPreview,
+      naturalWidth: width,
+      naturalHeight: height,
+      createdAt: Date.now(),
+    };
+    setShowImageUploadModal(false);
+    setImageUploadPreview(null);
+    setImageUploadName("");
+    setImageUploadError(null);
+    applySignatureToActivePage(signatureLike);
+  }, [
+    applySignatureToActivePage,
+    imagePlacementCount,
+    imageUploadName,
+    imageUploadPreview,
+    loadImageDimensions,
+  ]);
+
   const handleCloseUploadModal = useCallback(() => {
     setShowUploadModal(false);
     setShowSignatureHub(true);
@@ -4617,6 +4663,13 @@ function WorkspaceClient() {
     setUploadError(null);
     setSignatureNameError(null);
     setSignaturePanelMode("saved");
+  }, []);
+
+  const handleCloseImageUploadModal = useCallback(() => {
+    setShowImageUploadModal(false);
+    setImageUploadPreview(null);
+    setImageUploadName("");
+    setImageUploadError(null);
   }, []);
 
   const handleSaveTypedSignature = useCallback(async () => {
@@ -4770,6 +4823,63 @@ function WorkspaceClient() {
     };
     reader.readAsDataURL(file);
   }, []);
+
+  const handleOpenImageUpload = useCallback(() => {
+    setShowSignatureHub(false);
+    setShowImageUploadModal(true);
+    setImageUploadPreview(null);
+    setImageUploadName("");
+    setImageUploadError(null);
+  }, []);
+
+  const handleImageUploadFileInput = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result === "string") {
+        setImageUploadPreview(result);
+        setImageUploadError(null);
+      }
+    };
+    reader.onerror = () => {
+      setImageUploadError("Could not read that file. Try a PNG, JPG, or SVG.");
+    };
+    reader.readAsDataURL(file);
+  }, []);
+
+  const handleAddStickyNote = useCallback(() => {
+    const pageId = activePageId || pages[0]?.id;
+    if (!pageId) return;
+    const pageIndex = pages.findIndex((p) => p.id === pageId);
+    const width = 0.22;
+    const height = 0.14;
+    const x = clamp(0.5 - width / 2, 0, 1 - width);
+    const y = clamp(0.5 - height / 2, 0, 1 - height);
+    const annotationId = crypto.randomUUID();
+    setTextAnnotations((prev) => {
+      const existing = prev[pageId] ?? [];
+      return {
+        ...prev,
+        [pageId]: [
+          ...existing,
+          {
+            id: annotationId,
+            pageId,
+            pageIndex,
+            x,
+            y,
+            width,
+            height,
+            text: TEXT_PLACEHOLDER,
+            rotation: 0,
+          },
+        ],
+      };
+    });
+    setFocusedTextId(annotationId);
+  }, [activePageId, pages]);
 
   useEffect(() => {
     if (!showDrawModal) return;
@@ -5563,12 +5673,12 @@ function WorkspaceClient() {
         </div>
 
         {/* Bottom row (tools) */}
-        <div className="w-full border-b border-slate-200/60 bg-[#F1F5F9] shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
+        <div className="toolbar-font w-full border-b border-slate-200/60 bg-[#F1F5F9] shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
 	          <div className="w-full px-0.5 py-0.5 lg:px-6">
 	            <div className="relative h-10">
 	              <div className={`absolute inset-0 flex w-full items-center gap-3 lg:gap-4 ${loading ? "pointer-events-none" : ""}`}>
 	                <div className="tools-scroll flex min-w-0 flex-1 overflow-x-auto">
-	                  <div className="flex items-center gap-0 rounded-xl bg-[#F1F5F9] px-0.5 py-0 ring-1 ring-slate-200/80">
+	                  <div className="flex items-center gap-0 rounded-xl bg-[#F1F5F9] pl-0.5 pr-1.5 py-0">
 	                  <button
 	                    type="button"
 	                    className={`${toolButtonBase} ${toolIconButton} ${toolButtonInactiveBlack}`}
@@ -5633,6 +5743,87 @@ function WorkspaceClient() {
 	                  <button
 	                    type="button"
 	                    disabled={highlightButtonDisabled}
+	                    aria-pressed={textButtonOn}
+	                    className={`${toolButtonBase} ${textButtonOn ? toolButtonActive : toolButtonInactiveBlack}`}
+	                    onClick={() => {
+	                      if (highlightButtonDisabled) return;
+	                      setSelectMode(false);
+	                      setDeleteMode(false);
+	                      setTextMode(true);
+	                      setPenMode(false);
+	                      setHighlightMode(false);
+	                      setShapeMode(false);
+	                      setDraftHighlight(null);
+	                      setDraftShape(null);
+	                      setDraftTextBox(null);
+	                      setShowSignatureHub(false);
+	                      setSignaturePanelMode("none");
+	                      setPendingSignatureForPlacement(null);
+	                    }}
+	                  >
+	                    <Type className="h-5 w-5" />
+	                    Text
+	                  </button>
+
+	                  <div className="mx-1 h-6 w-px bg-slate-300/90" aria-hidden />
+
+	                  <button
+	                    type="button"
+	                    disabled={loading}
+	                    className={`${toolButtonBase} ${toolButtonInactiveBlack}`}
+	                    onClick={() => {
+	                      if (loading) return;
+	                      setSelectMode(false);
+	                      setDeleteMode(false);
+	                      setTextMode(false);
+	                      setPenMode(false);
+	                      setHighlightMode(false);
+	                      setShapeMode(false);
+	                      setDraftHighlight(null);
+	                      setDraftShape(null);
+	                      setDraftTextBox(null);
+	                      setShowSignatureHub(false);
+	                      setSignaturePanelMode("none");
+	                      setPendingSignatureForPlacement(null);
+	                      handleOpenImageUpload();
+	                    }}
+	                  >
+	                    <ImageIcon className="h-5 w-5" />
+	                    Image
+	                  </button>
+
+	                  <div className="mx-1 h-6 w-px bg-slate-300/90" aria-hidden />
+
+	                  <button
+	                    type="button"
+	                    disabled={highlightButtonDisabled}
+	                    aria-pressed={shapeButtonVisualOn}
+	                    className={`${toolButtonBase} ${shapeButtonVisualOn ? toolButtonActive : toolButtonInactiveBlack}`}
+	                    onClick={() => {
+	                      if (highlightButtonDisabled) return;
+	                      setSelectMode(false);
+	                      setDeleteMode(false);
+	                      setShapeMode(true);
+	                      setPenMode(false);
+	                      setHighlightMode(false);
+	                      setTextMode(false);
+	                      setDraftHighlight(null);
+	                      setDraftShape(null);
+	                      setDraftTextBox(null);
+	                      setShowSignatureHub(false);
+	                      setSignaturePanelMode("none");
+	                      setPendingSignatureForPlacement(null);
+	                    }}
+	                  >
+	                    <Shapes className="h-5 w-5" />
+	                    Shapes
+	                  </button>
+
+	                  <div className="mx-1 h-6 w-px bg-slate-300/90" aria-hidden />
+
+	                  <button
+	                    type="button"
+	                    disabled={highlightButtonDisabled}
 	                    aria-pressed={drawButtonOn}
 	                    className={`${toolButtonBase} ${drawButtonOn ? toolButtonActive : toolButtonInactiveBlack}`}
 	                    onClick={() => {
@@ -5686,38 +5877,10 @@ function WorkspaceClient() {
 
 	                  <button
 	                    type="button"
-	                    disabled={highlightButtonDisabled}
-	                    aria-pressed={shapeButtonVisualOn}
-	                    className={`${toolButtonBase} ${shapeButtonVisualOn ? toolButtonActive : toolButtonInactiveBlack}`}
+	                    disabled={loading}
+	                    className={`${toolButtonBase} ${toolButtonInactiveBlack}`}
 	                    onClick={() => {
-	                      if (highlightButtonDisabled) return;
-	                      setSelectMode(false);
-	                      setDeleteMode(false);
-	                      setShapeMode(true);
-	                      setPenMode(false);
-	                      setHighlightMode(false);
-	                      setTextMode(false);
-	                      setDraftHighlight(null);
-	                      setDraftShape(null);
-	                      setDraftTextBox(null);
-	                      setShowSignatureHub(false);
-	                      setSignaturePanelMode("none");
-	                      setPendingSignatureForPlacement(null);
-	                    }}
-	                  >
-	                    <Shapes className="h-5 w-5" />
-	                    Shapes
-	                  </button>
-
-	                  <div className="mx-1 h-6 w-px bg-slate-300/90" aria-hidden />
-
-	                  <button
-	                    type="button"
-	                    disabled={highlightButtonDisabled}
-	                    aria-pressed={textButtonOn}
-	                    className={`${toolButtonBase} ${textButtonOn ? toolButtonActive : toolButtonInactiveBlack}`}
-	                    onClick={() => {
-	                      if (highlightButtonDisabled) return;
+	                      if (loading) return;
 	                      setSelectMode(false);
 	                      setDeleteMode(false);
 	                      setTextMode(true);
@@ -5730,9 +5893,11 @@ function WorkspaceClient() {
 	                      setShowSignatureHub(false);
 	                      setSignaturePanelMode("none");
 	                      setPendingSignatureForPlacement(null);
+	                      handleAddStickyNote();
 	                    }}
 	                  >
-	                    Text
+	                    <Pin className="h-5 w-5 rotate-[45deg]" />
+	                    Note
 	                  </button>
 
 	                  <div className="mx-1 h-6 w-px bg-slate-300/90" aria-hidden />
@@ -5747,6 +5912,8 @@ function WorkspaceClient() {
 	                    <Eraser className="h-5 w-5" />
 	                    Eraser
 	                  </button>
+
+	                  <div className="mx-1 h-6 w-px bg-slate-300/90" aria-hidden />
 
 	                  <button
 	                    type="button"
@@ -6139,7 +6306,7 @@ function WorkspaceClient() {
 				                          {showPageOrderPanel ? (
 				                            <aside className="flex w-[280px] shrink-0 flex-col">
 				                              <div className="flex min-h-0 flex-1 flex-col bg-[#f8fafc]">
-				                                <div className="flex h-[45px] items-center justify-between border-b border-slate-200 bg-white px-4">
+                                <div className="toolbar-font flex h-[45px] items-center justify-between border-b border-slate-200 bg-white px-4">
 				                                  <p className="text-sm font-semibold text-slate-600">{pages.length} pages</p>
 				                                  <button
 				                                    type="button"
@@ -6885,6 +7052,77 @@ function WorkspaceClient() {
         </div>
       ) : null}
 
+      {showImageUploadModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleCloseImageUploadModal} />
+          <div className="relative z-10 w-full max-w-2xl rounded-2xl bg-white p-6 shadow-[0_40px_120px_rgba(5,10,30,0.45)]">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-semibold text-slate-900">Add an image</h3>
+                <p className="text-sm text-slate-600">Upload a PNG, JPG, or SVG. We&apos;ll drop it on the current page.</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseImageUploadModal}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mt-4 flex flex-col gap-3">
+              <label className="group flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-100">
+                <ImageIcon className="h-5 w-5" />
+                <span>{imageUploadPreview ? "Replace image" : "Choose an image file"}</span>
+                <span className="text-xs font-medium text-slate-500">PNG, JPG, or SVG</span>
+                <input type="file" accept="image/*" className="hidden" onChange={handleImageUploadFileInput} />
+              </label>
+              {imageUploadPreview ? (
+                <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={imageUploadPreview}
+                    alt="Uploaded image preview"
+                    className="h-16 w-28 rounded border border-slate-100 object-contain"
+                  />
+                  <div className="text-sm text-slate-700">Preview</div>
+                </div>
+              ) : null}
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-semibold text-slate-800">Label (optional)</label>
+                <input
+                  type="text"
+                  value={imageUploadName}
+                  onChange={(event) => {
+                    setImageUploadName(event.target.value);
+                    setImageUploadError(null);
+                  }}
+                  placeholder="e.g. Logo or Stamp"
+                  className="h-10 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-900 shadow-inner outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200/70"
+                />
+              </div>
+              {imageUploadError ? <p className="text-xs font-semibold text-rose-600">{imageUploadError}</p> : null}
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300"
+                  onClick={handleCloseImageUploadModal}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="rounded-full bg-[#024d7c] px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-[#012a44]/30 transition hover:-translate-y-0.5 disabled:opacity-50"
+                  disabled={!imageUploadPreview}
+                  onClick={handleSaveUploadedImage}
+                >
+                  Add to page
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {showDownloadGate ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowDownloadGate(false)} />
@@ -6942,7 +7180,7 @@ function WorkspaceClient() {
       ) : null}
 
 	      <div className="shrink-0 border-t border-slate-200 bg-white/85 shadow-[0_-18px_40px_rgba(15,23,42,0.12)] backdrop-blur-md">
-	        <div className="flex w-full justify-end px-4 py-3 lg:px-8">
+	        <div className="flex w-full justify-end px-4 py-[6.5px] lg:px-8">
 	          <div className="flex flex-wrap items-center justify-end gap-3">
 		            <div className="flex items-center gap-5">
 		              <span className="text-base font-semibold text-slate-800">Zoom</span>
