@@ -1593,6 +1593,7 @@ function WorkspaceClient() {
       const element = textNodeRefs.current.get(focusedTextId);
       if (!element) return false;
       const selection = window.getSelection();
+      if (!selection) return false;
       let range: Range | null = null;
       if (selection && selection.rangeCount > 0) {
         const activeRange = selection.getRangeAt(0);
@@ -1606,10 +1607,8 @@ function WorkspaceClient() {
       if (!range) {
         return false;
       }
-      if (selection) {
-        selection.removeAllRanges();
-        selection.addRange(range);
-      }
+      selection.removeAllRanges();
+      selection.addRange(range);
 
       if (range.collapsed) {
         const span = document.createElement("span");
