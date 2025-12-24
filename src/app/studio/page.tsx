@@ -1,6 +1,7 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type {
@@ -48,6 +49,14 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
+  Bold,
+  CaseSensitive,
+  Italic,
+  Strikethrough,
+  Underline,
   PanelRightClose,
   PanelRightOpen,
   MoreHorizontal,
@@ -154,6 +163,8 @@ type TextAnnotation = {
   width: number;
   height: number;
   rotation?: number;
+  textSizePt?: number;
+  richTextHtml?: string;
 };
 type TextFont =
   | "Inter"
@@ -338,6 +349,14 @@ type HighlightColorKey = keyof typeof HIGHLIGHT_COLORS;
 const PREVIEW_BASE_SCALE = 4;
 const MAX_DEVICE_PIXEL_RATIO = 4;
 const TEXT_PLACEHOLDER = "Type here";
+const TEXT_DEFAULT_WIDTH_PX = 360;
+const TEXT_DEFAULT_HEIGHT_PX = 48;
+const PT_TO_PX = 96 / 72;
+const PX_TO_PT = 72 / 96;
+const TEXT_SIZE_MIN_PT = 1;
+const TEXT_SIZE_MAX_PT = 96;
+const DEFAULT_TEXT_SIZE_PT = 11;
+const DEFAULT_TEXT_SIZE_PX = DEFAULT_TEXT_SIZE_PT * PT_TO_PX;
 const THUMB_MAX_WIDTH = 200;
 const PREVIEW_IMAGE_QUALITY = 0.98;
 const WORKSPACE_SESSION_KEY = "mpdf:files";
@@ -364,6 +383,29 @@ const TILE_VARIANTS = {
   hidden: { opacity: 0, y: 10 },
   visible: { opacity: 1, y: 0 },
 };
+
+function applyTextTransform(value: string, transform: "none" | "uppercase") {
+  if (transform === "uppercase") return value.toUpperCase();
+  return value;
+}
+
+function getTextDecorationLine(underline: boolean, strike: boolean) {
+  const parts = [];
+  if (underline) parts.push("underline");
+  if (strike) parts.push("line-through");
+  return parts.length > 0 ? parts.join(" ") : "none";
+}
+
+function rotatePoint(point: { x: number; y: number }, origin: { x: number; y: number }, angleRad: number) {
+  const dx = point.x - origin.x;
+  const dy = point.y - origin.y;
+  const cos = Math.cos(angleRad);
+  const sin = Math.sin(angleRad);
+  return {
+    x: origin.x + dx * cos - dy * sin,
+    y: origin.y + dx * sin + dy * cos,
+  };
+}
 
 function toCardPreviewDataUrl(canvas: HTMLCanvasElement) {
   try {
@@ -677,6 +719,122 @@ function getAspectPadding(width?: number, height?: number) {
 function normalizeRotation(rotation?: number) {
   const value = rotation ?? 0;
   return ((value % 360) + 360) % 360;
+}
+
+function normalizeTextSize(value: number) {
+  const snapped = Math.round(value * 2) / 2;
+  return clamp(snapped, TEXT_SIZE_MIN_PT, TEXT_SIZE_MAX_PT);
+}
+
+type RichTextRun = {
+  text: string;
+  sizePt: number;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  strike?: boolean;
+};
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function textToHtml(value: string) {
+  return escapeHtml(value).replace(/\r?\n/g, "<br>");
+}
+
+function parseFontSize(styleValue: string, fallback: number) {
+  const matchPt = styleValue.match(/(\d+(\.\d+)?)pt/);
+  if (matchPt) {
+    const parsed = Number(matchPt[1]);
+    return Number.isNaN(parsed) ? fallback : parsed;
+  }
+  const matchPx = styleValue.match(/(\d+(\.\d+)?)px/);
+  if (matchPx) {
+    const parsed = Number(matchPx[1]);
+    return Number.isNaN(parsed) ? fallback : parsed / PT_TO_PX;
+  }
+  return fallback;
+}
+
+function extractRichTextRuns(html: string, fallbackSize: number) {
+  if (typeof document === "undefined") {
+    return [{ text: html, sizePt: fallbackSize }];
+  }
+  const container = document.createElement("div");
+  container.innerHTML = html;
+  const runs: RichTextRun[] = [];
+
+  const pushText = (text: string, run: Omit<RichTextRun, "text">) => {
+    const cleaned = text.replace(/\u200b/g, "");
+    if (!cleaned) return;
+    runs.push({ text: cleaned, ...run });
+  };
+
+  const walk = (
+    node: Node,
+    current: { sizePt: number; bold: boolean; italic: boolean; underline: boolean; strike: boolean }
+  ) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      pushText(node.textContent ?? "", current);
+      return;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    const el = node as HTMLElement;
+    if (el.tagName === "BR") {
+      runs.push({ text: "\n", ...current });
+      return;
+    }
+    let next = { ...current };
+    if (el.dataset.fontSizePt) {
+      const parsed = Number(el.dataset.fontSizePt);
+      if (!Number.isNaN(parsed)) {
+        next.sizePt = parsed;
+      }
+    } else if (el.style.fontSize) {
+      next.sizePt = parseFontSize(el.style.fontSize, current.sizePt);
+    }
+    const tag = el.tagName;
+    if (tag === "B" || tag === "STRONG") next.bold = true;
+    if (tag === "I" || tag === "EM") next.italic = true;
+    if (tag === "U") next.underline = true;
+    if (tag === "S" || tag === "STRIKE" || tag === "DEL") next.strike = true;
+    if (el.style.fontWeight) {
+      const weight = el.style.fontWeight;
+      if (weight === "bold" || Number(weight) >= 600) next.bold = true;
+    }
+    if (el.style.fontStyle === "italic") next.italic = true;
+    const decoration = el.style.textDecorationLine || el.style.textDecoration;
+    if (decoration.includes("underline")) next.underline = true;
+    if (decoration.includes("line-through")) next.strike = true;
+    const isBlock = el.tagName === "DIV" || el.tagName === "P";
+    el.childNodes.forEach((child) => walk(child, next));
+    if (isBlock) {
+      runs.push({ text: "\n", ...next });
+    }
+  };
+
+  container.childNodes.forEach((child) =>
+    walk(child, { sizePt: fallbackSize, bold: false, italic: false, underline: false, strike: false })
+  );
+  return runs.length > 0 ? runs : [{ text: "", sizePt: fallbackSize }];
+}
+
+function splitRunsIntoLines(runs: RichTextRun[]) {
+  const lines: RichTextRun[][] = [[]];
+  runs.forEach((run) => {
+    const parts = run.text.split(/\r?\n/);
+    parts.forEach((part, idx) => {
+      if (part) lines[lines.length - 1].push({ ...run, text: part });
+      if (idx < parts.length - 1) lines.push([]);
+    });
+  });
+  return lines;
 }
 
 function smoothStrokePoints(points: Point[], tool: Exclude<DrawingTool, "text">): Point[] {
@@ -1171,8 +1329,10 @@ function WorkspaceClient() {
   const [pageActionMenuId, setPageActionMenuId] = useState<string | null>(null);
 		  const [shouldCenterOnChange, setShouldCenterOnChange] = useState(false);
 		  const [zoomPercent, setZoomPercent] = useState(100);
-		  const [baseScale, setBaseScale] = useState(1);
+		  const [baseScale, setBaseScale] = useState(PT_TO_PX);
 		  const [userAdjustedZoom, setUserAdjustedZoom] = useState(false);
+		  // 100% = true document scale (1pt = 1/72in).
+		  const zoomMultiplier = clamp(zoomPercent / 100, ZOOM_MIN_PERCENT / 100, MAX_ZOOM_MULTIPLIER);
   const [showPageOrderPanel, setShowPageOrderPanel] = useState(true);
   const pageNavigationLockRef = useRef<{ until: number; targetId: string } | null>(null);
   const scrollRatioRef = useRef<{ x: number; y: number }>({ x: 0.5, y: 0 });
@@ -1257,8 +1417,22 @@ function WorkspaceClient() {
   const [textAnnotations, setTextAnnotations] = useState<Record<string, TextAnnotation[]>>({});
   const [textBold, setTextBold] = useState(false);
   const [textItalic, setTextItalic] = useState(false);
-  const [textFont, setTextFont] = useState<TextFont>("Inter");
-  const [textSize, setTextSize] = useState(12);
+  const [textUnderline, setTextUnderline] = useState(false);
+  const [textStrike, setTextStrike] = useState(false);
+  const [textTransform, setTextTransform] = useState<"none" | "uppercase">("none");
+  const [textAlign, setTextAlign] = useState<"left" | "center" | "right">("left");
+  const [textSizeInput, setTextSizeInput] = useState<string>(`${DEFAULT_TEXT_SIZE_PT}`);
+  const [toolbarTooltip, setToolbarTooltip] = useState<{ label: string; x: number; y: number; visible: boolean }>({
+    label: "",
+    x: 0,
+    y: 0,
+    visible: false,
+  });
+  const toolbarTooltipTargetRef = useRef<HTMLElement | null>(null);
+  const [textFont, setTextFont] = useState<TextFont>("Arial");
+  const [textSize, setTextSize] = useState(DEFAULT_TEXT_SIZE_PT);
+  const [selectionFontSizePt, setSelectionFontSizePt] = useState<number | null>(null);
+  const [pendingTextSizePt, setPendingTextSizePt] = useState<number | null>(null);
   const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]>([]);
   const [redoHighlightHistory, setRedoHighlightHistory] = useState<HighlightHistoryEntry[]>([]);
   const [shapesByPage, setShapesByPage] = useState<Record<string, ShapeAnnotation[]>>({});
@@ -1280,12 +1454,6 @@ function WorkspaceClient() {
     offsetY: number;
   } | null>(null);
   const textDragCleanupRef = useRef<(() => void) | null>(null);
-  const [rotatingText, setRotatingText] = useState<{
-    pageId: string;
-    id: string;
-    pointerId: number;
-  } | null>(null);
-  const textRotateCleanupRef = useRef<(() => void) | null>(null);
   const [resizingText, setResizingText] = useState<{
     pageId: string;
     id: string;
@@ -1302,17 +1470,34 @@ function WorkspaceClient() {
     startY: number;
     currentX: number;
     currentY: number;
+    rectWidth: number;
+    rectHeight: number;
   } | null>(null);
   const [fontMenuOpen, setFontMenuOpen] = useState(false);
   const fontMenuRef = useRef<HTMLDivElement | null>(null);
+  const fontMenuButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [fontMenuPosition, setFontMenuPosition] = useState<{ left: number; top: number; width: number } | null>(null);
   const [focusedTextId, setFocusedTextId] = useState<string | null>(null);
+  const [typingTextId, setTypingTextId] = useState<string | null>(null);
+  const typingTextTimeoutRef = useRef<number | null>(null);
   const focusedTextIdRef = useRef<string | null>(null);
-  const textNodeRefs = useRef<Map<string, HTMLTextAreaElement>>(new Map());
+  const selectionRangeRef = useRef<Range | null>(null);
+  const textSizeCommitKeepSelectionRef = useRef(false);
+  const textNodeRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const textAnnotationRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const customFontBytesRef = useRef<Map<string, Uint8Array>>(new Map());
   const pdfFontCacheRef = useRef<Map<string, PDFFont>>(new Map());
   const fontkitModuleRef = useRef<null | { default?: unknown }>(null);
   const hasHydratedCloudAnnotationsRef = useRef(false);
+  const activeTextSize = useMemo(() => {
+    if (!focusedTextId) return textSize;
+    if (selectionFontSizePt) return selectionFontSizePt;
+    for (const list of Object.values(textAnnotations)) {
+      const match = list.find((item) => item.id === focusedTextId);
+      if (match) return match.textSizePt ?? textSize;
+    }
+    return textSize;
+  }, [focusedTextId, selectionFontSizePt, textAnnotations, textSize]);
 
   function resolveFontVariant(bold: boolean, italic: boolean): TextFontVariant {
     if (bold && italic) return "boldItalic";
@@ -1335,6 +1520,358 @@ function WorkspaceClient() {
     const node = textNodeRefs.current.get(activeId);
     node?.blur();
     setFocusedTextId(null);
+  }, []);
+
+  const noteTextTyping = useCallback((id: string) => {
+    setTypingTextId(id);
+    if (typingTextTimeoutRef.current) {
+      window.clearTimeout(typingTextTimeoutRef.current);
+    }
+    typingTextTimeoutRef.current = window.setTimeout(() => {
+      setTypingTextId((current) => (current === id ? null : current));
+    }, 600);
+  }, []);
+
+  const findTextAnnotationById = useCallback(
+    (id: string) => {
+      for (const [pageId, list] of Object.entries(textAnnotations)) {
+        const match = list.find((item) => item.id === id);
+        if (match) return { pageId, annotation: match };
+      }
+      return null;
+    },
+    [textAnnotations]
+  );
+
+  const syncTextAnnotationContent = useCallback(
+    (pageId: string, id: string, element: HTMLElement) => {
+      const html = element.innerHTML.replace(/\u200b/g, "");
+      const text = element.innerText.replace(/\u200b/g, "");
+      updateTextAnnotation(pageId, id, (item) => ({
+        ...item,
+        text: text || "",
+        richTextHtml: html,
+      }));
+    },
+    [updateTextAnnotation]
+  );
+  const resolveNodeFontSizePt = useCallback(
+    (node: Node, fallbackSize: number) => {
+      if (!focusedTextId) return fallbackSize;
+      const element = textNodeRefs.current.get(focusedTextId);
+      if (!element) return fallbackSize;
+      let current: HTMLElement | null =
+        node.nodeType === Node.ELEMENT_NODE ? (node as HTMLElement) : node.parentElement;
+      while (current && current !== element) {
+        if (current.dataset.fontSizePt) {
+          const parsed = Number(current.dataset.fontSizePt);
+          if (!Number.isNaN(parsed)) return parsed;
+        }
+        if (current.style.fontSize) {
+          const parsed = parseFontSize(current.style.fontSize, Number.NaN);
+          if (!Number.isNaN(parsed)) return parsed;
+        }
+        current = current.parentElement;
+      }
+      const computed = window.getComputedStyle(element);
+      const px = parseFloat(computed.fontSize || "");
+      if (!Number.isNaN(px) && px > 0) {
+        return px / PT_TO_PX / zoomMultiplier;
+      }
+      return fallbackSize;
+    },
+    [focusedTextId, zoomMultiplier]
+  );
+  const fontSizeToDisplayPx = useCallback(
+    (sizePt: number) => sizePt * PT_TO_PX * zoomMultiplier,
+    [zoomMultiplier]
+  );
+
+  const applyFontSizeToSelection = useCallback(
+    (sizePt: number) => {
+      if (!focusedTextId) return false;
+      const element = textNodeRefs.current.get(focusedTextId);
+      if (!element) return false;
+      const selection = window.getSelection();
+      let range: Range | null = null;
+      if (selection && selection.rangeCount > 0) {
+        const activeRange = selection.getRangeAt(0);
+        if (element.contains(activeRange.commonAncestorContainer)) {
+          range = activeRange;
+        }
+      }
+      if (!range && selectionRangeRef.current && element.contains(selectionRangeRef.current.commonAncestorContainer)) {
+        range = selectionRangeRef.current;
+      }
+      if (!range) {
+        return false;
+      }
+      if (selection) {
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+
+      if (range.collapsed) {
+        const span = document.createElement("span");
+        span.style.fontSize = `${fontSizeToDisplayPx(sizePt)}px`;
+        span.dataset.fontSizePt = String(sizePt);
+        span.appendChild(document.createTextNode("\u200b"));
+        range.insertNode(span);
+        range.setStart(span.firstChild ?? span, 1);
+        range.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      } else {
+        const span = document.createElement("span");
+        span.style.fontSize = `${fontSizeToDisplayPx(sizePt)}px`;
+        span.dataset.fontSizePt = String(sizePt);
+        try {
+          range.surroundContents(span);
+        } catch {
+          const contents = range.extractContents();
+          span.appendChild(contents);
+          range.insertNode(span);
+        }
+        const nextRange = document.createRange();
+        nextRange.selectNodeContents(span);
+        selection.removeAllRanges();
+        selection.addRange(nextRange);
+      }
+
+      selectionRangeRef.current = selection.getRangeAt(0).cloneRange();
+      const result = findTextAnnotationById(focusedTextId);
+      if (result) {
+        syncTextAnnotationContent(result.pageId, focusedTextId, element);
+        autoExpandTextAnnotation(result.pageId, focusedTextId);
+      }
+      return true;
+    },
+    [focusedTextId, findTextAnnotationById, syncTextAnnotationContent, autoExpandTextAnnotation, fontSizeToDisplayPx]
+  );
+  const applyFontSizeDeltaToSelection = useCallback(
+    (delta: number) => {
+      if (!focusedTextId) return false;
+      const element = textNodeRefs.current.get(focusedTextId);
+      if (!element) return false;
+      const selection = window.getSelection();
+      let range: Range | null = null;
+      if (selection && selection.rangeCount > 0) {
+        const activeRange = selection.getRangeAt(0);
+        if (element.contains(activeRange.commonAncestorContainer)) {
+          range = activeRange;
+        }
+      }
+      if (!range && selectionRangeRef.current && element.contains(selectionRangeRef.current.commonAncestorContainer)) {
+        range = selectionRangeRef.current;
+      }
+      if (!range || range.collapsed) return false;
+      if (selection) {
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+
+      const startMarker = document.createElement("span");
+      startMarker.dataset.selectionMarker = "start";
+      startMarker.appendChild(document.createTextNode("\u200b"));
+      const endMarker = document.createElement("span");
+      endMarker.dataset.selectionMarker = "end";
+      endMarker.appendChild(document.createTextNode("\u200b"));
+
+      const endRange = range.cloneRange();
+      endRange.collapse(false);
+      endRange.insertNode(endMarker);
+      const startRange = range.cloneRange();
+      startRange.collapse(true);
+      startRange.insertNode(startMarker);
+
+      const markerRange = document.createRange();
+      markerRange.setStartAfter(startMarker);
+      markerRange.setEndBefore(endMarker);
+
+      const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+      const textNodes: Text[] = [];
+      let current = walker.nextNode();
+      while (current) {
+        const parentEl = (current as Text).parentElement;
+        if (parentEl && parentEl.dataset.selectionMarker) {
+          current = walker.nextNode();
+          continue;
+        }
+        if (markerRange.intersectsNode(current)) {
+          textNodes.push(current as Text);
+        }
+        current = walker.nextNode();
+      }
+
+      textNodes.forEach((textNode) => {
+        const textLength = textNode.textContent?.length ?? 0;
+        if (textLength === 0) return;
+        const subRange = document.createRange();
+        let startOffset = 0;
+        let endOffset = textLength;
+        if (markerRange.startContainer === textNode) {
+          startOffset = markerRange.startOffset;
+        }
+        if (markerRange.endContainer === textNode) {
+          endOffset = markerRange.endOffset;
+        }
+        if (startOffset === endOffset) return;
+        subRange.setStart(textNode, startOffset);
+        subRange.setEnd(textNode, endOffset);
+        const currentSize = resolveNodeFontSizePt(textNode, activeTextSize);
+        const nextSize = normalizeTextSize(currentSize + delta);
+        const span = document.createElement("span");
+        span.style.fontSize = `${fontSizeToDisplayPx(nextSize)}px`;
+        span.dataset.fontSizePt = String(nextSize);
+        try {
+          subRange.surroundContents(span);
+        } catch {
+          const contents = subRange.extractContents();
+          span.appendChild(contents);
+          subRange.insertNode(span);
+        }
+      });
+
+      if (selection) {
+        selection.removeAllRanges();
+        selection.addRange(markerRange);
+      }
+      selectionRangeRef.current = markerRange.cloneRange();
+      startMarker.remove();
+      endMarker.remove();
+      const result = findTextAnnotationById(focusedTextId);
+      if (result) {
+        syncTextAnnotationContent(result.pageId, focusedTextId, element);
+        autoExpandTextAnnotation(result.pageId, focusedTextId);
+      }
+      return true;
+    },
+    [
+      activeTextSize,
+      autoExpandTextAnnotation,
+      findTextAnnotationById,
+      focusedTextId,
+      resolveNodeFontSizePt,
+      fontSizeToDisplayPx,
+      syncTextAnnotationContent,
+    ]
+  );
+  const applyInlineCommand = useCallback(
+    (command: "bold" | "italic" | "underline" | "strikeThrough") => {
+      if (!focusedTextId) return;
+      const element = textNodeRefs.current.get(focusedTextId);
+      if (!element) return;
+      element.focus();
+      const selection = window.getSelection();
+      let range: Range | null = null;
+      if (selection && selection.rangeCount > 0) {
+        const activeRange = selection.getRangeAt(0);
+        if (element.contains(activeRange.commonAncestorContainer)) {
+          range = activeRange;
+        }
+      }
+      if (!range && selectionRangeRef.current && element.contains(selectionRangeRef.current.commonAncestorContainer)) {
+        range = selectionRangeRef.current;
+      }
+      if (range && selection) {
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+      document.execCommand("styleWithCSS", false, "true");
+      document.execCommand(command);
+      if (selection && selection.rangeCount > 0) {
+        selectionRangeRef.current = selection.getRangeAt(0).cloneRange();
+      }
+      const result = findTextAnnotationById(focusedTextId);
+      if (result) {
+        syncTextAnnotationContent(result.pageId, focusedTextId, element);
+        autoExpandTextAnnotation(result.pageId, focusedTextId);
+      }
+      setTextBold(document.queryCommandState("bold"));
+      setTextItalic(document.queryCommandState("italic"));
+      setTextUnderline(document.queryCommandState("underline"));
+      setTextStrike(document.queryCommandState("strikeThrough"));
+    },
+    [autoExpandTextAnnotation, findTextAnnotationById, focusedTextId, syncTextAnnotationContent]
+  );
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const handleSelectionChange = () => {
+      if (!focusedTextId) return;
+      const element = textNodeRefs.current.get(focusedTextId);
+      const selection = window.getSelection();
+      if (!element || !selection || selection.rangeCount === 0) return;
+      const range = selection.getRangeAt(0);
+      if (!element.contains(range.commonAncestorContainer)) return;
+      selectionRangeRef.current = range.cloneRange();
+      let node =
+        range.startContainer.nodeType === Node.ELEMENT_NODE
+          ? (range.startContainer as HTMLElement)
+          : range.startContainer.parentElement;
+      let resolvedSize: number | null = null;
+      while (node && node !== element) {
+        if (node.dataset.fontSizePt) {
+          const parsed = Number(node.dataset.fontSizePt);
+          if (!Number.isNaN(parsed)) {
+            resolvedSize = parsed;
+            break;
+          }
+        }
+        if (node.style.fontSize) {
+          const parsed = parseFontSize(node.style.fontSize, Number.NaN);
+          if (!Number.isNaN(parsed)) {
+            resolvedSize = parsed;
+            break;
+          }
+        }
+        node = node.parentElement;
+      }
+      if (resolvedSize === null) {
+        const computed = window.getComputedStyle(element);
+        const px = parseFloat(computed.fontSize || "");
+        if (!Number.isNaN(px) && px > 0) {
+          resolvedSize = px / PT_TO_PX / zoomMultiplier;
+        }
+      }
+      if (resolvedSize !== null) {
+        setSelectionFontSizePt(normalizeTextSize(resolvedSize));
+      }
+      setTextBold(document.queryCommandState("bold"));
+      setTextItalic(document.queryCommandState("italic"));
+      setTextUnderline(document.queryCommandState("underline"));
+      setTextStrike(document.queryCommandState("strikeThrough"));
+    };
+    document.addEventListener("selectionchange", handleSelectionChange);
+    return () => {
+      document.removeEventListener("selectionchange", handleSelectionChange);
+    };
+  }, [focusedTextId, zoomMultiplier]);
+  const keepTextEditingActive = useCallback(
+    (event: ReactMouseEvent<HTMLButtonElement>) => {
+      if (!focusedTextId) return;
+      event.preventDefault();
+    },
+    [focusedTextId]
+  );
+  const restoreTextSelection = useCallback(() => {
+    if (!focusedTextId) return;
+    const element = textNodeRefs.current.get(focusedTextId);
+    const range = selectionRangeRef.current;
+    if (!element || !range || !element.contains(range.commonAncestorContainer)) return;
+    const selection = window.getSelection();
+    if (!selection) return;
+    element.focus();
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }, [focusedTextId]);
+
+  useEffect(() => {
+    return () => {
+      if (typingTextTimeoutRef.current) {
+        window.clearTimeout(typingTextTimeoutRef.current);
+      }
+    };
   }, []);
 
   const startTextDrag = useCallback(
@@ -1403,6 +1940,7 @@ function WorkspaceClient() {
     (
       pageId: string,
       annotationId: string,
+      corner: "nw" | "ne" | "sw" | "se" | "n" | "s" | "e" | "w",
       startEvent: ReactPointerEvent<HTMLDivElement>
     ) => {
       if (startEvent.button !== 0 && startEvent.pointerType !== "touch") return;
@@ -1417,6 +1955,12 @@ function WorkspaceClient() {
       textResizeCleanupRef.current?.();
       const startWidth = annotation.width ?? 0.14;
       const startHeight = annotation.height ?? 0.06;
+      const startX = annotation.x;
+      const startY = annotation.y;
+      const minWidth = 0.04;
+      const minHeight = 0.015;
+      const fixedRight = startX + startWidth;
+      const fixedBottom = startY + startHeight;
       const handleMove = (event: PointerEvent) => {
         if (event.pointerId !== pointerId) return;
         const point = getPageNormalizedPoint(pageId, event.clientX, event.clientY);
@@ -1425,13 +1969,46 @@ function WorkspaceClient() {
           const existing = prev[pageId] ?? [];
           const current = existing.find((a) => a.id === annotationId);
           if (!current) return prev;
-          const deltaX = point.x - startPoint.x;
-          const deltaY = point.y - startPoint.y;
-          const nextWidth = clamp(startWidth + deltaX, 0.04, 1 - current.x);
-          const nextHeight = clamp(startHeight + deltaY, 0.03, 1 - current.y);
+          let nextX = startX;
+          let nextY = startY;
+          let nextWidth = startWidth;
+          let nextHeight = startHeight;
+          if (corner === "se") {
+            const deltaX = point.x - startPoint.x;
+            const deltaY = point.y - startPoint.y;
+            nextWidth = clamp(startWidth + deltaX, minWidth, 1 - startX);
+            nextHeight = clamp(startHeight + deltaY, minHeight, 1 - startY);
+          } else if (corner === "nw") {
+            nextX = clamp(point.x, 0, fixedRight - minWidth);
+            nextY = clamp(point.y, 0, fixedBottom - minHeight);
+            nextWidth = clamp(fixedRight - nextX, minWidth, 1);
+            nextHeight = clamp(fixedBottom - nextY, minHeight, 1);
+          } else if (corner === "ne") {
+            nextY = clamp(point.y, 0, fixedBottom - minHeight);
+            nextWidth = clamp(point.x - startX, minWidth, 1 - startX);
+            nextHeight = clamp(fixedBottom - nextY, minHeight, 1);
+          } else if (corner === "sw") {
+            nextX = clamp(point.x, 0, fixedRight - minWidth);
+            nextWidth = clamp(fixedRight - nextX, minWidth, 1);
+            nextHeight = clamp(point.y - startY, minHeight, 1 - startY);
+          } else if (corner === "e") {
+            const deltaX = point.x - startPoint.x;
+            nextWidth = clamp(startWidth + deltaX, minWidth, 1 - startX);
+          } else if (corner === "w") {
+            const nextLeft = clamp(point.x, 0, fixedRight - minWidth);
+            nextX = nextLeft;
+            nextWidth = clamp(fixedRight - nextLeft, minWidth, 1);
+          } else if (corner === "s") {
+            const deltaY = point.y - startPoint.y;
+            nextHeight = clamp(startHeight + deltaY, minHeight, 1 - startY);
+          } else if (corner === "n") {
+            const nextTop = clamp(point.y, 0, fixedBottom - minHeight);
+            nextY = nextTop;
+            nextHeight = clamp(fixedBottom - nextTop, minHeight, 1);
+          }
           const updated = existing.map((item) =>
             item.id === annotationId
-              ? { ...item, width: nextWidth, height: nextHeight }
+              ? { ...item, x: nextX, y: nextY, width: nextWidth, height: nextHeight }
               : item
           );
           return { ...prev, [pageId]: updated };
@@ -1472,7 +2049,6 @@ function WorkspaceClient() {
   const [projectNameError, setProjectNameError] = useState<string | null>(null);
   const [organizeMode, setOrganizeMode] = useState(false);
   const [firstPageThumb, setFirstPageThumb] = useState<string | null>(null);
-  const lastPersistedThumbRef = useRef<string | null>(null);
 
   const addInputRef = useRef<HTMLInputElement>(null);
   const renderedSourcesRef = useRef(0);
@@ -1522,6 +2098,10 @@ function WorkspaceClient() {
     "inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-[0_6px_14px_rgba(15,23,42,0.06)] transition hover:border-[#024d7c]/40 hover:text-[#024d7c]";
   const signatureTabActive = "border-[#024d7c] bg-[#024d7c] text-white shadow-[0_10px_24px_rgba(2,77,124,0.2)]";
   const signatureTabInactive = "";
+  const textOptionButtonBase =
+    "inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60";
+  const textOptionButtonActive = "border-[#024d7c] bg-[#024d7c] text-white shadow-sm";
+  const textInputPill = "inline-flex h-9 items-center gap-1 px-2 text-sm font-semibold text-slate-700";
 
   // Better drag in grids
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
@@ -1577,6 +2157,12 @@ function WorkspaceClient() {
 	          highlights?: Record<string, HighlightStroke[]>;
 	          shapesByPage?: Record<string, ShapeAnnotation[]>;
 	          textAnnotations?: Record<string, TextAnnotation[]>;
+          textSizePt?: number;
+          textSize?: number;
+          textUnderline?: boolean;
+          textStrike?: boolean;
+          textTransform?: "none" | "uppercase";
+          textAlign?: "left" | "center" | "right";
 	          signaturePlacements?: Record<string, SignaturePlacement[]>;
 	          savedSignatures?: SavedSignature[];
 	          pages?: {
@@ -1594,6 +2180,23 @@ function WorkspaceClient() {
 	        if (data.textAnnotations) {
 	          setTextAnnotations(data.textAnnotations);
 	        }
+        if (typeof data.textSizePt === "number") {
+          setTextSize(data.textSizePt);
+        } else if (typeof data.textSize === "number") {
+          setTextSize(data.textSize * PX_TO_PT);
+        }
+        if (typeof data.textUnderline === "boolean") {
+          setTextUnderline(data.textUnderline);
+        }
+        if (typeof data.textStrike === "boolean") {
+          setTextStrike(data.textStrike);
+        }
+        if (data.textTransform === "uppercase" || data.textTransform === "none") {
+          setTextTransform(data.textTransform);
+        }
+        if (data.textAlign === "left" || data.textAlign === "center" || data.textAlign === "right") {
+          setTextAlign(data.textAlign);
+        }
         if (data.signaturePlacements) {
           setSignaturePlacements(data.signaturePlacements);
         }
@@ -1659,8 +2262,8 @@ function WorkspaceClient() {
         });
         if (cancelled) return;
 
-        const naturalWidth = page.width || baseImage.width || 612;
-        const naturalHeight = page.height || baseImage.height || naturalWidth * DEFAULT_ASPECT_RATIO;
+        const naturalWidth = baseImage.width || page.width || 612;
+        const naturalHeight = baseImage.height || page.height || naturalWidth * DEFAULT_ASPECT_RATIO;
         const rotationDegrees = normalizeRotation(page.rotation);
         const rotated = rotationDegrees % 180 !== 0;
         const baseWidth = rotated ? naturalHeight : naturalWidth;
@@ -1760,74 +2363,109 @@ function WorkspaceClient() {
 	              drawLine(bx, by, bx + Math.cos(right) * headLen, by + Math.sin(right) * headLen);
 	            };
 
-		            switch (shape.type) {
-		              case "line":
-		                drawLine(x1, y1, x2, y2);
-		                break;
-		              case "arrow":
-		                drawLine(x1, y1, x2, y2);
-		                drawArrowHead(x1, y1, x2, y2);
-		                break;
-		              case "rect":
-		                ctx.rect(minX, minY, w, h);
-		                break;
-		              case "ellipse":
-		                ctx.ellipse(minX + w / 2, minY + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
-		                break;
-		              case "triangle": {
-		                const top = { x: minX + w / 2, y: minY };
-		                const left = { x: minX, y: minY + h };
-		                const right = { x: minX + w, y: minY + h };
-		                drawLine(top.x, top.y, right.x, right.y);
-		                drawLine(right.x, right.y, left.x, left.y);
-		                drawLine(left.x, left.y, top.x, top.y);
-		                break;
-		              }
-		              case "x":
-		                drawLine(minX, minY, maxX, maxY);
-		                drawLine(maxX, minY, minX, maxY);
-		                break;
-	              case "check": {
-	                const p1 = { x: minX + w * 0.18, y: minY + h * 0.55 };
-	                const p2 = { x: minX + w * 0.42, y: minY + h * 0.78 };
-	                const p3 = { x: minX + w * 0.82, y: minY + h * 0.26 };
-	                drawLine(p1.x, p1.y, p2.x, p2.y);
-	                drawLine(p2.x, p2.y, p3.x, p3.y);
-	                break;
-	              }
-	              default:
-	                break;
-	            }
+            switch (shape.type) {
+              case "line":
+                drawLine(x1, y1, x2, y2);
+                break;
+              case "arrow":
+                drawLine(x1, y1, x2, y2);
+                drawArrowHead(x1, y1, x2, y2);
+                break;
+              case "rect":
+                ctx.rect(minX, minY, w, h);
+                break;
+              case "ellipse":
+                ctx.ellipse(minX + w / 2, minY + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+                break;
+              case "triangle": {
+                const top = { x: minX + w / 2, y: minY };
+                const left = { x: minX, y: minY + h };
+                const right = { x: minX + w, y: minY + h };
+                drawLine(top.x, top.y, right.x, right.y);
+                drawLine(right.x, right.y, left.x, left.y);
+                drawLine(left.x, left.y, top.x, top.y);
+                break;
+              }
+              case "x":
+                drawLine(minX, minY, maxX, maxY);
+                drawLine(maxX, minY, minX, maxY);
+                break;
+              case "check": {
+                const p1 = { x: minX + w * 0.18, y: minY + h * 0.55 };
+                const p2 = { x: minX + w * 0.42, y: minY + h * 0.78 };
+                const p3 = { x: minX + w * 0.82, y: minY + h * 0.26 };
+                drawLine(p1.x, p1.y, p2.x, p2.y);
+                drawLine(p2.x, p2.y, p3.x, p3.y);
+                break;
+              }
+              default:
+                break;
+            }
 	            ctx.stroke();
 	            ctx.restore();
 	          });
 	        }
 
-        const pageTexts = textAnnotations[page.id] ?? [];
-        if (pageTexts.length > 0) {
-          const pageWidthPx = drawWidth;
-          const pageHeightPx = drawHeight;
-          ctx.fillStyle = "#111827";
-          pageTexts.forEach((annotation) => {
-            const content = annotation.text;
-            if (!content || content === TEXT_PLACEHOLDER) return;
-            const boxWidth = (annotation.width ?? 0.14) * pageWidthPx;
-            const padding = Math.min(6, boxWidth * 0.05);
-            const x = (annotation.x - 0.5) * pageWidthPx + padding;
-            const startY = (annotation.y - 0.5) * pageHeightPx + padding;
-            const fontSize = 10;
-            const lineHeight = fontSize * 1.3;
-            ctx.font = `${fontSize}px Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-            ctx.textBaseline = "top";
-            const lines = content.split(/\r?\n/).slice(0, 6);
-            let cursorY = startY;
-            lines.forEach((line) => {
-              const maxWidth = Math.max(10, boxWidth - padding * 2);
-              ctx.fillText(line, x, cursorY, maxWidth);
-              cursorY += lineHeight;
-            });
-          });
-        }
+            const pageTexts = textAnnotations[page.id] ?? [];
+            if (pageTexts.length > 0) {
+              const pageWidthPx = drawWidth;
+              const pageHeightPx = drawHeight;
+              ctx.fillStyle = "#111827";
+              for (const annotation of pageTexts) {
+                const content = annotation.text;
+                if (!content || content === TEXT_PLACEHOLDER) continue;
+                const boxWidth = (annotation.width ?? 0.14) * pageWidthPx;
+                const padding = Math.min(6, boxWidth * 0.05);
+                const x = (annotation.x - 0.5) * pageWidthPx + padding;
+                const startY = (annotation.y - 0.5) * pageHeightPx + padding;
+                const baseSize = annotation.textSizePt ?? textSize;
+                const html = annotation.richTextHtml ?? textToHtml(annotation.text);
+                const runs = extractRichTextRuns(html, baseSize);
+                const lines = splitRunsIntoLines(runs).slice(0, 6);
+                let cursorY = startY;
+                ctx.textBaseline = "top";
+                lines.forEach((line) => {
+                  if (line.length === 0) {
+                    cursorY += baseSize * PT_TO_PX * 1.3;
+                    return;
+                  }
+                  const maxWidth = Math.max(10, boxWidth - padding * 2);
+                  const maxSize = Math.max(...line.map((run) => run.sizePt));
+                  const lineHeight = maxSize * PT_TO_PX * 1.3;
+                  let lineWidth = 0;
+                  line.forEach((run) => {
+                    ctx.font = `${run.italic ? "italic " : ""}${run.bold ? "bold " : ""}${run.sizePt * PT_TO_PX}px Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+                    lineWidth += ctx.measureText(run.text).width;
+                  });
+                  let cursorX = x;
+                  if (textAlign === "center") {
+                    cursorX = x + Math.max(0, (maxWidth - lineWidth) / 2);
+                  } else if (textAlign === "right") {
+                    cursorX = x + Math.max(0, maxWidth - lineWidth);
+                  }
+                  line.forEach((run) => {
+                    const sizePx = run.sizePt * PT_TO_PX;
+                    ctx.font = `${run.italic ? "italic " : ""}${run.bold ? "bold " : ""}${sizePx}px Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+                    const transformed = applyTextTransform(run.text, textTransform);
+                    ctx.fillText(transformed, cursorX, cursorY, maxWidth);
+                    const runWidth = ctx.measureText(transformed).width;
+                    if (run.underline || run.strike) {
+                      const thickness = Math.max(0.5, sizePx / 14);
+                      if (run.underline) {
+                        const underlineY = cursorY + sizePx * 0.9;
+                        ctx.fillRect(cursorX, underlineY, runWidth, thickness);
+                      }
+                      if (run.strike) {
+                        const strikeY = cursorY + sizePx * 0.45;
+                        ctx.fillRect(cursorX, strikeY, runWidth, thickness);
+                      }
+                    }
+                    cursorX += runWidth;
+                  });
+                  cursorY += lineHeight;
+                });
+              }
+            }
 
         const pageSignatures = signaturePlacements[page.id] ?? [];
         if (pageSignatures.length > 0) {
@@ -2226,6 +2864,9 @@ function WorkspaceClient() {
           for (let p = 1; p <= pdf.numPages; p++) {
             if (cancelled) return;
             const page = await pdf.getPage(p);
+            const view = page.view;
+            const pageWidth = view[2] - view[0];
+            const pageHeight = view[3] - view[1];
             const viewport = page.getViewport({ scale: previewScale });
             const canvas = document.createElement("canvas");
             const ctx = canvas.getContext("2d")!;
@@ -2256,8 +2897,8 @@ function WorkspaceClient() {
               thumb: thumbData,
               preview: previewData,
               rotation: 0,
-              width: scaledWidth,
-              height: scaledHeight,
+              width: pageWidth,
+              height: pageHeight,
             });
           }
         }
@@ -3067,17 +3708,22 @@ function WorkspaceClient() {
                   </Fragment>
                 ) : null}
               </svg>
-              {draftTextBox && draftTextBox.pageId === page.id ? (
-                <div
-                  className="absolute border border-dashed border-slate-300 bg-white/40"
-                  style={{
-                    left: `${Math.min(draftTextBox.startX, draftTextBox.currentX) * 100}%`,
-                    top: `${Math.min(draftTextBox.startY, draftTextBox.currentY) * 100}%`,
-                    width: `${Math.max(Math.abs(draftTextBox.currentX - draftTextBox.startX), 0.01) * 100}%`,
-                    height: `${Math.max(Math.abs(draftTextBox.currentY - draftTextBox.startY), 0.01) * 100}%`,
-                  }}
-                />
-              ) : null}
+              {draftTextBox && draftTextBox.pageId === page.id ? (() => {
+                const widthDelta = Math.abs(draftTextBox.currentX - draftTextBox.startX);
+                const heightDelta = Math.abs(draftTextBox.currentY - draftTextBox.startY);
+                if (widthDelta === 0 && heightDelta === 0) return null;
+                return (
+                  <div
+                    className="absolute border border-dashed border-slate-400/40"
+                    style={{
+                      left: `${Math.min(draftTextBox.startX, draftTextBox.currentX) * 100}%`,
+                      top: `${Math.min(draftTextBox.startY, draftTextBox.currentY) * 100}%`,
+                      width: `${Math.max(widthDelta, 0.01) * 100}%`,
+                      height: `${Math.max(heightDelta, 0.01) * 100}%`,
+                    }}
+                  />
+                );
+              })() : null}
               {pageSignatures.map((signature) => {
                 const isActive = activeSignaturePlacementId === signature.id;
                 const isDraggingThis = signatureDrag?.id === signature.id;
@@ -3187,17 +3833,22 @@ function WorkspaceClient() {
                 const annotationHeight = annotation.height ?? 0.06;
                 const isDraggingThis = draggingText?.id === annotation.id;
                 const isResizingThis = resizingText?.id === annotation.id;
-                const isRotatingThis = rotatingText?.id === annotation.id;
                 const rotation = annotation.rotation ?? 0;
                 const displayRotation = normalizeRotation(rotation);
-                const displayFontSize = textSize;
+                const displayFontSize = (annotation.textSizePt ?? textSize) * PT_TO_PX * zoomMultiplier;
+                const annotationHtml = annotation.richTextHtml ?? textToHtml(annotation.text);
+                const showTextActions = focusedTextId === annotation.id && typingTextId !== annotation.id;
+                const showResizeHandles = focusedTextId === annotation.id || isResizingThis;
+                const boxWidthPx = annotationWidth * contentWidth;
+                const boxHeightPx = annotationHeight * contentHeight;
+                const cornerSize = 12;
+                const showCornerIndicators =
+                  showResizeHandles && boxWidthPx >= cornerSize && boxHeightPx >= cornerSize;
                 return (
                 <div
                   key={annotation.id}
                   ref={registerTextAnnotationNode(annotation.id)}
-                  className={`absolute transition-transform duration-150 ${
-                    isRotatingThis ? "scale-[1.02] drop-shadow-[0_4px_18px_rgba(2,77,124,0.25)]" : ""
-                  }`}
+                  className="group absolute transition-transform duration-150"
                   data-text-annotation
                   style={{
                     left: `${annotation.x * 100}%`,
@@ -3206,8 +3857,6 @@ function WorkspaceClient() {
                     height: `${annotationHeight * 100}%`,
                     transform: `rotate(${displayRotation}deg)`,
                     transformOrigin: "center",
-                    willChange: isRotatingThis ? "transform" : undefined,
-                    transitionDuration: isRotatingThis ? "0ms" : undefined,
                     cursor: deleteMode ? ("url('/icons/eraser.svg') 4 4, auto" as CSSProperties["cursor"]) : undefined,
                   }}
                   onPointerDown={(event) => {
@@ -3224,54 +3873,189 @@ function WorkspaceClient() {
                   }}
                 >
                   <div className="relative h-full w-full">
-                    {isRotatingThis ? (
-                      <div
-                        className="absolute -top-8 left-1/2 rounded-full bg-slate-900/85 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm"
-                        style={{ transform: `translate(-50%, 0) rotate(${-displayRotation}deg)` }}
-                      >
-                        {Math.round(displayRotation)}°
+                    <div
+                      className={`pointer-events-none absolute inset-0 ${
+                        focusedTextId === annotation.id || isDraggingThis
+                          ? "border-2 border-[#51bdff]/55 shadow-sm"
+                          : "border border-transparent group-hover:border-slate-300"
+                      }`}
+                    >
+                      {showCornerIndicators ? (
+                        <>
+                          <div className="absolute left-0 top-0 h-2 w-2">
+                            <span className="absolute left-0 top-0 h-0.5 w-2 bg-slate-500" />
+                            <span className="absolute left-0 top-0 h-2 w-0.5 bg-slate-500" />
+                          </div>
+                          <div className="absolute right-0 top-0 h-2 w-2">
+                            <span className="absolute right-0 top-0 h-0.5 w-2 bg-slate-500" />
+                            <span className="absolute right-0 top-0 h-2 w-0.5 bg-slate-500" />
+                          </div>
+                          <div className="absolute bottom-0 left-0 h-2 w-2">
+                            <span className="absolute left-0 bottom-0 h-0.5 w-2 bg-slate-500" />
+                            <span className="absolute left-0 bottom-0 h-2 w-0.5 bg-slate-500" />
+                          </div>
+                          <div className="absolute bottom-0 right-0 h-2 w-2">
+                            <span className="absolute right-0 bottom-0 h-0.5 w-2 bg-slate-500" />
+                            <span className="absolute right-0 bottom-0 h-2 w-0.5 bg-slate-500" />
+                          </div>
+                          <div className="absolute left-1/2 top-0 h-0.5 w-3 -translate-x-1/2 bg-slate-400" />
+                          <div className="absolute left-1/2 bottom-0 h-0.5 w-3 -translate-x-1/2 bg-slate-400" />
+                          <div className="absolute left-0 top-1/2 h-3 w-0.5 -translate-y-1/2 bg-slate-400" />
+                          <div className="absolute right-0 top-1/2 h-3 w-0.5 -translate-y-1/2 bg-slate-400" />
+                        </>
+                      ) : null}
+                    </div>
+                    {showResizeHandles ? (
+                      <div className="pointer-events-none absolute inset-0">
+                        <div
+                          className="pointer-events-auto absolute inset-x-0 top-0 h-4 -translate-y-1/2 cursor-ns-resize"
+                          onPointerDown={(event) => {
+                            focusTextAnnotation(annotation.id);
+                            startTextResize(page.id, annotation.id, "n", event);
+                          }}
+                        />
+                        <div
+                          className="pointer-events-auto absolute inset-x-0 bottom-0 h-4 translate-y-1/2 cursor-ns-resize"
+                          onPointerDown={(event) => {
+                            focusTextAnnotation(annotation.id);
+                            startTextResize(page.id, annotation.id, "s", event);
+                          }}
+                        />
+                        <div
+                          className="pointer-events-auto absolute inset-y-0 left-0 w-4 -translate-x-1/2 cursor-ew-resize"
+                          onPointerDown={(event) => {
+                            focusTextAnnotation(annotation.id);
+                            startTextResize(page.id, annotation.id, "w", event);
+                          }}
+                        />
+                        <div
+                          className="pointer-events-auto absolute inset-y-0 right-0 w-4 translate-x-1/2 cursor-ew-resize"
+                          onPointerDown={(event) => {
+                            focusTextAnnotation(annotation.id);
+                            startTextResize(page.id, annotation.id, "e", event);
+                          }}
+                        />
                       </div>
                     ) : null}
-                    <textarea
-                      value={annotation.text}
-                      onChange={(event) =>
-                        updateTextAnnotation(page.id, annotation.id, (item) => ({
-                          ...item,
-                          text: event.target.value,
-                        }))
-                      }
-                      onBeforeInput={(event) => {
-                        // Clear the placeholder text on first keystroke so the user never types over "Type here".
-                        const target = event.currentTarget;
-                        if (target.value === TEXT_PLACEHOLDER) {
-                          target.value = "";
+                    {showCornerIndicators ? (
+                      <div className="pointer-events-none absolute inset-0">
+                        <div
+                          className="pointer-events-auto absolute left-0 top-0 h-6 w-6 -translate-x-1/2 -translate-y-1/2 cursor-nwse-resize"
+                          onPointerDown={(event) => {
+                            focusTextAnnotation(annotation.id);
+                            startTextResize(page.id, annotation.id, "nw", event);
+                          }}
+                        />
+                        <div
+                          className="pointer-events-auto absolute right-0 top-0 h-6 w-6 translate-x-1/2 -translate-y-1/2 cursor-nesw-resize"
+                          onPointerDown={(event) => {
+                            focusTextAnnotation(annotation.id);
+                            startTextResize(page.id, annotation.id, "ne", event);
+                          }}
+                        />
+                        <div
+                          className="pointer-events-auto absolute left-0 bottom-0 h-6 w-6 -translate-x-1/2 translate-y-1/2 cursor-nesw-resize"
+                          onPointerDown={(event) => {
+                            focusTextAnnotation(annotation.id);
+                            startTextResize(page.id, annotation.id, "sw", event);
+                          }}
+                        />
+                        <div
+                          className="pointer-events-auto absolute right-0 bottom-0 h-6 w-6 translate-x-1/2 translate-y-1/2 cursor-nwse-resize"
+                          onPointerDown={(event) => {
+                            focusTextAnnotation(annotation.id);
+                            startTextResize(page.id, annotation.id, "se", event);
+                          }}
+                        />
+                      </div>
+                    ) : null}
+                    <div
+                      contentEditable
+                      suppressContentEditableWarning
+                      spellCheck={false}
+                      onInput={(event) => {
+                        noteTextTyping(annotation.id);
+                        syncTextAnnotationContent(page.id, annotation.id, event.currentTarget);
+                        autoExpandTextAnnotation(page.id, annotation.id);
+                        if (pendingTextSizePt) {
+                          applyFontSizeToSelection(pendingTextSizePt);
+                          setPendingTextSizePt(null);
                         }
                       }}
-                      onFocus={() => setFocusedTextId(annotation.id)}
+                      onFocus={() => {
+                        setFocusedTextId(annotation.id);
+                        const selection = window.getSelection();
+                        if (selection && selection.rangeCount > 0) {
+                          selectionRangeRef.current = selection.getRangeAt(0).cloneRange();
+                        }
+                        if (pendingTextSizePt) {
+                          applyFontSizeToSelection(pendingTextSizePt);
+                          setPendingTextSizePt(null);
+                        }
+                        if (annotation.text === TEXT_PLACEHOLDER) {
+                          updateTextAnnotation(page.id, annotation.id, (item) => ({
+                            ...item,
+                            text: "",
+                            richTextHtml: "",
+                          }));
+                          const node = textNodeRefs.current.get(annotation.id);
+                          if (node) {
+                            node.innerHTML = "";
+                          }
+                        }
+                      }}
+                      onBlur={(event) => {
+                        if (typingTextTimeoutRef.current) {
+                          window.clearTimeout(typingTextTimeoutRef.current);
+                          typingTextTimeoutRef.current = null;
+                        }
+                        setTypingTextId((current) => (current === annotation.id ? null : current));
+                        const text = event.currentTarget.innerText.replace(/\u200b/g, "").trim();
+                        if (!text) {
+                          updateTextAnnotation(page.id, annotation.id, (item) => ({
+                            ...item,
+                            text: TEXT_PLACEHOLDER,
+                            richTextHtml: "",
+                          }));
+                          event.currentTarget.innerHTML = textToHtml(TEXT_PLACEHOLDER);
+                        }
+                      }}
                       onClick={() => setFocusedTextId(annotation.id)}
-                      ref={registerTextNode(annotation.id)}
-                      className={`min-w-[80px] min-h-[24px] resize-none rounded px-1 py-0.5 text-[12px] leading-snug text-slate-900 transition border border-dashed ${
+                      ref={(node) => {
+                        registerTextNode(annotation.id)(node);
+                        if (!node) return;
+                        const isActive = focusedTextId === annotation.id || typingTextId === annotation.id;
+                        if (!isActive && node.innerHTML !== annotationHtml) {
+                          node.innerHTML = annotationHtml;
+                        }
+                      }}
+                      className={`min-w-[80px] min-h-[24px] rounded-none px-2 py-1 text-[12px] leading-snug transition border border-solid border-transparent outline-none focus:outline-none focus-visible:outline-none whitespace-pre-wrap ${
+                        annotation.text === TEXT_PLACEHOLDER ? "text-slate-400" : "text-slate-900"
+                      } ${
                         focusedTextId === annotation.id || isDraggingThis
-                          ? `${isDraggingThis ? "border-slate-700 bg-white/90" : "border-slate-500 bg-white/80"} shadow-sm`
-                          : "border-transparent bg-transparent shadow-none"
+                          ? `${isDraggingThis ? "bg-white/80" : "bg-white/70"}`
+                          : "bg-transparent"
                       }`}
                       style={{
                         width: "100%",
                         height: "100%",
                         direction: "ltr",
-                        textAlign: "left",
                         backgroundColor: "transparent",
-                        fontWeight: textBold ? 700 : 500,
-                        fontStyle: textItalic ? "italic" : "normal",
+                        overflow: "hidden",
                         fontFamily: TEXT_FONT_OPTIONS[textFont].cssFamily,
                         fontSize: `${displayFontSize}px`,
+                        textTransform,
+                        textAlign: textAlign,
                       }}
                     />
-                    {focusedTextId === annotation.id ? (
-                      <div className="absolute -bottom-9 left-0 flex items-center gap-2">
+                    {showTextActions ? (
+                      <div
+                        className="absolute flex w-max items-center gap-0.5 rounded-lg border border-slate-300 bg-white/85 px-1 py-0.5 opacity-80 shadow-sm transition-opacity hover:opacity-100"
+                        style={{ left: "50%", top: "-2.5rem", transform: "translateX(-50%)" }}
+                      >
                         <button
                           type="button"
-                          className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 bg-white/80 text-slate-700 shadow-sm transition hover:bg-white active:translate-y-[1px]"
+                          className="flex h-7 w-7 items-center justify-center rounded-md text-slate-700 transition hover:bg-slate-200 hover:text-slate-900 active:translate-y-[1px]"
                           onPointerDown={(event) => {
                             focusTextAnnotation(annotation.id);
                             startTextDrag(page.id, annotation.id, event);
@@ -3279,19 +4063,21 @@ function WorkspaceClient() {
                         >
                           <Move className="h-4 w-4" />
                         </button>
+                        <div className="h-4 w-px bg-slate-300/80" />
                         <button
                           type="button"
-                          className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 bg-white/80 text-slate-700 shadow-sm transition hover:bg-white active:translate-y-[1px]"
-                          onPointerDown={(event) => {
-                            focusTextAnnotation(annotation.id);
-                            startTextRotate(page.id, annotation.id, event);
+                          className="flex h-7 w-7 items-center justify-center rounded-md text-slate-700 transition hover:bg-slate-200 hover:text-slate-900 active:translate-y-[1px]"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            duplicateTextAnnotation(page.id, annotation.id);
                           }}
                         >
-                          <RotateCcw className="h-4 w-4" />
+                          <Copy className="h-4 w-4" />
                         </button>
+                        <div className="h-4 w-px bg-slate-300/80" />
                         <button
                           type="button"
-                          className="flex h-8 w-8 items-center justify-center rounded-full border border-rose-300 bg-white/80 text-rose-700 shadow-sm transition hover:bg-rose-50 active:translate-y-[1px]"
+                          className="flex h-7 w-7 items-center justify-center rounded-md text-rose-600 transition hover:bg-rose-50 hover:text-rose-700 active:translate-y-[1px]"
                           onMouseDown={(event) => event.stopPropagation()}
                           onClick={(event) => {
                             event.stopPropagation();
@@ -3302,14 +4088,41 @@ function WorkspaceClient() {
                         </button>
                       </div>
                     ) : null}
-                    {focusedTextId === annotation.id || isResizingThis ? (
-                      <div
-                        className="absolute -bottom-2 -right-2 h-4 w-4 cursor-se-resize rounded-full border border-slate-600 bg-white shadow-sm transition hover:border-slate-700 hover:shadow-md"
-                        onPointerDown={(event) => {
-                          focusTextAnnotation(annotation.id);
-                          startTextResize(page.id, annotation.id, event);
-                        }}
-                      />
+                    {showResizeHandles ? (
+                      <>
+                        <div
+                          className="absolute h-4 w-4 cursor-nwse-resize"
+                          style={{ left: "0%", top: "0%", transform: "translate(-50%, -50%)" }}
+                          onPointerDown={(event) => {
+                            focusTextAnnotation(annotation.id);
+                            startTextResize(page.id, annotation.id, "nw", event);
+                          }}
+                        />
+                        <div
+                          className="absolute h-4 w-4 cursor-nesw-resize"
+                          style={{ left: "100%", top: "0%", transform: "translate(50%, -50%)" }}
+                          onPointerDown={(event) => {
+                            focusTextAnnotation(annotation.id);
+                            startTextResize(page.id, annotation.id, "ne", event);
+                          }}
+                        />
+                        <div
+                          className="absolute h-4 w-4 cursor-nesw-resize"
+                          style={{ left: "0%", top: "100%", transform: "translate(-50%, 50%)" }}
+                          onPointerDown={(event) => {
+                            focusTextAnnotation(annotation.id);
+                            startTextResize(page.id, annotation.id, "sw", event);
+                          }}
+                        />
+                        <div
+                          className="absolute h-4 w-4 cursor-nwse-resize"
+                          style={{ left: "100%", top: "100%", transform: "translate(50%, 50%)" }}
+                          onPointerDown={(event) => {
+                            focusTextAnnotation(annotation.id);
+                            startTextResize(page.id, annotation.id, "se", event);
+                          }}
+                        />
+                      </>
                     ) : null}
                   </div>
                 </div>
@@ -3394,6 +4207,7 @@ function WorkspaceClient() {
       y: clampToBounds ? clamp(yRaw, 0, 1) : yRaw,
       inside,
       rectWidth: rect.width,
+      rectHeight: rect.height,
     };
   }
 
@@ -3774,7 +4588,7 @@ function WorkspaceClient() {
   }, []);
 
   function registerTextNode(id: string) {
-    return (node: HTMLTextAreaElement | null) => {
+    return (node: HTMLDivElement | null) => {
       if (node) {
         textNodeRefs.current.set(id, node);
       } else {
@@ -3816,6 +4630,48 @@ function WorkspaceClient() {
     updateTextAnnotation(pageId, id, (annotation) => ({ ...annotation, width, height }));
   }
 
+  function autoExpandTextAnnotation(pageId: string, id: string) {
+    const element = textNodeRefs.current.get(id);
+    if (!element) return;
+    const node = previewNodeMap.current.get(pageId);
+    if (!node) return;
+    const containerRect = node.getBoundingClientRect();
+    if (!containerRect.height) return;
+    const nextHeight = clamp(element.scrollHeight / containerRect.height, 0.015, 1);
+    setTextAnnotations((prev) => {
+      const existing = prev[pageId] ?? [];
+      const current = existing.find((item) => item.id === id);
+      if (!current) return prev;
+      const maxHeight = 1 - current.y;
+      const targetHeight = clamp(nextHeight, 0.015, maxHeight);
+      if (targetHeight <= (current.height ?? 0)) return prev;
+      const updated = existing.map((item) =>
+        item.id === id ? { ...item, height: targetHeight } : item
+      );
+      return { ...prev, [pageId]: updated };
+    });
+  }
+
+  useLayoutEffect(() => {
+    if (!focusedTextId) return;
+    const pageId = Object.keys(textAnnotations).find((id) =>
+      textAnnotations[id]?.some((item) => item.id === focusedTextId)
+    );
+    if (!pageId) return;
+    autoExpandTextAnnotation(pageId, focusedTextId);
+  }, [
+    focusedTextId,
+    textAnnotations,
+    activeTextSize,
+    textBold,
+    textItalic,
+    textUnderline,
+    textStrike,
+    textAlign,
+    textTransform,
+    textFont,
+  ]);
+
   function deleteTextAnnotation(pageId: string, id: string) {
     setTextAnnotations((prev) => {
       const existing = prev[pageId] ?? [];
@@ -3824,71 +4680,36 @@ function WorkspaceClient() {
     setFocusedTextId((current) => (current === id ? null : current));
   }
 
-  const startTextRotate = useCallback(
-    (pageId: string, annotationId: string, startEvent: ReactPointerEvent<HTMLButtonElement>) => {
-      if (startEvent.button !== 0 && startEvent.pointerType !== "touch") return;
-      startEvent.preventDefault();
-      startEvent.stopPropagation();
-      const target = textAnnotationRefs.current.get(annotationId);
-      const annotation = textAnnotations[pageId]?.find((a) => a.id === annotationId);
-      if (!target || !annotation) return;
-      const rect = target.getBoundingClientRect();
-      const centerX = rect.left + rect.width / 2;
-      const centerY = rect.top + rect.height / 2;
-      let lastAngle = Math.atan2(startEvent.clientY - centerY, startEvent.clientX - centerX);
-      let accumulatedDelta = 0;
-      const baseRotation = annotation.rotation ?? 0;
-      const pointerId = startEvent.pointerId;
-
-      textRotateCleanupRef.current?.();
-
-      const handleMove = (event: PointerEvent) => {
-        if (event.pointerId !== pointerId) return;
-        const angle = Math.atan2(event.clientY - centerY, event.clientX - centerX);
-        let delta = angle - lastAngle;
-        if (delta > Math.PI) delta -= Math.PI * 2;
-        if (delta < -Math.PI) delta += Math.PI * 2;
-        accumulatedDelta += delta;
-        lastAngle = angle;
-        const deltaDegrees = (accumulatedDelta * 180) / Math.PI;
-        const nextRotation = baseRotation + deltaDegrees;
-        setTextAnnotations((prev) => {
-          const existing = prev[pageId] ?? [];
-          const updated = existing.map((item) =>
-            item.id === annotationId ? { ...item, rotation: nextRotation } : item
-          );
-          return { ...prev, [pageId]: updated };
-        });
+  const duplicateTextAnnotation = useCallback((pageId: string, id: string) => {
+    const newId = crypto.randomUUID();
+    setTextAnnotations((prev) => {
+      const existing = prev[pageId] ?? [];
+      const current = existing.find((item) => item.id === id);
+      if (!current) return prev;
+      const width = current.width ?? 0.14;
+      const height = current.height ?? 0.06;
+      const offset = 0.015;
+      const nextX = clamp(current.x + offset, 0, 1 - width);
+      const nextY = clamp(current.y + offset, 0, 1 - height);
+      return {
+        ...prev,
+        [pageId]: [
+          ...existing,
+          {
+            ...current,
+            id: newId,
+            x: nextX,
+            y: nextY,
+          },
+        ],
       };
-
-      const cleanup = () => {
-        window.removeEventListener("pointermove", handleMove);
-        window.removeEventListener("pointerup", handleUp);
-        window.removeEventListener("pointercancel", handleUp);
-        textRotateCleanupRef.current = null;
-        setRotatingText(null);
-      };
-
-      const handleUp = (event: PointerEvent) => {
-        if (event.pointerId !== pointerId) return;
-        cleanup();
-      };
-
-      window.addEventListener("pointermove", handleMove);
-      window.addEventListener("pointerup", handleUp);
-      window.addEventListener("pointercancel", handleUp);
-      textRotateCleanupRef.current = cleanup;
-      setRotatingText({ pageId, id: annotationId, pointerId });
-    },
-    [textAnnotations]
-  );
-
+    });
+    setFocusedTextId(newId);
+  }, []);
 
   const itemsIds = useMemo(() => pages.map((p) => p.id), [pages]);
   const downloadDisabled = busy || pages.length === 0;
 	  const activePageIndex = activePageIndexState >= 0 && activePageIndexState < pages.length ? activePageIndexState : -1;
-	  // 100% = "fit whole page". Other % scale from that baseline.
-	  const zoomMultiplier = clamp(zoomPercent / 100, ZOOM_MIN_PERCENT / 100, MAX_ZOOM_MULTIPLIER);
   const zoomLabel = `${Math.round(zoomPercent)}%`;
   const highlightButtonDisabled = pages.length === 0 || loading;
   const highlightColorEntries = Object.entries(
@@ -3998,6 +4819,69 @@ function WorkspaceClient() {
     () => Object.values(textAnnotations).reduce((sum, list) => sum + (list?.length ?? 0), 0),
     [textAnnotations]
   );
+  const applyTextSize = useCallback(
+    (next: number) => {
+      const normalized = normalizeTextSize(next);
+      setTextSize(normalized);
+      const applied = applyFontSizeToSelection(normalized);
+      if (!applied) {
+        setPendingTextSizePt(normalized);
+      } else {
+        setPendingTextSizePt(null);
+      }
+      if (focusedTextId) setSelectionFontSizePt(normalized);
+    },
+    [applyFontSizeToSelection, focusedTextId]
+  );
+  const stepTextSize = useCallback(
+    (direction: 1 | -1) => {
+      if (focusedTextId) {
+        const element = textNodeRefs.current.get(focusedTextId);
+        const range = selectionRangeRef.current;
+        if (element && range && element.contains(range.commonAncestorContainer) && !range.collapsed) {
+          const applied = applyFontSizeDeltaToSelection(direction);
+          if (applied) return;
+        }
+      }
+      applyTextSize(activeTextSize + direction);
+    },
+    [activeTextSize, applyFontSizeDeltaToSelection, applyTextSize, focusedTextId]
+  );
+  const showToolbarTooltip = useCallback((label: string, target: HTMLElement) => {
+    if (label === "Font" && fontMenuOpen) return;
+    const rect = target.getBoundingClientRect();
+    const toolbarRect = target.closest("[data-text-toolbar]")?.getBoundingClientRect();
+    const baseY = toolbarRect ? toolbarRect.bottom - 6 : rect.bottom - 6;
+    toolbarTooltipTargetRef.current = target;
+    setToolbarTooltip({
+      label,
+      x: rect.left + rect.width / 2,
+      y: baseY + 8,
+      visible: true,
+    });
+  }, [fontMenuOpen]);
+  const hideToolbarTooltip = useCallback(() => {
+    setToolbarTooltip((prev) => (prev.visible ? { ...prev, visible: false } : prev));
+  }, []);
+  useEffect(() => {
+    if (!toolbarTooltip.visible) return;
+    const updatePosition = () => {
+      const target = toolbarTooltipTargetRef.current;
+      if (!target) return;
+      const rect = target.getBoundingClientRect();
+      setToolbarTooltip((prev) =>
+        prev.visible
+          ? { ...prev, x: rect.left + rect.width / 2, y: rect.bottom + 8 }
+          : prev
+      );
+    };
+    window.addEventListener("scroll", updatePosition, true);
+    window.addEventListener("resize", updatePosition);
+    return () => {
+      window.removeEventListener("scroll", updatePosition, true);
+      window.removeEventListener("resize", updatePosition);
+    };
+  }, [toolbarTooltip.visible]);
   const signaturePlacementCount = useMemo(
     () => Object.values(signaturePlacements).reduce((sum, list) => sum + (list?.length ?? 0), 0),
     [signaturePlacements]
@@ -4013,6 +4897,30 @@ function WorkspaceClient() {
   }, [signaturePlacements]);
   const hasAnyTextAnnotations = textAnnotationCount > 0;
   const hasAnyAnnotations = highlightCount > 0 || shapeCount > 0 || hasAnyTextAnnotations || signaturePlacementCount > 0;
+  useEffect(() => {
+    setTextSizeInput((current) =>
+      document.activeElement?.getAttribute("aria-label") === "Text size" ? current : `${activeTextSize}`
+    );
+  }, [activeTextSize]);
+  useEffect(() => {
+    setTextAnnotations((prev) => {
+      let updated = false;
+      const next = { ...prev };
+      Object.entries(prev).forEach(([pageId, list]) => {
+        let changed = false;
+        const nextList = list.map((item) => {
+          if (typeof item.textSizePt === "number") return item;
+          changed = true;
+          updated = true;
+          return { ...item, textSizePt: textSize };
+        });
+        if (changed) {
+          next[pageId] = nextList;
+        }
+      });
+      return updated ? next : prev;
+    });
+  }, [textAnnotations, textSize]);
   useEffect(() => {
     updatePreviewHeightLimit();
   }, [updatePreviewHeightLimit, pages.length, activePageIndex]);
@@ -4056,37 +4964,39 @@ function WorkspaceClient() {
 	        width: page.width,
 	        height: page.height,
 	      })),
-	      highlights,
-	      shapesByPage,
-	      textAnnotations,
-	      signaturePlacements,
-	      savedSignatures,
-	    };
+      highlights,
+      shapesByPage,
+      textAnnotations,
+        textSizePt: textSize,
+        textUnderline,
+        textStrike,
+        textTransform,
+        textAlign,
+      signaturePlacements,
+      savedSignatures,
+    };
 	  }, [
 	    hasWorkspaceData,
 	    pages,
 	    firstPageThumb,
 	    projectName,
-	    sources,
-	    highlights,
-	    shapesByPage,
-	    textAnnotations,
-	    signaturePlacements,
-	    savedSignatures,
-	  ]);
-
-  useEffect(() => {
-    if (!currentProjectId || !firstPageThumb) return;
-    if (lastPersistedThumbRef.current === firstPageThumb) return;
-    const payload = buildCloudProjectData();
-    if (!payload) return;
-    lastPersistedThumbRef.current = firstPageThumb;
-    void saveProject(projectName, payload);
-  }, [buildCloudProjectData, currentProjectId, firstPageThumb, projectName, saveProject]);
+    sources,
+    highlights,
+    shapesByPage,
+    textAnnotations,
+      textSize,
+      textUnderline,
+      textStrike,
+      textTransform,
+      textAlign,
+    signaturePlacements,
+    savedSignatures,
+  ]);
 
   useEffect(() => {
     if (!authSession?.user) return;
     if (!hasWorkspaceData) return;
+    if (draggingText || resizingText) return;
     const ownerId = authSession.user.id ?? authSession.user.email ?? null;
     if (!ownerId) return;
 
@@ -4104,7 +5014,15 @@ function WorkspaceClient() {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [authSession?.user, buildCloudProjectData, hasWorkspaceData, projectName, saveProject]);
+  }, [
+    authSession?.user,
+    buildCloudProjectData,
+    hasWorkspaceData,
+    projectName,
+    saveProject,
+    draggingText,
+    resizingText,
+  ]);
 
 		  const computeBaseScale = useCallback(() => {
 		    const container = previewContainerRef.current;
@@ -4125,16 +5043,11 @@ function WorkspaceClient() {
 		    const availableWidth = Math.max(container.clientWidth - horizontalGutter, 200);
 		    const availableHeight = Math.max(container.clientHeight - verticalGutter, 200);
 
-		    // Baseline: 100% shows the whole page.
-		    const fitWholePageScale = Math.max(
-		      0.2,
-		      Math.min(availableWidth / baseWidth, availableHeight / baseHeight) * fitPadding,
-		    );
-
+		    const documentScale = PT_TO_PX;
 		    // Default zoom: fit-to-width (still leaving side space).
 		    const fitWidthScale = Math.max(0.2, (availableWidth / baseWidth) * fitPadding);
 		    const desiredZoomPercent = clamp(
-		      Math.round((fitWidthScale / fitWholePageScale) * 100),
+		      Math.round((fitWidthScale / documentScale) * 100),
 		      ZOOM_MIN_PERCENT,
 		      ZOOM_MAX_PERCENT,
 		    );
@@ -4142,7 +5055,7 @@ function WorkspaceClient() {
 		    if (!userAdjustedZoom) {
 		      setZoomPercent((prev) => (prev === desiredZoomPercent ? prev : desiredZoomPercent));
 		    }
-		    setBaseScale((prev) => (Math.abs(prev - fitWholePageScale) > 0.001 ? fitWholePageScale : prev));
+		    setBaseScale((prev) => (Math.abs(prev - documentScale) > 0.001 ? documentScale : prev));
 		  }, [activePageIndex, pages, userAdjustedZoom]);
 
 	  useEffect(() => {
@@ -4298,6 +5211,8 @@ function WorkspaceClient() {
         startY: point.y,
         currentX: point.x,
         currentY: point.y,
+        rectWidth: point.rectWidth,
+        rectHeight: point.rectHeight,
       });
       event.preventDefault();
       return;
@@ -4416,14 +5331,19 @@ function WorkspaceClient() {
       if (draftTextBox && draftTextBox.pageId === pageId) {
         const widthDelta = Math.abs(draftTextBox.currentX - draftTextBox.startX);
         const heightDelta = Math.abs(draftTextBox.currentY - draftTextBox.startY);
-        if (widthDelta < 0.005 && heightDelta < 0.005) {
-          setDraftTextBox(null);
-          return;
-        }
-        const width = Math.max(widthDelta, 0.04);
-        const height = Math.max(heightDelta, 0.03);
-        const x = Math.min(draftTextBox.startX, draftTextBox.currentX);
-        const y = Math.min(draftTextBox.startY, draftTextBox.currentY);
+        const isClick = widthDelta < 0.005 && heightDelta < 0.005;
+        const width = isClick
+          ? Math.min(TEXT_DEFAULT_WIDTH_PX / draftTextBox.rectWidth, 1)
+          : Math.max(widthDelta, 0.04);
+        const height = isClick
+          ? Math.min(TEXT_DEFAULT_HEIGHT_PX / draftTextBox.rectHeight, 1)
+          : Math.max(heightDelta, 0.03);
+        const x = isClick
+          ? clamp(draftTextBox.startX, 0, 1 - width)
+          : Math.min(draftTextBox.startX, draftTextBox.currentX);
+        const y = isClick
+          ? clamp(draftTextBox.startY, 0, 1 - height)
+          : Math.min(draftTextBox.startY, draftTextBox.currentY);
         const annotationId = crypto.randomUUID();
         const pageIndex = pages.findIndex((p) => p.id === pageId);
         setTextAnnotations((prev) => {
@@ -4442,6 +5362,7 @@ function WorkspaceClient() {
                 height,
                 text: TEXT_PLACEHOLDER,
                 rotation: 0,
+                textSizePt: textSize,
               },
             ],
           };
@@ -4874,6 +5795,7 @@ function WorkspaceClient() {
             height,
             text: TEXT_PLACEHOLDER,
             rotation: 0,
+            textSizePt: textSize,
           },
         ],
       };
@@ -4960,9 +5882,8 @@ function WorkspaceClient() {
         customFontBytesRef.current.set(path, bytes);
         return bytes;
       }
-      async function getDownloadFont() {
+      async function getDownloadFont(variant: TextFontVariant) {
         const config = TEXT_FONT_OPTIONS[textFont];
-        const variant = resolveFontVariant(textBold, textItalic);
         if (config.pdf.type === "standard") {
           const fontName = config.pdf.variants[variant];
           const cached = standardFontCache.get(fontName);
@@ -5138,35 +6059,98 @@ function WorkspaceClient() {
             });
           }
 	        if (pageTexts.length > 0) {
-	          const font = await getDownloadFont();
+	          const fontCache = new Map<TextFontVariant, PDFFont>();
+	          const getFontForVariant = async (variant: TextFontVariant) => {
+	            const cached = fontCache.get(variant);
+	            if (cached) return cached;
+	            const embedded = await getDownloadFont(variant);
+	            fontCache.set(variant, embedded);
+	            return embedded;
+	          };
 	          const { width: pageWidth, height: pageHeight } = copied.getSize();
-	          const fontSize = textSize;
-	          const lineHeight = fontSize * 1.3;
           const textColor = rgb(0.13, 0.15, 0.18);
-          pageTexts.forEach((annotation) => {
+          for (const annotation of pageTexts) {
             const content = annotation.text;
-            if (!content || content === TEXT_PLACEHOLDER) return;
+            if (!content || content === TEXT_PLACEHOLDER) continue;
             const boxWidth = (annotation.width ?? 0.14) * pageWidth;
             const padding = Math.min(6, boxWidth * 0.05);
             const x = annotation.x * pageWidth + padding;
             const startY = pageHeight - annotation.y * pageHeight - padding;
             let cursorY = startY;
-            const lines = content.split(/\r?\n/);
+            const html = annotation.richTextHtml ?? textToHtml(annotation.text);
+            const runs = extractRichTextRuns(html, annotation.textSizePt ?? textSize);
+            const lines = splitRunsIntoLines(runs);
             const rotation = annotation.rotation ?? 0;
-            lines.forEach((line) => {
-              cursorY -= fontSize;
-              copied.drawText(line, {
-                x,
-                y: cursorY,
-                size: fontSize,
-                font,
-                color: textColor,
-                maxWidth: Math.max(10, boxWidth - padding * 2),
-                rotate: degrees(rotation),
-              });
-              cursorY -= lineHeight - fontSize;
+            const rotationRadians = (rotation * Math.PI) / 180;
+            const variants = new Set<TextFontVariant>();
+            runs.forEach((run) => {
+              variants.add(resolveFontVariant(!!run.bold, !!run.italic));
             });
-          });
+            for (const variant of variants) {
+              await getFontForVariant(variant);
+            }
+            lines.forEach((line) => {
+              if (line.length === 0) {
+                const baseSize = annotation.textSizePt ?? textSize;
+                cursorY -= baseSize * 1.3;
+                return;
+              }
+              const maxWidth = Math.max(10, boxWidth - padding * 2);
+              const lineHeight = Math.max(...line.map((run) => run.sizePt)) * 1.3;
+              let lineWidth = 0;
+              line.forEach((run) => {
+                const transformed = applyTextTransform(run.text, textTransform);
+                const variant = resolveFontVariant(!!run.bold, !!run.italic);
+                const runFont = fontCache.get(variant);
+                if (runFont) {
+                  lineWidth += runFont.widthOfTextAtSize(transformed, run.sizePt);
+                }
+              });
+              const clampedWidth = Math.min(lineWidth, maxWidth);
+              let lineX = x;
+              if (textAlign === "center") {
+                lineX = x + Math.max(0, (maxWidth - clampedWidth) / 2);
+              } else if (textAlign === "right") {
+                lineX = x + Math.max(0, maxWidth - clampedWidth);
+              }
+              cursorY -= Math.max(...line.map((run) => run.sizePt));
+              let cursorX = lineX;
+              line.forEach((run) => {
+                const transformed = applyTextTransform(run.text, textTransform);
+                const variant = resolveFontVariant(!!run.bold, !!run.italic);
+                const runFont = fontCache.get(variant);
+                if (!runFont) return;
+                copied.drawText(transformed, {
+                  x: cursorX,
+                  y: cursorY,
+                  size: run.sizePt,
+                  font: runFont,
+                  color: textColor,
+                  maxWidth,
+                  rotate: degrees(rotation),
+                });
+                const runWidth = runFont.widthOfTextAtSize(transformed, run.sizePt);
+                if (run.underline || run.strike) {
+                  const lineOrigin = { x: cursorX, y: cursorY };
+                  const decorationThickness = Math.max(0.5, lineHeight / 14);
+                  if (run.underline) {
+                    const underlineY = cursorY - lineHeight * 0.1;
+                    const start = rotatePoint({ x: cursorX, y: underlineY }, lineOrigin, rotationRadians);
+                    const end = rotatePoint({ x: cursorX + runWidth, y: underlineY }, lineOrigin, rotationRadians);
+                    copied.drawLine({ start, end, thickness: decorationThickness, color: textColor });
+                  }
+                  if (run.strike) {
+                    const strikeY = cursorY + lineHeight * 0.35;
+                    const start = rotatePoint({ x: cursorX, y: strikeY }, lineOrigin, rotationRadians);
+                    const end = rotatePoint({ x: cursorX + runWidth, y: strikeY }, lineOrigin, rotationRadians);
+                    copied.drawLine({ start, end, thickness: decorationThickness, color: textColor });
+                  }
+                }
+                cursorX += runWidth;
+              });
+              cursorY -= lineHeight - Math.max(...line.map((run) => run.sizePt));
+            });
+          }
         }
         out.addPage(copied);
       }
@@ -5329,10 +6313,25 @@ function WorkspaceClient() {
   }, [focusedTextId]);
 
   useEffect(() => {
+    textNodeRefs.current.forEach((node) => {
+      const spans = node.querySelectorAll<HTMLElement>("[data-font-size-pt]");
+      spans.forEach((span) => {
+        const parsed = Number(span.dataset.fontSizePt);
+        if (!Number.isNaN(parsed)) {
+          span.style.fontSize = `${fontSizeToDisplayPx(parsed)}px`;
+        }
+      });
+    });
+  }, [fontSizeToDisplayPx, zoomMultiplier]);
+
+  useEffect(() => {
     const handleGlobalPointerDown = (event: PointerEvent) => {
       const target = event.target;
       if (!(target instanceof Element)) {
         clearTextFocus();
+        return;
+      }
+      if (target.closest("[data-text-toolbar]")) {
         return;
       }
       if (!target.closest("[data-text-annotation]")) {
@@ -5362,20 +6361,43 @@ function WorkspaceClient() {
     return () => {
       textDragCleanupRef.current?.();
       textResizeCleanupRef.current?.();
-      textRotateCleanupRef.current?.();
     };
   }, []);
   useEffect(() => {
     if (!fontMenuOpen) return;
-    const handleOutside = (event: PointerEvent) => {
+    const handleOutside = (event: MouseEvent) => {
       if (!(event.target instanceof Node)) return;
-      if (!fontMenuRef.current?.contains(event.target)) {
+      if (!fontMenuRef.current?.contains(event.target) && !fontMenuButtonRef.current?.contains(event.target)) {
         setFontMenuOpen(false);
       }
     };
-    window.addEventListener("pointerdown", handleOutside);
-    return () => window.removeEventListener("pointerdown", handleOutside);
+    document.addEventListener("click", handleOutside);
+    return () => document.removeEventListener("click", handleOutside);
   }, [fontMenuOpen]);
+  const updateFontMenuPosition = useCallback(() => {
+    const button = fontMenuButtonRef.current;
+    if (!button || typeof window === "undefined") return;
+    const rect = button.getBoundingClientRect();
+    const width = Math.max(224, rect.width);
+    const maxLeft = window.innerWidth - width - 8;
+    const left = Math.max(8, Math.min(rect.left, maxLeft));
+    const top = rect.bottom + 8;
+    setFontMenuPosition({ left, top, width });
+  }, []);
+  useEffect(() => {
+    if (!fontMenuOpen) {
+      setFontMenuPosition(null);
+      return;
+    }
+    updateFontMenuPosition();
+    const handleReposition = () => updateFontMenuPosition();
+    window.addEventListener("resize", handleReposition);
+    window.addEventListener("scroll", handleReposition, true);
+    return () => {
+      window.removeEventListener("resize", handleReposition);
+      window.removeEventListener("scroll", handleReposition, true);
+    };
+  }, [fontMenuOpen, updateFontMenuPosition]);
   useEffect(() => {
     if (!textMode) setFontMenuOpen(false);
   }, [textMode]);
@@ -5673,11 +6695,14 @@ function WorkspaceClient() {
         </div>
 
         {/* Bottom row (tools) */}
-        <div className="toolbar-font w-full border-b border-slate-200/60 bg-[#F1F5F9] shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
+        <div
+          className="toolbar-font relative z-[80] w-full border-b border-slate-200/60 bg-[#F1F5F9] shadow-[0_10px_24px_rgba(15,23,42,0.04)]"
+          data-text-toolbar
+        >
 	          <div className="w-full px-0.5 py-0.5 lg:px-6">
 	            <div className="relative h-10">
 	              <div className={`absolute inset-0 flex w-full items-center gap-3 lg:gap-4 ${loading ? "pointer-events-none" : ""}`}>
-	                <div className="tools-scroll flex min-w-0 flex-1 overflow-x-auto">
+	                <div className="tools-scroll flex min-w-0 flex-1 overflow-x-auto overflow-y-visible">
 	                  <div className="flex items-center gap-0 rounded-xl bg-[#F1F5F9] pl-0.5 pr-1.5 py-0">
 	                  <button
 	                    type="button"
@@ -6046,243 +7071,474 @@ function WorkspaceClient() {
 				                            <motion.div
 				                              key="tool-options-bar"
 				                              initial={{ height: 0, opacity: 0, y: -6 }}
-				                              animate={{ height: 45, opacity: 1, y: 0 }}
+				                              animate={{ height: 44, opacity: 1, y: 0 }}
 				                              exit={{ height: 0, opacity: 0, y: -6 }}
 				                              transition={{ duration: 0.18, ease: SOFT_EASE }}
 				                              className="min-w-0 overflow-hidden"
 				                            >
-				                              <div className="flex h-[45px] min-w-0 items-center border-b border-slate-200 bg-white px-4">
-					                            {shapeMode ? (
-					                              <div
-					                                className={`tools-scroll flex min-w-0 items-center gap-2 overflow-x-auto ${
-					                                  loading ? "pointer-events-none" : ""
-				                                }`}
-				                                aria-label="Shape options"
-				                              >
-				                                <div className="flex items-center gap-2">
-				                                  <span className="text-xs font-semibold text-slate-600">Shape</span>
-				                                  <div className="flex items-center gap-1.5">
-				                                    {[
-				                                      { type: "line" as const, label: "Line", icon: Minus },
-				                                      { type: "arrow" as const, label: "Arrow", icon: ArrowRight },
-				                                      { type: "rect" as const, label: "Square", icon: Square },
-				                                      { type: "ellipse" as const, label: "Circle", icon: Circle },
-				                                      { type: "triangle" as const, label: "Triangle", icon: Triangle },
-				                                      { type: "check" as const, label: "Check", icon: Check },
-				                                      { type: "x" as const, label: "X", icon: X },
-				                                    ].map((item) => {
-				                                      const Icon = item.icon;
-				                                      const selected = shapeType === item.type;
-				                                      return (
-				                                        <button
-				                                          key={item.type}
-				                                          type="button"
-				                                          onClick={() => setShapeType(item.type)}
-				                                          className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border transition ${
-				                                            selected
-				                                              ? "border-slate-200 bg-white text-slate-900 shadow-[0_6px_16px_rgba(15,23,42,0.10)]"
-				                                              : "border-transparent text-slate-600 hover:bg-white/80 hover:text-slate-900"
-				                                          }`}
-				                                          aria-label={item.label}
-				                                        >
-				                                          <Icon className="h-4 w-4" aria-hidden />
-				                                        </button>
-				                                      );
-				                                    })}
-				                                  </div>
-				                                </div>
-				
-				                                <div className="hidden h-8 w-px bg-slate-200/70 sm:block" aria-hidden />
-				
-				                                <div className="flex items-center gap-2">
-				                                  <span className="text-xs font-semibold text-slate-600">Color</span>
-				                                  <label className="relative h-8 w-8 cursor-pointer rounded-full border border-slate-200 bg-white shadow-sm">
-				                                    <span
-				                                      className="absolute inset-1 rounded-full"
-				                                      style={{ backgroundColor: shapeColor }}
-				                                      aria-hidden
-				                                    />
-				                                    <input
-				                                      type="color"
-				                                      value={shapeColor}
-				                                      onChange={(event) => setShapeColor(event.target.value)}
-				                                      className="absolute inset-0 cursor-pointer opacity-0"
-				                                      aria-label="Shape color"
-				                                    />
-				                                  </label>
-				                                </div>
-				
-				                                <div className="hidden h-8 w-px bg-slate-200/70 sm:block" aria-hidden />
-				
-				                                <div className="flex items-center gap-2">
-				                                  <span className="text-xs font-semibold text-slate-600">Thickness</span>
-				                                  <input
-				                                    type="range"
-				                                    min={1}
-				                                    max={10}
-				                                    step={1}
-				                                    value={shapeThickness}
-				                                    onChange={(event) => setShapeThickness(Number(event.target.value))}
-				                                    className="h-2 w-28 cursor-pointer accent-[#024d7c]"
-				                                    aria-label="Shape thickness"
-				                                  />
-				                                  <span className="w-12 text-right text-xs font-semibold tabular-nums text-slate-700">
-				                                    {Math.round(shapeThickness)}px
-				                                  </span>
-				                                </div>
-				                              </div>
-				                            ) : highlightMode ? (
-				                              <div
-				                                className={`tools-scroll flex min-w-0 items-center gap-2 overflow-x-auto ${
-				                                  loading ? "pointer-events-none" : ""
-				                                }`}
-				                                aria-label="Highlight options"
-				                              >
-				                                <div className="flex items-center gap-1.5">
-				                                  {highlightColorEntries.map(([key, value]) => (
-				                                    <button
-				                                      key={key}
-				                                      type="button"
-				                                      onClick={() => setHighlightColor(key)}
-				                                      className={`h-7 w-7 rounded-full border transition ${
-				                                        highlightColor === key
-				                                          ? "border-[#024d7c] ring-2 ring-[#024d7c]/25"
-				                                          : "border-white/30 hover:border-slate-300"
-				                                      }`}
-				                                      style={{ backgroundColor: value }}
-				                                      aria-label={`Use ${key} highlight`}
-				                                    />
-				                                  ))}
-				                                </div>
-				
-				                                <div className="hidden h-8 w-px bg-slate-200/70 sm:block" aria-hidden />
-				
-				                                <div className="flex items-center gap-2">
-				                                  <span className="text-xs font-semibold text-slate-600">Thickness</span>
-				                                  <input
-				                                    type="range"
-				                                    min={MIN_HIGHLIGHT_THICKNESS}
-				                                    max={MAX_HIGHLIGHT_THICKNESS}
-				                                    step={1}
-				                                    value={highlightThickness}
-				                                    onChange={(event) => setHighlightThickness(Number(event.target.value))}
-				                                    className="h-2 w-28 cursor-pointer accent-[#024d7c]"
-				                                    aria-label="Highlight thickness"
-				                                  />
-				                                  <span className="w-12 text-right text-xs font-semibold tabular-nums text-slate-700">
-				                                    {Math.round(highlightThickness)}px
-				                                  </span>
-				                                </div>
-				
-				                                <div className="hidden h-8 w-px bg-slate-200/70 sm:block" aria-hidden />
-				
-				                                <div className="flex items-center gap-2">
-				                                  <span className="text-xs font-semibold text-slate-600">Opacity</span>
-				                                  <input
-				                                    type="range"
-				                                    min={0.15}
-				                                    max={0.6}
-				                                    step={0.05}
-				                                    value={highlightOpacity}
-				                                    onChange={(event) => setHighlightOpacity(Number(event.target.value))}
-				                                    className="h-2 w-24 cursor-pointer accent-[#024d7c]"
-				                                    aria-label="Highlight opacity"
-				                                  />
-				                                  <span className="w-10 text-right text-xs font-semibold tabular-nums text-slate-700">
-				                                    {Math.round(highlightOpacity * 100)}%
-				                                  </span>
-				                                </div>
-				                              </div>
-				                            ) : penMode ? (
-				                              <div
-				                                className={`tools-scroll flex min-w-0 items-center gap-2 overflow-x-auto ${
-				                                  loading ? "pointer-events-none" : ""
-				                                }`}
-				                                aria-label="Draw options"
-				                              >
-				                                <div className="flex items-center gap-2">
-				                                  <span className="text-xs font-semibold text-slate-600">Color</span>
-				                                  <label className="relative h-8 w-8 cursor-pointer rounded-full border border-slate-200 bg-white shadow-sm">
-				                                    <span
-				                                      className="absolute inset-1 rounded-full"
-				                                      style={{ backgroundColor: penColor }}
-				                                      aria-hidden
-				                                    />
-				                                    <input
-				                                      type="color"
-				                                      value={penColor}
-				                                      onChange={(event) => setPenColor(event.target.value)}
-				                                      className="absolute inset-0 cursor-pointer opacity-0"
-				                                      aria-label="Stroke color"
-				                                    />
-				                                  </label>
-				                                </div>
-				
-				                                <div className="hidden h-8 w-px bg-slate-200/70 sm:block" aria-hidden />
-				
-				                                <div className="flex items-center gap-2">
-				                                  <span className="text-xs font-semibold text-slate-600">Thickness</span>
-				                                  <input
-				                                    type="range"
-				                                    min={1}
-				                                    max={10}
-				                                    step={1}
-				                                    value={penThickness}
-				                                    onChange={(event) => setPenThickness(Number(event.target.value))}
-				                                    className="h-2 w-28 cursor-pointer accent-[#024d7c]"
-				                                    aria-label="Stroke thickness"
-				                                  />
-				                                  <span className="w-12 text-right text-xs font-semibold tabular-nums text-slate-700">
-				                                    {Math.round(penThickness)}px
-				                                  </span>
-				                                </div>
-				                              </div>
-				                            ) : (
-				                              <div
-				                                className={`tools-scroll flex min-w-0 items-center gap-2 overflow-x-auto ${
-				                                  loading ? "pointer-events-none" : ""
-				                                }`}
-				                                aria-label="Text options"
-				                              >
-				                                <div className="flex items-center gap-2">
-				                                  <span className="text-xs font-semibold text-slate-600">Font</span>
-				                                  <select
-				                                    value={textFont}
-				                                    onChange={(event) => setTextFont(event.target.value as TextFont)}
-				                                    className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm outline-none transition focus:border-slate-300"
-				                                    aria-label="Text font"
-				                                  >
-				                                    {textFontEntries.map(([key, option]) => (
-				                                      <option key={key} value={key}>
-				                                        {option.label}
-				                                      </option>
-				                                    ))}
-				                                  </select>
-				                                </div>
-				
-				                                <div className="hidden h-8 w-px bg-slate-200/70 sm:block" aria-hidden />
-				
-				                                <div className="flex items-center gap-2">
-				                                  <span className="text-xs font-semibold text-slate-600">Size</span>
-				                                  <input
-				                                    type="range"
-				                                    min={8}
-				                                    max={48}
-				                                    step={1}
-				                                    value={textSize}
-				                                    onChange={(event) => setTextSize(Number(event.target.value))}
-				                                    className="h-2 w-28 cursor-pointer accent-[#024d7c]"
-				                                    aria-label="Text size"
-				                                  />
-				                                  <span className="w-12 text-right text-xs font-semibold tabular-nums text-slate-700">
-				                                    {Math.round(textSize)}px
-				                                  </span>
-				                                </div>
-				                              </div>
-				                            )}
-				                              </div>
-				                            </motion.div>
-				                          ) : null}
+                              <div className="toolbar-font w-full border-b border-slate-200/60 bg-white shadow-[0_1px_4px_rgba(15,23,42,0.06)]">
+                                <div className="w-full px-0.5 py-0.5 lg:px-6">
+                                  <div className="relative h-10">
+                                    <div
+                                      className={`absolute inset-0 flex w-full items-center gap-3 lg:gap-4 ${
+                                        loading ? "pointer-events-none" : ""
+                                      }`}
+                                      data-text-toolbar
+                                    >
+                                      {shapeMode ? (
+                                        <div
+                                          className={`tools-scroll flex min-w-0 items-center gap-2 overflow-x-auto ${
+                                            loading ? "pointer-events-none" : ""
+                                          }`}
+                                          aria-label="Shape options"
+                                        >
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-xs font-semibold text-slate-600">Shape</span>
+                                            <div className="flex items-center gap-1.5">
+                                              {[
+                                                { type: "line" as const, label: "Line", icon: Minus },
+                                                { type: "arrow" as const, label: "Arrow", icon: ArrowRight },
+                                                { type: "rect" as const, label: "Square", icon: Square },
+                                                { type: "ellipse" as const, label: "Circle", icon: Circle },
+                                                { type: "triangle" as const, label: "Triangle", icon: Triangle },
+                                                { type: "check" as const, label: "Check", icon: Check },
+                                                { type: "x" as const, label: "X", icon: X },
+                                              ].map((item) => {
+                                                const Icon = item.icon;
+                                                const selected = shapeType === item.type;
+                                                return (
+                                                  <button
+                                                    key={item.type}
+                                                    type="button"
+                                                    onClick={() => setShapeType(item.type)}
+                                                    className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border transition ${
+                                                      selected
+                                                        ? "border-slate-200 bg-white text-slate-900 shadow-[0_6px_16px_rgba(15,23,42,0.10)]"
+                                                        : "border-transparent text-slate-600 hover:bg-white/80 hover:text-slate-900"
+                                                    }`}
+                                                    aria-label={item.label}
+                                                  >
+                                                    <Icon className="h-4 w-4" aria-hidden />
+                                                  </button>
+                                                );
+                                              })}
+                                            </div>
+                                          </div>
+
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-xs font-semibold text-slate-600">Color</span>
+                                            <label className="relative h-8 w-8 cursor-pointer rounded-full border border-slate-200 bg-white shadow-sm">
+                                              <span
+                                                className="absolute inset-1 rounded-full"
+                                                style={{ backgroundColor: shapeColor }}
+                                                aria-hidden
+                                              />
+                                              <input
+                                                type="color"
+                                                value={shapeColor}
+                                                onChange={(event) => setShapeColor(event.target.value)}
+                                                className="absolute inset-0 cursor-pointer opacity-0"
+                                                aria-label="Shape color"
+                                              />
+                                            </label>
+                                          </div>
+
+                                          <div className="mx-1 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
+
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-xs font-semibold text-slate-600">Thickness</span>
+                                            <input
+                                              type="range"
+                                              min={1}
+                                              max={10}
+                                              step={1}
+                                              value={shapeThickness}
+                                              onChange={(event) => setShapeThickness(Number(event.target.value))}
+                                              className="h-2 w-28 cursor-pointer accent-[#024d7c]"
+                                              aria-label="Shape thickness"
+                                            />
+                                            <span className="w-12 text-right text-xs font-semibold tabular-nums text-slate-700">
+                                              {Math.round(shapeThickness)}px
+                                            </span>
+                                          </div>
+                                        </div>
+                                      ) : highlightMode ? (
+                                        <div
+                                          className={`tools-scroll flex min-w-0 items-center gap-2 overflow-x-auto ${
+                                            loading ? "pointer-events-none" : ""
+                                          }`}
+                                          aria-label="Highlight options"
+                                        >
+                                          <div className="flex items-center gap-1.5">
+                                            {highlightColorEntries.map(([key, value]) => (
+                                              <button
+                                                key={key}
+                                                type="button"
+                                                onClick={() => setHighlightColor(key)}
+                                                className={`h-7 w-7 rounded-full border transition ${
+                                                  highlightColor === key
+                                                    ? "border-[#024d7c] ring-2 ring-[#024d7c]/25"
+                                                    : "border-white/30 hover:border-slate-300"
+                                                }`}
+                                                style={{ backgroundColor: value }}
+                                                aria-label={`Use ${key} highlight`}
+                                              />
+                                            ))}
+                                          </div>
+
+                                          <div className="mx-1 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
+
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-xs font-semibold text-slate-600">Thickness</span>
+                                            <input
+                                              type="range"
+                                              min={MIN_HIGHLIGHT_THICKNESS}
+                                              max={MAX_HIGHLIGHT_THICKNESS}
+                                              step={1}
+                                              value={highlightThickness}
+                                              onChange={(event) => setHighlightThickness(Number(event.target.value))}
+                                              className="h-2 w-28 cursor-pointer accent-[#024d7c]"
+                                              aria-label="Highlight thickness"
+                                            />
+                                            <span className="w-12 text-right text-xs font-semibold tabular-nums text-slate-700">
+                                              {Math.round(highlightThickness)}px
+                                            </span>
+                                          </div>
+
+                                          <div className="mx-1 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
+
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-xs font-semibold text-slate-600">Opacity</span>
+                                            <input
+                                              type="range"
+                                              min={0.15}
+                                              max={0.6}
+                                              step={0.05}
+                                              value={highlightOpacity}
+                                              onChange={(event) => setHighlightOpacity(Number(event.target.value))}
+                                              className="h-2 w-24 cursor-pointer accent-[#024d7c]"
+                                              aria-label="Highlight opacity"
+                                            />
+                                            <span className="w-10 text-right text-xs font-semibold tabular-nums text-slate-700">
+                                              {Math.round(highlightOpacity * 100)}%
+                                            </span>
+                                          </div>
+                                        </div>
+                                      ) : penMode ? (
+                                        <div
+                                          className={`tools-scroll flex min-w-0 items-center gap-2 overflow-x-auto ${
+                                            loading ? "pointer-events-none" : ""
+                                          }`}
+                                          aria-label="Draw options"
+                                        >
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-xs font-semibold text-slate-600">Color</span>
+                                            <label className="relative h-8 w-8 cursor-pointer rounded-full border border-slate-200 bg-white shadow-sm">
+                                              <span
+                                                className="absolute inset-1 rounded-full"
+                                                style={{ backgroundColor: penColor }}
+                                                aria-hidden
+                                              />
+                                              <input
+                                                type="color"
+                                                value={penColor}
+                                                onChange={(event) => setPenColor(event.target.value)}
+                                                className="absolute inset-0 cursor-pointer opacity-0"
+                                                aria-label="Stroke color"
+                                              />
+                                            </label>
+                                          </div>
+
+                                          <div className="mx-1 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
+
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-xs font-semibold text-slate-600">Thickness</span>
+                                            <input
+                                              type="range"
+                                              min={1}
+                                              max={10}
+                                              step={1}
+                                              value={penThickness}
+                                              onChange={(event) => setPenThickness(Number(event.target.value))}
+                                              className="h-2 w-28 cursor-pointer accent-[#024d7c]"
+                                              aria-label="Stroke thickness"
+                                            />
+                                            <span className="w-12 text-right text-xs font-semibold tabular-nums text-slate-700">
+                                              {Math.round(penThickness)}px
+                                            </span>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <div
+                                          className={`tools-scroll flex min-w-0 items-center gap-0.5 overflow-visible ${
+                                            loading ? "pointer-events-none" : ""
+                                          }`}
+                                          aria-label="Text options"
+                                        >
+                                          <div className="relative flex items-center gap-0.5">
+                                            <div
+                                              className="group"
+                                              onMouseEnter={(event) => showToolbarTooltip("Font", event.currentTarget)}
+                                              onMouseLeave={hideToolbarTooltip}
+                                            >
+                                      <button
+                                        type="button"
+                                        ref={fontMenuButtonRef}
+                                        className={`${textInputPill} w-[150px] justify-between pr-2`}
+                                        onMouseDown={keepTextEditingActive}
+                                        onClick={() => setFontMenuOpen((prev) => !prev)}
+                                        aria-label="Text font"
+                                      >
+                                      <span className="min-w-0 flex-1 truncate text-left">
+                                        {textFontEntries.find(([key]) => key === textFont)?.[1].label ?? textFont}
+                                      </span>
+                                      <ChevronDown className="ml-2 h-4 w-4 text-slate-500" />
+                                    </button>
+                                            </div>
+                                          </div>
+                                          {fontMenuOpen && fontMenuPosition && typeof document !== "undefined"
+                                            ? createPortal(
+                                                <div
+                                                  ref={fontMenuRef}
+                                                  className="fixed z-[9999] rounded-lg bg-white p-1 shadow-[0_10px_24px_rgba(15,23,42,0.12)]"
+                                                  style={{
+                                                    left: fontMenuPosition.left,
+                                                    top: fontMenuPosition.top,
+                                                    width: fontMenuPosition.width,
+                                                  }}
+                                                >
+                                                  {textFontEntries
+                                                    .filter(([key]) => key !== textFont)
+                                                    .map(([key, option]) => (
+                                                      <button
+                                                        key={key}
+                                                        type="button"
+                                                        className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                                                        onMouseDown={keepTextEditingActive}
+                                                        onClick={() => {
+                                                          setTextFont(key);
+                                                          setFontMenuOpen(false);
+                                                        }}
+                                                      >
+                                                        {option.label}
+                                                      </button>
+                                                    ))}
+                                                </div>,
+                                                document.body,
+                                              )
+                                            : null}
+
+                                          <div className="mx-2 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
+
+                                          <div className="flex items-center">
+                                            <div className="inline-flex items-center gap-0 justify-start">
+                                              <button
+                                                type="button"
+                                                className="mr-2 flex h-7 w-7 items-center justify-center rounded text-slate-700 transition hover:bg-slate-100 hover:text-slate-900"
+                                                onMouseDown={keepTextEditingActive}
+                                                onClick={() => stepTextSize(-1)}
+                                                onMouseEnter={(event) => showToolbarTooltip("Decrease font size", event.currentTarget)}
+                                                onMouseLeave={hideToolbarTooltip}
+                                                aria-label="Decrease text size"
+                                              >
+                                                <Minus className="h-4 w-4" />
+                                              </button>
+                                              <input
+                                                type="text"
+                                                maxLength={2}
+                                                inputMode="decimal"
+                                                value={textSizeInput}
+                                                onMouseDown={() => {
+                                                  if (!focusedTextId) return;
+                                                  const element = textNodeRefs.current.get(focusedTextId);
+                                                  const selection = window.getSelection();
+                                                  if (!element || !selection || selection.rangeCount === 0) return;
+                                                  const range = selection.getRangeAt(0);
+                                                  if (element.contains(range.commonAncestorContainer)) {
+                                                    selectionRangeRef.current = range.cloneRange();
+                                                  }
+                                                }}
+                                                onChange={(event) => {
+                                                  const nextValue = event.target.value;
+                                                  setTextSizeInput(nextValue);
+                                                }}
+                                                onKeyDown={(event) => {
+                                                  if (event.key === "Enter") {
+                                                    textSizeCommitKeepSelectionRef.current = true;
+                                                    event.currentTarget.blur();
+                                                  }
+                                                }}
+                                                onBlur={(event) => {
+                                                  const shouldRestoreSelection =
+                                                    textSizeCommitKeepSelectionRef.current ||
+                                                    (event.relatedTarget instanceof Element &&
+                                                      event.relatedTarget.closest("[data-text-toolbar]"));
+                                                  if (!textSizeInput) {
+                                                    const fallback = 11;
+                                                    applyTextSize(fallback);
+                                                    setTextSizeInput(`${fallback}`);
+                                                    if (shouldRestoreSelection) {
+                                                      restoreTextSelection();
+                                                    }
+                                                    textSizeCommitKeepSelectionRef.current = false;
+                                                    return;
+                                                  }
+                                                  const next = Number(textSizeInput);
+                                                  if (Number.isNaN(next)) {
+                                                    setTextSizeInput(`${activeTextSize}`);
+                                                    if (shouldRestoreSelection) {
+                                                      restoreTextSelection();
+                                                    }
+                                                    textSizeCommitKeepSelectionRef.current = false;
+                                                    return;
+                                                  }
+                                                  const normalized = normalizeTextSize(next);
+                                                  applyTextSize(normalized);
+                                                  setTextSizeInput(`${normalized}`);
+                                                  if (shouldRestoreSelection) {
+                                                    restoreTextSelection();
+                                                  }
+                                                  textSizeCommitKeepSelectionRef.current = false;
+                                                }}
+                                                onMouseEnter={(event) => showToolbarTooltip("Font size", event.currentTarget)}
+                                                onMouseLeave={hideToolbarTooltip}
+                                                className="bg-transparent text-center text-sm font-semibold text-slate-700 outline-none rounded-md"
+                                                style={{
+                                                  border: "1px solid rgba(148, 163, 184, 0.7)",
+                                                  padding: "3px 5px",
+                                                  margin: "-3px -5px",
+                                                  width: "4ch",
+                                                  alignSelf: "center",
+                                                }}
+                                                aria-label="Text size"
+                                              />
+                                              <button
+                                                type="button"
+                                                className="ml-2 flex h-7 w-7 items-center justify-center rounded text-slate-700 transition hover:bg-slate-100 hover:text-slate-900"
+                                                onMouseDown={keepTextEditingActive}
+                                                onClick={() => stepTextSize(1)}
+                                                onMouseEnter={(event) => showToolbarTooltip("Increase font size", event.currentTarget)}
+                                                onMouseLeave={hideToolbarTooltip}
+                                                aria-label="Increase text size"
+                                              >
+                                                <Plus className="h-4 w-4" />
+                                              </button>
+                                            </div>
+                                          </div>
+
+                                          <div className="mx-2 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
+
+                                          <div className="flex items-center gap-0">
+                                            <button
+                                              type="button"
+                                              aria-pressed={textBold}
+                                              className={`${textOptionButtonBase} ${textBold ? textOptionButtonActive : ""} text-slate-800`}
+                                              onMouseDown={keepTextEditingActive}
+                                              onClick={() => applyInlineCommand("bold")}
+                                              onMouseEnter={(event) => showToolbarTooltip("Bold", event.currentTarget)}
+                                              onMouseLeave={hideToolbarTooltip}
+                                              aria-label="Bold"
+                                            >
+                                              <Bold className="h-[18px] w-[18px]" />
+                                            </button>
+                                            <button
+                                              type="button"
+                                              aria-pressed={textItalic}
+                                              className={`${textOptionButtonBase} ${textItalic ? textOptionButtonActive : ""} text-slate-800`}
+                                              onMouseDown={keepTextEditingActive}
+                                              onClick={() => applyInlineCommand("italic")}
+                                              onMouseEnter={(event) => showToolbarTooltip("Italic", event.currentTarget)}
+                                              onMouseLeave={hideToolbarTooltip}
+                                              aria-label="Italic"
+                                            >
+                                              <Italic className="h-[18px] w-[18px]" />
+                                            </button>
+                                            <button
+                                              type="button"
+                                              aria-pressed={textUnderline}
+                                              className={`${textOptionButtonBase} ${textUnderline ? textOptionButtonActive : ""} text-slate-800`}
+                                              onMouseDown={keepTextEditingActive}
+                                              onClick={() => applyInlineCommand("underline")}
+                                              onMouseEnter={(event) => showToolbarTooltip("Underline", event.currentTarget)}
+                                              onMouseLeave={hideToolbarTooltip}
+                                              aria-label="Underline"
+                                            >
+                                              <Underline className="h-[18px] w-[18px]" />
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className={textOptionButtonBase}
+                                              onMouseDown={keepTextEditingActive}
+                                              onClick={() =>
+                                                setTextAlign((prev) =>
+                                                  prev === "left" ? "center" : prev === "center" ? "right" : "left"
+                                                )
+                                              }
+                                              onMouseEnter={(event) => showToolbarTooltip("Align", event.currentTarget)}
+                                              onMouseLeave={hideToolbarTooltip}
+                                              aria-label="Text alignment"
+                                            >
+                                              {textAlign === "left" ? (
+                                                <AlignLeft className="h-[18px] w-[18px]" />
+                                              ) : textAlign === "center" ? (
+                                                <AlignCenter className="h-[18px] w-[18px]" />
+                                              ) : (
+                                                <AlignRight className="h-[18px] w-[18px]" />
+                                              )}
+                                            </button>
+                                            <button
+                                              type="button"
+                                              aria-pressed={textStrike}
+                                              className={`${textOptionButtonBase} ${textStrike ? textOptionButtonActive : ""} text-slate-800`}
+                                              onMouseDown={keepTextEditingActive}
+                                              onClick={() => applyInlineCommand("strikeThrough")}
+                                              onMouseEnter={(event) => showToolbarTooltip("Strikethrough", event.currentTarget)}
+                                              onMouseLeave={hideToolbarTooltip}
+                                              aria-label="Strikethrough"
+                                            >
+                                              <Strikethrough className="h-[18px] w-[18px]" />
+                                            </button>
+                                            <button
+                                              type="button"
+                                              aria-pressed={textTransform === "uppercase"}
+                                              className={`${textOptionButtonBase} ${
+                                                textTransform === "uppercase" ? textOptionButtonActive : ""
+                                              } text-slate-800`}
+                                              onMouseDown={keepTextEditingActive}
+                                              onClick={() =>
+                                                setTextTransform((prev) => (prev === "uppercase" ? "none" : "uppercase"))
+                                              }
+                                              onMouseEnter={(event) => showToolbarTooltip("Change case", event.currentTarget)}
+                                              onMouseLeave={hideToolbarTooltip}
+                                              aria-label="Change case"
+                                            >
+                                              <CaseSensitive className="h-[18px] w-[18px]" />
+                                            </button>
+                                          </div>
+                                          {zoomPercent !== 100 ? (
+                                            <div className="mx-2 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
+                                          ) : null}
+                                          {zoomPercent !== 100 ? (
+                                            <div className="text-xs font-semibold text-slate-500">
+                                              Font sizes are accurate at{" "}
+                                              <button
+                                                type="button"
+                                                className="text-slate-600 underline decoration-slate-300 underline-offset-2 transition hover:text-slate-900"
+                                                onClick={() => setZoomWithScrollPreserved(100)}
+                                              >
+                                                100%
+                                              </button>{" "}
+                                              zoom.
+                                            </div>
+                                          ) : null}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </motion.div>
+				              ) : null}
 				                        </AnimatePresence>
 			
 				                        <div className="min-w-0 flex-1 min-h-0 overflow-hidden">
@@ -6306,7 +7562,10 @@ function WorkspaceClient() {
 				                          {showPageOrderPanel ? (
 				                            <aside className="flex w-[280px] shrink-0 flex-col">
 				                              <div className="flex min-h-0 flex-1 flex-col bg-[#f8fafc]">
-                                <div className="toolbar-font flex h-[45px] items-center justify-between border-b border-slate-200 bg-white px-4">
+                                <div
+                                  className="toolbar-font flex h-[45px] items-center justify-between border-b border-slate-200 bg-white px-4"
+                                  data-text-toolbar
+                                >
 				                                  <p className="text-sm font-semibold text-slate-600">{pages.length} pages</p>
 				                                  <button
 				                                    type="button"
@@ -7273,7 +8532,18 @@ function WorkspaceClient() {
 			        </div>
 			      </div>
 
-	      <style jsx global>{`
+      {toolbarTooltip.visible && (!fontMenuOpen || toolbarTooltip.label !== "Font") && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="pointer-events-none fixed z-[10000] whitespace-nowrap rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white shadow-lg transition-opacity duration-150"
+              style={{ left: toolbarTooltip.x, top: toolbarTooltip.y, transform: "translateX(-50%)" }}
+            >
+              {toolbarTooltip.label}
+            </div>,
+            document.body
+          )
+        : null}
+      <style jsx global>{`
 	        .horizontal-slider {
 	          -webkit-appearance: none;
 	          appearance: none;
