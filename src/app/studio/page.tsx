@@ -7096,7 +7096,7 @@ function WorkspaceClient() {
     const rect = button.getBoundingClientRect();
     const width = Math.max(224, rect.width);
     const maxLeft = window.innerWidth - width - 8;
-    const left = Math.max(8, Math.min(rect.left + rect.width / 2 - menuWidth / 2, maxLeft));
+    const left = Math.max(8, Math.min(rect.left + rect.width / 2 - width / 2, maxLeft));
     const top = rect.bottom + 8;
     setFontMenuPosition({ left, top, width });
   }, []);
