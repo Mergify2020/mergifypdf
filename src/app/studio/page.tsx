@@ -887,60 +887,6 @@ function textToHtml(value: string) {
   return escapeHtml(value).replace(/\r?\n/g, "<br>");
 }
 
-function stripCaretMarkers(fragment: DocumentFragment | HTMLElement) {
-  const toRemove: Element[] = [];
-  fragment.querySelectorAll?.("[data-highlight-caret]").forEach((el) => {
-    toRemove.push(el);
-  });
-  toRemove.forEach((el) => {
-    const parent = el.parentNode;
-    if (!parent) return;
-    while (el.firstChild) parent.insertBefore(el.firstChild, el);
-    parent.removeChild(el);
-  });
-}
-
-function stripCaretMarkersInNode(element: HTMLElement) {
-  stripCaretMarkers(element);
-}
-
-function splitHighlightAtCaret(range: Range, container?: HTMLElement | null) {
-  if (!range.collapsed) return range;
-  let node: HTMLElement | null =
-    range.startContainer.nodeType === Node.ELEMENT_NODE
-      ? (range.startContainer as HTMLElement)
-      : range.startContainer.parentElement;
-  let highlightEl: HTMLElement | null = null;
-  while (node && node !== container) {
-    if (node.style?.backgroundColor) {
-      highlightEl = node;
-      break;
-    }
-    node = node.parentElement;
-  }
-  if (!highlightEl || !highlightEl.parentNode) return range;
-
-  const marker = document.createTextNode("");
-  range.insertNode(marker);
-
-  const rightWrapper = highlightEl.cloneNode(false) as HTMLElement;
-  let cursor = marker.nextSibling;
-  while (cursor) {
-    const next = cursor.nextSibling;
-    rightWrapper.appendChild(cursor);
-    cursor = next;
-  }
-  highlightEl.removeChild(marker);
-  if (rightWrapper.childNodes.length > 0) {
-    highlightEl.parentNode.insertBefore(rightWrapper, highlightEl.nextSibling);
-  }
-
-  const nextRange = document.createRange();
-  nextRange.setStartAfter(highlightEl);
-  nextRange.collapse(true);
-  return nextRange;
-}
-
 function parseFontSize(styleValue: string, fallback: number) {
   const matchPt = styleValue.match(/(\d+(\.\d+)?)pt/);
   if (matchPt) {
@@ -964,7 +910,7 @@ function extractRichTextRuns(html: string, fallbackSize: number) {
   const runs: RichTextRun[] = [];
 
   const pushText = (text: string, run: Omit<RichTextRun, "text">) => {
-    const cleaned = text.replace(/\u200b/g, "");
+    const cleaned = text.replace(/[\u200b\u2060]/g, "");
     if (!cleaned) return;
     runs.push({ text: cleaned, ...run });
   };
@@ -1660,11 +1606,9 @@ function WorkspaceClient() {
   const [textFont, setTextFont] = useState<TextFont>("Arial");
   const [textSize, setTextSize] = useState(DEFAULT_TEXT_SIZE_PT);
   const [textColor, setTextColor] = useState("#111827");
-  const [textHighlightColor, setTextHighlightColor] = useState("transparent");
   const [selectionFontSizePt, setSelectionFontSizePt] = useState<number | null>(null);
   const [selectionTextColor, setSelectionTextColor] = useState<string | null>(null);
-  const [selectionHighlightColor, setSelectionHighlightColor] = useState<string | null>(null);
-  const [typingHighlightColor, setTypingHighlightColor] = useState<string | null>(null);
+  const [selectionTextColorMixed, setSelectionTextColorMixed] = useState(false);
   const [pendingTextSizePt, setPendingTextSizePt] = useState<number | null>(null);
   const [pendingTextColor, setPendingTextColor] = useState<string | null>(null);
   const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]>([]);
@@ -1718,9 +1662,8 @@ function WorkspaceClient() {
   const alignMenuRef = useRef<HTMLDivElement | null>(null);
   const alignMenuButtonRef = useRef<HTMLButtonElement | null>(null);
   const [alignMenuPosition, setAlignMenuPosition] = useState<{ left: number; top: number } | null>(null);
-  const [colorPickerOpen, setColorPickerOpen] = useState<"text" | "highlight" | null>(null);
+  const [colorPickerOpen, setColorPickerOpen] = useState<"text" | null>(null);
   const [colorPickerDraft, setColorPickerDraft] = useState("#111827");
-  const [colorPickerIsNone, setColorPickerIsNone] = useState(false);
   const highlightColorButtonRef = useRef<HTMLButtonElement | null>(null);
   const highlightPopoverRef = useRef<HTMLDivElement | null>(null);
   const [highlightPopoverPosition, setHighlightPopoverPosition] = useState<{ left: number; top: number } | null>(null);
@@ -1728,13 +1671,11 @@ function WorkspaceClient() {
   const [highlightCustomHue, setHighlightCustomHue] = useState(0);
   const [highlightCustomSat, setHighlightCustomSat] = useState(100);
   const [highlightCustomVal, setHighlightCustomVal] = useState(100);
-  const typingHighlightColorRef = useRef<string | null>(null);
-  const lastInsertLengthRef = useRef<number | null>(null);
-  const lastInsertColorRef = useRef<string | null>(null);
   const [focusedTextId, setFocusedTextId] = useState<string | null>(null);
   const [activeTextContainerId, setActiveTextContainerId] = useState<string | null>(null);
   const [typingTextId, setTypingTextId] = useState<string | null>(null);
   const typingTextTimeoutRef = useRef<number | null>(null);
+  const textAutoExpandRafRef = useRef<number | null>(null);
   const focusedTextIdRef = useRef<string | null>(null);
   const selectionRangeRef = useRef<Range | null>(null);
   const textSizeCommitKeepSelectionRef = useRef(false);
@@ -1753,8 +1694,7 @@ function WorkspaceClient() {
     }
     return textSize;
   }, [focusedTextId, selectionFontSizePt, textAnnotations, textSize]);
-  const activeTextColor = selectionTextColor ?? textColor;
-  const activeTextHighlightColor = selectionHighlightColor ?? typingHighlightColor ?? textHighlightColor;
+  const activeTextColor = selectionTextColorMixed ? null : selectionTextColor ?? textColor;
   const highlightCustomRgb = useMemo(() => {
     const rgb = hexToRgb(colorPickerDraft);
     if (!rgb) return { r: 0, g: 0, b: 0 };
@@ -1788,6 +1728,8 @@ function WorkspaceClient() {
     node?.blur();
     setFocusedTextId(null);
     setActiveTextContainerId(null);
+    setSelectionTextColor(null);
+    setSelectionTextColorMixed(false);
   }, []);
 
   const noteTextTyping = useCallback((id: string) => {
@@ -1799,9 +1741,6 @@ function WorkspaceClient() {
       setTypingTextId((current) => (current === id ? null : current));
     }, 600);
   }, []);
-  useEffect(() => {
-    typingHighlightColorRef.current = typingHighlightColor ?? null;
-  }, [typingHighlightColor]);
 
   const findTextAnnotationById = useCallback(
     (id: string) => {
@@ -1816,8 +1755,8 @@ function WorkspaceClient() {
 
   const syncTextAnnotationContent = useCallback(
     (pageId: string, id: string, element: HTMLElement) => {
-      const html = element.innerHTML.replace(/\u200b/g, "");
-      const text = element.innerText.replace(/\u200b/g, "");
+      const html = element.innerHTML.replace(/[\u200b\u2060]/g, "");
+      const text = element.innerText.replace(/[\u200b\u2060]/g, "");
       updateTextAnnotation(pageId, id, (item) => ({
         ...item,
         text: text || "",
@@ -1918,6 +1857,7 @@ function WorkspaceClient() {
     },
     [focusedTextId, findTextAnnotationById, syncTextAnnotationContent, autoExpandTextAnnotation, fontSizeToDisplayPx]
   );
+
   const applyTextColorToSelection = useCallback(
     (color: string) => {
       if (!focusedTextId) return false;
@@ -1944,8 +1884,41 @@ function WorkspaceClient() {
       element.focus();
       selection.removeAllRanges();
       selection.addRange(range);
-      document.execCommand("styleWithCSS", false, "true");
-      document.execCommand("foreColor", false, color);
+      if (range.collapsed) {
+        const span = document.createElement("span");
+        span.style.color = color;
+        span.style.display = "inline";
+        span.style.whiteSpace = "inherit";
+        span.style.wordBreak = "inherit";
+        span.style.overflowWrap = "inherit";
+        span.dataset.textColor = color;
+        span.appendChild(document.createTextNode("\u2060"));
+        range.insertNode(span);
+        const nextRange = document.createRange();
+        nextRange.setStart(span.firstChild ?? span, 1);
+        nextRange.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(nextRange);
+      } else {
+        const span = document.createElement("span");
+        span.style.color = color;
+        span.style.display = "inline";
+        span.style.whiteSpace = "inherit";
+        span.style.wordBreak = "inherit";
+        span.style.overflowWrap = "inherit";
+        span.dataset.textColor = color;
+        try {
+          range.surroundContents(span);
+        } catch {
+          const contents = range.extractContents();
+          span.appendChild(contents);
+          range.insertNode(span);
+        }
+        const nextRange = document.createRange();
+        nextRange.selectNodeContents(span);
+        selection.removeAllRanges();
+        selection.addRange(nextRange);
+      }
       if (selection.rangeCount > 0) {
         selectionRangeRef.current = selection.getRangeAt(0).cloneRange();
       }
@@ -1955,61 +1928,7 @@ function WorkspaceClient() {
         autoExpandTextAnnotation(result.pageId, focusedTextId);
       }
       setSelectionTextColor(color);
-      return true;
-    },
-    [focusedTextId, findTextAnnotationById, syncTextAnnotationContent, autoExpandTextAnnotation]
-  );
-  const applyTextHighlightToSelection = useCallback(
-    (color: string, explicitRange?: Range | null) => {
-      if (!focusedTextId) return false;
-      const element = textNodeRefs.current.get(focusedTextId);
-      if (!element) return false;
-      const selection = window.getSelection();
-      if (!selection) return false;
-      let range: Range | null = null;
-      if (explicitRange && element.contains(explicitRange.commonAncestorContainer)) {
-        range = explicitRange;
-      }
-      if (selection.rangeCount > 0) {
-        const activeRange = selection.getRangeAt(0);
-        if (element.contains(activeRange.commonAncestorContainer)) {
-          range = activeRange;
-        }
-      }
-      if (!range || range.collapsed) return false;
-      const extracted = range.extractContents();
-      // Remove existing highlight/background styles inside the extracted fragment so the new span is authoritative.
-      const stripHighlight = (node: Node) => {
-        if (node.nodeType === Node.ELEMENT_NODE) {
-          const el = node as HTMLElement;
-          if (el.style.backgroundColor) {
-            el.style.backgroundColor = "";
-          }
-          el.removeAttribute("data-highlight-caret");
-          if (el.style.length === 0) {
-            el.removeAttribute("style");
-          }
-        }
-        node.childNodes.forEach(stripHighlight);
-      };
-      stripHighlight(extracted);
-      const wrapper = document.createElement("span");
-      if (color && color !== "transparent") {
-        wrapper.style.backgroundColor = color;
-      }
-      wrapper.appendChild(extracted);
-      range.insertNode(wrapper);
-      const afterRange = document.createRange();
-      afterRange.setStartAfter(wrapper);
-      afterRange.collapse(true);
-      selection.removeAllRanges();
-      selection.addRange(afterRange);
-      const result = findTextAnnotationById(focusedTextId);
-      if (result) {
-        syncTextAnnotationContent(result.pageId, focusedTextId, element);
-        autoExpandTextAnnotation(result.pageId, focusedTextId);
-      }
-      setSelectionHighlightColor(color === "transparent" ? null : color);
+      setSelectionTextColorMixed(false);
       return true;
     },
     [focusedTextId, findTextAnnotationById, syncTextAnnotationContent, autoExpandTextAnnotation]
@@ -2180,43 +2099,17 @@ function WorkspaceClient() {
       const range = selection.getRangeAt(0);
       if (!element.contains(range.commonAncestorContainer)) return;
       selectionRangeRef.current = range.cloneRange();
-      const resolveHighlightFromNode = (startNode: Node | null) => {
-        let current: HTMLElement | null =
-          startNode && startNode.nodeType === Node.ELEMENT_NODE
-            ? (startNode as HTMLElement)
-            : startNode?.parentElement ?? null;
-        while (current && current !== element) {
-          const computed = window.getComputedStyle(current);
-          const highlightValue = normalizeCssColor(computed.backgroundColor || "");
-          if (highlightValue) return highlightValue;
-          current = current.parentElement;
-        }
-        return null;
-      };
-      const resolveHighlightFromRange = () => {
-        if (range.startContainer.nodeType === Node.TEXT_NODE) {
-          return resolveHighlightFromNode(range.startContainer);
-        }
-        if (range.startContainer.nodeType === Node.ELEMENT_NODE) {
-          const container = range.startContainer as Element;
-          const children = container.childNodes;
-          const index = Math.min(range.startOffset, children.length);
-          const leftNode = index > 0 ? children[index - 1] : null;
-          const rightNode = index < children.length ? children[index] : null;
-          return (
-            resolveHighlightFromNode(leftNode) ??
-            resolveHighlightFromNode(rightNode) ??
-            resolveHighlightFromNode(container)
-          );
-        }
-        return null;
-      };
-      let node =
+      const startNode =
         range.startContainer.nodeType === Node.ELEMENT_NODE
           ? (range.startContainer as HTMLElement)
           : range.startContainer.parentElement;
+      let node = startNode;
+      let colorNode: HTMLElement | null = null;
       let resolvedSize: number | null = null;
       while (node && node !== element) {
+        if (!colorNode && (node.dataset.textColor || node.style.color)) {
+          colorNode = node;
+        }
         if (node.dataset.fontSizePt) {
           const parsed = Number(node.dataset.fontSizePt);
           if (!Number.isNaN(parsed)) {
@@ -2243,12 +2136,47 @@ function WorkspaceClient() {
       if (resolvedSize !== null) {
         setSelectionFontSizePt(normalizeTextSize(resolvedSize));
       }
-      if (node) {
-        const computed = window.getComputedStyle(node);
-        const color = normalizeCssColor(computed.color || "");
-        const highlight = resolveHighlightFromRange();
-        setSelectionTextColor(color);
-        setSelectionHighlightColor(highlight);
+      if (!range.collapsed) {
+        const colors = new Set<string>();
+        const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+        let current = walker.nextNode();
+        while (current) {
+          if (!range.intersectsNode(current)) {
+            current = walker.nextNode();
+            continue;
+          }
+          const text = current.textContent ?? "";
+          if (!text.trim()) {
+            current = walker.nextNode();
+            continue;
+          }
+          let parent = (current as Text).parentElement;
+          while (parent && parent !== element) {
+            if (parent.dataset.textColor || parent.style.color) break;
+            parent = parent.parentElement;
+          }
+          const colorTarget = parent ?? element;
+          const computed = window.getComputedStyle(colorTarget);
+          const color = normalizeCssColor(computed.color || "");
+          if (color) {
+            colors.add(color);
+          }
+          if (colors.size > 1) break;
+          current = walker.nextNode();
+        }
+        if (colors.size === 1) {
+          setSelectionTextColor(Array.from(colors)[0]);
+          setSelectionTextColorMixed(false);
+        } else {
+          setSelectionTextColor(null);
+          setSelectionTextColorMixed(true);
+        }
+      } else {
+      const colorTarget = colorNode ?? element;
+      const computed = window.getComputedStyle(colorTarget);
+      const color = normalizeCssColor(computed.color || "");
+      setSelectionTextColor(color);
+      setSelectionTextColorMixed(false);
       }
       setTextBold(document.queryCommandState("bold"));
       setTextItalic(document.queryCommandState("italic"));
@@ -2282,23 +2210,32 @@ function WorkspaceClient() {
       ensureCommandState("italic", defaultTextStyles.italic);
       ensureCommandState("underline", defaultTextStyles.underline);
       ensureCommandState("strikeThrough", defaultTextStyles.strike);
-      document.execCommand("styleWithCSS", false, "true");
-      document.execCommand("foreColor", false, textColor);
-      if (textHighlightColor && textHighlightColor !== "transparent") {
-        document.execCommand("hiliteColor", false, textHighlightColor);
-        document.execCommand("backColor", false, textHighlightColor);
-      } else {
-        document.execCommand("hiliteColor", false, "transparent");
-        document.execCommand("backColor", false, "transparent");
+      let caretColor = textColor;
+      if (selection.rangeCount > 0 && element.contains(selection.getRangeAt(0).commonAncestorContainer)) {
+        const range = selection.getRangeAt(0);
+        const startNode =
+          range.startContainer.nodeType === Node.ELEMENT_NODE
+            ? (range.startContainer as HTMLElement)
+            : range.startContainer.parentElement;
+        let colorNode = startNode;
+        while (colorNode && colorNode !== element) {
+          if (colorNode.dataset.textColor || colorNode.style.color) break;
+          colorNode = colorNode.parentElement;
+        }
+        const colorTarget = colorNode ?? element;
+        const computed = window.getComputedStyle(colorTarget);
+        caretColor = normalizeCssColor(computed.color || "") || textColor;
       }
+      document.execCommand("styleWithCSS", false, "true");
+      document.execCommand("foreColor", false, caretColor);
       setTextBold(defaultTextStyles.bold);
       setTextItalic(defaultTextStyles.italic);
       setTextUnderline(defaultTextStyles.underline);
       setTextStrike(defaultTextStyles.strike);
-      setSelectionTextColor(textColor);
-      setSelectionHighlightColor(textHighlightColor === "transparent" ? null : textHighlightColor);
+      setSelectionTextColor(caretColor);
+      setSelectionTextColorMixed(false);
     },
-    [defaultTextStyles, textColor, textHighlightColor]
+    [defaultTextStyles, textColor]
   );
   const restoreTextSelection = useCallback(() => {
     if (!focusedTextId) return;
@@ -2332,6 +2269,9 @@ function WorkspaceClient() {
     return () => {
       if (typingTextTimeoutRef.current) {
         window.clearTimeout(typingTextTimeoutRef.current);
+      }
+      if (textAutoExpandRafRef.current !== null) {
+        window.cancelAnimationFrame(textAutoExpandRafRef.current);
       }
     };
   }, []);
@@ -2602,7 +2542,8 @@ function WorkspaceClient() {
   const signatureTabActive = "border-[#024d7c] bg-[#024d7c] text-white shadow-[0_10px_24px_rgba(2,77,124,0.2)]";
   const signatureTabInactive = "";
   const textOptionButtonBase =
-    "inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60";
+    "inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60";
+  const textOptionButtonHover = "hover:bg-slate-100 hover:text-slate-900";
   const textOptionButtonActive = "bg-blue-100 text-blue-700 hover:bg-blue-100 hover:text-blue-700";
   const textInputPill = "inline-flex h-9 items-center gap-1 px-2 text-sm font-semibold text-slate-700";
 
@@ -2663,7 +2604,6 @@ function WorkspaceClient() {
           textSizePt?: number;
           textSize?: number;
           textColor?: string;
-          textHighlightColor?: string;
           textUnderline?: boolean;
           textStrike?: boolean;
           textTransform?: "none" | "uppercase";
@@ -2692,9 +2632,6 @@ function WorkspaceClient() {
         }
         if (typeof data.textColor === "string") {
           setTextColor(data.textColor);
-        }
-        if (typeof data.textHighlightColor === "string") {
-          setTextHighlightColor(data.textHighlightColor);
         }
         if (typeof data.textUnderline === "boolean") {
           setTextUnderline(data.textUnderline);
@@ -4420,36 +4357,36 @@ function WorkspaceClient() {
                     event.stopPropagation();
                   }}
                 >
-                  <div className="relative h-full w-full">
+                  <div className="relative h-full w-full overflow-visible">
                     <div
-                      className={`pointer-events-none absolute inset-0 ${
+                      className={`pointer-events-none absolute inset-0 overflow-visible ${
                         focusedTextId === annotation.id || isDraggingThis
-                          ? "border-2 border-[#51bdff]/55 shadow-sm"
+                          ? "border-2 border-[#A3A3A3] shadow-sm"
                           : "border border-transparent group-hover:border-slate-300"
                       }`}
                     >
                       {showCornerIndicators ? (
                         <>
-                          <div className="absolute left-0 top-0 h-2 w-2">
-                            <span className="absolute left-0 top-0 h-0.5 w-2 bg-slate-500" />
-                            <span className="absolute left-0 top-0 h-2 w-0.5 bg-slate-500" />
+                          <div className="absolute left-0 top-0 h-2 w-2 -translate-x-1/2 -translate-y-1/2">
+                            <span className="absolute left-0 top-0 h-0.5 w-2 bg-[#111111]" />
+                            <span className="absolute left-0 top-0 h-2 w-0.5 bg-[#111111]" />
                           </div>
-                          <div className="absolute right-0 top-0 h-2 w-2">
-                            <span className="absolute right-0 top-0 h-0.5 w-2 bg-slate-500" />
-                            <span className="absolute right-0 top-0 h-2 w-0.5 bg-slate-500" />
+                          <div className="absolute right-0 top-0 h-2 w-2 translate-x-1/2 -translate-y-1/2">
+                            <span className="absolute right-0 top-0 h-0.5 w-2 bg-[#111111]" />
+                            <span className="absolute right-0 top-0 h-2 w-0.5 bg-[#111111]" />
                           </div>
-                          <div className="absolute bottom-0 left-0 h-2 w-2">
-                            <span className="absolute left-0 bottom-0 h-0.5 w-2 bg-slate-500" />
-                            <span className="absolute left-0 bottom-0 h-2 w-0.5 bg-slate-500" />
+                          <div className="absolute bottom-0 left-0 h-2 w-2 -translate-x-1/2 translate-y-1/2">
+                            <span className="absolute left-0 bottom-0 h-0.5 w-2 bg-[#111111]" />
+                            <span className="absolute left-0 bottom-0 h-2 w-0.5 bg-[#111111]" />
                           </div>
-                          <div className="absolute bottom-0 right-0 h-2 w-2">
-                            <span className="absolute right-0 bottom-0 h-0.5 w-2 bg-slate-500" />
-                            <span className="absolute right-0 bottom-0 h-2 w-0.5 bg-slate-500" />
+                          <div className="absolute bottom-0 right-0 h-2 w-2 translate-x-1/2 translate-y-1/2">
+                            <span className="absolute right-0 bottom-0 h-0.5 w-2 bg-[#111111]" />
+                            <span className="absolute right-0 bottom-0 h-2 w-0.5 bg-[#111111]" />
                           </div>
-                          <div className="absolute left-1/2 top-0 h-0.5 w-3 -translate-x-1/2 bg-slate-400" />
-                          <div className="absolute left-1/2 bottom-0 h-0.5 w-3 -translate-x-1/2 bg-slate-400" />
-                          <div className="absolute left-0 top-1/2 h-3 w-0.5 -translate-y-1/2 bg-slate-400" />
-                          <div className="absolute right-0 top-1/2 h-3 w-0.5 -translate-y-1/2 bg-slate-400" />
+                          <div className="absolute left-1/2 top-0 h-0.5 w-3 -translate-x-1/2 -translate-y-[3px] bg-[#111111]" />
+                          <div className="absolute left-1/2 bottom-0 h-0.5 w-3 -translate-x-1/2 translate-y-[3px] bg-[#111111]" />
+                          <div className="absolute left-0 top-1/2 h-3 w-0.5 -translate-x-[3px] -translate-y-1/2 bg-[#111111]" />
+                          <div className="absolute right-0 top-1/2 h-3 w-0.5 translate-x-[3px] -translate-y-1/2 bg-[#111111]" />
                         </>
                       ) : null}
                     </div>
@@ -4521,44 +4458,16 @@ function WorkspaceClient() {
                       contentEditable
                       suppressContentEditableWarning
                       spellCheck={false}
-                      onBeforeInput={(event) => {
-                        const inputEvent = event.nativeEvent as InputEvent;
-                        if (!inputEvent || typeof inputEvent.inputType !== "string" || !inputEvent.data || !typingHighlightColorRef.current) {
-                          lastInsertLengthRef.current = null;
-                          lastInsertColorRef.current = null;
-                          return;
-                        }
-                        if (!inputEvent.inputType.startsWith("insert")) {
-                          lastInsertLengthRef.current = null;
-                          lastInsertColorRef.current = null;
-                          return;
-                        }
-                        const sel = window.getSelection();
-                        if (!sel || sel.rangeCount === 0) {
-                          lastInsertLengthRef.current = null;
-                          lastInsertColorRef.current = null;
-                          return;
-                        }
-                        const range = sel.getRangeAt(0);
-                        if (!range.collapsed) {
-                          lastInsertLengthRef.current = null;
-                          lastInsertColorRef.current = null;
-                          return;
-                        }
-                        // Ensure we are inside the active text container before tracking insert.
-                        const container = textNodeRefs.current.get(annotation.id);
-                        if (!container || !container.contains(range.commonAncestorContainer)) {
-                          lastInsertLengthRef.current = null;
-                          lastInsertColorRef.current = null;
-                          return;
-                        }
-                        lastInsertLengthRef.current = inputEvent.data.length;
-                        lastInsertColorRef.current = typingHighlightColorRef.current;
-                      }}
                       onInput={(event) => {
                         noteTextTyping(annotation.id);
                         syncTextAnnotationContent(page.id, annotation.id, event.currentTarget);
-                        autoExpandTextAnnotation(page.id, annotation.id);
+                        if (textAutoExpandRafRef.current !== null) {
+                          window.cancelAnimationFrame(textAutoExpandRafRef.current);
+                        }
+                        textAutoExpandRafRef.current = window.requestAnimationFrame(() => {
+                          textAutoExpandRafRef.current = null;
+                          autoExpandTextAnnotation(page.id, annotation.id);
+                        });
                         const selection = window.getSelection();
                         if (selection && selection.rangeCount > 0) {
                           const range = selection.getRangeAt(0);
@@ -4566,47 +4475,6 @@ function WorkspaceClient() {
                             selectionRangeRef.current = range.cloneRange();
                           }
                         }
-                        // Wrap newly inserted text with typing highlight color if set and inside this container.
-                        if (lastInsertLengthRef.current && lastInsertColorRef.current) {
-                          const len = lastInsertLengthRef.current;
-                          const color = lastInsertColorRef.current;
-                          const sel = window.getSelection();
-                          const container = textNodeRefs.current.get(annotation.id);
-                          if (sel && sel.rangeCount > 0 && container) {
-                            let focusNode = sel.focusNode;
-                            let offset = sel.focusOffset;
-                            if (focusNode && focusNode.nodeType !== Node.TEXT_NODE) {
-                              const prev = focusNode.childNodes[offset - 1] || focusNode.previousSibling;
-                              if (prev && prev.nodeType === Node.TEXT_NODE) {
-                                focusNode = prev;
-                                offset = (prev as Text).textContent?.length ?? 0;
-                              }
-                            }
-                            if (focusNode && focusNode.nodeType === Node.TEXT_NODE && container.contains(focusNode)) {
-                              const textNode = focusNode as Text;
-                              const start = Math.max(0, offset - len);
-                              const end = Math.max(start, offset);
-                              if (end > start) {
-                                const wrapRange = document.createRange();
-                                wrapRange.setStart(textNode, start);
-                                wrapRange.setEnd(textNode, end);
-                                const wrapper = document.createElement("span");
-                                if (color !== "transparent") {
-                                  wrapper.style.backgroundColor = color;
-                                }
-                                wrapRange.surroundContents(wrapper);
-                                const caretRange = document.createRange();
-                                caretRange.setStart(wrapper, wrapper.childNodes.length);
-                                caretRange.collapse(true);
-                                sel.removeAllRanges();
-                                sel.addRange(caretRange);
-                                selectionRangeRef.current = caretRange.cloneRange();
-                              }
-                            }
-                          }
-                        }
-                        lastInsertLengthRef.current = null;
-                        lastInsertColorRef.current = null;
                         if (pendingTextSizePt) {
                           applyFontSizeToSelection(pendingTextSizePt);
                           setPendingTextSizePt(null);
@@ -4664,7 +4532,7 @@ function WorkspaceClient() {
                         if (activeTextContainerId === annotation.id) {
                           setActiveTextContainerId(null);
                         }
-                        const text = event.currentTarget.innerText.replace(/\u200b/g, "").trim();
+                        const text = event.currentTarget.innerText.replace(/[\u200b\u2060]/g, "").trim();
                         if (!text) {
                           updateTextAnnotation(page.id, annotation.id, (item) => ({
                             ...item,
@@ -4673,71 +4541,6 @@ function WorkspaceClient() {
                           }));
                           event.currentTarget.innerHTML = textToHtml(TEXT_PLACEHOLDER);
                         }
-                      }}
-                      onCopy={(event) => {
-                        const selection = window.getSelection();
-                        const container = textNodeRefs.current.get(annotation.id);
-                        if (!selection || selection.rangeCount === 0 || !container) return;
-                        let range = selection.getRangeAt(0);
-                        if (!container.contains(range.commonAncestorContainer)) return;
-                        const fragment = range.cloneContents();
-                        stripCaretMarkers(fragment);
-                        const wrapper = document.createElement("div");
-                        wrapper.appendChild(fragment);
-                        if (!event.clipboardData) return;
-                        event.preventDefault();
-                        event.clipboardData.setData("text/html", wrapper.innerHTML);
-                        event.clipboardData.setData("text/plain", range.toString());
-                      }}
-                      onPaste={(event) => {
-                        const container = textNodeRefs.current.get(annotation.id);
-                        if (!container || !event.clipboardData) return;
-                        const selection = window.getSelection();
-                        if (!selection || selection.rangeCount === 0) return;
-                        let range = selection.getRangeAt(0);
-                        if (!container.contains(range.commonAncestorContainer)) return;
-
-                        const htmlData = event.clipboardData.getData("text/html");
-                        const textData = event.clipboardData.getData("text/plain");
-                        if (!htmlData && !textData) return;
-
-                        event.preventDefault();
-
-                        if (range.collapsed) {
-                          const splitRange = splitHighlightAtCaret(range, container);
-                          selection.removeAllRanges();
-                          selection.addRange(splitRange);
-                          range = splitRange;
-                        }
-
-                        let fragment: DocumentFragment;
-                        if (htmlData) {
-                          const parsed = new DOMParser().parseFromString(htmlData, "text/html");
-                          stripCaretMarkers(parsed.body);
-                          fragment = document.createDocumentFragment();
-                          while (parsed.body.firstChild) {
-                            fragment.appendChild(parsed.body.firstChild);
-                          }
-                        } else {
-                          fragment = document.createDocumentFragment();
-                          fragment.appendChild(document.createTextNode(textData));
-                        }
-
-                        const lastInserted = fragment.lastChild;
-                        range.deleteContents();
-                        range.insertNode(fragment);
-
-                        if (lastInserted) {
-                          const after = document.createRange();
-                          after.setStartAfter(lastInserted);
-                          after.collapse(true);
-                          selection.removeAllRanges();
-                          selection.addRange(after);
-                          selectionRangeRef.current = after.cloneRange();
-                        }
-                        stripCaretMarkersInNode(container);
-                        syncTextAnnotationContent(page.id, annotation.id, container);
-                        autoExpandTextAnnotation(page.id, annotation.id);
                       }}
                       onClick={() => {
                         setFocusedTextId(annotation.id);
@@ -4764,6 +4567,8 @@ function WorkspaceClient() {
                         direction: "ltr",
                         backgroundColor: "transparent",
                         overflow: "hidden",
+                        overflowWrap: "anywhere",
+                        wordBreak: "break-word",
                         fontFamily: TEXT_FONT_OPTIONS[textFont].cssFamily,
                         fontSize: `${displayFontSize}px`,
                         textTransform,
@@ -5580,71 +5385,12 @@ function WorkspaceClient() {
     },
     [applyTextColorToSelection]
   );
-  const applyTextHighlightColor = useCallback(
-    (color: string) => {
-      const nextTyping = color === "transparent" ? null : color;
-      setTypingHighlightColor(nextTyping);
-      typingHighlightColorRef.current = nextTyping;
-      setTextHighlightColor(color);
-
-      const element = focusedTextId ? textNodeRefs.current.get(focusedTextId) : null;
-      if (!element) {
-        setSelectionHighlightColor(null);
-        return;
-      }
-
-      const selection = typeof window !== "undefined" ? window.getSelection() : null;
-      let range: Range | null = null;
-      if (selection && selection.rangeCount > 0) {
-        const active = selection.getRangeAt(0);
-        if (element.contains(active.commonAncestorContainer)) {
-          range = active;
-        }
-      }
-      if (!range) {
-        range = document.createRange();
-        range.selectNodeContents(element);
-        range.collapse(false);
-      }
-
-      if (!range.collapsed && selection && selection.toString().length > 0) {
-        setSelectionHighlightColor(color === "transparent" ? null : color);
-        applyTextHighlightToSelection(color, range);
-        return;
-      }
-
-      // Caret only: create a new run by inserting an empty styled span and move caret inside.
-      if (selection) {
-        const caretRange = range.cloneRange();
-        const marker = document.createElement("span");
-        marker.dataset.highlightCaret = "true";
-        if (color && color !== "transparent") {
-          marker.style.backgroundColor = color;
-        }
-        marker.appendChild(document.createTextNode("\u200b"));
-        caretRange.insertNode(marker);
-        const nextRange = document.createRange();
-        nextRange.setStart(marker.firstChild ?? marker, marker.childNodes.length > 0 ? 1 : 0);
-        nextRange.collapse(true);
-        selection.removeAllRanges();
-        selection.addRange(nextRange);
-      }
-      setSelectionHighlightColor(null);
-    },
-    [applyTextHighlightToSelection, focusedTextId]
-  );
-  const openColorPicker = useCallback(
-    (type: "text" | "highlight") => {
-      const current =
-        type === "text" ? activeTextColor ?? textColor : activeTextHighlightColor ?? textHighlightColor;
-      const isNone = type === "highlight" && (!current || current === "transparent");
-      setColorPickerIsNone(isNone);
-      setColorPickerDraft(isNone ? "#fff266" : current || "#111827");
-      setHighlightCustomOpen(false);
-      setColorPickerOpen(type);
-    },
-    [activeTextColor, activeTextHighlightColor, textColor, textHighlightColor]
-  );
+  const openColorPicker = useCallback(() => {
+    const current = selectionTextColorMixed ? textColor : activeTextColor ?? textColor;
+    setColorPickerDraft(current || "#111827");
+    setHighlightCustomOpen(false);
+    setColorPickerOpen("text");
+  }, [activeTextColor, selectionTextColorMixed, textColor]);
   const pickHighlightColorFromScreen = useCallback(async () => {
     if (typeof window === "undefined") return;
     const EyeDropperCtor = (window as Window & { EyeDropper?: new () => { open: () => Promise<{ sRGBHex: string }> } })
@@ -5659,9 +5405,8 @@ function WorkspaceClient() {
       const result = await new EyeDropperCtor().open();
       if (result?.sRGBHex) {
         setColorPickerDraft(result.sRGBHex);
-        setColorPickerIsNone(false);
         setHighlightCustomOpen(true);
-        setColorPickerOpen("highlight");
+        setColorPickerOpen("text");
       }
     } catch {
       // User canceled the picker.
@@ -5681,7 +5426,6 @@ function WorkspaceClient() {
     setHighlightCustomSat(nextSat);
     setHighlightCustomVal(nextVal);
     setColorPickerDraft(hsvToHex(nextHue, nextSat, nextVal));
-    setColorPickerIsNone(false);
   }, []);
   const updateHighlightPlaneFromEvent = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
@@ -5723,7 +5467,6 @@ function WorkspaceClient() {
       const nextValue = clamp(numeric, 0, 255);
       const nextRgb = { ...highlightCustomRgb, [channel]: nextValue };
       setColorPickerDraft(rgbToHex(nextRgb.r, nextRgb.g, nextRgb.b));
-      setColorPickerIsNone(false);
     },
     [highlightCustomRgb]
   );
@@ -5758,6 +5501,14 @@ function WorkspaceClient() {
   const hideToolbarTooltip = useCallback(() => {
     setToolbarTooltip((prev) => (prev.visible ? { ...prev, visible: false } : prev));
   }, []);
+  const applyTextAlignment = useCallback(
+    (nextAlign: "left" | "center" | "right" | "justify") => {
+      setTextAlign(nextAlign);
+      setAlignMenuOpen(false);
+      hideToolbarTooltip();
+    },
+    [hideToolbarTooltip]
+  );
   useEffect(() => {
     if (!toolbarTooltip.visible) return;
     const updatePosition = () => {
@@ -5864,7 +5615,6 @@ function WorkspaceClient() {
       textAnnotations,
         textSizePt: textSize,
         textColor,
-        textHighlightColor,
         textUnderline,
         textStrike,
         textTransform,
@@ -5883,7 +5633,6 @@ function WorkspaceClient() {
     textAnnotations,
       textSize,
       textColor,
-      textHighlightColor,
       textUnderline,
       textStrike,
       textTransform,
@@ -7347,7 +7096,7 @@ function WorkspaceClient() {
     const rect = button.getBoundingClientRect();
     const width = Math.max(224, rect.width);
     const maxLeft = window.innerWidth - width - 8;
-    const left = Math.max(8, Math.min(rect.left, maxLeft));
+    const left = Math.max(8, Math.min(rect.left + rect.width / 2 - menuWidth / 2, maxLeft));
     const top = rect.bottom + 8;
     setFontMenuPosition({ left, top, width });
   }, []);
@@ -7355,9 +7104,7 @@ function WorkspaceClient() {
     const button = alignMenuButtonRef.current;
     if (!button || typeof window === "undefined") return;
     const rect = button.getBoundingClientRect();
-    const menuWidth = 148;
-    const maxLeft = window.innerWidth - menuWidth - 8;
-    const left = Math.max(8, Math.min(rect.left, maxLeft));
+    const left = rect.left + rect.width / 2;
     const top = rect.bottom + 8;
     setAlignMenuPosition({ left, top });
   }, []);
@@ -7413,7 +7160,7 @@ function WorkspaceClient() {
     setHighlightPopoverPosition({ left, top });
   }, []);
   useEffect(() => {
-    if (colorPickerOpen !== "highlight") {
+    if (colorPickerOpen !== "text") {
       setHighlightPopoverPosition(null);
       return;
     }
@@ -7427,7 +7174,7 @@ function WorkspaceClient() {
     };
   }, [colorPickerOpen, highlightCustomOpen, updateHighlightPopoverPosition]);
   useEffect(() => {
-    if (colorPickerOpen !== "highlight") return;
+    if (colorPickerOpen !== "text") return;
     const handleOutside = (event: MouseEvent) => {
       if (!(event.target instanceof Node)) return;
       if (
@@ -8488,7 +8235,7 @@ function WorkspaceClient() {
                                               className={`${textOptionButtonBase} ${
                                                 (focusedTextId ? textBold : defaultTextStyles.bold)
                                                   ? textOptionButtonActive
-                                                  : ""
+                                                  : textOptionButtonHover
                                               } text-slate-800`}
                                               onMouseDown={keepTextEditingActive}
                                               onClick={() => applyInlineCommand("bold")}
@@ -8504,7 +8251,7 @@ function WorkspaceClient() {
                                               className={`${textOptionButtonBase} ${
                                                 (focusedTextId ? textItalic : defaultTextStyles.italic)
                                                   ? textOptionButtonActive
-                                                  : ""
+                                                  : textOptionButtonHover
                                               } text-slate-800`}
                                               onMouseDown={keepTextEditingActive}
                                               onClick={() => applyInlineCommand("italic")}
@@ -8520,7 +8267,7 @@ function WorkspaceClient() {
                                               className={`${textOptionButtonBase} ${
                                                 (focusedTextId ? textUnderline : defaultTextStyles.underline)
                                                   ? textOptionButtonActive
-                                                  : ""
+                                                  : textOptionButtonHover
                                               } text-slate-800`}
                                               onMouseDown={keepTextEditingActive}
                                               onClick={() => applyInlineCommand("underline")}
@@ -8536,7 +8283,7 @@ function WorkspaceClient() {
                                               className={`${textOptionButtonBase} ${
                                                 (focusedTextId ? textStrike : defaultTextStyles.strike)
                                                   ? textOptionButtonActive
-                                                  : ""
+                                                  : textOptionButtonHover
                                               } text-slate-800`}
                                               onMouseDown={keepTextEditingActive}
                                               onClick={() => applyInlineCommand("strikeThrough")}
@@ -8550,9 +8297,12 @@ function WorkspaceClient() {
                                               <button
                                                 type="button"
                                                 ref={alignMenuButtonRef}
-                                                className={`${textOptionButtonBase} w-auto px-2 flex items-center gap-1`}
+                                                className={`${textOptionButtonBase} ${textOptionButtonHover} w-auto px-2 flex items-center gap-1`}
                                                 onMouseDown={keepTextEditingActive}
-                                                onClick={() => setAlignMenuOpen((prev) => !prev)}
+                                                onClick={() => {
+                                                  hideToolbarTooltip();
+                                                  setAlignMenuOpen((prev) => !prev);
+                                                }}
                                                 onMouseEnter={(event) => showToolbarTooltip("Align", event.currentTarget)}
                                                 onMouseLeave={hideToolbarTooltip}
                                                 aria-label="Text alignment"
@@ -8561,10 +8311,8 @@ function WorkspaceClient() {
                                                   <AlignLeft className="h-[18px] w-[18px]" />
                                                 ) : textAlign === "center" ? (
                                                   <AlignCenter className="h-[18px] w-[18px]" />
-                                                ) : textAlign === "right" ? (
-                                                  <AlignRight className="h-[18px] w-[18px]" />
                                                 ) : (
-                                                  <AlignJustify className="h-[18px] w-[18px]" />
+                                                  <AlignRight className="h-[18px] w-[18px]" />
                                                 )}
                                                 <svg className="h-2 w-2 text-slate-500" viewBox="0 0 8 5" aria-hidden="true">
                                                   <path d="M4 5L0 0h8L4 5z" fill="currentColor" />
@@ -8578,6 +8326,7 @@ function WorkspaceClient() {
                                                       style={{
                                                         left: alignMenuPosition.left,
                                                         top: alignMenuPosition.top,
+                                                        transform: "translateX(-50%)",
                                                       }}
                                                     >
                                                       <div className="flex items-center gap-1">
@@ -8585,7 +8334,6 @@ function WorkspaceClient() {
                                                           { value: "left", label: "Align left", Icon: AlignLeft },
                                                           { value: "center", label: "Align center", Icon: AlignCenter },
                                                           { value: "right", label: "Align right", Icon: AlignRight },
-                                                          { value: "justify", label: "Justify", Icon: AlignJustify },
                                                         ].map(({ value, label, Icon }) => (
                                                           <button
                                                             key={value}
@@ -8593,12 +8341,12 @@ function WorkspaceClient() {
                                                             className={`flex h-7 w-7 items-center justify-center rounded-md text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 ${
                                                               textAlign === value ? "bg-blue-100 text-blue-700" : ""
                                                             }`}
-                                                            onMouseDown={keepTextEditingActive}
+                                                            onPointerDown={keepTextEditingActive}
                                                             onMouseEnter={(event) => showToolbarTooltip(label, event.currentTarget)}
                                                             onMouseLeave={hideToolbarTooltip}
                                                             onClick={() => {
-                                                              setTextAlign(value as typeof textAlign);
-                                                              setAlignMenuOpen(false);
+                                                              applyTextAlignment(value as typeof textAlign);
+                                                              restoreTextSelectionSoon();
                                                             }}
                                                             aria-label={label}
                                                           >
@@ -8613,12 +8361,13 @@ function WorkspaceClient() {
                                             </div>
                                             <button
                                               type="button"
-                                              className={textOptionButtonBase}
+                                              className={`${textOptionButtonBase} ${textOptionButtonHover}`}
                                               onMouseDown={keepTextEditingActive}
-                                              onClick={() => openColorPicker("text")}
+                                              onClick={openColorPicker}
                                               onMouseEnter={(event) => showToolbarTooltip("Text color", event.currentTarget)}
                                               onMouseLeave={hideToolbarTooltip}
                                               aria-label="Text color"
+                                              ref={highlightColorButtonRef}
                                             >
                                               <span className="relative flex h-7 w-7 items-center justify-center">
                                                 <svg
@@ -8635,29 +8384,11 @@ function WorkspaceClient() {
                                                     strokeLinejoin="round"
                                                   />
                                                 </svg>
-                                                <span
-                                                  className="absolute -bottom-0.5 left-0 right-0 h-[3px] rounded-sm"
-                                                  style={{ backgroundColor: activeTextColor || "#111827" }}
-                                                />
-                                              </span>
-                                            </button>
-                                            <button
-                                              type="button"
-                                              className={textOptionButtonBase}
-                                              onMouseDown={keepTextEditingActive}
-                                              onClick={() => openColorPicker("highlight")}
-                                              onMouseEnter={(event) => showToolbarTooltip("Text highlight", event.currentTarget)}
-                                              onMouseLeave={hideToolbarTooltip}
-                                              aria-label="Text highlight"
-                                              ref={highlightColorButtonRef}
-                                            >
-                                              <span className="relative flex h-6 w-6 items-center justify-center">
-                                                <Highlighter className="h-5 w-5" />
-                                                {activeTextHighlightColor && activeTextHighlightColor !== "transparent" ? (
-                                                  <span
-                                                    className="absolute -bottom-1 left-0 right-0 h-[3px] rounded-sm"
-                                                    style={{ backgroundColor: activeTextHighlightColor }}
-                                                  />
+                                                {!selectionTextColorMixed ? (
+                                                    <span
+                                                      className="absolute bottom-0 left-0 right-0 h-[3px] rounded-sm"
+                                                      style={{ backgroundColor: activeTextColor || "#111827" }}
+                                                    />
                                                 ) : null}
                                               </span>
                                             </button>
@@ -9679,7 +9410,7 @@ function WorkspaceClient() {
 			        </div>
 			      </div>
 
-      {colorPickerOpen === "highlight" && typeof document !== "undefined"
+      {colorPickerOpen === "text" && typeof document !== "undefined"
         ? createPortal(
             <div
               ref={highlightPopoverRef}
@@ -9692,7 +9423,7 @@ function WorkspaceClient() {
                 pointerEvents: highlightPopoverPosition ? "auto" : "none",
               }}
             >
-              <div className="sr-only">Highlight color</div>
+              <div className="sr-only">Text color</div>
               <button
                 type="button"
                 className="mb-2 mt-0 flex w-full items-center gap-2 rounded-md px-1 py-1.5 text-left text-base font-semibold text-slate-900 transition hover:bg-slate-100"
@@ -9701,7 +9432,8 @@ function WorkspaceClient() {
                   keepTextEditingActive(event);
                 }}
                 onClick={() => {
-                  applyTextHighlightColor("transparent");
+                  applyTextColor("#111827");
+                  setColorPickerDraft("#111827");
                   setColorPickerOpen(null);
                   restoreTextSelectionSoon();
                 }}
@@ -9716,14 +9448,9 @@ function WorkspaceClient() {
                       if (!value) {
                         return <span key={`empty-${rowIndex}-${valueIndex}`} className="h-6 w-6" aria-hidden />;
                       }
-                      const selectedValue =
-                        typingHighlightColorRef.current && typingHighlightColorRef.current !== "transparent"
-                          ? typingHighlightColorRef.current.toLowerCase()
-                          : activeTextHighlightColor && activeTextHighlightColor !== "transparent"
-                            ? activeTextHighlightColor.toLowerCase()
-                            : textHighlightColor && textHighlightColor !== "transparent"
-                              ? textHighlightColor.toLowerCase()
-                              : "transparent";
+                      const selectedValue = selectionTextColorMixed
+                        ? ""
+                        : (activeTextColor ?? textColor).toLowerCase();
                       const isSelected = value.toLowerCase() === selectedValue;
                       const rgb = hexToRgb(value);
                       const luminance = rgb ? 0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b : 1;
@@ -9741,11 +9468,11 @@ function WorkspaceClient() {
                             keepTextEditingActive(event);
                           }}
                           onClick={() => {
-                            applyTextHighlightColor(value);
+                            applyTextColor(value);
                             setColorPickerOpen(null);
                             restoreTextSelectionSoon();
                           }}
-                          aria-label={`Highlight ${value}`}
+                          aria-label={`Text color ${value}`}
                         >
                           {isSelected ? (
                             <svg className="h-4 w-4" viewBox="0 0 20 20" aria-hidden="true">
@@ -9776,7 +9503,7 @@ function WorkspaceClient() {
                   onClick={() => setHighlightCustomOpen((prev) => !prev)}
                   onMouseEnter={(event) => showToolbarTooltip("Add a custom color", event.currentTarget)}
                   onMouseLeave={hideToolbarTooltip}
-                  aria-label="Custom highlight color"
+                  aria-label="Custom text color"
                 >
                   <Plus className="h-4 w-4" />
                 </button>
@@ -9845,9 +9572,8 @@ function WorkspaceClient() {
                         onChange={(event) => {
                           const next = event.target.value.trim();
                           const normalized = next.startsWith("#") ? next : `#${next}`;
-                          setColorPickerDraft(normalized.slice(0, 7));
-                          setColorPickerIsNone(false);
-                        }}
+        setColorPickerDraft(normalized.slice(0, 7));
+      }}
                         className="h-8 rounded-md border border-slate-200 px-2 text-xs font-semibold text-slate-600 outline-none focus:border-[#51bdff] focus:ring-2 focus:ring-[#51bdff]/25"
                         aria-label="Hex color"
                       />
@@ -9900,7 +9626,7 @@ function WorkspaceClient() {
                     className="rounded-md bg-[#024d7c] px-4 py-1.5 text-sm font-semibold text-white shadow-md shadow-[#012a44]/25 transition hover:bg-[#013d63]"
                     onMouseDown={keepTextEditingActive}
                     onClick={() => {
-                      applyTextHighlightColor(colorPickerIsNone ? "transparent" : colorPickerDraft);
+                      applyTextColor(colorPickerDraft);
                       setColorPickerOpen(null);
                       restoreTextSelectionSoon();
                     }}
@@ -9909,77 +9635,6 @@ function WorkspaceClient() {
                   </button>
                 </div>
               ) : null}
-            </div>,
-            document.body
-          )
-        : null}
-
-      {colorPickerOpen === "text" && typeof document !== "undefined"
-        ? createPortal(
-            <div
-              className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/20 px-4"
-              onMouseDown={() => setColorPickerOpen(null)}
-            >
-              <div
-                className="w-full max-w-[360px] rounded-2xl bg-white p-4 shadow-[0_18px_40px_rgba(15,23,42,0.2)]"
-                onMouseDown={(event) => event.stopPropagation()}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-semibold text-slate-800">Text color</div>
-                  <button
-                    type="button"
-                    className="rounded-md p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
-                    onClick={() => setColorPickerOpen(null)}
-                    aria-label="Close color picker"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-                <div className="mt-4 flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full border border-slate-200" style={{ backgroundColor: colorPickerDraft }} />
-                  <input
-                    type="color"
-                    value={colorPickerDraft}
-                    onChange={(event) => {
-                      setColorPickerDraft(event.target.value);
-                    }}
-                    className="h-10 w-10 cursor-pointer rounded-md border border-slate-200 bg-white p-0"
-                    aria-label="Color picker"
-                  />
-                  <div className="flex flex-1 flex-col gap-2">
-                    <label className="text-xs font-semibold text-slate-500">Hex</label>
-                    <input
-                      value={colorPickerDraft}
-                      onChange={(event) => {
-                        const next = event.target.value.trim();
-                        const normalized = next.startsWith("#") ? next : `#${next}`;
-                        setColorPickerDraft(normalized.slice(0, 7));
-                      }}
-                      className="h-9 rounded-md border border-slate-200 px-2 text-sm font-semibold text-slate-700 outline-none focus:border-[#51bdff] focus:ring-2 focus:ring-[#51bdff]/25"
-                      aria-label="Hex color"
-                    />
-                  </div>
-                </div>
-                <div className="mt-5 flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    className="rounded-md border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-800"
-                    onClick={() => setColorPickerOpen(null)}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-blue-700"
-                    onClick={() => {
-                      applyTextColor(colorPickerDraft);
-                      setColorPickerOpen(null);
-                    }}
-                  >
-                    OK
-                  </button>
-                </div>
-              </div>
             </div>,
             document.body
           )
@@ -10050,6 +9705,19 @@ function WorkspaceClient() {
         }
         .tools-scroll {
           scrollbar-width: none;
+        }
+        [data-text-annotation] span {
+          display: inline;
+          white-space: inherit;
+          word-break: inherit;
+          overflow-wrap: inherit;
+          line-height: inherit;
+        }
+        [data-text-annotation] [style*="line-through"] {
+          text-decoration-line: line-through;
+          text-decoration-thickness: clamp(0.06em, 0.08em, 0.12em);
+          text-decoration-color: currentColor;
+          text-decoration-skip-ink: none;
         }
         /* Make scrollbar gutters/tracks white across Studio */
         body.studio-page * {
