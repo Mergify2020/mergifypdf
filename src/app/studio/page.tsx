@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type {
   CSSProperties,
+  ClipboardEvent as ReactClipboardEvent,
   MouseEvent as ReactMouseEvent,
   PointerEvent as ReactPointerEvent,
   SVGProps,
