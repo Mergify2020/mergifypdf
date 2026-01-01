@@ -55,7 +55,6 @@ import {
   AlignJustify,
   Bold,
   Italic,
-  Strikethrough,
   Underline,
   DropletOff,
   Pipette,
@@ -63,7 +62,8 @@ import {
   PanelRightOpen,
   MoreHorizontal,
 	  Copy,
-	  ListOrdered,
+  List,
+  ListOrdered,
 	  Signature as SignatureIcon,
 	  UploadCloud,
   X,
@@ -113,6 +113,7 @@ type ShapeAnnotation = {
   start: Point;
   end: Point;
   color: string;
+  fillColor?: string | null;
   thickness: number;
 };
 type HighlightStroke = {
@@ -167,6 +168,7 @@ type TextAnnotation = {
   rotation?: number;
   textSizePt?: number;
   richTextHtml?: string;
+  lineSpacing?: number;
 };
 type TextFont =
   | "Inter"
@@ -374,6 +376,7 @@ const TEXT_SIZE_MIN_PT = 1;
 const TEXT_SIZE_MAX_PT = 96;
 const DEFAULT_TEXT_SIZE_PT = 11;
 const DEFAULT_TEXT_SIZE_PX = DEFAULT_TEXT_SIZE_PT * PT_TO_PX;
+const DEFAULT_TEXT_LINE_SPACING = 1.0;
 const THUMB_MAX_WIDTH = 200;
 const PREVIEW_IMAGE_QUALITY = 0.98;
 const WORKSPACE_SESSION_KEY = "mpdf:files";
@@ -406,12 +409,6 @@ function applyTextTransform(value: string, transform: "none" | "uppercase") {
   return value;
 }
 
-function getTextDecorationLine(underline: boolean, strike: boolean) {
-  const parts = [];
-  if (underline) parts.push("underline");
-  if (strike) parts.push("line-through");
-  return parts.length > 0 ? parts.join(" ") : "none";
-}
 
 function rotatePoint(point: { x: number; y: number }, origin: { x: number; y: number }, angleRad: number) {
   const dx = point.x - origin.x;
@@ -718,7 +715,6 @@ function useProjects() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const saveProject = useCallback(
@@ -871,7 +867,14 @@ type RichTextRun = {
   bold?: boolean;
   italic?: boolean;
   underline?: boolean;
-  strike?: boolean;
+};
+
+type StrikeOverlayLine = {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  color: string;
 };
 
 function escapeHtml(value: string) {
@@ -901,6 +904,33 @@ function parseFontSize(styleValue: string, fallback: number) {
   return fallback;
 }
 
+function parseLineHeightPx(styleValue: string, fontSizePx: number) {
+  if (!styleValue || styleValue === "normal") {
+    return fontSizePx * 1.2;
+  }
+  const unitless = styleValue.match(/^\d+(\.\d+)?$/);
+  if (unitless) {
+    const parsed = Number(styleValue);
+    return Number.isNaN(parsed) ? fontSizePx * 1.2 : fontSizePx * parsed;
+  }
+  const matchPx = styleValue.match(/(\d+(\.\d+)?)px/);
+  if (matchPx) {
+    const parsed = Number(matchPx[1]);
+    return Number.isNaN(parsed) ? fontSizePx * 1.2 : parsed;
+  }
+  const matchEm = styleValue.match(/(\d+(\.\d+)?)em/);
+  if (matchEm) {
+    const parsed = Number(matchEm[1]);
+    return Number.isNaN(parsed) ? fontSizePx * 1.2 : fontSizePx * parsed;
+  }
+  const matchPercent = styleValue.match(/(\d+(\.\d+)?)%/);
+  if (matchPercent) {
+    const parsed = Number(matchPercent[1]);
+    return Number.isNaN(parsed) ? fontSizePx * 1.2 : fontSizePx * (parsed / 100);
+  }
+  return fontSizePx * 1.2;
+}
+
 function extractRichTextRuns(html: string, fallbackSize: number) {
   if (typeof document === "undefined") {
     return [{ text: html, sizePt: fallbackSize }];
@@ -924,7 +954,6 @@ function extractRichTextRuns(html: string, fallbackSize: number) {
       bold: boolean;
       italic: boolean;
       underline: boolean;
-      strike: boolean;
     }
   ) => {
     if (node.nodeType === Node.TEXT_NODE) {
@@ -963,7 +992,6 @@ function extractRichTextRuns(html: string, fallbackSize: number) {
     if (tag === "B" || tag === "STRONG") next.bold = true;
     if (tag === "I" || tag === "EM") next.italic = true;
     if (tag === "U") next.underline = true;
-    if (tag === "S" || tag === "STRIKE" || tag === "DEL") next.strike = true;
     if (el.style.fontWeight) {
       const weight = el.style.fontWeight;
       if (weight === "bold" || Number(weight) >= 600) next.bold = true;
@@ -971,7 +999,6 @@ function extractRichTextRuns(html: string, fallbackSize: number) {
     if (el.style.fontStyle === "italic") next.italic = true;
     const decoration = el.style.textDecorationLine || el.style.textDecoration;
     if (decoration.includes("underline")) next.underline = true;
-    if (decoration.includes("line-through")) next.strike = true;
     const isBlock = el.tagName === "DIV" || el.tagName === "P";
     el.childNodes.forEach((child) => walk(child, next));
     if (isBlock) {
@@ -987,7 +1014,6 @@ function extractRichTextRuns(html: string, fallbackSize: number) {
       bold: false,
       italic: false,
       underline: false,
-      strike: false,
     })
   );
   return runs.length > 0 ? runs : [{ text: "", sizePt: fallbackSize }];
@@ -1107,16 +1133,30 @@ function shapeBounds(shape: Pick<ShapeAnnotation, "start" | "end">) {
 
 function shapeToSvgElements(
   shape: Pick<ShapeAnnotation, "type" | "start" | "end">,
-  opts: { stroke: string; strokeWidth: number; strokeOpacity?: number; interactiveProps?: SVGProps<SVGElement> }
+  opts: {
+    stroke: string;
+    strokeWidth: number;
+    strokeOpacity?: number;
+    fill?: string | null;
+    fillOpacity?: number;
+    interactiveProps?: SVGProps<SVGElement>;
+  }
 ) {
   const strokeOpacity = opts.strokeOpacity ?? 1;
-  const common = {
+  const strokeCommon = {
     stroke: opts.stroke,
     strokeWidth: opts.strokeWidth,
     strokeOpacity,
     fill: "none" as const,
     strokeLinecap: "round" as const,
     strokeLinejoin: "round" as const,
+  };
+  const fill = opts.fill ?? "none";
+  const fillOpacity = opts.fillOpacity ?? 1;
+  const filledCommon = {
+    ...strokeCommon,
+    fill,
+    fillOpacity,
   };
   const x1 = shape.start.x * 1000;
   const y1 = shape.start.y * 1000;
@@ -1147,19 +1187,29 @@ function shapeToSvgElements(
 
 	switch (shape.type) {
 	    case "line":
-	      return <line x1={x1} y1={y1} x2={x2} y2={y2} {...common} {...(opts.interactiveProps as any)} />;
+	      return <line x1={x1} y1={y1} x2={x2} y2={y2} {...strokeCommon} {...(opts.interactiveProps as any)} />;
 	    case "arrow": {
       const head = makeArrowHead();
       return (
         <g {...(opts.interactiveProps as any)}>
-          <line x1={x1} y1={y1} x2={x2} y2={y2} {...common} />
-          <line x1={x2} y1={y2} x2={head.lx} y2={head.ly} {...common} />
-          <line x1={x2} y1={y2} x2={head.rx} y2={head.ry} {...common} />
+          <line x1={x1} y1={y1} x2={x2} y2={y2} {...strokeCommon} />
+          <line x1={x2} y1={y2} x2={head.lx} y2={head.ly} {...strokeCommon} />
+          <line x1={x2} y1={y2} x2={head.rx} y2={head.ry} {...strokeCommon} />
         </g>
       );
     }
     case "rect":
-      return <rect x={minXPx} y={minYPx} width={wPx} height={hPx} rx={0} {...common} {...(opts.interactiveProps as any)} />;
+      return (
+        <rect
+          x={minXPx}
+          y={minYPx}
+          width={wPx}
+          height={hPx}
+          rx={0}
+          {...filledCommon}
+          {...(opts.interactiveProps as any)}
+        />
+      );
 	    case "ellipse":
 	      return (
 	        <ellipse
@@ -1167,7 +1217,7 @@ function shapeToSvgElements(
 	          cy={minYPx + hPx / 2}
 	          rx={wPx / 2}
 	          ry={hPx / 2}
-	          {...common}
+	          {...filledCommon}
 	          {...(opts.interactiveProps as any)}
 	        />
 	      );
@@ -1178,7 +1228,7 @@ function shapeToSvgElements(
 	      return (
 	        <polygon
 	          points={`${top.x},${top.y} ${right.x},${right.y} ${left.x},${left.y}`}
-	          {...common}
+	          {...filledCommon}
 	          {...(opts.interactiveProps as any)}
 	        />
 	      );
@@ -1186,8 +1236,8 @@ function shapeToSvgElements(
 	    case "x":
 	      return (
 	        <g {...(opts.interactiveProps as any)}>
-	          <line x1={minXPx} y1={minYPx} x2={minXPx + wPx} y2={minYPx + hPx} {...common} />
-          <line x1={minXPx + wPx} y1={minYPx} x2={minXPx} y2={minYPx + hPx} {...common} />
+	          <line x1={minXPx} y1={minYPx} x2={minXPx + wPx} y2={minYPx + hPx} {...strokeCommon} />
+          <line x1={minXPx + wPx} y1={minYPx} x2={minXPx} y2={minYPx + hPx} {...strokeCommon} />
         </g>
       );
     case "check": {
@@ -1197,7 +1247,7 @@ function shapeToSvgElements(
       return (
         <polyline
           points={`${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y}`}
-          {...common}
+          {...strokeCommon}
           {...(opts.interactiveProps as any)}
         />
       );
@@ -1518,6 +1568,8 @@ function WorkspaceClient() {
   const [shapeType, setShapeType] = useState<ShapeType>("arrow");
   const [shapeThickness, setShapeThickness] = useState(3);
   const [shapeColor, setShapeColor] = useState(PEN_COLOR);
+  const [shapeFillColor, setShapeFillColor] = useState<string | null>(null);
+  const [shapeThicknessInput, setShapeThicknessInput] = useState("3");
   const [headerMode, setHeaderMode] = useState<HeaderMode>("default");
   const [toolbarPreviewMode, setToolbarPreviewMode] = useState<Exclude<HeaderMode, "default"> | null>(null);
   const toolPreviewTimerRef = useRef<number | null>(null);
@@ -1581,18 +1633,17 @@ function WorkspaceClient() {
   const [imageUploadPreview, setImageUploadPreview] = useState<string | null>(null);
   const [imageUploadName, setImageUploadName] = useState("");
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
-  const [highlights, setHighlights] = useState<Record<string, HighlightStroke[]>>({});
-  const [textAnnotations, setTextAnnotations] = useState<Record<string, TextAnnotation[]>>({});
-  const [textBold, setTextBold] = useState(false);
-  const [textItalic, setTextItalic] = useState(false);
-  const [textUnderline, setTextUnderline] = useState(false);
-  const [textStrike, setTextStrike] = useState(false);
-  const [defaultTextStyles, setDefaultTextStyles] = useState({
-    bold: false,
-    italic: false,
-    underline: false,
-    strike: false,
-  });
+const [highlights, setHighlights] = useState<Record<string, HighlightStroke[]>>({});
+const [textAnnotations, setTextAnnotations] = useState<Record<string, TextAnnotation[]>>({});
+const [textBold, setTextBold] = useState(false);
+const [textItalic, setTextItalic] = useState(false);
+const [textUnderline, setTextUnderline] = useState(false);
+const [defaultTextStyles, setDefaultTextStyles] = useState({
+  bold: false,
+  italic: false,
+  underline: false,
+});
+const [listType, setListType] = useState<"bullet" | "number" | null>(null);
   const [textTransform, setTextTransform] = useState<"none" | "uppercase">("none");
   const [textAlign, setTextAlign] = useState<"left" | "center" | "right" | "justify">("left");
   const [textSizeInput, setTextSizeInput] = useState<string>(`${DEFAULT_TEXT_SIZE_PT}`);
@@ -1611,15 +1662,28 @@ function WorkspaceClient() {
   const [selectionTextColorMixed, setSelectionTextColorMixed] = useState(false);
   const [pendingTextSizePt, setPendingTextSizePt] = useState<number | null>(null);
   const [pendingTextColor, setPendingTextColor] = useState<string | null>(null);
-  const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]>([]);
+const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]>([]);
   const [redoHighlightHistory, setRedoHighlightHistory] = useState<HighlightHistoryEntry[]>([]);
   const [shapesByPage, setShapesByPage] = useState<Record<string, ShapeAnnotation[]>>({});
+  const [focusedShapeId, setFocusedShapeId] = useState<string | null>(null);
+  const [focusedShapePageId, setFocusedShapePageId] = useState<string | null>(null);
+  const [draggingShape, setDraggingShape] = useState<{
+    pageId: string;
+    id: string;
+    offsetX: number;
+    offsetY: number;
+  } | null>(null);
+  const shapeDragCleanupRef = useRef<(() => void) | null>(null);
+  const shapeDragRafRef = useRef<number | null>(null);
+  const shapeDragLatestPointRef = useRef<Point | null>(null);
+  const shapeDragLatestShapeRef = useRef<{ start: Point; end: Point } | null>(null);
   const [draftShape, setDraftShape] = useState<{
     pageId: string;
     type: ShapeType;
     start: Point;
     end: Point;
     color: string;
+    fillColor?: string | null;
     thickness: number;
   } | null>(null);
   const [draftHighlight, setDraftHighlight] = useState<DraftHighlight | null>(null);
@@ -1645,6 +1709,8 @@ function WorkspaceClient() {
     startY: number;
   } | null>(null);
   const textResizeCleanupRef = useRef<(() => void) | null>(null);
+  const textResizeRafRef = useRef<number | null>(null);
+  const textResizeLatestRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
   const [draftTextBox, setDraftTextBox] = useState<{
     pageId: string;
     startX: number;
@@ -1662,15 +1728,26 @@ function WorkspaceClient() {
   const alignMenuRef = useRef<HTMLDivElement | null>(null);
   const alignMenuButtonRef = useRef<HTMLButtonElement | null>(null);
   const [alignMenuPosition, setAlignMenuPosition] = useState<{ left: number; top: number } | null>(null);
-  const [colorPickerOpen, setColorPickerOpen] = useState<"text" | null>(null);
+  const [lineSpacingMenuOpen, setLineSpacingMenuOpen] = useState(false);
+  const lineSpacingMenuRef = useRef<HTMLDivElement | null>(null);
+  const lineSpacingMenuButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [lineSpacingMenuPosition, setLineSpacingMenuPosition] = useState<{ left: number; top: number } | null>(null);
+  const [colorPickerOpen, setColorPickerOpen] = useState<"text" | "shape-border" | "shape-fill" | null>(null);
   const [colorPickerDraft, setColorPickerDraft] = useState("#111827");
-  const highlightColorButtonRef = useRef<HTMLButtonElement | null>(null);
+  const textColorButtonRef = useRef<HTMLButtonElement | null>(null);
+  const shapeBorderColorButtonRef = useRef<HTMLButtonElement | null>(null);
+  const shapeFillColorButtonRef = useRef<HTMLButtonElement | null>(null);
   const highlightPopoverRef = useRef<HTMLDivElement | null>(null);
   const [highlightPopoverPosition, setHighlightPopoverPosition] = useState<{ left: number; top: number } | null>(null);
   const [highlightCustomOpen, setHighlightCustomOpen] = useState(false);
   const [highlightCustomHue, setHighlightCustomHue] = useState(0);
   const [highlightCustomSat, setHighlightCustomSat] = useState(100);
   const [highlightCustomVal, setHighlightCustomVal] = useState(100);
+  const [customTextColors, setCustomTextColors] = useState<string[]>([]);
+  const customTextColorStorageKey = useMemo(() => {
+    const userKey = authSession?.user?.email ?? authSession?.user?.name ?? "guest";
+    return `mergifypdf:text-colors:${userKey}`;
+  }, [authSession?.user?.email, authSession?.user?.name]);
   const [focusedTextId, setFocusedTextId] = useState<string | null>(null);
   const [activeTextContainerId, setActiveTextContainerId] = useState<string | null>(null);
   const [typingTextId, setTypingTextId] = useState<string | null>(null);
@@ -1694,7 +1771,25 @@ function WorkspaceClient() {
     }
     return textSize;
   }, [focusedTextId, selectionFontSizePt, textAnnotations, textSize]);
+  const activeLineSpacing = useMemo(() => {
+    if (!focusedTextId) return DEFAULT_TEXT_LINE_SPACING;
+    for (const list of Object.values(textAnnotations)) {
+      const match = list.find((item) => item.id === focusedTextId);
+      if (match && typeof match.lineSpacing === "number") return match.lineSpacing;
+    }
+    return DEFAULT_TEXT_LINE_SPACING;
+  }, [focusedTextId, textAnnotations]);
   const activeTextColor = selectionTextColorMixed ? null : selectionTextColor ?? textColor;
+  const focusedShape = useMemo(() => {
+    if (!focusedShapeId || !focusedShapePageId) return null;
+    const list = shapesByPage[focusedShapePageId] ?? [];
+    return list.find((shape) => shape.id === focusedShapeId) ?? null;
+  }, [focusedShapeId, focusedShapePageId, shapesByPage]);
+  const activeShapeBorderColor = focusedShape?.color ?? shapeColor;
+  const activeShapeFillColor = focusedShape?.fillColor ?? shapeFillColor;
+  const isTextColorPicker = colorPickerOpen === "text";
+  const isShapeBorderPicker = colorPickerOpen === "shape-border";
+  const isShapeFillPicker = colorPickerOpen === "shape-fill";
   const highlightCustomRgb = useMemo(() => {
     const rgb = hexToRgb(colorPickerDraft);
     if (!rgb) return { r: 0, g: 0, b: 0 };
@@ -1704,6 +1799,41 @@ function WorkspaceClient() {
       b: Math.round(rgb.b * 255),
     };
   }, [colorPickerDraft]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem(customTextColorStorageKey);
+    if (!stored) {
+      setCustomTextColors([]);
+      return;
+    }
+    try {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        setCustomTextColors(parsed.filter((value) => typeof value === "string"));
+      } else {
+        setCustomTextColors([]);
+      }
+    } catch {
+      setCustomTextColors([]);
+    }
+  }, [customTextColorStorageKey]);
+  const addCustomTextColor = useCallback(
+    (color: string) => {
+      const normalized = normalizeCssColor(color) ?? color;
+      if (!normalized || !normalized.startsWith("#")) return;
+      const cleaned = normalized.slice(0, 7).toLowerCase();
+      setCustomTextColors((prev) => {
+        const without = prev.filter((value) => value.toLowerCase() !== cleaned);
+        const next = [...without, cleaned];
+        const trimmed = next.length > 8 ? next.slice(next.length - 8) : next;
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem(customTextColorStorageKey, JSON.stringify(trimmed));
+        }
+        return trimmed;
+      });
+    },
+    [customTextColorStorageKey]
+  );
 
   function resolveFontVariant(bold: boolean, italic: boolean): TextFontVariant {
     if (bold && italic) return "boldItalic";
@@ -1711,6 +1841,55 @@ function WorkspaceClient() {
     if (italic) return "italic";
     return "normal";
   }
+
+  const normalizeStrikeMarkup = useCallback((element: HTMLElement) => {
+    const removeTags = element.querySelectorAll<HTMLElement>("s, strike, del, [data-strike='true']");
+    removeTags.forEach((node) => {
+      while (node.firstChild) {
+        node.parentNode?.insertBefore(node.firstChild, node);
+      }
+      node.remove();
+    });
+    const decorated = element.querySelectorAll<HTMLElement>('[style*="line-through"]');
+    decorated.forEach((node) => {
+      node.style.textDecoration = node.style.textDecoration.replace(/line-through/gi, "").trim();
+      node.style.textDecorationLine = node.style.textDecorationLine.replace(/line-through/gi, "").trim();
+      if (!node.style.textDecoration && !node.style.textDecorationLine) {
+        node.style.removeProperty("text-decoration");
+        node.style.removeProperty("text-decoration-line");
+      }
+    });
+  }, []);
+
+  const normalizeLineHeightMarkup = useCallback((element: HTMLElement) => {
+    const targets = element.querySelectorAll<HTMLElement>('[style*="line-height"]');
+    targets.forEach((node) => {
+      node.style.lineHeight = "";
+      const styleAttr = node.getAttribute("style");
+      if (styleAttr && !styleAttr.trim()) {
+        node.removeAttribute("style");
+      }
+    });
+    element.style.lineHeight = "";
+  }, []);
+
+  const getLineSpacingForTextId = useCallback(
+    (id: string) => {
+      for (const list of Object.values(textAnnotations)) {
+        const match = list.find((item) => item.id === id);
+        if (match) return match.lineSpacing ?? DEFAULT_TEXT_LINE_SPACING;
+      }
+      return DEFAULT_TEXT_LINE_SPACING;
+    },
+    [textAnnotations]
+  );
+
+  const updateStrikeOverlayForText = useCallback(
+    (id: string) => {
+      // Native strikethrough only; no custom overlay.
+    },
+    [normalizeStrikeMarkup]
+  );
 
   function focusTextAnnotation(id: string) {
     setFocusedTextId(id);
@@ -1730,6 +1909,10 @@ function WorkspaceClient() {
     setActiveTextContainerId(null);
     setSelectionTextColor(null);
     setSelectionTextColorMixed(false);
+  }, []);
+  const clearShapeFocus = useCallback(() => {
+    setFocusedShapeId(null);
+    setFocusedShapePageId(null);
   }, []);
 
   const noteTextTyping = useCallback((id: string) => {
@@ -1759,11 +1942,57 @@ function WorkspaceClient() {
       const text = element.innerText.replace(/[\u200b\u2060]/g, "");
       updateTextAnnotation(pageId, id, (item) => ({
         ...item,
-        text: text || "",
-        richTextHtml: html,
-      }));
+                    text: text || "",
+                    richTextHtml: html,
+                  }));
     },
     [updateTextAnnotation]
+  );
+
+  const handleCopyOrCut = useCallback(
+    (event: ReactClipboardEvent<HTMLDivElement>, isCut: boolean) => {
+      if (!focusedTextId) return;
+      const element = textNodeRefs.current.get(focusedTextId);
+      if (!element) return;
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) return;
+      const range = selection.getRangeAt(0);
+      if (range.collapsed || !element.contains(range.commonAncestorContainer)) return;
+
+      const fragment = range.cloneContents();
+      const container = document.createElement("div");
+      container.appendChild(fragment);
+
+      const textWalker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+      let current = textWalker.nextNode();
+      while (current) {
+        current.textContent = (current.textContent ?? "").replace(/[\u200b\u2060]/g, "");
+        current = textWalker.nextNode();
+      }
+
+      event.preventDefault();
+      event.clipboardData?.setData("text/html", container.innerHTML);
+      event.clipboardData?.setData("text/plain", container.innerText);
+
+      if (!isCut) return;
+      range.deleteContents();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      selectionRangeRef.current = range.cloneRange();
+      normalizeStrikeMarkup(element);
+      const result = findTextAnnotationById(focusedTextId);
+      if (result) {
+        syncTextAnnotationContent(result.pageId, focusedTextId, element);
+        autoExpandTextAnnotation(result.pageId, focusedTextId);
+      }
+    },
+    [
+      focusedTextId,
+      autoExpandTextAnnotation,
+      findTextAnnotationById,
+      normalizeStrikeMarkup,
+      syncTextAnnotationContent,
+    ]
   );
   const resolveNodeFontSizePt = useCallback(
     (node: Node, fallbackSize: number) => {
@@ -1783,19 +2012,11 @@ function WorkspaceClient() {
         }
         current = current.parentElement;
       }
-      const computed = window.getComputedStyle(element);
-      const px = parseFloat(computed.fontSize || "");
-      if (!Number.isNaN(px) && px > 0) {
-        return px / PT_TO_PX / zoomMultiplier;
-      }
       return fallbackSize;
     },
-    [focusedTextId, zoomMultiplier]
+    [focusedTextId]
   );
-  const fontSizeToDisplayPx = useCallback(
-    (sizePt: number) => sizePt * PT_TO_PX * zoomMultiplier,
-    [zoomMultiplier]
-  );
+  const fontSizeToDisplayPx = useCallback((sizePt: number) => sizePt * PT_TO_PX, []);
 
   const applyFontSizeToSelection = useCallback(
     (sizePt: number) => {
@@ -1815,7 +2036,10 @@ function WorkspaceClient() {
         range = selectionRangeRef.current;
       }
       if (!range) {
-        return false;
+        const fallback = document.createRange();
+        fallback.selectNodeContents(element);
+        fallback.collapse(false);
+        range = fallback;
       }
       selection.removeAllRanges();
       selection.addRange(range);
@@ -1933,6 +2157,39 @@ function WorkspaceClient() {
     },
     [focusedTextId, findTextAnnotationById, syncTextAnnotationContent, autoExpandTextAnnotation]
   );
+
+  const refreshInlineStyleState = useCallback((element: HTMLElement) => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0 || !element.contains(selection.getRangeAt(0).commonAncestorContainer)) {
+      return;
+    }
+    const range = selection.getRangeAt(0);
+    const startNode =
+      range.startContainer.nodeType === Node.ELEMENT_NODE
+        ? (range.startContainer as HTMLElement)
+        : range.startContainer.parentElement;
+    let node = startNode;
+    let bold = false;
+    let italic = false;
+    let underline = false;
+    let bullet = false;
+    let number = false;
+    while (node && node !== element) {
+      const style = window.getComputedStyle(node);
+      const weight = style.fontWeight;
+      if (weight === "bold" || Number(weight) >= 600) bold = true;
+      if (style.fontStyle === "italic") italic = true;
+      const deco = (style.textDecorationLine || style.textDecoration || "").toLowerCase();
+      if (deco.includes("underline")) underline = true;
+      if (node.tagName === "UL") bullet = true;
+      if (node.tagName === "OL") number = true;
+      node = node.parentElement;
+    }
+    setTextBold(bold);
+    setTextItalic(italic);
+    setTextUnderline(underline);
+    setListType(bullet ? "bullet" : number ? "number" : null);
+  }, []);
   const applyFontSizeDeltaToSelection = useCallback(
     (delta: number) => {
       if (!focusedTextId) return false;
@@ -2042,13 +2299,12 @@ function WorkspaceClient() {
     ]
   );
   const applyInlineCommand = useCallback(
-    (command: "bold" | "italic" | "underline" | "strikeThrough") => {
+    (command: "bold" | "italic" | "underline") => {
       if (!focusedTextId) {
         setDefaultTextStyles((prev) => {
           if (command === "bold") return { ...prev, bold: !prev.bold };
           if (command === "italic") return { ...prev, italic: !prev.italic };
           if (command === "underline") return { ...prev, underline: !prev.underline };
-          if (command === "strikeThrough") return { ...prev, strike: !prev.strike };
           return prev;
         });
         return;
@@ -2081,12 +2337,86 @@ function WorkspaceClient() {
         syncTextAnnotationContent(result.pageId, focusedTextId, element);
         autoExpandTextAnnotation(result.pageId, focusedTextId);
       }
-      setTextBold(document.queryCommandState("bold"));
-      setTextItalic(document.queryCommandState("italic"));
-      setTextUnderline(document.queryCommandState("underline"));
-      setTextStrike(document.queryCommandState("strikeThrough"));
+      refreshInlineStyleState(element);
     },
-    [autoExpandTextAnnotation, findTextAnnotationById, focusedTextId, syncTextAnnotationContent]
+    [
+      autoExpandTextAnnotation,
+      findTextAnnotationById,
+      focusedTextId,
+      syncTextAnnotationContent,
+      refreshInlineStyleState,
+    ]
+  );
+
+  const applyListCommand = useCallback(
+    (type: "bullet" | "number") => {
+      if (!focusedTextId) return;
+      const element = textNodeRefs.current.get(focusedTextId);
+      if (!element) return;
+      element.focus();
+      const selection = window.getSelection();
+      let range: Range | null = null;
+      if (selection && selection.rangeCount > 0) {
+        const activeRange = selection.getRangeAt(0);
+        if (element.contains(activeRange.commonAncestorContainer)) {
+          range = activeRange;
+        }
+      }
+      if (!range && selectionRangeRef.current && element.contains(selectionRangeRef.current.commonAncestorContainer)) {
+        range = selectionRangeRef.current;
+      }
+      const wasCollapsed = !!range?.collapsed;
+      if (range && selection) {
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+      const cmd = type === "bullet" ? "insertUnorderedList" : "insertOrderedList";
+      document.execCommand("styleWithCSS", false, "true");
+      document.execCommand(cmd);
+      if (selection && wasCollapsed) {
+        const anchorNode =
+          selection.rangeCount > 0
+            ? selection.getRangeAt(0).startContainer
+            : range?.startContainer ?? null;
+        const anchorElement =
+          anchorNode && anchorNode.nodeType === Node.ELEMENT_NODE
+            ? (anchorNode as HTMLElement)
+            : anchorNode?.parentElement ?? null;
+        const li = anchorElement?.closest("li");
+        if (li) {
+          const endRange = document.createRange();
+          endRange.selectNodeContents(li);
+          endRange.collapse(false);
+          selection.removeAllRanges();
+          selection.addRange(endRange);
+        }
+      }
+      if (selection && selection.rangeCount > 0) {
+        selectionRangeRef.current = selection.getRangeAt(0).cloneRange();
+      }
+      const result = findTextAnnotationById(focusedTextId);
+      if (result) {
+        syncTextAnnotationContent(result.pageId, focusedTextId, element);
+        autoExpandTextAnnotation(result.pageId, focusedTextId);
+      }
+      refreshInlineStyleState(element);
+    },
+    [autoExpandTextAnnotation, findTextAnnotationById, focusedTextId, refreshInlineStyleState, syncTextAnnotationContent]
+  );
+
+  const applyLineSpacing = useCallback(
+    (spacing: number) => {
+      if (!focusedTextId) return;
+      const result = findTextAnnotationById(focusedTextId);
+      if (!result) return;
+      updateTextAnnotation(result.pageId, focusedTextId, (item) => ({
+        ...item,
+        lineSpacing: spacing,
+      }));
+      autoExpandTextAnnotation(result.pageId, focusedTextId);
+      setLineSpacingMenuOpen(false);
+    },
+    [autoExpandTextAnnotation, findTextAnnotationById, focusedTextId, updateTextAnnotation]
   );
 
   useEffect(() => {
@@ -2117,20 +2447,15 @@ function WorkspaceClient() {
             break;
           }
         }
-        if (node.style.fontSize) {
-          const parsed = parseFontSize(node.style.fontSize, Number.NaN);
-          if (!Number.isNaN(parsed)) {
-            resolvedSize = parsed;
-            break;
-          }
-        }
         node = node.parentElement;
       }
       if (resolvedSize === null) {
-        const computed = window.getComputedStyle(element);
-        const px = parseFloat(computed.fontSize || "");
-        if (!Number.isNaN(px) && px > 0) {
-          resolvedSize = px / PT_TO_PX / zoomMultiplier;
+        for (const list of Object.values(textAnnotations)) {
+          const match = list.find((item) => item.id === focusedTextId);
+          if (match) {
+            resolvedSize = match.textSizePt ?? textSize;
+            break;
+          }
         }
       }
       if (resolvedSize !== null) {
@@ -2181,13 +2506,24 @@ function WorkspaceClient() {
       setTextBold(document.queryCommandState("bold"));
       setTextItalic(document.queryCommandState("italic"));
       setTextUnderline(document.queryCommandState("underline"));
-      setTextStrike(document.queryCommandState("strikeThrough"));
+      if (startNode) {
+        const listAncestor = startNode.closest("ul, ol");
+        if (listAncestor?.tagName === "UL") {
+          setListType("bullet");
+        } else if (listAncestor?.tagName === "OL") {
+          setListType("number");
+        } else {
+          setListType(null);
+        }
+      } else {
+        setListType(null);
+      }
     };
     document.addEventListener("selectionchange", handleSelectionChange);
     return () => {
       document.removeEventListener("selectionchange", handleSelectionChange);
     };
-  }, [focusedTextId, zoomMultiplier]);
+  }, [focusedTextId, textAnnotations, textSize]);
   const applyDefaultTextStylesToCaret = useCallback(
     (element: HTMLElement) => {
       const selection = window.getSelection();
@@ -2199,7 +2535,7 @@ function WorkspaceClient() {
         selection.removeAllRanges();
         selection.addRange(range);
       }
-      const ensureCommandState = (command: "bold" | "italic" | "underline" | "strikeThrough", enabled: boolean) => {
+      const ensureCommandState = (command: "bold" | "italic" | "underline", enabled: boolean) => {
         const current = document.queryCommandState(command);
         if (current !== enabled) {
           document.execCommand("styleWithCSS", false, "true");
@@ -2209,7 +2545,6 @@ function WorkspaceClient() {
       ensureCommandState("bold", defaultTextStyles.bold);
       ensureCommandState("italic", defaultTextStyles.italic);
       ensureCommandState("underline", defaultTextStyles.underline);
-      ensureCommandState("strikeThrough", defaultTextStyles.strike);
       let caretColor = textColor;
       if (selection.rangeCount > 0 && element.contains(selection.getRangeAt(0).commonAncestorContainer)) {
         const range = selection.getRangeAt(0);
@@ -2231,7 +2566,6 @@ function WorkspaceClient() {
       setTextBold(defaultTextStyles.bold);
       setTextItalic(defaultTextStyles.italic);
       setTextUnderline(defaultTextStyles.underline);
-      setTextStrike(defaultTextStyles.strike);
       setSelectionTextColor(caretColor);
       setSelectionTextColorMixed(false);
     },
@@ -2379,6 +2713,94 @@ function WorkspaceClient() {
     [getPageNormalizedPoint, textAnnotations]
   );
 
+  const startShapeDrag = useCallback(
+    (pageId: string, shapeId: string, startEvent: ReactPointerEvent<HTMLButtonElement>) => {
+      if (startEvent.button !== 0 && startEvent.pointerType !== "touch") return;
+      startEvent.preventDefault();
+      startEvent.stopPropagation();
+
+      const shape = shapesByPage[pageId]?.find((item) => item.id === shapeId);
+      if (!shape) return;
+      const startPoint = getPageNormalizedPoint(pageId, startEvent.clientX, startEvent.clientY);
+      if (!startPoint) return;
+
+      shapeDragCleanupRef.current?.();
+      const { minX, minY, w, h } = shapeBounds(shape);
+      const offsetX = startPoint.x - minX;
+      const offsetY = startPoint.y - minY;
+      const startShape = {
+        start: { ...shape.start },
+        end: { ...shape.end },
+      };
+      const pointerId = startEvent.pointerId;
+
+      const handleMove = (event: PointerEvent) => {
+        if (event.pointerId !== pointerId) return;
+        const point = getPageNormalizedPoint(pageId, event.clientX, event.clientY);
+        if (!point) return;
+        shapeDragLatestPointRef.current = point;
+        if (shapeDragRafRef.current !== null) return;
+        shapeDragRafRef.current = window.requestAnimationFrame(() => {
+          shapeDragRafRef.current = null;
+          const latestPoint = shapeDragLatestPointRef.current;
+          if (!latestPoint) return;
+          const nextMinX = clamp(latestPoint.x - offsetX, 0, 1 - w);
+          const nextMinY = clamp(latestPoint.y - offsetY, 0, 1 - h);
+          const deltaX = nextMinX - minX;
+          const deltaY = nextMinY - minY;
+          const nextShape = {
+            start: { x: startShape.start.x + deltaX, y: startShape.start.y + deltaY },
+            end: { x: startShape.end.x + deltaX, y: startShape.end.y + deltaY },
+          };
+          shapeDragLatestShapeRef.current = nextShape;
+          setShapesByPage((prev) => {
+            const list = prev[pageId] ?? [];
+            const updated = list.map((item) =>
+              item.id === shapeId ? { ...item, start: nextShape.start, end: nextShape.end } : item
+            );
+            return { ...prev, [pageId]: updated };
+          });
+        });
+      };
+
+      function cleanup() {
+        window.removeEventListener("pointermove", handleMove);
+        window.removeEventListener("pointerup", handleUp);
+        window.removeEventListener("pointercancel", handleUp);
+        shapeDragCleanupRef.current = null;
+        if (shapeDragRafRef.current !== null) {
+          window.cancelAnimationFrame(shapeDragRafRef.current);
+          shapeDragRafRef.current = null;
+        }
+        shapeDragLatestPointRef.current = null;
+        shapeDragLatestShapeRef.current = null;
+      }
+
+      function handleUp() {
+        const latestShape = shapeDragLatestShapeRef.current;
+        if (latestShape) {
+          setShapesByPage((prev) => {
+            const list = prev[pageId] ?? [];
+            const updated = list.map((item) =>
+              item.id === shapeId ? { ...item, start: latestShape.start, end: latestShape.end } : item
+            );
+            return { ...prev, [pageId]: updated };
+          });
+        }
+        setDraggingShape(null);
+        cleanup();
+      }
+
+      window.addEventListener("pointermove", handleMove);
+      window.addEventListener("pointerup", handleUp);
+      window.addEventListener("pointercancel", handleUp);
+
+      shapeDragCleanupRef.current = cleanup;
+      setDraggingShape({ pageId, id: shapeId, offsetX, offsetY });
+    },
+    [getPageNormalizedPoint, shapesByPage]
+  );
+
   const startTextResize = useCallback(
     (
       pageId: string,
@@ -2404,61 +2826,97 @@ function WorkspaceClient() {
       const minHeight = 0.015;
       const fixedRight = startX + startWidth;
       const fixedBottom = startY + startHeight;
+      const node = textAnnotationRefs.current.get(annotationId) ?? null;
       const handleMove = (event: PointerEvent) => {
         if (event.pointerId !== pointerId) return;
         const point = getPageNormalizedPoint(pageId, event.clientX, event.clientY);
         if (!point) return;
-        setTextAnnotations((prev) => {
-          const existing = prev[pageId] ?? [];
-          const current = existing.find((a) => a.id === annotationId);
-          if (!current) return prev;
-          let nextX = startX;
-          let nextY = startY;
-          let nextWidth = startWidth;
-          let nextHeight = startHeight;
-          if (corner === "se") {
-            const deltaX = point.x - startPoint.x;
-            const deltaY = point.y - startPoint.y;
-            nextWidth = clamp(startWidth + deltaX, minWidth, 1 - startX);
-            nextHeight = clamp(startHeight + deltaY, minHeight, 1 - startY);
-          } else if (corner === "nw") {
-            nextX = clamp(point.x, 0, fixedRight - minWidth);
-            nextY = clamp(point.y, 0, fixedBottom - minHeight);
-            nextWidth = clamp(fixedRight - nextX, minWidth, 1);
-            nextHeight = clamp(fixedBottom - nextY, minHeight, 1);
-          } else if (corner === "ne") {
-            nextY = clamp(point.y, 0, fixedBottom - minHeight);
-            nextWidth = clamp(point.x - startX, minWidth, 1 - startX);
-            nextHeight = clamp(fixedBottom - nextY, minHeight, 1);
-          } else if (corner === "sw") {
-            nextX = clamp(point.x, 0, fixedRight - minWidth);
-            nextWidth = clamp(fixedRight - nextX, minWidth, 1);
-            nextHeight = clamp(point.y - startY, minHeight, 1 - startY);
-          } else if (corner === "e") {
-            const deltaX = point.x - startPoint.x;
-            nextWidth = clamp(startWidth + deltaX, minWidth, 1 - startX);
-          } else if (corner === "w") {
-            const nextLeft = clamp(point.x, 0, fixedRight - minWidth);
-            nextX = nextLeft;
-            nextWidth = clamp(fixedRight - nextLeft, minWidth, 1);
-          } else if (corner === "s") {
-            const deltaY = point.y - startPoint.y;
-            nextHeight = clamp(startHeight + deltaY, minHeight, 1 - startY);
-          } else if (corner === "n") {
-            const nextTop = clamp(point.y, 0, fixedBottom - minHeight);
-            nextY = nextTop;
-            nextHeight = clamp(fixedBottom - nextTop, minHeight, 1);
+        let nextX = startX;
+        let nextY = startY;
+        let nextWidth = startWidth;
+        let nextHeight = startHeight;
+        if (corner === "se") {
+          const deltaX = point.x - startPoint.x;
+          const deltaY = point.y - startPoint.y;
+          nextWidth = clamp(startWidth + deltaX, minWidth, 1 - startX);
+          nextHeight = clamp(startHeight + deltaY, minHeight, 1 - startY);
+        } else if (corner === "nw") {
+          nextX = clamp(point.x, 0, fixedRight - minWidth);
+          nextY = clamp(point.y, 0, fixedBottom - minHeight);
+          nextWidth = clamp(fixedRight - nextX, minWidth, 1);
+          nextHeight = clamp(fixedBottom - nextY, minHeight, 1);
+        } else if (corner === "ne") {
+          nextY = clamp(point.y, 0, fixedBottom - minHeight);
+          nextWidth = clamp(point.x - startX, minWidth, 1 - startX);
+          nextHeight = clamp(fixedBottom - nextY, minHeight, 1);
+        } else if (corner === "sw") {
+          nextX = clamp(point.x, 0, fixedRight - minWidth);
+          nextWidth = clamp(fixedRight - nextX, minWidth, 1);
+          nextHeight = clamp(point.y - startY, minHeight, 1 - startY);
+        } else if (corner === "e") {
+          const deltaX = point.x - startPoint.x;
+          nextWidth = clamp(startWidth + deltaX, minWidth, 1 - startX);
+        } else if (corner === "w") {
+          const nextLeft = clamp(point.x, 0, fixedRight - minWidth);
+          nextX = nextLeft;
+          nextWidth = clamp(fixedRight - nextLeft, minWidth, 1);
+        } else if (corner === "s") {
+          const deltaY = point.y - startPoint.y;
+          nextHeight = clamp(startHeight + deltaY, minHeight, 1 - startY);
+        } else if (corner === "n") {
+          const nextTop = clamp(point.y, 0, fixedBottom - minHeight);
+          nextY = nextTop;
+          nextHeight = clamp(fixedBottom - nextTop, minHeight, 1);
+        }
+        textResizeLatestRef.current = { x: nextX, y: nextY, width: nextWidth, height: nextHeight };
+        if (textResizeRafRef.current !== null) return;
+        textResizeRafRef.current = window.requestAnimationFrame(() => {
+          textResizeRafRef.current = null;
+          const latest = textResizeLatestRef.current;
+          if (!latest || !node) return;
+          const containerNode = previewNodeMap.current.get(pageId);
+          if (!containerNode) return;
+          node.style.willChange = "left, top, width, height";
+          node.style.left = `${latest.x * 100}%`;
+          node.style.top = `${latest.y * 100}%`;
+          node.style.width = `${latest.width * 100}%`;
+          node.style.height = `${latest.height * 100}%`;
+          const containerRect = containerNode.getBoundingClientRect();
+          if (!containerRect.height) return;
+          const requiredHeight = clamp(node.scrollHeight / containerRect.height, minHeight, 1 - latest.y);
+          if (latest.height < requiredHeight) {
+            let adjustedY = latest.y;
+            if (corner === "n" || corner === "nw" || corner === "ne") {
+              adjustedY = clamp(fixedBottom - requiredHeight, 0, fixedBottom - minHeight);
+            }
+            const adjusted = { ...latest, y: adjustedY, height: requiredHeight };
+            textResizeLatestRef.current = adjusted;
+            node.style.top = `${adjustedY * 100}%`;
+            node.style.height = `${requiredHeight * 100}%`;
           }
-          const updated = existing.map((item) =>
-            item.id === annotationId
-              ? { ...item, x: nextX, y: nextY, width: nextWidth, height: nextHeight }
-              : item
-          );
-          return { ...prev, [pageId]: updated };
         });
       };
       const handleUp = (event: PointerEvent) => {
         if (event.pointerId !== pointerId) return;
+        const latest = textResizeLatestRef.current;
+        if (latest) {
+          setTextAnnotations((prev) => {
+            const existing = prev[pageId] ?? [];
+            const updated = existing.map((item) =>
+              item.id === annotationId
+                ? { ...item, x: latest.x, y: latest.y, width: latest.width, height: latest.height }
+                : item
+            );
+            return { ...prev, [pageId]: updated };
+          });
+          if (node) {
+            node.style.left = `${latest.x * 100}%`;
+            node.style.top = `${latest.y * 100}%`;
+            node.style.width = `${latest.width * 100}%`;
+            node.style.height = `${latest.height * 100}%`;
+            node.style.willChange = "";
+          }
+        }
         setResizingText(null);
         cleanup();
       };
@@ -2467,6 +2925,11 @@ function WorkspaceClient() {
         window.removeEventListener("pointerup", handleUp);
         window.removeEventListener("pointercancel", handleUp);
         textResizeCleanupRef.current = null;
+        if (textResizeRafRef.current !== null) {
+          window.cancelAnimationFrame(textResizeRafRef.current);
+          textResizeRafRef.current = null;
+        }
+        textResizeLatestRef.current = null;
       }
       window.addEventListener("pointermove", handleMove);
       window.addEventListener("pointerup", handleUp);
@@ -2514,6 +2977,8 @@ function WorkspaceClient() {
   }, []);
   const MIN_HIGHLIGHT_THICKNESS = 6;
   const MAX_HIGHLIGHT_THICKNESS = 32;
+  const MIN_SHAPE_THICKNESS = 1;
+  const MAX_SHAPE_THICKNESS = 10;
   const toolSwitchBase = "flex items-center gap-2 px-4 py-2 text-sm font-semibold transition";
   const toolSwitchActive = "bg-[#024d7c] text-white shadow-sm";
   const toolSwitchInactive = "bg-white text-slate-700 hover:bg-slate-50";
@@ -2523,10 +2988,11 @@ function WorkspaceClient() {
     `${buttonBase} border border-slate-200 bg-white text-slate-800 shadow-[0_4px_14px_rgba(15,23,42,0.12)] hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50`;
   const buttonPrimary =
     `${buttonBase} bg-[#024d7c] text-white shadow-md shadow-[#012a44]/30 hover:-translate-y-0.5 hover:bg-[#013d63]`;
+  // (definition moved earlier to avoid temporal dead zone)
   const toolButtonBase =
     "inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#009DFD]/25 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F1F5F9] disabled:cursor-not-allowed";
 	  const toolIconButton =
-	    "justify-center px-1.5";
+	    "justify-center px-1";
 	  const toolButtonInactiveNeutral =
 	    "border-transparent bg-[#F1F5F9] text-[#475569] shadow-none hover:bg-[#E5E7EB] hover:text-[#475569] hover:shadow-[0_1px_2px_rgba(0,0,0,0.06)]";
   const toolButtonInactiveBlack =
@@ -2542,10 +3008,29 @@ function WorkspaceClient() {
   const signatureTabActive = "border-[#024d7c] bg-[#024d7c] text-white shadow-[0_10px_24px_rgba(2,77,124,0.2)]";
   const signatureTabInactive = "";
   const textOptionButtonBase =
-    "inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60";
+    "inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-800 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60";
   const textOptionButtonHover = "hover:bg-slate-100 hover:text-slate-900";
   const textOptionButtonActive = "bg-blue-100 text-blue-700 hover:bg-blue-100 hover:text-blue-700";
-  const textInputPill = "inline-flex h-9 items-center gap-1 px-2 text-sm font-semibold text-slate-700";
+  const textInputPill = "inline-flex h-9 items-center gap-1 pl-0 pr-2 text-sm font-semibold text-slate-800";
+  const LineSpacingIcon = ({ className }: { className?: string }) => (
+    <svg
+      className={className}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3 3v10" />
+      <path d="M1.4 4.6L3 3l1.6 1.6" />
+      <path d="M1.4 11.4L3 13l1.6-1.6" />
+      <path d="M8 4h6" />
+      <path d="M8 8h6" />
+      <path d="M8 12h6" />
+    </svg>
+  );
 
   // Better drag in grids
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
@@ -2605,7 +3090,6 @@ function WorkspaceClient() {
           textSize?: number;
           textColor?: string;
           textUnderline?: boolean;
-          textStrike?: boolean;
           textTransform?: "none" | "uppercase";
           textAlign?: "left" | "center" | "right" | "justify";
 	          signaturePlacements?: Record<string, SignaturePlacement[]>;
@@ -2620,7 +3104,14 @@ function WorkspaceClient() {
 	          setHighlights(data.highlights);
 	        }
 	        if (data.shapesByPage) {
-	          setShapesByPage(data.shapesByPage);
+	          const normalized: Record<string, ShapeAnnotation[]> = {};
+	          Object.entries(data.shapesByPage).forEach(([pageId, list]) => {
+	            normalized[pageId] = list.map((shape) => ({
+	              ...shape,
+	              fillColor: shape.fillColor ?? null,
+	            }));
+	          });
+	          setShapesByPage(normalized);
 	        }
 	        if (data.textAnnotations) {
 	          setTextAnnotations(data.textAnnotations);
@@ -2635,9 +3126,6 @@ function WorkspaceClient() {
         }
         if (typeof data.textUnderline === "boolean") {
           setTextUnderline(data.textUnderline);
-        }
-        if (typeof data.textStrike === "boolean") {
-          setTextStrike(data.textStrike);
         }
         if (data.textTransform === "uppercase" || data.textTransform === "none") {
           setTextTransform(data.textTransform);
@@ -2791,6 +3279,9 @@ function WorkspaceClient() {
 	            const maxY = Math.max(y1, y2);
 	            const w = Math.max(1, maxX - minX);
 	            const h = Math.max(1, maxY - minY);
+	            const fillColor = shape.fillColor ?? null;
+	            const isClosedShape =
+	              shape.type === "rect" || shape.type === "ellipse" || shape.type === "triangle";
 
 	            ctx.save();
 	            ctx.strokeStyle = shape.color;
@@ -2837,6 +3328,7 @@ function WorkspaceClient() {
                 drawLine(top.x, top.y, right.x, right.y);
                 drawLine(right.x, right.y, left.x, left.y);
                 drawLine(left.x, left.y, top.x, top.y);
+                ctx.closePath();
                 break;
               }
               case "x":
@@ -2854,6 +3346,10 @@ function WorkspaceClient() {
               default:
                 break;
             }
+	            if (fillColor && isClosedShape) {
+	              ctx.fillStyle = fillColor;
+	              ctx.fill();
+	            }
 	            ctx.stroke();
 	            ctx.restore();
 	          });
@@ -2872,6 +3368,7 @@ function WorkspaceClient() {
                 const x = (annotation.x - 0.5) * pageWidthPx + padding;
                 const startY = (annotation.y - 0.5) * pageHeightPx + padding;
                 const baseSize = annotation.textSizePt ?? textSize;
+                const lineSpacing = annotation.lineSpacing ?? DEFAULT_TEXT_LINE_SPACING;
                 const html = annotation.richTextHtml ?? textToHtml(annotation.text);
                 const runs = extractRichTextRuns(html, baseSize);
                 const lines = splitRunsIntoLines(runs).slice(0, 6);
@@ -2879,12 +3376,12 @@ function WorkspaceClient() {
                 ctx.textBaseline = "top";
                 lines.forEach((line, lineIndex) => {
                   if (line.length === 0) {
-                    cursorY += baseSize * PT_TO_PX * 1.3;
+                    cursorY += baseSize * PT_TO_PX * lineSpacing;
                     return;
                   }
                   const maxWidth = Math.max(10, boxWidth - padding * 2);
                   const maxSize = Math.max(...line.map((run) => run.sizePt));
-                  const lineHeight = maxSize * PT_TO_PX * 1.3;
+                  const lineHeight = baseSize * PT_TO_PX * lineSpacing;
                   let lineWidth = 0;
                   line.forEach((run) => {
                     ctx.font = `${run.italic ? "italic " : ""}${run.bold ? "bold " : ""}${run.sizePt * PT_TO_PX}px Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
@@ -2935,16 +3432,10 @@ function WorkspaceClient() {
                       ctx.fillText(transformed, cursorX, cursorY, maxWidth);
                       cursorX += runWidth;
                     }
-                    if (run.underline || run.strike) {
+                    if (run.underline) {
                       const thickness = Math.max(0.5, sizePx / 14);
-                      if (run.underline) {
-                        const underlineY = cursorY + sizePx * 0.9;
-                        ctx.fillRect(runStartX, underlineY, runWidthAdjusted, thickness);
-                      }
-                      if (run.strike) {
-                        const strikeY = cursorY + sizePx * 0.45;
-                        ctx.fillRect(runStartX, strikeY, runWidthAdjusted, thickness);
-                      }
+                      const underlineY = cursorY + sizePx * 0.9;
+                      ctx.fillRect(runStartX, underlineY, runWidthAdjusted, thickness);
                     }
                   });
                   cursorY += lineHeight;
@@ -3844,12 +4335,13 @@ function WorkspaceClient() {
 
   const renderPreviewPage = (page: PageItem, idx: number) => {
     const pageHighlights = highlights[page.id] ?? [];
+    const pageShapes = shapesByPage[page.id] ?? [];
     const pageTexts = textAnnotations[page.id] ?? [];
     const pageSignatures = signaturePlacements[page.id] ?? [];
     const rotationDegrees = normalizeRotation(page.rotation);
     const naturalWidth = page.width || 612;
     const naturalHeight = page.height || naturalWidth * DEFAULT_ASPECT_RATIO;
-    const effectiveScale = baseScale * zoomMultiplier;
+    const effectiveScale = baseScale;
     const contentWidth = naturalWidth * effectiveScale;
     const contentHeight = naturalHeight * effectiveScale;
     const rotated = rotationDegrees % 180 !== 0;
@@ -4063,7 +4555,7 @@ function WorkspaceClient() {
                         />
                       ) : null
                     )}
-                    {(shapesByPage[page.id] ?? []).map((shape) => {
+                    {pageShapes.map((shape) => {
                       const baseWidth = Math.max(12, shape.thickness * 3000);
                       const hitProps: SVGProps<SVGElement> = {
                         style: {
@@ -4094,6 +4586,7 @@ function WorkspaceClient() {
                           {shapeToSvgElements(shape, {
                             stroke: "transparent",
                             strokeWidth: baseWidth,
+                            fill: "none",
                             interactiveProps: hitProps,
                           })}
                         </Fragment>
@@ -4147,11 +4640,15 @@ function WorkspaceClient() {
                   );
                 })}
 
-                {(shapesByPage[page.id] ?? []).map((shape) => {
+                {pageShapes.map((shape) => {
                   const baseWidth = Math.max(1, shape.thickness * 1000);
                   return (
                     <Fragment key={shape.id}>
-                      {shapeToSvgElements(shape, { stroke: shape.color, strokeWidth: baseWidth })}
+                      {shapeToSvgElements(shape, {
+                        stroke: shape.color,
+                        strokeWidth: baseWidth,
+                        fill: shape.fillColor ?? "none",
+                      })}
                     </Fragment>
                   );
                 })}
@@ -4189,10 +4686,102 @@ function WorkspaceClient() {
                     {shapeToSvgElements(draftShape, {
                       stroke: draftShape.color,
                       strokeWidth: Math.max(1, draftShape.thickness * 1000),
+                      fill: draftShape.fillColor ?? "none",
                     })}
                   </Fragment>
                 ) : null}
               </svg>
+              {pageShapes.map((shape) => {
+                const { minX, minY, w, h } = shapeBounds(shape);
+                const minBox = 0.02;
+                const boxWidth = Math.max(w, minBox);
+                const boxHeight = Math.max(h, minBox);
+                const extraX = (boxWidth - w) / 2;
+                const extraY = (boxHeight - h) / 2;
+                const boxLeft = clamp(minX - extraX, 0, 1 - boxWidth);
+                const boxTop = clamp(minY - extraY, 0, 1 - boxHeight);
+                const isDraggingThis = draggingShape?.id === shape.id;
+                const showShapeActions = focusedShapeId === shape.id;
+                return (
+                  <div
+                    key={`shape-overlay-${shape.id}`}
+                    data-shape-annotation
+                    className="group absolute"
+                    style={{
+                      left: `${boxLeft * 100}%`,
+                      top: `${boxTop * 100}%`,
+                      width: `${boxWidth * 100}%`,
+                      height: `${boxHeight * 100}%`,
+                      pointerEvents: deleteMode ? "none" : "auto",
+                      cursor: deleteMode
+                        ? ("url('/icons/eraser.svg') 4 4, auto" as CSSProperties["cursor"])
+                        : "pointer",
+                    }}
+                    onPointerDown={(event) => {
+                      event.stopPropagation();
+                      if (deleteMode) {
+                        setIsErasing(true);
+                        return;
+                      }
+                      setFocusedShapeId(shape.id);
+                      setFocusedShapePageId(page.id);
+                    }}
+                  >
+                    {showShapeActions ? (
+                      isDraggingThis ? (
+                        <div
+                          className="absolute flex h-7 w-7 items-center justify-center rounded-md border border-slate-300 bg-white/85 text-slate-700 shadow-sm"
+                          style={{ left: "50%", top: "-2.5rem", transform: "translateX(-50%)" }}
+                        >
+                          <span className="flex h-6 w-6 items-center justify-center rounded bg-slate-200/80">
+                            <Move className="h-4 w-4" />
+                          </span>
+                        </div>
+                      ) : (
+                        <div
+                          className="absolute flex w-max items-center gap-0.5 rounded-lg border border-slate-300 bg-white/85 px-1 py-0.5 opacity-80 shadow-sm transition-opacity hover:opacity-100"
+                          style={{ left: "50%", top: "-2.5rem", transform: "translateX(-50%)" }}
+                        >
+                          <button
+                            type="button"
+                            className="flex h-7 w-7 items-center justify-center rounded-md text-slate-700 transition hover:bg-slate-200 hover:text-slate-900 active:translate-y-[1px]"
+                            onPointerDown={(event) => {
+                              setFocusedShapeId(shape.id);
+                              setFocusedShapePageId(page.id);
+                              startShapeDrag(page.id, shape.id, event);
+                            }}
+                          >
+                            <Move className="h-4 w-4" />
+                          </button>
+                          <div className="h-4 w-px bg-slate-300/80" />
+                          <button
+                            type="button"
+                            className="flex h-7 w-7 items-center justify-center rounded-md text-slate-700 transition hover:bg-slate-200 hover:text-slate-900 active:translate-y-[1px]"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              duplicateShape(page.id, shape.id);
+                            }}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </button>
+                          <div className="h-4 w-px bg-slate-300/80" />
+                          <button
+                            type="button"
+                            className="flex h-7 w-7 items-center justify-center rounded-md text-rose-600 transition hover:bg-rose-50 hover:text-rose-700 active:translate-y-[1px]"
+                            onMouseDown={(event) => event.stopPropagation()}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleDeleteShape(page.id, shape.id);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )
+                    ) : null}
+                  </div>
+                );
+              })}
               {draftTextBox && draftTextBox.pageId === page.id ? (() => {
                 const widthDelta = Math.abs(draftTextBox.currentX - draftTextBox.startX);
                 const heightDelta = Math.abs(draftTextBox.currentY - draftTextBox.startY);
@@ -4321,6 +4910,7 @@ function WorkspaceClient() {
                 const rotation = annotation.rotation ?? 0;
                 const displayRotation = normalizeRotation(rotation);
                 const displayFontSize = (annotation.textSizePt ?? textSize) * PT_TO_PX * zoomMultiplier;
+                const lineSpacing = annotation.lineSpacing ?? DEFAULT_TEXT_LINE_SPACING;
                 const annotationHtml = annotation.richTextHtml ?? textToHtml(annotation.text);
                 const showTextActions = focusedTextId === annotation.id && typingTextId !== annotation.id;
                 const showResizeHandles = focusedTextId === annotation.id || isResizingThis;
@@ -4357,7 +4947,7 @@ function WorkspaceClient() {
                     event.stopPropagation();
                   }}
                 >
-                  <div className="relative h-full w-full overflow-visible">
+                    <div className="relative h-full w-full overflow-visible">
                     <div
                       className={`pointer-events-none absolute inset-0 overflow-visible ${
                         focusedTextId === annotation.id || isDraggingThis
@@ -4458,6 +5048,74 @@ function WorkspaceClient() {
                       contentEditable
                       suppressContentEditableWarning
                       spellCheck={false}
+                      onCopy={(event) => handleCopyOrCut(event, false)}
+                      onCut={(event) => handleCopyOrCut(event, true)}
+                      onKeyDown={(event) => {
+                        if (event.key !== "Backspace") return;
+                        const selection = window.getSelection();
+                        if (!selection || selection.rangeCount === 0) return;
+                        const range = selection.getRangeAt(0);
+                        if (!range.collapsed) return;
+                        const anchorNode =
+                          range.startContainer.nodeType === Node.ELEMENT_NODE
+                            ? (range.startContainer as HTMLElement)
+                            : range.startContainer.parentElement;
+                        const exitBlock = anchorNode?.closest("[data-list-exit='pending']") as HTMLElement | null;
+                        if (exitBlock) {
+                          const exitText = exitBlock.innerText.replace(/[\u200b\u2060]/g, "").trim();
+                          if (exitText.length > 0) return;
+                          event.preventDefault();
+                          exitBlock.style.paddingLeft = "";
+                          exitBlock.removeAttribute("data-list-exit");
+                          const nextRange = document.createRange();
+                          nextRange.selectNodeContents(exitBlock);
+                          nextRange.collapse(true);
+                          selection.removeAllRanges();
+                          selection.addRange(nextRange);
+                          selectionRangeRef.current = nextRange.cloneRange();
+                          setListType(null);
+                          return;
+                        }
+                        const li = anchorNode?.closest("li");
+                        if (!li) return;
+                        const text = li.innerText.replace(/[\u200b\u2060]/g, "").trim();
+                        if (text.length > 0) return;
+                        event.preventDefault();
+                        const list = li.parentElement;
+                        const replacement = document.createElement("div");
+                        replacement.appendChild(document.createElement("br"));
+                        replacement.dataset.listExit = "pending";
+                        if (list && (list.tagName === "UL" || list.tagName === "OL")) {
+                          const listStyle = window.getComputedStyle(list);
+                          if (listStyle.paddingLeft) {
+                            replacement.style.paddingLeft = listStyle.paddingLeft;
+                          }
+                          const afterList = list.cloneNode(false) as HTMLElement;
+                          let sibling = li.nextSibling;
+                          while (sibling) {
+                            const next = sibling.nextSibling;
+                            afterList.appendChild(sibling);
+                            sibling = next;
+                          }
+                          li.remove();
+                          list.insertAdjacentElement("afterend", replacement);
+                          if (afterList.children.length > 0) {
+                            replacement.insertAdjacentElement("afterend", afterList);
+                          }
+                          if (list.children.length === 0) {
+                            list.remove();
+                          }
+                        } else {
+                          li.replaceWith(replacement);
+                        }
+                        const nextRange = document.createRange();
+                        nextRange.selectNodeContents(replacement);
+                        nextRange.collapse(true);
+                        selection.removeAllRanges();
+                        selection.addRange(nextRange);
+                        selectionRangeRef.current = nextRange.cloneRange();
+                        setListType(null);
+                      }}
                       onInput={(event) => {
                         noteTextTyping(annotation.id);
                         syncTextAnnotationContent(page.id, annotation.id, event.currentTarget);
@@ -4468,6 +5126,7 @@ function WorkspaceClient() {
                           textAutoExpandRafRef.current = null;
                           autoExpandTextAnnotation(page.id, annotation.id);
                         });
+                        normalizeStrikeMarkup(event.currentTarget);
                         const selection = window.getSelection();
                         if (selection && selection.rangeCount > 0) {
                           const range = selection.getRangeAt(0);
@@ -4484,6 +5143,20 @@ function WorkspaceClient() {
                           setPendingTextColor(null);
                         }
                       }}
+                      onPaste={() => {
+                        window.setTimeout(() => {
+                          autoExpandTextAnnotation(page.id, annotation.id);
+                          window.requestAnimationFrame(() => {
+                            window.requestAnimationFrame(() => {
+                              const node = textNodeRefs.current.get(annotation.id);
+                              if (node) {
+                                normalizeStrikeMarkup(node);
+                                normalizeLineHeightMarkup(node);
+                              }
+                            });
+                          });
+                        }, 0);
+                      }}
                       onFocus={() => {
                         setFocusedTextId(annotation.id);
                         setActiveTextContainerId(annotation.id);
@@ -4492,6 +5165,9 @@ function WorkspaceClient() {
                           selectionRangeRef.current = selection.getRangeAt(0).cloneRange();
                         }
                         const node = textNodeRefs.current.get(annotation.id);
+                        if (node) {
+                          // no-op for strike overlay
+                        }
                         if (pendingTextSizePt) {
                           applyFontSizeToSelection(pendingTextSizePt);
                           setPendingTextSizePt(null);
@@ -4524,6 +5200,7 @@ function WorkspaceClient() {
                           });
                           return;
                         }
+                        // no-op for strike overlay
                         if (typingTextTimeoutRef.current) {
                           window.clearTimeout(typingTextTimeoutRef.current);
                           typingTextTimeoutRef.current = null;
@@ -4571,10 +5248,12 @@ function WorkspaceClient() {
                         wordBreak: "break-word",
                         fontFamily: TEXT_FONT_OPTIONS[textFont].cssFamily,
                         fontSize: `${displayFontSize}px`,
+                        lineHeight: `${lineSpacing}`,
                         textTransform,
                         textAlign: textAlign,
                       }}
                     />
+                    {/* Native strikethrough only; overlay removed */}
                     {showTextActions ? (
                       isDraggingThis ? (
                         <div
@@ -5206,7 +5885,6 @@ function WorkspaceClient() {
     textBold,
     textItalic,
     textUnderline,
-    textStrike,
     textAlign,
     textTransform,
     textFont,
@@ -5245,6 +5923,33 @@ function WorkspaceClient() {
       };
     });
     setFocusedTextId(newId);
+  }, []);
+
+  const duplicateShape = useCallback((pageId: string, id: string) => {
+    const newId = crypto.randomUUID();
+    setShapesByPage((prev) => {
+      const existing = prev[pageId] ?? [];
+      const current = existing.find((shape) => shape.id === id);
+      if (!current) return prev;
+      const offset = 0.015;
+      const { minX, minY, w, h } = shapeBounds(current);
+      const nextMinX = clamp(minX + offset, 0, 1 - w);
+      const nextMinY = clamp(minY + offset, 0, 1 - h);
+      const deltaX = nextMinX - minX;
+      const deltaY = nextMinY - minY;
+      const nextShape: ShapeAnnotation = {
+        ...current,
+        id: newId,
+        start: { x: current.start.x + deltaX, y: current.start.y + deltaY },
+        end: { x: current.end.x + deltaX, y: current.end.y + deltaY },
+      };
+      return {
+        ...prev,
+        [pageId]: [...existing, nextShape],
+      };
+    });
+    setFocusedShapeId(newId);
+    setFocusedShapePageId(pageId);
   }, []);
 
   const itemsIds = useMemo(() => pages.map((p) => p.id), [pages]);
@@ -5385,13 +6090,77 @@ function WorkspaceClient() {
     },
     [applyTextColorToSelection]
   );
-  const openColorPicker = useCallback(() => {
-    const current = selectionTextColorMixed ? textColor : activeTextColor ?? textColor;
-    setColorPickerDraft(current || "#111827");
-    setHighlightCustomOpen(false);
-    setColorPickerOpen("text");
-  }, [activeTextColor, selectionTextColorMixed, textColor]);
-  const pickHighlightColorFromScreen = useCallback(async () => {
+  const applyShapeBorderColor = useCallback(
+    (color: string) => {
+      setShapeColor(color);
+      if (!focusedShapeId || !focusedShapePageId) return;
+      setShapesByPage((prev) => {
+        const list = prev[focusedShapePageId] ?? [];
+        const updated = list.map((shape) => (shape.id === focusedShapeId ? { ...shape, color } : shape));
+        return { ...prev, [focusedShapePageId]: updated };
+      });
+    },
+    [focusedShapeId, focusedShapePageId]
+  );
+  const applyShapeFillColor = useCallback(
+    (color: string | null) => {
+      setShapeFillColor(color);
+      if (!focusedShapeId || !focusedShapePageId) return;
+      setShapesByPage((prev) => {
+        const list = prev[focusedShapePageId] ?? [];
+        const updated = list.map((shape) =>
+          shape.id === focusedShapeId ? { ...shape, fillColor: color } : shape
+        );
+        return { ...prev, [focusedShapePageId]: updated };
+      });
+    },
+    [focusedShapeId, focusedShapePageId]
+  );
+  const normalizeShapeThickness = useCallback(
+    (value: number) => clamp(Math.round(value), MIN_SHAPE_THICKNESS, MAX_SHAPE_THICKNESS),
+    [MIN_SHAPE_THICKNESS, MAX_SHAPE_THICKNESS]
+  );
+  const applyShapeThickness = useCallback(
+    (value: number) => {
+      const normalized = normalizeShapeThickness(value);
+      setShapeThickness(normalized);
+      if (!focusedShapeId || !focusedShapePageId) return;
+      const node = previewNodeMap.current.get(focusedShapePageId);
+      const rect = node?.getBoundingClientRect();
+      if (!rect?.width) return;
+      const normalizedThickness = normalized / rect.width;
+      setShapesByPage((prev) => {
+        const list = prev[focusedShapePageId] ?? [];
+        const updated = list.map((shape) =>
+          shape.id === focusedShapeId ? { ...shape, thickness: normalizedThickness } : shape
+        );
+        return { ...prev, [focusedShapePageId]: updated };
+      });
+    },
+    [focusedShapeId, focusedShapePageId, normalizeShapeThickness]
+  );
+  const resolvePickerColor = useCallback(
+    (target: "text" | "shape-border" | "shape-fill") => {
+      if (target === "text") {
+        return selectionTextColorMixed ? textColor : activeTextColor ?? textColor;
+      }
+      if (target === "shape-border") {
+        return activeShapeBorderColor ?? textColor;
+      }
+      return activeShapeFillColor ?? activeShapeBorderColor ?? textColor;
+    },
+    [activeShapeBorderColor, activeShapeFillColor, activeTextColor, selectionTextColorMixed, textColor]
+  );
+  const openColorPickerFor = useCallback(
+    (target: "text" | "shape-border" | "shape-fill") => {
+      const current = resolvePickerColor(target);
+      setColorPickerDraft(current || "#111827");
+      setHighlightCustomOpen(false);
+      setColorPickerOpen(target);
+    },
+    [resolvePickerColor]
+  );
+  const pickColorFromScreen = useCallback(async (target: "text" | "shape-border" | "shape-fill") => {
     if (typeof window === "undefined") return;
     const EyeDropperCtor = (window as Window & { EyeDropper?: new () => { open: () => Promise<{ sRGBHex: string }> } })
       .EyeDropper;
@@ -5404,14 +6173,43 @@ function WorkspaceClient() {
       setColorPickerOpen(null);
       const result = await new EyeDropperCtor().open();
       if (result?.sRGBHex) {
+        addCustomTextColor(result.sRGBHex);
         setColorPickerDraft(result.sRGBHex);
         setHighlightCustomOpen(true);
-        setColorPickerOpen("text");
+        setColorPickerOpen(target);
       }
     } catch {
       // User canceled the picker.
     }
-  }, []);
+  }, [addCustomTextColor]);
+  const applyColorFromPicker = useCallback(
+    (color: string | null) => {
+      if (!colorPickerOpen) return;
+      if (colorPickerOpen === "text" && color) {
+        applyTextColor(color);
+        setColorPickerOpen(null);
+        restoreTextSelectionSoon();
+        return;
+      }
+      if (colorPickerOpen === "shape-border" && color) {
+        applyShapeBorderColor(color);
+        setColorPickerOpen(null);
+        return;
+      }
+      if (colorPickerOpen === "shape-fill") {
+        applyShapeFillColor(color);
+        setColorPickerOpen(null);
+      }
+    },
+    [applyShapeBorderColor, applyShapeFillColor, applyTextColor, colorPickerOpen, restoreTextSelectionSoon]
+  );
+  const handleColorPickerMouseDown = useCallback(
+    (event: ReactMouseEvent<HTMLButtonElement>) => {
+      if (!isTextColorPicker) return;
+      keepTextEditingActive(event);
+    },
+    [isTextColorPicker, keepTextEditingActive]
+  );
   useEffect(() => {
     if (!highlightCustomOpen) return;
     const rgb = hexToRgb(colorPickerDraft);
@@ -5487,6 +6285,7 @@ function WorkspaceClient() {
   const showToolbarTooltip = useCallback((label: string, target: HTMLElement) => {
     if (label === "Font" && fontMenuOpen) return;
     if (label === "Align" && alignMenuOpen) return;
+    if (label === "Line spacing" && lineSpacingMenuOpen) return;
     const rect = target.getBoundingClientRect();
     const toolbarRect = target.closest("[data-text-toolbar]")?.getBoundingClientRect();
     const baseY = toolbarRect ? toolbarRect.bottom - 6 : rect.bottom - 6;
@@ -5497,7 +6296,7 @@ function WorkspaceClient() {
       y: baseY + 8,
       visible: true,
     });
-  }, [fontMenuOpen, alignMenuOpen]);
+  }, [fontMenuOpen, alignMenuOpen, lineSpacingMenuOpen]);
   const hideToolbarTooltip = useCallback(() => {
     setToolbarTooltip((prev) => (prev.visible ? { ...prev, visible: false } : prev));
   }, []);
@@ -5549,16 +6348,50 @@ function WorkspaceClient() {
     );
   }, [activeTextSize]);
   useEffect(() => {
+    setShapeThicknessInput((current) =>
+      document.activeElement?.getAttribute("aria-label") === "Thickness"
+        ? current
+        : `${Math.round(shapeThickness)}`
+    );
+  }, [shapeThickness]);
+  useEffect(() => {
+    if (!focusedShapeId || !focusedShapePageId || !focusedShape) return;
+    setShapeColor(focusedShape.color);
+    setShapeFillColor(focusedShape.fillColor ?? null);
+    const node = previewNodeMap.current.get(focusedShapePageId);
+    const rect = node?.getBoundingClientRect();
+    if (!rect?.width) return;
+    const nextThickness = clamp(
+      Math.round(focusedShape.thickness * rect.width),
+      MIN_SHAPE_THICKNESS,
+      MAX_SHAPE_THICKNESS
+    );
+    setShapeThickness(nextThickness);
+  }, [focusedShape, focusedShapeId, focusedShapePageId, MAX_SHAPE_THICKNESS, MIN_SHAPE_THICKNESS]);
+  useEffect(() => {
+    if (!focusedShapeId || focusedShape) return;
+    setFocusedShapeId(null);
+    setFocusedShapePageId(null);
+  }, [focusedShape, focusedShapeId]);
+  useEffect(() => {
     setTextAnnotations((prev) => {
       let updated = false;
       const next = { ...prev };
       Object.entries(prev).forEach(([pageId, list]) => {
         let changed = false;
         const nextList = list.map((item) => {
-          if (typeof item.textSizePt === "number") return item;
-          changed = true;
-          updated = true;
-          return { ...item, textSizePt: textSize };
+          let nextItem = item;
+          if (typeof item.textSizePt !== "number") {
+            changed = true;
+            updated = true;
+            nextItem = { ...nextItem, textSizePt: textSize };
+          }
+          if (typeof nextItem.lineSpacing !== "number") {
+            changed = true;
+            updated = true;
+            nextItem = { ...nextItem, lineSpacing: DEFAULT_TEXT_LINE_SPACING };
+          }
+          return nextItem;
         });
         if (changed) {
           next[pageId] = nextList;
@@ -5616,7 +6449,6 @@ function WorkspaceClient() {
         textSizePt: textSize,
         textColor,
         textUnderline,
-        textStrike,
         textTransform,
         textAlign,
       signaturePlacements,
@@ -5634,7 +6466,6 @@ function WorkspaceClient() {
       textSize,
       textColor,
       textUnderline,
-      textStrike,
       textTransform,
       textAlign,
     signaturePlacements,
@@ -5644,7 +6475,7 @@ function WorkspaceClient() {
   useEffect(() => {
     if (!authSession?.user) return;
     if (!hasWorkspaceData) return;
-    if (draggingText || resizingText) return;
+    if (draggingText || resizingText || draggingShape) return;
     const ownerId = authSession.user.id ?? authSession.user.email ?? null;
     if (!ownerId) return;
 
@@ -5670,6 +6501,7 @@ function WorkspaceClient() {
     saveProject,
     draggingText,
     resizingText,
+    draggingShape,
   ]);
 
 		  const computeBaseScale = useCallback(() => {
@@ -5789,6 +6621,7 @@ function WorkspaceClient() {
       start: { x: point.x, y: point.y },
       end: { x: point.x, y: point.y },
       color: shapeColor,
+      fillColor: shapeFillColor,
       thickness: shapeThickness / point.rectWidth,
     });
     event.preventDefault();
@@ -5816,6 +6649,7 @@ function WorkspaceClient() {
       start: { ...draftShape.start },
       end: { ...draftShape.end },
       color: draftShape.color,
+      fillColor: draftShape.fillColor ?? null,
       thickness: draftShape.thickness,
     };
     setShapesByPage((prev) => {
@@ -5840,8 +6674,12 @@ function WorkspaceClient() {
       event.preventDefault();
       return;
     }
-    if (!event.target || !(event.target as HTMLElement).closest("[data-text-annotation]")) {
+    if (
+      !event.target ||
+      !(event.target as HTMLElement).closest("[data-text-annotation], [data-shape-annotation]")
+    ) {
       clearTextFocus();
+      clearShapeFocus();
     }
     if (deleteMode) return;
     if (shapeMode) {
@@ -6011,6 +6849,7 @@ function WorkspaceClient() {
                 text: TEXT_PLACEHOLDER,
                 rotation: 0,
                 textSizePt: textSize,
+                lineSpacing: DEFAULT_TEXT_LINE_SPACING,
               },
             ],
           };
@@ -6444,6 +7283,7 @@ function WorkspaceClient() {
             text: TEXT_PLACEHOLDER,
             rotation: 0,
             textSizePt: textSize,
+            lineSpacing: DEFAULT_TEXT_LINE_SPACING,
           },
         ],
       };
@@ -6576,7 +7416,7 @@ function WorkspaceClient() {
 	        const pageShapes = shapesByPage[p.id] ?? [];
 	        const pageTexts = textAnnotations[p.id] ?? [];
 	          if (pageHighlights.length > 0) {
-	            const { width: pageWidth, height: pageHeight } = copied.getSize();
+          const { width: pageWidth, height: pageHeight } = copied.getSize();
 	            pageHighlights.forEach((stroke) => {
 	              const colorValue = hexToRgb(stroke.color);
 	              if (!colorValue) return;
@@ -6617,6 +7457,7 @@ function WorkspaceClient() {
             pageShapes.forEach((shape) => {
               const colorValue = hexToRgb(shape.color);
               if (!colorValue) return;
+              const fillColorValue = shape.fillColor ? hexToRgb(shape.fillColor) : null;
               const thickness = Math.max(1, shape.thickness * pageWidth);
               const start = unitToPdf(shape.start);
               const end = unitToPdf(shape.end);
@@ -6662,6 +7503,9 @@ function WorkspaceClient() {
 	                    y: minY,
 	                    width: w,
 	                    height: h,
+                      ...(fillColorValue
+                        ? { color: rgb(fillColorValue.r, fillColorValue.g, fillColorValue.b) }
+                        : {}),
 	                    borderWidth: thickness,
 	                    borderColor: strokeColor,
 	                    borderOpacity: 1,
@@ -6674,6 +7518,9 @@ function WorkspaceClient() {
 	                    y: minY + h / 2,
 	                    xScale: w / 2,
 	                    yScale: h / 2,
+                      ...(fillColorValue
+                        ? { color: rgb(fillColorValue.r, fillColorValue.g, fillColorValue.b) }
+                        : {}),
 	                    borderWidth: thickness,
 	                    borderColor: strokeColor,
 	                    borderOpacity: 1,
@@ -6684,9 +7531,18 @@ function WorkspaceClient() {
 	                  const top = { x: minX + w / 2, y: maxY };
 	                  const left = { x: minX, y: minY };
 	                  const right = { x: maxX, y: minY };
-	                  drawLineSegment(top, right);
-	                  drawLineSegment(right, left);
-	                  drawLineSegment(left, top);
+                    if (fillColorValue) {
+                      copied.drawSvgPath(`M ${top.x} ${top.y} L ${right.x} ${right.y} L ${left.x} ${left.y} Z`, {
+                        color: rgb(fillColorValue.r, fillColorValue.g, fillColorValue.b),
+                        borderColor: strokeColor,
+                        borderWidth: thickness,
+                        borderOpacity: 1,
+                      });
+                    } else {
+                      drawLineSegment(top, right);
+                      drawLineSegment(right, left);
+                      drawLineSegment(left, top);
+                    }
 	                  break;
 	                }
 	                case "x":
@@ -6727,7 +7583,9 @@ function WorkspaceClient() {
             const startY = pageHeight - annotation.y * pageHeight - padding;
             let cursorY = startY;
             const html = annotation.richTextHtml ?? textToHtml(annotation.text);
-            const runs = extractRichTextRuns(html, annotation.textSizePt ?? textSize);
+            const baseSize = annotation.textSizePt ?? textSize;
+            const lineSpacing = annotation.lineSpacing ?? DEFAULT_TEXT_LINE_SPACING;
+            const runs = extractRichTextRuns(html, baseSize);
             const lines = splitRunsIntoLines(runs);
             const rotation = annotation.rotation ?? 0;
             const rotationRadians = (rotation * Math.PI) / 180;
@@ -6740,12 +7598,11 @@ function WorkspaceClient() {
             }
             lines.forEach((line, lineIndex) => {
               if (line.length === 0) {
-                const baseSize = annotation.textSizePt ?? textSize;
-                cursorY -= baseSize * 1.3;
+                cursorY -= baseSize * lineSpacing;
                 return;
               }
               const maxWidth = Math.max(10, boxWidth - padding * 2);
-              const lineHeight = Math.max(...line.map((run) => run.sizePt)) * 1.3;
+          const lineHeight = baseSize * lineSpacing;
               let lineWidth = 0;
               line.forEach((run) => {
                 const transformed = applyTextTransform(run.text, textTransform);
@@ -6771,7 +7628,7 @@ function WorkspaceClient() {
                 : 0;
               const extraSpace =
                 shouldJustify && spaceCount > 0 ? Math.max(0, maxWidth - lineWidth) / spaceCount : 0;
-              cursorY -= Math.max(...line.map((run) => run.sizePt));
+              cursorY -= baseSize;
               let cursorX = lineX;
               line.forEach((run) => {
                 const transformed = applyTextTransform(run.text, textTransform);
@@ -6828,32 +7685,20 @@ function WorkspaceClient() {
                   });
                   cursorX += runWidth;
                 }
-                if (run.underline || run.strike) {
+                if (run.underline) {
                   const lineOrigin = { x: runStartX, y: cursorY };
                   const decorationThickness = Math.max(0.5, lineHeight / 14);
-                  if (run.underline) {
-                    const underlineY = cursorY - lineHeight * 0.1;
-                    const start = rotatePoint({ x: runStartX, y: underlineY }, lineOrigin, rotationRadians);
-                    const end = rotatePoint(
-                      { x: runStartX + runWidthAdjusted, y: underlineY },
-                      lineOrigin,
-                      rotationRadians
-                    );
-                    copied.drawLine({ start, end, thickness: decorationThickness, color: runColor });
-                  }
-                  if (run.strike) {
-                    const strikeY = cursorY + lineHeight * 0.35;
-                    const start = rotatePoint({ x: runStartX, y: strikeY }, lineOrigin, rotationRadians);
-                    const end = rotatePoint(
-                      { x: runStartX + runWidthAdjusted, y: strikeY },
-                      lineOrigin,
-                      rotationRadians
-                    );
-                    copied.drawLine({ start, end, thickness: decorationThickness, color: runColor });
-                  }
+                  const underlineY = cursorY - lineHeight * 0.1;
+                  const start = rotatePoint({ x: runStartX, y: underlineY }, lineOrigin, rotationRadians);
+                  const end = rotatePoint(
+                    { x: runStartX + runWidthAdjusted, y: underlineY },
+                    lineOrigin,
+                    rotationRadians
+                  );
+                  copied.drawLine({ start, end, thickness: decorationThickness, color: runColor });
                 }
               });
-              cursorY -= lineHeight - Math.max(...line.map((run) => run.sizePt));
+              cursorY -= lineHeight - baseSize;
             });
           }
         }
@@ -7027,7 +7872,7 @@ function WorkspaceClient() {
         }
       });
     });
-  }, [fontSizeToDisplayPx, zoomMultiplier]);
+  }, [fontSizeToDisplayPx]);
 
   useEffect(() => {
     const handleGlobalPointerDown = (event: PointerEvent) => {
@@ -7049,6 +7894,25 @@ function WorkspaceClient() {
   }, [clearTextFocus]);
 
   useEffect(() => {
+    const handleGlobalPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        clearShapeFocus();
+        return;
+      }
+      if (target.closest("[data-shape-toolbar]") || target.closest("[data-text-popover]")) {
+        return;
+      }
+      if (!target.closest("[data-shape-annotation]")) {
+        clearShapeFocus();
+      }
+    };
+
+    window.addEventListener("pointerdown", handleGlobalPointerDown);
+    return () => window.removeEventListener("pointerdown", handleGlobalPointerDown);
+  }, [clearShapeFocus]);
+
+  useEffect(() => {
     if (!textMode) {
       setDraftTextBox(null);
     }
@@ -7066,6 +7930,7 @@ function WorkspaceClient() {
     return () => {
       textDragCleanupRef.current?.();
       textResizeCleanupRef.current?.();
+      shapeDragCleanupRef.current?.();
     };
   }, []);
   useEffect(() => {
@@ -7090,6 +7955,20 @@ function WorkspaceClient() {
     document.addEventListener("click", handleOutside);
     return () => document.removeEventListener("click", handleOutside);
   }, [alignMenuOpen]);
+  useEffect(() => {
+    if (!lineSpacingMenuOpen) return;
+    const handleOutside = (event: MouseEvent) => {
+      if (!(event.target instanceof Node)) return;
+      if (
+        !lineSpacingMenuRef.current?.contains(event.target) &&
+        !lineSpacingMenuButtonRef.current?.contains(event.target)
+      ) {
+        setLineSpacingMenuOpen(false);
+      }
+    };
+    document.addEventListener("click", handleOutside);
+    return () => document.removeEventListener("click", handleOutside);
+  }, [lineSpacingMenuOpen]);
   const updateFontMenuPosition = useCallback(() => {
     const button = fontMenuButtonRef.current;
     if (!button || typeof window === "undefined") return;
@@ -7107,6 +7986,14 @@ function WorkspaceClient() {
     const left = rect.left + rect.width / 2;
     const top = rect.bottom + 8;
     setAlignMenuPosition({ left, top });
+  }, []);
+  const updateLineSpacingMenuPosition = useCallback(() => {
+    const button = lineSpacingMenuButtonRef.current;
+    if (!button || typeof window === "undefined") return;
+    const rect = button.getBoundingClientRect();
+    const left = rect.left + rect.width / 2;
+    const top = rect.bottom + 8;
+    setLineSpacingMenuPosition({ left, top });
   }, []);
   useEffect(() => {
     if (!fontMenuOpen) {
@@ -7137,16 +8024,43 @@ function WorkspaceClient() {
     };
   }, [alignMenuOpen, updateAlignMenuPosition]);
   useEffect(() => {
+    if (!lineSpacingMenuOpen) {
+      setLineSpacingMenuPosition(null);
+      return;
+    }
+    updateLineSpacingMenuPosition();
+    const handleReposition = () => updateLineSpacingMenuPosition();
+    window.addEventListener("resize", handleReposition);
+    window.addEventListener("scroll", handleReposition, true);
+    return () => {
+      window.removeEventListener("resize", handleReposition);
+      window.removeEventListener("scroll", handleReposition, true);
+    };
+  }, [lineSpacingMenuOpen, updateLineSpacingMenuPosition]);
+  useEffect(() => {
     if (!textMode) setFontMenuOpen(false);
   }, [textMode]);
   useEffect(() => {
     if (!textMode) setAlignMenuOpen(false);
   }, [textMode]);
   useEffect(() => {
-    if (!textMode) setColorPickerOpen(null);
+    if (!textMode) setLineSpacingMenuOpen(false);
   }, [textMode]);
+  useEffect(() => {
+    if (!textMode && colorPickerOpen === "text") setColorPickerOpen(null);
+  }, [colorPickerOpen, textMode]);
+  useEffect(() => {
+    if (!shapeMode && (colorPickerOpen === "shape-border" || colorPickerOpen === "shape-fill")) {
+      setColorPickerOpen(null);
+    }
+  }, [colorPickerOpen, shapeMode]);
   const updateHighlightPopoverPosition = useCallback(() => {
-    const button = highlightColorButtonRef.current;
+    const button =
+      colorPickerOpen === "shape-border"
+        ? shapeBorderColorButtonRef.current
+        : colorPickerOpen === "shape-fill"
+          ? shapeFillColorButtonRef.current
+          : textColorButtonRef.current;
     const popover = highlightPopoverRef.current;
     if (!button || !popover || typeof window === "undefined") return;
     const buttonRect = button.getBoundingClientRect();
@@ -7160,7 +8074,7 @@ function WorkspaceClient() {
     setHighlightPopoverPosition({ left, top });
   }, []);
   useEffect(() => {
-    if (colorPickerOpen !== "text") {
+    if (!colorPickerOpen) {
       setHighlightPopoverPosition(null);
       return;
     }
@@ -7174,12 +8088,14 @@ function WorkspaceClient() {
     };
   }, [colorPickerOpen, highlightCustomOpen, updateHighlightPopoverPosition]);
   useEffect(() => {
-    if (colorPickerOpen !== "text") return;
+    if (!colorPickerOpen) return;
     const handleOutside = (event: MouseEvent) => {
       if (!(event.target instanceof Node)) return;
       if (
         highlightPopoverRef.current?.contains(event.target) ||
-        highlightColorButtonRef.current?.contains(event.target)
+        textColorButtonRef.current?.contains(event.target) ||
+        shapeBorderColorButtonRef.current?.contains(event.target) ||
+        shapeFillColorButtonRef.current?.contains(event.target)
       ) {
         return;
       }
@@ -7397,6 +8313,10 @@ function WorkspaceClient() {
       ]);
       setRedoHighlightHistory([]);
     }
+    if (focusedShapeId === shapeId && focusedShapePageId === pageId) {
+      setFocusedShapeId(null);
+      setFocusedShapePageId(null);
+    }
   }
 
   function handleToggleDeleteMode() {
@@ -7493,42 +8413,50 @@ function WorkspaceClient() {
           className="toolbar-font relative z-[80] w-full border-b border-slate-200/60 bg-[#F1F5F9] shadow-[0_10px_24px_rgba(15,23,42,0.04)]"
           data-text-toolbar
         >
-	          <div className="w-full px-0.5 py-0.5 lg:px-6">
+	          <div className="w-full pl-8 pr-4 py-0.5 lg:pl-10 lg:pr-6">
 	            <div className="relative h-10">
 	              <div className={`absolute inset-0 flex w-full items-center gap-3 lg:gap-4 ${loading ? "pointer-events-none" : ""}`}>
 	                <div className="tools-scroll flex min-w-0 flex-1 overflow-x-auto overflow-y-visible">
-	                  <div className="flex items-center gap-0 rounded-xl bg-[#F1F5F9] pl-0.5 pr-1.5 py-0">
-	                  <button
-	                    type="button"
-	                    className={`${toolButtonBase} ${toolIconButton} ${toolButtonInactiveBlack}`}
-	                    disabled={loading}
-	                    aria-disabled={!hasUndoHistory}
-	                    aria-label="Undo"
-	                    title="Undo"
-	                    onClick={() => {
-	                      if (loading) return;
-	                      if (!hasUndoHistory) return;
-	                      handleUndoHighlight();
-	                    }}
-	                  >
-	                    <Undo2 className="h-5 w-5" />
-	                  </button>
+	                  <div className="flex items-center gap-0 rounded-xl bg-[#F1F5F9] pl-0 pr-1.5 py-0">
+	                  <div className="group relative">
+	                    <button
+	                      type="button"
+	                      className={`${toolButtonBase} ${toolIconButton} ${toolButtonInactiveBlack}`}
+	                      disabled={loading}
+	                      aria-disabled={!hasUndoHistory}
+	                      aria-label="Undo"
+	                      onClick={() => {
+	                        if (loading) return;
+	                        if (!hasUndoHistory) return;
+	                        handleUndoHighlight();
+	                      }}
+	                    >
+	                      <Undo2 className="h-5 w-5" />
+	                    </button>
+	                    <div className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100">
+	                      Undo
+	                    </div>
+	                  </div>
 
-	                  <button
-	                    type="button"
-	                    className={`${toolButtonBase} ${toolIconButton} ${toolButtonInactiveBlack}`}
-	                    disabled={loading}
-	                    aria-disabled={!hasRedoHistory}
-	                    aria-label="Redo"
-	                    title="Redo"
-	                    onClick={() => {
-	                      if (loading) return;
-	                      if (!hasRedoHistory) return;
-	                      handleRedoHighlight();
-	                    }}
-	                  >
-	                    <Redo2 className="h-5 w-5" />
-	                  </button>
+	                  <div className="group relative">
+	                    <button
+	                      type="button"
+	                      className={`${toolButtonBase} ${toolIconButton} ${toolButtonInactiveBlack}`}
+	                      disabled={loading}
+	                      aria-disabled={!hasRedoHistory}
+	                      aria-label="Redo"
+	                      onClick={() => {
+	                        if (loading) return;
+	                        if (!hasRedoHistory) return;
+	                        handleRedoHighlight();
+	                      }}
+	                    >
+	                      <Redo2 className="h-5 w-5" />
+	                    </button>
+	                    <div className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100">
+	                      Redo
+	                    </div>
+	                  </div>
 
 	                  <div className="mx-1 h-6 w-px bg-slate-300/90" aria-hidden />
 
@@ -7871,7 +8799,7 @@ function WorkspaceClient() {
 				                              className="min-w-0 overflow-hidden"
 				                            >
                               <div className="toolbar-font w-full border-b border-slate-200/60 bg-white shadow-[0_1px_4px_rgba(15,23,42,0.06)]">
-                                <div className="w-full px-0.5 py-0.5 lg:px-6">
+                                <div className="w-full pl-8 pr-4 py-0.5 lg:pl-10 lg:pr-6">
                                   <div className="relative h-10">
                                     <div
                                       className={`absolute inset-0 flex w-full items-center gap-3 lg:gap-4 ${
@@ -7884,76 +8812,196 @@ function WorkspaceClient() {
                                           className={`tools-scroll flex min-w-0 items-center gap-2 overflow-x-auto ${
                                             loading ? "pointer-events-none" : ""
                                           }`}
-                                          aria-label="Shape options"
+                                          aria-label="Options"
+                                          data-shape-toolbar
                                         >
-                                          <div className="flex items-center gap-2">
-                                            <span className="text-xs font-semibold text-slate-600">Shape</span>
-                                            <div className="flex items-center gap-1.5">
-                                              {[
-                                                { type: "line" as const, label: "Line", icon: Minus },
-                                                { type: "arrow" as const, label: "Arrow", icon: ArrowRight },
-                                                { type: "rect" as const, label: "Square", icon: Square },
-                                                { type: "ellipse" as const, label: "Circle", icon: Circle },
-                                                { type: "triangle" as const, label: "Triangle", icon: Triangle },
-                                                { type: "check" as const, label: "Check", icon: Check },
-                                                { type: "x" as const, label: "X", icon: X },
-                                              ].map((item) => {
-                                                const Icon = item.icon;
-                                                const selected = shapeType === item.type;
-                                                return (
-                                                  <button
-                                                    key={item.type}
-                                                    type="button"
-                                                    onClick={() => setShapeType(item.type)}
-                                                    className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border transition ${
-                                                      selected
-                                                        ? "border-slate-200 bg-white text-slate-900 shadow-[0_6px_16px_rgba(15,23,42,0.10)]"
-                                                        : "border-transparent text-slate-600 hover:bg-white/80 hover:text-slate-900"
-                                                    }`}
-                                                    aria-label={item.label}
-                                                  >
-                                                    <Icon className="h-4 w-4" aria-hidden />
-                                                  </button>
-                                                );
-                                              })}
-                                            </div>
+                                          <div className="flex items-center gap-1.5">
+                                            {[
+                                              { type: "line" as const, label: "Line", icon: Minus },
+                                              { type: "arrow" as const, label: "Arrow", icon: ArrowRight },
+                                            ].map((item) => {
+                                              const Icon = item.icon;
+                                              const selected = shapeType === item.type;
+                                              return (
+                                                <button
+                                                  key={item.type}
+                                                  type="button"
+                                                  onClick={() => setShapeType(item.type)}
+                                                  className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border transition ${
+                                                    selected
+                                                      ? "border-slate-200 bg-white text-slate-900 shadow-[0_6px_16px_rgba(15,23,42,0.10)]"
+                                                      : "border-transparent text-slate-600 hover:bg-white/80 hover:text-slate-900"
+                                                  }`}
+                                                  aria-label={item.label}
+                                                >
+                                                  <Icon className="h-4 w-4" aria-hidden />
+                                                </button>
+                                              );
+                                            })}
                                           </div>
 
-                                          <div className="flex items-center gap-2">
-                                            <span className="text-xs font-semibold text-slate-600">Color</span>
-                                            <label className="relative h-8 w-8 cursor-pointer rounded-full border border-slate-200 bg-white shadow-sm">
-                                              <span
-                                                className="absolute inset-1 rounded-full"
-                                                style={{ backgroundColor: shapeColor }}
-                                                aria-hidden
-                                              />
-                                              <input
-                                                type="color"
-                                                value={shapeColor}
-                                                onChange={(event) => setShapeColor(event.target.value)}
-                                                className="absolute inset-0 cursor-pointer opacity-0"
-                                                aria-label="Shape color"
-                                              />
-                                            </label>
+                                          <div className="mx-1 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
+
+                                          <div className="flex items-center gap-1.5">
+                                            {[
+                                              { type: "check" as const, label: "Check", icon: Check },
+                                              { type: "x" as const, label: "X", icon: X },
+                                            ].map((item) => {
+                                              const Icon = item.icon;
+                                              const selected = shapeType === item.type;
+                                              return (
+                                                <button
+                                                  key={item.type}
+                                                  type="button"
+                                                  onClick={() => setShapeType(item.type)}
+                                                  className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border transition ${
+                                                    selected
+                                                      ? "border-slate-200 bg-white text-slate-900 shadow-[0_6px_16px_rgba(15,23,42,0.10)]"
+                                                      : "border-transparent text-slate-600 hover:bg-white/80 hover:text-slate-900"
+                                                  }`}
+                                                  aria-label={item.label}
+                                                >
+                                                  <Icon className="h-4 w-4" aria-hidden />
+                                                </button>
+                                              );
+                                            })}
+                                          </div>
+
+                                          <div className="mx-1 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
+
+                                          <div className="flex items-center gap-1.5">
+                                            {[
+                                              { type: "rect" as const, label: "Rectangle", icon: Square },
+                                              { type: "ellipse" as const, label: "Circle", icon: Circle },
+                                              { type: "triangle" as const, label: "Triangle", icon: Triangle },
+                                            ].map((item) => {
+                                              const Icon = item.icon;
+                                              const selected = shapeType === item.type;
+                                              return (
+                                                <button
+                                                  key={item.type}
+                                                  type="button"
+                                                  onClick={() => setShapeType(item.type)}
+                                                  className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border transition ${
+                                                    selected
+                                                      ? "border-slate-200 bg-white text-slate-900 shadow-[0_6px_16px_rgba(15,23,42,0.10)]"
+                                                      : "border-transparent text-slate-600 hover:bg-white/80 hover:text-slate-900"
+                                                  }`}
+                                                  aria-label={item.label}
+                                                >
+                                                  <Icon className="h-4 w-4" aria-hidden />
+                                                </button>
+                                              );
+                                            })}
                                           </div>
 
                                           <div className="mx-1 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
 
                                           <div className="flex items-center gap-2">
-                                            <span className="text-xs font-semibold text-slate-600">Thickness</span>
-                                            <input
-                                              type="range"
-                                              min={1}
-                                              max={10}
-                                              step={1}
-                                              value={shapeThickness}
-                                              onChange={(event) => setShapeThickness(Number(event.target.value))}
-                                              className="h-2 w-28 cursor-pointer accent-[#024d7c]"
-                                              aria-label="Shape thickness"
-                                            />
-                                            <span className="w-12 text-right text-xs font-semibold tabular-nums text-slate-700">
-                                              {Math.round(shapeThickness)}px
-                                            </span>
+                                            <span className="text-xs font-semibold text-slate-600">Border</span>
+                                            <button
+                                              type="button"
+                                              className="relative h-8 w-8 rounded-full border border-slate-200 bg-white shadow-sm"
+                                              onClick={() => openColorPickerFor("shape-border")}
+                                              aria-label="Border color"
+                                              ref={shapeBorderColorButtonRef}
+                                            >
+                                              <span
+                                                className="absolute inset-1 rounded-full"
+                                                style={{ backgroundColor: activeShapeBorderColor ?? "#111827" }}
+                                                aria-hidden
+                                              />
+                                            </button>
+                                          </div>
+
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-xs font-semibold text-slate-600">Fill</span>
+                                            <button
+                                              type="button"
+                                              className="relative h-8 w-8 rounded-full border border-slate-200 bg-white shadow-sm"
+                                              onClick={() => openColorPickerFor("shape-fill")}
+                                              aria-label="Fill color"
+                                              ref={shapeFillColorButtonRef}
+                                            >
+                                              <span
+                                                className="absolute inset-1 rounded-full"
+                                                style={{ backgroundColor: activeShapeFillColor ?? "#ffffff" }}
+                                                aria-hidden
+                                              />
+                                            </button>
+                                          </div>
+
+                                          <div className="mx-1 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
+
+                                          <div className="flex items-center">
+                                            <div className="inline-flex items-center gap-0 justify-start">
+                                              <button
+                                                type="button"
+                                                className="mr-2 flex h-7 w-7 items-center justify-center rounded text-slate-800 transition hover:bg-slate-100 hover:text-slate-900"
+                                                onClick={() => applyShapeThickness(shapeThickness - 1)}
+                                                onMouseEnter={(event) =>
+                                                  showToolbarTooltip("Decrease stroke", event.currentTarget)
+                                                }
+                                                onMouseLeave={hideToolbarTooltip}
+                                                aria-label="Decrease thickness"
+                                              >
+                                                <Minus className="h-4 w-4" />
+                                              </button>
+                                              <input
+                                                type="text"
+                                                maxLength={2}
+                                                inputMode="decimal"
+                                                value={shapeThicknessInput}
+                                                onChange={(event) => {
+                                                  const nextValue = event.target.value;
+                                                  setShapeThicknessInput(nextValue);
+                                                }}
+                                                onKeyDown={(event) => {
+                                                  if (event.key === "Enter") {
+                                                    event.currentTarget.blur();
+                                                  }
+                                                }}
+                                                onBlur={() => {
+                                                  if (!shapeThicknessInput) {
+                                                    const fallback = MIN_SHAPE_THICKNESS;
+                                                    applyShapeThickness(fallback);
+                                                    setShapeThicknessInput(`${fallback}`);
+                                                    return;
+                                                  }
+                                                  const next = Number(shapeThicknessInput);
+                                                  if (Number.isNaN(next)) {
+                                                    setShapeThicknessInput(`${Math.round(shapeThickness)}`);
+                                                    return;
+                                                  }
+                                                  const normalized = normalizeShapeThickness(next);
+                                                  applyShapeThickness(normalized);
+                                                  setShapeThicknessInput(`${normalized}`);
+                                                }}
+                                                onMouseEnter={(event) => showToolbarTooltip("Stroke", event.currentTarget)}
+                                                onMouseLeave={hideToolbarTooltip}
+                                                className="bg-transparent text-center text-sm font-semibold text-slate-800 outline-none rounded-md"
+                                                style={{
+                                                  border: "1px solid rgba(148, 163, 184, 0.7)",
+                                                  padding: "3px 5px",
+                                                  margin: "-3px -5px",
+                                                  width: "4ch",
+                                                  alignSelf: "center",
+                                                }}
+                                                aria-label="Thickness"
+                                              />
+                                              <button
+                                                type="button"
+                                                className="ml-2 flex h-7 w-7 items-center justify-center rounded text-slate-800 transition hover:bg-slate-100 hover:text-slate-900"
+                                                onClick={() => applyShapeThickness(shapeThickness + 1)}
+                                                onMouseEnter={(event) =>
+                                                  showToolbarTooltip("Increase stroke", event.currentTarget)
+                                                }
+                                                onMouseLeave={hideToolbarTooltip}
+                                                aria-label="Increase thickness"
+                                              >
+                                                <Plus className="h-4 w-4" />
+                                              </button>
+                                            </div>
                                           </div>
                                         </div>
                                       ) : highlightMode ? (
@@ -8078,7 +9126,7 @@ function WorkspaceClient() {
                                       <button
                                         type="button"
                                         ref={fontMenuButtonRef}
-                                        className={`${textInputPill} w-[150px] justify-between pr-2`}
+                                        className={`${textInputPill} w-[150px] justify-between`}
                                         onMouseDown={keepTextEditingActive}
                                         onClick={() => setFontMenuOpen((prev) => !prev)}
                                         aria-label="Text font"
@@ -8087,7 +9135,7 @@ function WorkspaceClient() {
                                         {textFontEntries.find(([key]) => key === textFont)?.[1].label ?? textFont}
                                       </span>
                                       <svg
-                                        className="ml-2 h-2 w-2 text-slate-500"
+                                        className="ml-2 h-2 w-2 text-slate-800"
                                         viewBox="0 0 8 5"
                                         aria-hidden="true"
                                       >
@@ -8134,7 +9182,7 @@ function WorkspaceClient() {
                                             <div className="inline-flex items-center gap-0 justify-start">
                                               <button
                                                 type="button"
-                                                className="mr-2 flex h-7 w-7 items-center justify-center rounded text-slate-700 transition hover:bg-slate-100 hover:text-slate-900"
+                                                className="mr-2 flex h-7 w-7 items-center justify-center rounded text-slate-800 transition hover:bg-slate-100 hover:text-slate-900"
                                                 onMouseDown={keepTextEditingActive}
                                                 onClick={() => stepTextSize(-1)}
                                                 onMouseEnter={(event) => showToolbarTooltip("Decrease font size", event.currentTarget)}
@@ -8202,7 +9250,7 @@ function WorkspaceClient() {
                                                 }}
                                                 onMouseEnter={(event) => showToolbarTooltip("Font size", event.currentTarget)}
                                                 onMouseLeave={hideToolbarTooltip}
-                                                className="bg-transparent text-center text-sm font-semibold text-slate-700 outline-none rounded-md"
+                                                className="bg-transparent text-center text-sm font-semibold text-slate-800 outline-none rounded-md"
                                                 style={{
                                                   border: "1px solid rgba(148, 163, 184, 0.7)",
                                                   padding: "3px 5px",
@@ -8214,7 +9262,7 @@ function WorkspaceClient() {
                                               />
                                               <button
                                                 type="button"
-                                                className="ml-2 flex h-7 w-7 items-center justify-center rounded text-slate-700 transition hover:bg-slate-100 hover:text-slate-900"
+                                                className="ml-2 flex h-7 w-7 items-center justify-center rounded text-slate-800 transition hover:bg-slate-100 hover:text-slate-900"
                                                 onMouseDown={keepTextEditingActive}
                                                 onClick={() => stepTextSize(1)}
                                                 onMouseEnter={(event) => showToolbarTooltip("Increase font size", event.currentTarget)}
@@ -8224,6 +9272,44 @@ function WorkspaceClient() {
                                                 <Plus className="h-4 w-4" />
                                               </button>
                                             </div>
+                                          </div>
+
+                                          <div className="mx-2 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
+
+                                          <div className="flex items-center gap-1">
+                                            <button
+                                              type="button"
+                                              className={`${textOptionButtonBase} ${textOptionButtonHover}`}
+                                              onMouseDown={keepTextEditingActive}
+                                              onClick={() => openColorPickerFor("text")}
+                                              onMouseEnter={(event) => showToolbarTooltip("Text color", event.currentTarget)}
+                                              onMouseLeave={hideToolbarTooltip}
+                                              aria-label="Text color"
+                                              ref={textColorButtonRef}
+                                            >
+                                              <span className="relative flex h-7 w-7 items-center justify-center">
+                                                <svg
+                                                  className="h-4 w-4 text-slate-800"
+                                                  viewBox="0 0 24 24"
+                                                  aria-hidden="true"
+                                                >
+                                                  <path
+                                                    d="M5 20L10.5 4h3L19 20M7.5 14h9"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    strokeWidth="2.5"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                  />
+                                                </svg>
+                                                {!selectionTextColorMixed ? (
+                                                  <span
+                                                    className="absolute bottom-0 left-0 right-0 h-[3px] rounded-sm"
+                                                    style={{ backgroundColor: activeTextColor || "#111827" }}
+                                                  />
+                                                ) : null}
+                                              </span>
+                                            </button>
                                           </div>
 
                                           <div className="mx-2 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
@@ -8277,27 +9363,16 @@ function WorkspaceClient() {
                                             >
                                               <Underline className="h-[18px] w-[18px]" strokeWidth={2.5} />
                                             </button>
-                                            <button
-                                              type="button"
-                                              aria-pressed={focusedTextId ? textStrike : defaultTextStyles.strike}
-                                              className={`${textOptionButtonBase} ${
-                                                (focusedTextId ? textStrike : defaultTextStyles.strike)
-                                                  ? textOptionButtonActive
-                                                  : textOptionButtonHover
-                                              } text-slate-800`}
-                                              onMouseDown={keepTextEditingActive}
-                                              onClick={() => applyInlineCommand("strikeThrough")}
-                                              onMouseEnter={(event) => showToolbarTooltip("Strikethrough", event.currentTarget)}
-                                              onMouseLeave={hideToolbarTooltip}
-                                              aria-label="Strikethrough"
-                                            >
-                                              <Strikethrough className="h-[18px] w-[18px]" strokeWidth={2.5} />
-                                            </button>
+                                          </div>
+
+                                          <div className="mx-2 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
+
+                                          <div className="flex items-center gap-1">
                                             <div className="relative">
                                               <button
                                                 type="button"
                                                 ref={alignMenuButtonRef}
-                                                className={`${textOptionButtonBase} ${textOptionButtonHover} w-auto px-2 flex items-center gap-1`}
+                                                className={`${textOptionButtonBase} ${textOptionButtonHover} w-auto px-2 flex items-center gap-1 text-slate-800`}
                                                 onMouseDown={keepTextEditingActive}
                                                 onClick={() => {
                                                   hideToolbarTooltip();
@@ -8314,7 +9389,7 @@ function WorkspaceClient() {
                                                 ) : (
                                                   <AlignRight className="h-[18px] w-[18px]" />
                                                 )}
-                                                <svg className="h-2 w-2 text-slate-500" viewBox="0 0 8 5" aria-hidden="true">
+                                                <svg className="h-2 w-2 text-slate-800" viewBox="0 0 8 5" aria-hidden="true">
                                                   <path d="M4 5L0 0h8L4 5z" fill="currentColor" />
                                                 </svg>
                                               </button>
@@ -8329,17 +9404,19 @@ function WorkspaceClient() {
                                                         transform: "translateX(-50%)",
                                                       }}
                                                     >
-                                                      <div className="flex items-center gap-1">
+                                                      <div className="flex flex-col gap-1">
                                                         {[
-                                                          { value: "left", label: "Align left", Icon: AlignLeft },
-                                                          { value: "center", label: "Align center", Icon: AlignCenter },
-                                                          { value: "right", label: "Align right", Icon: AlignRight },
+                                                          { value: "left", label: "Left", Icon: AlignLeft },
+                                                          { value: "center", label: "Center", Icon: AlignCenter },
+                                                          { value: "right", label: "Right", Icon: AlignRight },
                                                         ].map(({ value, label, Icon }) => (
                                                           <button
                                                             key={value}
                                                             type="button"
-                                                            className={`flex h-7 w-7 items-center justify-center rounded-md text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 ${
-                                                              textAlign === value ? "bg-blue-100 text-blue-700" : ""
+                                                            className={`flex w-24 items-center gap-2 rounded-md px-2 py-1.5 text-sm font-semibold transition ${
+                                                              textAlign === value
+                                                                ? "bg-[#E0F2FE] text-[#024d7c]"
+                                                                : "text-slate-700 hover:bg-slate-50"
                                                             }`}
                                                             onPointerDown={keepTextEditingActive}
                                                             onMouseEnter={(event) => showToolbarTooltip(label, event.currentTarget)}
@@ -8348,9 +9425,10 @@ function WorkspaceClient() {
                                                               applyTextAlignment(value as typeof textAlign);
                                                               restoreTextSelectionSoon();
                                                             }}
-                                                            aria-label={label}
+                                                            aria-label={`Align ${label.toLowerCase()}`}
                                                           >
                                                             <Icon className="h-[18px] w-[18px]" />
+                                                            <span>{label}</span>
                                                           </button>
                                                         ))}
                                                       </div>
@@ -8359,55 +9437,103 @@ function WorkspaceClient() {
                                                   )
                                                 : null}
                                             </div>
-                                            <button
-                                              type="button"
-                                              className={`${textOptionButtonBase} ${textOptionButtonHover}`}
-                                              onMouseDown={keepTextEditingActive}
-                                              onClick={openColorPicker}
-                                              onMouseEnter={(event) => showToolbarTooltip("Text color", event.currentTarget)}
-                                              onMouseLeave={hideToolbarTooltip}
-                                              aria-label="Text color"
-                                              ref={highlightColorButtonRef}
-                                            >
-                                              <span className="relative flex h-7 w-7 items-center justify-center">
-                                                <svg
-                                                  className="h-4 w-4 text-slate-700"
-                                                  viewBox="0 0 24 24"
-                                                  aria-hidden="true"
-                                                >
-                                                  <path
-                                                    d="M5 20L10.5 4h3L19 20M7.5 14h9"
-                                                    fill="none"
-                                                    stroke="currentColor"
-                                                    strokeWidth="2.5"
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                  />
-                                                </svg>
-                                                {!selectionTextColorMixed ? (
-                                                    <span
-                                                      className="absolute bottom-0 left-0 right-0 h-[3px] rounded-sm"
-                                                      style={{ backgroundColor: activeTextColor || "#111827" }}
-                                                    />
-                                                ) : null}
-                                              </span>
-                                            </button>
-                                          </div>
-                                          {zoomPercent !== 100 ? (
-                                            <div className="mx-2 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
-                                          ) : null}
-                                          {zoomPercent !== 100 ? (
-                                            <div className="text-xs font-semibold text-slate-500">
-                                              Font sizes are accurate at{" "}
+                                            <div className="relative">
                                               <button
                                                 type="button"
-                                                className="text-blue-600 underline decoration-blue-300 underline-offset-2 transition hover:text-blue-700"
-                                                onClick={() => setZoomWithScrollPreserved(100)}
+                                                ref={lineSpacingMenuButtonRef}
+                                                className={`${textOptionButtonBase} ${
+                                                  lineSpacingMenuOpen ? textOptionButtonActive : textOptionButtonHover
+                                                } w-auto px-2 flex items-center gap-1 text-slate-800`}
+                                                onMouseDown={keepTextEditingActive}
+                                                onClick={() => {
+                                                  hideToolbarTooltip();
+                                                  setLineSpacingMenuOpen((prev) => !prev);
+                                                }}
+                                                onMouseEnter={(event) => showToolbarTooltip("Line spacing", event.currentTarget)}
+                                                onMouseLeave={hideToolbarTooltip}
+                                                aria-label="Line spacing"
                                               >
-                                                100%
-                                              </button>{" "}
-                                              zoom.
+                                                <LineSpacingIcon className="h-[18px] w-[18px]" />
+                                                <svg className="h-2 w-2 text-slate-800" viewBox="0 0 8 5" aria-hidden="true">
+                                                  <path d="M4 5L0 0h8L4 5z" fill="currentColor" />
+                                                </svg>
+                                              </button>
                                             </div>
+                                          </div>
+
+                                          <div className="mx-2 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
+
+                                          <div className="flex items-center gap-1">
+                                            <button
+                                              type="button"
+                                              aria-pressed={listType === "bullet"}
+                                              className={`${textOptionButtonBase} ${
+                                                listType === "bullet" ? textOptionButtonActive : textOptionButtonHover
+                                              } text-slate-800`}
+                                              onMouseDown={keepTextEditingActive}
+                                              onClick={() => applyListCommand("bullet")}
+                                              onMouseEnter={(event) => showToolbarTooltip("Bulleted list", event.currentTarget)}
+                                              onMouseLeave={hideToolbarTooltip}
+                                              aria-label="Bulleted list"
+                                            >
+                                              <List className="h-[18px] w-[18px]" strokeWidth={2.5} />
+                                            </button>
+                                            <button
+                                              type="button"
+                                              aria-pressed={listType === "number"}
+                                              className={`${textOptionButtonBase} ${
+                                                listType === "number" ? textOptionButtonActive : textOptionButtonHover
+                                              } text-slate-800`}
+                                              onMouseDown={keepTextEditingActive}
+                                              onClick={() => applyListCommand("number")}
+                                              onMouseEnter={(event) => showToolbarTooltip("Numbered list", event.currentTarget)}
+                                              onMouseLeave={hideToolbarTooltip}
+                                              aria-label="Numbered list"
+                                            >
+                                              <ListOrdered className="h-[18px] w-[18px]" strokeWidth={2.5} />
+                                            </button>
+                                          </div>
+                                          {lineSpacingMenuOpen && lineSpacingMenuPosition && typeof document !== "undefined"
+                                            ? createPortal(
+                                                <div
+                                                  ref={lineSpacingMenuRef}
+                                                  className="fixed z-[9999] rounded-lg bg-white p-2 shadow-[0_10px_24px_rgba(15,23,42,0.12)]"
+                                                  style={{
+                                                    left: lineSpacingMenuPosition.left,
+                                                    top: lineSpacingMenuPosition.top,
+                                                    transform: "translateX(-50%)",
+                                                  }}
+                                                >
+                                                  <div className="flex flex-col gap-1">
+                                                    {[
+                                                      { label: "Single", value: 1.0 },
+                                                      { label: "1.5", value: 1.5 },
+                                                      { label: "Double", value: 2.0 },
+                                                    ].map((option) => (
+                                                      <button
+                                                        key={option.label}
+                                                        type="button"
+                                                        className={`flex w-24 items-center justify-between rounded-md px-2 py-1.5 text-sm font-semibold transition ${
+                                                          activeLineSpacing === option.value
+                                                            ? "bg-[#E0F2FE] text-[#024d7c]"
+                                                            : "text-slate-700 hover:bg-slate-50"
+                                                        }`}
+                                                        onPointerDown={keepTextEditingActive}
+                                                        onClick={() => applyLineSpacing(option.value)}
+                                                      >
+                                                        <span>{option.label}</span>
+                                                        {activeLineSpacing === option.value ? (
+                                                          <Check className="h-3.5 w-3.5" />
+                                                        ) : null}
+                                                      </button>
+                                                    ))}
+                                                  </div>
+                                                </div>,
+                                                document.body,
+                                              )
+                                            : null}
+                                          {zoomPercent !== 100 ? (
+                                            <div className="mx-2 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
                                           ) : null}
                                         </div>
                                       )}
@@ -8541,9 +9667,9 @@ function WorkspaceClient() {
 				                            </aside>
 					                          ) : null}
 
-				                          <aside
-				                            className={`flex w-14 shrink-0 flex-col bg-white ${showPageOrderPanel ? "border-l border-slate-200" : ""}`}
-				                          >
+                          <aside
+                            className={`flex w-10 shrink-0 flex-col bg-white ${showPageOrderPanel ? "border-l border-slate-200" : ""}`}
+                          >
 				                            <div className="flex h-[45px] w-full items-center justify-center border-b border-slate-200">
 				                              <div className="group relative">
 				                                <button
@@ -9410,7 +10536,7 @@ function WorkspaceClient() {
 			        </div>
 			      </div>
 
-      {colorPickerOpen === "text" && typeof document !== "undefined"
+      {colorPickerOpen && typeof document !== "undefined"
         ? createPortal(
             <div
               ref={highlightPopoverRef}
@@ -9423,24 +10549,32 @@ function WorkspaceClient() {
                 pointerEvents: highlightPopoverPosition ? "auto" : "none",
               }}
             >
-              <div className="sr-only">Text color</div>
-              <button
-                type="button"
-                className="mb-2 mt-0 flex w-full items-center gap-2 rounded-md px-1 py-1.5 text-left text-base font-semibold text-slate-900 transition hover:bg-slate-100"
-                onMouseDown={(event) => {
-                  event.preventDefault();
-                  keepTextEditingActive(event);
-                }}
-                onClick={() => {
-                  applyTextColor("#111827");
-                  setColorPickerDraft("#111827");
-                  setColorPickerOpen(null);
-                  restoreTextSelectionSoon();
-                }}
-              >
-                <DropletOff className="h-5 w-5 text-slate-900" />
-                <span>None</span>
-              </button>
+              <div className="sr-only">
+                {isTextColorPicker ? "Text color" : isShapeBorderPicker ? "Border color" : "Fill color"}
+              </div>
+              {isTextColorPicker ? (
+                <button
+                  type="button"
+                  className="mb-2 mt-0 flex w-full items-center gap-2 rounded-md px-1 py-1.5 text-left text-base font-semibold text-slate-900 transition hover:bg-slate-100"
+                  onMouseDown={handleColorPickerMouseDown}
+                  onClick={() => {
+                    applyColorFromPicker("#111827");
+                    setColorPickerDraft("#111827");
+                  }}
+                >
+                  <DropletOff className="h-5 w-5 text-slate-900" />
+                  <span>None</span>
+                </button>
+              ) : isShapeFillPicker ? (
+                <button
+                  type="button"
+                  className="mb-2 mt-0 flex w-full items-center gap-2 rounded-md px-1 py-1.5 text-left text-base font-semibold text-slate-900 transition hover:bg-slate-100"
+                  onClick={() => applyColorFromPicker(null)}
+                >
+                  <DropletOff className="h-5 w-5 text-slate-900" />
+                  <span>None / Clear fill</span>
+                </button>
+              ) : null}
               <div className="grid gap-[2px]">
                 {HIGHLIGHT_COLOR_ROWS.map((row, rowIndex) => (
                   <div key={`row-${rowIndex}`} className="flex items-center gap-[2px]">
@@ -9448,9 +10582,13 @@ function WorkspaceClient() {
                       if (!value) {
                         return <span key={`empty-${rowIndex}-${valueIndex}`} className="h-6 w-6" aria-hidden />;
                       }
-                      const selectedValue = selectionTextColorMixed
-                        ? ""
-                        : (activeTextColor ?? textColor).toLowerCase();
+                      const selectedValue = isTextColorPicker
+                        ? selectionTextColorMixed
+                          ? ""
+                          : (activeTextColor ?? textColor).toLowerCase()
+                        : isShapeBorderPicker
+                          ? (activeShapeBorderColor ?? "").toLowerCase()
+                          : (activeShapeFillColor ?? "").toLowerCase();
                       const isSelected = value.toLowerCase() === selectedValue;
                       const rgb = hexToRgb(value);
                       const luminance = rgb ? 0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b : 1;
@@ -9463,16 +10601,13 @@ function WorkspaceClient() {
                             isSelected ? "border-slate-300" : "border-slate-200 hover:border-slate-300"
                           }`}
                           style={{ backgroundColor: value }}
-                          onMouseDown={(event) => {
-                            event.preventDefault();
-                            keepTextEditingActive(event);
-                          }}
+                          onMouseDown={handleColorPickerMouseDown}
                           onClick={() => {
-                            applyTextColor(value);
-                            setColorPickerOpen(null);
-                            restoreTextSelectionSoon();
+                            applyColorFromPicker(value);
                           }}
-                          aria-label={`Text color ${value}`}
+                          aria-label={`${
+                            isTextColorPicker ? "Text" : isShapeBorderPicker ? "Border" : "Fill"
+                          } color ${value}`}
                         >
                           {isSelected ? (
                             <svg className="h-4 w-4" viewBox="0 0 20 20" aria-hidden="true">
@@ -9499,7 +10634,7 @@ function WorkspaceClient() {
                 <button
                   type="button"
                   className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:border-slate-300 hover:text-slate-800"
-                  onMouseDown={keepTextEditingActive}
+                  onMouseDown={handleColorPickerMouseDown}
                   onClick={() => setHighlightCustomOpen((prev) => !prev)}
                   onMouseEnter={(event) => showToolbarTooltip("Add a custom color", event.currentTarget)}
                   onMouseLeave={hideToolbarTooltip}
@@ -9510,8 +10645,16 @@ function WorkspaceClient() {
                 <button
                   type="button"
                   className="flex h-7 w-7 items-center justify-center text-slate-600 transition hover:text-slate-800"
-                  onMouseDown={keepTextEditingActive}
-                  onClick={pickHighlightColorFromScreen}
+                  onMouseDown={handleColorPickerMouseDown}
+                  onClick={() => {
+                    const target =
+                      colorPickerOpen === "shape-border"
+                        ? "shape-border"
+                        : colorPickerOpen === "shape-fill"
+                          ? "shape-fill"
+                          : "text";
+                    pickColorFromScreen(target);
+                  }}
                   onMouseEnter={(event) => showToolbarTooltip("Pick a custom color", event.currentTarget)}
                   onMouseLeave={hideToolbarTooltip}
                   aria-label="Pick color from screen"
@@ -9519,6 +10662,26 @@ function WorkspaceClient() {
                   <Pipette className="h-4 w-4" />
                 </button>
               </div>
+              {customTextColors.length ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {customTextColors.map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 transition hover:border-slate-300"
+                      style={{ backgroundColor: value }}
+                      onMouseDown={handleColorPickerMouseDown}
+                      onClick={() => {
+                        applyColorFromPicker(value);
+                        setColorPickerDraft(value);
+                      }}
+                      aria-label={`Custom ${
+                        isTextColorPicker ? "text" : isShapeBorderPicker ? "border" : "fill"
+                      } color ${value}`}
+                    />
+                  ))}
+                </div>
+              ) : null}
               {highlightCustomOpen ? (
                 <div className="mt-3 space-y-3 rounded-md border border-slate-200 p-2">
                   <div
@@ -9616,19 +10779,18 @@ function WorkspaceClient() {
                   <button
                     type="button"
                     className="rounded-md border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-800"
-                    onMouseDown={keepTextEditingActive}
-                    onClick={() => setColorPickerOpen(null)}
+                    onMouseDown={handleColorPickerMouseDown}
+                    onClick={() => setHighlightCustomOpen(false)}
                   >
                     Cancel
                   </button>
                   <button
                     type="button"
                     className="rounded-md bg-[#024d7c] px-4 py-1.5 text-sm font-semibold text-white shadow-md shadow-[#012a44]/25 transition hover:bg-[#013d63]"
-                    onMouseDown={keepTextEditingActive}
+                    onMouseDown={handleColorPickerMouseDown}
                     onClick={() => {
-                      applyTextColor(colorPickerDraft);
-                      setColorPickerOpen(null);
-                      restoreTextSelectionSoon();
+                      addCustomTextColor(colorPickerDraft);
+                      applyColorFromPicker(colorPickerDraft);
                     }}
                   >
                     Apply
@@ -9706,18 +10868,27 @@ function WorkspaceClient() {
         .tools-scroll {
           scrollbar-width: none;
         }
-        [data-text-annotation] span {
+        [data-text-annotation] [contenteditable] span {
           display: inline;
           white-space: inherit;
           word-break: inherit;
           overflow-wrap: inherit;
           line-height: inherit;
         }
-        [data-text-annotation] [style*="line-through"] {
-          text-decoration-line: line-through;
-          text-decoration-thickness: clamp(0.06em, 0.08em, 0.12em);
-          text-decoration-color: currentColor;
-          text-decoration-skip-ink: none;
+        [data-text-annotation] [contenteditable] * {
+          line-height: inherit !important;
+        }
+        [data-text-annotation] ul,
+        [data-text-annotation] ol {
+          list-style-position: outside;
+          padding-left: 1.4em;
+          margin: 0.1em 0;
+        }
+        [data-text-annotation] ul {
+          list-style-type: disc;
+        }
+        [data-text-annotation] ol {
+          list-style-type: decimal;
         }
         /* Make scrollbar gutters/tracks white across Studio */
         body.studio-page * {
