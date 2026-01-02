@@ -1034,8 +1034,9 @@ function splitRunsIntoLines(runs: RichTextRun[]) {
 
 function smoothStrokePoints(points: Point[], tool: Exclude<DrawingTool, "text">): Point[] {
   if (points.length < 3) return points;
-  const baseIterations = 1;
-  const iterations = points.length > 180 ? 1 : baseIterations;
+  const isPen = tool === "pen" || tool === "pencil";
+  const baseIterations = isPen ? 4 : 1;
+  const iterations = points.length > 400 ? 1 : baseIterations;
 
   const segments: Point[][] = [];
   let currentSegment: Point[] = [];
@@ -1141,6 +1142,7 @@ function shapeToSvgElements(
     fill?: string | null;
     fillOpacity?: number;
     interactiveProps?: SVGProps<SVGElement>;
+    vectorEffect?: "non-scaling-stroke";
   }
 ) {
   const strokeOpacity = opts.strokeOpacity ?? 1;
@@ -1151,6 +1153,7 @@ function shapeToSvgElements(
     fill: "none" as const,
     strokeLinecap: "round" as const,
     strokeLinejoin: "round" as const,
+    vectorEffect: opts.vectorEffect,
   };
   const fill = opts.fill ?? "none";
   const fillOpacity = opts.fillOpacity ?? 1;
@@ -1242,9 +1245,9 @@ function shapeToSvgElements(
         </g>
       );
     case "check": {
-      const p1 = { x: minXPx + wPx * 0.18, y: minYPx + hPx * 0.55 };
-      const p2 = { x: minXPx + wPx * 0.42, y: minYPx + hPx * 0.78 };
-      const p3 = { x: minXPx + wPx * 0.82, y: minYPx + hPx * 0.26 };
+      const p1 = { x: minXPx + wPx * 0.0, y: minYPx + hPx * 0.62 };
+      const p2 = { x: minXPx + wPx * 0.32, y: minYPx + hPx * 0.9 };
+      const p3 = { x: minXPx + wPx * 1.0, y: minYPx + hPx * 0.12 };
       return (
         <polyline
           points={`${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y}`}
@@ -1564,9 +1567,12 @@ function WorkspaceClient() {
   const [penMode, setPenMode] = useState(false);
   const [penThickness, setPenThickness] = useState(3);
   const [penColor, setPenColor] = useState(PEN_COLOR);
+  const [penOpacity, setPenOpacity] = useState(1);
+  const [penThicknessInput, setPenThicknessInput] = useState("3");
+  const [penOpacityInput, setPenOpacityInput] = useState("100");
   const [selectMode, setSelectMode] = useState(true);
   const [shapeMode, setShapeMode] = useState(false);
-  const [shapeType, setShapeType] = useState<ShapeType>("arrow");
+  const [shapeType, setShapeType] = useState<ShapeType | null>(null);
   const [shapeThickness, setShapeThickness] = useState(3);
   const [shapeColor, setShapeColor] = useState(PEN_COLOR);
   const [shapeFillColor, setShapeFillColor] = useState<string | null>(null);
@@ -1674,10 +1680,36 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     offsetX: number;
     offsetY: number;
   } | null>(null);
+  const [resizingShape, setResizingShape] = useState<{
+    pageId: string;
+    id: string;
+    handle:
+      | "nw"
+      | "ne"
+      | "sw"
+      | "se"
+      | "n"
+      | "s"
+      | "e"
+      | "w"
+      | "start"
+      | "end"
+      | "tri-top"
+      | "tri-left"
+      | "tri-right";
+    pointerId: number;
+  } | null>(null);
   const shapeDragCleanupRef = useRef<(() => void) | null>(null);
   const shapeDragRafRef = useRef<number | null>(null);
   const shapeDragLatestPointRef = useRef<Point | null>(null);
   const shapeDragLatestShapeRef = useRef<{ start: Point; end: Point } | null>(null);
+  const shapeResizeCleanupRef = useRef<(() => void) | null>(null);
+  const shapeResizeRafRef = useRef<number | null>(null);
+  const shapeResizeLatestRef = useRef<{ start: Point; end: Point } | null>(null);
+  const shapeRenderNodeMap = useRef<Map<string, SVGGElement>>(new Map());
+  const shapeHitNodeMap = useRef<Map<string, SVGGElement>>(new Map());
+  const shapeIndicatorNodeMap = useRef<Map<string, HTMLDivElement>>(new Map());
+  const shapeHandleNodeMap = useRef<Map<string, HTMLDivElement>>(new Map());
   const [draftShape, setDraftShape] = useState<{
     pageId: string;
     type: ShapeType;
@@ -1733,11 +1765,14 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   const lineSpacingMenuRef = useRef<HTMLDivElement | null>(null);
   const lineSpacingMenuButtonRef = useRef<HTMLButtonElement | null>(null);
   const [lineSpacingMenuPosition, setLineSpacingMenuPosition] = useState<{ left: number; top: number } | null>(null);
-  const [colorPickerOpen, setColorPickerOpen] = useState<"text" | "shape-border" | "shape-fill" | null>(null);
+  const [colorPickerOpen, setColorPickerOpen] = useState<
+    "text" | "shape-border" | "shape-fill" | "pen" | null
+  >(null);
   const [colorPickerDraft, setColorPickerDraft] = useState("#111827");
   const textColorButtonRef = useRef<HTMLButtonElement | null>(null);
   const shapeBorderColorButtonRef = useRef<HTMLButtonElement | null>(null);
   const shapeFillColorButtonRef = useRef<HTMLButtonElement | null>(null);
+  const penColorButtonRef = useRef<HTMLButtonElement | null>(null);
   const highlightPopoverRef = useRef<HTMLDivElement | null>(null);
   const [highlightPopoverPosition, setHighlightPopoverPosition] = useState<{ left: number; top: number } | null>(null);
   const [highlightCustomOpen, setHighlightCustomOpen] = useState(false);
@@ -1788,9 +1823,12 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   }, [focusedShapeId, focusedShapePageId, shapesByPage]);
   const activeShapeBorderColor = focusedShape?.color ?? shapeColor;
   const activeShapeFillColor = focusedShape?.fillColor ?? shapeFillColor;
+  const resolvedShapeBorderColor = activeShapeBorderColor ?? textColor;
+  const resolvedShapeFillColor = activeShapeFillColor ?? activeShapeBorderColor ?? textColor;
   const isTextColorPicker = colorPickerOpen === "text";
   const isShapeBorderPicker = colorPickerOpen === "shape-border";
   const isShapeFillPicker = colorPickerOpen === "shape-fill";
+  const isPenColorPicker = colorPickerOpen === "pen";
   const highlightCustomRgb = useMemo(() => {
     const rgb = hexToRgb(colorPickerDraft);
     if (!rgb) return { r: 0, g: 0, b: 0 };
@@ -1893,6 +1931,8 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   );
 
   function focusTextAnnotation(id: string) {
+    setFocusedShapeId(null);
+    setFocusedShapePageId(null);
     setFocusedTextId(id);
     setActiveTextContainerId(id);
     const node = textNodeRefs.current.get(id);
@@ -2722,7 +2762,14 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
 
       const shape = shapesByPage[pageId]?.find((item) => item.id === shapeId);
       if (!shape) return;
-      const startPoint = getPageNormalizedPoint(pageId, startEvent.clientX, startEvent.clientY);
+      const pageNode = previewNodeMap.current.get(pageId);
+      const rect = pageNode?.getBoundingClientRect();
+      if (!rect?.width || !rect.height) return;
+      const getPoint = (clientX: number, clientY: number) => ({
+        x: clamp((clientX - rect.left) / rect.width, 0, 1),
+        y: clamp((clientY - rect.top) / rect.height, 0, 1),
+      });
+      const startPoint = getPoint(startEvent.clientX, startEvent.clientY);
       if (!startPoint) return;
 
       shapeDragCleanupRef.current?.();
@@ -2733,35 +2780,37 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         start: { ...shape.start },
         end: { ...shape.end },
       };
+      const renderNode = shapeRenderNodeMap.current.get(shapeId);
+      const hitNode = shapeHitNodeMap.current.get(shapeId);
       const pointerId = startEvent.pointerId;
 
       const handleMove = (event: PointerEvent) => {
         if (event.pointerId !== pointerId) return;
-        const point = getPageNormalizedPoint(pageId, event.clientX, event.clientY);
+        const point = getPoint(event.clientX, event.clientY);
         if (!point) return;
-        shapeDragLatestPointRef.current = point;
-        if (shapeDragRafRef.current !== null) return;
-        shapeDragRafRef.current = window.requestAnimationFrame(() => {
-          shapeDragRafRef.current = null;
-          const latestPoint = shapeDragLatestPointRef.current;
-          if (!latestPoint) return;
-          const nextMinX = clamp(latestPoint.x - offsetX, 0, 1 - w);
-          const nextMinY = clamp(latestPoint.y - offsetY, 0, 1 - h);
-          const deltaX = nextMinX - minX;
-          const deltaY = nextMinY - minY;
-          const nextShape = {
-            start: { x: startShape.start.x + deltaX, y: startShape.start.y + deltaY },
-            end: { x: startShape.end.x + deltaX, y: startShape.end.y + deltaY },
-          };
-          shapeDragLatestShapeRef.current = nextShape;
-          setShapesByPage((prev) => {
-            const list = prev[pageId] ?? [];
-            const updated = list.map((item) =>
-              item.id === shapeId ? { ...item, start: nextShape.start, end: nextShape.end } : item
-            );
-            return { ...prev, [pageId]: updated };
-          });
-        });
+        const nextMinX = clamp(point.x - offsetX, 0, 1 - w);
+        const nextMinY = clamp(point.y - offsetY, 0, 1 - h);
+        const deltaX = nextMinX - minX;
+        const deltaY = nextMinY - minY;
+        const nextShape = {
+          start: { x: startShape.start.x + deltaX, y: startShape.start.y + deltaY },
+          end: { x: startShape.end.x + deltaX, y: startShape.end.y + deltaY },
+        };
+        shapeDragLatestShapeRef.current = nextShape;
+        const translateX = deltaX * 1000;
+        const translateY = deltaY * 1000;
+        if (renderNode) {
+          renderNode.setAttribute("transform", `translate(${translateX} ${translateY})`);
+        }
+        if (hitNode) {
+          hitNode.setAttribute("transform", `translate(${translateX} ${translateY})`);
+        }
+        const indicatorNode = shapeIndicatorNodeMap.current.get(shapeId);
+        if (indicatorNode) {
+          indicatorNode.style.left = `${(nextMinX + w / 2) * 100}%`;
+          indicatorNode.style.top = `${nextMinY * 100}%`;
+          indicatorNode.style.transform = "translate(-50%, -2.5rem)";
+        }
       };
 
       function cleanup() {
@@ -2775,6 +2824,12 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         }
         shapeDragLatestPointRef.current = null;
         shapeDragLatestShapeRef.current = null;
+        if (renderNode) {
+          renderNode.removeAttribute("transform");
+        }
+        if (hitNode) {
+          hitNode.removeAttribute("transform");
+        }
       }
 
       function handleUp() {
@@ -2788,6 +2843,12 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
             return { ...prev, [pageId]: updated };
           });
         }
+        if (renderNode) {
+          renderNode.removeAttribute("transform");
+        }
+        if (hitNode) {
+          hitNode.removeAttribute("transform");
+        }
         setDraggingShape(null);
         cleanup();
       }
@@ -2799,7 +2860,236 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       shapeDragCleanupRef.current = cleanup;
       setDraggingShape({ pageId, id: shapeId, offsetX, offsetY });
     },
-    [getPageNormalizedPoint, shapesByPage]
+    [shapesByPage]
+  );
+
+  const startShapeResize = useCallback(
+    (
+      pageId: string,
+      shapeId: string,
+      handle:
+        | "nw"
+        | "ne"
+        | "sw"
+        | "se"
+        | "n"
+        | "s"
+        | "e"
+        | "w"
+        | "start"
+        | "end"
+        | "tri-top"
+        | "tri-left"
+        | "tri-right",
+      startEvent: ReactPointerEvent<HTMLDivElement>
+    ) => {
+      if (startEvent.button !== 0 && startEvent.pointerType !== "touch") return;
+      startEvent.preventDefault();
+      startEvent.stopPropagation();
+      const shape = shapesByPage[pageId]?.find((item) => item.id === shapeId);
+      if (!shape) return;
+      const pageNode = previewNodeMap.current.get(pageId);
+      const rect = pageNode?.getBoundingClientRect();
+      if (!rect?.width || !rect.height) return;
+      const getPoint = (clientX: number, clientY: number) => ({
+        x: clamp((clientX - rect.left) / rect.width, 0, 1),
+        y: clamp((clientY - rect.top) / rect.height, 0, 1),
+      });
+      const startPoint = getPoint(startEvent.clientX, startEvent.clientY);
+      if (!startPoint) return;
+      const pointerId = startEvent.pointerId;
+      const startShape = { start: { ...shape.start }, end: { ...shape.end } };
+      const bounds = shapeBounds(startShape);
+      const minSize = 0.01;
+      const renderNode = shapeRenderNodeMap.current.get(shapeId);
+      const hitNode = shapeHitNodeMap.current.get(shapeId);
+
+      shapeResizeCleanupRef.current?.();
+      const handleMove = (event: PointerEvent) => {
+        if (event.pointerId !== pointerId) return;
+        const point = getPoint(event.clientX, event.clientY);
+        if (!point) return;
+
+        let nextStart = { ...startShape.start };
+        let nextEnd = { ...startShape.end };
+
+        const deltaX = point.x - startPoint.x;
+        const deltaY = point.y - startPoint.y;
+
+        if (handle === "start") {
+          nextStart = {
+            x: clamp(startShape.start.x + deltaX, 0, 1),
+            y: clamp(startShape.start.y + deltaY, 0, 1),
+          };
+        } else if (handle === "end") {
+          nextEnd = {
+            x: clamp(startShape.end.x + deltaX, 0, 1),
+            y: clamp(startShape.end.y + deltaY, 0, 1),
+          };
+        } else {
+          let nextMinX = bounds.minX;
+          let nextMaxX = bounds.maxX;
+          let nextMinY = bounds.minY;
+          let nextMaxY = bounds.maxY;
+
+          if (handle === "nw") {
+            nextMinX = clamp(bounds.minX + deltaX, 0, bounds.maxX - minSize);
+            nextMinY = clamp(bounds.minY + deltaY, 0, bounds.maxY - minSize);
+          } else if (handle === "ne") {
+            nextMaxX = clamp(bounds.maxX + deltaX, bounds.minX + minSize, 1);
+            nextMinY = clamp(bounds.minY + deltaY, 0, bounds.maxY - minSize);
+          } else if (handle === "sw") {
+            nextMinX = clamp(bounds.minX + deltaX, 0, bounds.maxX - minSize);
+            nextMaxY = clamp(bounds.maxY + deltaY, bounds.minY + minSize, 1);
+          } else if (handle === "se") {
+            nextMaxX = clamp(bounds.maxX + deltaX, bounds.minX + minSize, 1);
+            nextMaxY = clamp(bounds.maxY + deltaY, bounds.minY + minSize, 1);
+          } else if (handle === "n" || handle === "tri-top") {
+            nextMinY = clamp(bounds.minY + deltaY, 0, bounds.maxY - minSize);
+          } else if (handle === "s") {
+            nextMaxY = clamp(bounds.maxY + deltaY, bounds.minY + minSize, 1);
+          } else if (handle === "w" || handle === "tri-left") {
+            nextMinX = clamp(bounds.minX + deltaX, 0, bounds.maxX - minSize);
+          } else if (handle === "e" || handle === "tri-right") {
+            nextMaxX = clamp(bounds.maxX + deltaX, bounds.minX + minSize, 1);
+          }
+
+          nextStart = { x: nextMinX, y: nextMinY };
+          nextEnd = { x: nextMaxX, y: nextMaxY };
+        }
+
+        shapeResizeLatestRef.current = { start: nextStart, end: nextEnd };
+        const nextBounds = shapeBounds({ start: nextStart, end: nextEnd });
+        let transform = "";
+        if (shape.type === "line" || shape.type === "arrow") {
+          const startVec = {
+            x: startShape.end.x - startShape.start.x,
+            y: startShape.end.y - startShape.start.y,
+          };
+          const nextVec = { x: nextEnd.x - nextStart.x, y: nextEnd.y - nextStart.y };
+          const startLen = Math.hypot(startVec.x, startVec.y) || 1e-6;
+          const nextLen = Math.hypot(nextVec.x, nextVec.y);
+          const scale = nextLen / startLen;
+          const angle = Math.atan2(nextVec.y, nextVec.x) - Math.atan2(startVec.y, startVec.x);
+          const deg = (angle * 180) / Math.PI;
+          const sx = startShape.start.x * 1000;
+          const sy = startShape.start.y * 1000;
+          const tx = nextStart.x * 1000;
+          const ty = nextStart.y * 1000;
+          transform = `translate(${tx} ${ty}) rotate(${deg}) scale(${scale}) translate(${-sx} ${-sy})`;
+        } else {
+          const startW = Math.max(1e-6, bounds.w);
+          const startH = Math.max(1e-6, bounds.h);
+          const scaleX = nextBounds.w / startW;
+          const scaleY = nextBounds.h / startH;
+          const sx = bounds.minX * 1000;
+          const sy = bounds.minY * 1000;
+          const tx = nextBounds.minX * 1000;
+          const ty = nextBounds.minY * 1000;
+          transform = `translate(${tx} ${ty}) scale(${scaleX} ${scaleY}) translate(${-sx} ${-sy})`;
+        }
+        if (renderNode) {
+          renderNode.setAttribute("transform", transform);
+        }
+        if (hitNode) {
+          hitNode.setAttribute("transform", transform);
+        }
+        const boxWidth = clamp(nextBounds.w, 0, 1);
+        const boxHeight = clamp(nextBounds.h, 0, 1);
+        const boxLeft = clamp(nextBounds.minX, 0, 1 - boxWidth);
+        const boxTop = clamp(nextBounds.minY, 0, 1 - boxHeight);
+        const startRelX = clamp((nextStart.x - boxLeft) / boxWidth, 0, 1);
+        const startRelY = clamp((nextStart.y - boxTop) / boxHeight, 0, 1);
+        const endRelX = clamp((nextEnd.x - boxLeft) / boxWidth, 0, 1);
+        const endRelY = clamp((nextEnd.y - boxTop) / boxHeight, 0, 1);
+        const handles: Array<{ key: string; x: number; y: number }> =
+          shape.type === "line" || shape.type === "arrow"
+            ? [
+                { key: "start", x: startRelX, y: startRelY },
+                { key: "end", x: endRelX, y: endRelY },
+              ]
+            : shape.type === "ellipse"
+              ? [
+                  { key: "n", x: 0.5, y: 0 },
+                  { key: "s", x: 0.5, y: 1 },
+                  { key: "w", x: 0, y: 0.5 },
+                  { key: "e", x: 1, y: 0.5 },
+                ]
+              : shape.type === "triangle"
+                ? [
+                    { key: "top", x: 0.5, y: 0 },
+                    { key: "left", x: 0, y: 1 },
+                    { key: "right", x: 1, y: 1 },
+                  ]
+                : shape.type === "check"
+                  ? [
+                      { key: "p1", x: 0.0, y: 0.62 },
+                      { key: "p2", x: 0.32, y: 0.9 },
+                      { key: "p3", x: 1.0, y: 0.12 },
+                    ]
+                  : [
+                      { key: "nw", x: 0, y: 0 },
+                      { key: "ne", x: 1, y: 0 },
+                      { key: "sw", x: 0, y: 1 },
+                      { key: "se", x: 1, y: 1 },
+                    ];
+        handles.forEach((handleDef) => {
+          const node = shapeHandleNodeMap.current.get(`${shapeId}:${handleDef.key}`);
+          if (!node) return;
+          node.style.left = `${(boxLeft + boxWidth * handleDef.x) * 100}%`;
+          node.style.top = `${(boxTop + boxHeight * handleDef.y) * 100}%`;
+        });
+      };
+
+      const handleUp = (event: PointerEvent) => {
+        if (event.pointerId !== pointerId) return;
+        const latest = shapeResizeLatestRef.current;
+        if (latest) {
+          setShapesByPage((prev) => {
+            const list = prev[pageId] ?? [];
+            const updated = list.map((item) =>
+              item.id === shapeId ? { ...item, start: latest.start, end: latest.end } : item
+            );
+            return { ...prev, [pageId]: updated };
+          });
+        }
+        setFocusedShapeId(shapeId);
+        setFocusedShapePageId(pageId);
+        if (renderNode) {
+          renderNode.removeAttribute("transform");
+        }
+        if (hitNode) {
+          hitNode.removeAttribute("transform");
+        }
+        cleanup();
+      };
+
+      function cleanup() {
+        window.removeEventListener("pointermove", handleMove);
+        window.removeEventListener("pointerup", handleUp);
+        window.removeEventListener("pointercancel", handleUp);
+        shapeResizeCleanupRef.current = null;
+        if (shapeResizeRafRef.current !== null) {
+          window.cancelAnimationFrame(shapeResizeRafRef.current);
+          shapeResizeRafRef.current = null;
+        }
+        shapeResizeLatestRef.current = null;
+        if (renderNode) {
+          renderNode.removeAttribute("transform");
+        }
+        if (hitNode) {
+          hitNode.removeAttribute("transform");
+        }
+        setResizingShape(null);
+      }
+
+      window.addEventListener("pointermove", handleMove);
+      window.addEventListener("pointerup", handleUp);
+      window.addEventListener("pointercancel", handleUp);
+      shapeResizeCleanupRef.current = cleanup;
+      setResizingShape({ pageId, id: shapeId, handle, pointerId });
+    },
+    [shapesByPage]
   );
 
   const startTextResize = useCallback(
@@ -3256,7 +3546,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
             });
             ctx.strokeStyle = stroke.color;
             const effectiveTool = stroke.tool === "pencil" ? "pen" : stroke.tool;
-            ctx.globalAlpha = effectiveTool === "highlight" ? stroke.opacity ?? 0.35 : 1;
+            ctx.globalAlpha = effectiveTool === "highlight" ? stroke.opacity ?? 0.35 : stroke.opacity ?? 1;
             const widthFactor = stroke.tool === "highlight" ? 1.2 : 1;
             ctx.lineWidth = Math.max(1, stroke.thickness * pageWidthPx * widthFactor);
             ctx.stroke();
@@ -3337,9 +3627,9 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                 drawLine(maxX, minY, minX, maxY);
                 break;
               case "check": {
-                const p1 = { x: minX + w * 0.18, y: minY + h * 0.55 };
-                const p2 = { x: minX + w * 0.42, y: minY + h * 0.78 };
-                const p3 = { x: minX + w * 0.82, y: minY + h * 0.26 };
+                const p1 = { x: minX + w * 0.0, y: minY + h * 0.62 };
+                const p2 = { x: minX + w * 0.32, y: minY + h * 0.9 };
+                const p3 = { x: minX + w * 1.0, y: minY + h * 0.12 };
                 drawLine(p1.x, p1.y, p2.x, p2.y);
                 drawLine(p2.x, p2.y, p3.x, p3.y);
                 break;
@@ -4333,6 +4623,51 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     };
   }
 
+  const registerShapeRenderNode = useCallback(
+    (id: string) => (node: SVGGElement | null) => {
+      if (node) {
+        shapeRenderNodeMap.current.set(id, node);
+      } else {
+        shapeRenderNodeMap.current.delete(id);
+      }
+    },
+    []
+  );
+
+  const registerShapeHitNode = useCallback(
+    (id: string) => (node: SVGGElement | null) => {
+      if (node) {
+        shapeHitNodeMap.current.set(id, node);
+      } else {
+        shapeHitNodeMap.current.delete(id);
+      }
+    },
+    []
+  );
+
+  const registerShapeIndicatorNode = useCallback(
+    (id: string) => (node: HTMLDivElement | null) => {
+      if (node) {
+        shapeIndicatorNodeMap.current.set(id, node);
+      } else {
+        shapeIndicatorNodeMap.current.delete(id);
+      }
+    },
+    []
+  );
+
+  const registerShapeHandleNode = useCallback(
+    (id: string, handleKey: string) => (node: HTMLDivElement | null) => {
+      const key = `${id}:${handleKey}`;
+      if (node) {
+        shapeHandleNodeMap.current.set(key, node);
+      } else {
+        shapeHandleNodeMap.current.delete(key);
+      }
+    },
+    []
+  );
+
 
   const renderPreviewPage = (page: PageItem, idx: number) => {
     const pageHighlights = highlights[page.id] ?? [];
@@ -4342,7 +4677,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     const rotationDegrees = normalizeRotation(page.rotation);
     const naturalWidth = page.width || 612;
     const naturalHeight = page.height || naturalWidth * DEFAULT_ASPECT_RATIO;
-    const effectiveScale = baseScale;
+    const effectiveScale = baseScale * zoomMultiplier;
     const contentWidth = naturalWidth * effectiveScale;
     const contentHeight = naturalHeight * effectiveScale;
     const rotated = rotationDegrees % 180 !== 0;
@@ -4602,7 +4937,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                   const isHighlight = effectiveTool === "highlight";
                   const cap = isHighlight ? "butt" : "round";
                   const join = isHighlight ? "miter" : "round";
-                  const opacity = isHighlight ? stroke.opacity ?? 0.35 : 1;
+                  const opacity = isHighlight ? stroke.opacity ?? 0.35 : stroke.opacity ?? 1;
                   const commonProps = {
                     d: pointsToSvgPath(stroke.points),
                     fill: "none" as const,
@@ -4642,15 +4977,22 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                 })}
 
                 {pageShapes.map((shape) => {
+                  const isDraggingThis = draggingShape?.id === shape.id;
+                  const isResizingThis = resizingShape?.id === shape.id;
                   const baseWidth = Math.max(1, shape.thickness * 1000);
                   return (
-                    <Fragment key={shape.id}>
+                    <g
+                      key={shape.id}
+                      ref={registerShapeRenderNode(shape.id)}
+                      style={isDraggingThis || isResizingThis ? { willChange: "transform" } : undefined}
+                    >
                       {shapeToSvgElements(shape, {
                         stroke: shape.color,
                         strokeWidth: baseWidth,
                         fill: shape.fillColor ?? "none",
+                        vectorEffect: isResizingThis ? "non-scaling-stroke" : undefined,
                       })}
-                    </Fragment>
+                    </g>
                   );
                 })}
 
@@ -4666,7 +5008,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                   const cap = isHighlight ? "butt" : "round";
                   const join = isHighlight ? "miter" : "round";
                   const style: CSSProperties = { mixBlendMode: isHighlight ? ("multiply" as any) : undefined };
-                  const opacity = isHighlight ? draftHighlight.opacity ?? 0.35 : 1;
+                  const opacity = isHighlight ? draftHighlight.opacity ?? 0.35 : draftHighlight.opacity ?? 1;
                   return (
                     <path
                       aria-hidden
@@ -4692,61 +5034,140 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                   </Fragment>
                 ) : null}
               </svg>
+              {!deleteMode && !draggingShape && !resizingShape ? (
+                <svg className="absolute inset-0 h-full w-full" viewBox="0 0 1000 1000" preserveAspectRatio="none">
+                  {pageShapes.map((shape) => {
+                    const baseWidth = Math.max(1, shape.thickness * 1000);
+                    const hitWidth = shape.fillColor
+                      ? baseWidth
+                      : baseWidth + (contentWidth ? (8 / contentWidth) * 1000 : 8);
+                    const hasFill =
+                      !!shape.fillColor &&
+                      (shape.type === "rect" || shape.type === "ellipse" || shape.type === "triangle");
+                    const hitProps: SVGProps<SVGElement> = {
+                      "data-shape-annotation": "true",
+                      style: { pointerEvents: hasFill ? ("fill" as const) : ("stroke" as const), cursor: "pointer" },
+                      onPointerDown: (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        clearTextFocus();
+                        setFocusedShapeId(shape.id);
+                        setFocusedShapePageId(page.id);
+                      },
+                    };
+                    return (
+                      <g key={`${shape.id}-select`} ref={registerShapeHitNode(shape.id)}>
+                        {shapeToSvgElements(shape, {
+                          stroke: "transparent",
+                          strokeWidth: hitWidth,
+                          fill: hasFill ? "transparent" : "none",
+                          fillOpacity: hasFill ? 0.01 : 1,
+                          interactiveProps: hitProps,
+                        })}
+                      </g>
+                    );
+                  })}
+                </svg>
+              ) : null}
               {pageShapes.map((shape) => {
                 const { minX, minY, w, h } = shapeBounds(shape);
-                const minBox = 0.02;
-                const boxWidth = Math.max(w, minBox);
-                const boxHeight = Math.max(h, minBox);
-                const extraX = (boxWidth - w) / 2;
-                const extraY = (boxHeight - h) / 2;
-                const boxLeft = clamp(minX - extraX, 0, 1 - boxWidth);
-                const boxTop = clamp(minY - extraY, 0, 1 - boxHeight);
+                const boxWidth = clamp(w, 0, 1);
+                const boxHeight = clamp(h, 0, 1);
+                const boxLeft = clamp(minX, 0, 1 - boxWidth);
+                const boxTop = clamp(minY, 0, 1 - boxHeight);
                 const isDraggingThis = draggingShape?.id === shape.id;
-                const showShapeActions = focusedShapeId === shape.id;
+                const isResizingThis = resizingShape?.id === shape.id;
+                const showShapeIndicator = focusedShapeId === shape.id && isDraggingThis;
+                const showShapeActions = focusedShapeId === shape.id && !isDraggingThis && !isResizingThis;
+                const showShapeHandles = (showShapeActions || isResizingThis) && !isDraggingThis;
+                const startRelX = clamp((shape.start.x - boxLeft) / boxWidth, 0, 1);
+                const startRelY = clamp((shape.start.y - boxTop) / boxHeight, 0, 1);
+                const endRelX = clamp((shape.end.x - boxLeft) / boxWidth, 0, 1);
+                const endRelY = clamp((shape.end.y - boxTop) / boxHeight, 0, 1);
+                const handleBaseClass =
+                  "pointer-events-auto absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-slate-500 bg-white shadow-sm transition hover:scale-110";
+                const handles: Array<{
+                  key: string;
+                  x: number;
+                  y: number;
+                  cursor: CSSProperties["cursor"];
+                  handle:
+                    | "nw"
+                    | "ne"
+                    | "sw"
+                    | "se"
+                    | "n"
+                    | "s"
+                    | "e"
+                    | "w"
+                    | "start"
+                    | "end"
+                    | "tri-top"
+                    | "tri-left"
+                    | "tri-right";
+                }> =
+                  shape.type === "line" || shape.type === "arrow"
+                    ? [
+                        { key: "start", x: startRelX, y: startRelY, cursor: "crosshair", handle: "start" },
+                        { key: "end", x: endRelX, y: endRelY, cursor: "crosshair", handle: "end" },
+                      ]
+                    : shape.type === "ellipse"
+                      ? [
+                          { key: "n", x: 0.5, y: 0, cursor: "ns-resize", handle: "n" },
+                          { key: "s", x: 0.5, y: 1, cursor: "ns-resize", handle: "s" },
+                          { key: "w", x: 0, y: 0.5, cursor: "ew-resize", handle: "w" },
+                          { key: "e", x: 1, y: 0.5, cursor: "ew-resize", handle: "e" },
+                        ]
+                      : shape.type === "triangle"
+                        ? [
+                            { key: "top", x: 0.5, y: 0, cursor: "ns-resize", handle: "tri-top" },
+                            { key: "left", x: 0, y: 1, cursor: "ew-resize", handle: "tri-left" },
+                            { key: "right", x: 1, y: 1, cursor: "ew-resize", handle: "tri-right" },
+                          ]
+                        : shape.type === "check"
+                          ? [
+                              { key: "p1", x: 0.0, y: 0.62, cursor: "nwse-resize", handle: "sw" },
+                              { key: "p2", x: 0.32, y: 0.9, cursor: "ns-resize", handle: "s" },
+                              { key: "p3", x: 1.0, y: 0.12, cursor: "nwse-resize", handle: "ne" },
+                            ]
+                          : [
+                              { key: "nw", x: 0, y: 0, cursor: "nwse-resize", handle: "nw" },
+                              { key: "ne", x: 1, y: 0, cursor: "nesw-resize", handle: "ne" },
+                              { key: "sw", x: 0, y: 1, cursor: "nesw-resize", handle: "sw" },
+                              { key: "se", x: 1, y: 1, cursor: "nwse-resize", handle: "se" },
+                            ];
+                const leftPercent = (boxLeft + boxWidth / 2) * 100;
+                const topPercent = boxTop * 100;
                 return (
-                  <div
-                    key={`shape-overlay-${shape.id}`}
-                    data-shape-annotation
-                    className="group absolute"
-                    style={{
-                      left: `${boxLeft * 100}%`,
-                      top: `${boxTop * 100}%`,
-                      width: `${boxWidth * 100}%`,
-                      height: `${boxHeight * 100}%`,
-                      pointerEvents: deleteMode ? "none" : "auto",
-                      cursor: deleteMode
-                        ? ("url('/icons/eraser.svg') 4 4, auto" as CSSProperties["cursor"])
-                        : "pointer",
-                    }}
-                    onPointerDown={(event) => {
-                      event.stopPropagation();
-                      if (deleteMode) {
-                        setIsErasing(true);
-                        return;
-                      }
-                      setFocusedShapeId(shape.id);
-                      setFocusedShapePageId(page.id);
-                    }}
-                  >
-                    {showShapeActions ? (
-                      isDraggingThis ? (
+                  <Fragment key={`shape-overlay-${shape.id}`}>
+                    {showShapeIndicator ? (
                         <div
-                          className="absolute flex h-7 w-7 items-center justify-center rounded-md border border-slate-300 bg-white/85 text-slate-700 shadow-sm"
-                          style={{ left: "50%", top: "-2.5rem", transform: "translateX(-50%)" }}
+                          className="absolute z-20 flex h-7 w-7 items-center justify-center rounded-md border border-slate-300 bg-white/85 text-slate-700 shadow-sm"
+                          data-shape-annotation
+                          ref={registerShapeIndicatorNode(shape.id)}
+                          style={{ left: `${leftPercent}%`, top: `${topPercent}%`, transform: "translate(-50%, -2.5rem)" }}
                         >
                           <span className="flex h-6 w-6 items-center justify-center rounded bg-slate-200/80">
                             <Move className="h-4 w-4" />
                           </span>
                         </div>
-                      ) : (
+                      ) : null}
+                    {showShapeActions ? (
                         <div
-                          className="absolute flex w-max items-center gap-0.5 rounded-lg border border-slate-300 bg-white/85 px-1 py-0.5 opacity-80 shadow-sm transition-opacity hover:opacity-100"
-                          style={{ left: "50%", top: "-2.5rem", transform: "translateX(-50%)" }}
+                          className="absolute z-20 flex w-max items-center gap-0.5 rounded-lg border border-slate-300 bg-white/85 px-1 py-0.5 opacity-80 shadow-sm transition-opacity hover:opacity-100"
+                          data-shape-annotation
+                          style={{ left: `${leftPercent}%`, top: `${topPercent}%`, transform: "translate(-50%, -2.5rem)" }}
+                          onPointerDown={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                          }}
                         >
                           <button
                             type="button"
                             className="flex h-7 w-7 items-center justify-center rounded-md text-slate-700 transition hover:bg-slate-200 hover:text-slate-900 active:translate-y-[1px]"
                             onPointerDown={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
                               setFocusedShapeId(shape.id);
                               setFocusedShapePageId(page.id);
                               startShapeDrag(page.id, shape.id, event);
@@ -4759,8 +5180,13 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                             type="button"
                             className="flex h-7 w-7 items-center justify-center rounded-md text-slate-700 transition hover:bg-slate-200 hover:text-slate-900 active:translate-y-[1px]"
                             onClick={(event) => {
+                              event.preventDefault();
                               event.stopPropagation();
                               duplicateShape(page.id, shape.id);
+                            }}
+                            onPointerDown={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
                             }}
                           >
                             <Copy className="h-4 w-4" />
@@ -4769,8 +5195,12 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                           <button
                             type="button"
                             className="flex h-7 w-7 items-center justify-center rounded-md text-rose-600 transition hover:bg-rose-50 hover:text-rose-700 active:translate-y-[1px]"
-                            onMouseDown={(event) => event.stopPropagation()}
+                            onPointerDown={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                            }}
                             onClick={(event) => {
+                              event.preventDefault();
                               event.stopPropagation();
                               handleDeleteShape(page.id, shape.id);
                             }}
@@ -4778,9 +5208,32 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
-                      )
                     ) : null}
-                  </div>
+                    {showShapeHandles && !deleteMode
+                      ? handles.map((handle) => {
+                          const handleLeft = (boxLeft + boxWidth * handle.x) * 100;
+                          const handleTop = (boxTop + boxHeight * handle.y) * 100;
+                          return (
+                            <div
+                              key={`${shape.id}-handle-${handle.key}`}
+                              className={`${handleBaseClass} z-20`}
+                              data-shape-annotation
+                              ref={registerShapeHandleNode(shape.id, handle.key)}
+                              style={{
+                                left: `${handleLeft}%`,
+                                top: `${handleTop}%`,
+                                cursor: handle.cursor,
+                              }}
+                              onPointerDown={(event) => {
+                                setFocusedShapeId(shape.id);
+                                setFocusedShapePageId(page.id);
+                                startShapeResize(page.id, shape.id, handle.handle, event);
+                              }}
+                            />
+                          );
+                        })
+                      : null}
+                  </Fragment>
                 );
               })}
               {draftTextBox && draftTextBox.pageId === page.id ? (() => {
@@ -6019,6 +6472,9 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       setHighlightMode(mode === "highlight");
       setPenMode(mode === "pen");
       setShapeMode(mode === "shapes");
+      if (mode === "shapes") {
+        setShapeType(null);
+      }
     },
     [clearToolPreviewTimer]
   );
@@ -6082,6 +6538,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   const applyTextColor = useCallback(
     (color: string) => {
       setTextColor(color);
+      setShapeColor(color);
       const applied = applyTextColorToSelection(color);
       if (!applied) {
         setPendingTextColor(color);
@@ -6094,6 +6551,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   const applyShapeBorderColor = useCallback(
     (color: string) => {
       setShapeColor(color);
+      setTextColor(color);
       if (!focusedShapeId || !focusedShapePageId) return;
       setShapesByPage((prev) => {
         const list = prev[focusedShapePageId] ?? [];
@@ -6121,6 +6579,14 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     (value: number) => clamp(Math.round(value), MIN_SHAPE_THICKNESS, MAX_SHAPE_THICKNESS),
     [MIN_SHAPE_THICKNESS, MAX_SHAPE_THICKNESS]
   );
+  const applyPenThickness = useCallback((value: number) => {
+    const normalized = clamp(Math.round(value), 1, 10);
+    setPenThickness(normalized);
+  }, []);
+  const applyPenOpacity = useCallback((value: number) => {
+    const normalized = clamp(value, 0.1, 1);
+    setPenOpacity(normalized);
+  }, []);
   const applyShapeThickness = useCallback(
     (value: number) => {
       const normalized = normalizeShapeThickness(value);
@@ -6129,7 +6595,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       const node = previewNodeMap.current.get(focusedShapePageId);
       const rect = node?.getBoundingClientRect();
       if (!rect?.width) return;
-      const normalizedThickness = normalized / rect.width;
+      const normalizedThickness = normalized / (rect.width / zoomMultiplier);
       setShapesByPage((prev) => {
         const list = prev[focusedShapePageId] ?? [];
         const updated = list.map((shape) =>
@@ -6138,22 +6604,25 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         return { ...prev, [focusedShapePageId]: updated };
       });
     },
-    [focusedShapeId, focusedShapePageId, normalizeShapeThickness]
+    [focusedShapeId, focusedShapePageId, normalizeShapeThickness, zoomMultiplier]
   );
   const resolvePickerColor = useCallback(
-    (target: "text" | "shape-border" | "shape-fill") => {
+    (target: "text" | "shape-border" | "shape-fill" | "pen") => {
       if (target === "text") {
         return selectionTextColorMixed ? textColor : activeTextColor ?? textColor;
       }
       if (target === "shape-border") {
         return activeShapeBorderColor ?? textColor;
       }
-      return activeShapeFillColor ?? activeShapeBorderColor ?? textColor;
+      if (target === "shape-fill") {
+        return activeShapeFillColor ?? activeShapeBorderColor ?? textColor;
+      }
+      return penColor;
     },
-    [activeShapeBorderColor, activeShapeFillColor, activeTextColor, selectionTextColorMixed, textColor]
+    [activeShapeBorderColor, activeShapeFillColor, activeTextColor, penColor, selectionTextColorMixed, textColor]
   );
   const openColorPickerFor = useCallback(
-    (target: "text" | "shape-border" | "shape-fill") => {
+    (target: "text" | "shape-border" | "shape-fill" | "pen") => {
       const current = resolvePickerColor(target);
       setColorPickerDraft(current || "#111827");
       setHighlightCustomOpen(false);
@@ -6161,7 +6630,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     },
     [resolvePickerColor]
   );
-  const pickColorFromScreen = useCallback(async (target: "text" | "shape-border" | "shape-fill") => {
+  const pickColorFromScreen = useCallback(async (target: "text" | "shape-border" | "shape-fill" | "pen") => {
     if (typeof window === "undefined") return;
     const EyeDropperCtor = (window as Window & { EyeDropper?: new () => { open: () => Promise<{ sRGBHex: string }> } })
       .EyeDropper;
@@ -6199,6 +6668,11 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       }
       if (colorPickerOpen === "shape-fill") {
         applyShapeFillColor(color);
+        setColorPickerOpen(null);
+        return;
+      }
+      if (colorPickerOpen === "pen" && color) {
+        setPenColor(color);
         setColorPickerOpen(null);
       }
     },
@@ -6356,6 +6830,20 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     );
   }, [shapeThickness]);
   useEffect(() => {
+    setPenThicknessInput((current) =>
+      document.activeElement?.getAttribute("aria-label") === "Stroke thickness"
+        ? current
+        : `${Math.round(penThickness)}`
+    );
+  }, [penThickness]);
+  useEffect(() => {
+    setPenOpacityInput((current) =>
+      document.activeElement?.getAttribute("aria-label") === "Stroke opacity"
+        ? current
+        : `${Math.round(penOpacity * 100)}`
+    );
+  }, [penOpacity]);
+  useEffect(() => {
     if (!focusedShapeId || !focusedShapePageId || !focusedShape) return;
     setShapeColor(focusedShape.color);
     setShapeFillColor(focusedShape.fillColor ?? null);
@@ -6363,12 +6851,12 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     const rect = node?.getBoundingClientRect();
     if (!rect?.width) return;
     const nextThickness = clamp(
-      Math.round(focusedShape.thickness * rect.width),
+      Math.round(focusedShape.thickness * (rect.width / zoomMultiplier)),
       MIN_SHAPE_THICKNESS,
       MAX_SHAPE_THICKNESS
     );
     setShapeThickness(nextThickness);
-  }, [focusedShape, focusedShapeId, focusedShapePageId, MAX_SHAPE_THICKNESS, MIN_SHAPE_THICKNESS]);
+  }, [focusedShape, focusedShapeId, focusedShapePageId, MAX_SHAPE_THICKNESS, MIN_SHAPE_THICKNESS, zoomMultiplier]);
   useEffect(() => {
     if (!focusedShapeId || focusedShape) return;
     setFocusedShapeId(null);
@@ -6613,6 +7101,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   }, [zoomPercent]);
 
   function handleShapePointerDown(pageId: string, event: ReactPointerEvent<HTMLDivElement>) {
+    if (!shapeType) return;
     const point = getPointerPoint(event, { requireInside: true, clampToBounds: true });
     if (!point) return;
     event.currentTarget.setPointerCapture?.(event.pointerId);
@@ -6623,7 +7112,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       end: { x: point.x, y: point.y },
       color: shapeColor,
       fillColor: shapeFillColor,
-      thickness: shapeThickness / point.rectWidth,
+      thickness: shapeThickness / (point.rectWidth / zoomMultiplier),
     });
     event.preventDefault();
   }
@@ -6658,6 +7147,8 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       list.push(shape);
       return { ...prev, [pageId]: list };
     });
+    setFocusedShapeId(shape.id);
+    setFocusedShapePageId(pageId);
     setHighlightHistory((prev) => [
       ...prev,
       { type: "addShape", pageId, shape: { ...shape, start: { ...shape.start }, end: { ...shape.end } } },
@@ -6711,11 +7202,8 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       tool,
       pageId,
       points: [{ x: point.x, y: point.y }],
-      color:
-        tool === "highlight"
-          ? HIGHLIGHT_COLORS[highlightColor]
-          : penColor,
-      opacity: tool === "highlight" ? highlightOpacity : 1,
+      color: tool === "highlight" ? HIGHLIGHT_COLORS[highlightColor] : penColor,
+      opacity: tool === "highlight" ? highlightOpacity : penOpacity,
       thickness: baseThickness / point.rectWidth,
     });
     event.preventDefault();
@@ -6778,13 +7266,13 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
           move: true,
         });
         nextPoints.push({ x: point.x, y: point.y });
-	      return {
-	        ...prev,
-	        points: nextPoints,
-	        thickness:
-	          (prev.tool === "highlight" ? highlightThickness : penThickness) / point.rectWidth,
-	      };
-	    });
+        return {
+          ...prev,
+          points: nextPoints,
+          thickness: (prev.tool === "highlight" ? highlightThickness : penThickness) / point.rectWidth,
+          opacity: prev.tool === "highlight" ? highlightOpacity : penOpacity,
+        };
+      });
     event.preventDefault();
     return;
   }
@@ -6792,17 +7280,18 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     setDraftHighlight((prev) => {
       if (!prev || prev.pageId !== pageId) return prev;
       const nextPoints = [...prev.points];
-      const last = nextPoints[nextPoints.length - 1];
-      if (!last || pointDistance(last, { x: point.x, y: point.y }) > 0.004) {
-        nextPoints.push({ x: point.x, y: point.y });
-      }
-	      return {
-	        ...prev,
-	        points: nextPoints,
-	        thickness:
-	          (prev.tool === "highlight" ? highlightThickness : penThickness) / point.rectWidth,
-	      };
-	    });
+    const last = nextPoints[nextPoints.length - 1];
+    const distanceThreshold = draftHighlight?.tool === "highlight" ? 0.004 : 0.0015;
+    if (!last || pointDistance(last, { x: point.x, y: point.y }) > distanceThreshold) {
+      nextPoints.push({ x: point.x, y: point.y });
+    }
+      return {
+        ...prev,
+        points: nextPoints,
+        thickness: (prev.tool === "highlight" ? highlightThickness : penThickness) / point.rectWidth,
+        opacity: prev.tool === "highlight" ? highlightOpacity : penOpacity,
+      };
+    });
     if (draftHighlight?.pageId === pageId) {
       event.preventDefault();
     }
@@ -7427,7 +7916,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
 	                tool === "highlight"
 	                  ? LineCapStyle.Butt
 	                  : LineCapStyle.Round;
-	              const baseOpacity = tool === "highlight" ? (stroke.opacity ?? 0.35) : 1;
+	              const baseOpacity = tool === "highlight" ? (stroke.opacity ?? 0.35) : stroke.opacity ?? 1;
 	              const widthFactor = tool === "highlight" ? 1.2 : 1;
 	              for (let i = 1; i < stroke.points.length; i++) {
 	                const start = stroke.points[i - 1];
@@ -7551,9 +8040,9 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
 	                  drawLineSegment({ x: maxX, y: minY }, { x: minX, y: maxY });
 	                  break;
                 case "check": {
-                  const p1 = { x: minX + w * 0.18, y: minY + h * 0.55 };
-                  const p2 = { x: minX + w * 0.42, y: minY + h * 0.78 };
-                  const p3 = { x: minX + w * 0.82, y: minY + h * 0.26 };
+                  const p1 = { x: minX + w * 0.0, y: minY + h * 0.62 };
+                  const p2 = { x: minX + w * 0.32, y: minY + h * 0.9 };
+                  const p3 = { x: minX + w * 1.0, y: minY + h * 0.12 };
                   drawLineSegment(p1, p2);
                   drawLineSegment(p2, p3);
                   break;
@@ -8055,13 +8544,20 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       setColorPickerOpen(null);
     }
   }, [colorPickerOpen, shapeMode]);
+  useEffect(() => {
+    if (!penMode && colorPickerOpen === "pen") {
+      setColorPickerOpen(null);
+    }
+  }, [colorPickerOpen, penMode]);
   const updateHighlightPopoverPosition = useCallback(() => {
     const button =
       colorPickerOpen === "shape-border"
         ? shapeBorderColorButtonRef.current
         : colorPickerOpen === "shape-fill"
           ? shapeFillColorButtonRef.current
-          : textColorButtonRef.current;
+          : colorPickerOpen === "pen"
+            ? penColorButtonRef.current
+            : textColorButtonRef.current;
     const popover = highlightPopoverRef.current;
     if (!button || !popover || typeof window === "undefined") return;
     const buttonRect = button.getBoundingClientRect();
@@ -8073,7 +8569,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       top = buttonRect.top - popoverRect.height - 8;
     }
     setHighlightPopoverPosition({ left, top });
-  }, []);
+  }, [colorPickerOpen]);
   useEffect(() => {
     if (!colorPickerOpen) {
       setHighlightPopoverPosition(null);
@@ -8096,7 +8592,8 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         highlightPopoverRef.current?.contains(event.target) ||
         textColorButtonRef.current?.contains(event.target) ||
         shapeBorderColorButtonRef.current?.contains(event.target) ||
-        shapeFillColorButtonRef.current?.contains(event.target)
+        shapeFillColorButtonRef.current?.contains(event.target) ||
+        penColorButtonRef.current?.contains(event.target)
       ) {
         return;
       }
@@ -8549,9 +9046,11 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
 	                    className={`${toolButtonBase} ${shapeButtonVisualOn ? toolButtonActive : toolButtonInactiveBlack}`}
 	                    onClick={() => {
 	                      if (highlightButtonDisabled) return;
+	                      clearTextFocus();
 	                      setSelectMode(false);
 	                      setDeleteMode(false);
 	                      setShapeMode(true);
+	                      setShapeType(null);
 	                      setPenMode(false);
 	                      setHighlightMode(false);
 	                      setTextMode(false);
@@ -8623,50 +9122,50 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
 
 	                  <div className="mx-1 h-6 w-px bg-slate-300/90" aria-hidden />
 
-	                  <button
-	                    type="button"
-	                    disabled={loading}
-	                    className={`${toolButtonBase} ${toolButtonInactiveBlack}`}
-	                    onClick={() => {
-	                      if (loading) return;
-	                      setSelectMode(false);
-	                      setDeleteMode(false);
-	                      setTextMode(true);
-	                      setPenMode(false);
-	                      setHighlightMode(false);
-	                      setShapeMode(false);
-	                      setDraftHighlight(null);
-	                      setDraftShape(null);
-	                      setDraftTextBox(null);
-	                      setShowSignatureHub(false);
-	                      setSignaturePanelMode("none");
-	                      setPendingSignatureForPlacement(null);
-	                      handleAddStickyNote();
-	                    }}
-	                  >
-	                    <Pin className="h-5 w-5 rotate-[45deg]" />
-	                    Note
-	                  </button>
-
-	                  <div className="mx-1 h-6 w-px bg-slate-300/90" aria-hidden />
-
-	                  <button
-	                    disabled={loading}
-	                    className={`${toolButtonBase} ${deleteMode ? toolButtonActive : toolButtonInactiveBlack}`}
-	                    onClick={handleToggleDeleteMode}
-	                    aria-pressed={deleteMode}
+                  <button
+                    disabled={loading}
+                    className={`${toolButtonBase} ${deleteMode ? toolButtonActive : toolButtonInactiveBlack}`}
+                    onClick={handleToggleDeleteMode}
+                    aria-pressed={deleteMode}
 	                    aria-disabled={!hasAnyAnnotations && !deleteMode}
 	                  >
-	                    <Eraser className="h-5 w-5" />
-	                    Eraser
-	                  </button>
+                    <Eraser className="h-5 w-5" />
+                    Eraser
+                  </button>
 
-	                  <div className="mx-1 h-6 w-px bg-slate-300/90" aria-hidden />
+                  <div className="mx-1 h-6 w-px bg-slate-300/90" aria-hidden />
 
-	                  <button
-	                    type="button"
-	                    disabled={loading}
-	                    aria-pressed={signatureButtonOn}
+                  <button
+                    type="button"
+                    disabled={loading}
+                    className={`${toolButtonBase} ${toolButtonInactiveBlack}`}
+                    onClick={() => {
+                      if (loading) return;
+                      setSelectMode(false);
+                      setDeleteMode(false);
+                      setTextMode(true);
+                      setPenMode(false);
+                      setHighlightMode(false);
+                      setShapeMode(false);
+                      setDraftHighlight(null);
+                      setDraftShape(null);
+                      setDraftTextBox(null);
+                      setShowSignatureHub(false);
+                      setSignaturePanelMode("none");
+                      setPendingSignatureForPlacement(null);
+                      handleAddStickyNote();
+                    }}
+                  >
+                    <Pin className="h-5 w-5 rotate-[45deg]" />
+                    Note
+                  </button>
+
+                  <div className="mx-1 h-6 w-px bg-slate-300/90" aria-hidden />
+
+                  <button
+                    type="button"
+                    disabled={loading}
+                    aria-pressed={signatureButtonOn}
 	                    className={`${toolButtonBase} ${signatureButtonOn ? toolButtonActive : toolButtonInactiveBlack}`}
 	                    onClick={() => {
 	                      if (loading) return;
@@ -8828,14 +9327,17 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                                                   key={item.type}
                                                   type="button"
                                                   onClick={() => setShapeType(item.type)}
-                                                  className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border transition ${
-                                                    selected
-                                                      ? "border-slate-200 bg-white text-slate-900 shadow-[0_6px_16px_rgba(15,23,42,0.10)]"
-                                                      : "border-transparent text-slate-600 hover:bg-white/80 hover:text-slate-900"
+                                                  aria-pressed={selected}
+                                                  className={`${textOptionButtonBase} ${
+                                                    selected ? textOptionButtonActive : textOptionButtonHover
                                                   }`}
+                                                  onMouseEnter={(event) =>
+                                                    showToolbarTooltip(item.label, event.currentTarget)
+                                                  }
+                                                  onMouseLeave={hideToolbarTooltip}
                                                   aria-label={item.label}
                                                 >
-                                                  <Icon className="h-4 w-4" aria-hidden />
+                                                  <Icon className="h-5 w-5" strokeWidth={2.2} aria-hidden />
                                                 </button>
                                               );
                                             })}
@@ -8846,7 +9348,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                                           <div className="flex items-center gap-1.5">
                                             {[
                                               { type: "check" as const, label: "Check", icon: Check },
-                                              { type: "x" as const, label: "X", icon: X },
+                                              { type: "x" as const, label: "Cross", icon: X },
                                             ].map((item) => {
                                               const Icon = item.icon;
                                               const selected = shapeType === item.type;
@@ -8855,14 +9357,17 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                                                   key={item.type}
                                                   type="button"
                                                   onClick={() => setShapeType(item.type)}
-                                                  className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border transition ${
-                                                    selected
-                                                      ? "border-slate-200 bg-white text-slate-900 shadow-[0_6px_16px_rgba(15,23,42,0.10)]"
-                                                      : "border-transparent text-slate-600 hover:bg-white/80 hover:text-slate-900"
+                                                  aria-pressed={selected}
+                                                  className={`${textOptionButtonBase} ${
+                                                    selected ? textOptionButtonActive : textOptionButtonHover
                                                   }`}
+                                                  onMouseEnter={(event) =>
+                                                    showToolbarTooltip(item.label, event.currentTarget)
+                                                  }
+                                                  onMouseLeave={hideToolbarTooltip}
                                                   aria-label={item.label}
                                                 >
-                                                  <Icon className="h-4 w-4" aria-hidden />
+                                                  <Icon className="h-5 w-5" strokeWidth={2.2} aria-hidden />
                                                 </button>
                                               );
                                             })}
@@ -8883,53 +9388,20 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                                                   key={item.type}
                                                   type="button"
                                                   onClick={() => setShapeType(item.type)}
-                                                  className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border transition ${
-                                                    selected
-                                                      ? "border-slate-200 bg-white text-slate-900 shadow-[0_6px_16px_rgba(15,23,42,0.10)]"
-                                                      : "border-transparent text-slate-600 hover:bg-white/80 hover:text-slate-900"
+                                                  aria-pressed={selected}
+                                                  className={`${textOptionButtonBase} ${
+                                                    selected ? textOptionButtonActive : textOptionButtonHover
                                                   }`}
+                                                  onMouseEnter={(event) =>
+                                                    showToolbarTooltip(item.label, event.currentTarget)
+                                                  }
+                                                  onMouseLeave={hideToolbarTooltip}
                                                   aria-label={item.label}
                                                 >
-                                                  <Icon className="h-4 w-4" aria-hidden />
+                                                  <Icon className="h-5 w-5" strokeWidth={2.2} aria-hidden />
                                                 </button>
                                               );
                                             })}
-                                          </div>
-
-                                          <div className="mx-1 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
-
-                                          <div className="flex items-center gap-2">
-                                            <span className="text-xs font-semibold text-slate-600">Border</span>
-                                            <button
-                                              type="button"
-                                              className="relative h-8 w-8 rounded-full border border-slate-200 bg-white shadow-sm"
-                                              onClick={() => openColorPickerFor("shape-border")}
-                                              aria-label="Border color"
-                                              ref={shapeBorderColorButtonRef}
-                                            >
-                                              <span
-                                                className="absolute inset-1 rounded-full"
-                                                style={{ backgroundColor: activeShapeBorderColor ?? "#111827" }}
-                                                aria-hidden
-                                              />
-                                            </button>
-                                          </div>
-
-                                          <div className="flex items-center gap-2">
-                                            <span className="text-xs font-semibold text-slate-600">Fill</span>
-                                            <button
-                                              type="button"
-                                              className="relative h-8 w-8 rounded-full border border-slate-200 bg-white shadow-sm"
-                                              onClick={() => openColorPickerFor("shape-fill")}
-                                              aria-label="Fill color"
-                                              ref={shapeFillColorButtonRef}
-                                            >
-                                              <span
-                                                className="absolute inset-1 rounded-full"
-                                                style={{ backgroundColor: activeShapeFillColor ?? "#ffffff" }}
-                                                aria-hidden
-                                              />
-                                            </button>
                                           </div>
 
                                           <div className="mx-1 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
@@ -9004,6 +9476,63 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                                               </button>
                                             </div>
                                           </div>
+
+                                          <div className="mx-1 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
+
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-xs font-semibold text-slate-600">Border</span>
+                                            <button
+                                              type="button"
+                                              className={`relative h-8 w-8 rounded-full border bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+                                                colorPickerOpen === "shape-border"
+                                                  ? "border-[#024d7c]"
+                                                  : "border-slate-200 hover:border-slate-300"
+                                              }`}
+                                              onClick={() => openColorPickerFor("shape-border")}
+                                              aria-label="Border color"
+                                              ref={shapeBorderColorButtonRef}
+                                            >
+                                              <span
+                                                className="absolute inset-[2px] rounded-full"
+                                                style={{ backgroundColor: resolvedShapeBorderColor ?? "#111827" }}
+                                                aria-hidden
+                                              />
+                                            </button>
+                                          </div>
+
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-xs font-semibold text-slate-600">Fill</span>
+                                            <button
+                                              type="button"
+                                              className={`relative h-8 w-8 rounded-full border bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+                                                colorPickerOpen === "shape-fill"
+                                                  ? "border-[#024d7c]"
+                                                  : "border-slate-200 hover:border-slate-300"
+                                              }`}
+                                              onClick={() => openColorPickerFor("shape-fill")}
+                                              aria-label="Fill color"
+                                              ref={shapeFillColorButtonRef}
+                                            >
+                                              <span
+                                                className={`absolute inset-[2px] rounded-full ${
+                                                  activeShapeFillColor ? "" : "bg-white"
+                                                }`}
+                                                style={
+                                                  activeShapeFillColor
+                                                    ? { backgroundColor: activeShapeFillColor }
+                                                    : {
+                                                        backgroundImage:
+                                                          "linear-gradient(45deg, rgba(148,163,184,0.6) 25%, transparent 25%), linear-gradient(-45deg, rgba(148,163,184,0.6) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, rgba(148,163,184,0.6) 75%), linear-gradient(-45deg, transparent 75%, rgba(148,163,184,0.6) 75%)",
+                                                        backgroundPosition: "0 0, 0 3px, 3px -3px, -3px 0px",
+                                                        backgroundSize: "6px 6px",
+                                                      }
+                                                }
+                                                aria-hidden
+                                              />
+                                            </button>
+                                          </div>
+
+                                          <div className="mx-1 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
                                         </div>
                                       ) : highlightMode ? (
                                         <div
@@ -9069,46 +9598,124 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                                         </div>
                                       ) : penMode ? (
                                         <div
-                                          className={`tools-scroll flex min-w-0 items-center gap-2 overflow-x-auto ${
+                                          className={`tools-scroll flex min-w-0 items-center gap-2 overflow-x-auto overflow-y-visible py-1 ${
                                             loading ? "pointer-events-none" : ""
                                           }`}
                                           aria-label="Draw options"
                                         >
-                                          <div className="flex items-center gap-2">
-                                            <span className="text-xs font-semibold text-slate-600">Color</span>
-                                            <label className="relative h-8 w-8 cursor-pointer rounded-full border border-slate-200 bg-white shadow-sm">
-                                              <span
-                                                className="absolute inset-1 rounded-full"
-                                                style={{ backgroundColor: penColor }}
-                                                aria-hidden
-                                              />
+                                          <div className="flex items-center">
+                                            <div className="inline-flex items-center gap-0 justify-start">
+                                              <button
+                                                type="button"
+                                                className="mr-2 flex h-7 w-7 items-center justify-center rounded text-slate-800 transition hover:bg-slate-100 hover:text-slate-900"
+                                                onClick={() => applyPenThickness(penThickness - 1)}
+                                                onMouseEnter={(event) =>
+                                                  showToolbarTooltip("Decrease stroke", event.currentTarget)
+                                                }
+                                                onMouseLeave={hideToolbarTooltip}
+                                                aria-label="Decrease thickness"
+                                              >
+                                                <Minus className="h-4 w-4" />
+                                              </button>
                                               <input
-                                                type="color"
-                                                value={penColor}
-                                                onChange={(event) => setPenColor(event.target.value)}
-                                                className="absolute inset-0 cursor-pointer opacity-0"
-                                                aria-label="Stroke color"
+                                                type="text"
+                                                maxLength={2}
+                                                inputMode="decimal"
+                                                value={penThicknessInput}
+                                                onChange={(event) => {
+                                                  const nextValue = event.target.value;
+                                                  setPenThicknessInput(nextValue);
+                                                }}
+                                                onKeyDown={(event) => {
+                                                  if (event.key === "Enter") {
+                                                    event.currentTarget.blur();
+                                                  }
+                                                }}
+                                                onBlur={() => {
+                                                  if (!penThicknessInput) {
+                                                    const fallback = 1;
+                                                    applyPenThickness(fallback);
+                                                    setPenThicknessInput(`${fallback}`);
+                                                    return;
+                                                  }
+                                                  const next = Number(penThicknessInput);
+                                                  if (Number.isNaN(next)) {
+                                                    setPenThicknessInput(`${Math.round(penThickness)}`);
+                                                    return;
+                                                  }
+                                                  const normalized = clamp(Math.round(next), 1, 10);
+                                                  applyPenThickness(normalized);
+                                                  setPenThicknessInput(`${normalized}`);
+                                                }}
+                                                onMouseEnter={(event) => showToolbarTooltip("Stroke", event.currentTarget)}
+                                                onMouseLeave={hideToolbarTooltip}
+                                                className="bg-transparent text-center text-sm font-semibold text-slate-800 outline-none rounded-md"
+                                                style={{
+                                                  border: "1px solid rgba(148, 163, 184, 0.7)",
+                                                  padding: "3px 5px",
+                                                  margin: "-3px -5px",
+                                                  width: "4ch",
+                                                  alignSelf: "center",
+                                                }}
+                                                aria-label="Stroke thickness"
                                               />
-                                            </label>
+                                              <button
+                                                type="button"
+                                                className="ml-2 flex h-7 w-7 items-center justify-center rounded text-slate-800 transition hover:bg-slate-100 hover:text-slate-900"
+                                                onClick={() => applyPenThickness(penThickness + 1)}
+                                                onMouseEnter={(event) =>
+                                                  showToolbarTooltip("Increase stroke", event.currentTarget)
+                                                }
+                                                onMouseLeave={hideToolbarTooltip}
+                                                aria-label="Increase thickness"
+                                              >
+                                                <Plus className="h-4 w-4" />
+                                              </button>
+                                            </div>
+                                          </div>
+
+                                          <div className="mx-1 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
+
+                                          <div className="flex items-center">
+                                            <div className="flex items-center gap-2">
+                                              <span className="text-xs font-semibold text-slate-600">Opacity</span>
+                                              <input
+                                                type="range"
+                                                min={10}
+                                                max={100}
+                                                step={5}
+                                                value={Math.round(penOpacity * 100)}
+                                                onChange={(event) => applyPenOpacity(Number(event.target.value) / 100)}
+                                                className="h-2 w-28 cursor-pointer accent-[#024d7c]"
+                                                aria-label="Stroke opacity"
+                                              />
+                                              <span className="w-12 text-right text-xs font-semibold tabular-nums text-slate-700">
+                                                {Math.round(penOpacity * 100)}%
+                                              </span>
+                                            </div>
                                           </div>
 
                                           <div className="mx-1 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
 
                                           <div className="flex items-center gap-2">
-                                            <span className="text-xs font-semibold text-slate-600">Thickness</span>
-                                            <input
-                                              type="range"
-                                              min={1}
-                                              max={10}
-                                              step={1}
-                                              value={penThickness}
-                                              onChange={(event) => setPenThickness(Number(event.target.value))}
-                                              className="h-2 w-28 cursor-pointer accent-[#024d7c]"
-                                              aria-label="Stroke thickness"
-                                            />
-                                            <span className="w-12 text-right text-xs font-semibold tabular-nums text-slate-700">
-                                              {Math.round(penThickness)}px
-                                            </span>
+                                            <span className="text-xs font-semibold text-slate-600">Color</span>
+                                            <button
+                                              type="button"
+                                              className={`relative h-8 w-8 rounded-full border bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+                                                colorPickerOpen === "pen"
+                                                  ? "border-[#024d7c]"
+                                                  : "border-slate-200 hover:border-slate-300"
+                                              }`}
+                                              onClick={() => openColorPickerFor("pen")}
+                                              aria-label="Stroke color"
+                                              ref={penColorButtonRef}
+                                            >
+                                              <span
+                                                className="absolute inset-[2px] rounded-full"
+                                                style={{ backgroundColor: penColor }}
+                                                aria-hidden
+                                              />
+                                            </button>
                                           </div>
                                         </div>
                                       ) : (
@@ -10551,8 +11158,15 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
               }}
             >
               <div className="sr-only">
-                {isTextColorPicker ? "Text color" : isShapeBorderPicker ? "Border color" : "Fill color"}
+                {isTextColorPicker
+                  ? "Text color"
+                  : isShapeBorderPicker
+                    ? "Border color"
+                    : isShapeFillPicker
+                      ? "Fill color"
+                      : "Stroke color"}
               </div>
+              {!isTextColorPicker ? null : null}
               {isTextColorPicker ? (
                 <button
                   type="button"
@@ -10569,10 +11183,10 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
               ) : isShapeFillPicker ? (
                 <button
                   type="button"
-                  className="mb-2 mt-0 flex w-full items-center gap-2 rounded-md px-1 py-1.5 text-left text-base font-semibold text-slate-900 transition hover:bg-slate-100"
+                  className="mb-2 mt-0 flex w-full items-center gap-2 rounded-md px-1 py-1.5 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
                   onClick={() => applyColorFromPicker(null)}
                 >
-                  <DropletOff className="h-5 w-5 text-slate-900" />
+                  <DropletOff className="h-4 w-4 text-slate-700" />
                   <span>None / Clear fill</span>
                 </button>
               ) : null}
@@ -10588,8 +11202,10 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                           ? ""
                           : (activeTextColor ?? textColor).toLowerCase()
                         : isShapeBorderPicker
-                          ? (activeShapeBorderColor ?? "").toLowerCase()
-                          : (activeShapeFillColor ?? "").toLowerCase();
+                          ? (resolvedShapeBorderColor ?? "").toLowerCase()
+                          : isShapeFillPicker
+                            ? (resolvedShapeFillColor ?? "").toLowerCase()
+                            : penColor.toLowerCase();
                       const isSelected = value.toLowerCase() === selectedValue;
                       const rgb = hexToRgb(value);
                       const luminance = rgb ? 0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b : 1;
@@ -10607,7 +11223,13 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                             applyColorFromPicker(value);
                           }}
                           aria-label={`${
-                            isTextColorPicker ? "Text" : isShapeBorderPicker ? "Border" : "Fill"
+                            isTextColorPicker
+                              ? "Text"
+                              : isShapeBorderPicker
+                                ? "Border"
+                                : isShapeFillPicker
+                                  ? "Fill"
+                                  : "Stroke"
                           } color ${value}`}
                         >
                           {isSelected ? (
@@ -10639,13 +11261,13 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                   onClick={() => setHighlightCustomOpen((prev) => !prev)}
                   onMouseEnter={(event) => showToolbarTooltip("Add a custom color", event.currentTarget)}
                   onMouseLeave={hideToolbarTooltip}
-                  aria-label="Custom text color"
+                  aria-label="Custom color"
                 >
                   <Plus className="h-4 w-4" />
                 </button>
                 <button
                   type="button"
-                  className="flex h-7 w-7 items-center justify-center text-slate-600 transition hover:text-slate-800"
+                  className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:border-slate-300 hover:text-slate-800"
                   onMouseDown={handleColorPickerMouseDown}
                   onClick={() => {
                     const target =
@@ -10653,7 +11275,9 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                         ? "shape-border"
                         : colorPickerOpen === "shape-fill"
                           ? "shape-fill"
-                          : "text";
+                          : colorPickerOpen === "pen"
+                            ? "pen"
+                            : "text";
                     pickColorFromScreen(target);
                   }}
                   onMouseEnter={(event) => showToolbarTooltip("Pick a custom color", event.currentTarget)}
@@ -10677,7 +11301,13 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                         setColorPickerDraft(value);
                       }}
                       aria-label={`Custom ${
-                        isTextColorPicker ? "text" : isShapeBorderPicker ? "border" : "fill"
+                        isTextColorPicker
+                          ? "text"
+                          : isShapeBorderPicker
+                            ? "border"
+                            : isShapeFillPicker
+                              ? "fill"
+                              : "stroke"
                       } color ${value}`}
                     />
                   ))}
