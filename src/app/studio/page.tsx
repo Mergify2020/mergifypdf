@@ -5044,7 +5044,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                     const hasFill =
                       !!shape.fillColor &&
                       (shape.type === "rect" || shape.type === "ellipse" || shape.type === "triangle");
-                    const hitProps: SVGProps<SVGElement> = {
+                    const hitProps: SVGProps<SVGElement> & { "data-shape-annotation"?: string } = {
                       "data-shape-annotation": "true",
                       style: { pointerEvents: hasFill ? ("fill" as const) : ("stroke" as const), cursor: "pointer" },
                       onPointerDown: (event) => {
