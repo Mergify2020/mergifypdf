@@ -1032,12 +1032,8 @@ function splitRunsIntoLines(runs: RichTextRun[]) {
   return lines;
 }
 
-function smoothStrokePoints(points: Point[], tool: Exclude<DrawingTool, "text">): Point[] {
-  if (points.length < 3) return points;
-  const isPen = tool === "pen" || tool === "pencil";
-  const baseIterations = isPen ? 4 : 1;
-  const iterations = points.length > 400 ? 1 : baseIterations;
-
+function smoothStrokePointsBase(points: Point[], iterations: number): Point[] {
+  if (points.length < 3 || iterations <= 0) return points;
   const segments: Point[][] = [];
   let currentSegment: Point[] = [];
   points.forEach((pt, idx) => {
@@ -1077,6 +1073,14 @@ function smoothStrokePoints(points: Point[], tool: Exclude<DrawingTool, "text">)
     });
   });
   return result;
+}
+
+function smoothStrokePoints(points: Point[], tool: Exclude<DrawingTool, "text">): Point[] {
+  if (points.length < 3) return points;
+  const isPen = tool === "pen" || tool === "pencil";
+  const baseIterations = isPen ? 5 : 1;
+  const iterations = points.length > 520 ? 2 : baseIterations;
+  return smoothStrokePointsBase(points, iterations);
 }
 
 function snapHighlightSegments(points: Point[]) {
@@ -1559,6 +1563,11 @@ function WorkspaceClient() {
   const pageNavigationLockRef = useRef<{ until: number; targetId: string } | null>(null);
   const scrollRatioRef = useRef<{ x: number; y: number }>({ x: 0.5, y: 0 });
   const restoreScrollOnNextZoomRef = useRef(false);
+  const suppressNextAutoZoomRef = useRef(0);
+  const draftHighlightRef = useRef<DraftHighlight | null>(null);
+  const draftHighlightLiveRafRef = useRef<number | null>(null);
+  const draftHighlightLivePathRef = useRef<{ pageId: string; d: string; last: Point | null } | null>(null);
+  const draftHighlightPathMapRef = useRef<Map<string, SVGPathElement>>(new Map());
   const [previewHeightLimit, setPreviewHeightLimit] = useState<number | null>(null);
   const [highlightMode, setHighlightMode] = useState(false);
   const [highlightColor, setHighlightColor] = useState<HighlightColorKey>("yellow");
@@ -1570,6 +1579,7 @@ function WorkspaceClient() {
   const [penOpacity, setPenOpacity] = useState(1);
   const [penThicknessInput, setPenThicknessInput] = useState("3");
   const [penOpacityInput, setPenOpacityInput] = useState("100");
+  const [recentInsertedPageId, setRecentInsertedPageId] = useState<string | null>(null);
   const [selectMode, setSelectMode] = useState(true);
   const [shapeMode, setShapeMode] = useState(false);
   const [shapeType, setShapeType] = useState<ShapeType | null>(null);
@@ -4220,6 +4230,11 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     const idx = activePageIndexState >= 0 && activePageIndexState < pages.length ? activePageIndexState : 0;
     setPageNumberDraft(String(idx + 1));
   }, [activePageIndexState, pages.length]);
+  useEffect(() => {
+    if (!recentInsertedPageId) return;
+    const timer = window.setTimeout(() => setRecentInsertedPageId(null), 220);
+    return () => window.clearTimeout(timer);
+  }, [recentInsertedPageId]);
 
   useEffect(() => {
     if (!pageActionMenuId) return;
@@ -4422,6 +4437,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   }
 
   async function handleAddBlankPageAfter(pageId: string) {
+    suppressNextAutoZoomRef.current = 2;
     const storageId = crypto.randomUUID();
     const doc = await PDFDocument.create();
     doc.addPage([612, 792]);
@@ -4431,8 +4447,10 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     const objectUrl = URL.createObjectURL(blob);
     const newPageId = buildPageId(storageId, 0);
     const pixelRatio = getDevicePixelRatio();
-    const viewportWidth = Math.floor(612 * PREVIEW_BASE_SCALE * pixelRatio);
-    const viewportHeight = Math.floor(792 * PREVIEW_BASE_SCALE * pixelRatio);
+    const pageWidth = 612;
+    const pageHeight = 792;
+    const viewportWidth = Math.floor(pageWidth * PREVIEW_BASE_SCALE * pixelRatio);
+    const viewportHeight = Math.floor(pageHeight * PREVIEW_BASE_SCALE * pixelRatio);
     const canvas = document.createElement("canvas");
     canvas.width = viewportWidth;
     canvas.height = viewportHeight;
@@ -4469,8 +4487,8 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         thumb: thumbData,
         preview: previewData,
         rotation: 0,
-        width: viewportWidth,
-        height: viewportHeight,
+        width: pageWidth,
+        height: pageHeight,
       };
       if (afterIndex === -1) next.push(newPage);
       else next.splice(afterIndex + 1, 0, newPage);
@@ -4478,12 +4496,15 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       return next;
     });
 
+    pageNavigationLockRef.current = { until: Date.now() + 700, targetId: newPageId };
     setActivePageId(newPageId);
     setActivePageIndex(insertedIndex);
     setShouldCenterOnChange(true);
+    setRecentInsertedPageId(newPageId);
   }
 
   async function handleAddBlankPageBefore(pageId: string) {
+    suppressNextAutoZoomRef.current = 2;
     const storageId = crypto.randomUUID();
     const doc = await PDFDocument.create();
     doc.addPage([612, 792]);
@@ -4493,8 +4514,10 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     const objectUrl = URL.createObjectURL(blob);
     const newPageId = buildPageId(storageId, 0);
     const pixelRatio = getDevicePixelRatio();
-    const viewportWidth = Math.floor(612 * PREVIEW_BASE_SCALE * pixelRatio);
-    const viewportHeight = Math.floor(792 * PREVIEW_BASE_SCALE * pixelRatio);
+    const pageWidth = 612;
+    const pageHeight = 792;
+    const viewportWidth = Math.floor(pageWidth * PREVIEW_BASE_SCALE * pixelRatio);
+    const viewportHeight = Math.floor(pageHeight * PREVIEW_BASE_SCALE * pixelRatio);
     const canvas = document.createElement("canvas");
     canvas.width = viewportWidth;
     canvas.height = viewportHeight;
@@ -4531,8 +4554,8 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         thumb: thumbData,
         preview: previewData,
         rotation: 0,
-        width: viewportWidth,
-        height: viewportHeight,
+        width: pageWidth,
+        height: pageHeight,
       };
       if (beforeIndex === -1) next.unshift(newPage);
       else next.splice(beforeIndex, 0, newPage);
@@ -4544,9 +4567,11 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     setActivePageId(newPageId);
     setActivePageIndex(insertedIndex);
     setShouldCenterOnChange(true);
+    setRecentInsertedPageId(newPageId);
   }
 
   async function handleDuplicatePage(page: PageItem) {
+    suppressNextAutoZoomRef.current = 2;
     const src = sources[page.srcIdx];
     if (!src) return;
     const stored = await readFileBlob(src.storageId);
@@ -4594,6 +4619,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     setActivePageId(newPageId);
     setActivePageIndex(insertedIndex);
     setShouldCenterOnChange(true);
+    setRecentInsertedPageId(newPageId);
   }
 
   function commitPageNumberDraft() {
@@ -4668,6 +4694,17 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     []
   );
 
+  const registerDraftHighlightPath = useCallback(
+    (pageId: string) => (node: SVGPathElement | null) => {
+      if (node) {
+        draftHighlightPathMapRef.current.set(pageId, node);
+      } else {
+        draftHighlightPathMapRef.current.delete(pageId);
+      }
+    },
+    []
+  );
+
 
   const renderPreviewPage = (page: PageItem, idx: number) => {
     const pageHighlights = highlights[page.id] ?? [];
@@ -4698,7 +4735,11 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         key={page.id}
         data-page-id={page.id}
         ref={registerPreviewRef(page.id)}
-        className="mx-auto w-fit opacity-0 scale-[0.98] animate-[page-enter_0.15s_ease-out_forwards]"
+        className={`mx-auto w-fit ${
+          recentInsertedPageId === page.id
+            ? "opacity-0 scale-[0.98] animate-[page-enter_0.15s_ease-out_forwards]"
+            : "opacity-100"
+        }`}
       >
         <div className="mx-auto mb-2 flex items-center" style={{ width: fittedWidth }}>
           <div className="w-24 text-lg font-semibold text-slate-500">#{idx + 1}</div>
@@ -4996,33 +5037,12 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                   );
                 })}
 
-                {draftHighlight?.pageId === page.id && draftHighlight.points.length > 1 ? (() => {
-                  const tool = draftHighlight.tool === "pencil" ? "pen" : draftHighlight.tool;
-                  const points =
-                    tool === "highlight"
-                      ? snapHighlightSegments(smoothStrokePoints(draftHighlight.points, tool))
-                      : smoothStrokePoints(draftHighlight.points, tool);
-                  const d = pointsToSvgPath(points);
-                  const baseWidth = Math.max(1, draftHighlight.thickness * 1000);
-                  const isHighlight = tool === "highlight";
-                  const cap = isHighlight ? "butt" : "round";
-                  const join = isHighlight ? "miter" : "round";
-                  const style: CSSProperties = { mixBlendMode: isHighlight ? ("multiply" as any) : undefined };
-                  const opacity = isHighlight ? draftHighlight.opacity ?? 0.35 : draftHighlight.opacity ?? 1;
-                  return (
-                    <path
-                      aria-hidden
-                      d={d}
-                      fill="none"
-                      stroke={draftHighlight.color}
-                      strokeWidth={isHighlight ? baseWidth * 1.2 : baseWidth}
-                      strokeLinecap={cap as any}
-                      strokeLinejoin={join as any}
-                      strokeOpacity={opacity}
-                      style={style}
-                    />
-                  );
-                })() : null}
+                <path
+                  ref={registerDraftHighlightPath(page.id)}
+                  aria-hidden
+                  fill="none"
+                  style={{ pointerEvents: "none", display: "none" }}
+                />
 
                 {draftShape?.pageId === page.id ? (
                   <Fragment>
@@ -5855,10 +5875,24 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   );
 
   useEffect(() => {
-	      if (deleteMode) {
-	        setDraftHighlight(null);
-	        setDraftShape(null);
-	      }
+    if (deleteMode) {
+      setDraftHighlight(null);
+      const current = draftHighlightRef.current;
+      if (current) {
+        const path = draftHighlightPathMapRef.current.get(current.pageId);
+        if (path) {
+          path.setAttribute("d", "");
+          path.style.display = "none";
+        }
+      }
+      draftHighlightRef.current = null;
+      draftHighlightLivePathRef.current = null;
+      if (draftHighlightLiveRafRef.current !== null) {
+        window.cancelAnimationFrame(draftHighlightLiveRafRef.current);
+        draftHighlightLiveRafRef.current = null;
+      }
+      setDraftShape(null);
+    }
   }, [deleteMode]);
 
   function getPointerPoint(
@@ -6964,7 +6998,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   useEffect(() => {
     if (!authSession?.user) return;
     if (!hasWorkspaceData) return;
-    if (draggingText || resizingText || draggingShape) return;
+    if (draggingText || resizingText || draggingShape || draftHighlight) return;
     const ownerId = authSession.user.id ?? authSession.user.email ?? null;
     if (!ownerId) return;
 
@@ -6991,6 +7025,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     draggingText,
     resizingText,
     draggingShape,
+    draftHighlight,
   ]);
 
 		  const computeBaseScale = useCallback(() => {
@@ -7100,6 +7135,60 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     });
   }, [zoomPercent]);
 
+  const applyDraftHighlightStyle = useCallback((draft: DraftHighlight, path: SVGPathElement) => {
+    const tool = draft.tool === "pencil" ? "pen" : draft.tool;
+    const baseWidth = Math.max(1, draft.thickness * 1000);
+    const isHighlight = tool === "highlight";
+    const cap = isHighlight ? "butt" : "round";
+    const join = isHighlight ? "miter" : "round";
+    const opacity = isHighlight ? draft.opacity ?? 0.35 : draft.opacity ?? 1;
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke", draft.color);
+    path.setAttribute("stroke-width", String(isHighlight ? baseWidth * 1.2 : baseWidth));
+    path.setAttribute("stroke-linecap", cap);
+    path.setAttribute("stroke-linejoin", join);
+    path.setAttribute("stroke-opacity", `${opacity}`);
+    path.style.pointerEvents = "none";
+    path.style.mixBlendMode = isHighlight ? "multiply" : "";
+  }, []);
+
+  const scheduleDraftHighlightLiveRender = useCallback(() => {
+    if (draftHighlightLiveRafRef.current !== null) return;
+    draftHighlightLiveRafRef.current = window.requestAnimationFrame(() => {
+      draftHighlightLiveRafRef.current = null;
+      const live = draftHighlightLivePathRef.current;
+      if (!live) return;
+      const path = draftHighlightPathMapRef.current.get(live.pageId);
+      if (!path) return;
+      path.setAttribute("d", live.d);
+      path.style.display = "";
+    });
+  }, []);
+
+  const clearDraftHighlightPath = useCallback((pageId: string) => {
+    const path = draftHighlightPathMapRef.current.get(pageId);
+    if (!path) return;
+    path.setAttribute("d", "");
+    path.style.display = "none";
+  }, []);
+  useEffect(() => {
+    if (draftHighlight) return;
+    const current = draftHighlightRef.current;
+    if (current) {
+      clearDraftHighlightPath(current.pageId);
+    }
+    draftHighlightRef.current = null;
+  }, [clearDraftHighlightPath, draftHighlight]);
+
+  useEffect(() => {
+    return () => {
+      if (draftHighlightLiveRafRef.current !== null) {
+        window.cancelAnimationFrame(draftHighlightLiveRafRef.current);
+        draftHighlightLiveRafRef.current = null;
+      }
+    };
+  }, []);
+
   function handleShapePointerDown(pageId: string, event: ReactPointerEvent<HTMLDivElement>) {
     if (!shapeType) return;
     const point = getPointerPoint(event, { requireInside: true, clampToBounds: true });
@@ -7198,14 +7287,38 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     strokeOutsidePageRef.current = false;
     event.currentTarget.setPointerCapture?.(event.pointerId);
     const baseThickness = tool === "highlight" ? highlightThickness : penThickness;
-    setDraftHighlight({
+    const startPoint = { x: point.x, y: point.y };
+    let seedPoints = [startPoint];
+    if (tool !== "highlight") {
+      const epsilon = 0.0002;
+      const bumpedX =
+        startPoint.x + epsilon <= 1
+          ? startPoint.x + epsilon
+          : startPoint.x - epsilon >= 0
+            ? startPoint.x - epsilon
+            : startPoint.x;
+      seedPoints = [startPoint, { x: bumpedX, y: startPoint.y }];
+    }
+    const draft: DraftHighlight = {
       tool,
       pageId,
-      points: [{ x: point.x, y: point.y }],
+      points: seedPoints,
       color: tool === "highlight" ? HIGHLIGHT_COLORS[highlightColor] : penColor,
       opacity: tool === "highlight" ? highlightOpacity : penOpacity,
       thickness: baseThickness / point.rectWidth,
-    });
+    };
+    draftHighlightRef.current = draft;
+    setDraftHighlight(draft);
+    const path = draftHighlightPathMapRef.current.get(pageId);
+    if (path) {
+      applyDraftHighlightStyle(draft, path);
+      const x = startPoint.x * 1000;
+      const y = startPoint.y * 1000;
+      const d = tool === "highlight" ? `M ${x} ${y}` : `M ${x} ${y} L ${x} ${y}`;
+      draftHighlightLivePathRef.current = { pageId, d, last: startPoint };
+      path.setAttribute("d", d);
+      path.style.display = "";
+    }
     event.preventDefault();
   }
 
@@ -7229,13 +7342,14 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       lastOutsideRawRef.current = { x: point.x, y: point.y };
       if (!strokeOutsidePageRef.current) {
         strokeOutsidePageRef.current = true;
-        setDraftHighlight((prev) => {
-          if (!prev || prev.pageId !== pageId) return prev;
-          const nextPoints = [...prev.points];
+        const current = draftHighlightRef.current;
+        if (current && current.pageId === pageId) {
+          const nextPoints = [...current.points];
+          let boundary: Point | null = null;
           for (let i = nextPoints.length - 1; i >= 0; i--) {
             const candidate = nextPoints[i];
             if (candidate && !candidate.move) {
-              const boundary = intersectUnitSquareBoundary(candidate, point, false);
+              boundary = intersectUnitSquareBoundary(candidate, point, false);
               if (boundary) {
                 const last = nextPoints[nextPoints.length - 1];
                 const eps = 0.0005;
@@ -7246,8 +7360,14 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
               break;
             }
           }
-          return { ...prev, points: nextPoints };
-        });
+          draftHighlightRef.current = { ...current, points: nextPoints };
+          const live = draftHighlightLivePathRef.current;
+          if (live && live.pageId === pageId && boundary) {
+            live.d += ` L ${boundary.x * 1000} ${boundary.y * 1000}`;
+            live.last = { x: boundary.x, y: boundary.y };
+            scheduleDraftHighlightLiveRender();
+          }
+        }
       }
       return;
     }
@@ -7256,9 +7376,9 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       strokeOutsidePageRef.current = false;
       const outside = lastOutsideRawRef.current;
       lastOutsideRawRef.current = null;
-      setDraftHighlight((prev) => {
-        if (!prev || prev.pageId !== pageId) return prev;
-        const nextPoints = [...prev.points];
+      const current = draftHighlightRef.current;
+      if (current && current.pageId === pageId) {
+        const nextPoints = [...current.points];
         const boundary = outside ? intersectUnitSquareBoundary(outside, point, true) : null;
         nextPoints.push({
           x: boundary?.x ?? clamp(point.x, 0, 1),
@@ -7266,33 +7386,48 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
           move: true,
         });
         nextPoints.push({ x: point.x, y: point.y });
-        return {
-          ...prev,
+        draftHighlightRef.current = {
+          ...current,
           points: nextPoints,
-          thickness: (prev.tool === "highlight" ? highlightThickness : penThickness) / point.rectWidth,
-          opacity: prev.tool === "highlight" ? highlightOpacity : penOpacity,
+          thickness: (current.tool === "highlight" ? highlightThickness : penThickness) / point.rectWidth,
+          opacity: current.tool === "highlight" ? highlightOpacity : penOpacity,
         };
-      });
-    event.preventDefault();
-    return;
-  }
-
-    setDraftHighlight((prev) => {
-      if (!prev || prev.pageId !== pageId) return prev;
-      const nextPoints = [...prev.points];
-    const last = nextPoints[nextPoints.length - 1];
-    const distanceThreshold = draftHighlight?.tool === "highlight" ? 0.004 : 0.0015;
-    if (!last || pointDistance(last, { x: point.x, y: point.y }) > distanceThreshold) {
-      nextPoints.push({ x: point.x, y: point.y });
+        const live = draftHighlightLivePathRef.current;
+        if (live && live.pageId === pageId) {
+          const mx = boundary?.x ?? clamp(point.x, 0, 1);
+          const my = boundary?.y ?? clamp(point.y, 0, 1);
+          live.d += ` M ${mx * 1000} ${my * 1000}`;
+          live.last = { x: mx, y: my };
+          scheduleDraftHighlightLiveRender();
+        }
+      }
+      event.preventDefault();
+      return;
     }
-      return {
-        ...prev,
+
+    const current = draftHighlightRef.current;
+    if (current && current.pageId === pageId) {
+      const nextPoints = [...current.points];
+      const last = nextPoints[nextPoints.length - 1];
+      const distanceThreshold = current.tool === "highlight" ? 0.004 : 0.0015;
+      if (!last || pointDistance(last, { x: point.x, y: point.y }) > distanceThreshold) {
+        nextPoints.push({ x: point.x, y: point.y });
+      }
+      draftHighlightRef.current = {
+        ...current,
         points: nextPoints,
-        thickness: (prev.tool === "highlight" ? highlightThickness : penThickness) / point.rectWidth,
-        opacity: prev.tool === "highlight" ? highlightOpacity : penOpacity,
+        thickness: (current.tool === "highlight" ? highlightThickness : penThickness) / point.rectWidth,
+        opacity: current.tool === "highlight" ? highlightOpacity : penOpacity,
       };
-    });
-    if (draftHighlight?.pageId === pageId) {
+      const live = draftHighlightLivePathRef.current;
+      if (live && live.pageId === pageId) {
+        const lastLive = live.last ?? { x: point.x, y: point.y };
+        const midX = (lastLive.x + point.x) / 2;
+        const midY = (lastLive.y + point.y) / 2;
+        live.d += ` Q ${lastLive.x * 1000} ${lastLive.y * 1000} ${midX * 1000} ${midY * 1000}`;
+        live.last = { x: point.x, y: point.y };
+        scheduleDraftHighlightLiveRender();
+      }
       event.preventDefault();
     }
   }
@@ -7351,11 +7486,14 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     }
     strokeOutsidePageRef.current = false;
     lastOutsideRawRef.current = null;
-    setDraftHighlight((prev) => {
-      if (!prev || prev.pageId !== pageId) return prev;
-      commitDraftHighlight(prev);
-      return null;
-    });
+    const current = draftHighlightRef.current;
+    if (current && current.pageId === pageId) {
+      commitDraftHighlight(current);
+    }
+    draftHighlightRef.current = null;
+    draftHighlightLivePathRef.current = null;
+    setDraftHighlight(null);
+    clearDraftHighlightPath(pageId);
   }
 
   function handlePageStep(direction: 1 | -1) {
@@ -8285,6 +8423,10 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
 
   useEffect(() => {
     if (userAdjustedZoom) return; // preserve manual zoom after user interaction
+    if (suppressNextAutoZoomRef.current > 0) {
+      suppressNextAutoZoomRef.current -= 1;
+      return;
+    }
     computeBaseScale();
   }, [computeBaseScale, pages.length, activePageIndex, userAdjustedZoom]);
 
