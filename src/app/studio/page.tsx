@@ -10147,10 +10147,14 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
           <div className="w-full max-w-md rounded-2xl bg-white px-8 py-6 text-center shadow-[0_30px_80px_rgba(5,10,30,0.45)]">
             <p className="text-base font-semibold text-slate-800">Getting project ready...</p>
             <p className="mt-1 text-sm text-slate-500">Loading your workspace</p>
-            <div className="mt-5 h-2 w-full overflow-hidden rounded-full bg-slate-200">
+            <div className="mt-5 h-4 w-full overflow-hidden rounded-full bg-slate-200">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-[#0b2f6a] via-[#1f4b99] to-[#7c3aed] transition-[width] duration-200 ease-out"
-                style={{ width: `${Math.round(startupProgress * 100)}%` }}
+                style={{
+                  width: `${Math.round(startupProgress * 100)}%`,
+                  backgroundSize: "200% 100%",
+                  animation: "mpdf-water 2.6s linear infinite",
+                }}
               />
             </div>
           </div>
@@ -13119,6 +13123,14 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
           }
           to {
             transform: translateX(0);
+          }
+        }
+        @keyframes mpdf-water {
+          from {
+            background-position: 0% 50%;
+          }
+          to {
+            background-position: 200% 50%;
           }
         }
       `}</style>
