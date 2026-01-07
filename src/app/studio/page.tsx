@@ -386,6 +386,8 @@ const LOW_RES_PREVIEW_SCALE = PREVIEW_BASE_SCALE * 0.5;
 const MAX_PARALLEL_PREVIEW_RENDERS = 6;
 const MAX_PARALLEL_LOW_PREVIEW_RENDERS = 2;
 const MAX_PARALLEL_THUMB_RENDERS = 1;
+const MIN_STARTUP_OVERLAY_MS = 4000;
+const STARTUP_OVERLAY_FULL_HOLD_MS = 1000;
 const STARTUP_OVERLAY_KEY = "mpdf:startup-overlay";
 const THUMB_MAX_WIDTH = 200;
 const PREVIEW_IMAGE_QUALITY = 0.98;
@@ -1642,7 +1644,12 @@ function WorkspaceClient() {
   const [highlightThickness, setHighlightThickness] = useState(14);
   const [highlightOpacity, setHighlightOpacity] = useState(0.35);
   const [showStartupOverlay, setShowStartupOverlay] = useState(false);
+  const [startupProgress, setStartupProgress] = useState(0);
   const startupOverlayActiveRef = useRef(false);
+  const startupOverlayStartRef = useRef<number | null>(null);
+  const startupOverlayTimerRef = useRef<number | null>(null);
+  const startupProgressRef = useRef(0);
+  const startupProgressTimerRef = useRef<number | null>(null);
   const [penMode, setPenMode] = useState(false);
   const [penThickness, setPenThickness] = useState(3);
   const [penColor, setPenColor] = useState(PEN_COLOR);
@@ -4512,6 +4519,23 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     });
   }, [enqueueRender, pages.length]);
 
+  useEffect(() => {
+    if (pages.length === 0) return;
+    const initialThumbCount = Math.min(INITIAL_PREVIEW_RENDER_COUNT, pages.length);
+    if (initialThumbCount === 0) return;
+    const seed = pagesRef.current.slice(0, initialThumbCount);
+    window.requestAnimationFrame(() => {
+      seed.forEach((page, index) => {
+        enqueueThumbRender({
+          pageId: page.id,
+          srcIdx: page.srcIdx,
+          pageIdx: page.pageIdx,
+          priority: 110 - index,
+        });
+      });
+    });
+  }, [enqueueThumbRender, pages.length]);
+
   /** Build page shells once per load and enqueue initial renders */
   useEffect(() => {
     if (sources.length === 0) {
@@ -4985,7 +5009,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
           setVisibleThumbIds(Array.from(visibleThumbIdsRef.current));
         }
       },
-      { root: container, threshold: 0.6 }
+      { root: container, threshold: 0.15, rootMargin: "40% 0px" }
     );
     thumbNodeMapRef.current.forEach((node) => observer.observe(node));
     return () => observer.disconnect();
@@ -5026,12 +5050,97 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     }
   }, []);
 
+  const computeStartupProgress = useCallback(() => {
+    const pageList = pagesRef.current;
+    if (pageList.length === 0) return 0;
+    const targetCount = Math.min(INITIAL_PREVIEW_RENDER_COUNT, pageList.length);
+    if (targetCount === 0) return 0;
+    const readyCount = pageList.slice(0, targetCount).reduce((count, page) => count + (page.preview ? 1 : 0), 0);
+    const renderProgress = readyCount / targetCount;
+    const startedAt = startupOverlayStartRef.current ?? performance.now();
+    const elapsed = performance.now() - startedAt;
+    const timeProgress = Math.min(elapsed / MIN_STARTUP_OVERLAY_MS, 1);
+    let nextProgress = 0;
+    if (renderProgress >= 1) {
+      nextProgress = 0.9 + 0.1 * timeProgress;
+    } else {
+      nextProgress = 0.1 + 0.8 * renderProgress;
+    }
+    return clamp(nextProgress, 0, 1);
+  }, []);
+
+  useEffect(() => {
+    if (!showStartupOverlay) {
+      startupOverlayStartRef.current = null;
+      if (startupOverlayTimerRef.current !== null) {
+        window.clearTimeout(startupOverlayTimerRef.current);
+        startupOverlayTimerRef.current = null;
+      }
+      if (startupProgressTimerRef.current !== null) {
+        window.clearInterval(startupProgressTimerRef.current);
+        startupProgressTimerRef.current = null;
+      }
+      startupProgressRef.current = 0;
+      setStartupProgress(0);
+      return;
+    }
+    if (startupOverlayStartRef.current === null) {
+      startupOverlayStartRef.current = performance.now();
+    }
+  }, [showStartupOverlay]);
+
+  useEffect(() => {
+    if (!showStartupOverlay) return;
+    const tick = () => {
+      const next = computeStartupProgress();
+      if (next !== startupProgressRef.current) {
+        startupProgressRef.current = next;
+        setStartupProgress(next);
+      }
+    };
+    tick();
+    if (startupProgressTimerRef.current !== null) {
+      window.clearInterval(startupProgressTimerRef.current);
+    }
+    startupProgressTimerRef.current = window.setInterval(tick, 120);
+    return () => {
+      if (startupProgressTimerRef.current !== null) {
+        window.clearInterval(startupProgressTimerRef.current);
+        startupProgressTimerRef.current = null;
+      }
+    };
+  }, [computeStartupProgress, showStartupOverlay]);
+
   useEffect(() => {
     if (!startupOverlayActiveRef.current || !showStartupOverlay) return;
     if (pages.length === 0) return;
-    setShowStartupOverlay(false);
-    startupOverlayActiveRef.current = false;
-  }, [pages.length, showStartupOverlay]);
+    const targetCount = Math.min(INITIAL_PREVIEW_RENDER_COUNT, pages.length);
+    const readyCount = pages.slice(0, targetCount).filter((page) => page.preview).length;
+    if (readyCount < targetCount) return;
+    const startedAt = startupOverlayStartRef.current ?? performance.now();
+    const elapsed = performance.now() - startedAt;
+    const required = MIN_STARTUP_OVERLAY_MS + STARTUP_OVERLAY_FULL_HOLD_MS;
+    const remaining = Math.max(0, required - elapsed);
+    if (remaining === 0) {
+      setShowStartupOverlay(false);
+      startupOverlayActiveRef.current = false;
+      return;
+    }
+    if (startupOverlayTimerRef.current !== null) {
+      window.clearTimeout(startupOverlayTimerRef.current);
+    }
+    startupOverlayTimerRef.current = window.setTimeout(() => {
+      if (!startupOverlayActiveRef.current) return;
+      setShowStartupOverlay(false);
+      startupOverlayActiveRef.current = false;
+    }, remaining);
+    return () => {
+      if (startupOverlayTimerRef.current !== null) {
+        window.clearTimeout(startupOverlayTimerRef.current);
+        startupOverlayTimerRef.current = null;
+      }
+    };
+  }, [pages, showStartupOverlay]);
 
   /** Add more PDFs (create object URLs and append to sources) */
   function handleAddClick() {
@@ -9780,18 +9889,12 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
             <p className="text-base font-semibold text-slate-800">Getting project ready...</p>
             <p className="mt-1 text-sm text-slate-500">Loading your workspace</p>
             <div className="mt-5 h-2 w-full overflow-hidden rounded-full bg-slate-200">
-              <div className="h-full w-1/2 animate-[studio-load_1.4s_ease-in-out_infinite] bg-gradient-to-r from-[#0b2f6a] via-[#1f4b99] to-[#7c3aed]" />
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-[#0b2f6a] via-[#1f4b99] to-[#7c3aed] transition-[width] duration-300 ease-out"
+                style={{ width: `${Math.round(startupProgress * 100)}%` }}
+              />
             </div>
           </div>
-          <style>
-            {`
-              @keyframes studio-load {
-                0% { transform: translateX(-60%); }
-                50% { transform: translateX(10%); }
-                100% { transform: translateX(120%); }
-              }
-            `}
-          </style>
         </div>
       ) : null}
       <header className="sticky top-0 z-40 border-b border-slate-200/60 bg-white shadow-[0_1px_4px_rgba(15,23,42,0.06)]">
