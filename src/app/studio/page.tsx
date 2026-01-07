@@ -385,10 +385,13 @@ const INITIAL_PREVIEW_RENDER_COUNT = 10;
 const LOW_RES_PREVIEW_SCALE = PREVIEW_BASE_SCALE * 0.5;
 const MAX_PARALLEL_PREVIEW_RENDERS = 6;
 const MAX_PARALLEL_LOW_PREVIEW_RENDERS = 2;
-const MAX_PARALLEL_THUMB_RENDERS = 1;
+const MAX_PARALLEL_THUMB_RENDERS = 4;
 const MIN_STARTUP_OVERLAY_MS = 4000;
 const STARTUP_OVERLAY_FULL_HOLD_MS = 1000;
 const STARTUP_OVERLAY_KEY = "mpdf:startup-overlay";
+const WORKSPACE_PREVIEW_CACHE_KEY = "mpdf:preview-cache";
+const PREVIEW_CACHE_VERSION = 1;
+const PREVIEW_CACHE_NEAR_RANGE = 2;
 const THUMB_MAX_WIDTH = 200;
 const PREVIEW_IMAGE_QUALITY = 0.98;
 const TRANSPARENT_PIXEL =
@@ -511,6 +514,135 @@ function getSessionStorage(): Storage | null {
 
 function workspaceFilesKey(projectId: string | null) {
   return projectId ? `${WORKSPACE_SESSION_KEY}:${projectId}` : WORKSPACE_SESSION_KEY;
+}
+
+function workspacePreviewCacheKey(projectKey: string) {
+  return `${WORKSPACE_PREVIEW_CACHE_KEY}:${projectKey}`;
+}
+
+function arraysEqual<T>(left: T[], right: T[]) {
+  if (left.length !== right.length) return false;
+  for (let i = 0; i < left.length; i += 1) {
+    if (left[i] !== right[i]) return false;
+  }
+  return true;
+}
+
+function readStoredSourceIds(projectId: string | null) {
+  const storage = getLocalStorage();
+  if (!storage) return null;
+  const raw = storage.getItem(workspaceFilesKey(projectId));
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as StoredSourceMeta[];
+    if (!Array.isArray(parsed)) return null;
+    return parsed
+      .map((entry) => (entry && typeof entry === "object" ? entry.id : null))
+      .filter((id): id is string => typeof id === "string" && id.length > 0);
+  } catch {
+    return null;
+  }
+}
+
+type WorkspacePreviewCache = {
+  version: number;
+  sourceIds: string[];
+  pages: Array<{
+    id: string;
+    srcIdx: number;
+    pageIdx: number;
+    rotation: number;
+    width: number;
+    height: number;
+    thumb: string;
+    preview: string;
+  }>;
+};
+
+function readWorkspacePreviewCache(projectKey: string, expectedSourceIds: string[] | null) {
+  const storage = getSessionStorage();
+  if (!storage) return null;
+  const raw = storage.getItem(workspacePreviewCacheKey(projectKey));
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as WorkspacePreviewCache;
+    if (
+      !parsed ||
+      parsed.version !== PREVIEW_CACHE_VERSION ||
+      !Array.isArray(parsed.pages) ||
+      !Array.isArray(parsed.sourceIds)
+    ) {
+      return null;
+    }
+    if (expectedSourceIds && expectedSourceIds.length > 0 && !arraysEqual(parsed.sourceIds, expectedSourceIds)) {
+      return null;
+    }
+    const pages = parsed.pages
+      .filter((page) => page && typeof page.id === "string")
+      .map((page) => ({
+        id: page.id,
+        srcIdx: typeof page.srcIdx === "number" ? page.srcIdx : 0,
+        pageIdx: typeof page.pageIdx === "number" ? page.pageIdx : 0,
+        rotation: typeof page.rotation === "number" ? page.rotation : 0,
+        width: typeof page.width === "number" ? page.width : 0,
+        height: typeof page.height === "number" ? page.height : 0,
+        thumb: typeof page.thumb === "string" ? page.thumb : "",
+        preview: typeof page.preview === "string" ? page.preview : "",
+      }));
+    return pages.length > 0 ? pages : null;
+  } catch {
+    return null;
+  }
+}
+
+function buildPreviewCachePages(pages: PageItem[], activePageId: string | null) {
+  const previewIds = new Set<string>();
+  const initialCount = Math.min(INITIAL_PREVIEW_RENDER_COUNT, pages.length);
+  for (let i = 0; i < initialCount; i += 1) {
+    previewIds.add(pages[i].id);
+  }
+  if (activePageId) {
+    const activeIndex = pages.findIndex((page) => page.id === activePageId);
+    if (activeIndex !== -1) {
+      for (let offset = -PREVIEW_CACHE_NEAR_RANGE; offset <= PREVIEW_CACHE_NEAR_RANGE; offset += 1) {
+        const idx = activeIndex + offset;
+        if (idx >= 0 && idx < pages.length) {
+          previewIds.add(pages[idx].id);
+        }
+      }
+    }
+  }
+  return pages.map((page) => ({
+    id: page.id,
+    srcIdx: page.srcIdx,
+    pageIdx: page.pageIdx,
+    rotation: page.rotation,
+    width: page.width,
+    height: page.height,
+    thumb: page.thumb,
+    preview: previewIds.has(page.id) ? page.preview : "",
+  }));
+}
+
+function persistWorkspacePreviewCache(
+  projectKey: string,
+  sourceIds: string[],
+  pages: PageItem[],
+  activePageId: string | null,
+) {
+  const storage = getSessionStorage();
+  if (!storage) return;
+  if (sourceIds.length === 0) return;
+  const payload: WorkspacePreviewCache = {
+    version: PREVIEW_CACHE_VERSION,
+    sourceIds,
+    pages: buildPreviewCachePages(pages, activePageId),
+  };
+  try {
+    storage.setItem(workspacePreviewCacheKey(projectKey), JSON.stringify(payload));
+  } catch {
+    // ignore storage failures (quota or access issues)
+  }
 }
 
 function persistSourceMetadata(list: SourceRef[], projectId: string | null) {
@@ -841,13 +973,14 @@ function cloneTextAnnotationMap(map: Record<string, TextAnnotation[]>): Record<s
   );
 }
 
-function createThumbnailDataUrl(canvas: HTMLCanvasElement) {
-  if (canvas.width <= THUMB_MAX_WIDTH) {
+function createThumbnailDataUrl(canvas: HTMLCanvasElement, maxWidth = THUMB_MAX_WIDTH) {
+  const targetWidth = Math.max(1, Math.floor(maxWidth));
+  if (canvas.width <= targetWidth) {
     return toCardPreviewDataUrl(canvas);
   }
-  const ratio = THUMB_MAX_WIDTH / canvas.width;
+  const ratio = targetWidth / canvas.width;
   const thumbCanvas = document.createElement("canvas");
-  thumbCanvas.width = THUMB_MAX_WIDTH;
+  thumbCanvas.width = targetWidth;
   thumbCanvas.height = Math.floor(canvas.height * ratio);
   const thumbCtx = thumbCanvas.getContext("2d")!;
   thumbCtx.imageSmoothingEnabled = true;
@@ -1327,6 +1460,39 @@ function intersectUnitSquareBoundary(
   return { x: candidates[0].x, y: candidates[0].y };
 }
 
+function mergePageList(current: PageItem[], nextPages: PageItem[]) {
+  if (current.length === 0) return nextPages;
+  const byId = new Map(current.map((page) => [page.id, page]));
+  return nextPages.map((page) => {
+    const existing = byId.get(page.id);
+    if (!existing) return page;
+    const rotation = typeof existing.rotation === "number" ? existing.rotation : page.rotation;
+    const preview = existing.preview || page.preview;
+    const thumb = existing.thumb || page.thumb;
+    const width = existing.width ?? page.width;
+    const height = existing.height ?? page.height;
+    if (
+      existing.srcIdx === page.srcIdx &&
+      existing.pageIdx === page.pageIdx &&
+      existing.rotation === rotation &&
+      existing.preview === preview &&
+      existing.thumb === thumb &&
+      existing.width === width &&
+      existing.height === height
+    ) {
+      return existing;
+    }
+    return {
+      ...page,
+      rotation,
+      preview,
+      thumb,
+      width,
+      height,
+    };
+  });
+}
+
 
 /** One sortable thumbnail tile */
 function SortableThumb({
@@ -1363,6 +1529,8 @@ function SortableThumb({
   const isQuarterTurn = rotationDegrees % 180 !== 0;
   const ratio = item.width && item.height ? item.width / item.height : 1;
   const scaleFix = isQuarterTurn ? Math.min(ratio, 1 / ratio) : 1;
+  const thumbSrc = item.thumb || TRANSPARENT_PIXEL;
+  const thumbVisible = Boolean(item.thumb);
 
 	  return (
 	    <li
@@ -1403,21 +1571,20 @@ function SortableThumb({
 	            >
 	              {index + 1}
 	            </span>
-	            <div
-	              className="relative z-0 flex h-full w-full items-center justify-center"
-	              style={{ transform: `rotate(${rotationDegrees}deg) scale(${scaleFix})`, transformOrigin: "center" }}
-	            >
-              <div className="absolute inset-0 bg-white" aria-hidden />
+            <div
+              className="relative z-0 flex h-full w-full items-center justify-center"
+              style={{ transform: `rotate(${rotationDegrees}deg) scale(${scaleFix})`, transformOrigin: "center" }}
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={item.thumb || TRANSPARENT_PIXEL}
+                src={thumbSrc}
                 alt={`Page ${index + 1}`}
-                className={`block h-full w-full object-contain transition-opacity duration-200 ${
-                  item.thumb ? "opacity-100" : "opacity-0"
+                className={`relative z-10 block h-full w-full object-contain transition-opacity duration-200 ${
+                  thumbVisible ? "opacity-100" : "opacity-0"
                 }`}
                 draggable={false}
               />
-	            </div>
+            </div>
 	            <div className="pointer-events-none absolute inset-x-2 bottom-2 z-20 flex justify-center opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
 	              <div className="flex items-center gap-1 rounded-md border border-slate-400 bg-white/95 p-1 shadow-[0_10px_24px_rgba(15,23,42,0.16)] backdrop-blur">
 	                <button
@@ -1590,6 +1757,7 @@ function WorkspaceClient() {
   const searchParams = useSearchParams();
   const { saveProject, savingProject, currentProjectId } = useProjects();
   const projectParam = searchParams.get("project");
+  const projectKey = projectParam ?? currentProjectId ?? "local";
   const [showDownloadGate, setShowDownloadGate] = useState(false);
   const [showDelayOverlay, setShowDelayOverlay] = useState<"intro" | "progress" | null>(null);
   const [sources, setSources] = useState<SourceRef[]>([]);
@@ -1635,9 +1803,7 @@ function WorkspaceClient() {
   const thumbRenderActiveRef = useRef(0);
   const thumbRenderStatusRef = useRef<Map<string, "ready" | "rendering">>(new Map());
   const thumbNodeMapRef = useRef<Map<string, HTMLLIElement>>(new Map());
-  const visibleThumbIdsRef = useRef<Set<string>>(new Set());
   const thumbsScrollRef = useRef<HTMLDivElement | null>(null);
-  const [visibleThumbIds, setVisibleThumbIds] = useState<string[]>([]);
   const [previewHeightLimit, setPreviewHeightLimit] = useState<number | null>(null);
   const [highlightMode, setHighlightMode] = useState(false);
   const [highlightColor, setHighlightColor] = useState<HighlightColorKey>("yellow");
@@ -3365,6 +3531,8 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   const pendingInsertedPageRef = useRef<{ afterId: string; newId: string } | null>(null);
   const lastProjectKeyRef = useRef<string | null>(null);
   const pendingInitialRenderRef = useRef<PageItem[]>([]);
+  const restoringPreviewCacheRef = useRef(false);
+  const previewCacheWriteTimerRef = useRef<number | null>(null);
   const nearPageIdsRef = useRef<Set<string>>(new Set());
   const [nearPageIds, setNearPageIds] = useState<string[]>([]);
   const visiblePageIdsRef = useRef<Set<string>>(new Set());
@@ -3374,17 +3542,22 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     pagesByIdRef.current = new Map(pages.map((page) => [page.id, page]));
   }, [pages]);
   useEffect(() => {
+    if (sources.length > 0) {
+      restoringPreviewCacheRef.current = false;
+    }
+  }, [sources.length]);
+  useEffect(() => {
     activePageIdRef.current = activePageId;
   }, [activePageId]);
   useEffect(() => {
     activePageIndexRef.current = activePageIndexState;
   }, [activePageIndexState]);
   useEffect(() => {
-    const projectKey = projectParam ?? currentProjectId ?? "local";
     if (lastProjectKeyRef.current === projectKey) return;
     lastProjectKeyRef.current = projectKey;
     renderedSourcesRef.current = 0;
     pendingInitialRenderRef.current = [];
+    restoringPreviewCacheRef.current = false;
     nearPageIdsRef.current.clear();
     setNearPageIds([]);
     visiblePageIdsRef.current.clear();
@@ -3964,10 +4137,27 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
 
     async function hydrateFromStorage() {
       hasHydratedSources.current = false;
+      const storageProjectId = projectParam ?? currentProjectId ?? null;
+      const storedSourceIds = readStoredSourceIds(storageProjectId);
+      if (storedSourceIds && storedSourceIds.length > 0 && pagesRef.current.length === 0) {
+        const cachedPages = readWorkspacePreviewCache(projectKey, storedSourceIds);
+        if (cachedPages && cachedPages.length > 0) {
+          restoringPreviewCacheRef.current = true;
+          setPages(cachedPages);
+          cachedPages.forEach((page) => {
+            if (page.preview) {
+              pageRenderStatusRef.current.set(page.id, "low");
+            }
+            if (page.thumb) {
+              thumbRenderStatusRef.current.set(page.id, "ready");
+            }
+          });
+        }
+      }
       setSources([]);
       const local = getLocalStorage();
       const session = getSessionStorage();
-      const projectId = projectParam ?? currentProjectId ?? null;
+      const projectId = storageProjectId;
       const key = workspaceFilesKey(projectId);
       let raw: string | null = null;
       let fromSession = false;
@@ -4117,6 +4307,29 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     const projectId = projectParam ?? currentProjectId ?? null;
     persistSourceMetadata(sources, projectId);
   }, [sources, currentProjectId, projectParam]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (pages.length === 0 || sources.length === 0) return;
+    if (!pages.some((page) => page.thumb || page.preview)) return;
+    if (previewCacheWriteTimerRef.current !== null) {
+      window.clearTimeout(previewCacheWriteTimerRef.current);
+    }
+    previewCacheWriteTimerRef.current = window.setTimeout(() => {
+      persistWorkspacePreviewCache(
+        projectKey,
+        sources.map((source) => source.storageId),
+        pages,
+        activePageId,
+      );
+    }, 600);
+    return () => {
+      if (previewCacheWriteTimerRef.current !== null) {
+        window.clearTimeout(previewCacheWriteTimerRef.current);
+        previewCacheWriteTimerRef.current = null;
+      }
+    };
+  }, [pages, sources, activePageId, projectKey]);
 
   /** Revoke object URLs we no longer need to avoid memory leaks */
   useEffect(() => {
@@ -4422,11 +4635,18 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         if (currentStatus === "ready" || currentStatus === "rendering") {
           continue;
         }
+        const existingPage = pagesByIdRef.current.get(next.pageId);
+        if (existingPage?.thumb) {
+          thumbRenderStatusRef.current.set(next.pageId, "ready");
+          continue;
+        }
         thumbRenderStatusRef.current.set(next.pageId, "rendering");
         thumbRenderActiveRef.current += 1;
         (async () => {
           const pdf = pdfDocumentCacheRef.current.get(next.srcIdx);
           if (!pdf) {
+            thumbRenderQueueRef.current.push({ ...next, priority: next.priority - 5 });
+            thumbRenderQueueKeyRef.current.add(next.pageId);
             thumbRenderActiveRef.current -= 1;
             if (thumbRenderStatusRef.current.get(next.pageId) === "rendering") {
               thumbRenderStatusRef.current.delete(next.pageId);
@@ -4439,7 +4659,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
             const baseViewport = page.getViewport({ scale: 1 });
             const scale = Math.min(1, THUMB_MAX_WIDTH / baseViewport.width);
             const viewport = page.getViewport({ scale });
-            const pixelRatio = Math.min(1, getDevicePixelRatio());
+            const pixelRatio = Math.min(2, getDevicePixelRatio());
             const canvas = document.createElement("canvas");
             const ctx = canvas.getContext("2d")!;
             const scaledWidth = Math.max(1, Math.floor(viewport.width * pixelRatio));
@@ -4454,12 +4674,12 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
             ctx.imageSmoothingEnabled = true;
             ctx.imageSmoothingQuality = "high";
             await page.render(renderContext).promise;
-            const thumbData = createThumbnailDataUrl(canvas);
+            const thumbData = createThumbnailDataUrl(canvas, THUMB_MAX_WIDTH * pixelRatio);
             setPages((current) => {
               let changed = false;
               const nextPages = current.map((item) => {
                 if (item.id !== next.pageId) return item;
-                if (item.thumb === thumbData) return item;
+                if (item.thumb) return item;
                 changed = true;
                 return { ...item, thumb: thumbData };
               });
@@ -4519,26 +4739,10 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     });
   }, [enqueueRender, pages.length]);
 
-  useEffect(() => {
-    if (pages.length === 0) return;
-    const initialThumbCount = Math.min(INITIAL_PREVIEW_RENDER_COUNT, pages.length);
-    if (initialThumbCount === 0) return;
-    const seed = pagesRef.current.slice(0, initialThumbCount);
-    window.requestAnimationFrame(() => {
-      seed.forEach((page, index) => {
-        enqueueThumbRender({
-          pageId: page.id,
-          srcIdx: page.srcIdx,
-          pageIdx: page.pageIdx,
-          priority: 110 - index,
-        });
-      });
-    });
-  }, [enqueueThumbRender, pages.length]);
-
   /** Build page shells once per load and enqueue initial renders */
   useEffect(() => {
     if (sources.length === 0) {
+      if (restoringPreviewCacheRef.current) return;
       setPages([]);
       renderedSourcesRef.current = 0;
       renderQueueRef.current = [];
@@ -4661,8 +4865,11 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         if (cancelled) return;
 
         if (isInitialLoad) {
-          setPages(newPages);
-          pendingInitialRenderRef.current = newPages.slice(0, INITIAL_PREVIEW_RENDER_COUNT);
+          setPages((prev) => {
+            const merged = mergePageList(prev, newPages);
+            pendingInitialRenderRef.current = merged.slice(0, INITIAL_PREVIEW_RENDER_COUNT);
+            return merged;
+          });
         } else if (newPages.length > 0) {
           setPages((prev) => {
             const existing = new Set(prev.map((page) => page.id));
@@ -4986,43 +5193,19 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   }, [activePageIndexState, enqueueRender, pages, visiblePageIds]);
 
   useEffect(() => {
-    const container = thumbsScrollRef.current;
-    if (!container || pages.length === 0) return;
-    visibleThumbIdsRef.current.clear();
-    setVisibleThumbIds([]);
-    const observer = new IntersectionObserver(
-      (entries) => {
-        let changed = false;
-        entries.forEach((entry) => {
-          const id = entry.target.getAttribute("data-thumb-id");
-          if (!id) return;
-          if (entry.isIntersecting) {
-            if (!visibleThumbIdsRef.current.has(id)) {
-              visibleThumbIdsRef.current.add(id);
-              changed = true;
-            }
-          } else if (visibleThumbIdsRef.current.delete(id)) {
-            changed = true;
-          }
-        });
-        if (changed) {
-          setVisibleThumbIds(Array.from(visibleThumbIdsRef.current));
-        }
-      },
-      { root: container, threshold: 0.15, rootMargin: "40% 0px" }
-    );
-    thumbNodeMapRef.current.forEach((node) => observer.observe(node));
-    return () => observer.disconnect();
-  }, [pages]);
-
-  useEffect(() => {
     if (pages.length === 0) return;
-    visibleThumbIds.forEach((id) => {
-      const page = pagesByIdRef.current.get(id);
-      if (!page) return;
-      enqueueThumbRender({ pageId: page.id, srcIdx: page.srcIdx, pageIdx: page.pageIdx, priority: 80 });
+    const pageList = pagesRef.current;
+    window.requestAnimationFrame(() => {
+      pageList.forEach((page, index) => {
+        enqueueThumbRender({
+          pageId: page.id,
+          srcIdx: page.srcIdx,
+          pageIdx: page.pageIdx,
+          priority: Math.max(20, 160 - Math.min(index, 120)),
+        });
+      });
     });
-  }, [enqueueThumbRender, pages.length, visibleThumbIds]);
+  }, [enqueueThumbRender, pages.length]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -5092,8 +5275,21 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   useEffect(() => {
     if (!showStartupOverlay) return;
     const tick = () => {
-      const next = computeStartupProgress();
-      if (next !== startupProgressRef.current) {
+      const target = computeStartupProgress();
+      const current = startupProgressRef.current;
+      let next = current;
+      if (target >= 0.999) {
+        next = target;
+      } else if (target > current) {
+        next = current + (target - current) * 0.22;
+        if (target - next < 0.0025) {
+          next = target;
+        }
+      }
+      if (next < current) {
+        next = current;
+      }
+      if (Math.abs(next - current) >= 0.001) {
         startupProgressRef.current = next;
         setStartupProgress(next);
       }
@@ -5102,7 +5298,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     if (startupProgressTimerRef.current !== null) {
       window.clearInterval(startupProgressTimerRef.current);
     }
-    startupProgressTimerRef.current = window.setInterval(tick, 120);
+    startupProgressTimerRef.current = window.setInterval(tick, 60);
     return () => {
       if (startupProgressTimerRef.current !== null) {
         window.clearInterval(startupProgressTimerRef.current);
@@ -9890,7 +10086,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
             <p className="mt-1 text-sm text-slate-500">Loading your workspace</p>
             <div className="mt-5 h-2 w-full overflow-hidden rounded-full bg-slate-200">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-[#0b2f6a] via-[#1f4b99] to-[#7c3aed] transition-[width] duration-300 ease-out"
+                className="h-full rounded-full bg-gradient-to-r from-[#0b2f6a] via-[#1f4b99] to-[#7c3aed] transition-[width] duration-200 ease-out"
                 style={{ width: `${Math.round(startupProgress * 100)}%` }}
               />
             </div>
