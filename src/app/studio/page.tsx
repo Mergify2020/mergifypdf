@@ -1833,6 +1833,8 @@ function WorkspaceClient() {
   const startupOverlayActiveRef = useRef(false);
   const startupOverlayStartRef = useRef<number | null>(null);
   const startupOverlayTimerRef = useRef<number | null>(null);
+  const startupOverlayFullAtRef = useRef<number | null>(null);
+  const startupOverlayFullTimerRef = useRef<number | null>(null);
   const startupProgressRef = useRef(0);
   const startupProgressTimerRef = useRef<number | null>(null);
   const [penMode, setPenMode] = useState(false);
@@ -5296,6 +5298,11 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   useEffect(() => {
     if (!showStartupOverlay) {
       startupOverlayStartRef.current = null;
+      startupOverlayFullAtRef.current = null;
+      if (startupOverlayFullTimerRef.current !== null) {
+        window.clearTimeout(startupOverlayFullTimerRef.current);
+        startupOverlayFullTimerRef.current = null;
+      }
       if (startupOverlayTimerRef.current !== null) {
         window.clearTimeout(startupOverlayTimerRef.current);
         startupOverlayTimerRef.current = null;
@@ -5355,26 +5362,67 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     const readyCount = pages.slice(0, targetCount).filter((page) => page.preview).length;
     if (readyCount < targetCount) return;
     const startedAt = startupOverlayStartRef.current ?? performance.now();
-    const elapsed = performance.now() - startedAt;
-    const required = MIN_STARTUP_OVERLAY_MS + STARTUP_OVERLAY_FULL_HOLD_MS;
-    const remaining = Math.max(0, required - elapsed);
+    const now = performance.now();
+    const elapsed = now - startedAt;
+    const remainingToMin = Math.max(0, MIN_STARTUP_OVERLAY_MS - elapsed);
+    const scheduleHide = (delayMs: number) => {
+      if (startupOverlayTimerRef.current !== null) {
+        window.clearTimeout(startupOverlayTimerRef.current);
+      }
+      startupOverlayTimerRef.current = window.setTimeout(() => {
+        if (!startupOverlayActiveRef.current) return;
+        setShowStartupOverlay(false);
+        startupOverlayActiveRef.current = false;
+      }, delayMs);
+    };
+    const ensureFullProgress = () => {
+      if (startupProgressRef.current < 1) {
+        startupProgressRef.current = 1;
+        setStartupProgress(1);
+      }
+      if (startupOverlayFullAtRef.current === null) {
+        startupOverlayFullAtRef.current = performance.now();
+      }
+    };
+
+    if (remainingToMin > 0) {
+      if (startupOverlayFullTimerRef.current !== null) {
+        window.clearTimeout(startupOverlayFullTimerRef.current);
+      }
+      startupOverlayFullTimerRef.current = window.setTimeout(() => {
+        if (!startupOverlayActiveRef.current) return;
+        ensureFullProgress();
+        scheduleHide(STARTUP_OVERLAY_FULL_HOLD_MS);
+      }, remainingToMin);
+      return () => {
+        if (startupOverlayTimerRef.current !== null) {
+          window.clearTimeout(startupOverlayTimerRef.current);
+          startupOverlayTimerRef.current = null;
+        }
+        if (startupOverlayFullTimerRef.current !== null) {
+          window.clearTimeout(startupOverlayFullTimerRef.current);
+          startupOverlayFullTimerRef.current = null;
+        }
+      };
+    }
+
+    ensureFullProgress();
+    const fullAt = startupOverlayFullAtRef.current ?? now;
+    const remaining = Math.max(0, STARTUP_OVERLAY_FULL_HOLD_MS - (now - fullAt));
     if (remaining === 0) {
       setShowStartupOverlay(false);
       startupOverlayActiveRef.current = false;
       return;
     }
-    if (startupOverlayTimerRef.current !== null) {
-      window.clearTimeout(startupOverlayTimerRef.current);
-    }
-    startupOverlayTimerRef.current = window.setTimeout(() => {
-      if (!startupOverlayActiveRef.current) return;
-      setShowStartupOverlay(false);
-      startupOverlayActiveRef.current = false;
-    }, remaining);
+    scheduleHide(remaining);
     return () => {
       if (startupOverlayTimerRef.current !== null) {
         window.clearTimeout(startupOverlayTimerRef.current);
         startupOverlayTimerRef.current = null;
+      }
+      if (startupOverlayFullTimerRef.current !== null) {
+        window.clearTimeout(startupOverlayFullTimerRef.current);
+        startupOverlayFullTimerRef.current = null;
       }
     };
   }, [pages, showStartupOverlay]);
@@ -10147,15 +10195,21 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
           <div className="w-full max-w-md rounded-2xl bg-white px-8 py-6 text-center shadow-[0_30px_80px_rgba(5,10,30,0.45)]">
             <p className="text-base font-semibold text-slate-800">Getting project ready...</p>
             <p className="mt-1 text-sm text-slate-500">Loading your workspace</p>
-            <div className="mt-5 h-4 w-full overflow-hidden rounded-full bg-slate-200">
+            <div className="mt-5 h-4 w-full overflow-hidden rounded-full bg-slate-200 shadow-inner">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-[#0b2f6a] via-[#1f4b99] to-[#7c3aed] transition-[width] duration-200 ease-out"
-                style={{
-                  width: `${Math.round(startupProgress * 100)}%`,
-                  backgroundSize: "200% 100%",
-                  animation: "mpdf-water 2.6s linear infinite",
-                }}
-              />
+                className="relative h-full overflow-hidden rounded-full bg-gradient-to-r from-[#0b2f6a] via-[#1f4b99] to-[#7c3aed] transition-[width] duration-200 ease-out"
+                style={{ width: `${Math.round(startupProgress * 100)}%` }}
+              >
+                <div
+                  className="absolute inset-0 opacity-70"
+                  style={{
+                    backgroundImage:
+                      "linear-gradient(120deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.08) 45%, rgba(255,255,255,0.35) 70%, rgba(255,255,255,0.08) 100%)",
+                    backgroundSize: "220% 100%",
+                    animation: "mpdf-water 2.8s ease-in-out infinite",
+                  }}
+                />
+              </div>
             </div>
           </div>
         </div>
