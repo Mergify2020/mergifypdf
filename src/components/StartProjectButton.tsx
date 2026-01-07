@@ -8,10 +8,10 @@ import { createPortal } from "react-dom";
 import { PROJECT_NAME_STORAGE_KEY, sanitizeProjectName } from "@/lib/projectName";
 import { addRecentProject } from "@/lib/recentProjects";
 import { preloadWorkspaceFilesForProject, type PendingWorkspaceFile } from "@/lib/preloadWorkspaceFiles";
-import LoadingOverlay from "@/components/LoadingOverlay";
 
 const WORKSPACE_META_KEY = "mpdf:files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
+const STARTUP_OVERLAY_KEY = "mpdf:startup-overlay";
 
 type Props = {
   className?: string;
@@ -186,6 +186,7 @@ export default function StartProjectButton({ className, variant = "default" }: P
       addRecentProject(ownerId, clean, id);
       setBusy(false);
       setOpen(false);
+      window.sessionStorage?.setItem(STARTUP_OVERLAY_KEY, "1");
       router.push(`/studio?project=${encodeURIComponent(id)}`);
     } catch {
       setError("Could not create that project. Please try again.");
@@ -401,7 +402,6 @@ export default function StartProjectButton({ className, variant = "default" }: P
               </div>
             </form>
           </div>
-          <LoadingOverlay open={busy} label="Getting your project ready..." zIndexClassName="z-[1100]" />
         </div>,
         document.body,
           )

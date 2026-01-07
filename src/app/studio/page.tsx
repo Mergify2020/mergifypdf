@@ -87,7 +87,6 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import WorkspaceSettingsMenu from "@/components/WorkspaceSettingsMenu";
-import LoadingOverlay from "@/components/LoadingOverlay";
 import { addRecentProject } from "@/lib/recentProjects";
 import { PROJECT_NAME_STORAGE_KEY, projectNameToFile, sanitizeProjectName } from "@/lib/projectName";
 import { PENDING_UPLOAD_STORAGE_KEY } from "@/lib/pendingUpload";
@@ -107,6 +106,7 @@ type Point = { x: number; y: number; move?: boolean };
 type DrawingTool = "highlight" | "pen" | "pencil" | "text";
 type HeaderMode = "default" | "pen" | "highlight" | "shapes";
 type ShapeType = "line" | "arrow" | "check" | "x" | "rect" | "ellipse" | "triangle";
+type LineStyle = "solid" | "dashed";
 type ShapeAnnotation = {
   id: string;
   type: ShapeType;
@@ -116,6 +116,7 @@ type ShapeAnnotation = {
   color: string;
   fillColor?: string | null;
   thickness: number;
+  lineStyle?: LineStyle;
 };
 type HighlightStroke = {
   id: string;
@@ -125,6 +126,7 @@ type HighlightStroke = {
   opacity?: number;
   seed?: number;
   thickness: number;
+  lineStyle?: LineStyle;
 };
 type DraftHighlight = {
   tool: Exclude<DrawingTool, "text">;
@@ -134,6 +136,7 @@ type DraftHighlight = {
   opacity?: number;
   seed?: number;
   thickness: number;
+  lineStyle?: LineStyle;
 };
 type HighlightHistoryEntry =
   | { type: "add"; pageId: string; highlight: HighlightStroke }
@@ -378,8 +381,16 @@ const TEXT_SIZE_MAX_PT = 96;
 const DEFAULT_TEXT_SIZE_PT = 11;
 const DEFAULT_TEXT_SIZE_PX = DEFAULT_TEXT_SIZE_PT * PT_TO_PX;
 const DEFAULT_TEXT_LINE_SPACING = 1.0;
+const INITIAL_PREVIEW_RENDER_COUNT = 10;
+const LOW_RES_PREVIEW_SCALE = PREVIEW_BASE_SCALE * 0.5;
+const MAX_PARALLEL_PREVIEW_RENDERS = 6;
+const MAX_PARALLEL_LOW_PREVIEW_RENDERS = 2;
+const MAX_PARALLEL_THUMB_RENDERS = 1;
+const STARTUP_OVERLAY_KEY = "mpdf:startup-overlay";
 const THUMB_MAX_WIDTH = 200;
 const PREVIEW_IMAGE_QUALITY = 0.98;
+const TRANSPARENT_PIXEL =
+  "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=";
 const WORKSPACE_SESSION_KEY = "mpdf:files";
 const WORKSPACE_DB_NAME = "mpdf-file-store";
 const WORKSPACE_DB_STORE = "files";
@@ -1078,8 +1089,22 @@ function smoothStrokePointsBase(points: Point[], iterations: number): Point[] {
 function smoothStrokePoints(points: Point[], tool: Exclude<DrawingTool, "text">): Point[] {
   if (points.length < 3) return points;
   const isPen = tool === "pen" || tool === "pencil";
-  const baseIterations = isPen ? 5 : 1;
-  const iterations = points.length > 520 ? 2 : baseIterations;
+  const baseIterations = isPen ? 2 : 1;
+  const iterations = points.length > 420 ? 1 : baseIterations;
+  if (!isPen) return smoothStrokePointsBase(points, iterations);
+  const first = points[0];
+  const last = points[points.length - 1];
+  const dx = last.x - first.x;
+  const dy = last.y - first.y;
+  const len = Math.max(1e-6, Math.hypot(dx, dy));
+  const maxDeviation = points.reduce((max, pt) => {
+    const proj = ((pt.x - first.x) * dx + (pt.y - first.y) * dy) / (len * len);
+    const closestX = first.x + proj * dx;
+    const closestY = first.y + proj * dy;
+    const dist = Math.hypot(pt.x - closestX, pt.y - closestY);
+    return Math.max(max, dist);
+  }, 0);
+  if (maxDeviation < 0.0025) return points;
   return smoothStrokePointsBase(points, iterations);
 }
 
@@ -1138,7 +1163,7 @@ function shapeBounds(shape: Pick<ShapeAnnotation, "start" | "end">) {
 }
 
 function shapeToSvgElements(
-  shape: Pick<ShapeAnnotation, "type" | "start" | "end">,
+  shape: Pick<ShapeAnnotation, "type" | "start" | "end" | "lineStyle">,
   opts: {
     stroke: string;
     strokeWidth: number;
@@ -1150,6 +1175,9 @@ function shapeToSvgElements(
   }
 ) {
   const strokeOpacity = opts.strokeOpacity ?? 1;
+  const allowDashed = shape.type !== "check" && shape.type !== "arrow";
+  const isDashed = allowDashed && shape.lineStyle === "dashed";
+  const dashArray = isDashed ? `${opts.strokeWidth * 2.5} ${opts.strokeWidth * 1.5}` : undefined;
   const strokeCommon = {
     stroke: opts.stroke,
     strokeWidth: opts.strokeWidth,
@@ -1157,6 +1185,7 @@ function shapeToSvgElements(
     fill: "none" as const,
     strokeLinecap: "round" as const,
     strokeLinejoin: "round" as const,
+    strokeDasharray: dashArray,
     vectorEffect: opts.vectorEffect,
   };
   const fill = opts.fill ?? "none";
@@ -1307,6 +1336,7 @@ function SortableThumb({
   onMoveDown,
   onDelete,
   disableMoveDown,
+  registerThumbNode,
 }: {
   item: PageItem;
   index: number;
@@ -1316,6 +1346,7 @@ function SortableThumb({
   onMoveDown: () => void;
   onDelete: () => void;
   disableMoveDown: boolean;
+  registerThumbNode: (id: string) => (node: HTMLLIElement | null) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
@@ -1332,7 +1363,16 @@ function SortableThumb({
   const scaleFix = isQuarterTurn ? Math.min(ratio, 1 / ratio) : 1;
 
 	  return (
-	    <li ref={setNodeRef} style={style} className="flex w-full justify-center" {...attributes}>
+	    <li
+        ref={(node) => {
+          setNodeRef(node);
+          registerThumbNode(item.id)(node);
+        }}
+        data-thumb-id={item.id}
+        style={style}
+        className="flex w-full justify-center"
+        {...attributes}
+      >
 	      <div
 	        role="button"
         tabIndex={0}
@@ -1362,16 +1402,19 @@ function SortableThumb({
 	              {index + 1}
 	            </span>
 	            <div
-	              className="z-0 flex h-full w-full items-center justify-center"
+	              className="relative z-0 flex h-full w-full items-center justify-center"
 	              style={{ transform: `rotate(${rotationDegrees}deg) scale(${scaleFix})`, transformOrigin: "center" }}
 	            >
-	              {/* eslint-disable-next-line @next/next/no-img-element */}
-	              <img
-	                src={item.thumb}
-	                alt={`Page ${index + 1}`}
-	                className="block h-full w-full object-contain"
-	                draggable={false}
-	              />
+              <div className="absolute inset-0 bg-white" aria-hidden />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={item.thumb || TRANSPARENT_PIXEL}
+                alt={`Page ${index + 1}`}
+                className={`block h-full w-full object-contain transition-opacity duration-200 ${
+                  item.thumb ? "opacity-100" : "opacity-0"
+                }`}
+                draggable={false}
+              />
 	            </div>
 	            <div className="pointer-events-none absolute inset-x-2 bottom-2 z-20 flex justify-center opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
 	              <div className="flex items-center gap-1 rounded-md border border-slate-400 bg-white/95 p-1 shadow-[0_10px_24px_rgba(15,23,42,0.16)] backdrop-blur">
@@ -1484,18 +1527,21 @@ function SortableOrganizeTile({
             }`}
           >
             <div
-              className={`h-full w-full bg-white border border-[rgba(148,163,184,0.5)] ${
+              className={`relative h-full w-full bg-white border border-[rgba(148,163,184,0.5)] ${
                 isDragging
                   ? "shadow-[0_8px_26px_rgba(15,23,42,0.24),_0_24px_60px_rgba(15,23,42,0.30)]"
                   : "shadow-[0_6px_20px_rgba(15,23,42,0.18),_0_18px_45px_rgba(15,23,42,0.22)] group-hover:outline group-hover:outline-[rgba(37,99,235,0.35)] group-hover:outline-1 group-hover:outline-offset-2 group-hover:shadow-[0_6px_20px_rgba(15,23,42,0.21),_0_18px_45px_rgba(15,23,42,0.25)]"
               } transition-shadow duration-200 ease-out`}
               style={{ transform: `rotate(${rotationDegrees}deg) scale(${scaleFix})`, transformOrigin: "center" }}
             >
+              <div className="absolute inset-0 bg-white" aria-hidden />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={item.preview}
+                src={item.preview || TRANSPARENT_PIXEL}
                 alt={`Page ${index + 1}`}
-                className="h-full w-full object-contain select-none"
+                className={`h-full w-full object-contain select-none transition-opacity duration-200 ${
+                  item.preview ? "opacity-100" : "opacity-0"
+                }`}
                 draggable={false}
               />
             </div>
@@ -1563,20 +1609,45 @@ function WorkspaceClient() {
   const pageNavigationLockRef = useRef<{ until: number; targetId: string } | null>(null);
   const scrollRatioRef = useRef<{ x: number; y: number }>({ x: 0.5, y: 0 });
   const restoreScrollOnNextZoomRef = useRef(false);
+  const pageLayoutRef = useRef<{ ids: string[]; centers: number[] }>({ ids: [], centers: [] });
+  const pageLayoutRafRef = useRef<number | null>(null);
+  const scrollUpdateRafRef = useRef<number | null>(null);
+  const activePageIdRef = useRef<string | null>(null);
+  const activePageIndexRef = useRef(0);
   const suppressNextAutoZoomRef = useRef(0);
   const draftHighlightRef = useRef<DraftHighlight | null>(null);
   const draftHighlightLiveRafRef = useRef<number | null>(null);
   const draftHighlightLivePathRef = useRef<{ pageId: string; d: string; last: Point | null } | null>(null);
   const draftHighlightPathMapRef = useRef<Map<string, SVGPathElement>>(new Map());
+  const pdfDocumentCacheRef = useRef<Map<number, any>>(new Map());
+  const renderQueueRef = useRef<
+    Array<{ pageId: string; srcIdx: number; pageIdx: number; quality: "low" | "high"; priority: number }>
+  >([]);
+  const renderQueueKeyRef = useRef<Set<string>>(new Set());
+  const renderQueueRafRef = useRef<number | null>(null);
+  const activeRenderCountRef = useRef(0);
+  const pageRenderStatusRef = useRef<Map<string, "low" | "high" | "rendering-low" | "rendering-high">>(new Map());
+  const thumbRenderQueueRef = useRef<Array<{ pageId: string; srcIdx: number; pageIdx: number; priority: number }>>([]);
+  const thumbRenderQueueKeyRef = useRef<Set<string>>(new Set());
+  const thumbRenderRafRef = useRef<number | null>(null);
+  const thumbRenderActiveRef = useRef(0);
+  const thumbRenderStatusRef = useRef<Map<string, "ready" | "rendering">>(new Map());
+  const thumbNodeMapRef = useRef<Map<string, HTMLLIElement>>(new Map());
+  const visibleThumbIdsRef = useRef<Set<string>>(new Set());
+  const thumbsScrollRef = useRef<HTMLDivElement | null>(null);
+  const [visibleThumbIds, setVisibleThumbIds] = useState<string[]>([]);
   const [previewHeightLimit, setPreviewHeightLimit] = useState<number | null>(null);
   const [highlightMode, setHighlightMode] = useState(false);
   const [highlightColor, setHighlightColor] = useState<HighlightColorKey>("yellow");
   const [highlightThickness, setHighlightThickness] = useState(14);
   const [highlightOpacity, setHighlightOpacity] = useState(0.35);
+  const [showStartupOverlay, setShowStartupOverlay] = useState(false);
+  const startupOverlayActiveRef = useRef(false);
   const [penMode, setPenMode] = useState(false);
   const [penThickness, setPenThickness] = useState(3);
   const [penColor, setPenColor] = useState(PEN_COLOR);
   const [penOpacity, setPenOpacity] = useState(1);
+  const [penLineStyle, setPenLineStyle] = useState<LineStyle>("solid");
   const [penThicknessInput, setPenThicknessInput] = useState("3");
   const [penOpacityInput, setPenOpacityInput] = useState("100");
   const [recentInsertedPageId, setRecentInsertedPageId] = useState<string | null>(null);
@@ -1586,6 +1657,7 @@ function WorkspaceClient() {
   const [shapeThickness, setShapeThickness] = useState(3);
   const [shapeColor, setShapeColor] = useState(PEN_COLOR);
   const [shapeFillColor, setShapeFillColor] = useState<string | null>(null);
+  const [shapeLineStyle, setShapeLineStyle] = useState<LineStyle>("solid");
   const [shapeThicknessInput, setShapeThicknessInput] = useState("3");
   const [headerMode, setHeaderMode] = useState<HeaderMode>("default");
   const [toolbarPreviewMode, setToolbarPreviewMode] = useState<Exclude<HeaderMode, "default"> | null>(null);
@@ -1728,6 +1800,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     color: string;
     fillColor?: string | null;
     thickness: number;
+    lineStyle?: LineStyle;
   } | null>(null);
   const [draftHighlight, setDraftHighlight] = useState<DraftHighlight | null>(null);
   const strokeOutsidePageRef = useRef(false);
@@ -1775,6 +1848,16 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   const lineSpacingMenuRef = useRef<HTMLDivElement | null>(null);
   const lineSpacingMenuButtonRef = useRef<HTMLButtonElement | null>(null);
   const [lineSpacingMenuPosition, setLineSpacingMenuPosition] = useState<{ left: number; top: number } | null>(null);
+  const [lineStyleMenuOpen, setLineStyleMenuOpen] = useState(false);
+  const lineStyleMenuRef = useRef<HTMLDivElement | null>(null);
+  const lineStyleMenuButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [lineStyleMenuPosition, setLineStyleMenuPosition] = useState<{ left: number; top: number } | null>(null);
+  const [shapeLineStyleMenuOpen, setShapeLineStyleMenuOpen] = useState(false);
+  const shapeLineStyleMenuRef = useRef<HTMLDivElement | null>(null);
+  const shapeLineStyleMenuButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [shapeLineStyleMenuPosition, setShapeLineStyleMenuPosition] = useState<{ left: number; top: number } | null>(
+    null
+  );
   const [colorPickerOpen, setColorPickerOpen] = useState<
     "text" | "shape-border" | "shape-fill" | "pen" | null
   >(null);
@@ -1833,6 +1916,9 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   }, [focusedShapeId, focusedShapePageId, shapesByPage]);
   const activeShapeBorderColor = focusedShape?.color ?? shapeColor;
   const activeShapeFillColor = focusedShape?.fillColor ?? shapeFillColor;
+  const activeShapeLineStyle = focusedShape?.lineStyle ?? shapeLineStyle;
+  const shapeLineStyleEligible = (focusedShape?.type ?? shapeType) !== "check" && (focusedShape?.type ?? shapeType) !== "arrow";
+  const resolvedShapeLineStyle = shapeLineStyleEligible ? activeShapeLineStyle : "solid";
   const resolvedShapeBorderColor = activeShapeBorderColor ?? textColor;
   const resolvedShapeFillColor = activeShapeFillColor ?? activeShapeBorderColor ?? textColor;
   const isTextColorPicker = colorPickerOpen === "text";
@@ -3263,11 +3349,58 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   const viewerScrollRef = previewContainerRef;
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
   const previewNodeMap = useRef<Map<string, HTMLDivElement>>(new Map());
+  const pagesRef = useRef<PageItem[]>([]);
+  const pagesByIdRef = useRef<Map<string, PageItem>>(new Map());
   const hasHydratedSources = useRef(false);
   const objectUrlCacheRef = useRef<Map<string, string>>(new Map());
   const hasHydratedHighlights = useRef(false);
   const hasHydratedSignatures = useRef(false);
   const pendingInsertedPageRef = useRef<{ afterId: string; newId: string } | null>(null);
+  const lastProjectKeyRef = useRef<string | null>(null);
+  const pendingInitialRenderRef = useRef<PageItem[]>([]);
+  const nearPageIdsRef = useRef<Set<string>>(new Set());
+  const [nearPageIds, setNearPageIds] = useState<string[]>([]);
+  const visiblePageIdsRef = useRef<Set<string>>(new Set());
+  const [visiblePageIds, setVisiblePageIds] = useState<string[]>([]);
+  useEffect(() => {
+    pagesRef.current = pages;
+    pagesByIdRef.current = new Map(pages.map((page) => [page.id, page]));
+  }, [pages]);
+  useEffect(() => {
+    activePageIdRef.current = activePageId;
+  }, [activePageId]);
+  useEffect(() => {
+    activePageIndexRef.current = activePageIndexState;
+  }, [activePageIndexState]);
+  useEffect(() => {
+    const projectKey = projectParam ?? currentProjectId ?? "local";
+    if (lastProjectKeyRef.current === projectKey) return;
+    lastProjectKeyRef.current = projectKey;
+    renderedSourcesRef.current = 0;
+    pendingInitialRenderRef.current = [];
+    nearPageIdsRef.current.clear();
+    setNearPageIds([]);
+    visiblePageIdsRef.current.clear();
+    setVisiblePageIds([]);
+    pagesByIdRef.current.clear();
+    pdfDocumentCacheRef.current.clear();
+    renderQueueRef.current = [];
+    renderQueueKeyRef.current.clear();
+    pageRenderStatusRef.current.clear();
+    activeRenderCountRef.current = 0;
+    thumbRenderQueueRef.current = [];
+    thumbRenderQueueKeyRef.current.clear();
+    thumbRenderStatusRef.current.clear();
+    thumbRenderActiveRef.current = 0;
+    if (thumbRenderRafRef.current !== null) {
+      window.cancelAnimationFrame(thumbRenderRafRef.current);
+      thumbRenderRafRef.current = null;
+    }
+    if (renderQueueRafRef.current !== null) {
+      window.cancelAnimationFrame(renderQueueRafRef.current);
+      renderQueueRafRef.current = null;
+    }
+  }, [projectParam, currentProjectId]);
   const updatePreviewHeightLimit = useCallback(() => {
     if (typeof window === "undefined") return;
     const container = previewContainerRef.current;
@@ -3397,7 +3530,13 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
 	          savedSignatures?: SavedSignature[];
 	          pages?: {
             id: string;
+            srcIdx?: number;
+            pageIdx?: number;
             rotation?: number;
+            width?: number;
+            height?: number;
+            thumb?: string;
+            preview?: string;
           }[];
         };
 
@@ -3410,6 +3549,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
 	            normalized[pageId] = list.map((shape) => ({
 	              ...shape,
 	              fillColor: shape.fillColor ?? null,
+                lineStyle: shape.lineStyle ?? "solid",
 	            }));
 	          });
 	          setShapesByPage(normalized);
@@ -3446,20 +3586,36 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
           setSavedSignatures(data.savedSignatures);
         }
         if (Array.isArray(data.pages) && data.pages.length > 0) {
-          const rotationById = new Map<string, number>();
-          data.pages.forEach((page) => {
-            if (page && typeof page.id === "string" && typeof page.rotation === "number") {
-              rotationById.set(page.id, page.rotation);
-            }
-          });
-          if (rotationById.size > 0) {
+          const normalizedPages = data.pages
+            .filter((page) => page && typeof page.id === "string")
+            .map((page) => ({
+              id: page.id as string,
+              rotation: typeof page.rotation === "number" ? page.rotation : undefined,
+              thumb: typeof page.thumb === "string" ? page.thumb : "",
+              preview: typeof page.preview === "string" ? page.preview : "",
+            }));
+          if (normalizedPages.length > 0) {
+            const byId = new Map(normalizedPages.map((page) => [page.id, page]));
             setPages((current) =>
-              current.map((page) =>
-                rotationById.has(page.id)
-                  ? { ...page, rotation: rotationById.get(page.id) ?? page.rotation }
-                  : page
-              )
+              current.map((page) => {
+                const incoming = byId.get(page.id);
+                if (!incoming) return page;
+                return {
+                  ...page,
+                  rotation: typeof incoming.rotation === "number" ? incoming.rotation : page.rotation,
+                  preview: incoming.preview || page.preview,
+                  thumb: incoming.thumb || page.thumb,
+                };
+              })
             );
+            normalizedPages.forEach((page) => {
+              if (page.preview) {
+                pageRenderStatusRef.current.set(page.id, "low");
+              }
+              if (page.thumb) {
+                thumbRenderStatusRef.current.set(page.id, "ready");
+              }
+            });
           }
         }
 
@@ -3558,8 +3714,12 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
             const effectiveTool = stroke.tool === "pencil" ? "pen" : stroke.tool;
             ctx.globalAlpha = effectiveTool === "highlight" ? stroke.opacity ?? 0.35 : stroke.opacity ?? 1;
             const widthFactor = stroke.tool === "highlight" ? 1.2 : 1;
-            ctx.lineWidth = Math.max(1, stroke.thickness * pageWidthPx * widthFactor);
+            const lineWidth = Math.max(1, stroke.thickness * pageWidthPx * widthFactor);
+            const dashed = effectiveTool !== "highlight" && stroke.lineStyle === "dashed";
+            ctx.setLineDash(dashed ? [lineWidth * 2.5, lineWidth * 1.5] : []);
+            ctx.lineWidth = lineWidth;
             ctx.stroke();
+            ctx.setLineDash([]);
           });
 	          ctx.globalAlpha = 1;
 	        }
@@ -3589,6 +3749,9 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
 	            ctx.lineWidth = thickness;
 	            ctx.lineCap = "round";
 	            ctx.lineJoin = "round";
+	            const allowDashed = shape.type !== "check" && shape.type !== "arrow";
+	            const isDashed = allowDashed && shape.lineStyle === "dashed";
+	            ctx.setLineDash(isDashed ? [thickness * 2.5, thickness * 1.5] : []);
 	            ctx.beginPath();
 
 	            const drawLine = (ax: number, ay: number, bx: number, by: number) => {
@@ -3800,10 +3963,12 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       const projectId = projectParam ?? currentProjectId ?? null;
       const key = workspaceFilesKey(projectId);
       let raw: string | null = null;
+      let fromSession = false;
       if (local) raw = local.getItem(key);
       if (!raw && session) {
         raw = session.getItem(key);
         if (raw && local) {
+          fromSession = true;
           try {
             local.setItem(key, raw);
           } catch {
@@ -3912,6 +4077,10 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         }
 
         if (!cancelled) {
+          if (fromSession) {
+            startupOverlayActiveRef.current = true;
+            setShowStartupOverlay(true);
+          }
           if (restored.length > 0) {
             setSources(restored);
           } else {
@@ -4085,26 +4254,354 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     }
   }, [authSession?.user?.id, savedSignatures]);
 
-  /** Render thumbnails for any sources that haven't been processed yet */
+  const registerThumbNode = useCallback(
+    (id: string) => (node: HTMLLIElement | null) => {
+      if (node) {
+        thumbNodeMapRef.current.set(id, node);
+      } else {
+        thumbNodeMapRef.current.delete(id);
+      }
+    },
+    []
+  );
+
+  const scheduleRenderQueue = useCallback(() => {
+    if (renderQueueRafRef.current !== null) return;
+    renderQueueRafRef.current = window.requestAnimationFrame(() => {
+      renderQueueRafRef.current = null;
+      const queue = renderQueueRef.current;
+      if (queue.length === 0) return;
+      let activeLow = 0;
+      pageRenderStatusRef.current.forEach((status) => {
+        if (status === "rendering-low") activeLow += 1;
+      });
+      queue.sort((a, b) => b.priority - a.priority);
+      while (activeRenderCountRef.current < MAX_PARALLEL_PREVIEW_RENDERS && queue.length > 0) {
+        const nextIndex = queue.findIndex(
+          (task) => task.quality === "high" || activeLow < MAX_PARALLEL_LOW_PREVIEW_RENDERS
+        );
+        if (nextIndex === -1) break;
+        const next = queue[nextIndex];
+        if (!next) break;
+        queue.splice(nextIndex, 1);
+        renderQueueKeyRef.current.delete(`${next.pageId}:${next.quality}`);
+        const currentStatus = pageRenderStatusRef.current.get(next.pageId);
+        if (
+          next.quality === "low" &&
+          (currentStatus === "low" ||
+            currentStatus === "high" ||
+            currentStatus === "rendering-low" ||
+            currentStatus === "rendering-high")
+        ) {
+          continue;
+        }
+        if (next.quality === "high" && (currentStatus === "high" || currentStatus === "rendering-high")) {
+          continue;
+        }
+        const renderingStatus = next.quality === "high" ? "rendering-high" : "rendering-low";
+        pageRenderStatusRef.current.set(next.pageId, renderingStatus);
+        activeRenderCountRef.current += 1;
+        if (next.quality === "low") {
+          activeLow += 1;
+        }
+        (async () => {
+          const pdf = pdfDocumentCacheRef.current.get(next.srcIdx);
+          if (!pdf) {
+            activeRenderCountRef.current -= 1;
+            if (pageRenderStatusRef.current.get(next.pageId) === renderingStatus) {
+              pageRenderStatusRef.current.delete(next.pageId);
+            }
+            scheduleRenderQueue();
+            return;
+          }
+          try {
+            const page = await pdf.getPage(next.pageIdx + 1);
+            const scale = next.quality === "high" ? PREVIEW_BASE_SCALE : LOW_RES_PREVIEW_SCALE;
+            const pixelRatio = getDevicePixelRatio();
+            const effectiveRatio = next.quality === "high" ? pixelRatio : Math.min(1, pixelRatio);
+            const viewport = page.getViewport({ scale });
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d")!;
+            const scaledWidth = Math.floor(viewport.width * effectiveRatio);
+            const scaledHeight = Math.floor(viewport.height * effectiveRatio);
+            canvas.width = scaledWidth;
+            canvas.height = scaledHeight;
+            const renderContext = {
+              canvasContext: ctx,
+              viewport,
+              transform: effectiveRatio !== 1 ? [effectiveRatio, 0, 0, effectiveRatio, 0, 0] : undefined,
+            };
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = "high";
+            await page.render(renderContext).promise;
+            const previewData = toCardPreviewDataUrl(canvas);
+            const status = pageRenderStatusRef.current.get(next.pageId);
+            if (next.quality === "low" && status === "high") {
+              // skip low-res overwrite if high-res already finished
+            } else {
+              setPages((current) => {
+                let changed = false;
+                const nextPages = current.map((item) => {
+                  if (item.id !== next.pageId) return item;
+                  if (item.preview === previewData) return item;
+                  changed = true;
+                  return { ...item, preview: previewData };
+                });
+                return changed ? nextPages : current;
+              });
+              if (!(next.quality === "low" && status === "rendering-high")) {
+                pageRenderStatusRef.current.set(next.pageId, next.quality);
+              }
+            }
+          } catch (err) {
+            console.error("Failed to render preview", err);
+            if (pageRenderStatusRef.current.get(next.pageId) === renderingStatus) {
+              pageRenderStatusRef.current.delete(next.pageId);
+            }
+          } finally {
+            activeRenderCountRef.current -= 1;
+            scheduleRenderQueue();
+          }
+        })();
+      }
+    });
+  }, []);
+
+  const enqueueRender = useCallback(
+    (task: { pageId: string; srcIdx: number; pageIdx: number; quality: "low" | "high"; priority: number }) => {
+      const existingPage = pagesByIdRef.current.get(task.pageId);
+      if (existingPage?.preview && !pageRenderStatusRef.current.has(task.pageId)) {
+        pageRenderStatusRef.current.set(task.pageId, "low");
+      }
+      const status = pageRenderStatusRef.current.get(task.pageId);
+      if (
+        task.quality === "low" &&
+        (status === "low" || status === "high" || status === "rendering-low" || status === "rendering-high")
+      ) {
+        return;
+      }
+      if (task.quality === "high" && (status === "high" || status === "rendering-high")) return;
+      const key = `${task.pageId}:${task.quality}`;
+      if (renderQueueKeyRef.current.has(key)) {
+        const queue = renderQueueRef.current;
+        const existingIndex = queue.findIndex(
+          (item) => item.pageId === task.pageId && item.quality === task.quality
+        );
+        if (existingIndex !== -1 && queue[existingIndex].priority < task.priority) {
+          queue[existingIndex] = { ...queue[existingIndex], priority: task.priority };
+          scheduleRenderQueue();
+        }
+        return;
+      }
+      renderQueueRef.current.push(task);
+      renderQueueKeyRef.current.add(key);
+      scheduleRenderQueue();
+    },
+    [scheduleRenderQueue]
+  );
+
+  const scheduleThumbRenderQueue = useCallback(() => {
+    if (thumbRenderRafRef.current !== null) return;
+    thumbRenderRafRef.current = window.requestAnimationFrame(() => {
+      thumbRenderRafRef.current = null;
+      const queue = thumbRenderQueueRef.current;
+      if (queue.length === 0) return;
+      queue.sort((a, b) => b.priority - a.priority);
+      while (thumbRenderActiveRef.current < MAX_PARALLEL_THUMB_RENDERS && queue.length > 0) {
+        const next = queue.shift();
+        if (!next) break;
+        thumbRenderQueueKeyRef.current.delete(next.pageId);
+        const currentStatus = thumbRenderStatusRef.current.get(next.pageId);
+        if (currentStatus === "ready" || currentStatus === "rendering") {
+          continue;
+        }
+        thumbRenderStatusRef.current.set(next.pageId, "rendering");
+        thumbRenderActiveRef.current += 1;
+        (async () => {
+          const pdf = pdfDocumentCacheRef.current.get(next.srcIdx);
+          if (!pdf) {
+            thumbRenderActiveRef.current -= 1;
+            if (thumbRenderStatusRef.current.get(next.pageId) === "rendering") {
+              thumbRenderStatusRef.current.delete(next.pageId);
+            }
+            scheduleThumbRenderQueue();
+            return;
+          }
+          try {
+            const page = await pdf.getPage(next.pageIdx + 1);
+            const baseViewport = page.getViewport({ scale: 1 });
+            const scale = Math.min(1, THUMB_MAX_WIDTH / baseViewport.width);
+            const viewport = page.getViewport({ scale });
+            const pixelRatio = Math.min(1, getDevicePixelRatio());
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d")!;
+            const scaledWidth = Math.max(1, Math.floor(viewport.width * pixelRatio));
+            const scaledHeight = Math.max(1, Math.floor(viewport.height * pixelRatio));
+            canvas.width = scaledWidth;
+            canvas.height = scaledHeight;
+            const renderContext = {
+              canvasContext: ctx,
+              viewport,
+              transform: pixelRatio !== 1 ? [pixelRatio, 0, 0, pixelRatio, 0, 0] : undefined,
+            };
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = "high";
+            await page.render(renderContext).promise;
+            const thumbData = createThumbnailDataUrl(canvas);
+            setPages((current) => {
+              let changed = false;
+              const nextPages = current.map((item) => {
+                if (item.id !== next.pageId) return item;
+                if (item.thumb === thumbData) return item;
+                changed = true;
+                return { ...item, thumb: thumbData };
+              });
+              return changed ? nextPages : current;
+            });
+            thumbRenderStatusRef.current.set(next.pageId, "ready");
+          } catch (err) {
+            console.error("Failed to render thumbnail", err);
+            if (thumbRenderStatusRef.current.get(next.pageId) === "rendering") {
+              thumbRenderStatusRef.current.delete(next.pageId);
+            }
+          } finally {
+            thumbRenderActiveRef.current -= 1;
+            scheduleThumbRenderQueue();
+          }
+        })();
+      }
+    });
+  }, []);
+
+  const enqueueThumbRender = useCallback(
+    (task: { pageId: string; srcIdx: number; pageIdx: number; priority: number }) => {
+      const page = pagesByIdRef.current.get(task.pageId);
+      if (!page) return;
+      if (page.thumb) {
+        thumbRenderStatusRef.current.set(task.pageId, "ready");
+        return;
+      }
+      const status = thumbRenderStatusRef.current.get(task.pageId);
+      if (status === "ready" || status === "rendering") return;
+      if (thumbRenderQueueKeyRef.current.has(task.pageId)) {
+        const queue = thumbRenderQueueRef.current;
+        const existingIndex = queue.findIndex((item) => item.pageId === task.pageId);
+        if (existingIndex !== -1 && queue[existingIndex].priority < task.priority) {
+          queue[existingIndex] = { ...queue[existingIndex], priority: task.priority };
+          scheduleThumbRenderQueue();
+        }
+        return;
+      }
+      thumbRenderQueueRef.current.push(task);
+      thumbRenderQueueKeyRef.current.add(task.pageId);
+      scheduleThumbRenderQueue();
+    },
+    [scheduleThumbRenderQueue]
+  );
+
+  useEffect(() => {
+    if (pages.length === 0) return;
+    if (pendingInitialRenderRef.current.length === 0) return;
+    const initialPages = pendingInitialRenderRef.current;
+    pendingInitialRenderRef.current = [];
+    window.requestAnimationFrame(() => {
+      initialPages.forEach((page) => {
+        enqueueRender({ pageId: page.id, srcIdx: page.srcIdx, pageIdx: page.pageIdx, quality: "low", priority: 200 });
+        enqueueRender({ pageId: page.id, srcIdx: page.srcIdx, pageIdx: page.pageIdx, quality: "high", priority: 150 });
+      });
+    });
+  }, [enqueueRender, pages.length]);
+
+  /** Build page shells once per load and enqueue initial renders */
   useEffect(() => {
     if (sources.length === 0) {
       setPages([]);
       renderedSourcesRef.current = 0;
+      renderQueueRef.current = [];
+      renderQueueKeyRef.current.clear();
+      pageRenderStatusRef.current.clear();
+      activeRenderCountRef.current = 0;
+      if (renderQueueRafRef.current !== null) {
+        window.cancelAnimationFrame(renderQueueRafRef.current);
+        renderQueueRafRef.current = null;
+      }
+      thumbRenderQueueRef.current = [];
+      thumbRenderQueueKeyRef.current.clear();
+      thumbRenderStatusRef.current.clear();
+      thumbRenderActiveRef.current = 0;
+      if (thumbRenderRafRef.current !== null) {
+        window.cancelAnimationFrame(thumbRenderRafRef.current);
+        thumbRenderRafRef.current = null;
+      }
       return;
     }
 
-    if (renderedSourcesRef.current >= sources.length) return;
-
     let cancelled = false;
-    async function renderNewSources() {
-      const shouldShowLoading = pages.length === 0;
-      if (shouldShowLoading) setLoading(true);
+
+    async function loadPdfSource(
+      src: SourceRef,
+      srcIdx: number,
+      pdfjsLib: typeof import("pdfjs-dist") & { GlobalWorkerOptions: { workerSrc: string } },
+    ) {
+      let pdf: any | null = null;
+      const sourceUrl = src.url;
+
+      if (sourceUrl) {
+        try {
+          pdf = await pdfjsLib.getDocument({ url: sourceUrl } as any).promise;
+        } catch (err) {
+          console.warn("pdfjs getDocument failed, retrying without worker", err);
+          try {
+            pdf = await pdfjsLib.getDocument({ url: sourceUrl, disableWorker: true } as any).promise;
+          } catch (innerErr) {
+            console.warn("pdfjs getDocument failed with url source, falling back to bytes", innerErr);
+          }
+        }
+      }
+
+      if (!pdf) {
+        const stored = await readFileBlob(src.storageId);
+        const blob = stored?.blob instanceof Blob ? stored.blob : null;
+        const bytes = blob
+          ? new Uint8Array(await blob.arrayBuffer())
+          : new Uint8Array(await (await fetch(src.url)).arrayBuffer());
+        try {
+          pdf = await pdfjsLib.getDocument({ data: bytes } as any).promise;
+        } catch (err) {
+          console.warn("pdfjs getDocument failed, retrying without worker", err);
+          pdf = await pdfjsLib.getDocument({ data: bytes, disableWorker: true } as any).promise;
+        }
+      }
+      if (!pdf) {
+        throw new Error("Unable to load PDF source");
+      }
+
+      let width = 612;
+      let height = 792;
+      try {
+        const firstPage = await pdf.getPage(1);
+        const view = firstPage.view;
+        width = view[2] - view[0];
+        height = view[3] - view[1];
+      } catch {
+        // keep default size
+      }
+
+      return { pdf, srcIdx, storageId: src.storageId, pageCount: pdf.numPages, width, height };
+    }
+
+    async function loadSources() {
+      const isInitialLoad = renderedSourcesRef.current === 0;
+      if (isInitialLoad) setLoading(true);
       setError(null);
-      const next: PageItem[] = [];
-      const startIdx = renderedSourcesRef.current;
+
+      const startIdx = isInitialLoad ? 0 : renderedSourcesRef.current;
+      if (startIdx >= sources.length) {
+        if (isInitialLoad) setLoading(false);
+        return;
+      }
 
       try {
-        // Import pdf.js in the browser only
         const pdfjsLib = (await import("pdfjs-dist")) as typeof import("pdfjs-dist") & {
           GlobalWorkerOptions: { workerSrc: string };
         };
@@ -4113,93 +4610,53 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
           import.meta.url,
         ).toString();
 
-        const pixelRatio = getDevicePixelRatio();
-        const previewScale = PREVIEW_BASE_SCALE;
+        const loadPromises = sources.slice(startIdx).map((src, offset) =>
+          loadPdfSource(src, startIdx + offset, pdfjsLib)
+        );
+        const results = await Promise.all(loadPromises);
+        if (cancelled) return;
 
-        // Only render thumbnails for sources we haven't seen yet
-        for (let s = startIdx; s < sources.length; s++) {
-          const src = sources[s];
-          let pdf: any;
-          try {
-            // Use `data` instead of `url` so the worker doesn't try to fetch `blob:` URLs,
-            // which can intermittently fail with "Unexpected server response (0)".
-            const stored = await readFileBlob(src.storageId);
-            const blob = stored?.blob instanceof Blob ? stored.blob : null;
-            const bytes = blob
-              ? new Uint8Array(await blob.arrayBuffer())
-              : new Uint8Array(await (await fetch(src.url)).arrayBuffer());
-            pdf = await pdfjsLib.getDocument({ data: bytes } as any).promise;
-          } catch (err) {
-            console.warn("pdfjs getDocument failed, retrying without worker", err);
-            const stored = await readFileBlob(src.storageId);
-            const blob = stored?.blob instanceof Blob ? stored.blob : null;
-            const bytes = blob
-              ? new Uint8Array(await blob.arrayBuffer())
-              : new Uint8Array(await (await fetch(src.url)).arrayBuffer());
-            pdf = await pdfjsLib.getDocument({ data: bytes, disableWorker: true } as any).promise;
-          }
-          for (let p = 1; p <= pdf.numPages; p++) {
-            if (cancelled) return;
-            const page = await pdf.getPage(p);
-            const view = page.view;
-            const pageWidth = view[2] - view[0];
-            const pageHeight = view[3] - view[1];
-            const viewport = page.getViewport({ scale: previewScale });
-            const canvas = document.createElement("canvas");
-            const ctx = canvas.getContext("2d")!;
-
-            const scaledWidth = Math.floor(viewport.width * pixelRatio);
-            const scaledHeight = Math.floor(viewport.height * pixelRatio);
-            canvas.width = scaledWidth;
-            canvas.height = scaledHeight;
-
-            const renderContext = {
-              canvasContext: ctx,
-              viewport,
-              transform: pixelRatio !== 1 ? [pixelRatio, 0, 0, pixelRatio, 0, 0] : undefined,
-            };
-
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = "high";
-            await page.render(renderContext).promise;
-
-            const previewData = toCardPreviewDataUrl(canvas);
-            const thumbData = createThumbnailDataUrl(canvas);
-
-            const pageId = buildPageId(src.storageId, p - 1);
-            next.push({
-              id: pageId,
-              srcIdx: s,
-              pageIdx: p - 1,
-              thumb: thumbData,
-              preview: previewData,
+        const newPages: PageItem[] = [];
+        results.forEach((result) => {
+          if (!result) return;
+          pdfDocumentCacheRef.current.set(result.srcIdx, result.pdf);
+          for (let pageIdx = 0; pageIdx < result.pageCount; pageIdx += 1) {
+            newPages.push({
+              id: buildPageId(result.storageId, pageIdx),
+              srcIdx: result.srcIdx,
+              pageIdx,
+              thumb: "",
+              preview: "",
               rotation: 0,
-              width: pageWidth,
-              height: pageHeight,
+              width: result.width,
+              height: result.height,
             });
           }
+        });
+
+        if (cancelled) return;
+
+        if (isInitialLoad) {
+          setPages(newPages);
+          pendingInitialRenderRef.current = newPages.slice(0, INITIAL_PREVIEW_RENDER_COUNT);
+        } else if (newPages.length > 0) {
+          setPages((prev) => {
+            const existing = new Set(prev.map((page) => page.id));
+            const appended = newPages.filter((page) => !existing.has(page.id));
+            return appended.length > 0 ? [...prev, ...appended] : prev;
+          });
         }
 
-        if (!cancelled) {
-          setPages((prev) => {
-            if (prev.length === 0) return [...prev, ...next];
-            const nextById = new Map(next.map((item) => [item.id, item]));
-            const merged = prev.map((item) => nextById.get(item.id) ?? item);
-            const existingIds = new Set(prev.map((item) => item.id));
-            const appended = next.filter((item) => !existingIds.has(item.id));
-            return appended.length ? [...merged, ...appended] : merged;
-          });
-          renderedSourcesRef.current = sources.length;
-        }
+        renderedSourcesRef.current = sources.length;
+        if (isInitialLoad) setLoading(false);
       } catch (e) {
         console.error(e);
         if (!cancelled) setError("Could not render previews (file may be encrypted or corrupted).");
-      } finally {
-        if (!cancelled && pages.length === 0) setLoading(false);
+        if (isInitialLoad && !cancelled) setLoading(false);
       }
     }
 
-    renderNewSources();
+    void loadSources();
     return () => {
       cancelled = true;
     };
@@ -4235,6 +4692,8 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     const timer = window.setTimeout(() => setRecentInsertedPageId(null), 220);
     return () => window.clearTimeout(timer);
   }, [recentInsertedPageId]);
+
+  const pageIdSignature = useMemo(() => pages.map((page) => page.id).join("|"), [pages]);
 
   useEffect(() => {
     if (!pageActionMenuId) return;
@@ -4322,40 +4781,239 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     setRedoHighlightHistory((prev) => prev.filter(filterAllowed));
   }, [pages, sources.length]);
 
+  const updateActivePageFromScroll = useCallback(() => {
+    const container = previewContainerRef.current;
+    const layout = pageLayoutRef.current;
+    if (!container || layout.ids.length === 0) return;
+    const viewCenter = container.scrollTop + container.clientHeight / 2;
+    let closestIndex = 0;
+    let closestDistance = Infinity;
+    for (let i = 0; i < layout.centers.length; i += 1) {
+      const distance = Math.abs(layout.centers[i] - viewCenter);
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closestIndex = i;
+      }
+    }
+    const nextId = layout.ids[closestIndex];
+    if (!nextId) return;
+    if (activePageIdRef.current !== nextId || activePageIndexRef.current !== closestIndex) {
+      activePageIdRef.current = nextId;
+      activePageIndexRef.current = closestIndex;
+      setActivePageId(nextId);
+      setActivePageIndex(closestIndex);
+    }
+  }, [setActivePageId, setActivePageIndex]);
+
+  const refreshPageLayout = useCallback(() => {
+    pageLayoutRafRef.current = null;
+    const container = previewContainerRef.current;
+    const pageList = pagesRef.current;
+    if (!container || pageList.length === 0) return;
+    const containerRect = container.getBoundingClientRect();
+    const ids: string[] = [];
+    const centers: number[] = [];
+    pageList.forEach((page) => {
+      const node = previewNodeMap.current.get(page.id);
+      if (!node) return;
+      const rect = node.getBoundingClientRect();
+      const top = rect.top - containerRect.top + container.scrollTop;
+      ids.push(page.id);
+      centers.push(top + rect.height / 2);
+    });
+    if (ids.length !== pageList.length) {
+      if (pageLayoutRafRef.current !== null) {
+        window.cancelAnimationFrame(pageLayoutRafRef.current);
+      }
+      pageLayoutRafRef.current = window.requestAnimationFrame(refreshPageLayout);
+      return;
+    }
+    pageLayoutRef.current = { ids, centers };
+    updateActivePageFromScroll();
+  }, [pageIdSignature, updateActivePageFromScroll]);
+
+  useEffect(() => {
+    if (pages.length === 0) {
+      pageLayoutRef.current = { ids: [], centers: [] };
+      return;
+    }
+    if (pageLayoutRafRef.current !== null) {
+      window.cancelAnimationFrame(pageLayoutRafRef.current);
+    }
+    pageLayoutRafRef.current = window.requestAnimationFrame(() => {
+      refreshPageLayout();
+    });
+    return () => {
+      if (pageLayoutRafRef.current !== null) {
+        window.cancelAnimationFrame(pageLayoutRafRef.current);
+        pageLayoutRafRef.current = null;
+      }
+    };
+  }, [pageIdSignature, baseScale, zoomMultiplier, refreshPageLayout, pages.length]);
+
   useEffect(() => {
     const container = previewContainerRef.current;
     if (!container || pages.length === 0) return;
+    const handleScroll = () => {
+      if (scrollUpdateRafRef.current !== null) return;
+      scrollUpdateRafRef.current = window.requestAnimationFrame(() => {
+        scrollUpdateRafRef.current = null;
+        updateActivePageFromScroll();
+      });
+    };
+    container.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll();
+    return () => {
+      container.removeEventListener("scroll", handleScroll);
+      if (scrollUpdateRafRef.current !== null) {
+        window.cancelAnimationFrame(scrollUpdateRafRef.current);
+        scrollUpdateRafRef.current = null;
+      }
+    };
+  }, [pages.length, updateActivePageFromScroll]);
 
+  useEffect(() => {
+    const container = previewContainerRef.current;
+    if (!container || pages.length === 0) return;
+    nearPageIdsRef.current.clear();
+    setNearPageIds([]);
     const observer = new IntersectionObserver(
       (entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
-        if (visible.length > 0) {
-          const id = visible[0].target.getAttribute("data-page-id");
-          if (id) {
-            const lock = pageNavigationLockRef.current;
-            if (lock && Date.now() < lock.until) {
-              if (id !== lock.targetId) return;
-              pageNavigationLockRef.current = null;
+        let changed = false;
+        entries.forEach((entry) => {
+          const id = entry.target.getAttribute("data-page-id");
+          if (!id) return;
+          if (entry.isIntersecting) {
+            if (!nearPageIdsRef.current.has(id)) {
+              nearPageIdsRef.current.add(id);
+              changed = true;
             }
-            setActivePageId((prev) => (prev === id ? prev : id));
+          } else if (nearPageIdsRef.current.delete(id)) {
+            changed = true;
           }
+        });
+        if (changed) {
+          setNearPageIds(Array.from(nearPageIdsRef.current));
         }
       },
-      { root: container, threshold: 0.65 }
+      { root: container, rootMargin: "120% 0px", threshold: 0.01 }
     );
-
     previewNodeMap.current.forEach((node) => observer.observe(node));
     return () => observer.disconnect();
   }, [pages]);
 
   useEffect(() => {
+    const container = previewContainerRef.current;
+    if (!container || pages.length === 0) return;
+    visiblePageIdsRef.current.clear();
+    setVisiblePageIds([]);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        let changed = false;
+        entries.forEach((entry) => {
+          const id = entry.target.getAttribute("data-page-id");
+          if (!id) return;
+          if (entry.isIntersecting) {
+            if (!visiblePageIdsRef.current.has(id)) {
+              visiblePageIdsRef.current.add(id);
+              changed = true;
+            }
+          } else if (visiblePageIdsRef.current.delete(id)) {
+            changed = true;
+          }
+        });
+        if (changed) {
+          setVisiblePageIds(Array.from(visiblePageIdsRef.current));
+        }
+      },
+      { root: container, threshold: 0.4 }
+    );
+    previewNodeMap.current.forEach((node) => observer.observe(node));
+    return () => observer.disconnect();
+  }, [pages]);
+
+  useEffect(() => {
+    if (pages.length === 0) return;
+    const candidates = new Set<string>();
+    nearPageIds.forEach((id) => candidates.add(id));
+    candidates.forEach((id) => {
+      const page = pagesByIdRef.current.get(id);
+      if (!page) return;
+      enqueueRender({ pageId: page.id, srcIdx: page.srcIdx, pageIdx: page.pageIdx, quality: "low", priority: 70 });
+    });
+  }, [enqueueRender, nearPageIds, pages.length]);
+
+  useEffect(() => {
+    if (pages.length === 0) return;
+    const candidates = new Set<string>(visiblePageIds);
+    const activeIndex =
+      activePageIndexState >= 0 && activePageIndexState < pages.length ? activePageIndexState : 0;
+    for (let offset = -2; offset <= 2; offset += 1) {
+      const idx = activeIndex + offset;
+      if (idx >= 0 && idx < pages.length) {
+        candidates.add(pages[idx].id);
+      }
+    }
+    candidates.forEach((id) => {
+      const page = pagesByIdRef.current.get(id);
+      if (!page) return;
+      enqueueRender({ pageId: page.id, srcIdx: page.srcIdx, pageIdx: page.pageIdx, quality: "high", priority: 120 });
+    });
+  }, [activePageIndexState, enqueueRender, pages, visiblePageIds]);
+
+  useEffect(() => {
+    const container = thumbsScrollRef.current;
+    if (!container || pages.length === 0) return;
+    visibleThumbIdsRef.current.clear();
+    setVisibleThumbIds([]);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        let changed = false;
+        entries.forEach((entry) => {
+          const id = entry.target.getAttribute("data-thumb-id");
+          if (!id) return;
+          if (entry.isIntersecting) {
+            if (!visibleThumbIdsRef.current.has(id)) {
+              visibleThumbIdsRef.current.add(id);
+              changed = true;
+            }
+          } else if (visibleThumbIdsRef.current.delete(id)) {
+            changed = true;
+          }
+        });
+        if (changed) {
+          setVisibleThumbIds(Array.from(visibleThumbIdsRef.current));
+        }
+      },
+      { root: container, threshold: 0.6 }
+    );
+    thumbNodeMapRef.current.forEach((node) => observer.observe(node));
+    return () => observer.disconnect();
+  }, [pages]);
+
+  useEffect(() => {
+    if (pages.length === 0) return;
+    visibleThumbIds.forEach((id) => {
+      const page = pagesByIdRef.current.get(id);
+      if (!page) return;
+      enqueueThumbRender({ pageId: page.id, srcIdx: page.srcIdx, pageIdx: page.pageIdx, priority: 80 });
+    });
+  }, [enqueueThumbRender, pages.length, visibleThumbIds]);
+
+  useEffect(() => {
     if (typeof window === "undefined") return;
+    const session = getSessionStorage();
+    if (session?.getItem(STARTUP_OVERLAY_KEY)) {
+      session.removeItem(STARTUP_OVERLAY_KEY);
+      startupOverlayActiveRef.current = true;
+      setShowStartupOverlay(true);
+    }
     const storage = getLocalStorage();
     if (!storage) return;
     const pending = storage.getItem(PENDING_UPLOAD_STORAGE_KEY);
     if (!pending) return;
+    startupOverlayActiveRef.current = true;
+    setShowStartupOverlay(true);
     storage.removeItem(PENDING_UPLOAD_STORAGE_KEY);
     try {
       const parsed = JSON.parse(pending);
@@ -4367,6 +5025,13 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       console.error("Failed to import pending upload", err);
     }
   }, []);
+
+  useEffect(() => {
+    if (!startupOverlayActiveRef.current || !showStartupOverlay) return;
+    if (pages.length === 0) return;
+    setShowStartupOverlay(false);
+    startupOverlayActiveRef.current = false;
+  }, [pages.length, showStartupOverlay]);
 
   /** Add more PDFs (create object URLs and append to sources) */
   function handleAddClick() {
@@ -4733,8 +5398,6 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     return (
       <div
         key={page.id}
-        data-page-id={page.id}
-        ref={registerPreviewRef(page.id)}
         className={`mx-auto w-fit ${
           recentInsertedPageId === page.id
             ? "opacity-0 scale-[0.98] animate-[page-enter_0.15s_ease-out_forwards]"
@@ -4826,12 +5489,14 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
           </div>
         </div>
         <div
+          data-page-id={page.id}
+          ref={registerPreviewRef(page.id)}
           className={`relative bg-white shadow-[0_12px_30px_rgba(15,23,42,0.18)] transition ${
             idx === activePageIndex ? "shadow-brand/30" : ""
           }`}
-            style={{
-              width: fittedWidth,
-              height: displayHeight,
+          style={{
+            width: fittedWidth,
+            height: displayHeight,
             overflow: undefined,
           }}
           onClick={(event) => {
@@ -4882,11 +5547,14 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                 handleMarkupPointerUp(page.id);
               }}
             >
+              <div className="absolute inset-0 bg-white" aria-hidden />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={page.preview}
+                src={page.preview || TRANSPARENT_PIXEL}
                 alt={`Page ${idx + 1}`}
-                className="h-full w-full object-contain"
+                className={`absolute inset-0 h-full w-full object-contain transition-opacity duration-200 ${
+                  page.preview ? "opacity-100" : "opacity-0"
+                }`}
                 draggable={false}
               />
               <svg
@@ -4979,12 +5647,16 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                   const cap = isHighlight ? "butt" : "round";
                   const join = isHighlight ? "miter" : "round";
                   const opacity = isHighlight ? stroke.opacity ?? 0.35 : stroke.opacity ?? 1;
+                  const isDashed = !isHighlight && stroke.lineStyle === "dashed";
+                  const dash = Math.max(6, baseWidth * 1.6);
+                  const gap = Math.max(4, baseWidth * 1.2);
                   const commonProps = {
                     d: pointsToSvgPath(stroke.points),
                     fill: "none" as const,
                     stroke: stroke.color,
                     strokeLinecap: cap as any,
                     strokeLinejoin: join as any,
+                    strokeDasharray: isDashed ? `${dash} ${gap}` : undefined,
                     style: {
                       pointerEvents: deleteMode ? ("stroke" as const) : ("none" as const),
                       cursor: deleteMode
@@ -5862,6 +6534,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         opacity: stroke.opacity,
         seed: stroke.seed,
         thickness: stroke.thickness,
+        lineStyle: stroke.lineStyle,
       };
       setHighlights((existing) => {
         const nextList = existing[stroke.pageId] ? [...existing[stroke.pageId]] : [];
@@ -6441,7 +7114,8 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   }, []);
 
   const itemsIds = useMemo(() => pages.map((p) => p.id), [pages]);
-  const downloadDisabled = busy || pages.length === 0;
+  const isLoadingPages = loading && pages.length === 0;
+  const downloadDisabled = busy || pages.length === 0 || isLoadingPages;
 	  const activePageIndex = activePageIndexState >= 0 && activePageIndexState < pages.length ? activePageIndexState : -1;
   const zoomLabel = `${Math.round(zoomPercent)}%`;
   const highlightButtonDisabled = pages.length === 0 || loading;
@@ -6608,6 +7282,21 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       });
     },
     [focusedShapeId, focusedShapePageId]
+  );
+  const applyShapeLineStyle = useCallback(
+    (style: LineStyle) => {
+      setShapeLineStyle(style);
+      if (!focusedShapeId || !focusedShapePageId) return;
+      if (focusedShape?.type === "check" || focusedShape?.type === "arrow") return;
+      setShapesByPage((prev) => {
+        const list = prev[focusedShapePageId] ?? [];
+        const updated = list.map((shape) =>
+          shape.id === focusedShapeId ? { ...shape, lineStyle: style } : shape
+        );
+        return { ...prev, [focusedShapePageId]: updated };
+      });
+    },
+    [focusedShape, focusedShapeId, focusedShapePageId]
   );
   const normalizeShapeThickness = useCallback(
     (value: number) => clamp(Math.round(value), MIN_SHAPE_THICKNESS, MAX_SHAPE_THICKNESS),
@@ -6795,6 +7484,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     if (label === "Font" && fontMenuOpen) return;
     if (label === "Align" && alignMenuOpen) return;
     if (label === "Line spacing" && lineSpacingMenuOpen) return;
+    if (label === "Line style" && (lineStyleMenuOpen || shapeLineStyleMenuOpen)) return;
     const rect = target.getBoundingClientRect();
     const toolbarRect = target.closest("[data-text-toolbar]")?.getBoundingClientRect();
     const baseY = toolbarRect ? toolbarRect.bottom - 6 : rect.bottom - 6;
@@ -6805,7 +7495,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       y: baseY + 8,
       visible: true,
     });
-  }, [fontMenuOpen, alignMenuOpen, lineSpacingMenuOpen]);
+  }, [fontMenuOpen, alignMenuOpen, lineSpacingMenuOpen, lineStyleMenuOpen, shapeLineStyleMenuOpen]);
   const hideToolbarTooltip = useCallback(() => {
     setToolbarTooltip((prev) => (prev.visible ? { ...prev, visible: false } : prev));
   }, []);
@@ -6881,6 +7571,9 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     if (!focusedShapeId || !focusedShapePageId || !focusedShape) return;
     setShapeColor(focusedShape.color);
     setShapeFillColor(focusedShape.fillColor ?? null);
+    setShapeLineStyle(
+      focusedShape.type === "check" || focusedShape.type === "arrow" ? "solid" : focusedShape.lineStyle ?? "solid"
+    );
     const node = previewNodeMap.current.get(focusedShapePageId);
     const rect = node?.getBoundingClientRect();
     if (!rect?.width) return;
@@ -6958,14 +7651,16 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         size: source.size,
         updatedAt: source.updatedAt,
       })),
-	      pages: pages.map((page) => ({
-	        id: page.id,
-	        srcIdx: page.srcIdx,
-	        pageIdx: page.pageIdx,
-	        rotation: page.rotation,
-	        width: page.width,
-	        height: page.height,
-	      })),
+      pages: pages.map((page) => ({
+        id: page.id,
+        srcIdx: page.srcIdx,
+        pageIdx: page.pageIdx,
+        rotation: page.rotation,
+        width: page.width,
+        height: page.height,
+        thumb: page.thumb,
+        preview: page.preview,
+      })),
       highlights,
       shapesByPage,
       textAnnotations,
@@ -7028,13 +7723,14 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     draftHighlight,
   ]);
 
-		  const computeBaseScale = useCallback(() => {
-		    const container = previewContainerRef.current;
-		    if (!container || pages.length === 0) return;
-		    const targetIndex = activePageIndex >= 0 ? activePageIndex : 0;
-		    const targetPage = pages[targetIndex];
-		    const naturalWidth = targetPage?.width || 612;
-		    const naturalHeight = targetPage?.height || naturalWidth * DEFAULT_ASPECT_RATIO;
+	  const computeBaseScale = useCallback(() => {
+	    const container = previewContainerRef.current;
+	    const pageList = pagesRef.current;
+	    if (!container || pageList.length === 0) return;
+	    const targetIndex = activePageIndexRef.current >= 0 ? activePageIndexRef.current : 0;
+	    const targetPage = pageList[targetIndex] ?? pageList[0];
+	    const naturalWidth = targetPage?.width || 612;
+	    const naturalHeight = targetPage?.height || naturalWidth * DEFAULT_ASPECT_RATIO;
 		    // Rotation should not affect zoom/fit scaling. A rotated page is still the same page,
 		    // just turned; users can pan/scroll to see it rather than the app re-zooming.
 		    const baseWidth = naturalWidth;
@@ -7060,7 +7756,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
 		      setZoomPercent((prev) => (prev === desiredZoomPercent ? prev : desiredZoomPercent));
 		    }
 		    setBaseScale((prev) => (Math.abs(prev - documentScale) > 0.001 ? documentScale : prev));
-		  }, [activePageIndex, pages, userAdjustedZoom]);
+	  }, [pageIdSignature, userAdjustedZoom]);
 
 	  useEffect(() => {
 	    if (!shouldCenterOnChange) return;
@@ -7142,12 +7838,20 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     const cap = isHighlight ? "butt" : "round";
     const join = isHighlight ? "miter" : "round";
     const opacity = isHighlight ? draft.opacity ?? 0.35 : draft.opacity ?? 1;
+    const isDashed = !isHighlight && draft.lineStyle === "dashed";
+    const dash = Math.max(6, baseWidth * 1.6);
+    const gap = Math.max(4, baseWidth * 1.2);
     path.setAttribute("fill", "none");
     path.setAttribute("stroke", draft.color);
     path.setAttribute("stroke-width", String(isHighlight ? baseWidth * 1.2 : baseWidth));
     path.setAttribute("stroke-linecap", cap);
     path.setAttribute("stroke-linejoin", join);
     path.setAttribute("stroke-opacity", `${opacity}`);
+    if (isDashed) {
+      path.setAttribute("stroke-dasharray", `${dash} ${gap}`);
+    } else {
+      path.removeAttribute("stroke-dasharray");
+    }
     path.style.pointerEvents = "none";
     path.style.mixBlendMode = isHighlight ? "multiply" : "";
   }, []);
@@ -7193,6 +7897,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     if (!shapeType) return;
     const point = getPointerPoint(event, { requireInside: true, clampToBounds: true });
     if (!point) return;
+    const lineStyle = shapeType === "check" || shapeType === "arrow" ? "solid" : shapeLineStyle;
     event.currentTarget.setPointerCapture?.(event.pointerId);
     setDraftShape({
       pageId,
@@ -7202,6 +7907,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       color: shapeColor,
       fillColor: shapeFillColor,
       thickness: shapeThickness / (point.rectWidth / zoomMultiplier),
+      lineStyle,
     });
     event.preventDefault();
   }
@@ -7230,6 +7936,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       color: draftShape.color,
       fillColor: draftShape.fillColor ?? null,
       thickness: draftShape.thickness,
+      lineStyle: draftShape.lineStyle ?? "solid",
     };
     setShapesByPage((prev) => {
       const list = prev[pageId] ? [...prev[pageId]] : [];
@@ -7306,6 +8013,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       color: tool === "highlight" ? HIGHLIGHT_COLORS[highlightColor] : penColor,
       opacity: tool === "highlight" ? highlightOpacity : penOpacity,
       thickness: baseThickness / point.rectWidth,
+      lineStyle: tool === "highlight" ? "solid" : penLineStyle,
     };
     draftHighlightRef.current = draft;
     setDraftHighlight(draft);
@@ -7497,6 +8205,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   }
 
   function handlePageStep(direction: 1 | -1) {
+    if (isLoadingPages) return;
     if (pages.length === 0) return;
     let currentIndex = pages.findIndex((p) => p.id === activePageId);
     if (currentIndex === -1) currentIndex = 0;
@@ -8055,6 +8764,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
 	                  ? LineCapStyle.Butt
 	                  : LineCapStyle.Round;
 	              const baseOpacity = tool === "highlight" ? (stroke.opacity ?? 0.35) : stroke.opacity ?? 1;
+	              const dashed = tool !== "highlight" && stroke.lineStyle === "dashed";
 	              const widthFactor = tool === "highlight" ? 1.2 : 1;
 	              for (let i = 1; i < stroke.points.length; i++) {
 	                const start = stroke.points[i - 1];
@@ -8072,6 +8782,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
 	                  color: rgb(colorValue.r, colorValue.g, colorValue.b),
 	                  opacity: baseOpacity,
 	                  lineCap: cap,
+	                  ...(dashed ? { dashArray: [baseThickness * 2.5, baseThickness * 1.5] } : {}),
 	                });
 	              }
 	            });
@@ -8087,6 +8798,9 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
               if (!colorValue) return;
               const fillColorValue = shape.fillColor ? hexToRgb(shape.fillColor) : null;
               const thickness = Math.max(1, shape.thickness * pageWidth);
+              const allowDashed = shape.type !== "check" && shape.type !== "arrow";
+              const isDashed = allowDashed && shape.lineStyle === "dashed";
+              const dashArray = isDashed ? [thickness * 2.5, thickness * 1.5] : undefined;
               const start = unitToPdf(shape.start);
               const end = unitToPdf(shape.end);
               const minX = Math.min(start.x, end.x);
@@ -8104,6 +8818,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                   color: strokeColor,
                   opacity: 1,
                   lineCap: LineCapStyle.Round,
+                  ...(dashArray ? { dashArray } : {}),
                 });
               };
               const drawArrowHead = (a: { x: number; y: number }, b: { x: number; y: number }) => {
@@ -8137,6 +8852,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
 	                    borderWidth: thickness,
 	                    borderColor: strokeColor,
 	                    borderOpacity: 1,
+	                    ...(dashArray ? { borderDashArray: dashArray } : {}),
 	                    borderLineCap: LineCapStyle.Round,
 	                  });
 	                  break;
@@ -8152,6 +8868,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
 	                    borderWidth: thickness,
 	                    borderColor: strokeColor,
 	                    borderOpacity: 1,
+	                    ...(dashArray ? { borderDashArray: dashArray } : {}),
 	                    borderLineCap: LineCapStyle.Round,
 	                  });
 	                  break;
@@ -8165,6 +8882,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                         borderColor: strokeColor,
                         borderWidth: thickness,
                         borderOpacity: 1,
+                        ...(dashArray ? { borderDashArray: dashArray } : {}),
                       });
                     } else {
                       drawLineSegment(top, right);
@@ -8395,6 +9113,15 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     setProjectNameError(null);
   }
 
+  const handleLogoNavigate = useCallback(
+    (event: React.MouseEvent<HTMLAnchorElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
+      router.push("/");
+    },
+    [router]
+  );
+
   function handleRotatePage(pageId: string) {
     setPages((prev) =>
       prev.map((page) =>
@@ -8428,7 +9155,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       return;
     }
     computeBaseScale();
-  }, [computeBaseScale, pages.length, activePageIndex, userAdjustedZoom]);
+  }, [computeBaseScale, pages.length, userAdjustedZoom]);
 
   useEffect(() => {
     if (!showDelayOverlay) return;
@@ -8601,6 +9328,31 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     document.addEventListener("click", handleOutside);
     return () => document.removeEventListener("click", handleOutside);
   }, [lineSpacingMenuOpen]);
+  useEffect(() => {
+    if (!lineStyleMenuOpen) return;
+    const handleOutside = (event: MouseEvent) => {
+      if (!(event.target instanceof Node)) return;
+      if (!lineStyleMenuRef.current?.contains(event.target) && !lineStyleMenuButtonRef.current?.contains(event.target)) {
+        setLineStyleMenuOpen(false);
+      }
+    };
+    document.addEventListener("click", handleOutside);
+    return () => document.removeEventListener("click", handleOutside);
+  }, [lineStyleMenuOpen]);
+  useEffect(() => {
+    if (!shapeLineStyleMenuOpen) return;
+    const handleOutside = (event: MouseEvent) => {
+      if (!(event.target instanceof Node)) return;
+      if (
+        !shapeLineStyleMenuRef.current?.contains(event.target) &&
+        !shapeLineStyleMenuButtonRef.current?.contains(event.target)
+      ) {
+        setShapeLineStyleMenuOpen(false);
+      }
+    };
+    document.addEventListener("click", handleOutside);
+    return () => document.removeEventListener("click", handleOutside);
+  }, [shapeLineStyleMenuOpen]);
   const updateFontMenuPosition = useCallback(() => {
     const button = fontMenuButtonRef.current;
     if (!button || typeof window === "undefined") return;
@@ -8626,6 +9378,22 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     const left = rect.left + rect.width / 2;
     const top = rect.bottom + 8;
     setLineSpacingMenuPosition({ left, top });
+  }, []);
+  const updateLineStyleMenuPosition = useCallback(() => {
+    const button = lineStyleMenuButtonRef.current;
+    if (!button || typeof window === "undefined") return;
+    const rect = button.getBoundingClientRect();
+    const left = rect.left + rect.width / 2;
+    const top = rect.bottom + 8;
+    setLineStyleMenuPosition({ left, top });
+  }, []);
+  const updateShapeLineStyleMenuPosition = useCallback(() => {
+    const button = shapeLineStyleMenuButtonRef.current;
+    if (!button || typeof window === "undefined") return;
+    const rect = button.getBoundingClientRect();
+    const left = rect.left + rect.width / 2;
+    const top = rect.bottom + 8;
+    setShapeLineStyleMenuPosition({ left, top });
   }, []);
   useEffect(() => {
     if (!fontMenuOpen) {
@@ -8670,6 +9438,34 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     };
   }, [lineSpacingMenuOpen, updateLineSpacingMenuPosition]);
   useEffect(() => {
+    if (!lineStyleMenuOpen) {
+      setLineStyleMenuPosition(null);
+      return;
+    }
+    updateLineStyleMenuPosition();
+    const handleReposition = () => updateLineStyleMenuPosition();
+    window.addEventListener("resize", handleReposition);
+    window.addEventListener("scroll", handleReposition, true);
+    return () => {
+      window.removeEventListener("resize", handleReposition);
+      window.removeEventListener("scroll", handleReposition, true);
+    };
+  }, [lineStyleMenuOpen, updateLineStyleMenuPosition]);
+  useEffect(() => {
+    if (!shapeLineStyleMenuOpen) {
+      setShapeLineStyleMenuPosition(null);
+      return;
+    }
+    updateShapeLineStyleMenuPosition();
+    const handleReposition = () => updateShapeLineStyleMenuPosition();
+    window.addEventListener("resize", handleReposition);
+    window.addEventListener("scroll", handleReposition, true);
+    return () => {
+      window.removeEventListener("resize", handleReposition);
+      window.removeEventListener("scroll", handleReposition, true);
+    };
+  }, [shapeLineStyleMenuOpen, updateShapeLineStyleMenuPosition]);
+  useEffect(() => {
     if (!textMode) setFontMenuOpen(false);
   }, [textMode]);
   useEffect(() => {
@@ -8678,6 +9474,12 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   useEffect(() => {
     if (!textMode) setLineSpacingMenuOpen(false);
   }, [textMode]);
+  useEffect(() => {
+    if (!penMode) setLineStyleMenuOpen(false);
+  }, [penMode]);
+  useEffect(() => {
+    if (!shapeMode) setShapeLineStyleMenuOpen(false);
+  }, [shapeMode]);
   useEffect(() => {
     if (!textMode && colorPickerOpen === "text") setColorPickerOpen(null);
   }, [colorPickerOpen, textMode]);
@@ -8972,11 +9774,36 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
 
   return (
     <main className="flex h-screen flex-col overflow-hidden bg-[#f3f6fb]">
+      {showStartupOverlay ? (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/60">
+          <div className="w-full max-w-md rounded-2xl bg-white px-8 py-6 text-center shadow-[0_30px_80px_rgba(5,10,30,0.45)]">
+            <p className="text-base font-semibold text-slate-800">Getting project ready...</p>
+            <p className="mt-1 text-sm text-slate-500">Loading your workspace</p>
+            <div className="mt-5 h-2 w-full overflow-hidden rounded-full bg-slate-200">
+              <div className="h-full w-1/2 animate-[studio-load_1.4s_ease-in-out_infinite] bg-gradient-to-r from-[#0b2f6a] via-[#1f4b99] to-[#7c3aed]" />
+            </div>
+          </div>
+          <style>
+            {`
+              @keyframes studio-load {
+                0% { transform: translateX(-60%); }
+                50% { transform: translateX(10%); }
+                100% { transform: translateX(120%); }
+              }
+            `}
+          </style>
+        </div>
+      ) : null}
       <header className="sticky top-0 z-40 border-b border-slate-200/60 bg-white shadow-[0_1px_4px_rgba(15,23,42,0.06)]">
         {/* Top row */}
         <div className="w-full border-b border-slate-100 bg-white">
           <div className="flex h-14 w-full items-center gap-4 px-4 lg:px-6">
-            <Link href="/" className="inline-flex items-center gap-2" aria-label="Back to workspace">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2"
+              aria-label="Back to workspace"
+              onClickCapture={handleLogoNavigate}
+            >
               <Image src="/logo-wordmark2.svg" alt="MergifyPDF" width={160} height={40} priority />
             </Link>
 
@@ -9031,7 +9858,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
               </div>
 
               <div className="flex shrink-0 items-center gap-2">
-                <button className={`${buttonNeutral} px-5 py-2`} onClick={handleAddClick} disabled={pages.length === 0}>
+                <button className={`${buttonNeutral} px-5 py-2`} onClick={handleAddClick} disabled={isLoadingPages}>
                   Add pages
                 </button>
 	                <button className={`${buttonPrimary} px-5 py-2`} onClick={() => handleDownload()} disabled={downloadDisabled}>
@@ -9050,7 +9877,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
 
         {/* Bottom row (tools) */}
         <div
-          className="toolbar-font relative z-[80] w-full border-b border-slate-200/60 bg-[#F1F5F9] shadow-[0_10px_24px_rgba(15,23,42,0.04)]"
+          className="toolbar-font relative z-[100] w-full bg-[#F1F5F9] shadow-[0_1px_4px_rgba(15,23,42,0.06)]"
           data-text-toolbar
         >
 	          <div className="w-full pl-8 pr-4 py-0.5 lg:pl-10 lg:pr-6">
@@ -9361,15 +10188,8 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
             )}
 
 	            <div className="relative flex-1 min-h-0 overflow-hidden">
-		            <LoadingOverlay
-		              open={loading}
-		              label="Loading your project..."
-		              variant="container"
-		              zIndexClassName="z-50"
-		              backdropClassName="bg-slate-50/90"
-		            />
-	              <AnimatePresence mode="wait">
-	                {organizeMode && !loading && pages.length > 0 ? (
+              <AnimatePresence mode="wait">
+                {organizeMode && !loading && pages.length > 0 ? (
 	                  <motion.div
                     key="manage-view"
                     initial={{ opacity: 0, scale: 0.97 }}
@@ -9419,7 +10239,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                   </motion.div>
                 ) : null}
 
-	                {!organizeMode && pages.length > 0 ? (
+	                {!organizeMode && (pages.length > 0 || loading) ? (
 	                  <motion.div
 	                    key="preview-view"
 	                    initial={{ opacity: 0.95, scale: 0.97 }}
@@ -9438,9 +10258,9 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
 				                              animate={{ height: 44, opacity: 1, y: 0 }}
 				                              exit={{ height: 0, opacity: 0, y: -6 }}
 				                              transition={{ duration: 0.18, ease: SOFT_EASE }}
-				                              className="min-w-0 overflow-hidden"
+				                              className="relative z-[30] min-w-0 overflow-hidden border-b border-slate-200 bg-white"
 				                            >
-                              <div className="toolbar-font w-full border-b border-slate-200/60 bg-white shadow-[0_1px_4px_rgba(15,23,42,0.06)]">
+                              <div className="toolbar-font w-full">
                                 <div className="w-full pl-8 pr-4 py-0.5 lg:pl-10 lg:pr-6">
                                   <div className="relative h-10">
                                     <div
@@ -9457,6 +10277,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                                           aria-label="Options"
                                           data-shape-toolbar
                                         >
+                                          <div className="mx-1 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
                                           <div className="flex items-center gap-1.5">
                                             {[
                                               { type: "line" as const, label: "Line", icon: Minus },
@@ -9642,6 +10463,8 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                                             </button>
                                           </div>
 
+                                          <div className="mx-1 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
+
                                           <div className="flex items-center gap-2">
                                             <span className="text-xs font-semibold text-slate-600">Fill</span>
                                             <button
@@ -9672,6 +10495,93 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                                                 aria-hidden
                                               />
                                             </button>
+                                          </div>
+
+                                          <div className="mx-1 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
+
+                                          <div className="flex items-center gap-1">
+                                            <div className="relative">
+                                              <button
+                                                type="button"
+                                                ref={shapeLineStyleMenuButtonRef}
+                                                disabled={!shapeLineStyleEligible}
+                                                className={`${textOptionButtonBase} ${textOptionButtonHover} w-auto px-2 flex items-center gap-1 text-slate-800 disabled:cursor-not-allowed disabled:opacity-40`}
+                                                onClick={() => {
+                                                  if (!shapeLineStyleEligible) return;
+                                                  hideToolbarTooltip();
+                                                  setShapeLineStyleMenuOpen((prev) => !prev);
+                                                }}
+                                                onMouseEnter={(event) => showToolbarTooltip("Line style", event.currentTarget)}
+                                                onMouseLeave={hideToolbarTooltip}
+                                                aria-label="Line style"
+                                              >
+                                                <svg className="h-[18px] w-[18px]" viewBox="0 0 18 6" aria-hidden="true">
+                                                  {resolvedShapeLineStyle === "dashed" ? (
+                                                    <>
+                                                      <line x1="1" y1="3" x2="5" y2="3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                                                      <line x1="8" y1="3" x2="12" y2="3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                                                      <line x1="15" y1="3" x2="17" y2="3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                                                    </>
+                                                  ) : (
+                                                    <line x1="1" y1="3" x2="17" y2="3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                                                  )}
+                                                </svg>
+                                                <svg className="h-2 w-2 text-slate-800" viewBox="0 0 8 5" aria-hidden="true">
+                                                  <path d="M4 5L0 0h8L4 5z" fill="currentColor" />
+                                                </svg>
+                                              </button>
+                                              {shapeLineStyleMenuOpen && shapeLineStyleMenuPosition && typeof document !== "undefined"
+                                                ? createPortal(
+                                                    <div
+                                                      ref={shapeLineStyleMenuRef}
+                                                      className="fixed z-[9999] rounded-lg bg-white p-1 shadow-[0_10px_24px_rgba(15,23,42,0.12)]"
+                                                      style={{
+                                                        left: shapeLineStyleMenuPosition.left,
+                                                        top: shapeLineStyleMenuPosition.top,
+                                                        transform: "translateX(-50%)",
+                                                      }}
+                                                    >
+                                                      <div className="flex flex-col gap-1">
+                                                        {[
+                                                          { value: "solid", label: "Solid" },
+                                                          { value: "dashed", label: "Dashed" },
+                                                        ].map(({ value, label }) => (
+                                                          <button
+                                                            key={value}
+                                                            type="button"
+                                                            className={`flex w-28 items-center gap-2 rounded-md px-2 py-1.5 text-sm font-semibold transition ${
+                                                              resolvedShapeLineStyle === value
+                                                                ? "bg-[#E0F2FE] text-[#024d7c]"
+                                                                : "text-slate-700 hover:bg-slate-50"
+                                                            }`}
+                                                            onMouseEnter={(event) => showToolbarTooltip(label, event.currentTarget)}
+                                                            onMouseLeave={hideToolbarTooltip}
+                                                            onClick={() => {
+                                                              applyShapeLineStyle(value as LineStyle);
+                                                              setShapeLineStyleMenuOpen(false);
+                                                            }}
+                                                            aria-label={`Line style ${label.toLowerCase()}`}
+                                                          >
+                                                            <svg className="h-[18px] w-[18px] text-slate-700" viewBox="0 0 18 6" aria-hidden="true">
+                                                              {value === "dashed" ? (
+                                                                <>
+                                                                  <line x1="1" y1="3" x2="5" y2="3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                                                                  <line x1="8" y1="3" x2="12" y2="3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                                                                  <line x1="15" y1="3" x2="17" y2="3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                                                                </>
+                                                              ) : (
+                                                                <line x1="1" y1="3" x2="17" y2="3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                                                              )}
+                                                            </svg>
+                                                            <span>{label}</span>
+                                                          </button>
+                                                        ))}
+                                                      </div>
+                                                    </div>,
+                                                    document.body,
+                                                  )
+                                                : null}
+                                            </div>
                                           </div>
 
                                           <div className="mx-1 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
@@ -9745,6 +10655,8 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                                           }`}
                                           aria-label="Draw options"
                                         >
+                                          <div className="mx-1 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
+
                                           <div className="flex items-center">
                                             <div className="inline-flex items-center gap-0 justify-start">
                                               <button
@@ -9825,15 +10737,105 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                                                 type="range"
                                                 min={10}
                                                 max={100}
-                                                step={5}
+                                                step={10}
                                                 value={Math.round(penOpacity * 100)}
                                                 onChange={(event) => applyPenOpacity(Number(event.target.value) / 100)}
-                                                className="h-2 w-28 cursor-pointer accent-[#024d7c]"
+                                                className="opacity-slider w-28 cursor-pointer"
+                                                style={{
+                                                  background: `linear-gradient(to right, #024d7c ${Math.round(
+                                                    penOpacity * 100
+                                                  )}%, #e2e8f0 ${Math.round(penOpacity * 100)}%)`,
+                                                }}
                                                 aria-label="Stroke opacity"
                                               />
                                               <span className="w-12 text-right text-xs font-semibold tabular-nums text-slate-700">
                                                 {Math.round(penOpacity * 100)}%
                                               </span>
+                                            </div>
+                                          </div>
+
+                                          <div className="mx-1 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
+
+                                          <div className="flex items-center gap-1">
+                                            <div className="relative">
+                                              <button
+                                                type="button"
+                                                ref={lineStyleMenuButtonRef}
+                                                className={`${textOptionButtonBase} ${textOptionButtonHover} w-auto px-2 flex items-center gap-1 text-slate-800`}
+                                                onClick={() => {
+                                                  hideToolbarTooltip();
+                                                  setLineStyleMenuOpen((prev) => !prev);
+                                                }}
+                                                onMouseEnter={(event) => showToolbarTooltip("Line style", event.currentTarget)}
+                                                onMouseLeave={hideToolbarTooltip}
+                                                aria-label="Line style"
+                                              >
+                                                <svg className="h-[18px] w-[18px]" viewBox="0 0 18 6" aria-hidden="true">
+                                                  {penLineStyle === "dashed" ? (
+                                                    <>
+                                                      <line x1="1" y1="3" x2="5" y2="3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                                                      <line x1="8" y1="3" x2="12" y2="3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                                                      <line x1="15" y1="3" x2="17" y2="3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                                                    </>
+                                                  ) : (
+                                                    <line x1="1" y1="3" x2="17" y2="3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                                                  )}
+                                                </svg>
+                                                <svg className="h-2 w-2 text-slate-800" viewBox="0 0 8 5" aria-hidden="true">
+                                                  <path d="M4 5L0 0h8L4 5z" fill="currentColor" />
+                                                </svg>
+                                              </button>
+                                              {lineStyleMenuOpen && lineStyleMenuPosition && typeof document !== "undefined"
+                                                ? createPortal(
+                                                    <div
+                                                      ref={lineStyleMenuRef}
+                                                      className="fixed z-[9999] rounded-lg bg-white p-1 shadow-[0_10px_24px_rgba(15,23,42,0.12)]"
+                                                      style={{
+                                                        left: lineStyleMenuPosition.left,
+                                                        top: lineStyleMenuPosition.top,
+                                                        transform: "translateX(-50%)",
+                                                      }}
+                                                    >
+                                                      <div className="flex flex-col gap-1">
+                                                        {[
+                                                          { value: "solid", label: "Solid" },
+                                                          { value: "dashed", label: "Dashed" },
+                                                        ].map(({ value, label }) => (
+                                                          <button
+                                                            key={value}
+                                                            type="button"
+                                                            className={`flex w-28 items-center gap-2 rounded-md px-2 py-1.5 text-sm font-semibold transition ${
+                                                              penLineStyle === value
+                                                                ? "bg-[#E0F2FE] text-[#024d7c]"
+                                                                : "text-slate-700 hover:bg-slate-50"
+                                                            }`}
+                                                            onMouseEnter={(event) => showToolbarTooltip(label, event.currentTarget)}
+                                                            onMouseLeave={hideToolbarTooltip}
+                                                            onClick={() => {
+                                                              setPenLineStyle(value as LineStyle);
+                                                              setLineStyleMenuOpen(false);
+                                                            }}
+                                                            aria-label={`Line style ${label.toLowerCase()}`}
+                                                          >
+                                                            <svg className="h-[18px] w-[18px] text-slate-700" viewBox="0 0 18 6" aria-hidden="true">
+                                                              {value === "dashed" ? (
+                                                                <>
+                                                                  <line x1="1" y1="3" x2="5" y2="3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                                                                  <line x1="8" y1="3" x2="12" y2="3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                                                                  <line x1="15" y1="3" x2="17" y2="3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                                                                </>
+                                                              ) : (
+                                                                <line x1="1" y1="3" x2="17" y2="3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                                                              )}
+                                                            </svg>
+                                                            <span>{label}</span>
+                                                          </button>
+                                                        ))}
+                                                      </div>
+                                                    </div>,
+                                                    document.body,
+                                                  )
+                                                : null}
                                             </div>
                                           </div>
 
@@ -9856,17 +10858,21 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                                                 className="absolute inset-[2px] rounded-full"
                                                 style={{ backgroundColor: penColor }}
                                                 aria-hidden
-                                              />
-                                            </button>
-                                          </div>
+                                            />
+                                          </button>
                                         </div>
-                                      ) : (
+
+                                        <div className="mx-1 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
+                                      </div>
+                                    ) : (
                                         <div
                                           className={`tools-scroll flex min-w-0 items-center gap-0.5 overflow-visible ${
                                             loading ? "pointer-events-none" : ""
                                           }`}
                                           aria-label="Text options"
                                         >
+                                          <div className="mx-2 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
+
                                           <div className="relative flex items-center gap-0.5">
                                             <div
                                               className="group"
@@ -10243,6 +11249,8 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                                               <ListOrdered className="h-[18px] w-[18px]" strokeWidth={2.5} />
                                             </button>
                                           </div>
+
+                                          <div className="mx-2 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
                                           {lineSpacingMenuOpen && lineSpacingMenuPosition && typeof document !== "undefined"
                                             ? createPortal(
                                                 <div
@@ -10282,9 +11290,6 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                                                 document.body,
                                               )
                                             : null}
-                                          {zoomPercent !== 100 ? (
-                                            <div className="mx-2 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
-                                          ) : null}
                                         </div>
                                       )}
                                     </div>
@@ -10295,7 +11300,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
 				              ) : null}
 				                        </AnimatePresence>
 			
-				                        <div className="min-w-0 flex-1 min-h-0 overflow-hidden">
+				                        <div className="relative min-w-0 flex-1 min-h-0 overflow-hidden">
 				                          <div
 				                            ref={viewerScrollRef}
 				                            className="viewer-scroll relative flex h-full w-full overflow-auto pb-16"
@@ -10315,12 +11320,19 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
 				                      <div className="flex shrink-0 items-stretch border-l border-slate-200">
 				                          {showPageOrderPanel ? (
 				                            <aside className="flex w-[280px] shrink-0 flex-col">
-				                              <div className="flex min-h-0 flex-1 flex-col bg-[#f8fafc]">
+                              <div className="flex min-h-0 flex-1 flex-col bg-[#f8fafc]">
                                 <div
                                   className="toolbar-font flex h-[45px] items-center justify-between border-b border-slate-200 bg-white px-4"
                                   data-text-toolbar
                                 >
-				                                  <p className="text-sm font-semibold text-slate-600">{pages.length} pages</p>
+				                                  {loading && pages.length === 0 ? (
+                                    <div className="flex items-center gap-2 text-sm font-semibold text-slate-600">
+                                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-[#024d7c]" aria-hidden />
+                                      <span>Loading</span>
+                                    </div>
+                                  ) : (
+				                                    <p className="text-sm font-semibold text-slate-600">{pages.length} pages</p>
+                                  )}
 				                                  <button
 				                                    type="button"
 				                                    onClick={() => setOrganizeMode(true)}
@@ -10330,15 +11342,18 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
 				                                    Manage pages
 				                                  </button>
 				                                </div>
-				                                <div className="thumbs-scroll min-h-0 flex-1 overflow-y-auto pl-4 pr-0">
+				                                <div
+                                    ref={thumbsScrollRef}
+                                    className="thumbs-scroll relative min-h-0 flex-1 overflow-y-auto pl-4 pr-0"
+                                  >
 				                            <DndContext
 				                              sensors={sensors}
 				                              collisionDetection={closestCenter}
 		                              onDragEnd={handleDragEnd}
 		                            >
-		                              <SortableContext items={itemsIds} strategy={verticalListSortingStrategy}>
-		                                <ul className="flex flex-col py-0">
-		                                  {pages.length > 0 ? (
+                                      <SortableContext items={itemsIds} strategy={verticalListSortingStrategy}>
+                                        <ul className="flex flex-col py-0">
+                                          {pages.length > 0 ? (
 		                                    <li className="group relative flex h-12 items-center justify-center">
 			                                      <div className="pointer-events-none flex w-full items-center justify-center gap-3 px-2 opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
 		                                        <div className="h-0.5 flex-1 bg-[#024d7c]/70" aria-hidden />
@@ -10368,6 +11383,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
 		                                        onMoveDown={() => moveThumbPage(i, 1)}
 		                                        onDelete={() => handleDeletePage(p.id)}
 		                                        disableMoveDown={i === pages.length - 1}
+                                            registerThumbNode={registerThumbNode}
 		                                      />
 		                                      {i < pages.length - 1 ? (
 		                                        <li className="group relative flex h-12 items-center justify-center">
@@ -11640,6 +12656,47 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         }
         .tools-scroll {
           scrollbar-width: none;
+        }
+        .opacity-slider {
+          -webkit-appearance: none;
+          appearance: none;
+          height: 6px;
+          border-radius: 9999px;
+          background: #e2e8f0;
+        }
+        .opacity-slider::-webkit-slider-runnable-track {
+          height: 6px;
+          border-radius: 9999px;
+          background: transparent;
+        }
+        .opacity-slider::-moz-range-progress {
+          height: 6px;
+          border-radius: 9999px;
+          background: #024d7c;
+        }
+        .opacity-slider::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 14px;
+          height: 14px;
+          border-radius: 9999px;
+          background-color: #ffffff;
+          border: 2px solid #024d7c;
+          box-shadow: 0 2px 6px rgba(15, 23, 42, 0.16);
+          margin-top: -4px;
+        }
+        .opacity-slider::-moz-range-track {
+          height: 6px;
+          border-radius: 9999px;
+          background: #e2e8f0;
+        }
+        .opacity-slider::-moz-range-thumb {
+          width: 14px;
+          height: 14px;
+          border-radius: 9999px;
+          background-color: #ffffff;
+          border: 2px solid #024d7c;
+          box-shadow: 0 2px 6px rgba(15, 23, 42, 0.16);
         }
         [data-text-annotation] [contenteditable] span {
           display: inline;

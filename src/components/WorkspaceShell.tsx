@@ -49,6 +49,7 @@ import { preloadWorkspaceFilesForProject, type PendingWorkspaceFile } from "@/li
 
 const WORKSPACE_META_KEY = "mpdf:files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
+const STARTUP_OVERLAY_KEY = "mpdf:startup-overlay";
 
 async function resetWorkspaceStorage() {
   try {
@@ -319,6 +320,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
       addRecentProject(ownerId, clean, id);
       setCreateBusy(false);
       setCreateOpen(false);
+      window.sessionStorage?.setItem(STARTUP_OVERLAY_KEY, "1");
       router.push(`/studio?project=${encodeURIComponent(id)}`);
     } catch {
       setCreateError("Could not create that project. Please try again.");
@@ -1845,7 +1847,6 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                   </div>
                 </form>
               </div>
-              <LoadingOverlay open={createBusy} label="Getting your project ready..." zIndexClassName="z-[1100]" />
             </div>,
             document.body,
           )
