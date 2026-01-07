@@ -97,6 +97,8 @@ type PageItem = {
   srcIdx: number; // which source file
   pageIdx: number; // page index inside that source
   thumb: string; // small preview
+  thumbWidth?: number;
+  thumbHeight?: number;
   preview: string; // large preview
   rotation: number;
   width: number;
@@ -385,14 +387,14 @@ const INITIAL_PREVIEW_RENDER_COUNT = 10;
 const LOW_RES_PREVIEW_SCALE = PREVIEW_BASE_SCALE * 0.5;
 const MAX_PARALLEL_PREVIEW_RENDERS = 6;
 const MAX_PARALLEL_LOW_PREVIEW_RENDERS = 2;
-const MAX_PARALLEL_THUMB_RENDERS = 4;
+const MAX_PARALLEL_THUMB_RENDERS = 6;
 const MIN_STARTUP_OVERLAY_MS = 4000;
 const STARTUP_OVERLAY_FULL_HOLD_MS = 1000;
 const STARTUP_OVERLAY_KEY = "mpdf:startup-overlay";
 const WORKSPACE_PREVIEW_CACHE_KEY = "mpdf:preview-cache";
 const PREVIEW_CACHE_VERSION = 1;
 const PREVIEW_CACHE_NEAR_RANGE = 2;
-const THUMB_MAX_WIDTH = 200;
+const THUMB_MAX_WIDTH = 240;
 const PREVIEW_IMAGE_QUALITY = 0.98;
 const TRANSPARENT_PIXEL =
   "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=";
@@ -555,6 +557,8 @@ type WorkspacePreviewCache = {
     width: number;
     height: number;
     thumb: string;
+    thumbWidth?: number;
+    thumbHeight?: number;
     preview: string;
   }>;
 };
@@ -587,6 +591,8 @@ function readWorkspacePreviewCache(projectKey: string, expectedSourceIds: string
         width: typeof page.width === "number" ? page.width : 0,
         height: typeof page.height === "number" ? page.height : 0,
         thumb: typeof page.thumb === "string" ? page.thumb : "",
+        thumbWidth: typeof page.thumbWidth === "number" ? page.thumbWidth : 0,
+        thumbHeight: typeof page.thumbHeight === "number" ? page.thumbHeight : 0,
         preview: typeof page.preview === "string" ? page.preview : "",
       }));
     return pages.length > 0 ? pages : null;
@@ -620,6 +626,8 @@ function buildPreviewCachePages(pages: PageItem[], activePageId: string | null) 
     width: page.width,
     height: page.height,
     thumb: page.thumb,
+    thumbWidth: page.thumbWidth ?? 0,
+    thumbHeight: page.thumbHeight ?? 0,
     preview: previewIds.has(page.id) ? page.preview : "",
   }));
 }
@@ -686,6 +694,11 @@ function buildPageId(sourceId: string, pageIdx: number) {
 function getDevicePixelRatio() {
   if (typeof window === "undefined") return 1;
   return window.devicePixelRatio ? Math.min(window.devicePixelRatio, MAX_DEVICE_PIXEL_RATIO) : 1;
+}
+
+function getThumbTargetWidth() {
+  const pixelRatio = Math.min(2, getDevicePixelRatio());
+  return Math.max(1, Math.floor(THUMB_MAX_WIDTH * pixelRatio));
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -1469,6 +1482,8 @@ function mergePageList(current: PageItem[], nextPages: PageItem[]) {
     const rotation = typeof existing.rotation === "number" ? existing.rotation : page.rotation;
     const preview = existing.preview || page.preview;
     const thumb = existing.thumb || page.thumb;
+    const thumbWidth = existing.thumbWidth ?? page.thumbWidth ?? 0;
+    const thumbHeight = existing.thumbHeight ?? page.thumbHeight ?? 0;
     const width = existing.width ?? page.width;
     const height = existing.height ?? page.height;
     if (
@@ -1477,6 +1492,8 @@ function mergePageList(current: PageItem[], nextPages: PageItem[]) {
       existing.rotation === rotation &&
       existing.preview === preview &&
       existing.thumb === thumb &&
+      (existing.thumbWidth ?? 0) === thumbWidth &&
+      (existing.thumbHeight ?? 0) === thumbHeight &&
       existing.width === width &&
       existing.height === height
     ) {
@@ -1487,6 +1504,8 @@ function mergePageList(current: PageItem[], nextPages: PageItem[]) {
       rotation,
       preview,
       thumb,
+      thumbWidth,
+      thumbHeight,
       width,
       height,
     };
@@ -3708,7 +3727,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
           textAlign?: "left" | "center" | "right" | "justify";
 	          signaturePlacements?: Record<string, SignaturePlacement[]>;
 	          savedSignatures?: SavedSignature[];
-	          pages?: {
+          pages?: {
             id: string;
             srcIdx?: number;
             pageIdx?: number;
@@ -3716,6 +3735,8 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
             width?: number;
             height?: number;
             thumb?: string;
+            thumbWidth?: number;
+            thumbHeight?: number;
             preview?: string;
           }[];
         };
@@ -3772,6 +3793,8 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
               id: page.id as string,
               rotation: typeof page.rotation === "number" ? page.rotation : undefined,
               thumb: typeof page.thumb === "string" ? page.thumb : "",
+              thumbWidth: typeof page.thumbWidth === "number" ? page.thumbWidth : undefined,
+              thumbHeight: typeof page.thumbHeight === "number" ? page.thumbHeight : undefined,
               preview: typeof page.preview === "string" ? page.preview : "",
             }));
           if (normalizedPages.length > 0) {
@@ -3785,14 +3808,19 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                   rotation: typeof incoming.rotation === "number" ? incoming.rotation : page.rotation,
                   preview: incoming.preview || page.preview,
                   thumb: incoming.thumb || page.thumb,
+                  thumbWidth:
+                    typeof incoming.thumbWidth === "number" ? incoming.thumbWidth : page.thumbWidth,
+                  thumbHeight:
+                    typeof incoming.thumbHeight === "number" ? incoming.thumbHeight : page.thumbHeight,
                 };
               })
             );
+            const targetThumbWidth = getThumbTargetWidth();
             normalizedPages.forEach((page) => {
               if (page.preview) {
                 pageRenderStatusRef.current.set(page.id, "low");
               }
-              if (page.thumb) {
+              if (page.thumb && (page.thumbWidth ?? 0) >= targetThumbWidth) {
                 thumbRenderStatusRef.current.set(page.id, "ready");
               }
             });
@@ -4144,11 +4172,12 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         if (cachedPages && cachedPages.length > 0) {
           restoringPreviewCacheRef.current = true;
           setPages(cachedPages);
+          const targetThumbWidth = getThumbTargetWidth();
           cachedPages.forEach((page) => {
             if (page.preview) {
               pageRenderStatusRef.current.set(page.id, "low");
             }
-            if (page.thumb) {
+            if (page.thumb && (page.thumbWidth ?? 0) >= targetThumbWidth) {
               thumbRenderStatusRef.current.set(page.id, "ready");
             }
           });
@@ -4626,6 +4655,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       thumbRenderRafRef.current = null;
       const queue = thumbRenderQueueRef.current;
       if (queue.length === 0) return;
+      const targetThumbWidth = getThumbTargetWidth();
       queue.sort((a, b) => b.priority - a.priority);
       while (thumbRenderActiveRef.current < MAX_PARALLEL_THUMB_RENDERS && queue.length > 0) {
         const next = queue.shift();
@@ -4636,7 +4666,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
           continue;
         }
         const existingPage = pagesByIdRef.current.get(next.pageId);
-        if (existingPage?.thumb) {
+        if (existingPage?.thumb && (existingPage.thumbWidth ?? 0) >= targetThumbWidth) {
           thumbRenderStatusRef.current.set(next.pageId, "ready");
           continue;
         }
@@ -4674,14 +4704,22 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
             ctx.imageSmoothingEnabled = true;
             ctx.imageSmoothingQuality = "high";
             await page.render(renderContext).promise;
-            const thumbData = createThumbnailDataUrl(canvas, THUMB_MAX_WIDTH * pixelRatio);
+            const targetThumbWidth = Math.max(1, Math.floor(THUMB_MAX_WIDTH * pixelRatio));
+            const thumbData = createThumbnailDataUrl(canvas, targetThumbWidth);
+            const thumbWidth =
+              canvas.width <= targetThumbWidth ? canvas.width : targetThumbWidth;
+            const thumbHeight =
+              canvas.width <= targetThumbWidth
+                ? canvas.height
+                : Math.floor(canvas.height * (targetThumbWidth / canvas.width));
             setPages((current) => {
               let changed = false;
               const nextPages = current.map((item) => {
                 if (item.id !== next.pageId) return item;
-                if (item.thumb) return item;
+                const currentWidth = item.thumbWidth ?? 0;
+                if (item.thumb && currentWidth >= thumbWidth) return item;
                 changed = true;
-                return { ...item, thumb: thumbData };
+                return { ...item, thumb: thumbData, thumbWidth, thumbHeight };
               });
               return changed ? nextPages : current;
             });
@@ -4704,7 +4742,8 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     (task: { pageId: string; srcIdx: number; pageIdx: number; priority: number }) => {
       const page = pagesByIdRef.current.get(task.pageId);
       if (!page) return;
-      if (page.thumb) {
+      const targetThumbWidth = getThumbTargetWidth();
+      if (page.thumb && (page.thumbWidth ?? 0) >= targetThumbWidth) {
         thumbRenderStatusRef.current.set(task.pageId, "ready");
         return;
       }
@@ -4854,6 +4893,8 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
               srcIdx: result.srcIdx,
               pageIdx,
               thumb: "",
+              thumbWidth: 0,
+              thumbHeight: 0,
               preview: "",
               rotation: 0,
               width: result.width,
@@ -5438,7 +5479,14 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       );
     }
     const previewData = toCardPreviewDataUrl(canvas);
-    const thumbData = createThumbnailDataUrl(canvas);
+    const targetThumbWidth = getThumbTargetWidth();
+    const thumbData = createThumbnailDataUrl(canvas, targetThumbWidth);
+    const thumbWidth =
+      canvas.width <= targetThumbWidth ? canvas.width : targetThumbWidth;
+    const thumbHeight =
+      canvas.width <= targetThumbWidth
+        ? canvas.height
+        : Math.floor(canvas.height * (targetThumbWidth / canvas.width));
 
     let newSrcIdx = sources.length;
     setSources((prev) => {
@@ -5455,6 +5503,8 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         srcIdx: newSrcIdx,
         pageIdx: 0,
         thumb: thumbData,
+        thumbWidth,
+        thumbHeight,
         preview: previewData,
         rotation: 0,
         width: pageWidth,
@@ -5505,7 +5555,14 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       );
     }
     const previewData = toCardPreviewDataUrl(canvas);
-    const thumbData = createThumbnailDataUrl(canvas);
+    const targetThumbWidth = getThumbTargetWidth();
+    const thumbData = createThumbnailDataUrl(canvas, targetThumbWidth);
+    const thumbWidth =
+      canvas.width <= targetThumbWidth ? canvas.width : targetThumbWidth;
+    const thumbHeight =
+      canvas.width <= targetThumbWidth
+        ? canvas.height
+        : Math.floor(canvas.height * (targetThumbWidth / canvas.width));
 
     let newSrcIdx = sources.length;
     setSources((prev) => {
@@ -5522,6 +5579,8 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         srcIdx: newSrcIdx,
         pageIdx: 0,
         thumb: thumbData,
+        thumbWidth,
+        thumbHeight,
         preview: previewData,
         rotation: 0,
         width: pageWidth,
@@ -5575,6 +5634,8 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         srcIdx: newSrcIdx,
         pageIdx: 0,
         thumb: page.thumb,
+        thumbWidth: page.thumbWidth ?? 0,
+        thumbHeight: page.thumbHeight ?? 0,
         preview: page.preview,
         rotation: page.rotation,
         width: page.width,
@@ -7964,6 +8025,8 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         width: page.width,
         height: page.height,
         thumb: page.thumb,
+        thumbWidth: page.thumbWidth ?? 0,
+        thumbHeight: page.thumbHeight ?? 0,
         preview: page.preview,
       })),
       highlights,
