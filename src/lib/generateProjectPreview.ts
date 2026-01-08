@@ -7,6 +7,7 @@ import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.js";
 const PREVIEW_DIR = path.join(process.cwd(), "public", "previews");
 const PDF_PUBLIC_ROOT = path.join(process.cwd(), "public");
 const PREVIEW_SCALE = 1.0;
+type PdfDocumentParams = pdfjsLib.DocumentInitParameters & { disableWorker?: boolean };
 
 async function loadPdfBytes(pdfUrl: string): Promise<Uint8Array> {
   if (pdfUrl.startsWith("http://") || pdfUrl.startsWith("https://")) {
@@ -42,7 +43,10 @@ export async function generateProjectPreview(projectId: string) {
   }
 
   const pdfBytes = await loadPdfBytes(project.pdfUrl);
-  const pdf = await pdfjsLib.getDocument({ data: pdfBytes, disableWorker: true }).promise;
+  const pdf = await pdfjsLib.getDocument({
+    data: pdfBytes,
+    disableWorker: true,
+  } as PdfDocumentParams).promise;
   const page = await pdf.getPage(1);
   const viewport = page.getViewport({ scale: PREVIEW_SCALE });
 
