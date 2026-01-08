@@ -59,10 +59,13 @@ export async function generateProjectPreview(projectId: string) {
 
   const toBuffer = (mimeType: string) =>
     new Promise<Buffer>((resolve, reject) => {
-      canvas.toBuffer((err, result) => {
-        if (err) reject(err);
-        else resolve(result);
-      }, mimeType);
+      (canvas as unknown as { toBuffer: Function }).toBuffer(
+        (err: Error | null, result: Buffer) => {
+          if (err) reject(err);
+          else resolve(result);
+        },
+        mimeType
+      );
     });
 
   let previewBuffer: Buffer;
