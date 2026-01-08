@@ -57,12 +57,20 @@ export async function generateProjectPreview(projectId: string) {
 
   await page.render({ canvasContext: ctx as unknown as CanvasRenderingContext2D, viewport }).promise;
 
+  const toBuffer = (mimeType: string) =>
+    new Promise<Buffer>((resolve, reject) => {
+      canvas.toBuffer((err, result) => {
+        if (err) reject(err);
+        else resolve(result);
+      }, mimeType);
+    });
+
   let previewBuffer: Buffer;
   let previewFilename = `${project.id}.webp`;
   try {
-    previewBuffer = canvas.toBuffer("image/webp");
+    previewBuffer = await toBuffer("image/webp");
   } catch {
-    previewBuffer = canvas.toBuffer("image/png");
+    previewBuffer = await toBuffer("image/png");
     previewFilename = `${project.id}.png`;
   }
 
