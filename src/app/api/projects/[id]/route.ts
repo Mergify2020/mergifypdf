@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
-import { derivePreviewMeta } from "@/lib/projectPreview";
 import { Prisma } from "@prisma/client";
 
 async function ensureDbConnection() {
@@ -27,6 +26,11 @@ async function ensureDbConnection() {
   }
 }
 
+function extractPagesCount(data: unknown) {
+  if (!data || typeof data !== "object") return 0;
+  const pages = (data as { pages?: unknown }).pages;
+  return Array.isArray(pages) ? pages.length : 0;
+}
 
 export async function GET(
   _req: NextRequest,
@@ -57,21 +61,14 @@ export async function GET(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const hasPreview = typeof project.previewUrl === "string" && project.previewUrl.length > 0;
   const hasPagesCount = typeof project.pagesCount === "number" && project.pagesCount > 0;
-  if (!hasPreview || !hasPagesCount) {
-    const derived = derivePreviewMeta(project.data);
-    const nextPreviewUrl = hasPreview ? project.previewUrl : derived.previewUrl;
-    const nextPagesCount =
-      hasPagesCount && typeof project.pagesCount === "number"
-        ? project.pagesCount
-        : derived.pagesCount;
-    if (nextPreviewUrl || nextPagesCount) {
+  if (!hasPagesCount) {
+    const nextPagesCount = extractPagesCount(project.data);
+    if (nextPagesCount > 0) {
       const updated = await prisma.project.update({
         where: { id: project.id },
         data: {
-          previewUrl: nextPreviewUrl ?? project.previewUrl,
-          pagesCount: nextPagesCount > 0 ? nextPagesCount : project.pagesCount ?? null,
+          pagesCount: nextPagesCount,
         },
       });
       return NextResponse.json({ project: updated });
@@ -133,7 +130,6 @@ export async function PUT(
           const nextData = (data ?? existingWithData.data) as
             | Prisma.InputJsonValue
             | Prisma.NullTypes.JsonNull;
-          const derived = derivePreviewMeta(nextData);
           const existingPreview =
             typeof (existingWithData as { previewUrl?: unknown }).previewUrl === "string"
               ? ((existingWithData as { previewUrl?: string }).previewUrl as string)
@@ -142,15 +138,15 @@ export async function PUT(
             typeof (existingWithData as { pagesCount?: unknown }).pagesCount === "number"
               ? ((existingWithData as { pagesCount?: number }).pagesCount as number)
               : 0;
-          const nextPreviewUrl = derived.previewUrl ?? existingPreview;
+          const derivedPagesCount = extractPagesCount(nextData);
           const nextPagesCount =
-            derived.pagesCount > 0 ? derived.pagesCount : existingPagesCount;
+            derivedPagesCount > 0 ? derivedPagesCount : existingPagesCount;
           return prisma.project.update({
             where: { id: existing.id },
             data: {
               name: name ?? existing.name,
               data: nextData,
-              previewUrl: nextPreviewUrl,
+              previewUrl: existingPreview,
               pagesCount: nextPagesCount,
             },
           });

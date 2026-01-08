@@ -79,6 +79,17 @@ export function useWorkspaceFilePreloader() {
         } catch (err) {
           console.error("Failed to persist workspace metadata to session storage", err);
         }
+
+        const firstFile = current.files[0]?.file ?? null;
+        if (firstFile) {
+          const formData = new FormData();
+          formData.set("file", firstFile, firstFile.name || "document.pdf");
+          void fetch(`/api/projects/${encodeURIComponent(current.projectId)}/pdf`, {
+            method: "POST",
+            credentials: "include",
+            body: formData,
+          }).catch(() => {});
+        }
       } catch (err) {
         console.error("Failed to preload workspace files", err);
       }

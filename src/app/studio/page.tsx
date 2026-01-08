@@ -3575,7 +3575,6 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   const [projectNameDraft, setProjectNameDraft] = useState("Untitled Project");
   const [projectNameError, setProjectNameError] = useState<string | null>(null);
   const [organizeMode, setOrganizeMode] = useState(false);
-  const [firstPageThumb, setFirstPageThumb] = useState<string | null>(null);
 
   const addInputRef = useRef<HTMLInputElement>(null);
   const renderedSourcesRef = useRef(0);
@@ -3584,6 +3583,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
   const previewNodeMap = useRef<Map<string, HTMLDivElement>>(new Map());
   const pagesRef = useRef<PageItem[]>([]);
+  const previewSyncRef = useRef<Set<string>>(new Set());
   const pagesByIdRef = useRef<Map<string, PageItem>>(new Map());
   const hasHydratedSources = useRef(false);
   const objectUrlCacheRef = useRef<Map<string, string>>(new Map());
@@ -3919,321 +3919,69 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     };
   }, [pages.length, searchParams]);
 
-  /** Derive a small annotated thumbnail of the first page for project cards */
+  
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (pages.length === 0) {
-      setFirstPageThumb(null);
-      return;
-    }
+    const projectId = projectParam ?? currentProjectId ?? null;
+    if (!projectId) return;
+    if (previewSyncRef.current.has(projectId)) return;
 
     let cancelled = false;
+    previewSyncRef.current.add(projectId);
 
-    async function generateThumb() {
-      const page = pages[0];
-      if (!page.preview) {
-        setFirstPageThumb(null);
-        return;
-      }
-
+    const ensurePreview = async () => {
       try {
-        const baseImage = await new Promise<HTMLImageElement>((resolve, reject) => {
-          const img = new window.Image();
-          img.src = page.preview;
-          img.onload = () => resolve(img);
-          img.onerror = () => reject(new Error("Failed to load base preview image"));
-        });
-        if (cancelled) return;
+        const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}`, { cache: "no-store" });
+        if (!res.ok || cancelled) return;
+        const json = (await res.json().catch(() => null)) as {
+          project?: { previewUrl?: string | null; pdfUrl?: string | null };
+        } | null;
+        if (json?.project?.previewUrl) return;
 
-        const naturalWidth = baseImage.width || page.width || 612;
-        const naturalHeight = baseImage.height || page.height || naturalWidth * DEFAULT_ASPECT_RATIO;
-        const rotationDegrees = normalizeRotation(page.rotation);
-        const rotated = rotationDegrees % 180 !== 0;
-        const baseWidth = rotated ? naturalHeight : naturalWidth;
-        const baseHeight = rotated ? naturalWidth : naturalHeight;
-
-        // Render a high-resolution thumbnail for project cards.
-        // Target ~2–3x the typical display width so the
-        // image can scale down sharply without blurring.
-        const targetWidth = 1100;
-        const scale = Math.min(1.25, targetWidth / baseWidth);
-        const outputWidth = baseWidth * scale;
-        const outputHeight = baseHeight * scale;
-
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.max(1, Math.round(outputWidth));
-        canvas.height = Math.max(1, Math.round(outputHeight));
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        ctx.save();
-        ctx.translate(canvas.width / 2, canvas.height / 2);
-        ctx.rotate((rotationDegrees * Math.PI) / 180);
-
-        const drawWidth = naturalWidth * scale;
-        const drawHeight = naturalHeight * scale;
-        ctx.drawImage(baseImage, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
-
-	        const pageHighlights = highlights[page.id] ?? [];
-	        if (pageHighlights.length > 0) {
-	          const pageWidthPx = drawWidth;
-	          const pageHeightPx = drawHeight;
-	          pageHighlights.forEach((stroke) => {
-            if (stroke.points.length < 2) return;
-            ctx.lineCap = stroke.tool === "highlight" ? "butt" : "round";
-            ctx.lineJoin = stroke.tool === "highlight" ? "miter" : "round";
-            ctx.beginPath();
-            stroke.points.forEach((pt, index) => {
-              const x = (pt.x - 0.5) * pageWidthPx;
-              const y = (pt.y - 0.5) * pageHeightPx;
-              if (index === 0 || pt.move) {
-                ctx.moveTo(x, y);
-              } else {
-                ctx.lineTo(x, y);
-              }
-            });
-            ctx.strokeStyle = stroke.color;
-            const effectiveTool = stroke.tool === "pencil" ? "pen" : stroke.tool;
-            ctx.globalAlpha = effectiveTool === "highlight" ? stroke.opacity ?? 0.35 : stroke.opacity ?? 1;
-            const widthFactor = stroke.tool === "highlight" ? 1.2 : 1;
-            const lineWidth = Math.max(1, stroke.thickness * pageWidthPx * widthFactor);
-            const dashed = effectiveTool !== "highlight" && stroke.lineStyle === "dashed";
-            ctx.setLineDash(dashed ? [lineWidth * 2.5, lineWidth * 1.5] : []);
-            ctx.lineWidth = lineWidth;
-            ctx.stroke();
-            ctx.setLineDash([]);
+        if (json?.project?.pdfUrl) {
+          const previewRes = await fetch(`/api/projects/${encodeURIComponent(projectId)}/preview`, {
+            method: "POST",
+            credentials: "include",
           });
-	          ctx.globalAlpha = 1;
-	        }
-
-	        const pageShapes = shapesByPage[page.id] ?? [];
-	        if (pageShapes.length > 0) {
-	          const pageWidthPx = drawWidth;
-	          const pageHeightPx = drawHeight;
-	          pageShapes.forEach((shape) => {
-	            const thickness = Math.max(1, shape.thickness * pageWidthPx);
-	            const x1 = (shape.start.x - 0.5) * pageWidthPx;
-	            const y1 = (shape.start.y - 0.5) * pageHeightPx;
-	            const x2 = (shape.end.x - 0.5) * pageWidthPx;
-	            const y2 = (shape.end.y - 0.5) * pageHeightPx;
-	            const minX = Math.min(x1, x2);
-	            const maxX = Math.max(x1, x2);
-	            const minY = Math.min(y1, y2);
-	            const maxY = Math.max(y1, y2);
-	            const w = Math.max(1, maxX - minX);
-	            const h = Math.max(1, maxY - minY);
-	            const fillColor = shape.fillColor ?? null;
-	            const isClosedShape =
-	              shape.type === "rect" || shape.type === "ellipse" || shape.type === "triangle";
-
-	            ctx.save();
-	            ctx.strokeStyle = shape.color;
-	            ctx.lineWidth = thickness;
-	            ctx.lineCap = "round";
-	            ctx.lineJoin = "round";
-	            const allowDashed = shape.type !== "check" && shape.type !== "arrow";
-	            const isDashed = allowDashed && shape.lineStyle === "dashed";
-	            ctx.setLineDash(isDashed ? [thickness * 2.5, thickness * 1.5] : []);
-	            ctx.beginPath();
-
-	            const drawLine = (ax: number, ay: number, bx: number, by: number) => {
-	              ctx.moveTo(ax, ay);
-	              ctx.lineTo(bx, by);
-	            };
-
-	            const drawArrowHead = (ax: number, ay: number, bx: number, by: number) => {
-	              const dx = bx - ax;
-	              const dy = by - ay;
-	              const len = Math.max(1e-6, Math.sqrt(dx * dx + dy * dy));
-	              const headLen = clamp(len * 0.16, 10, 26);
-	              const angle = Math.atan2(dy, dx);
-	              const left = angle + (Math.PI * 5) / 6;
-	              const right = angle - (Math.PI * 5) / 6;
-	              drawLine(bx, by, bx + Math.cos(left) * headLen, by + Math.sin(left) * headLen);
-	              drawLine(bx, by, bx + Math.cos(right) * headLen, by + Math.sin(right) * headLen);
-	            };
-
-            switch (shape.type) {
-              case "line":
-                drawLine(x1, y1, x2, y2);
-                break;
-              case "arrow":
-                drawLine(x1, y1, x2, y2);
-                drawArrowHead(x1, y1, x2, y2);
-                break;
-              case "rect":
-                ctx.rect(minX, minY, w, h);
-                break;
-              case "ellipse":
-                ctx.ellipse(minX + w / 2, minY + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
-                break;
-              case "triangle": {
-                const top = { x: minX + w / 2, y: minY };
-                const left = { x: minX, y: minY + h };
-                const right = { x: minX + w, y: minY + h };
-                drawLine(top.x, top.y, right.x, right.y);
-                drawLine(right.x, right.y, left.x, left.y);
-                drawLine(left.x, left.y, top.x, top.y);
-                ctx.closePath();
-                break;
-              }
-              case "x":
-                drawLine(minX, minY, maxX, maxY);
-                drawLine(maxX, minY, minX, maxY);
-                break;
-              case "check": {
-                const p1 = { x: minX + w * 0.0, y: minY + h * 0.62 };
-                const p2 = { x: minX + w * 0.32, y: minY + h * 0.9 };
-                const p3 = { x: minX + w * 1.0, y: minY + h * 0.12 };
-                drawLine(p1.x, p1.y, p2.x, p2.y);
-                drawLine(p2.x, p2.y, p3.x, p3.y);
-                break;
-              }
-              default:
-                break;
-            }
-	            if (fillColor && isClosedShape) {
-	              ctx.fillStyle = fillColor;
-	              ctx.fill();
-	            }
-	            ctx.stroke();
-	            ctx.restore();
-	          });
-	        }
-
-            const pageTexts = textAnnotations[page.id] ?? [];
-            if (pageTexts.length > 0) {
-              const pageWidthPx = drawWidth;
-              const pageHeightPx = drawHeight;
-              ctx.fillStyle = "#111827";
-              for (const annotation of pageTexts) {
-                const content = annotation.text;
-                if (!content || content === TEXT_PLACEHOLDER) continue;
-                const boxWidth = (annotation.width ?? 0.14) * pageWidthPx;
-                const padding = Math.min(6, boxWidth * 0.05);
-                const x = (annotation.x - 0.5) * pageWidthPx + padding;
-                const startY = (annotation.y - 0.5) * pageHeightPx + padding;
-                const baseSize = annotation.textSizePt ?? textSize;
-                const lineSpacing = annotation.lineSpacing ?? DEFAULT_TEXT_LINE_SPACING;
-                const html = annotation.richTextHtml ?? textToHtml(annotation.text);
-                const runs = extractRichTextRuns(html, baseSize);
-                const lines = splitRunsIntoLines(runs).slice(0, 6);
-                let cursorY = startY;
-                ctx.textBaseline = "top";
-                lines.forEach((line, lineIndex) => {
-                  if (line.length === 0) {
-                    cursorY += baseSize * PT_TO_PX * lineSpacing;
-                    return;
-                  }
-                  const maxWidth = Math.max(10, boxWidth - padding * 2);
-                  const maxSize = Math.max(...line.map((run) => run.sizePt));
-                  const lineHeight = baseSize * PT_TO_PX * lineSpacing;
-                  let lineWidth = 0;
-                  line.forEach((run) => {
-                    ctx.font = `${run.italic ? "italic " : ""}${run.bold ? "bold " : ""}${run.sizePt * PT_TO_PX}px Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-                    const transformed = applyTextTransform(run.text, textTransform);
-                    lineWidth += ctx.measureText(transformed).width;
-                  });
-                  let cursorX = x;
-                  if (textAlign === "center") {
-                    cursorX = x + Math.max(0, (maxWidth - lineWidth) / 2);
-                  } else if (textAlign === "right") {
-                    cursorX = x + Math.max(0, maxWidth - lineWidth);
-                  }
-                  const shouldJustify = textAlign === "justify" && lineIndex < lines.length - 1;
-                  const spaceCount = shouldJustify
-                    ? line.reduce(
-                        (count, run) => count + (applyTextTransform(run.text, textTransform).match(/ /g)?.length ?? 0),
-                        0
-                      )
-                    : 0;
-                  const extraSpace =
-                    shouldJustify && spaceCount > 0 ? Math.max(0, maxWidth - lineWidth) / spaceCount : 0;
-                  line.forEach((run) => {
-                    const sizePx = run.sizePt * PT_TO_PX;
-                    ctx.font = `${run.italic ? "italic " : ""}${run.bold ? "bold " : ""}${sizePx}px Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-                    const transformed = applyTextTransform(run.text, textTransform);
-                    const runWidth = ctx.measureText(transformed).width;
-                    const runSpaceCount = shouldJustify ? (transformed.match(/ /g)?.length ?? 0) : 0;
-                    const runWidthAdjusted = runWidth + runSpaceCount * extraSpace;
-                    const runStartX = cursorX;
-                    const runHighlight = run.highlightColor;
-                    if (runHighlight) {
-                      ctx.fillStyle = runHighlight;
-                      ctx.fillRect(runStartX, cursorY, runWidthAdjusted, lineHeight);
-                    }
-                    ctx.fillStyle = run.color ?? textColor;
-                    if (shouldJustify && spaceCount > 0) {
-                      const segments = transformed.split(/( )/);
-                      segments.forEach((segment) => {
-                        if (segment === " ") {
-                          const spaceWidth = ctx.measureText(" ").width;
-                          cursorX += spaceWidth + extraSpace;
-                        } else if (segment) {
-                          ctx.fillText(segment, cursorX, cursorY, maxWidth);
-                          cursorX += ctx.measureText(segment).width;
-                        }
-                      });
-                    } else {
-                      ctx.fillText(transformed, cursorX, cursorY, maxWidth);
-                      cursorX += runWidth;
-                    }
-                    if (run.underline) {
-                      const thickness = Math.max(0.5, sizePx / 14);
-                      const underlineY = cursorY + sizePx * 0.9;
-                      ctx.fillRect(runStartX, underlineY, runWidthAdjusted, thickness);
-                    }
-                  });
-                  cursorY += lineHeight;
-                });
-              }
-            }
-
-        const pageSignatures = signaturePlacements[page.id] ?? [];
-        if (pageSignatures.length > 0) {
-          const placed = pageSignatures.filter((sig) => sig.status === "placed");
-          for (const sig of placed) {
-            if (!sig.dataUrl) continue;
-            const sigImage = await new Promise<HTMLImageElement>((resolve, reject) => {
-              const img = new window.Image();
-              img.src = sig.dataUrl;
-              img.onload = () => resolve(img);
-              img.onerror = () => reject(new Error("Failed to load signature image"));
-            });
-            if (cancelled) return;
-            const sigWidth = sig.width * drawWidth;
-            const sigHeight = sig.height * drawHeight;
-            const centerX = (sig.x - 0.5 + sig.width / 2) * drawWidth;
-            const centerY = (sig.y - 0.5 + sig.height / 2) * drawHeight;
-            ctx.save();
-            ctx.translate(centerX, centerY);
-            ctx.rotate(((sig.rotation ?? 0) * Math.PI) / 180);
-            ctx.drawImage(sigImage, -sigWidth / 2, -sigHeight / 2, sigWidth, sigHeight);
-            ctx.restore();
+          if (!previewRes.ok) {
+            previewSyncRef.current.delete(projectId);
           }
+          return;
         }
 
-        ctx.restore();
+        const source = sources[0];
+        if (!source?.storageId) {
+          previewSyncRef.current.delete(projectId);
+          return;
+        }
+        const stored = await readFileBlob(source.storageId);
+        const blob = stored?.blob instanceof Blob ? stored.blob : null;
+        if (!blob) {
+          previewSyncRef.current.delete(projectId);
+          return;
+        }
 
-        if (!cancelled) {
-          setFirstPageThumb(toCardPreviewDataUrl(canvas));
+        const formData = new FormData();
+        formData.set("file", blob, source.name ?? "document.pdf");
+        const pdfRes = await fetch(`/api/projects/${encodeURIComponent(projectId)}/pdf`, {
+          method: "POST",
+          credentials: "include",
+          body: formData,
+        });
+        if (!pdfRes.ok) {
+          previewSyncRef.current.delete(projectId);
         }
       } catch {
-        if (!cancelled) {
-          setFirstPageThumb(pages[0]?.thumb ?? null);
-        }
+        previewSyncRef.current.delete(projectId);
       }
-    }
+    };
 
-    void generateThumb();
+    void ensurePreview();
 
     return () => {
       cancelled = true;
     };
-  }, [pages, highlights, textAnnotations, signaturePlacements, textAlign, textTransform, textSize, textColor]);
+  }, [currentProjectId, projectParam, sources]);
 
   /** Rehydrate any stored PDFs from IndexedDB so refreshes survive deployments */
   useEffect(() => {
@@ -8226,23 +7974,14 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     !!draftHighlight ||
     !!draftShape ||
     !!draftTextBox;
-  const firstPagePreview = pages[0]?.preview ?? null;
-  const firstPageThumbValue = pages[0]?.thumb ?? null;
-
   const buildCloudProjectData = useCallback(() => {
     if (!hasWorkspaceData) return null;
-    // Prefer the higher-resolution preview image for cards.
-    const cloudThumb =
-      firstPageThumb ??
-      (pages.length > 0 ? pages[0]?.preview ?? pages[0]?.thumb ?? null : null);
     const pageThumbs = pages
       .map((page) => page.preview ?? page.thumb)
       .filter((src): src is string => typeof src === "string" && src.length > 0)
       .slice(0, 24);
-	      return {
-	      name: projectName,
-      firstPageThumb: cloudThumb,
-      previewUrl: cloudThumb,
+    return {
+      name: projectName,
       pagesCount: pages.length,
       pageThumbs,
       sources: sources.map((source) => ({
@@ -8274,11 +8013,10 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       signaturePlacements,
       savedSignatures,
     };
-	  }, [
-	    hasWorkspaceData,
-	    pages,
-	    firstPageThumb,
-	    projectName,
+  }, [
+    hasWorkspaceData,
+    pages,
+    projectName,
     sources,
     highlights,
     shapesByPage,
@@ -9781,13 +9519,14 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!hasWorkspaceData) return;
+    if (!savingProject) return;
     const handler = (event: BeforeUnloadEvent) => {
       event.preventDefault();
       event.returnValue = "";
     };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
-  }, [hasWorkspaceData]);
+  }, [hasWorkspaceData, savingProject]);
 
   useEffect(() => {
     if (!highlightMode && !penMode) {

@@ -63,6 +63,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       name: true,
       data: true,
       previewUrl: true,
+      pdfUrl: true,
       pagesCount: true,
     },
   });
@@ -82,7 +83,8 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       userId,
       name: copyName,
       data: withoutTrashedFlag(existing.data),
-      previewUrl: existing.previewUrl,
+      previewUrl: null,
+      pdfUrl: existing.pdfUrl,
       pagesCount: existing.pagesCount ?? 0,
     },
     select: {

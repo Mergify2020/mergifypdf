@@ -44,9 +44,9 @@ export default function ProjectCard({
   onToggleSelected,
   onRenamed,
   onCopied,
-  imageLoading = "lazy",
-  imagePriority = false,
   onTrashed,
+  imageLoading,
+  imagePriority,
 }: ProjectCardProps & { onTrashed?: (id: string) => void }) {
   const { data: session } = useSession();
   const ownerKey = session?.user?.id ?? session?.user?.email ?? null;
@@ -54,16 +54,7 @@ export default function ProjectCard({
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const cardRef = useRef<HTMLDivElement | null>(null);
-  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [previewRetry, setPreviewRetry] = useState(0);
-  const activePreview = project.previewUrl ?? null;
-  const previewSrc =
-    activePreview && !activePreview.startsWith("data:image/")
-      ? `${activePreview}${activePreview.includes("?") ? "&" : "?"}r=${previewRetry}`
-      : activePreview;
-  const previewKey = previewSrc ?? "none";
-  const [loadedPreviewKey, setLoadedPreviewKey] = useState("");
-  const previewLoaded = loadedPreviewKey === previewKey;
+  const previewUrl = project.previewUrl ?? null;
   const [renaming, setRenaming] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [renameBusy, setRenameBusy] = useState(false);
@@ -82,28 +73,6 @@ export default function ProjectCard({
       document.removeEventListener("mousedown", handleGlobalMouseDown);
     };
   }, [menuOpen]);
-
-  const MAX_PREVIEW_RETRIES = 2;
-
-  useEffect(() => {
-    return () => {
-      if (retryTimerRef.current !== null) {
-        clearTimeout(retryTimerRef.current);
-        retryTimerRef.current = null;
-      }
-    };
-  }, []);
-
-
-  const handlePreviewError = () => {
-    if (!activePreview) return;
-    if (previewRetry >= MAX_PREVIEW_RETRIES) return;
-    if (retryTimerRef.current !== null) return;
-    retryTimerRef.current = setTimeout(() => {
-      retryTimerRef.current = null;
-      setPreviewRetry((prev) => prev + 1);
-    }, 700);
-  };
 
   const cardClasses = [
     "relative rounded-[10px] bg-[#F9FAFC] transition",
@@ -431,35 +400,21 @@ export default function ProjectCard({
             aria-hidden="true"
             className="pointer-events-none absolute inset-0 z-[5] bg-black/[0.03] opacity-0 transition-opacity duration-150 group-hover:opacity-100"
           />
-          {activePreview ? (
+          {previewUrl ? (
             <div className="relative h-full w-full p-2 sm:p-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-	                key={previewKey}
-	                src={previewSrc ?? ""}
-	                alt=""
-	                loading={imageLoading}
-	                fetchPriority={imagePriority ? "high" : "auto"}
-	                decoding="async"
-	                className={`h-full w-full object-cover object-top transition-opacity ${
-	                  previewLoaded ? "opacity-100" : "opacity-0"
-	                }`}
-	                onLoad={() => setLoadedPreviewKey(previewKey)}
-	                onError={handlePreviewError}
-	                ref={(node) => {
-	                  if (!node) return;
-	                  if (node.complete && node.naturalWidth > 0) {
-	                    setLoadedPreviewKey(previewKey);
-	                  }
-	                }}
-	              />
-              {!previewLoaded ? (
-                <div className="pointer-events-none absolute inset-0 rounded-[10px] skeleton-shimmer opacity-90" />
-              ) : null}
+                src={previewUrl}
+                alt=""
+                loading={imageLoading ?? "eager"}
+                fetchPriority={imagePriority ? "high" : "auto"}
+                decoding="async"
+                className="h-full w-full object-contain object-center"
+              />
             </div>
           ) : (
-            <div className="relative h-full w-full">
-              <div className="absolute inset-0 rounded-[10px] skeleton-shimmer opacity-90" />
+            <div className="flex h-full w-full items-center justify-center px-3 text-center text-sm text-slate-500">
+              Preview unavailable
             </div>
           )}
         </div>

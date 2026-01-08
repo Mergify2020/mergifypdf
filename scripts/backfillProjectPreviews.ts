@@ -1,47 +1,37 @@
+/* One-off backfill for missing previews.
+ *
+ * Usage:
+ *   pnpm ts-node scripts/backfillProjectPreviews.ts
+ */
 import { prisma } from "../src/lib/prisma";
-import { derivePreviewMeta } from "../src/lib/projectPreview";
+import { generateProjectPreview } from "../src/lib/generateProjectPreview";
 
-type ProjectRecord = {
-  id: string;
-  previewUrl: string | null;
-  pagesCount: number | null;
-  data: unknown;
-};
-
-async function backfillProjectPreviews() {
+async function main() {
   const projects = await prisma.project.findMany({
-    where: {
-      OR: [{ previewUrl: null }, { previewUrl: "" }],
-    },
-    select: { id: true, previewUrl: true, pagesCount: true, data: true },
+    where: { previewUrl: null },
+    select: { id: true, pdfUrl: true },
   });
 
-  let updated = 0;
-  for (const project of projects as ProjectRecord[]) {
-    const meta = derivePreviewMeta(project.data);
-    const nextPreviewUrl = meta.previewUrl ?? null;
-    const nextPagesCount = meta.pagesCount > 0 ? meta.pagesCount : project.pagesCount ?? 0;
-    if (!nextPreviewUrl) continue;
-    await prisma.project.update({
-      where: { id: project.id },
-      data: {
-        previewUrl: nextPreviewUrl,
-        pagesCount: nextPagesCount > 0 ? nextPagesCount : project.pagesCount,
-      },
-    });
-    updated += 1;
-  }
+  console.log(`Found ${projects.length} projects missing previews.`);
 
-  return updated;
+  for (const project of projects) {
+    if (!project.pdfUrl) {
+      console.warn(`Skipping ${project.id}: missing pdfUrl`);
+      continue;
+    }
+    try {
+      await generateProjectPreview(project.id);
+      console.log(`Generated preview for ${project.id}`);
+    } catch (err) {
+      console.error(`Failed to generate preview for ${project.id}`, err);
+    }
+  }
 }
 
-backfillProjectPreviews()
-  .then((count) => {
-    console.log(`Backfilled previews for ${count} projects.`);
-  })
-  .catch((err) => {
-    console.error("Preview backfill failed.", err);
-    process.exitCode = 1;
+main()
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
   })
   .finally(async () => {
     await prisma.$disconnect();

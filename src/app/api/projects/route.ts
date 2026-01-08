@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
-import { derivePreviewMeta } from "@/lib/projectPreview";
 import { prisma } from "@/lib/prisma";
 
 async function ensureDbConnection() {
@@ -137,7 +136,6 @@ export async function POST(req: Request) {
 
   const body = await req.json().catch(() => ({}));
   const { name, data } = body;
-  const { previewUrl, pagesCount } = derivePreviewMeta(data);
 
   if (!name || data === undefined) {
     return NextResponse.json(
@@ -146,6 +144,11 @@ export async function POST(req: Request) {
     );
   }
 
+  const pagesCount =
+    data && typeof data === "object" && Array.isArray((data as { pages?: unknown }).pages)
+      ? (data as { pages: unknown[] }).pages.length
+      : 0;
+
   let project;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
@@ -153,7 +156,7 @@ export async function POST(req: Request) {
         data: {
           name,
           data,
-          previewUrl,
+          previewUrl: null,
           pagesCount,
           userId,
         },
