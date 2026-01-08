@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { Activity, Clock, UserCheck } from "lucide-react";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
+import { getServerSessionSafe } from "@/lib/serverSession";
 import SignatureRequestsTable from "./SignatureRequestsTable";
 
+export const dynamic = "force-dynamic";
+
 export default async function SignatureCenterPage() {
-  const session = await getServerSession(authOptions);
+  const session = await getServerSessionSafe();
   const displayName = session?.user?.name ?? session?.user?.email ?? "Guest";
   const shortName = displayName.split(" ")[0] ?? "Guest";
 

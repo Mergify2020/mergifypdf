@@ -11,6 +11,7 @@ type UploadCtaProps = {
 };
 
 const STARTUP_OVERLAY_KEY = "mpdf:startup-overlay";
+const STARTUP_OVERLAY_CONTEXT_KEY = "mpdf:startup-overlay-context";
 
 export default function UploadCta({ usedToday, variant = "default", className }: UploadCtaProps) {
   const router = useRouter();
@@ -67,6 +68,7 @@ export default function UploadCta({ usedToday, variant = "default", className }:
             JSON.stringify({ name: file.name, data: reader.result })
           );
           window.sessionStorage?.setItem(STARTUP_OVERLAY_KEY, "1");
+          window.sessionStorage?.setItem(STARTUP_OVERLAY_CONTEXT_KEY, "new");
         }
         router.push("/studio");
       } catch (err) {

@@ -90,6 +90,7 @@ import WorkspaceSettingsMenu from "@/components/WorkspaceSettingsMenu";
 import { addRecentProject } from "@/lib/recentProjects";
 import { PROJECT_NAME_STORAGE_KEY, projectNameToFile, sanitizeProjectName } from "@/lib/projectName";
 import { PENDING_UPLOAD_STORAGE_KEY } from "@/lib/pendingUpload";
+import { refreshProjectsSummary } from "@/lib/projectsSummaryCache";
 
 type SourceRef = { storageId: string; url: string; name: string; size: number; updatedAt: number };
 type PageItem = {
@@ -383,17 +384,21 @@ const TEXT_SIZE_MAX_PT = 96;
 const DEFAULT_TEXT_SIZE_PT = 11;
 const DEFAULT_TEXT_SIZE_PX = DEFAULT_TEXT_SIZE_PT * PT_TO_PX;
 const DEFAULT_TEXT_LINE_SPACING = 1.0;
-const INITIAL_PREVIEW_RENDER_COUNT = 10;
+const INITIAL_PREVIEW_RENDER_COUNT = 20;
 const LOW_RES_PREVIEW_SCALE = PREVIEW_BASE_SCALE * 0.5;
 const MAX_PARALLEL_PREVIEW_RENDERS = 6;
-const MAX_PARALLEL_LOW_PREVIEW_RENDERS = 2;
+const MAX_PARALLEL_LOW_PREVIEW_RENDERS = 3;
 const MAX_PARALLEL_THUMB_RENDERS = 6;
 const MIN_STARTUP_OVERLAY_MS = 4000;
 const STARTUP_OVERLAY_FULL_HOLD_MS = 1000;
 const STARTUP_OVERLAY_KEY = "mpdf:startup-overlay";
+const STARTUP_OVERLAY_CONTEXT_KEY = "mpdf:startup-overlay-context";
 const WORKSPACE_PREVIEW_CACHE_KEY = "mpdf:preview-cache";
 const PREVIEW_CACHE_VERSION = 1;
 const PREVIEW_CACHE_NEAR_RANGE = 2;
+const BACKGROUND_LOW_RES_BATCH = 3;
+const BACKGROUND_LOW_RES_PRIORITY = 5;
+const BACKGROUND_LOW_RES_IDLE_TIMEOUT = 220;
 const THUMB_MAX_WIDTH = 240;
 const PREVIEW_IMAGE_QUALITY = 0.98;
 const TRANSPARENT_PIXEL =
@@ -410,6 +415,10 @@ const ZOOM_MAX_PERCENT = 300;
 const ZOOM_STEP_PERCENT = 25;
 const MAX_ZOOM_MULTIPLIER = ZOOM_MAX_PERCENT / 100;
 const VIEW_TRANSITION = { duration: 0.2, ease: SOFT_EASE };
+const LARGE_DOC_PAGE_THRESHOLD = 80;
+const LARGE_DOC_INITIAL_RENDER_COUNT = 8;
+const LARGE_DOC_RENDER_CHUNK = 20;
+const LARGE_DOC_THUMB_LIMIT = 50;
 const GRID_VARIANTS = {
   hidden: { opacity: 0, scale: 0.97 },
   visible: {
@@ -426,6 +435,22 @@ const TILE_VARIANTS = {
 function applyTextTransform(value: string, transform: "none" | "uppercase") {
   if (transform === "uppercase") return value.toUpperCase();
   return value;
+}
+
+function getInitialPreviewRenderCount(pageCount: number, largeDocMode: boolean) {
+  if (pageCount <= 0) return 0;
+  if (!largeDocMode) return Math.min(INITIAL_PREVIEW_RENDER_COUNT, pageCount);
+  return Math.min(LARGE_DOC_INITIAL_RENDER_COUNT, pageCount);
+}
+
+function cancelIdleOrTimeout(timerId: ReturnType<typeof setTimeout>) {
+  if (typeof window !== "undefined" && "cancelIdleCallback" in window) {
+    (window as Window & { cancelIdleCallback?: (id: number) => void }).cancelIdleCallback?.(
+      Number(timerId)
+    );
+    return;
+  }
+  clearTimeout(timerId);
 }
 
 
@@ -603,7 +628,10 @@ function readWorkspacePreviewCache(projectKey: string, expectedSourceIds: string
 
 function buildPreviewCachePages(pages: PageItem[], activePageId: string | null) {
   const previewIds = new Set<string>();
-  const initialCount = Math.min(INITIAL_PREVIEW_RENDER_COUNT, pages.length);
+  const initialCount = getInitialPreviewRenderCount(
+    pages.length,
+    pages.length > LARGE_DOC_PAGE_THRESHOLD
+  );
   for (let i = 0; i < initialCount; i += 1) {
     previewIds.add(pages[i].id);
   }
@@ -1795,6 +1823,7 @@ function WorkspaceClient() {
 		  // 100% = true document scale (1pt = 1/72in).
 		  const zoomMultiplier = clamp(zoomPercent / 100, ZOOM_MIN_PERCENT / 100, MAX_ZOOM_MULTIPLIER);
   const [showPageOrderPanel, setShowPageOrderPanel] = useState(true);
+  const largeDocMode = pages.length > LARGE_DOC_PAGE_THRESHOLD;
   const pageNavigationLockRef = useRef<{ until: number; targetId: string } | null>(null);
   const scrollRatioRef = useRef<{ x: number; y: number }>({ x: 0.5, y: 0 });
   const restoreScrollOnNextZoomRef = useRef(false);
@@ -1830,13 +1859,24 @@ function WorkspaceClient() {
   const [highlightOpacity, setHighlightOpacity] = useState(0.35);
   const [showStartupOverlay, setShowStartupOverlay] = useState(false);
   const [startupProgress, setStartupProgress] = useState(0);
+  const [startupOverlayVariant, setStartupOverlayVariant] = useState<"new" | "existing">("existing");
+  const [startupOverlayMessage, setStartupOverlayMessage] = useState("Preparing your workspace");
   const startupOverlayActiveRef = useRef(false);
   const startupOverlayStartRef = useRef<number | null>(null);
-  const startupOverlayTimerRef = useRef<number | null>(null);
+  const startupOverlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startupOverlayFullAtRef = useRef<number | null>(null);
-  const startupOverlayFullTimerRef = useRef<number | null>(null);
+  const startupOverlayFullTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startupProgressRef = useRef(0);
-  const startupProgressTimerRef = useRef<number | null>(null);
+  const startupProgressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startupOverlayShownRef = useRef(false);
+  const startupOverlayProjectRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (startupOverlayProjectRef.current !== projectParam) {
+      startupOverlayProjectRef.current = projectParam;
+      startupOverlayShownRef.current = false;
+    }
+  }, [projectParam]);
   const [penMode, setPenMode] = useState(false);
   const [penThickness, setPenThickness] = useState(3);
   const [penColor, setPenColor] = useState(PEN_COLOR);
@@ -1855,7 +1895,7 @@ function WorkspaceClient() {
   const [shapeThicknessInput, setShapeThicknessInput] = useState("3");
   const [headerMode, setHeaderMode] = useState<HeaderMode>("default");
   const [toolbarPreviewMode, setToolbarPreviewMode] = useState<Exclude<HeaderMode, "default"> | null>(null);
-  const toolPreviewTimerRef = useRef<number | null>(null);
+  const toolPreviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [textMode, setTextMode] = useState(false);
   const [signaturePanelMode, setSignaturePanelMode] = useState<SignaturePanelMode>("none");
   const [savedSignatures, setSavedSignatures] = useState<SavedSignature[]>([]);
@@ -2074,7 +2114,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   const [focusedTextId, setFocusedTextId] = useState<string | null>(null);
   const [activeTextContainerId, setActiveTextContainerId] = useState<string | null>(null);
   const [typingTextId, setTypingTextId] = useState<string | null>(null);
-  const typingTextTimeoutRef = useRef<number | null>(null);
+  const typingTextTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const textAutoExpandRafRef = useRef<number | null>(null);
   const focusedTextIdRef = useRef<string | null>(null);
   const selectionRangeRef = useRef<Range | null>(null);
@@ -2249,9 +2289,9 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   const noteTextTyping = useCallback((id: string) => {
     setTypingTextId(id);
     if (typingTextTimeoutRef.current) {
-      window.clearTimeout(typingTextTimeoutRef.current);
+      clearTimeout(typingTextTimeoutRef.current);
     }
-    typingTextTimeoutRef.current = window.setTimeout(() => {
+    typingTextTimeoutRef.current = setTimeout(() => {
       setTypingTextId((current) => (current === id ? null : current));
     }, 600);
   }, []);
@@ -2933,7 +2973,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   useEffect(() => {
     return () => {
       if (typingTextTimeoutRef.current) {
-        window.clearTimeout(typingTextTimeoutRef.current);
+        clearTimeout(typingTextTimeoutRef.current);
       }
       if (textAutoExpandRafRef.current !== null) {
         window.cancelAnimationFrame(textAutoExpandRafRef.current);
@@ -3553,7 +3593,13 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   const lastProjectKeyRef = useRef<string | null>(null);
   const pendingInitialRenderRef = useRef<PageItem[]>([]);
   const restoringPreviewCacheRef = useRef(false);
-  const previewCacheWriteTimerRef = useRef<number | null>(null);
+  const previewCacheWriteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const backgroundLowResTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const backgroundLowResIndexRef = useRef(0);
+  const scheduleBackgroundLowResRef = useRef<() => void>(() => {});
+  const enqueueRenderRef = useRef<
+    (task: { pageId: string; srcIdx: number; pageIdx: number; quality: "low" | "high"; priority: number }) => void
+  >(() => {});
   const nearPageIdsRef = useRef<Set<string>>(new Set());
   const [nearPageIds, setNearPageIds] = useState<string[]>([]);
   const visiblePageIdsRef = useRef<Set<string>>(new Set());
@@ -3567,6 +3613,23 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       restoringPreviewCacheRef.current = false;
     }
   }, [sources.length]);
+  useEffect(() => {
+    if (pages.length === 0 || largeDocMode) {
+      if (backgroundLowResTimerRef.current !== null) {
+        cancelIdleOrTimeout(backgroundLowResTimerRef.current);
+        backgroundLowResTimerRef.current = null;
+      }
+      backgroundLowResIndexRef.current = 0;
+      return;
+    }
+    scheduleBackgroundLowResRef.current();
+    return () => {
+      if (backgroundLowResTimerRef.current !== null) {
+        cancelIdleOrTimeout(backgroundLowResTimerRef.current);
+        backgroundLowResTimerRef.current = null;
+      }
+    };
+  }, [largeDocMode, pages.length]);
   useEffect(() => {
     activePageIdRef.current = activePageId;
   }, [activePageId]);
@@ -3789,15 +3852,27 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
           setSavedSignatures(data.savedSignatures);
         }
         if (Array.isArray(data.pages) && data.pages.length > 0) {
+          const initialPreviewCount = getInitialPreviewRenderCount(
+            pages.length,
+            pages.length > LARGE_DOC_PAGE_THRESHOLD,
+          );
+          const thumbLimit =
+            pages.length > LARGE_DOC_PAGE_THRESHOLD ? LARGE_DOC_THUMB_LIMIT : pages.length;
           const normalizedPages = data.pages
             .filter((page) => page && typeof page.id === "string")
-            .map((page) => ({
+            .map((page, index) => ({
               id: page.id as string,
               rotation: typeof page.rotation === "number" ? page.rotation : undefined,
-              thumb: typeof page.thumb === "string" ? page.thumb : "",
+              thumb:
+                index < thumbLimit && typeof page.thumb === "string"
+                  ? page.thumb
+                  : "",
               thumbWidth: typeof page.thumbWidth === "number" ? page.thumbWidth : undefined,
               thumbHeight: typeof page.thumbHeight === "number" ? page.thumbHeight : undefined,
-              preview: typeof page.preview === "string" ? page.preview : "",
+              preview:
+                index < initialPreviewCount && typeof page.preview === "string"
+                  ? page.preview
+                  : "",
             }));
           if (normalizedPages.length > 0) {
             const byId = new Map(normalizedPages.map((page) => [page.id, page]));
@@ -4344,9 +4419,9 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     if (pages.length === 0 || sources.length === 0) return;
     if (!pages.some((page) => page.thumb || page.preview)) return;
     if (previewCacheWriteTimerRef.current !== null) {
-      window.clearTimeout(previewCacheWriteTimerRef.current);
+      clearTimeout(previewCacheWriteTimerRef.current);
     }
-    previewCacheWriteTimerRef.current = window.setTimeout(() => {
+    previewCacheWriteTimerRef.current = setTimeout(() => {
       persistWorkspacePreviewCache(
         projectKey,
         sources.map((source) => source.storageId),
@@ -4356,7 +4431,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     }, 600);
     return () => {
       if (previewCacheWriteTimerRef.current !== null) {
-        window.clearTimeout(previewCacheWriteTimerRef.current);
+        clearTimeout(previewCacheWriteTimerRef.current);
         previewCacheWriteTimerRef.current = null;
       }
     };
@@ -4516,6 +4591,62 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     []
   );
 
+  const scheduleBackgroundLowRes = useCallback(() => {
+    if (backgroundLowResTimerRef.current !== null) return;
+    const pageList = pagesRef.current;
+    if (pageList.length === 0) return;
+    const run = (deadline?: { timeRemaining?: () => number }) => {
+      backgroundLowResTimerRef.current = null;
+      const list = pagesRef.current;
+      if (list.length === 0) return;
+      if (renderQueueRef.current.length > MAX_PARALLEL_PREVIEW_RENDERS * 4) {
+        scheduleBackgroundLowRes();
+        return;
+      }
+      let index = backgroundLowResIndexRef.current;
+      let enqueued = 0;
+      let scanned = 0;
+      const maxScan = list.length;
+      while (scanned < maxScan && enqueued < BACKGROUND_LOW_RES_BATCH) {
+        const page = list[index];
+        if (page) {
+          const status = pageRenderStatusRef.current.get(page.id);
+          if (
+            !page.preview &&
+            status !== "low" &&
+            status !== "high" &&
+            status !== "rendering-low" &&
+            status !== "rendering-high"
+          ) {
+            enqueueRenderRef.current({
+              pageId: page.id,
+              srcIdx: page.srcIdx,
+              pageIdx: page.pageIdx,
+              quality: "low",
+              priority: BACKGROUND_LOW_RES_PRIORITY,
+            });
+            enqueued += 1;
+          }
+        }
+        index = (index + 1) % list.length;
+        scanned += 1;
+        if (deadline?.timeRemaining && deadline.timeRemaining() < 4) break;
+      }
+      backgroundLowResIndexRef.current = index;
+      if (list.some((page) => !page.preview)) {
+        scheduleBackgroundLowRes();
+      }
+    };
+    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+      backgroundLowResTimerRef.current = (window as any).requestIdleCallback(run, {
+        timeout: BACKGROUND_LOW_RES_IDLE_TIMEOUT,
+      });
+    } else {
+      backgroundLowResTimerRef.current = setTimeout(() => run(), BACKGROUND_LOW_RES_IDLE_TIMEOUT);
+    }
+  }, []);
+  scheduleBackgroundLowResRef.current = scheduleBackgroundLowRes;
+
   const scheduleRenderQueue = useCallback(() => {
     if (renderQueueRafRef.current !== null) return;
     renderQueueRafRef.current = window.requestAnimationFrame(() => {
@@ -4650,6 +4781,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     },
     [scheduleRenderQueue]
   );
+  enqueueRenderRef.current = enqueueRender;
 
   const scheduleThumbRenderQueue = useCallback(() => {
     if (thumbRenderRafRef.current !== null) return;
@@ -4910,7 +5042,11 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         if (isInitialLoad) {
           setPages((prev) => {
             const merged = mergePageList(prev, newPages);
-            pendingInitialRenderRef.current = merged.slice(0, INITIAL_PREVIEW_RENDER_COUNT);
+            const initialCount = getInitialPreviewRenderCount(
+              merged.length,
+              merged.length > LARGE_DOC_PAGE_THRESHOLD
+            );
+            pendingInitialRenderRef.current = merged.slice(0, initialCount);
             return merged;
           });
         } else if (newPages.length > 0) {
@@ -4963,8 +5099,8 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   }, [activePageIndexState, pages.length]);
   useEffect(() => {
     if (!recentInsertedPageId) return;
-    const timer = window.setTimeout(() => setRecentInsertedPageId(null), 220);
-    return () => window.clearTimeout(timer);
+    const timer = setTimeout(() => setRecentInsertedPageId(null), 220);
+    return () => clearTimeout(timer);
   }, [recentInsertedPageId]);
 
   const pageIdSignature = useMemo(() => pages.map((page) => page.id).join("|"), [pages]);
@@ -5239,7 +5375,22 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     if (pages.length === 0) return;
     const pageList = pagesRef.current;
     window.requestAnimationFrame(() => {
-      pageList.forEach((page, index) => {
+      const limit = largeDocMode ? Math.min(LARGE_DOC_THUMB_LIMIT, pageList.length) : pageList.length;
+      const thumbTargets = new Set<PageItem>();
+      for (let index = 0; index < limit; index += 1) {
+        const page = pageList[index];
+        if (page) thumbTargets.add(page);
+      }
+      if (largeDocMode) {
+        const activeIndex =
+          activePageIndexState >= 0 && activePageIndexState < pageList.length ? activePageIndexState : 0;
+        for (let offset = -3; offset <= 3; offset += 1) {
+          const idx = activeIndex + offset;
+          const page = pageList[idx];
+          if (page) thumbTargets.add(page);
+        }
+      }
+      Array.from(thumbTargets).forEach((page, index) => {
         enqueueThumbRender({
           pageId: page.id,
           srcIdx: page.srcIdx,
@@ -5248,38 +5399,57 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         });
       });
     });
-  }, [enqueueThumbRender, pages.length]);
+  }, [activePageIndexState, enqueueThumbRender, largeDocMode, pages.length]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (startupOverlayShownRef.current) return;
+
+    const startOverlay = (variant: "new" | "existing") => {
+      startupOverlayActiveRef.current = true;
+      setStartupOverlayVariant(variant);
+      setShowStartupOverlay(true);
+      startupOverlayShownRef.current = true;
+    };
+
     const session = getSessionStorage();
     if (session?.getItem(STARTUP_OVERLAY_KEY)) {
       session.removeItem(STARTUP_OVERLAY_KEY);
-      startupOverlayActiveRef.current = true;
-      setShowStartupOverlay(true);
+      const context = session.getItem(STARTUP_OVERLAY_CONTEXT_KEY) as "new" | "existing" | null;
+      if (context) {
+        session.removeItem(STARTUP_OVERLAY_CONTEXT_KEY);
+      }
+      startOverlay(context === "new" ? "new" : "existing");
+      return;
     }
+
     const storage = getLocalStorage();
     if (!storage) return;
     const pending = storage.getItem(PENDING_UPLOAD_STORAGE_KEY);
-    if (!pending) return;
-    startupOverlayActiveRef.current = true;
-    setShowStartupOverlay(true);
-    storage.removeItem(PENDING_UPLOAD_STORAGE_KEY);
-    try {
-      const parsed = JSON.parse(pending);
-      if (!parsed?.data || !parsed?.name) return;
-      const blob = dataURLToBlob(parsed.data as string);
-      const file = new File([blob], parsed.name as string, { type: blob.type ?? "application/pdf" });
-      processSelectedFiles([file]);
-    } catch (err) {
-      console.error("Failed to import pending upload", err);
+    if (pending) {
+      startOverlay("new");
+      storage.removeItem(PENDING_UPLOAD_STORAGE_KEY);
+      try {
+        const parsed = JSON.parse(pending);
+        if (!parsed?.data || !parsed?.name) return;
+        const blob = dataURLToBlob(parsed.data as string);
+        const file = new File([blob], parsed.name as string, { type: blob.type ?? "application/pdf" });
+        processSelectedFiles([file]);
+      } catch (err) {
+        console.error("Failed to import pending upload", err);
+      }
+      return;
     }
-  }, []);
+
+    if (projectParam) {
+      startOverlay("existing");
+    }
+  }, [projectParam]);
 
   const computeStartupProgress = useCallback(() => {
     const pageList = pagesRef.current;
     if (pageList.length === 0) return 0;
-    const targetCount = Math.min(INITIAL_PREVIEW_RENDER_COUNT, pageList.length);
+    const targetCount = getInitialPreviewRenderCount(pageList.length, largeDocMode);
     if (targetCount === 0) return 0;
     const readyCount = pageList.slice(0, targetCount).reduce((count, page) => count + (page.preview ? 1 : 0), 0);
     const renderProgress = readyCount / targetCount;
@@ -5299,16 +5469,17 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     if (!showStartupOverlay) {
       startupOverlayStartRef.current = null;
       startupOverlayFullAtRef.current = null;
+      setStartupOverlayMessage("Preparing your workspace");
       if (startupOverlayFullTimerRef.current !== null) {
-        window.clearTimeout(startupOverlayFullTimerRef.current);
+        clearTimeout(startupOverlayFullTimerRef.current);
         startupOverlayFullTimerRef.current = null;
       }
       if (startupOverlayTimerRef.current !== null) {
-        window.clearTimeout(startupOverlayTimerRef.current);
+        clearTimeout(startupOverlayTimerRef.current);
         startupOverlayTimerRef.current = null;
       }
       if (startupProgressTimerRef.current !== null) {
-        window.clearInterval(startupProgressTimerRef.current);
+        clearInterval(startupProgressTimerRef.current);
         startupProgressTimerRef.current = null;
       }
       startupProgressRef.current = 0;
@@ -5319,6 +5490,19 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       startupOverlayStartRef.current = performance.now();
     }
   }, [showStartupOverlay]);
+
+  useEffect(() => {
+    if (!showStartupOverlay) return;
+    const initialMessage =
+      startupOverlayVariant === "new" ? "Combining pages" : "Opening your project";
+    setStartupOverlayMessage(initialMessage);
+    const timer = setTimeout(() => {
+      setStartupOverlayMessage("Preparing your workspace");
+    }, 2000);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [showStartupOverlay, startupOverlayVariant]);
 
   useEffect(() => {
     if (!showStartupOverlay) return;
@@ -5344,12 +5528,12 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     };
     tick();
     if (startupProgressTimerRef.current !== null) {
-      window.clearInterval(startupProgressTimerRef.current);
+      clearInterval(startupProgressTimerRef.current);
     }
-    startupProgressTimerRef.current = window.setInterval(tick, 60);
+    startupProgressTimerRef.current = setInterval(tick, 60);
     return () => {
       if (startupProgressTimerRef.current !== null) {
-        window.clearInterval(startupProgressTimerRef.current);
+        clearInterval(startupProgressTimerRef.current);
         startupProgressTimerRef.current = null;
       }
     };
@@ -5358,7 +5542,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   useEffect(() => {
     if (!startupOverlayActiveRef.current || !showStartupOverlay) return;
     if (pages.length === 0) return;
-    const targetCount = Math.min(INITIAL_PREVIEW_RENDER_COUNT, pages.length);
+    const targetCount = getInitialPreviewRenderCount(pages.length, largeDocMode);
     const readyCount = pages.slice(0, targetCount).filter((page) => page.preview).length;
     if (readyCount < targetCount) return;
     const startedAt = startupOverlayStartRef.current ?? performance.now();
@@ -5367,9 +5551,9 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     const remainingToMin = Math.max(0, MIN_STARTUP_OVERLAY_MS - elapsed);
     const scheduleHide = (delayMs: number) => {
       if (startupOverlayTimerRef.current !== null) {
-        window.clearTimeout(startupOverlayTimerRef.current);
+        clearTimeout(startupOverlayTimerRef.current);
       }
-      startupOverlayTimerRef.current = window.setTimeout(() => {
+      startupOverlayTimerRef.current = setTimeout(() => {
         if (!startupOverlayActiveRef.current) return;
         setShowStartupOverlay(false);
         startupOverlayActiveRef.current = false;
@@ -5387,20 +5571,20 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
 
     if (remainingToMin > 0) {
       if (startupOverlayFullTimerRef.current !== null) {
-        window.clearTimeout(startupOverlayFullTimerRef.current);
+        clearTimeout(startupOverlayFullTimerRef.current);
       }
-      startupOverlayFullTimerRef.current = window.setTimeout(() => {
+      startupOverlayFullTimerRef.current = setTimeout(() => {
         if (!startupOverlayActiveRef.current) return;
         ensureFullProgress();
         scheduleHide(STARTUP_OVERLAY_FULL_HOLD_MS);
       }, remainingToMin);
       return () => {
         if (startupOverlayTimerRef.current !== null) {
-          window.clearTimeout(startupOverlayTimerRef.current);
+          clearTimeout(startupOverlayTimerRef.current);
           startupOverlayTimerRef.current = null;
         }
         if (startupOverlayFullTimerRef.current !== null) {
-          window.clearTimeout(startupOverlayFullTimerRef.current);
+          clearTimeout(startupOverlayFullTimerRef.current);
           startupOverlayFullTimerRef.current = null;
         }
       };
@@ -5417,15 +5601,15 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     scheduleHide(remaining);
     return () => {
       if (startupOverlayTimerRef.current !== null) {
-        window.clearTimeout(startupOverlayTimerRef.current);
+        clearTimeout(startupOverlayTimerRef.current);
         startupOverlayTimerRef.current = null;
       }
       if (startupOverlayFullTimerRef.current !== null) {
-        window.clearTimeout(startupOverlayFullTimerRef.current);
+        clearTimeout(startupOverlayFullTimerRef.current);
         startupOverlayFullTimerRef.current = null;
       }
     };
-  }, [pages, showStartupOverlay]);
+  }, [largeDocMode, pages, showStartupOverlay]);
 
   /** Add more PDFs (create object URLs and append to sources) */
   function handleAddClick() {
@@ -6704,7 +6888,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                         }
                       }}
                       onPaste={() => {
-                        window.setTimeout(() => {
+                        setTimeout(() => {
                           autoExpandTextAnnotation(page.id, annotation.id);
                           window.requestAnimationFrame(() => {
                             window.requestAnimationFrame(() => {
@@ -6762,7 +6946,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
                         }
                         // no-op for strike overlay
                         if (typingTextTimeoutRef.current) {
-                          window.clearTimeout(typingTextTimeoutRef.current);
+                          clearTimeout(typingTextTimeoutRef.current);
                           typingTextTimeoutRef.current = null;
                         }
                         setTypingTextId((current) => (current === annotation.id ? null : current));
@@ -7571,7 +7755,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
 
   const clearToolPreviewTimer = useCallback(() => {
     if (toolPreviewTimerRef.current) {
-      window.clearTimeout(toolPreviewTimerRef.current);
+      clearTimeout(toolPreviewTimerRef.current);
       toolPreviewTimerRef.current = null;
     }
   }, []);
@@ -7607,7 +7791,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         setSelectMode(false);
         setDeleteMode(false);
 	      setToolbarPreviewMode(mode);
-	      toolPreviewTimerRef.current = window.setTimeout(() => {
+	      toolPreviewTimerRef.current = setTimeout(() => {
 	        toolPreviewTimerRef.current = null;
 	        enterToolMode(mode);
 	      }, 180);
@@ -8042,6 +8226,8 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     !!draftHighlight ||
     !!draftShape ||
     !!draftTextBox;
+  const firstPagePreview = pages[0]?.preview ?? null;
+  const firstPageThumbValue = pages[0]?.thumb ?? null;
 
   const buildCloudProjectData = useCallback(() => {
     if (!hasWorkspaceData) return null;
@@ -8114,7 +8300,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     if (!ownerId) return;
 
     let cancelled = false;
-    const timer = window.setTimeout(() => {
+    const timer = setTimeout(() => {
       const projectData = buildCloudProjectData();
       if (!projectData || cancelled) return;
       void saveProject(projectName, projectData).then((saved) => {
@@ -8125,19 +8311,19 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
 
     return () => {
       cancelled = true;
-      window.clearTimeout(timer);
+      clearTimeout(timer);
     };
-  }, [
-    authSession?.user,
-    buildCloudProjectData,
-    hasWorkspaceData,
-    projectName,
-    saveProject,
-    draggingText,
-    resizingText,
-    draggingShape,
-    draftHighlight,
-  ]);
+    }, [
+      authSession?.user,
+      buildCloudProjectData,
+      hasWorkspaceData,
+      projectName,
+      saveProject,
+      draggingText,
+      resizingText,
+      draggingShape,
+      draftHighlight,
+    ]);
 
 	  const computeBaseScale = useCallback(() => {
 	    const container = previewContainerRef.current;
@@ -8198,7 +8384,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
 	      behavior: "smooth",
 	    });
 	    setShouldCenterOnChange(false);
-	  }, [activePageId, activePageIndex, baseScale, pages, shouldCenterOnChange, zoomMultiplier]);
+  }, [activePageId, activePageIndex, baseScale, pages, shouldCenterOnChange, zoomMultiplier]);
 
   useEffect(() => {
     function handleResize() {
@@ -8934,11 +9120,11 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         }
       }
     };
-    const interval = window.setInterval(poll, 2500);
+    const interval = setInterval(poll, 2500);
     poll();
     return () => {
       cancelled = true;
-      window.clearInterval(interval);
+      clearInterval(interval);
     };
   }, [
     applySignatureToActivePage,
@@ -9533,6 +9719,10 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     (event: React.MouseEvent<HTMLAnchorElement>) => {
       event.preventDefault();
       event.stopPropagation();
+      if (typeof window !== "undefined") {
+        window.location.href = "/";
+        return;
+      }
       router.push("/");
     },
     [router]
@@ -9576,15 +9766,15 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   useEffect(() => {
     if (!showDelayOverlay) return;
     if (showDelayOverlay === "intro") {
-      const timer = window.setTimeout(() => setShowDelayOverlay("progress"), 1000);
-      return () => window.clearTimeout(timer);
+      const timer = setTimeout(() => setShowDelayOverlay("progress"), 1000);
+      return () => clearTimeout(timer);
     }
     if (showDelayOverlay === "progress") {
-      const timer = window.setTimeout(() => {
+      const timer = setTimeout(() => {
         setShowDelayOverlay(null);
         handleDownload(true);
       }, 3000);
-      return () => window.clearTimeout(timer);
+      return () => clearTimeout(timer);
     }
   }, [showDelayOverlay]);
 
@@ -10191,25 +10381,31 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   return (
     <main className="flex h-screen flex-col overflow-hidden bg-[#f3f6fb]">
       {showStartupOverlay ? (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/60">
-          <div className="w-full max-w-md rounded-2xl bg-white px-8 py-6 text-center shadow-[0_30px_80px_rgba(5,10,30,0.45)]">
-            <p className="text-base font-semibold text-slate-800">Getting project ready...</p>
-            <p className="mt-1 text-sm text-slate-500">Loading your workspace</p>
-            <div className="mt-5 h-4 w-full overflow-hidden rounded-full bg-slate-200 shadow-inner">
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/50 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-[28px] border border-white/60 bg-white/85 px-8 py-7 text-center shadow-[0_28px_80px_rgba(15,23,42,0.35)] backdrop-blur-xl">
+            <p className="text-[15px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+              MergifyPDF
+            </p>
+            <p className="mt-2 text-lg font-semibold text-slate-900">{startupOverlayMessage}</p>
+            <div className="mt-5 h-2.5 w-full overflow-hidden rounded-full bg-slate-200/80">
               <div
-                className="relative h-full overflow-hidden rounded-full bg-gradient-to-r from-[#0b2f6a] via-[#1f4b99] to-[#7c3aed] transition-[width] duration-200 ease-out"
+                className="relative h-full overflow-hidden rounded-full bg-gradient-to-r from-[#0f172a] via-[#1d4ed8] to-[#38bdf8] transition-[width] duration-200 ease-out"
                 style={{ width: `${Math.round(startupProgress * 100)}%` }}
               >
                 <div
                   className="absolute inset-0 opacity-70"
                   style={{
                     backgroundImage:
-                      "linear-gradient(120deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.08) 45%, rgba(255,255,255,0.35) 70%, rgba(255,255,255,0.08) 100%)",
+                      "linear-gradient(120deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.12) 45%, rgba(255,255,255,0.35) 70%, rgba(255,255,255,0.12) 100%)",
                     backgroundSize: "220% 100%",
                     animation: "mpdf-water 2.8s ease-in-out infinite",
                   }}
                 />
               </div>
+            </div>
+            <div className="mt-4 flex items-center justify-center gap-2 text-xs font-medium text-slate-500">
+              <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+              <span>Optimizing previews for speed</span>
             </div>
           </div>
         </div>

@@ -17,13 +17,14 @@ type SummaryProject = {
 type Props = {
   firstName: string;
   accountName: string;
+  ownerKey: string | null;
   projects: SummaryProject[];
 };
 
 type OwnerFilter = "any" | "shared" | "you";
 type SortOption = "activity" | "az" | "za";
 
-export default function HomeProjectsSearch({ firstName, accountName, projects }: Props) {
+export default function HomeProjectsSearch({ firstName, accountName, ownerKey, projects }: Props) {
   const [query, setQuery] = useState("");
   const initialProjects = useMemo(() => projects, [projects]);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -347,6 +348,7 @@ export default function HomeProjectsSearch({ firstName, accountName, projects }:
               query={query}
               ownerFilter={ownerFilter}
               sortOption={sortOption}
+              ownerKey={ownerKey}
             />
           </div>
           <div className="mt-6 flex justify-center">

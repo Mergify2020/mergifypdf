@@ -1,13 +1,14 @@
 import { redirect } from "next/navigation";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
+import { getServerSessionSafe } from "@/lib/serverSession";
 import { prisma } from "@/lib/prisma";
 import { curatedProjects } from "@/lib/sampleProjects";
 import AllProjectsGrid from "@/components/AllProjectsGrid";
 import { formatProjectLastEdited } from "@/lib/formatProjectLastEdited";
 
+export const dynamic = "force-dynamic";
+
 export default async function StarredProjectsPage() {
-  const session = await getServerSession(authOptions);
+  const session = await getServerSessionSafe();
 
   if (!session?.user) {
     redirect("/login");
@@ -23,12 +24,14 @@ export default async function StarredProjectsPage() {
         name: string | null;
         updatedAt: Date;
         data: unknown;
+        previewUrl: string | null;
       }[]
     | null = null;
 
   try {
     dbProjects = await prisma.project.findMany({
       where: { userId: session.user.id },
+      select: { id: true, name: true, updatedAt: true, data: true, previewUrl: true },
       orderBy: { updatedAt: "desc" },
     });
   } catch (error) {
@@ -38,29 +41,11 @@ export default async function StarredProjectsPage() {
   const projects =
     dbProjects && dbProjects.length > 0
       ? dbProjects.map((project) => {
-          const data = project.data as
-            | {
-                firstPageThumb?: string | null;
-                pages?: { id: string }[];
-                pageThumbs?: string[];
-              }
-            | null;
-          const preview =
-            data && typeof data.firstPageThumb === "string" && data.firstPageThumb.length > 0
-              ? data.firstPageThumb
-              : undefined;
-          const pagesCount = Array.isArray(data?.pages) ? data.pages.length : undefined;
-          const pageThumbs =
-            Array.isArray(data?.pageThumbs) && data.pageThumbs.length > 0
-              ? data.pageThumbs.filter((thumb) => typeof thumb === "string" && thumb.length > 0)
-              : undefined;
           return {
             id: project.id,
             title: project.name?.trim() || "Untitled project",
             updated: formatProjectLastEdited(project.updatedAt),
-            preview,
-            pagesCount,
-            pageThumbs,
+            previewUrl: project.previewUrl,
           };
         })
       : curatedProjects;

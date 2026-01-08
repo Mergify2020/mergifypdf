@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { preloadImageUrls } from "@/lib/preloadImageUrls";
-import { setProjectsSummaryCache, type ProjectsSummaryProject } from "@/lib/projectsSummaryCache";
+import { refreshProjectsSummary, setProjectsSummaryCache, type ProjectsSummaryProject } from "@/lib/projectsSummaryCache";
 
 export default function ProjectsSummarySeed({
   projects,
@@ -14,12 +13,8 @@ export default function ProjectsSummarySeed({
   useEffect(() => {
     if (!Array.isArray(projects) || projects.length === 0) return;
     setProjectsSummaryCache(ownerKey, projects);
-    preloadImageUrls(
-      projects
-        .map((project) => project.previewUrl)
-        .filter((url): url is string => typeof url === "string" && url.length > 0)
-        .slice(0, 12),
-    );
+    if (!ownerKey) return;
+    void refreshProjectsSummary(ownerKey, "no-store");
   }, [ownerKey, projects]);
 
   return null;

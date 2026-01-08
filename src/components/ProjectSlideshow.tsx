@@ -10,19 +10,19 @@ type SlideshowProps = {
 
 export default function ProjectSlideshow({ thumbs, title, pagesCount }: SlideshowProps) {
   const [index, setIndex] = useState(0);
-  const intervalRef = useRef<number | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (thumbs.length <= 1) return;
     if (typeof window === "undefined") return;
 
-    intervalRef.current = window.setInterval(() => {
+    intervalRef.current = setInterval(() => {
       setIndex((prev) => (prev + 1) % thumbs.length);
     }, 1200);
 
     return () => {
       if (intervalRef.current != null) {
-        window.clearInterval(intervalRef.current);
+        clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
     };
@@ -49,4 +49,3 @@ export default function ProjectSlideshow({ thumbs, title, pagesCount }: Slidesho
     </div>
   );
 }
-

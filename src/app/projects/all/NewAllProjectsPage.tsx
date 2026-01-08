@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatProjectLastEdited } from "@/lib/formatProjectLastEdited";
 
 type ApiProject = {
@@ -102,36 +102,70 @@ export default function NewAllProjectsPage() {
 
 function ProjectCardView({ project }: { project: ProjectCard }) {
   const [imageLoaded, setImageLoaded] = useState(false);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [previewRetry, setPreviewRetry] = useState(0);
+  const [previewFailed, setPreviewFailed] = useState(false);
 
-  const hasPreview = typeof project.previewUrl === "string" && project.previewUrl.length > 0;
+  const previewUrl = project.previewUrl ?? null;
+  const previewSrc =
+    previewUrl && !previewUrl.startsWith("data:image/")
+      ? `${previewUrl}${previewUrl.includes("?") ? "&" : "?"}r=${previewRetry}`
+      : previewUrl;
+  const MAX_PREVIEW_RETRIES = 2;
+
+  useEffect(() => {
+    return () => {
+      if (retryTimerRef.current !== null) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    setPreviewFailed(false);
+  }, [previewUrl]);
+
+  const handlePreviewError = () => {
+    if (!previewUrl) return;
+    if (previewRetry >= MAX_PREVIEW_RETRIES) {
+      setPreviewFailed(true);
+      return;
+    }
+    if (retryTimerRef.current !== null) return;
+    retryTimerRef.current = setTimeout(() => {
+      retryTimerRef.current = null;
+      setPreviewRetry((prev) => prev + 1);
+    }, 700);
+  };
 
   return (
     <a
       href={`/studio?project=${encodeURIComponent(project.id)}`}
       className="group flex flex-col rounded-2xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+      aria-label={project.title}
     >
       <div className="relative aspect-[1.23/1] overflow-hidden rounded-xl bg-[#EEF1F5]">
-        {hasPreview ? (
+        {previewUrl && !previewFailed ? (
           <>
             {!imageLoaded ? (
               <div className="absolute inset-0 animate-pulse rounded-xl bg-slate-100" />
             ) : null}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={project.previewUrl!}
-              alt={project.title}
+              src={previewSrc ?? ""}
+              alt=""
               loading="lazy"
               decoding="async"
               onLoad={() => setImageLoaded(true)}
+              onError={handlePreviewError}
               className={`h-full w-full object-contain transition-opacity duration-200 ${
                 imageLoaded ? "opacity-100" : "opacity-0"
               }`}
             />
           </>
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-3xl font-semibold text-slate-500">
-            {project.title.charAt(0)}
-          </div>
+          <div className="absolute inset-0 animate-pulse rounded-xl bg-slate-100" />
         )}
       </div>
       <div className="mt-4 space-y-1">

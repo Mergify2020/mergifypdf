@@ -1,6 +1,4 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
 import { verifyTwoFactorSetupCode } from "@/lib/twoFactorVerification";
 
@@ -9,6 +7,8 @@ function unauthorized() {
 }
 
 export async function POST(req: Request) {
+  const { getServerSession } = await import("next-auth");
+  const { authOptions } = await import("@/lib/authOptions");
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return unauthorized();
 

@@ -2,6 +2,14 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  experimental: {
+    cpus: 1,
+  },
+  allowedDevOrigins: [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://172.30.190.27:3000",
+  ],
 
   webpack: (config) => {
     config.resolve = config.resolve || {};
@@ -31,7 +39,6 @@ const nextConfig: NextConfig = {
     ];
   },
 
-  turbopack: {},
 };
 
 export default nextConfig;

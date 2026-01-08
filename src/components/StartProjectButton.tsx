@@ -7,11 +7,12 @@ import { FileText, FileUp, Plus, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import { PROJECT_NAME_STORAGE_KEY, sanitizeProjectName } from "@/lib/projectName";
 import { addRecentProject } from "@/lib/recentProjects";
-import { preloadWorkspaceFilesForProject, type PendingWorkspaceFile } from "@/lib/preloadWorkspaceFiles";
+import { useWorkspaceFilePreloader, type PendingWorkspaceFile } from "@/components/useWorkspaceFilePreloader";
 
 const WORKSPACE_META_KEY = "mpdf:files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
 const STARTUP_OVERLAY_KEY = "mpdf:startup-overlay";
+const STARTUP_OVERLAY_CONTEXT_KEY = "mpdf:startup-overlay-context";
 
 type Props = {
   className?: string;
@@ -39,6 +40,7 @@ async function resetWorkspaceStorage() {
 export default function StartProjectButton({ className, variant = "default" }: Props) {
   const router = useRouter();
   const { data: session } = useSession();
+  const { queuePreload } = useWorkspaceFilePreloader();
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
   const [pendingFiles, setPendingFiles] = useState<PendingWorkspaceFile[]>([]);
@@ -178,15 +180,12 @@ export default function StartProjectButton({ className, variant = "default" }: P
         setBusy(false);
         return;
       }
-      try {
-        await preloadWorkspaceFilesForProject(pendingFiles, id);
-      } catch (err) {
-        console.error("Failed to preload workspace files", err);
-      }
+      queuePreload(pendingFiles, id);
       addRecentProject(ownerId, clean, id);
       setBusy(false);
       setOpen(false);
       window.sessionStorage?.setItem(STARTUP_OVERLAY_KEY, "1");
+      window.sessionStorage?.setItem(STARTUP_OVERLAY_CONTEXT_KEY, "new");
       router.push(`/studio?project=${encodeURIComponent(id)}`);
     } catch {
       setError("Could not create that project. Please try again.");

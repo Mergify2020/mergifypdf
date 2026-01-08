@@ -29,7 +29,12 @@ import {
 } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 import { PROJECT_NAME_STORAGE_KEY, sanitizeProjectName } from "@/lib/projectName";
-import { addRecentProject, loadRecentProjects, RECENT_PROJECTS_EVENT, saveRecentProjects } from "@/lib/recentProjects";
+import {
+  addRecentProject,
+  loadRecentProjects,
+  saveRecentProjects,
+  subscribeRecentProjects,
+} from "@/lib/recentProjects";
 import AppHeaderBrand from "./AppHeaderBrand";
 import SettingsMenu from "./SettingsMenu";
 import HeroHeader from "./HeroHeader";
@@ -39,17 +44,17 @@ import { useAvatarPreference } from "@/lib/useAvatarPreference";
 import { getAvatarFallback } from "@/lib/avatarFallback";
 import {
   getProjectsSummaryCache,
-  PROJECTS_SUMMARY_EVENT,
   refreshProjectsSummary,
   setProjectsSummaryCache,
+  subscribeProjectsSummary,
   type ProjectsSummaryProject,
 } from "@/lib/projectsSummaryCache";
-import { preloadImageUrls } from "@/lib/preloadImageUrls";
-import { preloadWorkspaceFilesForProject, type PendingWorkspaceFile } from "@/lib/preloadWorkspaceFiles";
+import { useWorkspaceFilePreloader, type PendingWorkspaceFile } from "@/components/useWorkspaceFilePreloader";
 
 const WORKSPACE_META_KEY = "mpdf:files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
 const STARTUP_OVERLAY_KEY = "mpdf:startup-overlay";
+const STARTUP_OVERLAY_CONTEXT_KEY = "mpdf:startup-overlay-context";
 
 async function resetWorkspaceStorage() {
   try {
@@ -147,6 +152,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
   const router = useRouter();
   const { data: session } = useSession();
   const pathname = usePathname();
+  const { queuePreload } = useWorkspaceFilePreloader();
   const [homeRecentProjects, setHomeRecentProjects] = useState<
     { id?: string; title: string; updatedAt?: number; previewUrl?: string | null }[]
   >([]);
@@ -312,15 +318,12 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
         setCreateBusy(false);
         return;
       }
-      try {
-        await preloadWorkspaceFilesForProject(createPendingFiles, id);
-      } catch (err) {
-        console.error("Failed to preload workspace files", err);
-      }
+      queuePreload(createPendingFiles, id);
       addRecentProject(ownerId, clean, id);
       setCreateBusy(false);
       setCreateOpen(false);
       window.sessionStorage?.setItem(STARTUP_OVERLAY_KEY, "1");
+      window.sessionStorage?.setItem(STARTUP_OVERLAY_CONTEXT_KEY, "new");
       router.push(`/studio?project=${encodeURIComponent(id)}`);
     } catch {
       setCreateError("Could not create that project. Please try again.");
@@ -368,6 +371,14 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
     if (getProjectsSummaryCache(ownerKey)) return;
 
     let cancelled = false;
+    const preloadImages = (urls: string[]) => {
+      urls.forEach((url) => {
+        const img = new Image();
+        img.decoding = "async";
+        img.src = url;
+      });
+    };
+
     const warm = async () => {
       try {
         const res = await fetch("/api/projects?summary=1", { cache: "force-cache" });
@@ -375,7 +386,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
         const data = (await res.json()) as { projects?: ProjectsSummaryProject[] };
         if (!Array.isArray(data.projects) || cancelled) return;
         setProjectsSummaryCache(ownerKey, data.projects);
-        preloadImageUrls(
+        preloadImages(
           data.projects
             .map((project) => project.previewUrl)
             .filter((url): url is string => typeof url === "string" && url.length > 0)
@@ -440,10 +451,14 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
       setHomeRecentProjects(fallback);
     };
 
-    const recentEventKey = `${RECENT_PROJECTS_EVENT}:${ownerKey ?? "anon"}`;
-    const summaryEventKey = `${PROJECTS_SUMMARY_EVENT}:${ownerKey ?? "anon"}`;
-    window.addEventListener(recentEventKey, sync);
-    window.addEventListener(summaryEventKey, sync);
+    const unsubscribeRecents = subscribeRecentProjects((update) => {
+      if ((update.ownerKey ?? null) !== (ownerKey ?? null)) return;
+      sync();
+    });
+    const unsubscribeSummary = subscribeProjectsSummary((update) => {
+      if ((update.ownerKey ?? null) !== (ownerKey ?? null)) return;
+      sync();
+    });
 
     const reconcileRecents = (projects: ProjectsSummaryProject[]) => {
       const existing = loadRecentProjects(ownerKey);
@@ -467,13 +482,22 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
       }
     };
 
+    const preloadImages = (urls: string[]) => {
+      if (typeof window === "undefined") return;
+      urls.forEach((url) => {
+        const img = new Image();
+        img.decoding = "async";
+        img.src = url;
+      });
+    };
+
     const refreshAndSync = async () => {
       const projects = await refreshProjectsSummary(ownerKey, "no-store");
       if (projects) {
         reconcileRecents(projects);
       }
       if (projects && projects.length > 0) {
-        preloadImageUrls(
+        preloadImages(
           projects
             .map((project) => project.previewUrl)
             .filter((url): url is string => typeof url === "string" && url.length > 0)
@@ -499,7 +523,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
         reconcileRecents(projects);
       }
       if (projects && projects.length > 0) {
-        preloadImageUrls(
+        preloadImages(
           projects
             .map((project) => project.previewUrl)
             .filter((url): url is string => typeof url === "string" && url.length > 0)
@@ -512,8 +536,8 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
     window.addEventListener("focus", handleFocus);
     document.addEventListener("visibilitychange", handleVisibility);
     return () => {
-      window.removeEventListener(recentEventKey, sync);
-      window.removeEventListener(summaryEventKey, sync);
+      unsubscribeRecents();
+      unsubscribeSummary();
       window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
@@ -1339,18 +1363,18 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
 	                                className="flex w-full min-w-0 items-center gap-3 rounded-2xl px-1 py-0.5 text-left transition hover:bg-white/60"
 	                              >
 	                                <span className="relative inline-flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white text-slate-500 shadow-sm ring-1 ring-slate-200">
-	                                  {item.previewUrl ? (
-	                                    // eslint-disable-next-line @next/next/no-img-element
-	                                    <img
-	                                      src={item.previewUrl}
-	                                      alt={item.label}
-	                                      loading="lazy"
-	                                      decoding="async"
-	                                      className="h-full w-full object-cover object-top"
-	                                    />
-	                                  ) : (
-	                                    <FileText className="h-6 w-6 opacity-60" aria-hidden />
-	                                  )}
+                                  {item.previewUrl ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                      src={item.previewUrl}
+                                      alt=""
+                                      loading="lazy"
+                                      decoding="async"
+                                      className="h-full w-full object-cover object-top"
+                                    />
+                                  ) : (
+                                    <div className="h-full w-full animate-pulse bg-slate-100" />
+                                  )}
 	                                </span>
 	                                <span className="min-w-0">
 	                                  <span className="block truncate text-lg font-semibold text-slate-800 sm:text-xl">
@@ -1367,18 +1391,18 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
 	                                <span className={isHomePanel ? "flex min-w-0 items-center gap-4" : ""}>
 	                                  {isHomePanel && !item.hidePreview ? (
 	                                    <span className="relative inline-flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white text-slate-500 shadow-sm ring-1 ring-slate-200">
-	                                      {item.previewUrl ? (
-	                                        // eslint-disable-next-line @next/next/no-img-element
-	                                        <img
-	                                          src={item.previewUrl}
-	                                          alt={item.label}
-	                                          loading="lazy"
-	                                          decoding="async"
-	                                          className="h-full w-full object-cover object-top"
-	                                        />
-	                                      ) : (
-	                                        <FileText className="h-6 w-6 opacity-60" aria-hidden />
-	                                      )}
+                                      {item.previewUrl ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img
+                                          src={item.previewUrl}
+                                          alt=""
+                                          loading="lazy"
+                                          decoding="async"
+                                          className="h-full w-full object-cover object-top"
+                                        />
+                                      ) : (
+                                        <div className="h-full w-full animate-pulse bg-slate-100" />
+                                      )}
 	                                    </span>
 	                                  ) : null}
 	                                  <span className={isHomePanel ? "truncate" : ""}>{item.label}</span>
@@ -1503,13 +1527,13 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                               // eslint-disable-next-line @next/next/no-img-element
                               <img
                                 src={item.previewUrl}
-                                alt={item.label}
+                                alt=""
                                 loading="lazy"
                                 decoding="async"
                                 className="h-full w-full object-cover object-top"
                               />
                             ) : (
-                              <FileText className="h-5 w-5 opacity-60" aria-hidden />
+                              <div className="h-full w-full animate-pulse bg-slate-100" />
                             )}
                           </span>
                           <span className="min-w-0">

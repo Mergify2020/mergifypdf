@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
+import { getServerSessionSafe } from "@/lib/serverSession";
+
+export const dynamic = "force-dynamic";
 
 export default async function ProjectsPage() {
-  const session = await getServerSession(authOptions);
+  const session = await getServerSessionSafe();
 
   if (!session?.user) {
     redirect("/login");

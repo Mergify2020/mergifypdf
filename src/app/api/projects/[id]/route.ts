@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
+import { derivePreviewMeta } from "@/lib/projectPreview";
 import { Prisma } from "@prisma/client";
 
 async function ensureDbConnection() {
@@ -26,31 +27,6 @@ async function ensureDbConnection() {
   }
 }
 
-function derivePreviewMeta(data: unknown): { previewUrl: string | null; pagesCount: number } {
-  let previewUrl: string | null = null;
-  let pagesCount = 0;
-
-  if (data && typeof data === "object") {
-    const payload = data as Record<string, unknown>;
-
-    if (typeof payload.previewUrl === "string" && payload.previewUrl.length > 0) {
-      previewUrl = payload.previewUrl;
-    } else if (
-      typeof payload.firstPageThumb === "string" &&
-      payload.firstPageThumb.length > 0
-    ) {
-      previewUrl = payload.firstPageThumb;
-    }
-
-    if (typeof payload.pagesCount === "number" && Number.isFinite(payload.pagesCount)) {
-      pagesCount = payload.pagesCount;
-    } else if (Array.isArray(payload.pages)) {
-      pagesCount = payload.pages.length;
-    }
-  }
-
-  return { previewUrl, pagesCount };
-}
 
 export async function GET(
   _req: NextRequest,
@@ -81,6 +57,27 @@ export async function GET(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const hasPreview = typeof project.previewUrl === "string" && project.previewUrl.length > 0;
+  const hasPagesCount = typeof project.pagesCount === "number" && project.pagesCount > 0;
+  if (!hasPreview || !hasPagesCount) {
+    const derived = derivePreviewMeta(project.data);
+    const nextPreviewUrl = hasPreview ? project.previewUrl : derived.previewUrl;
+    const nextPagesCount =
+      hasPagesCount && typeof project.pagesCount === "number"
+        ? project.pagesCount
+        : derived.pagesCount;
+    if (nextPreviewUrl || nextPagesCount) {
+      const updated = await prisma.project.update({
+        where: { id: project.id },
+        data: {
+          previewUrl: nextPreviewUrl ?? project.previewUrl,
+          pagesCount: nextPagesCount > 0 ? nextPagesCount : project.pagesCount ?? null,
+        },
+      });
+      return NextResponse.json({ project: updated });
+    }
+  }
+
   return NextResponse.json({ project });
 }
 
@@ -105,7 +102,6 @@ export async function PUT(
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const name = typeof body.name === "string" ? body.name : undefined;
   const data = "data" in body ? body.data : undefined;
-
   const existing =
     data === undefined
       ? await prisma.project.findUnique({
@@ -137,14 +133,25 @@ export async function PUT(
           const nextData = (data ?? existingWithData.data) as
             | Prisma.InputJsonValue
             | Prisma.NullTypes.JsonNull;
-          const { previewUrl, pagesCount } = derivePreviewMeta(nextData);
+          const derived = derivePreviewMeta(nextData);
+          const existingPreview =
+            typeof (existingWithData as { previewUrl?: unknown }).previewUrl === "string"
+              ? ((existingWithData as { previewUrl?: string }).previewUrl as string)
+              : null;
+          const existingPagesCount =
+            typeof (existingWithData as { pagesCount?: unknown }).pagesCount === "number"
+              ? ((existingWithData as { pagesCount?: number }).pagesCount as number)
+              : 0;
+          const nextPreviewUrl = derived.previewUrl ?? existingPreview;
+          const nextPagesCount =
+            derived.pagesCount > 0 ? derived.pagesCount : existingPagesCount;
           return prisma.project.update({
             where: { id: existing.id },
             data: {
               name: name ?? existing.name,
               data: nextData,
-              previewUrl,
-              pagesCount,
+              previewUrl: nextPreviewUrl,
+              pagesCount: nextPagesCount,
             },
           });
         })();

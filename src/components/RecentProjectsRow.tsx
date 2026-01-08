@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import ProjectCard from "./ProjectCard";
 import { matchesSearch } from "@/lib/search";
 import { formatProjectLastEdited } from "@/lib/formatProjectLastEdited";
+import { getProjectsSummaryCache } from "@/lib/projectsSummaryCache";
 
 type SummaryProject = {
   id: string;
@@ -18,6 +19,7 @@ type Props = {
   query?: string;
   ownerFilter?: "any" | "shared" | "you";
   sortOption?: "activity" | "az" | "za";
+  ownerKey?: string | null;
 };
 
 export default function RecentProjectsRow({
@@ -25,13 +27,37 @@ export default function RecentProjectsRow({
   query = "",
   ownerFilter = "any",
   sortOption = "activity",
+  ownerKey = null,
 }: Props) {
   const [projects, setProjects] = useState<SummaryProject[]>(initialProjects ?? []);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [loading, setLoading] = useState(!initialProjects || initialProjects.length === 0);
+
+  useEffect(() => {
+    if (initialProjects && initialProjects.length) return;
+    if (!ownerKey) return;
+    const cached = getProjectsSummaryCache(ownerKey);
+    if (!cached || cached.length === 0) return;
+    const normalized = cached.map((project) => ({
+      ...project,
+      name: project.name ?? "Untitled project",
+      updatedAt:
+        typeof project.updatedAt === "number" ? new Date(project.updatedAt) : project.updatedAt,
+    }));
+    setProjects(normalized);
+    setLoading(false);
+  }, [initialProjects, ownerKey]);
+
+  useEffect(() => {
+    if (initialProjects && initialProjects.length) return;
+    if (ownerKey) return;
+    setLoading(false);
+  }, [initialProjects, ownerKey]);
 
   useEffect(() => {
     if (initialProjects && initialProjects.length) return;
     let cancelled = false;
+    setLoading(true);
     const load = async () => {
       try {
         const res = await fetch("/api/projects?summary=1", { cache: "force-cache" });
@@ -42,6 +68,8 @@ export default function RecentProjectsRow({
         setProjects(data.projects);
       } catch {
         // ignore
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     };
     void load();
@@ -50,11 +78,31 @@ export default function RecentProjectsRow({
     };
   }, [initialProjects]);
 
-  if (!projects.length) {
+  if (!projects.length && !loading) {
     return (
       <div className="mt-6 flex min-h-[260px] w-full flex-col items-center justify-center rounded-[24px] border-[3px] border-dashed border-[#51bdff] bg-white/70 px-8 py-12 text-center shadow-sm">
         <p className="text-lg font-semibold text-slate-900 sm:text-xl">No projects yet</p>
         <p className="mt-2 max-w-sm text-sm text-slate-600 sm:text-base">Start a new project to see it here.</p>
+      </div>
+    );
+  }
+
+  if (loading && !projects.length) {
+    return (
+      <div className="projects-grid mt-2 grid w-full grid-cols-[repeat(auto-fill,minmax(max(300px,calc(100%/6)),1fr))] gap-5">
+        {Array.from({ length: 6 }).map((_, index) => (
+          <div key={`home-loading-project-${index}`} className="flex flex-col text-left">
+            <div className="relative rounded-[10px] bg-[#F9FAFC]">
+              <div className="relative m-[3px] aspect-[1.23/1] w-[calc(100%-6px)] overflow-hidden rounded-[10px] border border-[rgba(0,0,0,0.06)] bg-[#EEF1F5]">
+                <div className="absolute inset-0 rounded-[10px] skeleton-shimmer opacity-90" />
+              </div>
+            </div>
+            <div className="mt-2 space-y-0.5">
+              <div className="h-7 w-2/3 rounded-full bg-slate-100" />
+              <div className="h-5 w-1/2 rounded-full bg-slate-100" />
+            </div>
+          </div>
+        ))}
       </div>
     );
   }

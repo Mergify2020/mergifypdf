@@ -7,44 +7,37 @@ export type RecentProjectEntry = {
 export const RECENT_PROJECTS_STORAGE_KEY = "mpdf:recent-projects";
 export const RECENT_PROJECTS_EVENT = "mpdf:recent-projects-updated";
 
-function isBrowser() {
-  return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
-}
+export type RecentProjectsUpdate = {
+  ownerKey: string | null;
+  projects: RecentProjectEntry[];
+};
+
+const cachedByOwner = new Map<string | null, RecentProjectEntry[]>();
+const listeners = new Set<(update: RecentProjectsUpdate) => void>();
 
 function storageKey(ownerId: string | null | undefined) {
   return `${RECENT_PROJECTS_STORAGE_KEY}:${ownerId ?? "anon"}`;
 }
 
 export function loadRecentProjects(ownerId: string | null | undefined): RecentProjectEntry[] {
-  if (!isBrowser()) return [];
-  try {
-    const raw = window.localStorage.getItem(storageKey(ownerId));
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((entry) => typeof entry?.id === "string" && typeof entry?.title === "string");
-  } catch {
-    return [];
-  }
+  return cachedByOwner.get(ownerId ?? null) ?? [];
 }
 
 export function saveRecentProjects(ownerId: string | null | undefined, projects: RecentProjectEntry[]) {
-  if (!isBrowser()) return;
-  try {
-    window.localStorage.setItem(storageKey(ownerId), JSON.stringify(projects));
-    window.dispatchEvent(new Event(`${RECENT_PROJECTS_EVENT}:${ownerId ?? "anon"}`));
-    if (ownerId) {
-      void fetch("/api/recent-projects", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projects }),
-      }).catch(() => {
-        // ignore network errors
-      });
-    }
-  } catch {
-    // ignore storage failures
-  }
+  cachedByOwner.set(ownerId ?? null, projects);
+  const payload: RecentProjectsUpdate = { ownerKey: ownerId ?? null, projects };
+  listeners.forEach((listener) => listener(payload));
+}
+
+export function subscribeRecentProjects(listener: (update: RecentProjectsUpdate) => void) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+export function recentProjectsStorageKey(ownerId: string | null | undefined) {
+  return storageKey(ownerId);
 }
 
 export function addRecentProject(ownerId: string | null | undefined, title: string, id?: string) {

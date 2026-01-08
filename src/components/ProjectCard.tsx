@@ -54,7 +54,14 @@ export default function ProjectCard({
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const cardRef = useRef<HTMLDivElement | null>(null);
-  const previewKey = project.previewUrl ?? "none";
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [previewRetry, setPreviewRetry] = useState(0);
+  const activePreview = project.previewUrl ?? null;
+  const previewSrc =
+    activePreview && !activePreview.startsWith("data:image/")
+      ? `${activePreview}${activePreview.includes("?") ? "&" : "?"}r=${previewRetry}`
+      : activePreview;
+  const previewKey = previewSrc ?? "none";
   const [loadedPreviewKey, setLoadedPreviewKey] = useState("");
   const previewLoaded = loadedPreviewKey === previewKey;
   const [renaming, setRenaming] = useState(false);
@@ -76,7 +83,27 @@ export default function ProjectCard({
     };
   }, [menuOpen]);
 
-  const activePreview = project.previewUrl ?? null;
+  const MAX_PREVIEW_RETRIES = 2;
+
+  useEffect(() => {
+    return () => {
+      if (retryTimerRef.current !== null) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+    };
+  }, []);
+
+
+  const handlePreviewError = () => {
+    if (!activePreview) return;
+    if (previewRetry >= MAX_PREVIEW_RETRIES) return;
+    if (retryTimerRef.current !== null) return;
+    retryTimerRef.current = setTimeout(() => {
+      retryTimerRef.current = null;
+      setPreviewRetry((prev) => prev + 1);
+    }, 700);
+  };
 
   const cardClasses = [
     "relative rounded-[10px] bg-[#F9FAFC] transition",
@@ -180,6 +207,7 @@ export default function ProjectCard({
     <Link
       href={`/studio?project=${encodeURIComponent(project.id)}`}
       className="group flex flex-col text-left transition hover:-translate-y-1"
+      aria-label={project.title}
       aria-disabled={hasSelection}
       onClick={(event) => {
         if (renaming) {
@@ -408,8 +436,8 @@ export default function ProjectCard({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
 	                key={previewKey}
-	                src={activePreview}
-	                alt={project.title}
+	                src={previewSrc ?? ""}
+	                alt=""
 	                loading={imageLoading}
 	                fetchPriority={imagePriority ? "high" : "auto"}
 	                decoding="async"
@@ -417,7 +445,7 @@ export default function ProjectCard({
 	                  previewLoaded ? "opacity-100" : "opacity-0"
 	                }`}
 	                onLoad={() => setLoadedPreviewKey(previewKey)}
-	                onError={() => setLoadedPreviewKey(previewKey)}
+	                onError={handlePreviewError}
 	                ref={(node) => {
 	                  if (!node) return;
 	                  if (node.complete && node.naturalWidth > 0) {
@@ -430,8 +458,8 @@ export default function ProjectCard({
               ) : null}
             </div>
           ) : (
-            <div className="flex h-full w-full items-center justify-center text-4xl font-semibold text-slate-500 transition-colors duration-150 group-hover:text-slate-600">
-              {project.title.charAt(0)}
+            <div className="relative h-full w-full">
+              <div className="absolute inset-0 rounded-[10px] skeleton-shimmer opacity-90" />
             </div>
           )}
         </div>

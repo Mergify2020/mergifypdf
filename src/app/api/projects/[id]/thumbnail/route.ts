@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
+import { derivePreviewMeta } from "@/lib/projectPreview";
+import { normalizePreviewUrl } from "@/lib/previewUrl";
 
 export async function GET(
   _req: NextRequest,
@@ -25,35 +27,19 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const payload = project.data as
-    | {
-        firstPageThumb?: string | null;
-        pageThumbs?: string[];
-      }
-    | null;
-
-  const dataUrl =
-    (project.previewUrl &&
-      typeof project.previewUrl === "string" &&
-      project.previewUrl.length > 0 &&
-      project.previewUrl) ||
-    (payload?.firstPageThumb &&
-      typeof payload.firstPageThumb === "string" &&
-      payload.firstPageThumb.length > 0 &&
-      payload.firstPageThumb) ||
-    (Array.isArray(payload?.pageThumbs) && payload.pageThumbs[0]) ||
-    null;
+  const meta = derivePreviewMeta(project.data);
+  const dataUrl = normalizePreviewUrl(project.previewUrl) ?? meta.previewUrl ?? null;
 
   if (!dataUrl || typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/")) {
     return NextResponse.json({ error: "No thumbnail" }, { status: 404 });
   }
 
-  const [meta, base64] = dataUrl.split(",", 2);
+  const [metaHeader, base64] = dataUrl.split(",", 2);
   if (!base64) {
     return NextResponse.json({ error: "Invalid thumbnail" }, { status: 500 });
   }
 
-  const mimeMatch = /^data:(.*?);base64$/.exec(meta);
+  const mimeMatch = /^data:(.*?);base64$/.exec(metaHeader);
   const mime = mimeMatch?.[1] ?? "image/png";
 
   const buffer = Buffer.from(base64, "base64");

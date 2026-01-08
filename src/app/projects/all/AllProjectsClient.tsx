@@ -8,6 +8,7 @@ import ContainerShadowOverlay from "@/components/ContainerShadowOverlay";
 import StartProjectButton from "@/components/StartProjectButton";
 import {
   getProjectsSummaryCache,
+  refreshProjectsSummary,
   setProjectsSummaryCache,
   type ProjectsSummaryProject,
 } from "@/lib/projectsSummaryCache";

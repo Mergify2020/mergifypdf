@@ -1,7 +1,6 @@
 import Image from "next/image";
 import { redirect } from "next/navigation";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
+import { getServerSessionSafe } from "@/lib/serverSession";
 import UploadCta from "@/components/UploadCta";
 import HeroStats from "@/components/HeroStats";
 import HeroFeatureArea from "@/components/HeroFeatureArea";
@@ -12,6 +11,9 @@ import { prisma } from "@/lib/prisma";
 import ProjectsSummarySeed from "@/components/ProjectsSummarySeed";
 import ContainerShadowOverlay from "@/components/ContainerShadowOverlay";
 import HomeProjectsSearch from "@/components/HomeProjectsSearch";
+import { unstable_cache } from "next/cache";
+
+export const dynamic = "force-dynamic";
 
 function Sparkle({ className, gradientId }: { className?: string; gradientId: string }) {
   return (
@@ -46,7 +48,7 @@ export default async function Home({
         ? landingParam[0]
         : undefined;
 
-  const session = await getServerSession(authOptions);
+  const session = await getServerSessionSafe();
 
   // When explicitly requested, always show the marketing hero,
   // even if the user already has an active session.
@@ -143,26 +145,44 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
   );
 }
 
+const loadProjectsSummary = unstable_cache(
+  async (userId: string) => {
+    return prisma.$queryRaw<
+      {
+        id: string;
+        name: string;
+        updatedAt: Date;
+        pagesCount: number | null;
+        previewUrl: string | null;
+      }[]
+    >`
+      SELECT
+        id,
+        name,
+        "updatedAt",
+        "pagesCount",
+        "previewUrl"
+      FROM "Project"
+      WHERE "userId" = ${userId}
+        AND COALESCE((data->>'trashed')::boolean, false) = false
+      ORDER BY "updatedAt" DESC
+      LIMIT 60
+    `;
+  },
+  ["projects-dashboard-summary"],
+  { revalidate: 30 }
+);
+
 async function ProjectsDashboard({ displayName, userId }: { displayName: string; userId: string }) {
   const firstName = displayName.split(" ")[0] ?? "there";
-  const shapedProjects = await prisma.$queryRaw<
-    { id: string; name: string; updatedAt: Date; pagesCount: number | null; hasPreview: boolean }[]
-  >`
-    SELECT id, name, "updatedAt", "pagesCount", ("previewUrl" IS NOT NULL) as "hasPreview"
-    FROM "Project"
-    WHERE "userId" = ${userId}
-      AND COALESCE((data->>'trashed')::boolean, false) = false
-    ORDER BY "updatedAt" DESC
-    LIMIT 60
-  `;
+  const shapedProjects =
+    process.env.NODE_ENV === "development" ? [] : await loadProjectsSummary(userId);
   const summaryProjects = shapedProjects.map((project) => ({
     id: project.id,
     name: project.name,
     updatedAt: project.updatedAt,
     pagesCount: project.pagesCount ?? 0,
-    previewUrl: project.hasPreview
-      ? `/api/projects/${encodeURIComponent(project.id)}/thumbnail?v=${project.updatedAt.getTime()}`
-      : null,
+    previewUrl: project.previewUrl,
   }));
   return (
     <main className="min-h-screen w-full bg-slate-100 px-2 py-4 sm:px-4 sm:py-6 lg:px-6 lg:py-8">
@@ -182,7 +202,12 @@ async function ProjectsDashboard({ displayName, userId }: { displayName: string;
           className="pointer-events-none absolute inset-y-0 left-0 w-10 rounded-l-[32px] bg-gradient-to-r from-slate-900/5 to-transparent"
         />
         <div className="w-full">
-          <HomeProjectsSearch firstName={firstName} accountName={displayName} projects={summaryProjects} />
+          <HomeProjectsSearch
+            firstName={firstName}
+            accountName={displayName}
+            ownerKey={userId}
+            projects={summaryProjects}
+          />
         </div>
       </div>
       <ContainerShadowOverlay targetId="home-projects-container" overlayZIndex={45} />

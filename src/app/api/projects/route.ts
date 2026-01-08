@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
+import { derivePreviewMeta } from "@/lib/projectPreview";
 import { prisma } from "@/lib/prisma";
 
 async function ensureDbConnection() {
@@ -22,32 +23,6 @@ async function ensureDbConnection() {
       throw err;
     }
   }
-}
-
-function derivePreviewMeta(data: unknown): { previewUrl: string | null; pagesCount: number } {
-  let previewUrl: string | null = null;
-  let pagesCount = 0;
-
-  if (data && typeof data === "object") {
-    const payload = data as any;
-
-    if (typeof payload.previewUrl === "string" && payload.previewUrl.length > 0) {
-      previewUrl = payload.previewUrl;
-    } else if (
-      typeof payload.firstPageThumb === "string" &&
-      payload.firstPageThumb.length > 0
-    ) {
-      previewUrl = payload.firstPageThumb;
-    }
-
-    if (typeof payload.pagesCount === "number" && Number.isFinite(payload.pagesCount)) {
-      pagesCount = payload.pagesCount;
-    } else if (Array.isArray(payload.pages)) {
-      pagesCount = payload.pages.length;
-    }
-  }
-
-  return { previewUrl, pagesCount };
 }
 
 export async function GET(request: NextRequest) {
@@ -75,11 +50,18 @@ export async function GET(request: NextRequest) {
             id: string;
             name: string;
             updatedAt: Date;
-            previewUrl: string | null;
+            storedPreviewUrl: string | null;
             pagesCount: number | null;
+            data: unknown;
           }[]
         >`
-          SELECT id, name, "updatedAt", "previewUrl", "pagesCount"
+          SELECT
+            id,
+            name,
+            "updatedAt",
+            "previewUrl" as "storedPreviewUrl",
+            "pagesCount",
+            data
           FROM "Project"
           WHERE "userId" = ${userId}
             AND COALESCE((data->>'trashed')::boolean, false) = true
@@ -91,11 +73,18 @@ export async function GET(request: NextRequest) {
             id: string;
             name: string;
             updatedAt: Date;
-            previewUrl: string | null;
+            storedPreviewUrl: string | null;
             pagesCount: number | null;
+            data: unknown;
           }[]
         >`
-          SELECT id, name, "updatedAt", "previewUrl", "pagesCount"
+          SELECT
+            id,
+            name,
+            "updatedAt",
+            "previewUrl" as "storedPreviewUrl",
+            "pagesCount",
+            data
           FROM "Project"
           WHERE "userId" = ${userId}
             AND COALESCE((data->>'trashed')::boolean, false) = false
@@ -103,20 +92,25 @@ export async function GET(request: NextRequest) {
           LIMIT 60
         `;
 
-    return NextResponse.json({
-      projects: projects.map((project) => ({
-        ...project,
-        previewUrl: project.previewUrl
-          ? `/api/projects/${encodeURIComponent(project.id)}/thumbnail?v=${project.updatedAt.getTime()}`
-          : null,
-        pagesCount: project.pagesCount ?? 0,
-      })),
-    }, {
-      headers: {
-        // User-specific; allow short-lived browser caching to speed app navigation.
-        "Cache-Control": "private, max-age=30, stale-while-revalidate=300",
+    return NextResponse.json(
+      {
+        projects: projects.map((project) => {
+          return {
+            id: project.id,
+            name: project.name,
+            updatedAt: project.updatedAt,
+            previewUrl: project.storedPreviewUrl ?? null,
+            pagesCount: project.pagesCount ?? 0,
+          };
+        }),
       },
-    });
+      {
+        headers: {
+          // User-specific; allow short-lived browser caching to speed app navigation.
+          "Cache-Control": "private, max-age=30, stale-while-revalidate=300",
+        },
+      }
+    );
   }
 
   const projects = await prisma.project.findMany({

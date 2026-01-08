@@ -1,21 +1,15 @@
 ﻿// src/app/layout.tsx
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import Providers from "@/components/Providers";
 import WorkspaceShell from "@/components/WorkspaceShell";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
 import AppHeaderBrand from "@/components/AppHeaderBrand";
 import Footer from "@/components/Footer";
 import HeaderAuthButtons from "@/components/HeaderAuthButtons";
 import HeroHeader from "@/components/HeroHeader";
 import WorkspaceSettingsMenu from "@/components/WorkspaceSettingsMenu";
+import { getServerSessionSafe } from "@/lib/serverSession";
 import "./globals.css";
 
-const inter = Inter({
-  subsets: ["latin"],
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "MergifyPDF",
@@ -31,8 +25,10 @@ export const metadata: Metadata = {
   },
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const session = await getServerSession(authOptions);
+  const session = await getServerSessionSafe();
   const lockedByTwoFactor =
     !!session?.user?.twoFactorEnabled && session.user.twoFactorPassed !== true;
 
@@ -40,7 +36,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const useWorkspaceShell = authedWorkspace;
 
   return (
-    <html lang="en" className={inter.className}>
+    <html lang="en">
       <head>
         {/* Force light UI */}
         <meta name="color-scheme" content="light" />

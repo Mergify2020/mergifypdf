@@ -3,15 +3,15 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowUpRight, FileText, Folder, MoreVertical } from "lucide-react";
+import { ArrowUpRight, Folder, MoreVertical } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { sanitizeProjectName } from "@/lib/projectName";
 import { formatProjectLastEdited } from "@/lib/formatProjectLastEdited";
 import {
-  RECENT_PROJECTS_EVENT,
   RecentProjectEntry,
   loadRecentProjects,
   saveRecentProjects,
+  subscribeRecentProjects,
 } from "@/lib/recentProjects";
 
 type ProjectItem = {
@@ -20,7 +20,7 @@ type ProjectItem = {
   subtitle: string;
   status: string;
   updated: string;
-   preview?: string | null;
+  previewUrl?: string | null;
   updatedAt?: number;
   persisted?: boolean;
 };
@@ -57,9 +57,8 @@ export default function ProjectsList({ initialProjects }: Props) {
   const baseProjects = useMemo(() => initialProjects.filter((project) => !project.persisted), [initialProjects]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const syncFromStorage = () => {
-      const stored = loadRecentProjects(ownerId)
+    const syncFromStore = (entries?: RecentProjectEntry[]) => {
+      const stored = (entries ?? loadRecentProjects(ownerId))
         .slice()
         .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
         .map(convertStoredEntry);
@@ -70,7 +69,7 @@ export default function ProjectsList({ initialProjects }: Props) {
       });
       setStorageReady(true);
     };
-    syncFromStorage();
+    syncFromStore();
     // Also hydrate from the account-level API when signed in so projects follow the user.
     const hydrateFromApi = async () => {
       if (!ownerId) return;
@@ -113,9 +112,11 @@ export default function ProjectsList({ initialProjects }: Props) {
       }
     };
     void hydrateFromApi();
-    const eventKey = `${RECENT_PROJECTS_EVENT}:${ownerId ?? "anon"}`;
-    window.addEventListener(eventKey, syncFromStorage);
-    return () => window.removeEventListener(eventKey, syncFromStorage);
+    const unsubscribe = subscribeRecentProjects((update) => {
+      if ((update.ownerKey ?? null) !== (ownerId ?? null)) return;
+      syncFromStore(update.projects);
+    });
+    return () => unsubscribe();
   }, [baseProjects, ownerId]);
 
   function openRename(project: ProjectItem) {
@@ -197,6 +198,7 @@ export default function ProjectsList({ initialProjects }: Props) {
         </div>
         <div className="mt-6 grid gap-6 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {visibleProjects.map((project) => {
+            const previewUrl = project.previewUrl ?? null;
             return (
               <div
                 key={project.id}
@@ -204,23 +206,22 @@ export default function ProjectsList({ initialProjects }: Props) {
               >
                 <div className="relative">
                   <div className="relative w-full aspect-[1.23/1] overflow-hidden rounded-[16px] bg-[#EEF1F5] border border-[rgba(0,0,0,0.06)]">
-                    {project.preview ? (
+                    {previewUrl ? (
                       <div className="relative h-full w-full px-3 pt-4 pb-0">
                         <div className="flex h-full w-full items-start justify-center bg-white shadow-[0_10px_30px_rgba(15,23,42,0.16)] overflow-hidden">
                           <Image
-                            src={project.preview}
-                            alt={project.title}
+                            src={previewUrl}
+                            alt=""
                             width={800}
                             height={1100}
                             className="max-w-full h-auto object-contain object-[50%_0]"
                             sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 25vw"
+                            unoptimized={previewUrl.startsWith("data:image/")}
                           />
                         </div>
                       </div>
                     ) : (
-                      <div className="flex h-full w-full items-center justify-center">
-                        <FileText className="h-10 w-10 text-slate-500 opacity-40" />
-                      </div>
+                      <div className="absolute inset-0 animate-pulse bg-slate-100" />
                     )}
                   </div>
                   <span className="absolute left-4 top-4 rounded-full bg-slate-900/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white shadow-lg">
