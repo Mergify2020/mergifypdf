@@ -7,7 +7,7 @@ import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.js";
 const PREVIEW_DIR = path.join(process.cwd(), "public", "previews");
 const PDF_PUBLIC_ROOT = path.join(process.cwd(), "public");
 const PREVIEW_SCALE = 1.0;
-type PdfDocumentParams = pdfjsLib.DocumentInitParameters & { disableWorker?: boolean };
+type PdfDocumentParams = { data: Uint8Array; disableWorker?: boolean };
 
 async function loadPdfBytes(pdfUrl: string): Promise<Uint8Array> {
   if (pdfUrl.startsWith("http://") || pdfUrl.startsWith("https://")) {
