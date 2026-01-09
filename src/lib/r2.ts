@@ -52,3 +52,16 @@ export async function createSignedR2Url(config: R2Config, key: string, expiresIn
     { expiresIn }
   );
 }
+
+export async function createSignedR2UploadUrl(
+  config: R2Config,
+  key: string,
+  contentType: string,
+  expiresIn = 60,
+) {
+  return getSignedUrl(
+    config.client,
+    new PutObjectCommand({ Bucket: config.bucket, Key: key, ContentType: contentType }),
+    { expiresIn }
+  );
+}

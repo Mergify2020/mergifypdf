@@ -4099,15 +4099,43 @@ const timer =
           return;
         }
 
-        const formData = new FormData();
-        formData.set("file", blob, source.name ?? "document.pdf");
-        const pdfRes = await fetch(`/api/projects/${encodeURIComponent(projectId)}/pdf`, {
-          method: "POST",
-          credentials: "include",
-          body: formData,
-        });
-        if (!pdfRes.ok) {
-          previewSyncRef.current.delete(projectId);
+        const uploadViaSignedUrl = async () => {
+          const initRes = await fetch(
+            `/api/projects/${encodeURIComponent(projectId)}/pdf-upload`,
+            { method: "POST", credentials: "include" }
+          );
+          if (!initRes.ok) return false;
+          const initData = (await initRes.json().catch(() => null)) as
+            | { url?: string; key?: string }
+            | null;
+          if (!initData?.url || !initData?.key) return false;
+          const putRes = await fetch(initData.url, {
+            method: "PUT",
+            headers: { "Content-Type": blob.type || "application/pdf" },
+            body: blob,
+          });
+          if (!putRes.ok) return false;
+          const confirmRes = await fetch(`/api/projects/${encodeURIComponent(projectId)}/pdf`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ pdfKey: initData.key }),
+          });
+          return confirmRes.ok;
+        };
+
+        const uploaded = await uploadViaSignedUrl().catch(() => false);
+        if (!uploaded) {
+          const formData = new FormData();
+          formData.set("file", blob, source.name ?? "document.pdf");
+          const pdfRes = await fetch(`/api/projects/${encodeURIComponent(projectId)}/pdf`, {
+            method: "POST",
+            credentials: "include",
+            body: formData,
+          });
+          if (!pdfRes.ok) {
+            previewSyncRef.current.delete(projectId);
+          }
         }
       } catch {
         previewSyncRef.current.delete(projectId);

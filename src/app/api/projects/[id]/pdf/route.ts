@@ -52,6 +52,21 @@ export async function POST(
   if (!project) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+
+  const contentType = req.headers.get("content-type") ?? "";
+  if (contentType.includes("application/json")) {
+    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    const pdfKey = typeof body.pdfKey === "string" ? body.pdfKey.trim() : "";
+    if (!pdfKey || pdfKey !== `${id}.pdf`) {
+      return NextResponse.json({ error: "Invalid PDF key" }, { status: 400 });
+    }
+    await prisma.project.updateMany({
+      where: { id: project.id, userId },
+      data: { pdfKey },
+    });
+    return NextResponse.json({ success: true });
+  }
+
   const formData = await req.formData();
   const file = formData.get("file");
   if (!(file instanceof File)) {
