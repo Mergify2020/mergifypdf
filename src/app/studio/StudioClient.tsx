@@ -4090,14 +4090,7 @@ const timer =
         if (json?.project?.previewUrl) return;
 
         if (json?.project?.pdfUrl) {
-          console.info("Attempting server-side preview generation.", { projectId });
-          const previewRes = await fetch(`/api/projects/${encodeURIComponent(projectId)}/preview`, {
-            method: "POST",
-            credentials: "include",
-          });
-          if (!previewRes.ok) {
-            throw new Error(`Preview generation failed with status ${previewRes.status}`);
-          }
+          console.info("Preview missing; waiting for client-side generation.", { projectId });
           return;
         }
 
@@ -4204,70 +4197,105 @@ const timer =
       }
       if (!raw) {
         // If this is a saved cloud project, try to hydrate the source list
-        // from the cloud project data (files still live in IndexedDB).
+        // from the cloud project data (files live in IndexedDB or R2).
         if (projectId) {
           try {
             const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}`, { cache: "no-store" });
-            if (res.ok) {
-              const json = (await res.json().catch(() => null)) as { project?: { data?: unknown } } | null;
-              const cloudData = json?.project?.data;
-              const cloudSources =
-                cloudData && typeof cloudData === "object" && "sources" in cloudData
-                  ? (cloudData as { sources?: unknown }).sources
-                  : null;
-              if (Array.isArray(cloudSources) && cloudSources.length > 0) {
-                const restored: SourceRef[] = [];
-                for (const entry of cloudSources) {
-                  if (!entry || typeof entry !== "object") continue;
-                  const id =
-                    "id" in entry && typeof (entry as { id?: unknown }).id === "string"
-                      ? (entry as { id: string }).id
-                      : null;
-                  if (!id) continue;
-                  try {
-                    const stored = await readFileBlob(id);
-                    const blobRecord = stored?.blob instanceof Blob ? stored.blob : null;
-                    if (!blobRecord) continue;
-                    const objectUrl = URL.createObjectURL(blobRecord);
-                    restored.push({
-                      storageId: id,
-                      url: objectUrl,
-                      name:
-                        ("name" in entry && typeof (entry as { name?: unknown }).name === "string"
-                          ? (entry as { name: string }).name
-                          : null) ??
-                        stored?.name ??
-                        "Document.pdf",
-                      size:
-                        ("size" in entry && typeof (entry as { size?: unknown }).size === "number"
-                          ? (entry as { size: number }).size
-                          : null) ??
-                        stored?.size ??
-                        blobRecord.size ??
-                        0,
-                      updatedAt:
-                        ("updatedAt" in entry && typeof (entry as { updatedAt?: unknown }).updatedAt === "number"
-                          ? (entry as { updatedAt: number }).updatedAt
-                          : null) ??
-                        stored?.updatedAt ??
-                        Date.now(),
-                    });
-                  } catch (err) {
-                    console.error("Failed to restore stored PDF", err);
-                  }
-                }
-                if (!cancelled && restored.length > 0) {
-                  setSources(restored);
-                  persistSourceMetadata(restored, projectId);
-                  setError(null);
+            if (!res.ok) {
+              throw new Error(`Cloud project fetch failed with status ${res.status}`);
+            }
+            const json = (await res.json().catch(() => null)) as {
+              project?: { data?: unknown; pdfUrl?: string | null };
+            } | null;
+            const cloudData = json?.project?.data;
+            const cloudSources =
+              cloudData && typeof cloudData === "object" && "sources" in cloudData
+                ? (cloudData as { sources?: unknown }).sources
+                : null;
+            const pdfUrl =
+              json?.project?.pdfUrl && typeof json.project.pdfUrl === "string"
+                ? json.project.pdfUrl
+                : null;
+            if (Array.isArray(cloudSources) && cloudSources.length > 0) {
+              const restored: SourceRef[] = [];
+              const missing: string[] = [];
+              for (const entry of cloudSources) {
+                if (!entry || typeof entry !== "object") continue;
+                const id =
+                  "id" in entry && typeof (entry as { id?: unknown }).id === "string"
+                    ? (entry as { id: string }).id
+                    : null;
+                if (!id) continue;
+                const stored = await readFileBlob(id);
+                const blobRecord = stored?.blob instanceof Blob ? stored.blob : null;
+                if (!blobRecord) {
+                  missing.push(id);
                 }
               }
+              if (missing.length > 0 && cloudSources.length > 1) {
+                throw new Error("Multiple source PDFs are not available in this browser.");
+              }
+              let downloadedBlob: Blob | null = null;
+              for (const entry of cloudSources) {
+                if (!entry || typeof entry !== "object") continue;
+                const id =
+                  "id" in entry && typeof (entry as { id?: unknown }).id === "string"
+                    ? (entry as { id: string }).id
+                    : null;
+                if (!id) continue;
+                const name =
+                  ("name" in entry && typeof (entry as { name?: unknown }).name === "string"
+                    ? (entry as { name: string }).name
+                    : null) ?? "Document.pdf";
+                const size =
+                  ("size" in entry && typeof (entry as { size?: unknown }).size === "number"
+                    ? (entry as { size: number }).size
+                    : null) ?? 0;
+                const updatedAt =
+                  ("updatedAt" in entry && typeof (entry as { updatedAt?: unknown }).updatedAt === "number"
+                    ? (entry as { updatedAt: number }).updatedAt
+                    : null) ?? Date.now();
+                let stored = await readFileBlob(id);
+                let blobRecord = stored?.blob instanceof Blob ? stored.blob : null;
+                if (!blobRecord) {
+                  if (!pdfUrl) {
+                    throw new Error("Cloud PDF is not available for this project.");
+                  }
+                  if (!downloadedBlob) {
+                    const pdfRes = await fetch(pdfUrl, { cache: "no-store" });
+                    if (!pdfRes.ok) {
+                      throw new Error(`Cloud PDF download failed with status ${pdfRes.status}`);
+                    }
+                    downloadedBlob = await pdfRes.blob();
+                  }
+                  blobRecord = downloadedBlob;
+                  await storeFileBlob(id, blobRecord, name, blobRecord.size || size);
+                  stored = { blob: blobRecord, name, size: blobRecord.size || size, updatedAt };
+                }
+                const objectUrl = URL.createObjectURL(blobRecord);
+                restored.push({
+                  storageId: id,
+                  url: objectUrl,
+                  name: stored?.name ?? name,
+                  size: stored?.size ?? size ?? blobRecord.size ?? 0,
+                  updatedAt: stored?.updatedAt ?? updatedAt,
+                });
+              }
+              if (!cancelled && restored.length > 0) {
+                setSources(restored);
+                persistSourceMetadata(restored, projectId);
+                setError(null);
+              }
             }
-          } catch {
-            // ignore cloud hydration failures; fall back to empty state
+          } catch (err) {
+            console.error("Cloud project hydration failed.", err);
+            setError("Unable to restore this project from cloud storage. Please re-upload the PDF.");
           }
         }
-        hasHydratedSources.current = true;
+        if (!cancelled) {
+          hasHydratedSources.current = true;
+          setSourcesHydrated(true);
+        }
         return;
       }
 
