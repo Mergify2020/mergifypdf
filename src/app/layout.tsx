@@ -1,5 +1,6 @@
 ﻿// src/app/layout.tsx
 import type { Metadata } from "next";
+import Providers from "@/components/Providers";
 import { getServerSessionSafe } from "@/lib/serverSession";
 import "./globals.css";
 
