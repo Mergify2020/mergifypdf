@@ -31,10 +31,14 @@ export async function POST(
     trashed: true,
   };
 
-  const updated = await prisma.project.update({
-    where: { id: existing.id },
+  await prisma.project.updateMany({
+    where: { id: existing.id, userId },
     data: { data: payload },
   });
+  const updated = await prisma.project.findFirst({ where: { id: existing.id, userId } });
+  if (!updated) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
 
   return NextResponse.json({ project: updated });
 }

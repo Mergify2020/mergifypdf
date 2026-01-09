@@ -22,6 +22,8 @@ type ApiProject = {
   pdfUrl?: string | null;
   pagesCount?: number | null;
   rotation?: number | null;
+  hasPreview?: boolean;
+  hasPdf?: boolean;
 };
 
 type ProjectCard = {
@@ -32,6 +34,7 @@ type ProjectCard = {
   pdfUrl?: string | null;
   pagesCount?: number;
   rotation?: number | null;
+  hasPreview?: boolean;
 };
 
 function mapSummaryProjects(projects: ProjectsSummaryProject[]): ProjectCard[] {
@@ -44,9 +47,10 @@ function mapSummaryProjects(projects: ProjectsSummaryProject[]): ProjectCard[] {
       title: project.name?.trim() || "Untitled project",
       updated: formatProjectLastEdited(updatedAt),
       updatedAtMs: updatedAt.getTime(),
-      pdfUrl: project.pdfUrl ?? null,
+      pdfUrl: null,
       pagesCount: project.pagesCount ?? 0,
       rotation: project.rotation ?? 0,
+      hasPreview: project.hasPreview ?? false,
     };
   });
 }

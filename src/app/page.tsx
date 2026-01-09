@@ -8,12 +8,11 @@ import PersonaHighlight from "@/components/PersonaHighlight";
 import LogoCarousel from "@/components/LogoCarousel";
 import { hasUsedToday } from "@/lib/quota";
 import { prisma } from "@/lib/prisma";
-import ProjectsSummarySeed from "@/components/ProjectsSummarySeed";
 import ContainerShadowOverlay from "@/components/ContainerShadowOverlay";
 import HomeProjectsSearch from "@/components/HomeProjectsSearch";
-import { unstable_cache } from "next/cache";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 function Sparkle({ className, gradientId }: { className?: string; gradientId: string }) {
   return (
@@ -145,49 +144,37 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
   );
 }
 
-const loadProjectsSummary = unstable_cache(
-  async (userId: string) => {
-    return prisma.$queryRaw<
-      {
-        id: string;
-        name: string;
-        updatedAt: Date;
-        pagesCount: number | null;
-        previewUrl: string | null;
-        pdfUrl: string | null;
-        data: unknown;
-      }[]
-    >`
-      SELECT
-        id,
-        name,
-        "updatedAt",
-        "pagesCount",
-        "previewUrl",
-        "pdfUrl",
-        data
-      FROM "Project"
-      WHERE "userId" = ${userId}
-        AND COALESCE((data->>'trashed')::boolean, false) = false
-      ORDER BY "updatedAt" DESC
-      LIMIT 60
-    `;
-  },
-  ["projects-dashboard-summary"],
-  { revalidate: 30 }
-);
+function isTrashedProject(data: unknown) {
+  if (!data || typeof data !== "object") return false;
+  const record = data as Record<string, unknown>;
+  return record.trashed === true;
+}
 
 async function ProjectsDashboard({ displayName, userId }: { displayName: string; userId: string }) {
   const firstName = displayName.split(" ")[0] ?? "there";
-  const shapedProjects =
-    process.env.NODE_ENV === "development" ? [] : await loadProjectsSummary(userId);
-  const summaryProjects = shapedProjects.map((project) => ({
+  const shapedProjects = await prisma.project.findMany({
+    where: { userId },
+    orderBy: { updatedAt: "desc" },
+    take: 60,
+    select: {
+      id: true,
+      name: true,
+      updatedAt: true,
+      pagesCount: true,
+      previewKey: true,
+      pdfKey: true,
+      data: true,
+    },
+  });
+  const visibleProjects = shapedProjects.filter((project) => !isTrashedProject(project.data));
+  const summaryProjects = visibleProjects.map((project) => ({
     id: project.id,
     name: project.name,
     updatedAt: project.updatedAt,
     pagesCount: project.pagesCount ?? 0,
-    previewUrl: project.previewUrl,
-    pdfUrl: project.pdfUrl,
+    previewUrl: null,
+    pdfUrl: null,
+    hasPreview: !!project.previewKey,
     rotation: (() => {
       if (!project.data || typeof project.data !== "object") return 0;
       const record = project.data as Record<string, unknown>;
@@ -202,7 +189,6 @@ async function ProjectsDashboard({ displayName, userId }: { displayName: string;
   }));
   return (
     <main className="min-h-screen w-full bg-slate-100 px-2 py-4 sm:px-4 sm:py-6 lg:px-6 lg:py-8">
-      <ProjectsSummarySeed projects={summaryProjects} ownerKey={userId} />
       <div
         id="home-projects-container"
         className="relative z-40 mx-auto mb-6 flex min-h-[calc(100vh-4rem)] w-full flex-col rounded-[32px] border border-slate-200/70 bg-white px-4 pb-12 pt-6 shadow-[0_18px_50px_rgba(15,23,42,0.10)] data-[shadow-overlay=true]:border-transparent data-[shadow-overlay=true]:shadow-none sm:mb-8 sm:px-6 sm:pt-10 lg:px-10 lg:pt-14"
@@ -221,7 +207,6 @@ async function ProjectsDashboard({ displayName, userId }: { displayName: string;
           <HomeProjectsSearch
             firstName={firstName}
             accountName={displayName}
-            ownerKey={userId}
             projects={summaryProjects}
           />
         </div>

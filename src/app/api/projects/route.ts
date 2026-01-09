@@ -3,39 +3,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
 
-function extractPreviewFromData(data: unknown): string | null {
-  if (!data || typeof data !== "object") return null;
-  const record = data as Record<string, unknown>;
-  const pageThumbs = Array.isArray(record.pageThumbs) ? record.pageThumbs : null;
-  if (pageThumbs) {
-    const candidate = pageThumbs.find(
-      (item) => typeof item === "string" && item.length > 0
-    ) as string | undefined;
-    if (candidate && (candidate.startsWith("data:image/") || candidate.startsWith("/previews/"))) {
-      return candidate;
-    }
-  }
-  const pages = Array.isArray(record.pages) ? record.pages : null;
-  if (!pages || pages.length === 0) return null;
-  const first = pages[0];
-  if (!first || typeof first !== "object") return null;
-  const preview =
-    typeof (first as { preview?: unknown }).preview === "string"
-      ? (first as { preview: string }).preview
-      : null;
-  if (preview && (preview.startsWith("data:image/") || preview.startsWith("/previews/"))) {
-    return preview;
-  }
-  const thumb =
-    typeof (first as { thumb?: unknown }).thumb === "string"
-      ? (first as { thumb: string }).thumb
-      : null;
-  if (thumb && (thumb.startsWith("data:image/") || thumb.startsWith("/previews/"))) {
-    return thumb;
-  }
-  return null;
-}
-
 function extractPagesCountFromData(data: unknown): number | null {
   if (!data || typeof data !== "object") return null;
   const record = data as Record<string, unknown>;
@@ -55,6 +22,12 @@ function extractRotationFromData(data: unknown): number | null {
       ? (first as { rotation: number }).rotation
       : null;
   return rotation;
+}
+
+function isTrashedProject(data: unknown) {
+  if (!data || typeof data !== "object") return false;
+  const record = data as Record<string, unknown>;
+  return record.trashed === true;
 }
 
 async function ensureDbConnection() {
@@ -97,69 +70,34 @@ export async function GET(request: NextRequest) {
 
   // Lightweight summary payload used by the All Projects grid.
   if (summary === "1") {
-    const projects = trashed
-      ? await prisma.$queryRaw<
-          {
-            id: string;
-            name: string;
-            updatedAt: Date;
-            storedPreviewUrl: string | null;
-            pdfUrl: string | null;
-            pagesCount: number | null;
-            data: unknown;
-          }[]
-        >`
-          SELECT
-            id,
-            name,
-            "updatedAt",
-            "previewUrl" as "storedPreviewUrl",
-            "pdfUrl",
-            "pagesCount",
-            data
-          FROM "Project"
-          WHERE "userId" = ${userId}
-            AND COALESCE((data->>'trashed')::boolean, false) = true
-          ORDER BY "updatedAt" DESC
-          LIMIT 60
-        `
-      : await prisma.$queryRaw<
-          {
-            id: string;
-            name: string;
-            updatedAt: Date;
-            storedPreviewUrl: string | null;
-            pdfUrl: string | null;
-            pagesCount: number | null;
-            data: unknown;
-          }[]
-        >`
-          SELECT
-            id,
-            name,
-            "updatedAt",
-            "previewUrl" as "storedPreviewUrl",
-            "pdfUrl",
-            "pagesCount",
-            data
-          FROM "Project"
-          WHERE "userId" = ${userId}
-            AND COALESCE((data->>'trashed')::boolean, false) = false
-          ORDER BY "updatedAt" DESC
-          LIMIT 60
-        `;
+    const projects = await prisma.project.findMany({
+      where: { userId },
+      orderBy: { updatedAt: "desc" },
+      take: 60,
+      select: {
+        id: true,
+        name: true,
+        updatedAt: true,
+        previewKey: true,
+        pdfKey: true,
+        pagesCount: true,
+        data: true,
+      },
+    });
+    const visible = projects.filter((project) =>
+      trashed ? isTrashedProject(project.data) : !isTrashedProject(project.data)
+    );
 
     return NextResponse.json(
       {
-        projects: projects.map((project) => {
-          const derivedPreview = extractPreviewFromData(project.data);
+        projects: visible.map((project) => {
           const derivedPagesCount = extractPagesCountFromData(project.data);
           return {
             id: project.id,
             name: project.name,
             updatedAt: project.updatedAt,
-            previewUrl: derivedPreview ?? project.storedPreviewUrl ?? null,
-            pdfUrl: project.pdfUrl ?? null,
+            hasPreview: !!project.previewKey,
+            hasPdf: !!project.pdfKey,
             pagesCount: project.pagesCount ?? derivedPagesCount ?? 0,
             rotation: extractRotationFromData(project.data) ?? 0,
           };
@@ -167,8 +105,7 @@ export async function GET(request: NextRequest) {
       },
       {
         headers: {
-          // User-specific; allow short-lived browser caching to speed app navigation.
-          "Cache-Control": "private, max-age=30, stale-while-revalidate=300",
+          "Cache-Control": "no-store",
         },
       }
     );
@@ -177,9 +114,34 @@ export async function GET(request: NextRequest) {
   const projects = await prisma.project.findMany({
     where: { userId },
     orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      name: true,
+      data: true,
+      pdfKey: true,
+      previewKey: true,
+      createdAt: true,
+      updatedAt: true,
+      pagesCount: true,
+    },
   });
 
-  return NextResponse.json({ projects });
+  const sanitized = projects.map((project) => {
+    const { pdfKey: _pdfKey, previewKey: _previewKey, ...rest } = project;
+    return {
+      ...rest,
+      hasPreview: !!project.previewKey,
+      hasPdf: !!project.pdfKey,
+    };
+  });
+  return NextResponse.json(
+    { projects: sanitized },
+    {
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    }
+  );
 }
 
 export async function POST(req: Request) {
@@ -218,7 +180,8 @@ export async function POST(req: Request) {
         data: {
           name,
           data,
-          previewUrl: null,
+          previewKey: null,
+          pdfKey: null,
           pagesCount,
           userId,
         },

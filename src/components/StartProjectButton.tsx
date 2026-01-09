@@ -6,7 +6,6 @@ import { useSession } from "next-auth/react";
 import { FileText, FileUp, Plus, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import { PROJECT_NAME_STORAGE_KEY, sanitizeProjectName } from "@/lib/projectName";
-import { addRecentProject } from "@/lib/recentProjects";
 import { useWorkspaceFilePreloader, type PendingWorkspaceFile } from "@/components/useWorkspaceFilePreloader";
 
 const WORKSPACE_META_KEY = "mpdf:files";
@@ -161,8 +160,7 @@ export default function StartProjectButton({ className, variant = "default" }: P
     }
     setBusy(true);
     await resetWorkspaceStorage();
-    const ownerId = session?.user?.id ?? session?.user?.email ?? null;
-    try {
+      try {
       const res = await fetch("/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -181,7 +179,6 @@ export default function StartProjectButton({ className, variant = "default" }: P
         return;
       }
       queuePreload(pendingFiles, id);
-      addRecentProject(ownerId, clean, id);
       setBusy(false);
       setOpen(false);
       window.sessionStorage?.setItem(STARTUP_OVERLAY_KEY, "1");

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
-import { generateProjectPreview } from "@/lib/generateProjectPreview";
+import { createSignedR2Url, getR2Config } from "@/lib/r2";
 
 async function ensureDbConnection() {
   for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -44,32 +44,48 @@ export async function POST(
   }
 
   const userId = session.user.id;
-  const project = await prisma.project.findUnique({
-    where: { id },
-    select: { id: true, userId: true, previewUrl: true, pdfUrl: true },
+  const project = await prisma.project.findFirst({
+    where: { id, userId },
+    select: { id: true, userId: true, previewKey: true, pdfKey: true },
   });
 
   if (!project) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  if (project.userId !== userId) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  return NextResponse.json(
+    { error: "Server-side preview generation is disabled" },
+    { status: 410 }
+  );
+}
+
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (project.previewUrl) {
-    return NextResponse.json({ previewUrl: project.previewUrl });
-  }
-  if (!project.pdfUrl) {
-    return NextResponse.json({ error: "Project PDF is missing" }, { status: 400 });
+  const userId = session.user.id;
+  const project = await prisma.project.findFirst({
+    where: { id, userId },
+    select: { previewKey: true },
+  });
+
+  if (!project?.previewKey) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  let r2Config;
   try {
-    const previewUrl = await generateProjectPreview(project.id);
-    return NextResponse.json({ previewUrl });
-  } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Preview generation failed" },
-      { status: 500 }
-    );
+    r2Config = getR2Config();
+  } catch {
+    return NextResponse.json({ error: "Preview storage is not configured" }, { status: 500 });
   }
+
+  const url = await createSignedR2Url(r2Config, project.previewKey, 60);
+  return NextResponse.json({ url });
 }

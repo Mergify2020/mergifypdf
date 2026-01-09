@@ -6,9 +6,7 @@ import { createPortal } from "react-dom";
 import { Check, Star, MoreHorizontal, ExternalLink, Copy, Link2, Trash2, Pencil } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { refreshProjectsSummary } from "@/lib/projectsSummaryCache";
-import { removeRecentProject, updateRecentProjectTitle } from "@/lib/recentProjects";
 import { sanitizeProjectName } from "@/lib/projectName";
-import HomePdfPreview from "@/components/HomePdfPreview";
 
 type Project = {
   id: string;
@@ -17,6 +15,7 @@ type Project = {
   pdfUrl?: string | null;
   pagesCount?: number;
   rotation?: number | null;
+  hasPreview?: boolean;
 };
 
 type ProjectCardProps = {
@@ -47,13 +46,12 @@ export default function ProjectCard({
   onTrashed,
 }: ProjectCardProps & { onTrashed?: (id: string) => void }) {
   const { data: session } = useSession();
-  const ownerKey = session?.user?.id ?? session?.user?.email ?? null;
+  const ownerKey = session?.user?.id ?? null;
   const [starred, setStarred] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const cardRef = useRef<HTMLDivElement | null>(null);
-  const pdfUrl = project.pdfUrl ?? null;
-  const rotation = project.rotation ?? 0;
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [renameBusy, setRenameBusy] = useState(false);
@@ -72,6 +70,34 @@ export default function ProjectCard({
       document.removeEventListener("mousedown", handleGlobalMouseDown);
     };
   }, [menuOpen]);
+
+  useEffect(() => {
+    if (!project.hasPreview) {
+      setPreviewUrl(null);
+      return;
+    }
+    let cancelled = false;
+    const controller = new AbortController();
+    const load = async () => {
+      try {
+        const res = await fetch(`/api/projects/${encodeURIComponent(project.id)}/preview`, {
+          signal: controller.signal,
+          cache: "no-store",
+        });
+        if (!res.ok) return;
+        const data = (await res.json().catch(() => null)) as { url?: string } | null;
+        if (!data?.url || cancelled) return;
+        setPreviewUrl(data.url);
+      } catch {
+        // fail silently
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [project.hasPreview, project.id]);
 
   const cardClasses = [
     "relative rounded-[10px] bg-[#F9FAFC] transition",
@@ -142,14 +168,13 @@ export default function ProjectCard({
         onRenamed?.(project.id, previousTitle);
         if (res.status === 404) {
           setRenameError("Couldn’t save — project not found. Refreshing…");
-          void refreshProjectsSummary(ownerKey, "no-store");
+          void refreshProjectsSummary(ownerKey);
         } else {
           setRenameError("Couldn’t save. Try again.");
         }
         return;
       }
-      updateRecentProjectTitle(ownerKey, project.id, next);
-      void refreshProjectsSummary(ownerKey, "force-cache");
+      void refreshProjectsSummary(ownerKey);
       setRenaming(false);
       setDraftName("");
     } finally {
@@ -331,7 +356,7 @@ export default function ProjectCard({
                             { ...duplicated, id: duplicated.id, pdfUrl: duplicated.pdfUrl ?? null },
                             project.id
                           );
-                          void refreshProjectsSummary(ownerKey, "force-cache");
+                          void refreshProjectsSummary(ownerKey);
                         } catch {
                           // ignore
                         }
@@ -373,8 +398,7 @@ export default function ProjectCard({
                         method: "POST",
                       })
                         .then(() => {
-                          removeRecentProject(ownerKey, project.id);
-                          return refreshProjectsSummary(ownerKey, "force-cache");
+                          return refreshProjectsSummary(ownerKey);
                         })
                         .catch(() => {});
                       if (onTrashed) {
@@ -402,7 +426,40 @@ export default function ProjectCard({
             aria-hidden="true"
             className="pointer-events-none absolute inset-0 z-[5] bg-black/[0.03] opacity-0 transition-opacity duration-150 group-hover:opacity-100"
           />
-          <HomePdfPreview pdfUrl={pdfUrl} rotation={rotation} />
+          <div className="flex h-full w-full items-center justify-center p-4 sm:p-5">
+            {previewUrl ? (
+              <img
+                src={previewUrl}
+                alt=""
+                className="max-h-full max-w-full object-contain"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-slate-300">
+                <svg viewBox="0 0 64 64" className="h-12 w-12" aria-hidden="true">
+                  <path
+                    d="M18 8h20l10 10v34a4 4 0 0 1-4 4H18a4 4 0 0 1-4-4V12a4 4 0 0 1 4-4z"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                  />
+                  <path
+                    d="M38 8v10h10"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M24 34h16M24 42h16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </div>
+            )}
+          </div>
         </div>
       </div>
       <div className="mt-2 space-y-0.5">

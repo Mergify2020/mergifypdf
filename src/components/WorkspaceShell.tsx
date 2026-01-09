@@ -29,12 +29,6 @@ import {
 } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 import { PROJECT_NAME_STORAGE_KEY, sanitizeProjectName } from "@/lib/projectName";
-import {
-  addRecentProject,
-  loadRecentProjects,
-  saveRecentProjects,
-  subscribeRecentProjects,
-} from "@/lib/recentProjects";
 import AppHeaderBrand from "./AppHeaderBrand";
 import SettingsMenu from "./SettingsMenu";
 import HeroHeader from "./HeroHeader";
@@ -42,13 +36,6 @@ import PageLoadingSkeleton from "./PageLoadingSkeleton";
 import LoadingOverlay from "./LoadingOverlay";
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
 import { getAvatarFallback } from "@/lib/avatarFallback";
-import {
-  getProjectsSummaryCache,
-  refreshProjectsSummary,
-  setProjectsSummaryCache,
-  subscribeProjectsSummary,
-  type ProjectsSummaryProject,
-} from "@/lib/projectsSummaryCache";
 import { useWorkspaceFilePreloader, type PendingWorkspaceFile } from "@/components/useWorkspaceFilePreloader";
 
 const WORKSPACE_META_KEY = "mpdf:files";
@@ -299,7 +286,6 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
     }
     setCreateBusy(true);
     await resetWorkspaceStorage();
-    const ownerId = session?.user?.id ?? session?.user?.email ?? null;
     try {
       const res = await fetch("/api/projects", {
         method: "POST",
@@ -319,7 +305,6 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
         return;
       }
       queuePreload(createPendingFiles, id);
-      addRecentProject(ownerId, clean, id);
       setCreateBusy(false);
       setCreateOpen(false);
       window.sessionStorage?.setItem(STARTUP_OVERLAY_KEY, "1");
@@ -366,124 +351,17 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const ownerKey = session?.user?.id ?? session?.user?.email ?? null;
-    if (!ownerKey) return;
-    if (getProjectsSummaryCache(ownerKey)) return;
 
-    let cancelled = false;
-    const preloadImages = (urls: string[]) => {
-      urls.forEach((url) => {
-        const img = new Image();
-        img.decoding = "async";
-        img.src = url;
-      });
-    };
-
-    const warm = async () => {
-      try {
-        const res = await fetch("/api/projects?summary=1", { cache: "force-cache" });
-        if (!res.ok) return;
-        const data = (await res.json()) as { projects?: ProjectsSummaryProject[] };
-        if (!Array.isArray(data.projects) || cancelled) return;
-        setProjectsSummaryCache(ownerKey, data.projects);
-        preloadImages(
-          data.projects
-            .map((project) => project.previewUrl)
-            .filter((url): url is string => typeof url === "string" && url.length > 0)
-            .slice(0, 12),
-        );
-      } catch {
-        // ignore warmup failures
-      }
-    };
-    void warm();
-    return () => {
-      cancelled = true;
-    };
-  }, [session?.user?.email, session?.user?.id]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const ownerKey = session?.user?.id ?? session?.user?.email ?? null;
+    const ownerKey = session?.user?.id ?? null;
     if (!ownerKey) {
       setHomeRecentProjects([]);
       return;
     }
 
-    const sync = () => {
-      const summary = getProjectsSummaryCache(ownerKey) ?? [];
-      const recentEntries = loadRecentProjects(ownerKey)
-        .slice()
-        .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
-
-      const merged = recentEntries
-        .map((entry) => {
-          const match = summary.find((project) => project.id === entry.id);
-          const title = match?.name?.trim() || entry.title?.trim() || "Untitled project";
-          const updatedAt = match
-            ? new Date(match.updatedAt).getTime()
-            : entry.updatedAt ?? Date.now();
-          return {
-            id: entry.id,
-            title,
-            updatedAt,
-            previewUrl: match?.previewUrl ?? null,
-          };
-        })
-        .filter((entry) => Boolean(entry.id) && entry.title.length > 0);
-
-      if (merged.length > 0) {
-        setHomeRecentProjects(merged);
-        return;
-      }
-
-      const fallback = summary
-        .slice()
-        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-        .slice(0, 5)
-        .map((project) => ({
-          id: project.id,
-          title: project.name?.trim() || "Untitled project",
-          updatedAt: new Date(project.updatedAt).getTime(),
-          previewUrl: project.previewUrl ?? null,
-        }));
-      setHomeRecentProjects(fallback);
-    };
-
-    const unsubscribeRecents = subscribeRecentProjects((update) => {
-      if ((update.ownerKey ?? null) !== (ownerKey ?? null)) return;
-      sync();
-    });
-    const unsubscribeSummary = subscribeProjectsSummary((update) => {
-      if ((update.ownerKey ?? null) !== (ownerKey ?? null)) return;
-      sync();
-    });
-
-    const reconcileRecents = (projects: ProjectsSummaryProject[]) => {
-      const existing = loadRecentProjects(ownerKey);
-      if (existing.length === 0) return;
-
-      const allowed = new Set(projects.map((project) => project.id));
-      if (allowed.size === 0) {
-        saveRecentProjects(ownerKey, []);
-        return;
-      }
-
-      const nameById = new Map(
-        projects.map((project) => [project.id, project.name?.trim() || "Untitled project"] as const),
-      );
-      const next = existing
-        .filter((entry) => allowed.has(entry.id))
-        .map((entry) => ({ ...entry, title: nameById.get(entry.id) ?? entry.title }));
-
-      if (next.length !== existing.length || next.some((entry, index) => entry.title !== existing[index]?.title)) {
-        saveRecentProjects(ownerKey, next);
-      }
-    };
+    let cancelled = false;
+    setHomeRecentProjects([]);
 
     const preloadImages = (urls: string[]) => {
-      if (typeof window === "undefined") return;
       urls.forEach((url) => {
         const img = new Image();
         img.decoding = "async";
@@ -491,57 +369,70 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
       });
     };
 
-    const refreshAndSync = async () => {
-      const projects = await refreshProjectsSummary(ownerKey, "no-store");
-      if (projects) {
-        reconcileRecents(projects);
-      }
-      if (projects && projects.length > 0) {
+    const load = async () => {
+      try {
+        const res = await fetch("/api/projects?summary=1", { cache: "no-store" });
+        if (!res.ok) {
+          if (!cancelled) setHomeRecentProjects([]);
+          return;
+        }
+        const data = (await res.json()) as {
+          projects?: {
+            id: string;
+            name: string | null;
+            updatedAt: string | number | Date;
+            previewUrl?: string | null;
+          }[];
+        };
+        if (!Array.isArray(data.projects) || cancelled) {
+          if (!cancelled) setHomeRecentProjects([]);
+          return;
+        }
+        const mapped = data.projects
+          .map((project) => ({
+            id: project.id,
+            title: project.name?.trim() || "Untitled project",
+            updatedAt: new Date(project.updatedAt).getTime(),
+            previewUrl: project.previewUrl ?? null,
+          }))
+          .filter((entry) => Boolean(entry.id) && entry.title.length > 0)
+          .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+        if (!cancelled) {
+          setHomeRecentProjects(mapped);
+        }
         preloadImages(
-          projects
+          mapped
             .map((project) => project.previewUrl)
             .filter((url): url is string => typeof url === "string" && url.length > 0)
             .slice(0, 12),
         );
+      } catch {
+        if (!cancelled) {
+          setHomeRecentProjects([]);
+        }
       }
-      sync();
     };
 
+    void load();
+
     const handleFocus = () => {
-      void refreshAndSync();
+      void load();
     };
 
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
-        void refreshAndSync();
+        void load();
       }
     };
-
-    sync();
-    void refreshProjectsSummary(ownerKey, "force-cache").then((projects) => {
-      if (projects) {
-        reconcileRecents(projects);
-      }
-      if (projects && projects.length > 0) {
-        preloadImages(
-          projects
-            .map((project) => project.previewUrl)
-            .filter((url): url is string => typeof url === "string" && url.length > 0)
-            .slice(0, 12),
-        );
-      }
-      sync();
-    });
 
     window.addEventListener("focus", handleFocus);
     document.addEventListener("visibilitychange", handleVisibility);
     return () => {
-      unsubscribeRecents();
-      unsubscribeSummary();
+      cancelled = true;
       window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [session?.user?.email, session?.user?.id]);
+  }, [session?.user?.id]);
 
   const activePanelItems: SidebarPanel["items"] =
     panelKey === "home"

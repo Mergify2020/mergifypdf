@@ -55,15 +55,15 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
   const userId = session.user.id;
 
-  const existing = await prisma.project.findUnique({
-    where: { id },
+  const existing = await prisma.project.findFirst({
+    where: { id, userId },
     select: {
       id: true,
       userId: true,
       name: true,
       data: true,
-      previewUrl: true,
-      pdfUrl: true,
+      previewKey: true,
+      pdfKey: true,
       pagesCount: true,
     },
   });
@@ -71,10 +71,6 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  if (existing.userId !== userId) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
   const baseName = (existing.name ?? "Untitled project").trim() || "Untitled project";
   const copyName = baseName.endsWith(" (copy)") ? `${baseName} 2` : `${baseName} (copy)`;
 
@@ -83,19 +79,28 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       userId,
       name: copyName,
       data: withoutTrashedFlag(existing.data),
-      previewUrl: null,
-      pdfUrl: existing.pdfUrl,
+      previewKey: null,
+      pdfKey: existing.pdfKey,
       pagesCount: existing.pagesCount ?? 0,
     },
     select: {
       id: true,
       name: true,
       updatedAt: true,
-      previewUrl: true,
-      pdfUrl: true,
+      previewKey: true,
+      pdfKey: true,
       pagesCount: true,
     },
   });
 
-  return NextResponse.json({ project: duplicated });
+  const { pdfKey: _pdfKey, previewKey: _previewKey, ...rest } = duplicated;
+  return NextResponse.json({
+    project: {
+      ...rest,
+      hasPdf: !!duplicated.pdfKey,
+      hasPreview: !!duplicated.previewKey,
+      pdfUrl: null,
+      previewUrl: null,
+    },
+  });
 }

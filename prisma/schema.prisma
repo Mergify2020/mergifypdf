@@ -74,8 +74,8 @@ model Project {
   user      User     @relation(fields: [userId], references: [id])
   name      String
   data       Json
-  pdfUrl    String?
-  previewUrl String?
+  pdfKey    String?
+  previewKey String?
   pagesCount Int?     @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

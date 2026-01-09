@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import AllProjectsGrid from "@/components/AllProjectsGrid";
 import { formatProjectLastEdited } from "@/lib/formatProjectLastEdited";
 
@@ -23,11 +24,23 @@ type ProjectCard = {
   rotation?: number | null;
 };
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default function TrashProjectsPage() {
+  const { data: session } = useSession();
+  const ownerId = session?.user?.id ?? null;
   const [projects, setProjects] = useState<ProjectCard[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!ownerId) {
+      setProjects([]);
+      setLoading(false);
+      return;
+    }
+    setProjects([]);
+    setLoading(true);
     let cancelled = false;
 
     const load = async () => {
@@ -61,7 +74,7 @@ export default function TrashProjectsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [ownerId]);
 
   return (
     <div className="min-h-screen bg-[#F9FAFC] px-2 pb-10 pt-10 sm:px-4 sm:pt-12 lg:px-6 lg:pt-14">

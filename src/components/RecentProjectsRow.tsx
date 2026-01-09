@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import ProjectCard from "./ProjectCard";
 import { matchesSearch } from "@/lib/search";
 import { formatProjectLastEdited } from "@/lib/formatProjectLastEdited";
-import { getProjectsSummaryCache } from "@/lib/projectsSummaryCache";
 
 type SummaryProject = {
   id: string;
@@ -13,6 +12,7 @@ type SummaryProject = {
   pdfUrl?: string | null;
   pagesCount?: number | null;
   rotation?: number | null;
+  hasPreview?: boolean;
 };
 
 type Props = {
@@ -20,7 +20,6 @@ type Props = {
   query?: string;
   ownerFilter?: "any" | "shared" | "you";
   sortOption?: "activity" | "az" | "za";
-  ownerKey?: string | null;
 };
 
 export default function RecentProjectsRow({
@@ -28,55 +27,13 @@ export default function RecentProjectsRow({
   query = "",
   ownerFilter = "any",
   sortOption = "activity",
-  ownerKey = null,
 }: Props) {
   const [projects, setProjects] = useState<SummaryProject[]>(initialProjects ?? []);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
-  const [loading, setLoading] = useState(!initialProjects || initialProjects.length === 0);
+  const loading = false;
 
   useEffect(() => {
-    if (initialProjects && initialProjects.length) return;
-    if (!ownerKey) return;
-    const cached = getProjectsSummaryCache(ownerKey);
-    if (!cached || cached.length === 0) return;
-    const normalized = cached.map((project) => ({
-      ...project,
-      name: project.name ?? "Untitled project",
-      updatedAt:
-        typeof project.updatedAt === "number" ? new Date(project.updatedAt) : project.updatedAt,
-    }));
-    setProjects(normalized);
-    setLoading(false);
-  }, [initialProjects, ownerKey]);
-
-  useEffect(() => {
-    if (initialProjects && initialProjects.length) return;
-    if (ownerKey) return;
-    setLoading(false);
-  }, [initialProjects, ownerKey]);
-
-  useEffect(() => {
-    if (initialProjects && initialProjects.length) return;
-    let cancelled = false;
-    setLoading(true);
-    const load = async () => {
-      try {
-        const res = await fetch("/api/projects?summary=1", { cache: "force-cache" });
-        if (!res.ok) return;
-        const data = (await res.json()) as { projects?: SummaryProject[] };
-        if (!data.projects || !Array.isArray(data.projects)) return;
-        if (cancelled) return;
-        setProjects(data.projects);
-      } catch {
-        // ignore
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    void load();
-    return () => {
-      cancelled = true;
-    };
+    setProjects(initialProjects ?? []);
   }, [initialProjects]);
 
   if (!projects.length && !loading) {
@@ -131,6 +88,7 @@ export default function RecentProjectsRow({
     pdfUrl: project.pdfUrl ?? null,
     pagesCount: project.pagesCount ?? 0,
     rotation: project.rotation ?? 0,
+    hasPreview: project.hasPreview ?? false,
   }));
   const hasSelection = Object.values(selected).some(Boolean);
 

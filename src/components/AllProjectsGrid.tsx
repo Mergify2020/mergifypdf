@@ -10,6 +10,7 @@ type Project = {
   pdfUrl?: string | null;
   pagesCount?: number;
   rotation?: number | null;
+  hasPreview?: boolean;
 };
 
 type Props = {
@@ -22,6 +23,7 @@ type Props = {
       updatedAt?: string | number | Date;
       pdfUrl?: string | null;
       pagesCount?: number | null;
+      hasPreview?: boolean;
     },
     sourceId: string,
   ) => void;

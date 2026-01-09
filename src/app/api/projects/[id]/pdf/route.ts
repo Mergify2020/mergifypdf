@@ -2,9 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
-import { generateProjectPreview } from "@/lib/generateProjectPreview";
-import { promises as fs } from "fs";
-import path from "path";
+import { createSignedR2Url, getR2Config, uploadR2Object } from "@/lib/r2";
 
 async function ensureDbConnection() {
   for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -28,8 +26,6 @@ async function ensureDbConnection() {
   }
 }
 
-const PDF_DIR = path.join(process.cwd(), "public", "pdfs");
-
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -48,18 +44,14 @@ export async function POST(
   }
 
   const userId = session.user.id;
-  const project = await prisma.project.findUnique({
-    where: { id },
-    select: { id: true, userId: true, previewUrl: true },
+  const project = await prisma.project.findFirst({
+    where: { id, userId },
+    select: { id: true, userId: true, previewKey: true, pdfKey: true },
   });
 
   if (!project) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  if (project.userId !== userId) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
   const formData = await req.formData();
   const file = formData.get("file");
   if (!(file instanceof File)) {
@@ -67,28 +59,52 @@ export async function POST(
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  await fs.mkdir(PDF_DIR, { recursive: true });
-  const pdfPath = path.join(PDF_DIR, `${project.id}.pdf`);
-  await fs.writeFile(pdfPath, buffer);
-
-  await prisma.project.update({
-    where: { id: project.id },
-    data: {
-      pdfUrl: `/pdfs/${project.id}.pdf`,
-    },
-  });
-
-  let previewError: string | null = null;
+  let r2Config;
   try {
-    await generateProjectPreview(project.id, { force: true });
-  } catch (err) {
-    previewError =
-      err instanceof Error ? err.message : "Preview generation failed";
-    console.error("Preview generation failed", {
-      projectId: project.id,
-      error: previewError,
-    });
+    r2Config = getR2Config();
+  } catch {
+    return NextResponse.json({ error: "PDF storage is not configured" }, { status: 500 });
   }
 
-  return NextResponse.json({ success: true, previewError });
+  const objectKey = `${id}.pdf`;
+  await uploadR2Object(r2Config, objectKey, buffer, "application/pdf");
+
+  await prisma.project.updateMany({
+    where: { id: project.id, userId },
+    data: { pdfKey: objectKey },
+  });
+
+  return NextResponse.json({ success: true });
+}
+
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const userId = session.user.id;
+  const project = await prisma.project.findFirst({
+    where: { id, userId },
+    select: { pdfKey: true },
+  });
+
+  if (!project?.pdfKey) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  let r2Config;
+  try {
+    r2Config = getR2Config();
+  } catch {
+    return NextResponse.json({ error: "PDF storage is not configured" }, { status: 500 });
+  }
+
+  const url = await createSignedR2Url(r2Config, project.pdfKey);
+  return NextResponse.json({ url });
 }

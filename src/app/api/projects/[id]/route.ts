@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
+import { createSignedR2Url, getR2Config, uploadR2Object } from "@/lib/r2";
 import { Prisma } from "@prisma/client";
 
 async function ensureDbConnection() {
@@ -32,6 +33,28 @@ function extractPagesCount(data: unknown) {
   return Array.isArray(pages) ? pages.length : 0;
 }
 
+function parseDataImageUrl(dataUrl: string) {
+  const match = /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.*)$/.exec(dataUrl);
+  if (!match) return null;
+  return { mime: match[1], data: match[2] };
+}
+
+async function uploadPreviewFromDataUrl(
+  dataUrl: string,
+  projectId: string,
+  r2: ReturnType<typeof getR2Config>,
+) {
+  const parsed = parseDataImageUrl(dataUrl);
+  if (!parsed) {
+    throw new Error("Invalid preview data URL");
+  }
+
+  const buffer = Buffer.from(parsed.data, "base64");
+  const objectKey = `${projectId}.webp`;
+  await uploadR2Object(r2, objectKey, buffer, parsed.mime);
+  return objectKey;
+}
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -51,31 +74,64 @@ export async function GET(
 
   const userId = session.user.id;
 
-  const project = await prisma.project.findUnique({ where: { id } });
+  const project = await prisma.project.findFirst({ where: { id, userId } });
 
   if (!project) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  if (project.userId !== userId) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  let signedPdfUrl: string | null = null;
+  let signedPreviewUrl: string | null = null;
+  if (project.pdfKey || project.previewKey) {
+    try {
+      const r2Config = getR2Config();
+      if (project.pdfKey) {
+        signedPdfUrl = await createSignedR2Url(r2Config, project.pdfKey);
+      }
+      if (project.previewKey) {
+        signedPreviewUrl = await createSignedR2Url(r2Config, project.previewKey);
+      }
+    } catch {
+      signedPdfUrl = null;
+      signedPreviewUrl = null;
+    }
   }
 
   const hasPagesCount = typeof project.pagesCount === "number" && project.pagesCount > 0;
   if (!hasPagesCount) {
     const nextPagesCount = extractPagesCount(project.data);
     if (nextPagesCount > 0) {
-      const updated = await prisma.project.update({
-        where: { id: project.id },
-        data: {
-          pagesCount: nextPagesCount,
+      await prisma.project.updateMany({
+        where: { id: project.id, userId },
+        data: { pagesCount: nextPagesCount },
+      });
+      const updated = await prisma.project.findFirst({ where: { id: project.id, userId } });
+      if (!updated) {
+        return NextResponse.json({ error: "Not found" }, { status: 404 });
+      }
+      const { pdfKey: _pdfKey, previewKey: _previewKey, ...rest } = updated;
+      return NextResponse.json({
+        project: {
+          ...rest,
+          hasPdf: !!updated.pdfKey,
+          hasPreview: !!updated.previewKey,
+          pdfUrl: signedPdfUrl,
+          previewUrl: signedPreviewUrl,
         },
       });
-      return NextResponse.json({ project: updated });
     }
   }
 
-  return NextResponse.json({ project });
+  const { pdfKey: _pdfKey, previewKey: _previewKey, ...rest } = project;
+  return NextResponse.json({
+    project: {
+      ...rest,
+      hasPdf: !!project.pdfKey,
+      hasPreview: !!project.previewKey,
+      pdfUrl: signedPdfUrl,
+      previewUrl: signedPreviewUrl,
+    },
+  });
 }
 
 export async function PUT(
@@ -99,71 +155,79 @@ export async function PUT(
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const name = typeof body.name === "string" ? body.name : undefined;
   const data = "data" in body ? body.data : undefined;
-  const previewUrl =
-    typeof body.previewUrl === "string" && body.previewUrl.length > 0
-      ? body.previewUrl
-      : null;
+  const previewUrlRaw = typeof body.previewUrl === "string" ? body.previewUrl.trim() : "";
   const existing =
     data === undefined
-      ? await prisma.project.findUnique({
-          where: { id },
-          select: { id: true, userId: true, name: true },
+      ? await prisma.project.findFirst({
+          where: { id, userId },
+          select: { id: true, userId: true, name: true, previewKey: true },
         })
-      : await prisma.project.findUnique({
-          where: { id },
+      : await prisma.project.findFirst({
+          where: { id, userId },
         });
 
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  if (existing.userId !== userId) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  let resolvedPreviewKey: string | null | undefined = undefined;
+  if (previewUrlRaw.length > 0) {
+    if (previewUrlRaw.startsWith("data:image/")) {
+      const r2Config = getR2Config();
+      resolvedPreviewKey = await uploadPreviewFromDataUrl(previewUrlRaw, id, r2Config);
+    } else {
+      return NextResponse.json({ error: "Invalid preview payload" }, { status: 400 });
+    }
   }
 
-  const normalizedPreview =
-    previewUrl &&
-    (previewUrl.startsWith("data:image/") || previewUrl.startsWith("/previews/"))
-      ? previewUrl
-      : null;
+  if (data === undefined) {
+    const existingPreviewKey =
+      (existing as typeof existing & { previewKey?: string | null }).previewKey ?? null;
+    await prisma.project.updateMany({
+      where: { id: existing.id, userId },
+      data: {
+        name: name ?? existing.name,
+        ...(resolvedPreviewKey || existingPreviewKey === null
+          ? { previewKey: resolvedPreviewKey ?? existingPreviewKey }
+          : {}),
+      },
+    });
+  } else {
+    const existingWithData = existing as typeof existing & { data: unknown };
+    const nextData = (data ?? existingWithData.data) as
+      | Prisma.InputJsonValue
+      | Prisma.NullTypes.JsonNull;
+    const existingPreviewKey =
+      (existingWithData as { previewKey?: string | null }).previewKey ?? null;
+    const existingPagesCount =
+      typeof (existingWithData as { pagesCount?: unknown }).pagesCount === "number"
+        ? ((existingWithData as { pagesCount?: number }).pagesCount as number)
+        : 0;
+    const derivedPagesCount = extractPagesCount(nextData);
+    const nextPagesCount = derivedPagesCount > 0 ? derivedPagesCount : existingPagesCount;
+    await prisma.project.updateMany({
+      where: { id: existing.id, userId },
+      data: {
+        name: name ?? existing.name,
+        data: nextData,
+        previewKey: resolvedPreviewKey ?? existingPreviewKey,
+        pagesCount: nextPagesCount,
+      },
+    });
+  }
 
-  const updated =
-    data === undefined
-      ? await prisma.project.update({
-          where: { id: existing.id },
-          data: {
-            name: name ?? existing.name,
-            ...(normalizedPreview ? { previewUrl: normalizedPreview } : {}),
-          },
-        })
-      : (() => {
-          const existingWithData = existing as typeof existing & { data: unknown };
-          const nextData = (data ?? existingWithData.data) as
-            | Prisma.InputJsonValue
-            | Prisma.NullTypes.JsonNull;
-          const existingPreview =
-            typeof (existingWithData as { previewUrl?: unknown }).previewUrl === "string"
-              ? ((existingWithData as { previewUrl?: string }).previewUrl as string)
-              : null;
-          const existingPagesCount =
-            typeof (existingWithData as { pagesCount?: unknown }).pagesCount === "number"
-              ? ((existingWithData as { pagesCount?: number }).pagesCount as number)
-              : 0;
-          const derivedPagesCount = extractPagesCount(nextData);
-          const nextPagesCount =
-            derivedPagesCount > 0 ? derivedPagesCount : existingPagesCount;
-          return prisma.project.update({
-            where: { id: existing.id },
-            data: {
-              name: name ?? existing.name,
-              data: nextData,
-              previewUrl: normalizedPreview ?? existingPreview,
-              pagesCount: nextPagesCount,
-            },
-          });
-        })();
-
-  return NextResponse.json({ project: updated });
+  const updated = await prisma.project.findFirst({ where: { id: existing.id, userId } });
+  if (!updated) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  const { pdfKey: _pdfKey, previewKey: _previewKey, ...rest } = updated;
+  return NextResponse.json({
+    project: {
+      ...rest,
+      hasPdf: !!updated.pdfKey,
+      hasPreview: !!updated.previewKey,
+    },
+  });
 }
 
 export async function DELETE(
@@ -185,18 +249,14 @@ export async function DELETE(
 
   const userId = session.user.id;
 
-  const existing = await prisma.project.findUnique({ where: { id } });
+  const existing = await prisma.project.findFirst({ where: { id, userId } });
 
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  if (existing.userId !== userId) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
-  await prisma.project.delete({
-    where: { id: existing.id },
+  await prisma.project.deleteMany({
+    where: { id: existing.id, userId },
   });
 
   return NextResponse.json({ success: true });

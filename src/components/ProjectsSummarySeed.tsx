@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect } from "react";
-import { refreshProjectsSummary, setProjectsSummaryCache, type ProjectsSummaryProject } from "@/lib/projectsSummaryCache";
+import {
+  refreshProjectsSummary,
+  setProjectsSummaryCache,
+  type ProjectsSummaryProject,
+} from "@/lib/projectsSummaryCache";
 
 export default function ProjectsSummarySeed({
   projects,
@@ -11,10 +15,10 @@ export default function ProjectsSummarySeed({
   ownerKey: string | null | undefined;
 }) {
   useEffect(() => {
-    if (!Array.isArray(projects) || projects.length === 0) return;
+    if (!Array.isArray(projects)) return;
     setProjectsSummaryCache(ownerKey, projects);
     if (!ownerKey) return;
-    void refreshProjectsSummary(ownerKey, "no-store");
+    void refreshProjectsSummary(ownerKey);
   }, [ownerKey, projects]);
 
   return null;

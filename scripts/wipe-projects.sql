@@ -1,0 +1,3 @@
+BEGIN;
+DELETE FROM "Project";
+COMMIT;

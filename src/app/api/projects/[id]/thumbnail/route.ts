@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
+import { createSignedR2Url, getR2Config } from "@/lib/r2";
 
 export async function GET(
   _req: NextRequest,
@@ -18,35 +19,25 @@ export async function GET(
 
   const project = await prisma.project.findFirst({
     where: { id, userId },
-    select: { previewUrl: true },
+    select: { previewKey: true },
   });
 
   if (!project) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const previewUrl = project.previewUrl;
-
-  if (!previewUrl || typeof previewUrl !== "string") {
+  const previewKey = project.previewKey;
+  if (!previewKey) {
     return NextResponse.json({ error: "No thumbnail" }, { status: 404 });
   }
 
-  if (previewUrl.startsWith("data:image/")) {
-    const [metaHeader, base64] = previewUrl.split(",", 2);
-    if (!base64) {
-      return NextResponse.json({ error: "Invalid thumbnail" }, { status: 500 });
-    }
-    const mimeMatch = /^data:(.*?);base64$/.exec(metaHeader);
-    const mime = mimeMatch?.[1] ?? "image/png";
-    const buffer = Buffer.from(base64, "base64");
-    return new NextResponse(buffer, {
-      status: 200,
-      headers: {
-        "Content-Type": mime,
-        "Cache-Control": "private, max-age=31536000, immutable",
-      },
-    });
+  let r2Config;
+  try {
+    r2Config = getR2Config();
+  } catch {
+    return NextResponse.json({ error: "Preview storage is not configured" }, { status: 500 });
   }
 
-  return NextResponse.redirect(new URL(previewUrl, _req.url));
+  const url = await createSignedR2Url(r2Config, previewKey);
+  return NextResponse.redirect(url);
 }
