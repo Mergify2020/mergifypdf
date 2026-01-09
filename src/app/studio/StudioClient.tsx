@@ -386,6 +386,7 @@ type HighlightColorKey = keyof typeof HIGHLIGHT_COLORS;
 const PREVIEW_BASE_SCALE = 4;
 const MAX_DEVICE_PIXEL_RATIO = 4;
 const COVER_PREVIEW_SCALE = 3;
+const COVER_PREVIEW_QUALITY = 0.86;
 const TEXT_PLACEHOLDER = "Type here";
 const TEXT_DEFAULT_WIDTH_PX = 360;
 const TEXT_DEFAULT_HEIGHT_PX = 48;
@@ -491,7 +492,12 @@ function toCardPreviewDataUrl(canvas: HTMLCanvasElement) {
 }
 
 function toCoverPreviewDataUrl(canvas: HTMLCanvasElement) {
-  return canvas.toDataURL("image/png");
+  try {
+    const webp = canvas.toDataURL("image/webp", COVER_PREVIEW_QUALITY);
+    if (webp.startsWith("data:image/webp")) return webp;
+  } catch {
+  }
+  return canvas.toDataURL("image/png", COVER_PREVIEW_QUALITY);
 }
 
 type StoredSourceMeta = { id: string; name?: string; size?: number; updatedAt?: number };
