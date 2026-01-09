@@ -455,16 +455,14 @@ function getInitialPreviewRenderCount(pageCount: number, largeDocMode: boolean) 
   return Math.min(LARGE_DOC_INITIAL_RENDER_COUNT, pageCount);
 }
 
-function cancelIdleOrTimeout(
-  timerId: number | IdleCallbackHandle | null
-) {
+function cancelIdleOrTimeout(timerId: number | null, usesIdleCallback = false) {
   if (timerId == null) return;
 
-  if (typeof timerId === "number") {
-    clearTimeout(timerId);
-  } else {
+  if (usesIdleCallback && typeof window !== "undefined" && "cancelIdleCallback" in window) {
     window.cancelIdleCallback(timerId);
+    return;
   }
+  clearTimeout(timerId);
 }
 
 function rotatePoint(point: { x: number; y: number }, origin: { x: number; y: number }, angleRad: number) {
@@ -1889,10 +1887,10 @@ function WorkspaceClient() {
   const [startupOverlayMessage, setStartupOverlayMessage] = useState("Preparing your workspace");
   const startupOverlayActiveRef = useRef(false);
   const startupOverlayStartRef = useRef<number | null>(null);
-  const startupOverlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startupOverlayTimerRef = useRef<number | null>(null);
   const startupOverlayFullAtRef = useRef<number | null>(null);
-  const startupOverlayFullTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const startupOverlayFailSafeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startupOverlayFullTimerRef = useRef<number | null>(null);
+  const startupOverlayFailSafeRef = useRef<number | null>(null);
   const startupProgressRef = useRef(0);
   const startupProgressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startupOverlayShownRef = useRef(false);
@@ -1924,7 +1922,7 @@ function WorkspaceClient() {
   const [shapeThicknessInput, setShapeThicknessInput] = useState("3");
   const [headerMode, setHeaderMode] = useState<HeaderMode>("default");
   const [toolbarPreviewMode, setToolbarPreviewMode] = useState<Exclude<HeaderMode, "default"> | null>(null);
-  const toolPreviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const toolPreviewTimerRef = useRef<number | null>(null);
   const [textMode, setTextMode] = useState(false);
   const [signaturePanelMode, setSignaturePanelMode] = useState<SignaturePanelMode>("none");
   const [savedSignatures, setSavedSignatures] = useState<SavedSignature[]>([]);
@@ -2143,7 +2141,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   const [focusedTextId, setFocusedTextId] = useState<string | null>(null);
   const [activeTextContainerId, setActiveTextContainerId] = useState<string | null>(null);
   const [typingTextId, setTypingTextId] = useState<string | null>(null);
-  const typingTextTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const typingTextTimeoutRef = useRef<number | null>(null);
   const textAutoExpandRafRef = useRef<number | null>(null);
   const focusedTextIdRef = useRef<string | null>(null);
   const selectionRangeRef = useRef<Range | null>(null);
@@ -3627,8 +3625,9 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   const lastProjectKeyRef = useRef<string | null>(null);
   const pendingInitialRenderRef = useRef<PageItem[]>([]);
   const restoringPreviewCacheRef = useRef(false);
-  const previewCacheWriteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const backgroundLowResTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewCacheWriteTimerRef = useRef<number | null>(null);
+  const backgroundLowResTimerRef = useRef<number | null>(null);
+  const backgroundLowResUsesIdleRef = useRef(false);
   const backgroundLowResIndexRef = useRef(0);
   const scheduleBackgroundLowResRef = useRef<() => void>(() => {});
   const enqueueRenderRef = useRef<
@@ -3703,7 +3702,7 @@ const timer =
 
     return () => {
       cancelled = true;
-      cancelIdleOrTimeout(timer);
+      cancelIdleOrTimeout(timer, "requestIdleCallback" in win);
     };
   }, [authSession?.user, currentProjectId, pages, projectParam, coverPreviewUrl]);
   useEffect(() => {
@@ -3741,7 +3740,7 @@ const timer =
   useEffect(() => {
     if (pages.length === 0 || largeDocMode) {
       if (backgroundLowResTimerRef.current !== null) {
-        cancelIdleOrTimeout(backgroundLowResTimerRef.current);
+        cancelIdleOrTimeout(backgroundLowResTimerRef.current, backgroundLowResUsesIdleRef.current);
         backgroundLowResTimerRef.current = null;
       }
       backgroundLowResIndexRef.current = 0;
@@ -3750,7 +3749,7 @@ const timer =
     scheduleBackgroundLowResRef.current();
     return () => {
       if (backgroundLowResTimerRef.current !== null) {
-        cancelIdleOrTimeout(backgroundLowResTimerRef.current);
+        cancelIdleOrTimeout(backgroundLowResTimerRef.current, backgroundLowResUsesIdleRef.current);
         backgroundLowResTimerRef.current = null;
       }
     };
@@ -4515,10 +4514,12 @@ const timer =
       }
     };
     if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+      backgroundLowResUsesIdleRef.current = true;
       backgroundLowResTimerRef.current = (window as any).requestIdleCallback(run, {
         timeout: BACKGROUND_LOW_RES_IDLE_TIMEOUT,
       });
     } else {
+      backgroundLowResUsesIdleRef.current = false;
       backgroundLowResTimerRef.current = setTimeout(() => run(), BACKGROUND_LOW_RES_IDLE_TIMEOUT);
     }
   }, []);
