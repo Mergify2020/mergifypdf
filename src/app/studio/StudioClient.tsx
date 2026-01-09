@@ -3691,14 +3691,14 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       }
     };
 
-    const timer =
-      "requestIdleCallback" in win
-        ? win.requestIdleCallback(() => {
-            void renderCover();
-          }, { timeout: 1500 })
-        : win.setTimeout(() => {
-            void renderCover();
-          }, 350);
+const timer =
+  typeof window !== "undefined" && "requestIdleCallback" in window
+    ? window.requestIdleCallback(() => {
+        void renderCover();
+      }, { timeout: 1500 })
+    : globalThis.setTimeout(() => {
+        void renderCover();
+      }, 350);
 
     return () => {
       cancelled = true;
