@@ -220,6 +220,16 @@ type CloudProject = {
   pagesCount?: number | null;
 };
 
+function getProjectCoverPreview(pages: PageItem[]): string | null {
+  const first = pages[0];
+  if (!first) return null;
+  const candidate = first.thumb || first.preview;
+  if (typeof candidate !== "string" || !candidate.startsWith("data:image/")) {
+    return null;
+  }
+  return candidate;
+}
+
 const TYPED_SIGNATURE_STYLES = [
   { id: "script", label: "Script", fontFamily: "'Segoe Script', 'Comic Sans MS', cursive" },
   { id: "classic", label: "Classic", fontFamily: "'Georgia', 'Times New Roman', serif" },
@@ -905,12 +915,19 @@ function useProjects() {
   }, []);
 
   const saveProject = useCallback(
-    async (name: string, data: unknown): Promise<CloudProject | null> => {
+    async (
+      name: string,
+      data: unknown,
+      previewUrl?: string | null
+    ): Promise<CloudProject | null> => {
       const trimmedName = name.trim();
       if (!trimmedName) return null;
       setSavingProject(true);
       try {
-        const payload = { name: trimmedName, data };
+        const payload =
+          typeof previewUrl === "string" && previewUrl.length > 0
+            ? { name: trimmedName, data, previewUrl }
+            : { name: trimmedName, data };
         if (currentProjectId) {
           const res = await fetch(`/api/projects/${currentProjectId}`, {
             method: "PUT",
@@ -7976,14 +7993,9 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     !!draftTextBox;
   const buildCloudProjectData = useCallback(() => {
     if (!hasWorkspaceData) return null;
-    const pageThumbs = pages
-      .map((page) => page.preview ?? page.thumb)
-      .filter((src): src is string => typeof src === "string" && src.length > 0)
-      .slice(0, 24);
     return {
       name: projectName,
       pagesCount: pages.length,
-      pageThumbs,
       sources: sources.map((source) => ({
         id: source.storageId,
         name: source.name,
@@ -7997,10 +8009,6 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         rotation: page.rotation,
         width: page.width,
         height: page.height,
-        thumb: page.thumb,
-        thumbWidth: page.thumbWidth ?? 0,
-        thumbHeight: page.thumbHeight ?? 0,
-        preview: page.preview,
       })),
       highlights,
       shapesByPage,
@@ -8041,7 +8049,8 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     const timer = setTimeout(() => {
       const projectData = buildCloudProjectData();
       if (!projectData || cancelled) return;
-      void saveProject(projectName, projectData).then((saved) => {
+      const previewUrl = getProjectCoverPreview(pagesRef.current);
+      void saveProject(projectName, projectData, previewUrl).then((saved) => {
         if (!saved || cancelled) return;
         addRecentProject(ownerId, saved.name ?? projectName, saved.id);
       });
@@ -8991,7 +9000,8 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     }
     const projectData = buildCloudProjectData();
     if (!projectData) return;
-    const saved = await saveProject(projectName, projectData);
+    const previewUrl = getProjectCoverPreview(pagesRef.current);
+    const saved = await saveProject(projectName, projectData, previewUrl);
     const ownerId = authSession.user.id ?? authSession.user.email ?? null;
     if (saved && ownerId) {
       addRecentProject(ownerId, saved.name ?? projectName, saved.id);
@@ -9004,7 +9014,8 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       const projectData = buildCloudProjectData();
       if (projectData) {
         const ownerId = authSession.user.id ?? authSession.user.email ?? null;
-        void saveProject(projectName, projectData).then((saved) => {
+        const previewUrl = getProjectCoverPreview(pagesRef.current);
+        void saveProject(projectName, projectData, previewUrl).then((saved) => {
           if (saved && ownerId) {
             addRecentProject(ownerId, saved.name ?? projectName, saved.id);
           }

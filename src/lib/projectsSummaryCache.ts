@@ -15,6 +15,7 @@ export type ProjectsSummaryUpdate = {
 
 let cachedSummaryOwner: string | null = null;
 let cachedSummary: ProjectsSummaryProject[] | null = null;
+const previewInFlight = new Set<string>();
 
 const listeners = new Set<(update: ProjectsSummaryUpdate) => void>();
 
@@ -60,8 +61,40 @@ export async function refreshProjectsSummary(ownerKey: string | null | undefined
     const data = (await res.json()) as { projects?: ProjectsSummaryProject[] };
     if (!Array.isArray(data.projects)) return null;
     setProjectsSummaryCache(ownerKey, data.projects);
+    void primeMissingPreviews(ownerKey, data.projects);
     return data.projects;
   } catch {
     return null;
   }
+}
+
+async function primeMissingPreviews(
+  ownerKey: string | null | undefined,
+  projects: ProjectsSummaryProject[]
+) {
+  if (!ownerKey) return;
+  const targets = projects
+    .filter((project) => !project.previewUrl)
+    .slice(0, 6);
+  await Promise.all(
+    targets.map(async (project) => {
+      if (previewInFlight.has(project.id)) return;
+      previewInFlight.add(project.id);
+      try {
+        const res = await fetch(`/api/projects/${encodeURIComponent(project.id)}/preview`, {
+          method: "POST",
+          credentials: "include",
+        });
+        const json = (await res.json().catch(() => null)) as { previewUrl?: string } | null;
+        if (!res.ok || !json?.previewUrl) return;
+        if (!cachedSummary || cachedSummaryOwner !== (ownerKey ?? null)) return;
+        const next = cachedSummary.map((entry) =>
+          entry.id === project.id ? { ...entry, previewUrl: json.previewUrl } : entry
+        );
+        setProjectsSummaryCache(ownerKey, next);
+      } finally {
+        previewInFlight.delete(project.id);
+      }
+    })
+  );
 }
