@@ -86,13 +86,16 @@ export async function GET(
     let r2Config;
     try {
       r2Config = getR2Config();
-    } catch (err) {
-      console.error("R2 config missing when signing project URLs.", {
-        projectId: id,
-        env: process.env.NODE_ENV,
-        error: err,
-      });
-      return NextResponse.json({ error: "R2 storage is not configured" }, { status: 500 });
+      } catch (err) {
+        console.error("R2 config missing when signing project URLs.", {
+          projectId: id,
+          env: process.env.NODE_ENV,
+          error: err,
+        });
+      return NextResponse.json(
+        { error: err instanceof Error ? err.message : "R2 storage is not configured" },
+        { status: 500 }
+      );
     }
     if (project.pdfKey) {
       signedPdfUrl = await createSignedR2Url(r2Config, project.pdfKey);
@@ -187,7 +190,10 @@ export async function PUT(
           env: process.env.NODE_ENV,
           error: err,
         });
-        return NextResponse.json({ error: "Preview storage is not configured" }, { status: 500 });
+        return NextResponse.json(
+          { error: err instanceof Error ? err.message : "Preview storage is not configured" },
+          { status: 500 }
+        );
       }
       resolvedPreviewKey = await uploadPreviewFromDataUrl(previewUrlRaw, id, r2Config);
       console.info("Uploaded preview image to R2.", { projectId: id, env: process.env.NODE_ENV });

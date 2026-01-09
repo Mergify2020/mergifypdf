@@ -78,12 +78,15 @@ export async function POST(
   let r2Config;
   try {
     r2Config = getR2Config();
-  } catch {
+  } catch (err) {
     console.error("R2 config missing when uploading PDF via server.", {
       projectId: id,
       env: process.env.NODE_ENV,
     });
-    return NextResponse.json({ error: "PDF storage is not configured" }, { status: 500 });
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "PDF storage is not configured" },
+      { status: 500 }
+    );
   }
 
   const objectKey = `${id}.pdf`;
@@ -122,8 +125,11 @@ export async function GET(
   let r2Config;
   try {
     r2Config = getR2Config();
-  } catch {
-    return NextResponse.json({ error: "PDF storage is not configured" }, { status: 500 });
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "PDF storage is not configured" },
+      { status: 500 }
+    );
   }
 
   const url = await createSignedR2Url(r2Config, project.pdfKey);

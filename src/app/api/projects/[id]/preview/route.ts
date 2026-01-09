@@ -82,12 +82,15 @@ export async function GET(
   let r2Config;
   try {
     r2Config = getR2Config();
-  } catch {
+  } catch (err) {
     console.error("R2 config missing when signing preview URL.", {
       projectId: id,
       env: process.env.NODE_ENV,
     });
-    return NextResponse.json({ error: "Preview storage is not configured" }, { status: 500 });
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Preview storage is not configured" },
+      { status: 500 }
+    );
   }
 
   const url = await createSignedR2Url(r2Config, project.previewKey, 60);

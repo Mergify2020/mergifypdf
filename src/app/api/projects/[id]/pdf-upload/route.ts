@@ -56,12 +56,15 @@ export async function POST(
   let r2Config;
   try {
     r2Config = getR2Config();
-  } catch {
+  } catch (err) {
     console.error("R2 config missing when issuing PDF upload URL.", {
       projectId: id,
       env: process.env.NODE_ENV,
     });
-    return NextResponse.json({ error: "PDF storage is not configured" }, { status: 500 });
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "PDF storage is not configured" },
+      { status: 500 }
+    );
   }
 
   const objectKey = `${id}.pdf`;
