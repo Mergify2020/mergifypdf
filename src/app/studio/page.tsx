@@ -237,6 +237,8 @@ const TYPED_SIGNATURE_STYLES = [
   { id: "marker", label: "Marker", fontFamily: "'Poppins', 'Arial', sans-serif" },
 ] as const;
 
+const PREVIEW_SYNC_DEBOUNCE_MS = 900;
+
 type FontOption =
   | {
       label: string;
@@ -3601,6 +3603,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   const previewNodeMap = useRef<Map<string, HTMLDivElement>>(new Map());
   const pagesRef = useRef<PageItem[]>([]);
   const previewSyncRef = useRef<Set<string>>(new Set());
+  const previewUploadRef = useRef<Record<string, string>>({});
   const pagesByIdRef = useRef<Map<string, PageItem>>(new Map());
   const hasHydratedSources = useRef(false);
   const objectUrlCacheRef = useRef<Map<string, string>>(new Map());
@@ -3625,6 +3628,27 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     pagesRef.current = pages;
     pagesByIdRef.current = new Map(pages.map((page) => [page.id, page]));
   }, [pages]);
+  useEffect(() => {
+    if (!authSession?.user) return;
+    const projectId = projectParam ?? currentProjectId ?? null;
+    if (!projectId || pages.length === 0) return;
+    const previewUrl = getProjectCoverPreview(pages);
+    if (!previewUrl) return;
+    if (previewUploadRef.current[projectId] === previewUrl) return;
+    previewUploadRef.current[projectId] = previewUrl;
+
+    const timer = setTimeout(() => {
+      void fetch(`/api/projects/${encodeURIComponent(projectId)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ previewUrl }),
+      }).catch(() => {
+        previewUploadRef.current[projectId] = "";
+      });
+    }, PREVIEW_SYNC_DEBOUNCE_MS);
+
+    return () => clearTimeout(timer);
+  }, [authSession?.user, currentProjectId, pages, projectParam]);
   useEffect(() => {
     if (sources.length > 0) {
       restoringPreviewCacheRef.current = false;
