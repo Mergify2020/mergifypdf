@@ -12,8 +12,17 @@ export function getR2Config(): R2Config {
   const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
   const bucket = process.env.R2_BUCKET;
 
-  if (!accountId || !accessKeyId || !secretAccessKey || !bucket) {
-    throw new Error("R2 storage is not configured");
+  const missing = [
+    !accountId ? "R2_ACCOUNT_ID" : null,
+    !accessKeyId ? "R2_ACCESS_KEY_ID" : null,
+    !secretAccessKey ? "R2_SECRET_ACCESS_KEY" : null,
+    !bucket ? "R2_BUCKET" : null,
+  ].filter((key): key is string => key !== null);
+
+  if (missing.length > 0) {
+    const message = `R2 storage is not configured. Missing: ${missing.join(", ")}`;
+    console.error(message, { env: process.env.NODE_ENV });
+    throw new Error(message);
   }
 
   return {

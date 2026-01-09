@@ -83,17 +83,22 @@ export async function GET(
   let signedPdfUrl: string | null = null;
   let signedPreviewUrl: string | null = null;
   if (project.pdfKey || project.previewKey) {
+    let r2Config;
     try {
-      const r2Config = getR2Config();
-      if (project.pdfKey) {
-        signedPdfUrl = await createSignedR2Url(r2Config, project.pdfKey);
-      }
-      if (project.previewKey) {
-        signedPreviewUrl = await createSignedR2Url(r2Config, project.previewKey);
-      }
-    } catch {
-      signedPdfUrl = null;
-      signedPreviewUrl = null;
+      r2Config = getR2Config();
+    } catch (err) {
+      console.error("R2 config missing when signing project URLs.", {
+        projectId: id,
+        env: process.env.NODE_ENV,
+        error: err,
+      });
+      return NextResponse.json({ error: "R2 storage is not configured" }, { status: 500 });
+    }
+    if (project.pdfKey) {
+      signedPdfUrl = await createSignedR2Url(r2Config, project.pdfKey);
+    }
+    if (project.previewKey) {
+      signedPreviewUrl = await createSignedR2Url(r2Config, project.previewKey);
     }
   }
 
@@ -173,8 +178,19 @@ export async function PUT(
   let resolvedPreviewKey: string | null | undefined = undefined;
   if (previewUrlRaw.length > 0) {
     if (previewUrlRaw.startsWith("data:image/")) {
-      const r2Config = getR2Config();
+      let r2Config;
+      try {
+        r2Config = getR2Config();
+      } catch (err) {
+        console.error("R2 config missing when uploading preview.", {
+          projectId: id,
+          env: process.env.NODE_ENV,
+          error: err,
+        });
+        return NextResponse.json({ error: "Preview storage is not configured" }, { status: 500 });
+      }
       resolvedPreviewKey = await uploadPreviewFromDataUrl(previewUrlRaw, id, r2Config);
+      console.info("Uploaded preview image to R2.", { projectId: id, env: process.env.NODE_ENV });
     } else {
       return NextResponse.json({ error: "Invalid preview payload" }, { status: 400 });
     }

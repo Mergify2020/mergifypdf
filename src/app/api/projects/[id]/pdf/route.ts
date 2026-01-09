@@ -64,6 +64,7 @@ export async function POST(
       where: { id: project.id, userId },
       data: { pdfKey },
     });
+    console.info("Confirmed PDF upload key.", { projectId: id, env: process.env.NODE_ENV });
     return NextResponse.json({ success: true });
   }
 
@@ -78,6 +79,10 @@ export async function POST(
   try {
     r2Config = getR2Config();
   } catch {
+    console.error("R2 config missing when uploading PDF via server.", {
+      projectId: id,
+      env: process.env.NODE_ENV,
+    });
     return NextResponse.json({ error: "PDF storage is not configured" }, { status: 500 });
   }
 
@@ -89,6 +94,7 @@ export async function POST(
     data: { pdfKey: objectKey },
   });
 
+  console.info("Uploaded PDF via server route.", { projectId: id, env: process.env.NODE_ENV });
   return NextResponse.json({ success: true });
 }
 

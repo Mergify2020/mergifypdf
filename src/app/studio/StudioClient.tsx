@@ -3731,13 +3731,23 @@ const timer =
     if (previewUploadRef.current[projectId] === previewUrl) return;
     previewUploadRef.current[projectId] = previewUrl;
 
-    const timer = setTimeout(() => {
-      void fetch(`/api/projects/${encodeURIComponent(projectId)}`, {
+    const uploadPreview = async () => {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ previewUrl }),
-      }).catch(() => {
+      });
+      if (!res.ok) {
+        throw new Error(`Preview upload failed with status ${res.status}`);
+      }
+    };
+
+    const timer = setTimeout(() => {
+      void uploadPreview().catch((err) => {
         previewUploadRef.current[projectId] = "";
+        setError("Preview upload failed. Check R2 credentials and network logs.");
+        console.error("Preview upload failed during cloud sync.", err);
+        throw err;
       });
     }, PREVIEW_SYNC_DEBOUNCE_MS);
 
@@ -4070,75 +4080,73 @@ const timer =
     const ensurePreview = async () => {
       try {
         const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}`, { cache: "no-store" });
-        if (!res.ok || cancelled) return;
+        if (cancelled) return;
+        if (!res.ok) {
+          throw new Error(`Project fetch failed with status ${res.status}`);
+        }
         const json = (await res.json().catch(() => null)) as {
           project?: { previewUrl?: string | null; pdfUrl?: string | null };
         } | null;
         if (json?.project?.previewUrl) return;
 
         if (json?.project?.pdfUrl) {
+          console.info("Attempting server-side preview generation.", { projectId });
           const previewRes = await fetch(`/api/projects/${encodeURIComponent(projectId)}/preview`, {
             method: "POST",
             credentials: "include",
           });
           if (!previewRes.ok) {
-            previewSyncRef.current.delete(projectId);
+            throw new Error(`Preview generation failed with status ${previewRes.status}`);
           }
           return;
         }
 
         const source = sources[0];
         if (!source?.storageId) {
-          previewSyncRef.current.delete(projectId);
-          return;
+          throw new Error("No local source available to upload PDF.");
         }
         const stored = await readFileBlob(source.storageId);
         const blob = stored?.blob instanceof Blob ? stored.blob : null;
         if (!blob) {
-          previewSyncRef.current.delete(projectId);
-          return;
+          throw new Error("Local PDF blob not found in storage.");
         }
 
-        const uploadViaSignedUrl = async () => {
-          const initRes = await fetch(
-            `/api/projects/${encodeURIComponent(projectId)}/pdf-upload`,
-            { method: "POST", credentials: "include" }
-          );
-          if (!initRes.ok) return false;
-          const initData = (await initRes.json().catch(() => null)) as
-            | { url?: string; key?: string }
-            | null;
-          if (!initData?.url || !initData?.key) return false;
-          const putRes = await fetch(initData.url, {
-            method: "PUT",
-            headers: { "Content-Type": blob.type || "application/pdf" },
-            body: blob,
-          });
-          if (!putRes.ok) return false;
-          const confirmRes = await fetch(`/api/projects/${encodeURIComponent(projectId)}/pdf`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({ pdfKey: initData.key }),
-          });
-          return confirmRes.ok;
-        };
-
-        const uploaded = await uploadViaSignedUrl().catch(() => false);
-        if (!uploaded) {
-          const formData = new FormData();
-          formData.set("file", blob, source.name ?? "document.pdf");
-          const pdfRes = await fetch(`/api/projects/${encodeURIComponent(projectId)}/pdf`, {
-            method: "POST",
-            credentials: "include",
-            body: formData,
-          });
-          if (!pdfRes.ok) {
-            previewSyncRef.current.delete(projectId);
-          }
+        const initRes = await fetch(`/api/projects/${encodeURIComponent(projectId)}/pdf-upload`, {
+          method: "POST",
+          credentials: "include",
+        });
+        if (!initRes.ok) {
+          throw new Error(`PDF upload init failed with status ${initRes.status}`);
         }
-      } catch {
+        const initData = (await initRes.json().catch(() => null)) as
+          | { url?: string; key?: string }
+          | null;
+        if (!initData?.url || !initData?.key) {
+          throw new Error("PDF upload init returned an invalid payload.");
+        }
+        console.info("Uploading PDF via signed R2 URL.", { projectId });
+        const putRes = await fetch(initData.url, {
+          method: "PUT",
+          headers: { "Content-Type": blob.type || "application/pdf" },
+          body: blob,
+        });
+        if (!putRes.ok) {
+          throw new Error(`PDF upload to R2 failed with status ${putRes.status}`);
+        }
+        const confirmRes = await fetch(`/api/projects/${encodeURIComponent(projectId)}/pdf`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ pdfKey: initData.key }),
+        });
+        if (!confirmRes.ok) {
+          throw new Error(`PDF upload confirmation failed with status ${confirmRes.status}`);
+        }
+      } catch (err) {
         previewSyncRef.current.delete(projectId);
+        setError("PDF upload failed in production. Check R2 credentials and network logs.");
+        console.error("PDF upload failed during cloud sync.", err);
+        throw err;
       }
     };
 

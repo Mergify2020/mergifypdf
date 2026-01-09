@@ -83,9 +83,14 @@ export async function GET(
   try {
     r2Config = getR2Config();
   } catch {
+    console.error("R2 config missing when signing preview URL.", {
+      projectId: id,
+      env: process.env.NODE_ENV,
+    });
     return NextResponse.json({ error: "Preview storage is not configured" }, { status: 500 });
   }
 
   const url = await createSignedR2Url(r2Config, project.previewKey, 60);
+  console.info("Issued signed preview URL.", { projectId: id, env: process.env.NODE_ENV });
   return NextResponse.json({ url });
 }

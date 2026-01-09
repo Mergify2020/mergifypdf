@@ -57,10 +57,15 @@ export async function POST(
   try {
     r2Config = getR2Config();
   } catch {
+    console.error("R2 config missing when issuing PDF upload URL.", {
+      projectId: id,
+      env: process.env.NODE_ENV,
+    });
     return NextResponse.json({ error: "PDF storage is not configured" }, { status: 500 });
   }
 
   const objectKey = `${id}.pdf`;
   const url = await createSignedR2UploadUrl(r2Config, objectKey, "application/pdf");
+  console.info("Issued signed PDF upload URL.", { projectId: id, env: process.env.NODE_ENV });
   return NextResponse.json({ url, key: objectKey });
 }
