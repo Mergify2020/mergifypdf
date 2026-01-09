@@ -3642,7 +3642,8 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     pagesByIdRef.current = new Map(pages.map((page) => [page.id, page]));
   }, [pages]);
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    const win = typeof window === "undefined" ? null : window;
+    if (!win) return;
     if (!authSession?.user) return;
     const projectId = projectParam ?? currentProjectId ?? null;
     if (!projectId) return;
@@ -3691,11 +3692,11 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     };
 
     const timer =
-      "requestIdleCallback" in window
-        ? window.requestIdleCallback(() => {
+      "requestIdleCallback" in win
+        ? win.requestIdleCallback(() => {
             void renderCover();
           }, { timeout: 1500 })
-        : window.setTimeout(() => {
+        : win.setTimeout(() => {
             void renderCover();
           }, 350);
 
