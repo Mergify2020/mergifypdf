@@ -24,6 +24,9 @@ export function getR2Config(): R2Config {
     console.error(message, { env: process.env.NODE_ENV });
     throw new Error(message);
   }
+  if (!accountId || !accessKeyId || !secretAccessKey || !bucket) {
+    throw new Error("R2 storage is not configured.");
+  }
 
   return {
     client: new S3Client({
