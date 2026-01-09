@@ -455,7 +455,7 @@ function getInitialPreviewRenderCount(pageCount: number, largeDocMode: boolean) 
   return Math.min(LARGE_DOC_INITIAL_RENDER_COUNT, pageCount);
 }
 
-function cancelIdleOrTimeout(timerId: number | null, usesIdleCallback = false) {
+function cancelIdleOrTimeout(timerId: ReturnType<typeof setTimeout> | number | null, usesIdleCallback = false) {
   if (timerId == null) return;
 
   if (usesIdleCallback && typeof window !== "undefined" && "cancelIdleCallback" in window) {
