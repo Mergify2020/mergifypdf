@@ -1,12 +1,5 @@
 ﻿// src/app/layout.tsx
 import type { Metadata } from "next";
-import Providers from "@/components/Providers";
-import WorkspaceShell from "@/components/WorkspaceShell";
-import AppHeaderBrand from "@/components/AppHeaderBrand";
-import Footer from "@/components/Footer";
-import HeaderAuthButtons from "@/components/HeaderAuthButtons";
-import HeroHeader from "@/components/HeroHeader";
-import WorkspaceSettingsMenu from "@/components/WorkspaceSettingsMenu";
 import { getServerSessionSafe } from "@/lib/serverSession";
 import "./globals.css";
 
@@ -30,11 +23,6 @@ export const revalidate = 0;
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSessionSafe();
-  const lockedByTwoFactor =
-    !!session?.user?.twoFactorEnabled && session.user.twoFactorPassed !== true;
-
-  const authedWorkspace = session?.user && !lockedByTwoFactor;
-  const useWorkspaceShell = authedWorkspace;
 
   return (
     <html lang="en">
@@ -54,26 +42,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
       <body className="min-h-screen bg-white text-gray-900">
         <Providers session={session}>
-          {useWorkspaceShell ? (
-            <WorkspaceShell>{children}</WorkspaceShell>
-          ) : (
-            <>
-              <HeroHeader>
-                <div className="mx-auto flex h-[76px] w-full max-w-7xl items-center justify-between px-4 lg:px-6">
-                  <div className="flex items-center gap-3">
-                    <AppHeaderBrand />
-                  </div>
-                  {!session?.user || lockedByTwoFactor ? (
-                    <HeaderAuthButtons />
-                  ) : (
-                    <WorkspaceSettingsMenu />
-                  )}
-                </div>
-              </HeroHeader>
-              <main className="page-fade-in">{children}</main>
-              <Footer />
-            </>
-          )}
+          {children}
         </Providers>
       </body>
     </html>
