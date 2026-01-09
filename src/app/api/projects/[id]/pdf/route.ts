@@ -78,16 +78,17 @@ export async function POST(
     },
   });
 
-  if (!project.previewUrl) {
-    try {
-      await generateProjectPreview(project.id);
-    } catch (err) {
-      return NextResponse.json(
-        { error: err instanceof Error ? err.message : "Preview generation failed" },
-        { status: 500 }
-      );
-    }
+  let previewError: string | null = null;
+  try {
+    await generateProjectPreview(project.id, { force: true });
+  } catch (err) {
+    previewError =
+      err instanceof Error ? err.message : "Preview generation failed";
+    console.error("Preview generation failed", {
+      projectId: project.id,
+      error: previewError,
+    });
   }
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, previewError });
 }

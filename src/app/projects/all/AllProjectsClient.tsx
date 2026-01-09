@@ -19,8 +19,9 @@ type ApiProject = {
   id: string;
   name: string | null;
   updatedAt: string | number | Date;
-  previewUrl?: string | null;
+  pdfUrl?: string | null;
   pagesCount?: number | null;
+  rotation?: number | null;
 };
 
 type ProjectCard = {
@@ -28,8 +29,9 @@ type ProjectCard = {
   title: string;
   updated: string;
   updatedAtMs: number;
-  previewUrl?: string | null;
+  pdfUrl?: string | null;
   pagesCount?: number;
+  rotation?: number | null;
 };
 
 function mapSummaryProjects(projects: ProjectsSummaryProject[]): ProjectCard[] {
@@ -42,8 +44,9 @@ function mapSummaryProjects(projects: ProjectsSummaryProject[]): ProjectCard[] {
       title: project.name?.trim() || "Untitled project",
       updated: formatProjectLastEdited(updatedAt),
       updatedAtMs: updatedAt.getTime(),
-      previewUrl: project.previewUrl ?? null,
+      pdfUrl: project.pdfUrl ?? null,
       pagesCount: project.pagesCount ?? 0,
+      rotation: project.rotation ?? 0,
     };
   });
 }
@@ -901,8 +904,9 @@ export default function AllProjectsClient() {
                 title: nextTitle,
                 updated: formatProjectLastEdited(updatedAt),
                 updatedAtMs: new Date(updatedAt).getTime(),
-                previewUrl: duplicated.previewUrl ?? null,
+                pdfUrl: duplicated.pdfUrl ?? null,
                 pagesCount: duplicated.pagesCount ?? 0,
+                rotation: 0,
               };
               setProjects((prev) => {
                 const withoutNew = prev.filter((project) => project.id !== nextId);

@@ -24,14 +24,15 @@ export default async function StarredProjectsPage() {
         name: string | null;
         updatedAt: Date;
         data: unknown;
-        previewUrl: string | null;
+        pdfUrl: string | null;
+        rotation?: number | null;
       }[]
     | null = null;
 
   try {
     dbProjects = await prisma.project.findMany({
       where: { userId: session.user.id },
-      select: { id: true, name: true, updatedAt: true, data: true, previewUrl: true },
+      select: { id: true, name: true, updatedAt: true, data: true, pdfUrl: true },
       orderBy: { updatedAt: "desc" },
     });
   } catch (error) {
@@ -45,10 +46,17 @@ export default async function StarredProjectsPage() {
             id: project.id,
             title: project.name?.trim() || "Untitled project",
             updated: formatProjectLastEdited(project.updatedAt),
-            previewUrl: project.previewUrl,
+            pdfUrl: project.pdfUrl,
+            rotation: 0,
           };
         })
-      : curatedProjects;
+      : curatedProjects.map((project) => ({
+          id: project.id,
+          title: project.title,
+          updated: project.updated,
+          pdfUrl: null,
+          rotation: 0,
+        }));
 
   return (
     <div className="min-h-screen bg-[#F9FAFC] px-2 pb-0 pt-10 sm:px-4 sm:pt-12 lg:px-6 lg:pt-14">

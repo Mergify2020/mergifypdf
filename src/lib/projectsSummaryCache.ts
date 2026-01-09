@@ -5,7 +5,9 @@ export type ProjectsSummaryProject = {
   name: string | null;
   updatedAt: string | number | Date;
   previewUrl?: string | null;
+  pdfUrl?: string | null;
   pagesCount?: number | null;
+  rotation?: number | null;
 };
 
 export type ProjectsSummaryUpdate = {

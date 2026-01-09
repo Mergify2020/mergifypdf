@@ -1,6 +1,7 @@
 import { createCanvas } from "canvas";
 import { promises as fs } from "fs";
 import path from "path";
+import { createRequire } from "module";
 import { prisma } from "@/lib/prisma";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.js";
 
@@ -8,6 +9,14 @@ const PREVIEW_DIR = path.join(process.cwd(), "public", "previews");
 const PDF_PUBLIC_ROOT = path.join(process.cwd(), "public");
 const PREVIEW_SCALE = 1.0;
 type PdfDocumentParams = { data: Uint8Array; disableWorker?: boolean };
+const require = createRequire(import.meta.url);
+const workerSrc =
+  (pdfjsLib as { GlobalWorkerOptions?: { workerSrc?: string } }).GlobalWorkerOptions
+    ?.workerSrc ?? null;
+if (!workerSrc && (pdfjsLib as { GlobalWorkerOptions?: { workerSrc?: string } }).GlobalWorkerOptions) {
+  (pdfjsLib as { GlobalWorkerOptions: { workerSrc: string } }).GlobalWorkerOptions.workerSrc =
+    require.resolve("pdfjs-dist/legacy/build/pdf.worker.js");
+}
 
 async function loadPdfBytes(pdfUrl: string): Promise<Uint8Array> {
   if (pdfUrl.startsWith("http://") || pdfUrl.startsWith("https://")) {
@@ -24,7 +33,11 @@ async function loadPdfBytes(pdfUrl: string): Promise<Uint8Array> {
   return new Uint8Array(buffer);
 }
 
-export async function generateProjectPreview(projectId: string) {
+type PreviewOptions = {
+  force?: boolean;
+};
+
+export async function generateProjectPreview(projectId: string, options: PreviewOptions = {}) {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     select: { id: true, pdfUrl: true, previewUrl: true },
@@ -34,7 +47,7 @@ export async function generateProjectPreview(projectId: string) {
     throw new Error("Project not found");
   }
 
-  if (project.previewUrl) {
+  if (!options.force && project.previewUrl) {
     return project.previewUrl;
   }
 
@@ -81,7 +94,8 @@ export async function generateProjectPreview(projectId: string) {
   const previewPath = path.join(PREVIEW_DIR, previewFilename);
   await fs.writeFile(previewPath, previewBuffer);
 
-  const previewUrl = `/previews/${previewFilename}`;
+  const cacheBust = Date.now();
+  const previewUrl = `/previews/${previewFilename}?v=${cacheBust}`;
   await prisma.project.update({
     where: { id: project.id },
     data: { previewUrl },

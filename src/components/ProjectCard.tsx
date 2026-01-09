@@ -8,13 +8,15 @@ import { useSession } from "next-auth/react";
 import { refreshProjectsSummary } from "@/lib/projectsSummaryCache";
 import { removeRecentProject, updateRecentProjectTitle } from "@/lib/recentProjects";
 import { sanitizeProjectName } from "@/lib/projectName";
+import HomePdfPreview from "@/components/HomePdfPreview";
 
 type Project = {
   id: string;
   title: string;
   updated: string;
-  previewUrl?: string | null;
+  pdfUrl?: string | null;
   pagesCount?: number;
+  rotation?: number | null;
 };
 
 type ProjectCardProps = {
@@ -28,13 +30,11 @@ type ProjectCardProps = {
       id: string;
       name?: string | null;
       updatedAt?: string | number | Date;
-      previewUrl?: string | null;
+      pdfUrl?: string | null;
       pagesCount?: number | null;
     },
     sourceId: string,
   ) => void;
-  imageLoading?: "eager" | "lazy";
-  imagePriority?: boolean;
 };
 
 export default function ProjectCard({
@@ -45,8 +45,6 @@ export default function ProjectCard({
   onRenamed,
   onCopied,
   onTrashed,
-  imageLoading,
-  imagePriority,
 }: ProjectCardProps & { onTrashed?: (id: string) => void }) {
   const { data: session } = useSession();
   const ownerKey = session?.user?.id ?? session?.user?.email ?? null;
@@ -54,7 +52,8 @@ export default function ProjectCard({
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const cardRef = useRef<HTMLDivElement | null>(null);
-  const previewUrl = project.previewUrl ?? null;
+  const pdfUrl = project.pdfUrl ?? null;
+  const rotation = project.rotation ?? 0;
   const [renaming, setRenaming] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [renameBusy, setRenameBusy] = useState(false);
@@ -321,14 +320,17 @@ export default function ProjectCard({
                                   id?: string;
                                   name?: string | null;
                                   updatedAt?: string | number | Date;
-                                  previewUrl?: string | null;
+                                  pdfUrl?: string | null;
                                   pagesCount?: number | null;
                                 };
                               }
                             | null;
                           const duplicated = json?.project;
                           if (!duplicated?.id) return;
-                          onCopied?.({ ...duplicated, id: duplicated.id }, project.id);
+                          onCopied?.(
+                            { ...duplicated, id: duplicated.id, pdfUrl: duplicated.pdfUrl ?? null },
+                            project.id
+                          );
                           void refreshProjectsSummary(ownerKey, "force-cache");
                         } catch {
                           // ignore
@@ -390,7 +392,7 @@ export default function ProjectCard({
               )}
           </>
         )}
-        <div className="relative m-[3px] w-[calc(100%-6px)] aspect-[1.23/1] overflow-hidden rounded-[10px] bg-[#EEF1F5] border border-[rgba(0,0,0,0.06)] transition-colors group-hover:bg-[#E3E8EF]">
+        <div className="relative m-[3px] w-[calc(100%-6px)] aspect-[1.23/1] bg-[#EEF1F5] border border-[rgba(0,0,0,0.06)] transition-colors group-hover:bg-[#E3E8EF]">
           {typeof project.pagesCount === "number" && project.pagesCount > 0 ? (
             <div className="pointer-events-none absolute bottom-3 right-3 z-10 rounded-full bg-black/60 px-4 py-2.5 text-sm font-semibold leading-none text-white opacity-0 shadow-sm backdrop-blur-sm transition-opacity group-hover:opacity-100">
               {project.pagesCount} {project.pagesCount === 1 ? "page" : "pages"}
@@ -400,23 +402,7 @@ export default function ProjectCard({
             aria-hidden="true"
             className="pointer-events-none absolute inset-0 z-[5] bg-black/[0.03] opacity-0 transition-opacity duration-150 group-hover:opacity-100"
           />
-          {previewUrl ? (
-            <div className="relative h-full w-full p-2 sm:p-3">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={previewUrl}
-                alt=""
-                loading={imageLoading ?? "eager"}
-                fetchPriority={imagePriority ? "high" : "auto"}
-                decoding="async"
-                className="h-full w-full object-contain object-center"
-              />
-            </div>
-          ) : (
-            <div className="flex h-full w-full items-center justify-center px-3 text-center text-sm text-slate-500">
-              Preview unavailable
-            </div>
-          )}
+          <HomePdfPreview pdfUrl={pdfUrl} rotation={rotation} />
         </div>
       </div>
       <div className="mt-2 space-y-0.5">

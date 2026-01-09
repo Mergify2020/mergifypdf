@@ -7,9 +7,9 @@ type Project = {
   id: string;
   title: string;
   updated: string;
-  previewUrl?: string | null;
-  pageThumbs?: string[];
+  pdfUrl?: string | null;
   pagesCount?: number;
+  rotation?: number | null;
 };
 
 type Props = {
@@ -20,7 +20,7 @@ type Props = {
       id: string;
       name?: string | null;
       updatedAt?: string | number | Date;
-      previewUrl?: string | null;
+      pdfUrl?: string | null;
       pagesCount?: number | null;
     },
     sourceId: string,
@@ -56,8 +56,6 @@ export default function AllProjectsGrid({
             isSelected={isSelected}
             hasSelection={hasSelection}
             onToggleSelected={toggleSelected}
-            imageLoading={index < 12 ? "eager" : "lazy"}
-            imagePriority={index < 6}
             onTrashed={onProjectTrashed}
             onRenamed={onProjectRenamed}
             onCopied={onProjectCopied}

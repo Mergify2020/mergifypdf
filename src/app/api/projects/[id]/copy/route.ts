@@ -92,6 +92,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       name: true,
       updatedAt: true,
       previewUrl: true,
+      pdfUrl: true,
       pagesCount: true,
     },
   });

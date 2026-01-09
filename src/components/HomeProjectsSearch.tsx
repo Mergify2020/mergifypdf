@@ -10,8 +10,9 @@ type SummaryProject = {
   id: string;
   name: string;
   updatedAt: string | Date;
-  previewUrl?: string | null;
+  pdfUrl?: string | null;
   pagesCount?: number | null;
+  rotation?: number | null;
 };
 
 type Props = {

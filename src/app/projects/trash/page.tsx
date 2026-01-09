@@ -9,16 +9,18 @@ type ApiProject = {
   id: string;
   name: string | null;
   updatedAt: string | number | Date;
-  previewUrl?: string | null;
+  pdfUrl?: string | null;
   pagesCount?: number | null;
+  rotation?: number | null;
 };
 
 type ProjectCard = {
   id: string;
   title: string;
   updated: string;
-  previewUrl?: string | null;
+  pdfUrl?: string | null;
   pagesCount?: number;
+  rotation?: number | null;
 };
 
 export default function TrashProjectsPage() {
@@ -39,8 +41,9 @@ export default function TrashProjectsPage() {
           id: project.id,
           title: project.name?.trim() || "Untitled project",
           updated: formatProjectLastEdited(project.updatedAt),
-          previewUrl: project.previewUrl ?? null,
+          pdfUrl: project.pdfUrl ?? null,
           pagesCount: project.pagesCount ?? 0,
+          rotation: project.rotation ?? 0,
         }));
 
         if (!cancelled) {

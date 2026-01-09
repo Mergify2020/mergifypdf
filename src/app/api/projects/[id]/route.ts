@@ -99,6 +99,10 @@ export async function PUT(
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const name = typeof body.name === "string" ? body.name : undefined;
   const data = "data" in body ? body.data : undefined;
+  const previewUrl =
+    typeof body.previewUrl === "string" && body.previewUrl.length > 0
+      ? body.previewUrl
+      : null;
   const existing =
     data === undefined
       ? await prisma.project.findUnique({
@@ -117,12 +121,19 @@ export async function PUT(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const normalizedPreview =
+    previewUrl &&
+    (previewUrl.startsWith("data:image/") || previewUrl.startsWith("/previews/"))
+      ? previewUrl
+      : null;
+
   const updated =
     data === undefined
       ? await prisma.project.update({
           where: { id: existing.id },
           data: {
             name: name ?? existing.name,
+            ...(normalizedPreview ? { previewUrl: normalizedPreview } : {}),
           },
         })
       : (() => {
@@ -146,7 +157,7 @@ export async function PUT(
             data: {
               name: name ?? existing.name,
               data: nextData,
-              previewUrl: existingPreview,
+              previewUrl: normalizedPreview ?? existingPreview,
               pagesCount: nextPagesCount,
             },
           });

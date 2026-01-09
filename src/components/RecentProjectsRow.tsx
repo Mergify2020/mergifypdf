@@ -10,8 +10,9 @@ type SummaryProject = {
   id: string;
   name: string;
   updatedAt: string | Date;
-  previewUrl?: string | null;
+  pdfUrl?: string | null;
   pagesCount?: number | null;
+  rotation?: number | null;
 };
 
 type Props = {
@@ -127,8 +128,9 @@ export default function RecentProjectsRow({
     id: project.id,
     title: project.name?.trim() || "Untitled project",
     updated: formatProjectLastEdited(project.updatedAt),
-    previewUrl: project.previewUrl ?? null,
+    pdfUrl: project.pdfUrl ?? null,
     pagesCount: project.pagesCount ?? 0,
+    rotation: project.rotation ?? 0,
   }));
   const hasSelection = Object.values(selected).some(Boolean);
 
@@ -173,8 +175,6 @@ export default function RecentProjectsRow({
             onToggleSelected={(id) =>
               setSelected((prev) => ({ ...prev, [id]: !prev[id] }))
             }
-            imageLoading={index < 6 ? "eager" : "lazy"}
-            imagePriority={index < 2}
             onRenamed={(id, title) => {
               setProjects((prev) =>
                 prev.map((entry) => (entry.id === id ? { ...entry, name: title } : entry))
@@ -191,8 +191,9 @@ export default function RecentProjectsRow({
                   id: nextId,
                   name: nextName,
                   updatedAt: nextUpdatedAt,
-                  previewUrl: duplicated.previewUrl ?? null,
+                  pdfUrl: duplicated.pdfUrl ?? null,
                   pagesCount: duplicated.pagesCount ?? 0,
+                  rotation: 0,
                 };
                 const withoutNew = prev.filter((entry) => entry.id !== nextId);
                 const sourceIndex = withoutNew.findIndex((entry) => entry.id === sourceId);

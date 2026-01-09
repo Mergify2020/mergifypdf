@@ -1885,6 +1885,7 @@ function WorkspaceClient() {
   const startupOverlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startupOverlayFullAtRef = useRef<number | null>(null);
   const startupOverlayFullTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startupOverlayFailSafeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startupProgressRef = useRef(0);
   const startupProgressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startupOverlayShownRef = useRef(false);
@@ -1894,6 +1895,8 @@ function WorkspaceClient() {
     if (startupOverlayProjectRef.current !== projectParam) {
       startupOverlayProjectRef.current = projectParam;
       startupOverlayShownRef.current = false;
+      setShowStartupOverlay(false);
+      startupOverlayActiveRef.current = false;
     }
   }, [projectParam]);
   const [penMode, setPenMode] = useState(false);
@@ -3604,8 +3607,10 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   const pagesRef = useRef<PageItem[]>([]);
   const previewSyncRef = useRef<Set<string>>(new Set());
   const previewUploadRef = useRef<Record<string, string>>({});
+  const rotationSaveRef = useRef(false);
   const pagesByIdRef = useRef<Map<string, PageItem>>(new Map());
   const hasHydratedSources = useRef(false);
+  const [sourcesHydrated, setSourcesHydrated] = useState(false);
   const objectUrlCacheRef = useRef<Map<string, string>>(new Map());
   const hasHydratedHighlights = useRef(false);
   const hasHydratedSignatures = useRef(false);
@@ -4186,6 +4191,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       } finally {
         if (!cancelled) {
           hasHydratedSources.current = true;
+          setSourcesHydrated(true);
         }
       }
     }
@@ -5199,6 +5205,11 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       setStartupOverlayVariant(variant);
       setShowStartupOverlay(true);
       startupOverlayShownRef.current = true;
+      const bypass = window.setTimeout(() => {
+        setShowStartupOverlay(false);
+        startupOverlayActiveRef.current = false;
+      }, 3500);
+      return () => window.clearTimeout(bypass);
     };
 
     const session = getSessionStorage();
@@ -5208,7 +5219,8 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       if (context) {
         session.removeItem(STARTUP_OVERLAY_CONTEXT_KEY);
       }
-      startOverlay(context === "new" ? "new" : "existing");
+      const cleanup = startOverlay(context === "new" ? "new" : "existing");
+      return cleanup;
       return;
     }
 
@@ -5216,7 +5228,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     if (!storage) return;
     const pending = storage.getItem(PENDING_UPLOAD_STORAGE_KEY);
     if (pending) {
-      startOverlay("new");
+      const cleanup = startOverlay("new");
       storage.removeItem(PENDING_UPLOAD_STORAGE_KEY);
       try {
         const parsed = JSON.parse(pending);
@@ -5227,12 +5239,10 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       } catch (err) {
         console.error("Failed to import pending upload", err);
       }
-      return;
+      return cleanup;
     }
 
-    if (projectParam) {
-      startOverlay("existing");
-    }
+    if (projectParam) return;
   }, [projectParam]);
 
   const computeStartupProgress = useCallback(() => {
@@ -5271,6 +5281,10 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         clearInterval(startupProgressTimerRef.current);
         startupProgressTimerRef.current = null;
       }
+      if (startupOverlayFailSafeRef.current !== null) {
+        clearTimeout(startupOverlayFailSafeRef.current);
+        startupOverlayFailSafeRef.current = null;
+      }
       startupProgressRef.current = 0;
       setStartupProgress(0);
       return;
@@ -5279,6 +5293,33 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       startupOverlayStartRef.current = performance.now();
     }
   }, [showStartupOverlay]);
+  useEffect(() => {
+    if (!showStartupOverlay) return;
+    if (startupOverlayFailSafeRef.current !== null) {
+      clearTimeout(startupOverlayFailSafeRef.current);
+    }
+    startupOverlayFailSafeRef.current = setTimeout(() => {
+      setShowStartupOverlay(false);
+      startupOverlayActiveRef.current = false;
+    }, 10000);
+    return () => {
+      if (startupOverlayFailSafeRef.current !== null) {
+        clearTimeout(startupOverlayFailSafeRef.current);
+        startupOverlayFailSafeRef.current = null;
+      }
+    };
+  }, [showStartupOverlay]);
+
+  useEffect(() => {
+    if (!showStartupOverlay) return;
+    if (!sourcesHydrated) return;
+    if (loading) return;
+    const timer = setTimeout(() => {
+      setShowStartupOverlay(false);
+      startupOverlayActiveRef.current = false;
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [loading, showStartupOverlay, sourcesHydrated]);
 
   useEffect(() => {
     if (!showStartupOverlay) return;
@@ -8063,6 +8104,16 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   ]);
 
   useEffect(() => {
+    if (!rotationSaveRef.current) return;
+    rotationSaveRef.current = false;
+    if (!authSession?.user) return;
+    const projectData = buildCloudProjectData();
+    if (!projectData) return;
+    const previewUrl = getProjectCoverPreview(pagesRef.current);
+    void saveProject(projectName, projectData, previewUrl);
+  }, [authSession?.user, buildCloudProjectData, projectName, saveProject, pages]);
+
+  useEffect(() => {
     if (!authSession?.user) return;
     if (!hasWorkspaceData) return;
     if (draggingText || resizingText || draggingShape || draftHighlight) return;
@@ -9502,6 +9553,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   );
 
   function handleRotatePage(pageId: string) {
+    rotationSaveRef.current = true;
     setPages((prev) =>
       prev.map((page) =>
         page.id === pageId

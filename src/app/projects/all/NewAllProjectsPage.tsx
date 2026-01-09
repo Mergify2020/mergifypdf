@@ -2,20 +2,23 @@
 
 import { useEffect, useState } from "react";
 import { formatProjectLastEdited } from "@/lib/formatProjectLastEdited";
+import HomePdfPreview from "@/components/HomePdfPreview";
 
 type ApiProject = {
   id: string;
   name: string | null;
   updatedAt: string | number | Date;
-  previewUrl?: string | null;
+  pdfUrl?: string | null;
   pagesCount?: number | null;
+  rotation?: number | null;
 };
 
 type ProjectCard = {
   id: string;
   title: string;
   updatedLabel: string;
-  previewUrl: string | null;
+  pdfUrl: string | null;
+  rotation?: number | null;
 };
 
 export default function NewAllProjectsPage() {
@@ -36,7 +39,8 @@ export default function NewAllProjectsPage() {
           id: project.id,
           title: project.name?.trim() || "Untitled project",
           updatedLabel: formatProjectLastEdited(project.updatedAt),
-          previewUrl: project.previewUrl ?? null,
+          pdfUrl: project.pdfUrl ?? null,
+          rotation: project.rotation ?? 0,
         }));
 
         if (!cancelled) {
@@ -101,7 +105,8 @@ export default function NewAllProjectsPage() {
 }
 
 function ProjectCardView({ project }: { project: ProjectCard }) {
-  const previewUrl = project.previewUrl ?? null;
+  const pdfUrl = project.pdfUrl ?? null;
+  const rotation = project.rotation ?? 0;
 
   return (
     <a
@@ -109,21 +114,8 @@ function ProjectCardView({ project }: { project: ProjectCard }) {
       className="group flex flex-col rounded-2xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md"
       aria-label={project.title}
     >
-      <div className="relative aspect-[1.23/1] overflow-hidden rounded-xl bg-[#EEF1F5]">
-        {previewUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={previewUrl}
-            alt=""
-            loading="eager"
-            decoding="async"
-            className="h-full w-full object-contain object-center"
-          />
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center text-center text-sm text-slate-500">
-            Preview unavailable
-          </div>
-        )}
+      <div className="relative aspect-[1.23/1] bg-[#EEF1F5]">
+        <HomePdfPreview pdfUrl={pdfUrl} rotation={rotation} />
       </div>
       <div className="mt-4 space-y-1">
         <p className="truncate text-sm font-semibold text-slate-900">{project.title}</p>

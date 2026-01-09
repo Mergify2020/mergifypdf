@@ -154,6 +154,8 @@ const loadProjectsSummary = unstable_cache(
         updatedAt: Date;
         pagesCount: number | null;
         previewUrl: string | null;
+        pdfUrl: string | null;
+        data: unknown;
       }[]
     >`
       SELECT
@@ -161,7 +163,9 @@ const loadProjectsSummary = unstable_cache(
         name,
         "updatedAt",
         "pagesCount",
-        "previewUrl"
+        "previewUrl",
+        "pdfUrl",
+        data
       FROM "Project"
       WHERE "userId" = ${userId}
         AND COALESCE((data->>'trashed')::boolean, false) = false
@@ -183,6 +187,18 @@ async function ProjectsDashboard({ displayName, userId }: { displayName: string;
     updatedAt: project.updatedAt,
     pagesCount: project.pagesCount ?? 0,
     previewUrl: project.previewUrl,
+    pdfUrl: project.pdfUrl,
+    rotation: (() => {
+      if (!project.data || typeof project.data !== "object") return 0;
+      const record = project.data as Record<string, unknown>;
+      const pages = Array.isArray(record.pages) ? record.pages : null;
+      if (!pages || pages.length === 0) return 0;
+      const first = pages[0];
+      if (!first || typeof first !== "object") return 0;
+      return typeof (first as { rotation?: unknown }).rotation === "number"
+        ? (first as { rotation: number }).rotation
+        : 0;
+    })(),
   }));
   return (
     <main className="min-h-screen w-full bg-slate-100 px-2 py-4 sm:px-4 sm:py-6 lg:px-6 lg:py-8">
