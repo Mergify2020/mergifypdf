@@ -455,16 +455,17 @@ function getInitialPreviewRenderCount(pageCount: number, largeDocMode: boolean) 
   return Math.min(LARGE_DOC_INITIAL_RENDER_COUNT, pageCount);
 }
 
-function cancelIdleOrTimeout(timerId: ReturnType<typeof setTimeout>) {
-  if (typeof window !== "undefined" && "cancelIdleCallback" in window) {
-    (window as Window & { cancelIdleCallback?: (id: number) => void }).cancelIdleCallback?.(
-      Number(timerId)
-    );
-    return;
-  }
-  clearTimeout(timerId);
-}
+function cancelIdleOrTimeout(
+  timerId: number | IdleCallbackHandle | null
+) {
+  if (timerId == null) return;
 
+  if (typeof timerId === "number") {
+    clearTimeout(timerId);
+  } else {
+    window.cancelIdleCallback(timerId);
+  }
+}
 
 function rotatePoint(point: { x: number; y: number }, origin: { x: number; y: number }, angleRad: number) {
   const dx = point.x - origin.x;
