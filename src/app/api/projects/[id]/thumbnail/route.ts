@@ -4,6 +4,9 @@ import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
 import { createSignedR2Url, getR2Config } from "@/lib/r2";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -39,5 +42,9 @@ export async function GET(
   }
 
   const url = await createSignedR2Url(r2Config, previewKey);
-  return NextResponse.redirect(url);
+  return NextResponse.redirect(url, {
+    headers: {
+      "Cache-Control": "no-store",
+    },
+  });
 }

@@ -52,6 +52,8 @@ export default function ProjectCard({
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const cardRef = useRef<HTMLDivElement | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const previewRefreshInFlight = useRef(false);
+  const lastFailedPreviewRef = useRef<string | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [renameBusy, setRenameBusy] = useState(false);
@@ -71,6 +73,21 @@ export default function ProjectCard({
     };
   }, [menuOpen]);
 
+  const fetchPreviewUrl = async (signal?: AbortSignal) => {
+    const res = await fetch(`/api/projects/${encodeURIComponent(project.id)}/preview`, {
+      signal,
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      throw new Error(`Preview fetch failed with status ${res.status}`);
+    }
+    const data = (await res.json().catch(() => null)) as { url?: string } | null;
+    if (!data?.url) {
+      throw new Error("Preview fetch returned an invalid payload.");
+    }
+    return data.url;
+  };
+
   useEffect(() => {
     if (!project.hasPreview) {
       setPreviewUrl(null);
@@ -80,14 +97,10 @@ export default function ProjectCard({
     const controller = new AbortController();
     const load = async () => {
       try {
-        const res = await fetch(`/api/projects/${encodeURIComponent(project.id)}/preview`, {
-          signal: controller.signal,
-          cache: "no-store",
-        });
-        if (!res.ok) return;
-        const data = (await res.json().catch(() => null)) as { url?: string } | null;
-        if (!data?.url || cancelled) return;
-        setPreviewUrl(data.url);
+        const url = await fetchPreviewUrl(controller.signal);
+        if (cancelled) return;
+        lastFailedPreviewRef.current = null;
+        setPreviewUrl(url);
       } catch {
         // fail silently
       }
@@ -98,6 +111,20 @@ export default function ProjectCard({
       controller.abort();
     };
   }, [project.hasPreview, project.id]);
+
+  const refreshPreviewUrl = async () => {
+    if (!project.hasPreview || previewRefreshInFlight.current) return;
+    previewRefreshInFlight.current = true;
+    try {
+      const url = await fetchPreviewUrl();
+      lastFailedPreviewRef.current = null;
+      setPreviewUrl(url);
+    } catch {
+      setPreviewUrl(null);
+    } finally {
+      previewRefreshInFlight.current = false;
+    }
+  };
 
   const cardClasses = [
     "relative rounded-[10px] bg-[#F9FAFC] transition",
@@ -432,6 +459,14 @@ export default function ProjectCard({
                 src={previewUrl}
                 alt=""
                 className="max-h-full max-w-full object-contain"
+                onError={() => {
+                  if (previewUrl && lastFailedPreviewRef.current !== previewUrl) {
+                    lastFailedPreviewRef.current = previewUrl;
+                    void refreshPreviewUrl();
+                  } else {
+                    setPreviewUrl(null);
+                  }
+                }}
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-slate-300">

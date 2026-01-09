@@ -5,6 +5,9 @@ import { prisma } from "@/lib/prisma";
 import { createSignedR2Url, getR2Config, uploadR2Object } from "@/lib/r2";
 import { Prisma } from "@prisma/client";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 async function ensureDbConnection() {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
@@ -118,28 +121,42 @@ export async function GET(
         return NextResponse.json({ error: "Not found" }, { status: 404 });
       }
       const { pdfKey: _pdfKey, previewKey: _previewKey, ...rest } = updated;
-      return NextResponse.json({
-        project: {
-          ...rest,
-          hasPdf: !!updated.pdfKey,
-          hasPreview: !!updated.previewKey,
-          pdfUrl: signedPdfUrl,
-          previewUrl: signedPreviewUrl,
+      return NextResponse.json(
+        {
+          project: {
+            ...rest,
+            hasPdf: !!updated.pdfKey,
+            hasPreview: !!updated.previewKey,
+            pdfUrl: signedPdfUrl,
+            previewUrl: signedPreviewUrl,
+          },
         },
-      });
+        {
+          headers: {
+            "Cache-Control": "no-store",
+          },
+        }
+      );
     }
   }
 
   const { pdfKey: _pdfKey, previewKey: _previewKey, ...rest } = project;
-  return NextResponse.json({
-    project: {
-      ...rest,
-      hasPdf: !!project.pdfKey,
-      hasPreview: !!project.previewKey,
-      pdfUrl: signedPdfUrl,
-      previewUrl: signedPreviewUrl,
+  return NextResponse.json(
+    {
+      project: {
+        ...rest,
+        hasPdf: !!project.pdfKey,
+        hasPreview: !!project.previewKey,
+        pdfUrl: signedPdfUrl,
+        previewUrl: signedPreviewUrl,
+      },
     },
-  });
+    {
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    }
+  );
 }
 
 export async function PUT(

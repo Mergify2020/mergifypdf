@@ -138,6 +138,7 @@ interface WorkspaceShellProps {
 export default function WorkspaceShell({ children }: WorkspaceShellProps) {
   const router = useRouter();
   const { data: session } = useSession();
+  const previewRefreshInFlight = useRef<Set<string>>(new Set());
   const pathname = usePathname();
   const { queuePreload } = useWorkspaceFilePreloader();
   const [homeRecentProjects, setHomeRecentProjects] = useState<
@@ -433,6 +434,32 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
       document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [session?.user?.id]);
+
+  const refreshPreviewUrl = async (projectId: string) => {
+    if (previewRefreshInFlight.current.has(projectId)) return;
+    previewRefreshInFlight.current.add(projectId);
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/preview`, {
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        throw new Error(`Preview refresh failed with status ${res.status}`);
+      }
+      const data = (await res.json().catch(() => null)) as { url?: string } | null;
+      if (!data?.url) {
+        throw new Error("Preview refresh returned an invalid payload.");
+      }
+      setHomeRecentProjects((prev) =>
+        prev.map((entry) => (entry.id === projectId ? { ...entry, previewUrl: data.url ?? null } : entry))
+      );
+    } catch {
+      setHomeRecentProjects((prev) =>
+        prev.map((entry) => (entry.id === projectId ? { ...entry, previewUrl: null } : entry))
+      );
+    } finally {
+      previewRefreshInFlight.current.delete(projectId);
+    }
+  };
 
   const activePanelItems: SidebarPanel["items"] =
     panelKey === "home"
@@ -1262,6 +1289,11 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                                       loading="lazy"
                                       decoding="async"
                                       className="h-full w-full object-cover object-top"
+                                      onError={() => {
+                                        if (typeof item.key === "string" && item.key.length > 0) {
+                                          void refreshPreviewUrl(item.key);
+                                        }
+                                      }}
                                     />
                                   ) : (
                                     <div className="h-full w-full animate-pulse bg-slate-100" />
@@ -1290,6 +1322,11 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                                           loading="lazy"
                                           decoding="async"
                                           className="h-full w-full object-cover object-top"
+                                          onError={() => {
+                                            if (typeof item.key === "string" && item.key.length > 0) {
+                                              void refreshPreviewUrl(item.key);
+                                            }
+                                          }}
                                         />
                                       ) : (
                                         <div className="h-full w-full animate-pulse bg-slate-100" />
@@ -1422,6 +1459,11 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                                 loading="lazy"
                                 decoding="async"
                                 className="h-full w-full object-cover object-top"
+                                onError={() => {
+                                  if (typeof item.key === "string" && item.key.length > 0) {
+                                    void refreshPreviewUrl(item.key);
+                                  }
+                                }}
                               />
                             ) : (
                               <div className="h-full w-full animate-pulse bg-slate-100" />

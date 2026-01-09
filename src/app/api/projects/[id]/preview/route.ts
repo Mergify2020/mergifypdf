@@ -4,6 +4,9 @@ import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
 import { createSignedR2Url, getR2Config } from "@/lib/r2";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 async function ensureDbConnection() {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
@@ -95,5 +98,12 @@ export async function GET(
 
   const url = await createSignedR2Url(r2Config, project.previewKey, 60);
   console.info("Issued signed preview URL.", { projectId: id, env: process.env.NODE_ENV });
-  return NextResponse.json({ url });
+  return NextResponse.json(
+    { url },
+    {
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    }
+  );
 }
