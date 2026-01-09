@@ -24,7 +24,7 @@ export default async function StarredProjectsPage() {
         name: string | null;
         updatedAt: Date;
         data: unknown;
-        pdfUrl: string | null;
+        pdfKey: string | null;
         rotation?: number | null;
       }[]
     | null = null;
@@ -45,7 +45,7 @@ export default async function StarredProjectsPage() {
         id: project.id,
         title: project.name?.trim() || "Untitled project",
         updated: formatProjectLastEdited(project.updatedAt),
-        pdfUrl: null,
+        pdfUrl: project.pdfKey ? `/api/projects/${project.id}/pdf` : null,
         rotation: 0,
       };
     }) ?? [];
