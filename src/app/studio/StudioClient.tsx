@@ -1892,10 +1892,10 @@ function WorkspaceClient() {
   const [startupOverlayMessage, setStartupOverlayMessage] = useState("Preparing your workspace");
   const startupOverlayActiveRef = useRef(false);
   const startupOverlayStartRef = useRef<number | null>(null);
-  const startupOverlayTimerRef = useRef<number | null>(null);
+  const startupOverlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startupOverlayFullAtRef = useRef<number | null>(null);
-  const startupOverlayFullTimerRef = useRef<number | null>(null);
-  const startupOverlayFailSafeRef = useRef<number | null>(null);
+  const startupOverlayFullTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startupOverlayFailSafeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startupProgressRef = useRef(0);
   const startupProgressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startupOverlayShownRef = useRef(false);
@@ -1927,7 +1927,7 @@ function WorkspaceClient() {
   const [shapeThicknessInput, setShapeThicknessInput] = useState("3");
   const [headerMode, setHeaderMode] = useState<HeaderMode>("default");
   const [toolbarPreviewMode, setToolbarPreviewMode] = useState<Exclude<HeaderMode, "default"> | null>(null);
-  const toolPreviewTimerRef = useRef<number | null>(null);
+  const toolPreviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [textMode, setTextMode] = useState(false);
   const [signaturePanelMode, setSignaturePanelMode] = useState<SignaturePanelMode>("none");
   const [savedSignatures, setSavedSignatures] = useState<SavedSignature[]>([]);
@@ -3630,8 +3630,8 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   const lastProjectKeyRef = useRef<string | null>(null);
   const pendingInitialRenderRef = useRef<PageItem[]>([]);
   const restoringPreviewCacheRef = useRef(false);
-  const previewCacheWriteTimerRef = useRef<number | null>(null);
-  const backgroundLowResTimerRef = useRef<number | null>(null);
+  const previewCacheWriteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const backgroundLowResTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const backgroundLowResUsesIdleRef = useRef(false);
   const backgroundLowResIndexRef = useRef(0);
   const scheduleBackgroundLowResRef = useRef<() => void>(() => {});
