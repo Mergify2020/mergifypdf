@@ -139,6 +139,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
   const router = useRouter();
   const { data: session } = useSession();
   const previewRefreshInFlight = useRef<Set<string>>(new Set());
+  const lastFailedPreviewRef = useRef<Map<string, string>>(new Map());
   const pathname = usePathname();
   const { queuePreload } = useWorkspaceFilePreloader();
   const [homeRecentProjects, setHomeRecentProjects] = useState<
@@ -435,8 +436,14 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
     };
   }, [session?.user?.id]);
 
-  const refreshPreviewUrl = async (projectId: string) => {
+  const refreshPreviewUrl = async (projectId: string, previousUrl?: string | null) => {
     if (previewRefreshInFlight.current.has(projectId)) return;
+    if (previousUrl && lastFailedPreviewRef.current.get(projectId) === previousUrl) {
+      setHomeRecentProjects((prev) =>
+        prev.map((entry) => (entry.id === projectId ? { ...entry, previewUrl: null } : entry))
+      );
+      return;
+    }
     previewRefreshInFlight.current.add(projectId);
     try {
       const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/preview`, {
@@ -449,10 +456,14 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
       if (!data?.url) {
         throw new Error("Preview refresh returned an invalid payload.");
       }
+      lastFailedPreviewRef.current.delete(projectId);
       setHomeRecentProjects((prev) =>
         prev.map((entry) => (entry.id === projectId ? { ...entry, previewUrl: data.url ?? null } : entry))
       );
     } catch {
+      if (previousUrl) {
+        lastFailedPreviewRef.current.set(projectId, previousUrl);
+      }
       setHomeRecentProjects((prev) =>
         prev.map((entry) => (entry.id === projectId ? { ...entry, previewUrl: null } : entry))
       );
@@ -1291,7 +1302,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                                       className="h-full w-full object-cover object-top"
                                       onError={() => {
                                         if (typeof item.key === "string" && item.key.length > 0) {
-                                          void refreshPreviewUrl(item.key);
+                                          void refreshPreviewUrl(item.key, item.previewUrl);
                                         }
                                       }}
                                     />
@@ -1324,7 +1335,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                                           className="h-full w-full object-cover object-top"
                                           onError={() => {
                                             if (typeof item.key === "string" && item.key.length > 0) {
-                                              void refreshPreviewUrl(item.key);
+                                              void refreshPreviewUrl(item.key, item.previewUrl);
                                             }
                                           }}
                                         />
@@ -1461,7 +1472,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                                 className="h-full w-full object-cover object-top"
                                 onError={() => {
                                   if (typeof item.key === "string" && item.key.length > 0) {
-                                    void refreshPreviewUrl(item.key);
+                                    void refreshPreviewUrl(item.key, item.previewUrl);
                                   }
                                 }}
                               />
