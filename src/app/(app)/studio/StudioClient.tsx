@@ -288,12 +288,12 @@ const TEXT_FONT_OPTIONS: Record<TextFont, FontOption> = {
     cssFamily: "'Roboto', 'Arial', 'Helvetica Neue', sans-serif",
     pdf: {
       type: "custom",
-      variants: {
-        normal: "/fonts/Roboto-Regular.ttf",
-        bold: "/fonts/Roboto-Bold.ttf",
-        italic: "/fonts/Roboto-Italic.ttf",
-        boldItalic: "/fonts/Roboto-BoldItalic.ttf",
-      },
+variants: {
+  normal: "/fonts/Roboto-Regular.ttf",
+  bold: "/fonts/Roboto-Regular.ttf",
+  italic: "/fonts/Roboto-Regular.ttf",
+  boldItalic: "/fonts/Roboto-Regular.ttf",
+},
       fallback: StandardFonts.Helvetica,
     },
   },
