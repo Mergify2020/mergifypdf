@@ -998,7 +998,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                   })}
                   <StartProjectButton
                     variant="custom"
-                    className="flex h-12 w-[220px] items-center justify-center rounded-full border-2 border-[#5FB8F5] bg-[#1D9BF0] px-5 text-sm font-medium tracking-wide text-white shadow-[0_8px_18px_rgba(15,23,42,0.18)] transition hover:bg-[#1787D0]"
+                    className="flex h-12 w-[220px] items-center justify-center rounded-full border border-transparent bg-[#1E293B] px-5 text-sm font-semibold tracking-wide text-white shadow-[0_6px_14px_rgba(15,23,42,0.18)] transition hover:bg-[#182035]"
                   />
                 </nav>
 

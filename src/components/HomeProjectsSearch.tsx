@@ -598,7 +598,7 @@ export default function HomeProjectsSearch({ firstName, accountName, accountEmai
           <div className="mt-6 flex justify-start">
             <Link
               href="/projects/all"
-              className="inline-flex h-10 items-center justify-center rounded-full border-2 border-[#5FB8F5] bg-[#1D9BF0] px-6 text-xs font-medium tracking-wide text-white shadow-[0_8px_18px_rgba(15,23,42,0.18)] transition hover:bg-[#1787D0] sm:text-sm"
+              className="inline-flex items-center gap-2 rounded-full border-2 border-[#E6EBF2] bg-white px-4 py-2 text-xs font-semibold text-[#1F2A37] transition hover:border-[#D8DEE8] sm:text-sm"
             >
               View all projects
             </Link>
