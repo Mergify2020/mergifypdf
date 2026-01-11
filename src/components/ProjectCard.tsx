@@ -134,7 +134,7 @@ export default function ProjectCard({
     .join(" ");
 
   const checkboxClasses = [
-    "absolute left-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-[12px] border-[3px] text-xs font-semibold shadow-md transition-transform transition-opacity duration-150 xl:h-10 xl:w-10",
+    "absolute left-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-[10px] border-[3px] text-xs font-semibold shadow-md transition-transform transition-opacity duration-150 xl:h-9 xl:w-9",
     isSelected
       ? "bg-[#4C6FFF] border-[#4C6FFF] text-white opacity-100 scale-100"
       : [
@@ -153,7 +153,7 @@ export default function ProjectCard({
     .filter(Boolean)
     .join(" ");
   const actionButtonBase =
-    "flex h-11 w-11 items-center justify-center text-sm hover:bg-slate-100/80 transition xl:h-12 xl:w-12";
+    "flex h-9 w-9 items-center justify-center text-sm hover:bg-slate-100/80 transition xl:h-10 xl:w-10";
 
   const startRenaming = (event: { preventDefault: () => void; stopPropagation: () => void }) => {
     event.preventDefault();
@@ -443,9 +443,9 @@ export default function ProjectCard({
               )}
           </>
         )}
-        <div className="relative m-[3px] w-[calc(100%-6px)] aspect-[1.23/1] bg-[#EEF1F5] border border-[rgba(0,0,0,0.06)] transition-colors group-hover:bg-[#E3E8EF]">
+        <div className="relative m-[3px] w-[calc(100%-6px)] aspect-square bg-[#EEF1F5] border border-[rgba(0,0,0,0.06)] transition-colors group-hover:bg-[#E3E8EF]">
           {typeof project.pagesCount === "number" && project.pagesCount > 0 ? (
-            <div className="pointer-events-none absolute bottom-3 right-3 z-10 rounded-full bg-black/60 px-4 py-2.5 text-sm font-semibold leading-none text-white opacity-0 shadow-sm backdrop-blur-sm transition-opacity group-hover:opacity-100">
+            <div className="pointer-events-none absolute bottom-2.5 right-2.5 z-10 rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold leading-none text-white opacity-0 shadow-sm backdrop-blur-sm transition-opacity group-hover:opacity-100">
               {project.pagesCount} {project.pagesCount === 1 ? "page" : "pages"}
             </div>
           ) : null}
@@ -453,7 +453,7 @@ export default function ProjectCard({
             aria-hidden="true"
             className="pointer-events-none absolute inset-0 z-[5] bg-black/[0.03] opacity-0 transition-opacity duration-150 group-hover:opacity-100"
           />
-          <div className="flex h-full w-full items-center justify-center p-4 sm:p-5">
+          <div className="flex h-full w-full items-center justify-center p-3 sm:p-4">
             {previewUrl ? (
               <img
                 src={previewUrl}
@@ -470,7 +470,7 @@ export default function ProjectCard({
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-slate-300">
-                <svg viewBox="0 0 64 64" className="h-12 w-12" aria-hidden="true">
+                <svg viewBox="0 0 64 64" className="h-10 w-10" aria-hidden="true">
                   <path
                     d="M18 8h20l10 10v34a4 4 0 0 1-4 4H18a4 4 0 0 1-4-4V12a4 4 0 0 1 4-4z"
                     fill="none"
@@ -519,14 +519,14 @@ export default function ProjectCard({
             onBlur={() => {
               void submitRename();
             }}
-            className="w-full rounded-lg border-[3px] border-[#019dfd] bg-white px-2 py-1 text-lg font-semibold text-slate-900 shadow-sm outline-none focus:border-[#019dfd] focus:ring-0 disabled:opacity-70"
+            className="w-full rounded-lg border-2 border-[#019dfd] bg-white px-2 py-1 text-base font-semibold text-slate-900 shadow-sm outline-none focus:border-[#019dfd] focus:ring-0 disabled:opacity-70"
           />
         ) : (
           <div className="group/title flex items-center gap-2">
             <button
               type="button"
               onClick={startRenaming}
-              className="min-w-0 flex-1 truncate py-1.5 text-left text-lg font-semibold text-slate-900"
+              className="min-w-0 flex-1 truncate py-1 text-left text-base font-semibold text-slate-900"
               aria-label="Rename project"
             >
               {project.title}
@@ -538,7 +538,7 @@ export default function ProjectCard({
                 aria-label="Rename project"
                 className="inline-flex items-center justify-center text-black opacity-0 transition-opacity group-hover/title:opacity-100"
               >
-                <Pencil className="h-5 w-5" aria-hidden />
+                <Pencil className="h-4 w-4" aria-hidden />
               </button>
             ) : null}
           </div>
@@ -546,7 +546,9 @@ export default function ProjectCard({
         {renameError ? (
           <p className="text-xs font-semibold text-rose-600">{renameError}</p>
         ) : null}
-        <p className="text-sm text-slate-500">{project.updated}</p>
+        <p className="text-xs text-slate-500" suppressHydrationWarning>
+          {project.updated}
+        </p>
       </div>
     </Link>
   );

@@ -25,8 +25,8 @@ export default function SettingsMenu({ variant = "default", trigger = "avatar" }
     session?.user?.name ?? session?.user?.email ?? "User"
   );
 
-  const outerSizeClass = variant === "pricing" ? "h-12 w-12" : "h-10 w-10";
-  const innerSizeClass = variant === "pricing" ? "h-11 w-11" : "h-9 w-9";
+  const outerSizeClass = variant === "pricing" ? "h-12 w-12" : "h-9 w-9";
+  const innerSizeClass = variant === "pricing" ? "h-11 w-11" : "h-8 w-8";
 
   useEffect(() => {
     if (!open) return;
@@ -83,7 +83,7 @@ export default function SettingsMenu({ variant = "default", trigger = "avatar" }
       <button
         type="button"
         onClick={handleToggle}
-        className={`flex items-center justify-center rounded-full border border-slate-200 bg-white shadow-md transition hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-800 active:scale-95 active:shadow-sm ${outerSizeClass}`}
+        className={`flex items-center justify-center rounded-full border border-slate-200 bg-white transition hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-800 active:scale-95 ${outerSizeClass}`}
         aria-haspopup="menu"
         aria-expanded={open}
       >

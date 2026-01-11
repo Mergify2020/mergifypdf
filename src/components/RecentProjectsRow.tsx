@@ -47,11 +47,11 @@ export default function RecentProjectsRow({
 
   if (loading && !projects.length) {
     return (
-      <div className="projects-grid mt-2 grid w-full grid-cols-[repeat(auto-fill,minmax(max(300px,calc(100%/6)),1fr))] gap-5">
+      <div className="projects-grid mt-2 grid w-full max-w-[1296px] justify-start gap-6 grid-cols-[repeat(auto-fit,minmax(240px,1fr))]">
         {Array.from({ length: 6 }).map((_, index) => (
           <div key={`home-loading-project-${index}`} className="flex flex-col text-left">
             <div className="relative rounded-[10px] bg-[#F9FAFC]">
-              <div className="relative m-[3px] aspect-[1.23/1] w-[calc(100%-6px)] overflow-hidden rounded-[10px] border border-[rgba(0,0,0,0.06)] bg-[#EEF1F5]">
+              <div className="relative m-[3px] aspect-square w-[calc(100%-6px)] overflow-hidden rounded-[10px] border border-[rgba(0,0,0,0.06)] bg-[#EEF1F5]">
                 <div className="absolute inset-0 rounded-[10px] skeleton-shimmer opacity-90" />
               </div>
             </div>
@@ -80,7 +80,7 @@ export default function RecentProjectsRow({
     const cmp = aName.localeCompare(bName);
     return sortOption === "az" ? cmp : -cmp;
   });
-  const displayProjects = sortedProjects.slice(0, trimmed ? 24 : 6);
+  const displayProjects = sortedProjects.slice(0, trimmed ? 24 : 9);
   const mapped = displayProjects.map((project) => ({
     id: project.id,
     title: project.name?.trim() || "Untitled project",
@@ -97,13 +97,13 @@ export default function RecentProjectsRow({
       <div className="relative">
         <div
           aria-hidden="true"
-          className="projects-grid mt-2 grid w-full grid-cols-[repeat(auto-fill,minmax(max(300px,calc(100%/6)),1fr))] gap-5"
+          className="projects-grid mt-2 grid w-full max-w-[1296px] justify-start gap-6 grid-cols-[repeat(auto-fit,minmax(240px,1fr))]"
         >
           {Array.from({ length: 6 }).map((_, index) => (
-            <div key={`home-empty-project-${index}`} className="invisible flex flex-col text-left">
-              <div className="relative rounded-[10px] bg-[#F9FAFC]">
-                <div className="relative m-[3px] aspect-[1.23/1] w-[calc(100%-6px)] overflow-hidden rounded-[10px] border border-[rgba(0,0,0,0.06)] bg-[#EEF1F5]" />
-              </div>
+          <div key={`home-empty-project-${index}`} className="invisible flex flex-col text-left">
+            <div className="relative rounded-[10px] bg-[#F9FAFC]">
+              <div className="relative m-[3px] aspect-square w-[calc(100%-6px)] overflow-hidden rounded-[10px] border border-[rgba(0,0,0,0.06)] bg-[#EEF1F5]" />
+            </div>
               <div className="mt-2 space-y-0.5">
                 <div className="h-7 w-2/3 rounded-full bg-slate-100" />
                 <div className="h-5 w-1/2 rounded-full bg-slate-100" />
@@ -121,7 +121,7 @@ export default function RecentProjectsRow({
   }
 
   return (
-    <div className="projects-grid mt-2 grid w-full grid-cols-[repeat(auto-fill,minmax(max(300px,calc(100%/6)),1fr))] gap-5">
+    <div className="projects-grid mt-2 grid w-full max-w-[1296px] justify-start gap-6 grid-cols-[repeat(auto-fit,minmax(240px,1fr))]">
       {mapped.map((project, index) => {
         const isSelected = !!selected[project.id];
         return (

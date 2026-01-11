@@ -1,7 +1,5 @@
 @import "tailwindcss";
 
-@import "tailwindcss";
-
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -283,4 +281,13 @@ body {
   .with-sidebar-panel .projects-grid {
     grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)) !important;
   }
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }

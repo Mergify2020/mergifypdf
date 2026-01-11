@@ -197,8 +197,8 @@ export default function StartProjectButton({ className, variant = "default" }: P
         onClick={launchModal}
         className={`${variant === "custom" ? "" : "btn-primary px-8 text-base"} ${className ?? ""}`}
       >
+        <Plus className="mr-2 h-5 w-5" aria-hidden />
         Start a new project
-        <Plus className="ml-2 h-5 w-5" aria-hidden />
       </button>
 
       {open
