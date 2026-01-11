@@ -828,7 +828,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
               <Icon
                 className={`${iconSizeClasses} shrink-0`}
                 aria-hidden
-                weight={isActive ? "fill" : "bold"}
+                weight={isActive ? "fill" : "regular"}
               />
             </span>
             {isExpanded ? (
