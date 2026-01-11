@@ -958,9 +958,11 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
     <>
     <div
       className={`flex min-h-screen ${isHomePanel ? "bg-[#F1F4F9]" : "bg-slate-100"}`}
-      style={{
-        ["--shell-left" as React.CSSProperties]: "max(24px, calc((100vw - 1960px) / 2))",
-      }}
+      style={
+        {
+          "--shell-left": "max(24px, calc((100vw - 1960px) / 2))",
+        } as React.CSSProperties
+      }
     >
       {/* Desktop sidebar */}
       <aside className="fixed left-[var(--shell-left)] top-6 bottom-6 z-50 hidden w-[256px] text-slate-800 md:flex">
