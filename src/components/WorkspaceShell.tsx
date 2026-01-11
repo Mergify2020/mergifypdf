@@ -910,7 +910,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
 
       const content = (
         <>
-          <Icon className="h-6 w-6 shrink-0" aria-hidden weight={isActive ? "fill" : "bold"} />
+          <Icon className="h-6 w-6 shrink-0" aria-hidden weight={isActive ? "fill" : "regular"} />
           <span className="truncate whitespace-nowrap">{label}</span>
         </>
       );
