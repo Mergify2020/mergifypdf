@@ -52,11 +52,41 @@ export default function AppHeaderBrand({ variant = "default" }: Props) {
 
   return useHardNav ? (
     <a href="/" className="inline-flex items-center gap-2" aria-label="Back to dashboard">
-      <Image src="/logo-wording.2026.2.svg" alt="MergifyPDF" width={logoWidth} height={logoHeight} priority />
+      <Image
+        src="/logo-wording.2026.2.svg"
+        alt="MergifyPDF"
+        width={logoWidth}
+        height={logoHeight}
+        priority
+        className="block dark:hidden"
+      />
+      <Image
+        src="/Merg.dark-logo.2026.svg"
+        alt="MergifyPDF"
+        width={logoWidth}
+        height={logoHeight}
+        priority
+        className="hidden dark:block"
+      />
     </a>
   ) : (
     <Link href="/" className="inline-flex items-center gap-2" aria-label="Back to dashboard">
-      <Image src="/logo-wording.2026.2.svg" alt="MergifyPDF" width={logoWidth} height={logoHeight} priority />
+      <Image
+        src="/logo-wording.2026.2.svg"
+        alt="MergifyPDF"
+        width={logoWidth}
+        height={logoHeight}
+        priority
+        className="block dark:hidden"
+      />
+      <Image
+        src="/Merg.dark-logo.2026.svg"
+        alt="MergifyPDF"
+        width={logoWidth}
+        height={logoHeight}
+        priority
+        className="hidden dark:block"
+      />
     </Link>
   );
 }

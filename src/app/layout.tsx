@@ -1,5 +1,7 @@
 ﻿// src/app/layout.tsx
 import type { Metadata } from "next";
+import Script from "next/script";
+import { cookies } from "next/headers";
 import Providers from "@/components/Providers";
 import { getServerSessionSafe } from "@/lib/serverSession";
 import "./globals.css";
@@ -24,14 +26,36 @@ export const revalidate = 0;
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSessionSafe();
+  const cookieStore = await cookies();
+  const themeCookie = cookieStore.get?.("theme")?.value;
+  const themeClass = themeCookie === "dark" ? "dark" : undefined;
 
   return (
-    <html lang="en">
+    <html lang="en" className={themeClass} suppressHydrationWarning>
       <head>
         {/* Force light UI */}
         <meta name="color-scheme" content="light" />
         <meta name="supported-color-schemes" content="light" />
         <meta name="theme-color" content="#ffffff" />
+
+        <Script
+          id="theme-init"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function () {
+                try {
+                  var stored = localStorage.getItem("theme");
+                  var fallback = document.documentElement.classList.contains("dark") ? "dark" : "light";
+                  var theme = stored === "dark" || stored === "light" ? stored : fallback;
+                  document.documentElement.classList.toggle("dark", theme === "dark");
+                  localStorage.setItem("theme", theme);
+                  document.cookie = "theme=" + theme + "; path=/; max-age=31536000";
+                } catch (e) {}
+              })();
+            `,
+          }}
+        />
 
         {/* Explicit links (helps stubborn Safari/iOS) */}
         <link rel="icon" type="image/svg+xml" href="/favicon2080.svg" />
@@ -41,7 +65,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <link rel="mask-icon" href="/safari-pinned-tab-2080.svg" color="#024d7c" />
       </head>
 
-      <body className="min-h-screen bg-white text-gray-900">
+      <body className="min-h-screen bg-white text-gray-900 dark:bg-[#222224] dark:text-zinc-100">
         <Providers session={session}>
           {children}
         </Providers>

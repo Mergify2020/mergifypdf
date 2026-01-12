@@ -33,12 +33,13 @@ type Props = {
   accountName: string;
   accountEmail?: string | null;
   projects: SummaryProject[];
+  headline?: string;
 };
 
 type OwnerFilter = "any" | "shared" | "you";
 type SortOption = "activity" | "az" | "za";
 
-export default function HomeProjectsSearch({ firstName, accountName, accountEmail, projects }: Props) {
+export default function HomeProjectsSearch({ firstName, accountName, accountEmail, projects, headline }: Props) {
   const [query, setQuery] = useState("");
   const initialProjects = useMemo(() => projects, [projects]);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -278,18 +279,27 @@ export default function HomeProjectsSearch({ firstName, accountName, accountEmai
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const stored = window.localStorage.getItem("mpdf:theme");
-    if (stored === "dark" || stored === "light") {
-      setTheme(stored);
-    }
+    const stored = window.localStorage.getItem("theme");
+    const initialTheme = stored === "dark" ? "dark" : "light";
+    document.documentElement.classList.toggle("dark", initialTheme === "dark");
+    document.body.classList.remove("dark");
+    setTheme(initialTheme);
   }, []);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const root = document.documentElement;
-    root.classList.toggle("dark", theme === "dark");
-    window.localStorage.setItem("mpdf:theme", theme);
-  }, [theme]);
+  const toggleTheme = () => {
+    document.documentElement.classList.add("theme-transition");
+    const nextTheme = theme === "dark" ? "light" : "dark";
+    document.documentElement.classList.toggle("dark", nextTheme === "dark");
+    if (nextTheme === "light") {
+      document.body.classList.remove("dark");
+    }
+    window.localStorage.setItem("theme", nextTheme);
+    document.cookie = `theme=${nextTheme}; path=/; max-age=31536000`;
+    setTheme(nextTheme);
+    window.setTimeout(() => {
+      document.documentElement.classList.remove("theme-transition");
+    }, 200);
+  };
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -311,13 +321,13 @@ export default function HomeProjectsSearch({ firstName, accountName, accountEmai
         >
           <div className="flex w-full items-center justify-between gap-3 lg:mr-[-312px] lg:w-[calc(100%+312px)]">
             <div className="flex flex-1 items-center gap-6">
-              <p className="whitespace-nowrap text-2xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-[#7C3AED] to-[#2563EB]">
-                Hello, {firstName}
+              <p className="whitespace-nowrap text-2xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-[#7C3AED] to-[#2563EB] dark:text-zinc-200 dark:bg-none">
+                {headline ?? `Hello, ${firstName}`}
               </p>
               <div className="flex w-full items-center gap-6">
                 <div className="flex w-full max-w-sm">
                   <div
-                    className="flex h-11 w-full cursor-text rounded-full border border-[#E5E7EB] bg-transparent p-[1px] shadow-[0_12px_36px_rgba(15,23,42,0.10)] focus-within:border-transparent focus-within:bg-gradient-to-r focus-within:from-[#009DFD] focus-within:to-[#4F46E5]"
+                    className="flex h-11 w-full cursor-text rounded-full border border-[#E5E7EB] bg-transparent p-[1px] shadow-[0_12px_36px_rgba(15,23,42,0.10)] focus-within:border-transparent focus-within:bg-gradient-to-r focus-within:from-[#009DFD] focus-within:to-[#4F46E5] dark:border-zinc-700 dark:bg-zinc-900/60 dark:shadow-none dark:focus-within:from-zinc-700 dark:focus-within:to-zinc-600"
                     onMouseDown={(event) => {
                       const target = event.target;
                       if (target instanceof HTMLInputElement) return;
@@ -328,7 +338,7 @@ export default function HomeProjectsSearch({ firstName, accountName, accountEmai
                       searchInputRef.current?.focus();
                     }}
                   >
-                    <div className="flex h-full w-full items-center gap-2 rounded-full bg-white px-4 text-[#1F2A37]">
+                    <div className="flex h-full w-full items-center gap-2 rounded-full bg-white px-4 text-[#1F2A37] [--search-gradient-start:#009DFD] [--search-gradient-end:#4F46E5] dark:bg-zinc-900 dark:text-zinc-100 dark:[--search-gradient-start:#e4e4e7] dark:[--search-gradient-end:#a1a1aa]">
                       <svg
                         aria-hidden="true"
                         viewBox="0 0 24 24"
@@ -341,8 +351,8 @@ export default function HomeProjectsSearch({ firstName, accountName, accountEmai
                       >
                         <defs>
                           <linearGradient id="searchGradient" x1="0" y1="0" x2="1" y2="0">
-                            <stop offset="0%" stopColor="#009DFD" />
-                            <stop offset="100%" stopColor="#4F46E5" />
+                            <stop offset="0%" stopColor="var(--search-gradient-start)" />
+                            <stop offset="100%" stopColor="var(--search-gradient-end)" />
                           </linearGradient>
                         </defs>
                         <circle cx="11" cy="11" r="8" />
@@ -354,7 +364,7 @@ export default function HomeProjectsSearch({ firstName, accountName, accountEmai
                         value={query}
                         onChange={(event) => setQuery(event.target.value)}
                         placeholder="Search projects..."
-                        className="h-full min-w-0 flex-1 border-none bg-white text-sm text-[#1F2A37] placeholder:text-[#6B7280] outline-none focus:outline-none focus:ring-0 sm:text-base"
+                        className="h-full min-w-0 flex-1 border-none bg-white text-sm text-[#1F2A37] placeholder:text-[#6B7280] outline-none focus:outline-none focus:ring-0 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-400 sm:text-base"
                       />
                     </div>
                   </div>
@@ -364,28 +374,28 @@ export default function HomeProjectsSearch({ firstName, accountName, accountEmai
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setTheme((prev) => (prev === "dark" ? "light" : "dark"))}
-                className="flex h-11 w-11 items-center justify-center rounded-full border border-[#E5E7EB] bg-white text-[#1F2A37] transition hover:bg-slate-50"
+                onClick={toggleTheme}
+                className="flex h-11 w-11 items-center justify-center rounded-full border border-[#E5E7EB] bg-white text-[#1F2A37] transition hover:bg-slate-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
                 aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
                 aria-pressed={theme === "dark"}
               >
                 {theme === "dark" ? <Sun className="h-4 w-4" aria-hidden /> : <Moon className="h-4 w-4" aria-hidden />}
               </button>
-              <div className="flex h-11 items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white py-1.5 pl-1 pr-1.5 shadow-[0_10px_24px_rgba(15,23,42,0.12)]">
+              <div className="flex h-11 items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white py-1.5 pl-1 pr-1.5 shadow-[0_10px_24px_rgba(15,23,42,0.12)] dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-none">
                 <div className="shrink-0">
                   <SettingsMenu />
                 </div>
                 <span className="flex min-w-0 flex-col leading-tight">
-                  <span className="max-w-[220px] truncate text-[13px] font-semibold text-[#1F2A37]">
+                  <span className="max-w-[220px] truncate text-[13px] font-semibold text-[#1F2A37] dark:text-zinc-100">
                     {accountName}
                   </span>
                   {accountEmail ? (
-                    <span className="max-w-[220px] truncate text-[11px] font-medium text-[#64748B]">
+                    <span className="max-w-[220px] truncate text-[11px] font-medium text-[#64748B] dark:text-zinc-400">
                       {accountEmail}
                     </span>
                   ) : null}
                 </span>
-                <ChevronDown className="h-4 w-4 text-[#94A3B8]" aria-hidden="true" />
+                <ChevronDown className="h-4 w-4 text-[#94A3B8] dark:text-zinc-400" aria-hidden="true" />
               </div>
             </div>
           </div>
@@ -395,10 +405,10 @@ export default function HomeProjectsSearch({ firstName, accountName, accountEmai
       <section className="mt-6 w-full">
         <div
           ref={recentCardRef}
-          className="flex min-h-0 flex-col rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-[0_12px_36px_rgba(15,23,42,0.10)] sm:p-5"
+          className="flex min-h-0 flex-col rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-[0_12px_36px_rgba(15,23,42,0.10)] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-none sm:p-5"
         >
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <h2 className="text-base font-semibold text-[#1F2A37] sm:text-lg">
+            <h2 className="text-base font-semibold text-[#1F2A37] dark:text-zinc-100 sm:text-lg">
               {query.trim() ? "Search results" : "Recent projects"}
             </h2>
             <div className="flex items-center gap-2">
@@ -406,8 +416,10 @@ export default function HomeProjectsSearch({ firstName, accountName, accountEmai
                 <button
                   type="button"
                   onClick={() => setSortMenuOpen((prev) => !prev)}
-                  className={`inline-flex items-center gap-2 rounded-full border-2 border-[#E6EBF2] px-4 py-2 text-xs font-semibold transition ${
-                    sortMenuOpen ? "bg-[#009DFD] text-white" : "bg-white text-[#1F2A37] hover:border-[#D8DEE8]"
+                  className={`inline-flex items-center gap-2 rounded-full border-2 border-[#E6EBF2] px-4 py-2 text-xs font-semibold transition dark:border-zinc-700 ${
+                    sortMenuOpen
+                      ? "bg-[#009DFD] text-white dark:bg-zinc-200 dark:text-zinc-900"
+                      : "bg-white text-[#1F2A37] hover:border-[#D8DEE8] dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-zinc-600"
                   }`}
                   aria-haspopup="menu"
                   aria-expanded={sortMenuOpen}
@@ -432,7 +444,7 @@ export default function HomeProjectsSearch({ firstName, accountName, accountEmai
                 {sortMenuOpen ? (
                   <div
                     role="menu"
-                    className="absolute left-0 z-50 mt-3 w-[320px] overflow-hidden rounded-3xl border border-[#E6EBF2] bg-white text-sm text-[#1F2A37]"
+                    className="absolute left-0 z-50 mt-3 w-[320px] overflow-hidden rounded-3xl border border-[#E6EBF2] bg-white text-sm text-[#1F2A37] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
                   >
                     <div className="pb-3 pt-2">
                       {(
@@ -451,16 +463,16 @@ export default function HomeProjectsSearch({ firstName, accountName, accountEmai
                             setSortMenuOpen(false);
                           }}
                           className={`mx-3 flex w-[calc(100%-1.5rem)] items-center justify-between rounded-2xl px-3 py-3 text-left transition ${
-                            sortOption === key ? "bg-slate-100" : "hover:bg-slate-50"
+                            sortOption === key ? "bg-slate-100 dark:bg-zinc-800/70" : "hover:bg-slate-50 dark:hover:bg-zinc-800/60"
                           }`}
                         >
                           <span className="flex min-w-0 items-center gap-3">
-                            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-slate-700">
+                            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-slate-700 dark:bg-zinc-800 dark:text-zinc-200">
                               <Icon className="h-5 w-5" aria-hidden />
                             </span>
-                            <span className="truncate text-base font-medium text-[#1F2A37]">{label}</span>
+                            <span className="truncate text-base font-medium text-[#1F2A37] dark:text-zinc-100">{label}</span>
                           </span>
-                          {sortOption === key ? <Check className="h-6 w-6 text-[#1F2A37]" aria-hidden /> : null}
+                          {sortOption === key ? <Check className="h-6 w-6 text-[#1F2A37] dark:text-zinc-100" aria-hidden /> : null}
                         </button>
                       ))}
                     </div>
@@ -478,8 +490,10 @@ export default function HomeProjectsSearch({ firstName, accountName, accountEmai
                       return next;
                     });
                   }}
-                  className={`inline-flex items-center gap-2 rounded-full border-2 border-[#E6EBF2] px-4 py-2 text-xs font-semibold transition ${
-                    ownerMenuOpen ? "bg-[#009DFD] text-white" : "bg-white text-[#1F2A37] hover:border-[#D8DEE8]"
+                  className={`inline-flex items-center gap-2 rounded-full border-2 border-[#E6EBF2] px-4 py-2 text-xs font-semibold transition dark:border-zinc-700 ${
+                    ownerMenuOpen
+                      ? "bg-[#009DFD] text-white dark:bg-zinc-200 dark:text-zinc-900"
+                      : "bg-white text-[#1F2A37] hover:border-[#D8DEE8] dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-zinc-600"
                   }`}
                   aria-haspopup="menu"
                   aria-expanded={ownerMenuOpen}
@@ -497,17 +511,17 @@ export default function HomeProjectsSearch({ firstName, accountName, accountEmai
                 {ownerMenuOpen ? (
                   <div
                     role="menu"
-                    className="absolute right-0 z-50 mt-3 w-[320px] overflow-hidden rounded-3xl border border-[#E6EBF2] bg-white text-sm text-[#1F2A37]"
+                    className="absolute right-0 z-50 mt-3 w-[320px] overflow-hidden rounded-3xl border border-[#E6EBF2] bg-white text-sm text-[#1F2A37] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
                   >
                     <div className="p-4 pb-3">
-                      <div className="flex items-center gap-3 rounded-2xl border border-[#E6EBF2] bg-white px-4 py-3">
-                        <Search className="h-5 w-5 text-[#009DFD]" aria-hidden />
+                      <div className="flex items-center gap-3 rounded-2xl border border-[#E6EBF2] bg-white px-4 py-3 dark:border-zinc-700 dark:bg-zinc-900/60">
+                        <Search className="h-5 w-5 text-[#009DFD] dark:text-zinc-300" aria-hidden />
                         <input
                           type="text"
                           value={ownerSearch}
                           onChange={(event) => setOwnerSearch(event.target.value)}
                           placeholder="Search people"
-                          className="w-full border-none bg-transparent text-sm text-[#1F2A37] placeholder:text-[#6B7280] focus:outline-none focus:ring-0"
+                          className="w-full border-none bg-transparent text-sm text-[#1F2A37] placeholder:text-[#6B7280] focus:outline-none focus:ring-0 dark:text-zinc-100 dark:placeholder:text-zinc-400"
                         />
                       </div>
                     </div>
@@ -519,7 +533,7 @@ export default function HomeProjectsSearch({ firstName, accountName, accountEmai
                             key: "any",
                             label: "Any owner",
                             leading: (
-                              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-slate-700">
+                              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-slate-700 dark:bg-zinc-800 dark:text-zinc-200">
                                 <UserRound className="h-5 w-5" aria-hidden />
                               </span>
                             ),
@@ -528,7 +542,7 @@ export default function HomeProjectsSearch({ firstName, accountName, accountEmai
                             key: "shared",
                             label: "Shared with you",
                             leading: (
-                              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-slate-700">
+                              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-slate-700 dark:bg-zinc-800 dark:text-zinc-200">
                                 <UsersRound className="h-5 w-5" aria-hidden />
                               </span>
                             ),
@@ -537,7 +551,7 @@ export default function HomeProjectsSearch({ firstName, accountName, accountEmai
                             key: "you",
                             label: `${accountName} (You)`,
                             leading: (
-                              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-600 text-sm font-semibold text-white">
+                              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-600 text-sm font-semibold text-white dark:bg-zinc-700">
                                 {accountInitials}
                               </span>
                             ),
@@ -559,15 +573,17 @@ export default function HomeProjectsSearch({ firstName, accountName, accountEmai
                               setOwnerMenuOpen(false);
                             }}
                             className={`mx-3 flex w-[calc(100%-1.5rem)] items-center justify-between rounded-2xl px-3 py-3 text-left transition ${
-                              ownerFilter === option.key ? "bg-slate-100" : "hover:bg-slate-50"
+                              ownerFilter === option.key
+                                ? "bg-slate-100 dark:bg-zinc-800/70"
+                                : "hover:bg-slate-50 dark:hover:bg-zinc-800/60"
                             }`}
                           >
                             <span className="flex min-w-0 items-center gap-3">
                               {option.leading}
-                              <span className="truncate text-base font-medium text-[#1F2A37]">{option.label}</span>
+                              <span className="truncate text-base font-medium text-[#1F2A37] dark:text-zinc-100">{option.label}</span>
                             </span>
                             {ownerFilter === option.key ? (
-                              <Check className="h-6 w-6 text-[#1F2A37]" aria-hidden />
+                              <Check className="h-6 w-6 text-[#1F2A37] dark:text-zinc-100" aria-hidden />
                             ) : null}
                           </button>
                         ))}
@@ -598,7 +614,7 @@ export default function HomeProjectsSearch({ firstName, accountName, accountEmai
           <div className="mt-6 flex justify-start">
             <Link
               href="/projects/all"
-              className="inline-flex items-center gap-2 rounded-full border-2 border-[#E6EBF2] bg-white px-4 py-2 text-xs font-semibold text-[#1F2A37] transition hover:border-[#D8DEE8] sm:text-sm"
+              className="inline-flex items-center gap-2 rounded-full border-2 border-[#E6EBF2] bg-white px-4 py-2 text-xs font-semibold text-[#1F2A37] transition hover:border-[#D8DEE8] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-zinc-600 sm:text-sm"
             >
               View all projects
             </Link>

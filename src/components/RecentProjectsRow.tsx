@@ -38,9 +38,9 @@ export default function RecentProjectsRow({
 
   if (!projects.length && !loading) {
     return (
-      <div className="mt-6 flex min-h-[260px] w-full flex-col items-center justify-center rounded-[24px] border-[3px] border-dashed border-[#51bdff] bg-white/70 px-8 py-12 text-center shadow-sm">
-        <p className="text-lg font-semibold text-slate-900 sm:text-xl">No projects yet</p>
-        <p className="mt-2 max-w-sm text-sm text-slate-600 sm:text-base">Start a new project to see it here.</p>
+      <div className="mt-6 flex min-h-[260px] w-full flex-col items-center justify-center rounded-[24px] border-[3px] border-dashed border-[#51bdff] bg-white/70 px-8 py-12 text-center shadow-sm dark:shadow-none dark:border-zinc-700 dark:bg-zinc-900/60">
+        <p className="text-lg font-semibold text-slate-900 dark:text-zinc-100 sm:text-xl">No projects yet</p>
+        <p className="mt-2 max-w-sm text-sm text-slate-600 dark:text-zinc-400 sm:text-base">Start a new project to see it here.</p>
       </div>
     );
   }
@@ -50,14 +50,14 @@ export default function RecentProjectsRow({
       <div className="projects-grid mt-2 grid w-full max-w-[1296px] justify-start gap-6 grid-cols-[repeat(auto-fit,minmax(240px,1fr))]">
         {Array.from({ length: 6 }).map((_, index) => (
           <div key={`home-loading-project-${index}`} className="flex flex-col text-left">
-            <div className="relative rounded-[10px] bg-[#F9FAFC]">
-              <div className="relative m-[3px] aspect-square w-[calc(100%-6px)] overflow-hidden rounded-[10px] border border-[rgba(0,0,0,0.06)] bg-[#EEF1F5]">
+            <div className="relative rounded-[10px] bg-[#F9FAFC] dark:bg-zinc-900/60">
+              <div className="relative m-[3px] aspect-square w-[calc(100%-6px)] overflow-hidden rounded-[10px] border border-[rgba(0,0,0,0.06)] bg-[#EEF1F5] dark:border-zinc-800 dark:bg-zinc-800/70">
                 <div className="absolute inset-0 rounded-[10px] skeleton-shimmer opacity-90" />
               </div>
             </div>
             <div className="mt-2 space-y-0.5">
-              <div className="h-7 w-2/3 rounded-full bg-slate-100" />
-              <div className="h-5 w-1/2 rounded-full bg-slate-100" />
+              <div className="h-7 w-2/3 rounded-full bg-slate-100 dark:bg-zinc-800/70" />
+              <div className="h-5 w-1/2 rounded-full bg-slate-100 dark:bg-zinc-800/70" />
             </div>
           </div>
         ))}
@@ -101,18 +101,18 @@ export default function RecentProjectsRow({
         >
           {Array.from({ length: 6 }).map((_, index) => (
           <div key={`home-empty-project-${index}`} className="invisible flex flex-col text-left">
-            <div className="relative rounded-[10px] bg-[#F9FAFC]">
-              <div className="relative m-[3px] aspect-square w-[calc(100%-6px)] overflow-hidden rounded-[10px] border border-[rgba(0,0,0,0.06)] bg-[#EEF1F5]" />
+            <div className="relative rounded-[10px] bg-[#F9FAFC] dark:bg-zinc-900/60">
+              <div className="relative m-[3px] aspect-square w-[calc(100%-6px)] overflow-hidden rounded-[10px] border border-[rgba(0,0,0,0.06)] bg-[#EEF1F5] dark:border-zinc-800 dark:bg-zinc-800/70" />
             </div>
               <div className="mt-2 space-y-0.5">
-                <div className="h-7 w-2/3 rounded-full bg-slate-100" />
-                <div className="h-5 w-1/2 rounded-full bg-slate-100" />
+                <div className="h-7 w-2/3 rounded-full bg-slate-100 dark:bg-zinc-800/70" />
+                <div className="h-5 w-1/2 rounded-full bg-slate-100 dark:bg-zinc-800/70" />
               </div>
             </div>
           ))}
         </div>
         <div className="pointer-events-none absolute inset-0 flex items-start justify-center pt-10">
-          <p className="rounded-full bg-white/85 px-5 py-2 text-sm font-semibold text-slate-500 shadow-sm backdrop-blur sm:text-base">
+          <p className="rounded-full bg-white/85 px-5 py-2 text-sm font-semibold text-slate-500 shadow-sm dark:shadow-none backdrop-blur dark:bg-zinc-900/80 dark:text-zinc-300 sm:text-base">
             No projects match &quot;{trimmed}&quot;.
           </p>
         </div>

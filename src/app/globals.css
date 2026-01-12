@@ -1,3 +1,4 @@
+@config "../../tailwind.config.js";
 @import "tailwindcss";
 
 :root {
@@ -14,6 +15,9 @@
   --color-border-subtle: #e1e5f0;
   --color-text-main: #0f172a;
   --color-text-muted: #6b7280;
+  --scrollbar-track: #ffffff;
+  --scrollbar-thumb: #cbd5e1;
+  --scrollbar-thumb-hover: #94a3b8;
 }
 
 @font-face {
@@ -102,6 +106,12 @@ body {
   font-family: "Roboto", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
+.dark {
+  --scrollbar-track: #18181b;
+  --scrollbar-thumb: #3f3f46;
+  --scrollbar-thumb-hover: #52525b;
+}
+
 .toolbar-font {
   font-family: "Poppins", "Roboto", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
@@ -148,6 +158,10 @@ body {
   animation: shimmer 1.4s ease-in-out infinite;
 }
 
+.dark .skeleton-shimmer {
+  background-image: linear-gradient(90deg, #2a2a2e 0%, #3f3f46 50%, #2a2a2e 100%);
+}
+
 @keyframes page-fade-in {
   0% {
     opacity: 0;
@@ -163,6 +177,115 @@ body {
 
 .page-fade-in {
   animation: page-fade-in 420ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html {
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+  transition: background-color 320ms ease;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
+  border: 2px solid var(--scrollbar-track);
+  transition: background-color 320ms ease, border-color 320ms ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+ 
+
+html.theme-transition body {
+  transition: background-color 200ms ease, color 200ms ease;
+}
+
+html.theme-transition body * {
+  transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease;
+}
+
+html.theme-transition .no-theme-transition,
+html.theme-transition .no-theme-transition * {
+  transition: none !important;
+}
+
+html.theme-transition {
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+html.theme-transition ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+html.theme-transition ::-webkit-scrollbar-thumb {
+  border-color: transparent;
+}
+
+
+@keyframes scrollbar-track-reveal-dark {
+  from {
+    background-color: transparent;
+  }
+  to {
+    background-color: #18181b;
+  }
+}
+
+@keyframes scrollbar-thumb-reveal-dark {
+  from {
+    background-color: transparent;
+    border-color: transparent;
+  }
+  to {
+    background-color: #3f3f46;
+    border-color: #18181b;
+  }
+}
+
+@keyframes scrollbar-track-reveal-light {
+  from {
+    background-color: transparent;
+  }
+  to {
+    background-color: #e2e8f0;
+  }
+}
+
+@keyframes scrollbar-thumb-reveal-light {
+  from {
+    background-color: transparent;
+    border-color: transparent;
+  }
+  to {
+    background-color: #cbd5e1;
+    border-color: #e2e8f0;
+  }
+}
+
+html.theme-scroll-reveal.dark ::-webkit-scrollbar-track {
+  animation: scrollbar-track-reveal-dark 200ms ease;
+}
+
+html.theme-scroll-reveal.dark ::-webkit-scrollbar-thumb {
+  animation: scrollbar-thumb-reveal-dark 200ms ease;
+}
+
+html.theme-scroll-reveal:not(.dark) ::-webkit-scrollbar-track {
+  animation: scrollbar-track-reveal-light 200ms ease;
+}
+
+html.theme-scroll-reveal:not(.dark) ::-webkit-scrollbar-thumb {
+  animation: scrollbar-thumb-reveal-light 200ms ease;
 }
 
 @keyframes pricing-gradient-shift {

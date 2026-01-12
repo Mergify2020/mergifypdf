@@ -358,7 +358,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
   const [activeProjectsFilter, setActiveProjectsFilter] = useState("all");
   const itemLabelClasses = "opacity-100 translate-x-0 max-w-full";
   const panelKey =
-    pathname === "/"
+    pathname === "/" || pathname === "/projects/all"
       ? "home"
       : pathname?.startsWith("/projects")
         ? "projects"
@@ -769,13 +769,17 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
         : `flex ${sidebarCompact ? "h-11" : "h-13"} w-full items-center justify-center rounded-2xl transition`;
       const iconWrapperState = homeSidebarLocked
         ? isActive
-          ? "text-[#2563EB]"
-          : "text-[#6B7280]"
+          ? "text-[#2563EB] dark:text-zinc-100"
+          : "text-[#6B7280] dark:text-zinc-400"
         : isActive
-          ? "text-[#2563EB]"
-          : "text-[#6B7280]";
-      const iconWrapperHover = !isActive && !disabled ? "group-hover:text-[#374151]" : "";
-      const logoutHoverClass = isLogout ? "group-hover:text-red-600" : "";
+          ? "text-[#2563EB] dark:text-zinc-100"
+          : "text-[#6B7280] dark:text-zinc-400";
+      const iconWrapperHover = !isActive && !disabled
+        ? isLogout
+          ? "group-hover:text-red-600 dark:group-hover:text-red-600"
+          : "group-hover:text-[#374151] dark:group-hover:text-zinc-200"
+        : "";
+      const logoutHoverClass = isLogout ? "group-hover:text-red-600 dark:group-hover:text-red-600" : "";
       const iconWrapperClasses = `${iconWrapperBase} ${iconWrapperState} ${iconWrapperHover} ${logoutHoverClass} transition-colors duration-[120ms] ease-out`;
       const iconSizeClasses = isExpanded
         ? sidebarCompact
@@ -795,24 +799,24 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
       const itemClasses = homeSidebarLocked
         ? `group flex w-full rounded-xl text-sm font-medium transition-[background-color,color] duration-[120ms] ease-out ${
             disabled
-              ? "cursor-not-allowed text-[#4B5563]"
+              ? "cursor-not-allowed text-[#4B5563] dark:text-zinc-500"
               : isActive
-                ? "text-[#2563EB]"
-                : "cursor-pointer text-[#4B5563] hover:text-[#374151]"
+                ? "text-[#2563EB] dark:text-zinc-100"
+                : "cursor-pointer text-[#4B5563] hover:text-[#374151] dark:text-zinc-400 dark:hover:text-zinc-200"
           } ${isExpanded ? expandedLayoutClasses : collapsedLayoutClasses}`
         : `group flex w-full overflow-hidden rounded-xl text-sm font-medium transition-[background-color,color] duration-[120ms] ease-out ${
             disabled
-              ? "cursor-not-allowed text-[#4B5563]"
+              ? "cursor-not-allowed text-[#4B5563] dark:text-zinc-500"
               : isActive
-                ? "text-[#2563EB] bg-[rgba(59,130,246,0.08)]"
-                : "cursor-pointer text-[#4B5563] hover:text-[#374151]"
+                ? "text-[#2563EB] bg-[rgba(59,130,246,0.08)] dark:text-zinc-100 dark:bg-zinc-800/60"
+                : "cursor-pointer text-[#4B5563] hover:text-[#374151] dark:text-zinc-400 dark:hover:text-zinc-200"
           } ${isExpanded ? expandedLayoutClasses : collapsedLayoutClasses}`;
 
       const content = (
         <span className="relative flex w-full items-center pl-0">
           <span
             className={`absolute left-0 inset-y-0 w-[3px] rounded-full ${
-              isActive ? "bg-[#2563EB]" : "bg-transparent"
+              isActive ? "bg-[#2563EB] dark:bg-zinc-200" : "bg-transparent"
             }`}
             style={{ top: 3, bottom: 3 }}
             aria-hidden
@@ -820,8 +824,8 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
           <span
             className={`flex items-center transition-[padding,width] duration-[140ms] ease-out ${
               isActive
-                ? "w-full rounded-r-xl bg-[rgba(59,130,246,0.08)] px-3 py-2.5 shadow-inner"
-                : "group-hover:w-full group-hover:rounded-xl group-hover:bg-[rgba(0,0,0,0.04)] group-hover:px-3 group-hover:py-2.5"
+                ? "w-full rounded-r-xl bg-[rgba(59,130,246,0.08)] px-3 py-2.5 shadow-inner dark:shadow-none dark:bg-zinc-800/60"
+                : "group-hover:w-full group-hover:rounded-xl group-hover:bg-[rgba(0,0,0,0.04)] group-hover:px-3 group-hover:py-2.5 dark:group-hover:bg-white/5"
             }`}
           >
             <span className={iconWrapperClasses}>
@@ -842,7 +846,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
             ) : (
               <span
                 className={`text-[11px] sm:text-xs lg:text-sm font-medium tracking-wide ${logoutHoverClass} ${
-                  isActive ? "text-sky-700" : "text-slate-500"
+                  isActive ? "text-sky-700 dark:text-zinc-100" : "text-slate-500 dark:text-zinc-400"
                 }`}
               >
                 {label}
@@ -957,7 +961,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
   const workspaceShell = (
     <>
     <div
-      className={`flex min-h-screen ${isHomePanel ? "bg-[#F1F4F9]" : "bg-slate-100"}`}
+      className={`flex min-h-screen ${isHomePanel ? "bg-[#F1F4F9]" : "bg-slate-100"} dark:bg-[#222224]`}
       style={
         {
           "--shell-left": "max(24px, calc((100vw - 1960px) / 2))",
@@ -965,14 +969,14 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
       }
     >
       {/* Desktop sidebar */}
-      <aside className="fixed left-[var(--shell-left)] top-6 bottom-6 z-50 hidden w-[256px] text-slate-800 md:flex">
+      <aside className="fixed left-[var(--shell-left)] top-6 bottom-6 z-50 hidden w-[256px] text-slate-800 dark:text-zinc-100 md:flex">
         <div className="relative flex h-full w-full">
           <div
             ref={sidebarRef}
             className={`flex h-full ${railWidthClass} flex-col ${
               homeSidebarLocked
-                ? "rounded-xl border border-[#E5E7EB] bg-white shadow-[0_10px_30px_rgba(0,0,0,0.08)]"
-                : "rounded-xl border border-[#E5E7EB] bg-white shadow-[0_10px_30px_rgba(0,0,0,0.08)]"
+                ? "rounded-xl border border-[#E5E7EB] bg-white shadow-[0_10px_30px_rgba(0,0,0,0.08)] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-none"
+                : "rounded-xl border border-[#E5E7EB] bg-white shadow-[0_10px_30px_rgba(0,0,0,0.08)] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-none"
             } w-full ${sidebarCompact ? "z-10" : "z-20"}`}
           >
             <div className="flex flex-1 flex-col gap-4 overflow-y-auto overflow-x-hidden px-1 py-5 lg:px-2">
@@ -983,7 +987,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                   <button
                     type="button"
                     onClick={() => setExpanded((prev) => !prev)}
-                    className="relative z-10 flex h-9 w-9 items-center justify-center rounded-full bg-[#1e293b] text-white shadow-[0_8px_24px_rgba(10,37,64,0.35)] transition hover:bg-[#253248]"
+                    className="relative z-10 flex h-9 w-9 items-center justify-center rounded-full bg-[#1e293b] text-white shadow-[0_8px_24px_rgba(10,37,64,0.35)] transition hover:bg-[#253248] dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
                     aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
                   >
                     {expanded ? <ChevronLeft className="h-6 w-6" /> : <ChevronRight className="h-6 w-6" />}
@@ -998,7 +1002,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                   })}
                   <StartProjectButton
                     variant="custom"
-                    className="flex h-12 w-[220px] items-center justify-center rounded-full border border-transparent bg-[#1E293B] px-5 text-sm font-semibold tracking-wide text-white shadow-[0_6px_14px_rgba(15,23,42,0.18)] transition hover:bg-[#182035]"
+                    className="flex h-12 w-[220px] items-center justify-center rounded-full border border-transparent bg-[#1E293B] px-5 text-sm font-semibold tracking-wide text-white shadow-[0_6px_14px_rgba(15,23,42,0.18)] transition hover:bg-[#182035] dark:border-zinc-700/40 dark:bg-zinc-800 dark:text-zinc-100 dark:shadow-[0_10px_24px_rgba(0,0,0,0.45)] dark:hover:bg-zinc-700 dark:hover:border-zinc-600/60 dark:hover:shadow-[0_12px_28px_rgba(0,0,0,0.55)] dark:active:bg-zinc-900"
                   />
                 </nav>
 
@@ -1020,7 +1024,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                 <button
                   type="button"
                   onClick={() => setProfileOpen((prev) => !prev)}
-                  className="flex w-full items-center justify-center rounded-2xl px-3 py-2 transition hover:bg-white/70"
+                  className="flex w-full items-center justify-center rounded-2xl px-3 py-2 transition hover:bg-white/70 dark:hover:bg-zinc-800/60"
                 >
                   <span
                     className={`relative flex ${
@@ -1059,7 +1063,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
               ? createPortal(
                   <div
                     ref={profileMenuRef}
-                    className={`fixed z-[60] w-80 rounded-3xl border border-slate-100 bg-white p-4 text-sm text-slate-800 shadow-[0_30px_80px_rgba(15,23,42,0.35)] ${
+                    className={`fixed z-[60] w-80 rounded-3xl border border-slate-100 bg-white p-4 text-sm text-slate-800 shadow-[0_30px_80px_rgba(15,23,42,0.35)] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:shadow-none ${
                       isHomePanel ? "right-8 top-[92px] max-h-[calc(100vh-120px)] overflow-auto" : ""
                     }`}
                     style={
@@ -1259,7 +1263,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
               data-workspace-secondary-panel="true"
               className={`absolute ${panelLeftClass} top-0 hidden h-full border-l border-slate-200 ${
                 shouldOverlay ? "bg-white" : "bg-slate-100"
-              } px-4 py-6 text-slate-800 shadow-[12px_0_36px_rgba(15,23,42,0.10)] transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform md:flex ${sidebarCompact ? "w-[240px]" : "w-[320px]"} z-0 ${
+              } px-4 py-6 text-slate-800 shadow-[12px_0_36px_rgba(15,23,42,0.10)] transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform md:flex ${sidebarCompact ? "w-[240px]" : "w-[320px]"} z-0 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:shadow-none ${
                 panelExpanded
                   ? "translate-x-0 opacity-100 pointer-events-auto"
                   : "-translate-x-10 opacity-0 pointer-events-none"
@@ -1276,7 +1280,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                         setProfileOpen(false);
                         router.push("/account");
                       }}
-                      className="flex w-full items-center gap-3 rounded-2xl bg-slate-100 px-4 py-3.5 text-left text-2xl font-semibold text-slate-800"
+                      className="flex w-full items-center gap-3 rounded-2xl bg-slate-100 px-4 py-3.5 text-left text-2xl font-semibold text-slate-800 dark:bg-zinc-800 dark:text-zinc-100"
                     >
                       <User className="h-6 w-6 text-slate-600" aria-hidden />
                       <span>Account</span>
@@ -1380,7 +1384,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                                   isProjectsPanel ? "text-base sm:text-lg" : "text-[0.95rem]"
                                 } font-semibold transition ${
                                   activeProjectsFilter === (item.key ?? item.label)
-                                    ? "bg-sky-50 text-sky-700 shadow-inner"
+                                    ? "bg-sky-50 text-sky-700 shadow-inner dark:shadow-none"
                                     : "text-slate-700 hover:bg-slate-50"
                                 }`}
                               >
@@ -1411,9 +1415,9 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
 	                                    setExpanded(false);
 	                                  }
 	                                }}
-	                                className="flex w-full min-w-0 items-center gap-3 rounded-2xl px-1 py-0.5 text-left transition hover:bg-white/60"
+	                                className="flex w-full min-w-0 items-center gap-3 rounded-2xl px-1 py-0.5 text-left transition hover:bg-white/60 dark:hover:bg-zinc-800/60"
 	                              >
-	                                <span className="relative inline-flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white text-slate-500 shadow-sm ring-1 ring-slate-200">
+	                                <span className="relative inline-flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white text-slate-500 shadow-sm dark:shadow-none ring-1 ring-slate-200 dark:bg-zinc-800 dark:text-zinc-300 dark:ring-zinc-700">
                                   {item.previewUrl ? (
                                     // eslint-disable-next-line @next/next/no-img-element
                                     <img
@@ -1446,7 +1450,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
 	                              >
 	                                <span className={isHomePanel ? "flex min-w-0 items-center gap-4" : ""}>
 	                                  {isHomePanel && !item.hidePreview ? (
-	                                    <span className="relative inline-flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white text-slate-500 shadow-sm ring-1 ring-slate-200">
+	                                    <span className="relative inline-flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white text-slate-500 shadow-sm dark:shadow-none ring-1 ring-slate-200 dark:bg-zinc-800 dark:text-zinc-300 dark:ring-zinc-700">
                                       {item.previewUrl ? (
                                         // eslint-disable-next-line @next/next/no-img-element
                                         <img
@@ -1497,13 +1501,13 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
       {/* Mobile drawer */}
       {mobileOpen ? (
         <>
-          <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={() => setMobileOpen(false)} />
-          <aside className="fixed inset-y-0 left-0 z-50 w-72 overflow-y-auto border-r border-slate-200 bg-white p-6 shadow-2xl transition-transform duration-300 md:hidden">
+          <div className="fixed inset-0 z-40 bg-black/40 dark:bg-zinc-950/60 md:hidden" onClick={() => setMobileOpen(false)} />
+          <aside className="fixed inset-y-0 left-0 z-50 w-72 overflow-y-auto border-r border-slate-200 bg-white p-6 shadow-2xl dark:shadow-none transition-transform duration-300 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 md:hidden">
             <div className="mb-6 flex items-center justify-end">
               <button
                 type="button"
                 onClick={() => setMobileOpen(false)}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-[#1e293b] p-2 text-white shadow-[0_8px_24px_rgba(10,37,64,0.35)] transition hover:bg-[#253248]"
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-[#1e293b] p-2 text-white shadow-[0_8px_24px_rgba(10,37,64,0.35)] transition hover:bg-[#253248] dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
                 aria-label="Close menu"
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -1583,7 +1587,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                           }}
                           className="flex w-full min-w-0 items-center gap-3 rounded-2xl px-1 py-1 text-left transition hover:bg-slate-50"
                         >
-                          <span className="relative inline-flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white text-slate-500 shadow-sm ring-1 ring-slate-200">
+                          <span className="relative inline-flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white text-slate-500 shadow-sm dark:shadow-none ring-1 ring-slate-200 dark:bg-zinc-800 dark:text-zinc-300 dark:ring-zinc-700">
                             {item.previewUrl ? (
                               // eslint-disable-next-line @next/next/no-img-element
                               <img
@@ -1715,7 +1719,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
       <div
         className={`flex min-h-screen w-full flex-col bg-transparent transition-all duration-300 ease-in-out ${contentOffsetClass}`}
       >
-        <header className="sticky top-0 z-20 w-full border-b border-slate-200 bg-white/90 backdrop-blur md:hidden">
+        <header className="sticky top-0 z-20 w-full border-b border-slate-200 bg-white/90 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/90 md:hidden">
           <div className="mx-auto flex h-[76px] w-full max-w-7xl items-center justify-between px-3 lg:px-6">
             <div className="flex items-center gap-2">
               <button
@@ -1750,22 +1754,22 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
         ? createPortal(
             <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
               <div
-                className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm"
+                className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm dark:bg-zinc-950/70"
                 onClick={closeCreateModal}
               />
               <div
                 ref={createRef}
-                className="page-fade-in relative z-10 w-full max-w-3xl rounded-2xl border border-white/60 bg-white/35 bg-gradient-to-b from-white/90 via-white/70 to-white/40 p-1.5 text-slate-900 shadow-[0_0_0_1px_rgba(255,255,255,0.65),0_22px_60px_rgba(15,23,42,0.22)] backdrop-blur-lg sm:p-2"
+                className="page-fade-in relative z-10 w-full max-w-3xl rounded-2xl border border-white/60 bg-white/35 bg-gradient-to-b from-white/90 via-white/70 to-white/40 p-1.5 text-slate-900 shadow-[0_0_0_1px_rgba(255,255,255,0.65),0_22px_60px_rgba(15,23,42,0.22)] dark:shadow-none backdrop-blur-lg dark:border-zinc-700 dark:bg-zinc-900/60 dark:from-zinc-900/80 dark:via-zinc-900/60 dark:to-zinc-900/40 dark:text-zinc-100 sm:p-2"
               >
                 <form
-                  className="flex max-h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-[18px] bg-white/85 shadow-[0_0_0_1px_rgba(148,163,184,0.14)]"
+                  className="flex max-h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-[18px] bg-white/85 shadow-[0_0_0_1px_rgba(148,163,184,0.14)] dark:bg-zinc-900/80 dark:shadow-none"
                   onSubmit={(event) => {
                     event.preventDefault();
                     void handleCreateStart();
                   }}
                 >
                   <div className="overflow-y-auto px-6 pt-8 pb-4 sm:px-10 sm:pt-10">
-                    <h2 className="text-[23px] font-semibold tracking-tight text-slate-900 sm:text-[26px]">
+                    <h2 className="text-[23px] font-semibold tracking-tight text-slate-900 dark:text-zinc-100 sm:text-[26px]">
                       Create a new project
                     </h2>
 
@@ -1780,10 +1784,10 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                             if (createError) setCreateError(null);
                           }}
                           aria-label="Project name (required)"
-                          className={`peer w-full rounded-2xl border-[3px] bg-white py-4 pl-8 pr-5 text-lg text-slate-900 shadow-sm transition focus:outline-none focus:ring-0 ${
+                          className={`peer w-full rounded-2xl border-[3px] bg-white py-4 pl-8 pr-5 text-lg text-slate-900 shadow-sm dark:shadow-none transition focus:outline-none focus:ring-0 dark:bg-zinc-900 dark:text-zinc-100 ${
                             showCreateNameError
                               ? "border-rose-400 hover:border-rose-500 focus:border-rose-500"
-                              : "border-slate-300 hover:border-[#51bdff] focus:border-[#51bdff]"
+                              : "border-slate-300 hover:border-[#51bdff] focus:border-[#51bdff] dark:border-zinc-700 dark:hover:border-zinc-500 dark:focus:border-zinc-500"
                           }`}
                           disabled={createBusy}
                         />
@@ -1793,7 +1797,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                             className="pointer-events-none absolute inset-y-0 left-5 flex items-center gap-1 text-base"
                           >
                             <span className="font-bold text-rose-500">*</span>
-                            <span className="text-slate-500">Name your project</span>
+                            <span className="text-slate-500 dark:text-zinc-400">Name your project</span>
                           </div>
                         ) : null}
                       </div>
@@ -1804,10 +1808,10 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                       <div
                         className={`flex flex-col items-center justify-center rounded-[18px] border-[3px] border-dashed px-6 py-10 text-center transition ${
                           showCreateFilesError
-                            ? "border-rose-400 bg-rose-50/40"
+                            ? "border-rose-400 bg-rose-50/40 dark:bg-zinc-900/60"
                             : createDragActive
-                              ? "border-[#51bdff] bg-sky-50/60"
-                              : "border-slate-300 bg-white/60 hover:border-[#51bdff]"
+                              ? "border-[#51bdff] bg-sky-50/60 dark:border-zinc-500 dark:bg-zinc-900/70"
+                              : "border-slate-300 bg-white/60 hover:border-[#51bdff] dark:border-zinc-700 dark:bg-zinc-900/50 dark:hover:border-zinc-500"
                         } ${createBusy ? "opacity-70" : ""}`}
                         onDragOver={(event) => {
                           event.preventDefault();
@@ -1825,7 +1829,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                         <p className="mt-3 text-base font-semibold text-slate-900">Drop document here to upload</p>
                         <button
                           type="button"
-                          className="mt-4 inline-flex items-center justify-center rounded-[12px] border-[3px] border-[#51bdff] bg-white px-5 py-2 text-sm font-semibold text-[#013d63] shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-50"
+                          className="mt-4 inline-flex items-center justify-center rounded-[12px] border-[3px] border-[#51bdff] bg-white px-5 py-2 text-sm font-semibold text-[#013d63] shadow-sm dark:shadow-none transition hover:-translate-y-0.5 hover:bg-slate-50"
                           onClick={() => createFileInputRef.current?.click()}
                           disabled={createBusy}
                         >

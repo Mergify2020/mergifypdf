@@ -127,33 +127,35 @@ export default function ProjectCard({
   };
 
   const cardClasses = [
-    "relative rounded-[10px] bg-[#F9FAFC] transition",
-    isSelected ? "ring-[3px] ring-[#4C6FFF] shadow-[0_0_0_4px_rgba(76,111,255,0.15)]" : "",
+    "relative rounded-[10px] bg-[#F9FAFC] transition dark:bg-zinc-900 dark:ring-0",
+    isSelected
+      ? "ring-[3px] ring-[#4C6FFF] shadow-[0_0_0_4px_rgba(76,111,255,0.15)] dark:ring-zinc-200 dark:shadow-none"
+      : "",
   ]
     .filter(Boolean)
     .join(" ");
 
   const checkboxClasses = [
-    "absolute left-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-[10px] border-[3px] text-xs font-semibold shadow-md transition-transform transition-opacity duration-150 xl:h-9 xl:w-9",
+    "absolute left-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-[10px] border-[3px] text-xs font-semibold shadow-md dark:shadow-none transition-transform transition-opacity duration-150 xl:h-9 xl:w-9",
     isSelected
-      ? "bg-[#4C6FFF] border-[#4C6FFF] text-white opacity-100 scale-100"
+      ? "bg-[#4C6FFF] border-[#4C6FFF] text-white opacity-100 scale-100 dark:bg-zinc-200 dark:border-zinc-200 dark:text-zinc-900"
       : [
           // Always visible on very small screens (no hover), hover-only from sm and up.
-          "bg-white/90 border-slate-200 text-slate-500 opacity-100 scale-100",
+          "bg-white/90 border-slate-200 text-slate-500 opacity-100 scale-100 dark:bg-zinc-900/90 dark:border-zinc-700 dark:text-zinc-300",
           "sm:opacity-0 sm:scale-90 sm:group-hover:opacity-100 sm:group-hover:scale-100 sm:group-hover:border-slate-400",
         ].join(" "),
   ]
     .filter(Boolean)
     .join(" ");
   const actionsContainerClasses = [
-    "absolute right-3 top-2 z-10 inline-flex items-center overflow-hidden rounded-[10px] bg-white/95 text-slate-400 shadow-[0_4px_12px_rgba(15,23,42,0.18)]",
+    "absolute right-3 top-2 z-10 inline-flex items-center overflow-hidden rounded-[10px] bg-white/95 text-slate-400 shadow-[0_4px_12px_rgba(15,23,42,0.18)] dark:bg-zinc-900/95 dark:text-zinc-200 dark:shadow-none",
     "opacity-100 scale-100 transition-transform transition-opacity duration-150",
     "sm:opacity-0 sm:scale-90 sm:group-hover:opacity-100 sm:group-hover:scale-100",
   ]
     .filter(Boolean)
     .join(" ");
   const actionButtonBase =
-    "flex h-9 w-9 items-center justify-center text-sm hover:bg-slate-100/80 transition xl:h-10 xl:w-10";
+    "flex h-9 w-9 items-center justify-center text-sm hover:bg-slate-100/80 transition dark:hover:bg-zinc-800/80 xl:h-10 xl:w-10";
 
   const startRenaming = (event: { preventDefault: () => void; stopPropagation: () => void }) => {
     event.preventDefault();
@@ -322,7 +324,7 @@ export default function ProjectCard({
                 <div
                   role="menu"
                   aria-label="Project actions"
-                  className="fixed z-[9999] w-80 -translate-y-1/2 overflow-hidden rounded-3xl border border-slate-200 bg-white text-sm text-slate-800 shadow-[0_24px_70px_rgba(15,23,42,0.20)]"
+                  className="fixed z-[9999] w-80 -translate-y-1/2 overflow-hidden rounded-3xl border border-slate-200 bg-white text-sm text-slate-800 shadow-[0_24px_70px_rgba(15,23,42,0.20)] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:shadow-none"
                   onMouseDown={(event) => {
                     // Prevent the global outside-click handler from firing for clicks inside the menu
                     event.stopPropagation();
@@ -330,14 +332,14 @@ export default function ProjectCard({
                   style={{ top: menuPosition.top, left: menuPosition.left }}
                 >
                   <div className="p-4 pb-3">
-                    <p className="truncate text-base font-semibold text-slate-900">{project.title}</p>
-                    <p className="mt-1 text-xs font-medium text-slate-500">{project.updated}</p>
+                    <p className="truncate text-base font-semibold text-slate-900 dark:text-zinc-100">{project.title}</p>
+                    <p className="mt-1 text-xs font-medium text-slate-500 dark:text-zinc-400">{project.updated}</p>
                   </div>
-                  <div className="h-px bg-slate-100" />
+                  <div className="h-px bg-slate-100 dark:bg-zinc-800" />
                   <button
                     type="button"
                     role="menuitem"
-                    className="mx-3 mt-2 flex w-[calc(100%-1.5rem)] items-center gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-slate-50"
+                    className="mx-3 mt-2 flex w-[calc(100%-1.5rem)] items-center gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-slate-50 dark:hover:bg-zinc-800/70"
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
@@ -345,15 +347,15 @@ export default function ProjectCard({
                       setMenuPosition(null);
                     }}
                   >
-                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-slate-700">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-slate-700 dark:bg-zinc-800 dark:text-zinc-200">
                       <ExternalLink className="h-5 w-5" aria-hidden />
                     </span>
-                    <span className="text-base font-medium text-slate-900">Open in new tab</span>
+                    <span className="text-base font-medium text-slate-900 dark:text-zinc-100">Open in new tab</span>
                   </button>
                   <button
                     type="button"
                     role="menuitem"
-                    className="mx-3 flex w-[calc(100%-1.5rem)] items-center gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-slate-50"
+                    className="mx-3 flex w-[calc(100%-1.5rem)] items-center gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-slate-50 dark:hover:bg-zinc-800/70"
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
@@ -390,15 +392,15 @@ export default function ProjectCard({
                       })();
                     }}
                   >
-                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-slate-700">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-slate-700 dark:bg-zinc-800 dark:text-zinc-200">
                       <Copy className="h-5 w-5" aria-hidden />
                     </span>
-                    <span className="text-base font-medium text-slate-900">Make a copy</span>
+                    <span className="text-base font-medium text-slate-900 dark:text-zinc-100">Make a copy</span>
                   </button>
                   <button
                     type="button"
                     role="menuitem"
-                    className="mx-3 flex w-[calc(100%-1.5rem)] items-center gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-slate-50"
+                    className="mx-3 flex w-[calc(100%-1.5rem)] items-center gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-slate-50 dark:hover:bg-zinc-800/70"
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
@@ -406,16 +408,16 @@ export default function ProjectCard({
                       setMenuPosition(null);
                     }}
                   >
-                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-slate-700">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-slate-700 dark:bg-zinc-800 dark:text-zinc-200">
                       <Link2 className="h-5 w-5" aria-hidden />
                     </span>
-                    <span className="text-base font-medium text-slate-900">Copy link</span>
+                    <span className="text-base font-medium text-slate-900 dark:text-zinc-100">Copy link</span>
                   </button>
-                  <div className="mx-3 my-2 h-px bg-slate-100" />
+                  <div className="mx-3 my-2 h-px bg-slate-100 dark:bg-zinc-800" />
                   <button
                     type="button"
                     role="menuitem"
-                    className="mx-3 mb-2 flex w-[calc(100%-1.5rem)] items-center gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-rose-50"
+                    className="mx-3 mb-2 flex w-[calc(100%-1.5rem)] items-center gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-rose-50 dark:hover:bg-zinc-800/60"
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
@@ -443,9 +445,9 @@ export default function ProjectCard({
               )}
           </>
         )}
-        <div className="relative m-[3px] w-[calc(100%-6px)] aspect-square bg-[#EEF1F5] border border-[rgba(0,0,0,0.06)] transition-colors group-hover:bg-[#E3E8EF]">
+        <div className="relative m-[3px] w-[calc(100%-6px)] aspect-square bg-[#EEF1F5] border border-[rgba(0,0,0,0.06)] transition-colors group-hover:bg-[#E3E8EF] dark:border-transparent dark:bg-zinc-800/70 dark:group-hover:bg-zinc-800">
           {typeof project.pagesCount === "number" && project.pagesCount > 0 ? (
-            <div className="pointer-events-none absolute bottom-2.5 right-2.5 z-10 rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold leading-none text-white opacity-0 shadow-sm backdrop-blur-sm transition-opacity group-hover:opacity-100">
+            <div className="pointer-events-none absolute bottom-2.5 right-2.5 z-10 rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold leading-none text-white opacity-0 shadow-sm dark:shadow-none backdrop-blur-sm transition-opacity group-hover:opacity-100 dark:bg-zinc-800/80 dark:text-zinc-100">
               {project.pagesCount} {project.pagesCount === 1 ? "page" : "pages"}
             </div>
           ) : null}
@@ -469,7 +471,7 @@ export default function ProjectCard({
                 }}
               />
             ) : (
-              <div className="flex h-full w-full items-center justify-center text-slate-300">
+              <div className="flex h-full w-full items-center justify-center text-slate-300 dark:text-zinc-600">
                 <svg viewBox="0 0 64 64" className="h-10 w-10" aria-hidden="true">
                   <path
                     d="M18 8h20l10 10v34a4 4 0 0 1-4 4H18a4 4 0 0 1-4-4V12a4 4 0 0 1 4-4z"
@@ -519,14 +521,14 @@ export default function ProjectCard({
             onBlur={() => {
               void submitRename();
             }}
-            className="w-full rounded-lg border-2 border-[#019dfd] bg-white px-2 py-1 text-base font-semibold text-slate-900 shadow-sm outline-none focus:border-[#019dfd] focus:ring-0 disabled:opacity-70"
+            className="w-full rounded-lg border-2 border-[#019dfd] bg-white px-2 py-1 text-base font-semibold text-slate-900 shadow-sm dark:shadow-none outline-none focus:border-[#019dfd] focus:ring-0 disabled:opacity-70 dark:bg-zinc-900 dark:text-zinc-100"
           />
         ) : (
           <div className="group/title flex items-center gap-2">
             <button
               type="button"
               onClick={startRenaming}
-              className="min-w-0 flex-1 truncate py-1 text-left text-base font-semibold text-slate-900"
+              className="min-w-0 flex-1 truncate py-1 text-left text-base font-semibold text-slate-900 dark:text-zinc-100"
               aria-label="Rename project"
             >
               {project.title}
@@ -536,7 +538,7 @@ export default function ProjectCard({
                 type="button"
                 onClick={startRenaming}
                 aria-label="Rename project"
-                className="inline-flex items-center justify-center text-black opacity-0 transition-opacity group-hover/title:opacity-100"
+                className="inline-flex items-center justify-center text-black opacity-0 transition-opacity group-hover/title:opacity-100 dark:text-zinc-200"
               >
                 <Pencil className="h-4 w-4" aria-hidden />
               </button>
@@ -546,7 +548,7 @@ export default function ProjectCard({
         {renameError ? (
           <p className="text-xs font-semibold text-rose-600">{renameError}</p>
         ) : null}
-        <p className="text-xs text-slate-500" suppressHydrationWarning>
+        <p className="text-xs text-slate-500 dark:text-zinc-400" suppressHydrationWarning>
           {project.updated}
         </p>
       </div>

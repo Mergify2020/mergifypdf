@@ -105,7 +105,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
                 {["1 free upload per day", "Fast performance", "Simple to use"].map((badge) => (
                   <span
                     key={badge}
-                    className="inline-flex cursor-default items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-4 py-1.5 text-slate-700 shadow-sm"
+                    className="inline-flex cursor-default items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-4 py-1.5 text-slate-700 shadow-sm dark:shadow-none"
                   >
                     <span className="h-2 w-2 rounded-full bg-[#024d7c]" />
                     {badge}
@@ -124,7 +124,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
                 alt="Preview of the MergifyPDF workspace"
                 width={880}
                 height={640}
-                className="w-full max-w-xl rounded-xl object-cover shadow-[0_40px_120px_rgba(9,20,45,0.25)]"
+                className="w-full max-w-xl rounded-xl object-cover shadow-[0_40px_120px_rgba(9,20,45,0.25)] dark:shadow-none"
                 priority
               />
               {/* Sparkles anchored to the screenshot card */}
@@ -200,7 +200,7 @@ async function ProjectsDashboard({
     })(),
   }));
   return (
-    <main className="h-screen w-full bg-[#F1F4F9] py-6">
+    <main className="h-screen w-full bg-[#F1F4F9] py-6 dark:bg-[#222224]">
       <div className="w-full">
         <div className="grid h-full w-full max-w-[1680px] min-h-0 gap-[24px] lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start">
           <div
@@ -225,49 +225,49 @@ async function ProjectsDashboard({
               gap: "var(--home-section-gap, 24px)",
             }}
           >
-            <div className="rounded-xl border border-[#E5E7EB] bg-white px-4 py-4 shadow-[0_12px_36px_rgba(15,23,42,0.10)]">
+            <div className="rounded-xl border border-[#E5E7EB] bg-white px-4 py-4 shadow-[0_12px_36px_rgba(15,23,42,0.10)] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-none">
               <Link
                 href="/signature-center"
-                className="text-xs font-semibold uppercase tracking-[0.14em] text-[#6B7280] hover:text-[#4B5563]"
+                className="text-xs font-semibold uppercase tracking-[0.14em] text-[#6B7280] hover:text-[#4B5563] dark:text-zinc-400 dark:hover:text-zinc-200"
               >
                 SIGN DOCUMENTS
               </Link>
-              <div className="mt-3 flex flex-col text-sm font-medium text-slate-700">
+              <div className="no-theme-transition mt-3 flex flex-col text-sm font-medium text-slate-700 dark:text-zinc-200">
                 <Link
                   href="/signature-center"
-                  className="group flex items-center gap-3 rounded-lg px-2 py-2 transition hover:bg-slate-50 cursor-pointer"
+                  className="group flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-slate-50 dark:hover:bg-zinc-800/60 cursor-pointer"
                 >
-                  <Send className="h-4 w-4 text-[#4F46E5] transition-transform duration-[120ms] group-hover:translate-x-0.5" aria-hidden />
+                  <Send className="h-4 w-4 text-[#4F46E5] transition-transform duration-[120ms] group-hover:translate-x-0.5 dark:text-zinc-200" aria-hidden />
                   <span className="font-semibold">Request signature</span>
                 </Link>
                 <Link
                   href="/signature-center"
-                  className="group flex items-center gap-3 rounded-lg px-2 py-2 transition hover:bg-slate-50 cursor-pointer"
+                  className="group flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-slate-50 dark:hover:bg-zinc-800/60 cursor-pointer"
                 >
-                  <PenLine className="h-4 w-4 text-slate-500 transition-transform duration-[120ms] group-hover:translate-x-0.5" aria-hidden />
+                  <PenLine className="h-4 w-4 text-slate-500 transition-transform duration-[120ms] group-hover:translate-x-0.5 dark:text-zinc-400" aria-hidden />
                   <span>Create signature</span>
                 </Link>
                 <Link
                   href="/signature-center"
-                  className="group flex items-center gap-3 rounded-lg px-2 py-2 transition hover:bg-slate-50 cursor-pointer"
+                  className="group flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-slate-50 dark:hover:bg-zinc-800/60 cursor-pointer"
                 >
-                  <FileText className="h-4 w-4 text-slate-500 transition-transform duration-[120ms] group-hover:translate-x-0.5" aria-hidden />
+                  <FileText className="h-4 w-4 text-slate-500 transition-transform duration-[120ms] group-hover:translate-x-0.5 dark:text-zinc-400" aria-hidden />
                   <span>Manage signatures</span>
                 </Link>
               </div>
             </div>
-            <div className="rounded-xl border border-[#E5E7EB] bg-white px-4 py-4 shadow-[0_12px_36px_rgba(15,23,42,0.10)]">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#6B7280]">Activity</p>
-              <div className="mt-3 flex h-24 flex-col items-start justify-center gap-2 rounded-xl border border-dashed border-[#E6EBF2] bg-[#F7F9FC] px-3 text-xs text-[#6B7280]">
-                <span className="h-2.5 w-2.5 rounded-full bg-[#E6EBF2]" />
+            <div className="rounded-xl border border-[#E5E7EB] bg-white px-4 py-4 shadow-[0_12px_36px_rgba(15,23,42,0.10)] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-none">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#6B7280] dark:text-zinc-400">Activity</p>
+              <div className="mt-3 flex h-24 flex-col items-start justify-center gap-2 rounded-xl border border-dashed border-[#E6EBF2] bg-[#F7F9FC] px-3 text-xs text-[#6B7280] dark:border-zinc-700 dark:bg-zinc-900/60 dark:text-zinc-400">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#E6EBF2] dark:bg-zinc-700" />
                 <span>No recent activity</span>
               </div>
             </div>
             <div className="flex flex-1 min-h-0 flex-col gap-[24px]">
-              <div className="flex flex-[1] min-h-0 flex-col rounded-xl border border-[#E5E7EB] bg-white px-4 py-4 shadow-[0_12px_36px_rgba(15,23,42,0.10)]">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#6B7280]">Templates</p>
-                <div className="mt-3 flex flex-1 flex-col items-start justify-center gap-2 rounded-xl border border-dashed border-[#E6EBF2] bg-[#F7F9FC] px-3 text-xs text-[#6B7280] min-h-0">
-                  <span className="h-2.5 w-2.5 rounded-full bg-[#E6EBF2]" />
+              <div className="flex flex-[1] min-h-0 flex-col rounded-xl border border-[#E5E7EB] bg-white px-4 py-4 shadow-[0_12px_36px_rgba(15,23,42,0.10)] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-none">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#6B7280] dark:text-zinc-400">Templates</p>
+                <div className="mt-3 flex flex-1 flex-col items-start justify-center gap-2 rounded-xl border border-dashed border-[#E6EBF2] bg-[#F7F9FC] px-3 text-xs text-[#6B7280] min-h-0 dark:border-zinc-700 dark:bg-zinc-900/60 dark:text-zinc-400">
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#E6EBF2] dark:bg-zinc-700" />
                   <span>No templates yet</span>
                 </div>
               </div>
