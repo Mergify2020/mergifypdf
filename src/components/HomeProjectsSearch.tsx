@@ -295,6 +295,39 @@ export default function HomeProjectsSearch({
     };
   }, [query, ownerFilter, sortOption, initialProjects]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const list = recentListRef.current;
+    if (!list) return;
+    let raf = 0;
+    let lastValue = "";
+
+    const update = () => {
+      const width = list.getBoundingClientRect().width;
+      const next = width < 940 ? "200px" : "240px";
+      if (next !== lastValue) {
+        list.style.setProperty("--projects-grid-min", next);
+        lastValue = next;
+      }
+    };
+
+    const schedule = () => {
+      if (raf) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(update);
+    };
+
+    schedule();
+    window.addEventListener("resize", schedule);
+    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(schedule) : null;
+    if (observer) observer.observe(list);
+
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      window.removeEventListener("resize", schedule);
+      if (observer) observer.disconnect();
+    };
+  }, []);
+
 
   useEffect(() => {
     if (typeof window === "undefined") return;

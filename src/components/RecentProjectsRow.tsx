@@ -51,7 +51,7 @@ export default function RecentProjectsRow({
 
   if (loading && !projects.length) {
     return (
-      <div className="projects-grid mt-2 grid w-full max-w-[1296px] justify-start gap-6 grid-cols-[repeat(auto-fit,minmax(240px,1fr))]">
+      <div className="projects-grid mt-2 grid w-full max-w-[1296px] justify-start gap-6 grid-cols-[repeat(auto-fit,minmax(var(--projects-grid-min,240px),1fr))]">
         {Array.from({ length: 6 }).map((_, index) => (
           <div key={`home-loading-project-${index}`} className="flex flex-col text-left">
             <div className="relative rounded-[10px] bg-[#F9FAFC] dark:bg-zinc-900/60">
@@ -101,7 +101,7 @@ export default function RecentProjectsRow({
       <div className="relative">
         <div
           aria-hidden="true"
-          className="projects-grid mt-2 grid w-full max-w-[1296px] justify-start gap-6 grid-cols-[repeat(auto-fit,minmax(240px,1fr))]"
+          className="projects-grid mt-2 grid w-full max-w-[1296px] justify-start gap-6 grid-cols-[repeat(auto-fit,minmax(var(--projects-grid-min,240px),1fr))]"
         >
           {Array.from({ length: 6 }).map((_, index) => (
           <div key={`home-empty-project-${index}`} className="invisible flex flex-col text-left">
@@ -125,7 +125,7 @@ export default function RecentProjectsRow({
   }
 
   return (
-    <div className="projects-grid mt-2 grid w-full max-w-[1296px] justify-start gap-6 grid-cols-[repeat(auto-fit,minmax(240px,1fr))]">
+    <div className="projects-grid mt-2 grid w-full max-w-[1296px] justify-start gap-6 grid-cols-[repeat(auto-fit,minmax(var(--projects-grid-min,240px),1fr))]">
       {mapped.map((project, index) => {
         const isSelected = !!selected[project.id];
         return (
