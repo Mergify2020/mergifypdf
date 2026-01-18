@@ -693,12 +693,14 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
     offset = 12,
     useSidebarEdge = false
   ) => {
+    if (label === "Expand sidebar" && expanded) return;
+    if (label === "Collapse sidebar" && !expanded) return;
     const rect = event.currentTarget.getBoundingClientRect();
     const sidebarRect = sidebarRef.current?.getBoundingClientRect();
     const leftAnchor = useSidebarEdge ? sidebarRect?.right ?? rect.right : rect.right;
     setSidebarTooltip({
       label,
-      top: rect.top + rect.height / 2 + (label === "Expand sidebar" ? 6 : 0),
+      top: rect.top + rect.height / 2 + (label === "Expand sidebar" || label === "Collapse sidebar" ? 6 : 0),
       left: leftAnchor + offset,
     });
   };
@@ -1062,17 +1064,23 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                     <AppHeaderBrand />
                     <button
                       type="button"
-                      onClick={() => setExpanded((prev) => !prev)}
+                      onClick={() => {
+                        setSidebarTooltip(null);
+                        setExpanded((prev) => !prev);
+                      }}
+                      onMouseDown={() => {
+                        setSidebarTooltip(null);
+                      }}
                       className="relative z-10 inline-flex items-center justify-center p-1 text-slate-500 transition hover:text-slate-900 dark:text-zinc-300 dark:hover:text-white"
                       aria-label="Collapse sidebar"
                       onMouseEnter={(event) => {
-                        setSidebarTooltipFromEvent(event, "Collapse sidebar");
+                        setSidebarTooltipFromEvent(event, "Collapse sidebar", 3, true);
                       }}
                       onMouseLeave={() => {
                         setSidebarTooltip(null);
                       }}
                       onFocus={(event) => {
-                        setSidebarTooltipFromEvent(event, "Collapse sidebar");
+                        setSidebarTooltipFromEvent(event, "Collapse sidebar", 3, true);
                       }}
                       onBlur={() => {
                         setSidebarTooltip(null);
@@ -1084,7 +1092,13 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                 ) : (
                   <button
                     type="button"
-                    onClick={() => setExpanded(true)}
+                    onClick={() => {
+                      setSidebarTooltip(null);
+                      setExpanded(true);
+                    }}
+                    onMouseDown={() => {
+                      setSidebarTooltip(null);
+                    }}
                     className="inline-flex items-center justify-center overflow-visible"
                     aria-label="Expand sidebar"
                     onMouseEnter={(event) => {

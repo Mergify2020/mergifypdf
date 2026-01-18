@@ -295,6 +295,7 @@ export default function HomeProjectsSearch({
     };
   }, [query, ownerFilter, sortOption, initialProjects]);
 
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     const stored = window.localStorage.getItem("theme");
