@@ -432,6 +432,7 @@ const LARGE_DOC_PAGE_THRESHOLD = 80;
 const LARGE_DOC_INITIAL_RENDER_COUNT = 8;
 const LARGE_DOC_RENDER_CHUNK = 20;
 const LARGE_DOC_THUMB_LIMIT = 50;
+const STARTUP_OVERLAY_PREVIEW_TARGET = 8;
 const GRID_VARIANTS = {
   hidden: { opacity: 0, scale: 0.97 },
   visible: {
@@ -3629,6 +3630,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   const pagesByIdRef = useRef<Map<string, PageItem>>(new Map());
   const hasHydratedSources = useRef(false);
   const [sourcesHydrated, setSourcesHydrated] = useState(false);
+  const [projectHasSources, setProjectHasSources] = useState<boolean | null>(null);
   const objectUrlCacheRef = useRef<Map<string, string>>(new Map());
   const hasHydratedHighlights = useRef(false);
   const hasHydratedSignatures = useRef(false);
@@ -3729,7 +3731,6 @@ const timer =
     const previewUrl = coverPreviewUrl ?? getProjectCoverPreview(pages);
     if (!previewUrl) return;
     if (previewUploadRef.current[projectId] === previewUrl) return;
-    previewUploadRef.current[projectId] = previewUrl;
 
     const uploadPreview = async () => {
       const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}`, {
@@ -3740,6 +3741,7 @@ const timer =
       if (!res.ok) {
         throw new Error(`Preview upload failed with status ${res.status}`);
       }
+      previewUploadRef.current[projectId] = previewUrl;
     };
 
     const timer = setTimeout(() => {
@@ -3836,7 +3838,7 @@ const timer =
     `${buttonBase} bg-[#024d7c] text-white shadow-md shadow-[#012a44]/30 hover:-translate-y-0.5 hover:bg-[#013d63]`;
   // (definition moved earlier to avoid temporal dead zone)
   const toolButtonBase =
-    "inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#009DFD]/25 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F1F5F9] disabled:cursor-not-allowed";
+    "inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#009DFD]/25 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F1F5F9]";
 	  const toolIconButton =
 	    "justify-center px-1";
 	  const toolButtonInactiveNeutral =
@@ -3845,6 +3847,7 @@ const timer =
     "border-transparent bg-[#F1F5F9] text-[#1f2937] shadow-none hover:bg-[#E5E7EB] hover:text-[#111827] hover:shadow-[0_1px_2px_rgba(0,0,0,0.06)]";
 	  const toolButtonActive =
 	    "border-transparent bg-[#024d7c] text-white shadow-md shadow-[#012a44]/25 hover:bg-[#013d63] hover:shadow-md";
+  const toolbarLoading = loading || !sourcesHydrated;
   const controlButtonClass =
     "flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,0.08)] transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-40";
   const bottomBarButtonClass =
@@ -4157,9 +4160,11 @@ const timer =
 
     async function hydrateFromStorage() {
       hasHydratedSources.current = false;
+      setProjectHasSources(null);
       const storageProjectId = projectParam ?? currentProjectId ?? null;
       const storedSourceIds = readStoredSourceIds(storageProjectId);
       if (storedSourceIds && storedSourceIds.length > 0 && pagesRef.current.length === 0) {
+        setProjectHasSources(true);
         const cachedPages = readWorkspacePreviewCache(projectKey, storedSourceIds);
         if (cachedPages && cachedPages.length > 0) {
           restoringPreviewCacheRef.current = true;
@@ -4216,7 +4221,11 @@ const timer =
               json?.project?.pdfUrl && typeof json.project.pdfUrl === "string"
                 ? json.project.pdfUrl
                 : null;
+            if (pdfUrl) {
+              setProjectHasSources(true);
+            }
             if (Array.isArray(cloudSources) && cloudSources.length > 0) {
+              setProjectHasSources(true);
               const restored: SourceRef[] = [];
               const missing: string[] = [];
               for (const entry of cloudSources) {
@@ -4287,10 +4296,18 @@ const timer =
                 setError(null);
               }
             }
+            if (!pdfUrl && Array.isArray(cloudSources) && cloudSources.length === 0) {
+              setProjectHasSources(false);
+            }
           } catch (err) {
             console.error("Cloud project hydration failed.", err);
             setError("Unable to restore this project from cloud storage. Please re-upload the PDF.");
+            if (!cancelled) {
+              setProjectHasSources(null);
+            }
           }
+        } else {
+          setProjectHasSources(false);
         }
         if (!cancelled) {
           hasHydratedSources.current = true;
@@ -4335,8 +4352,10 @@ const timer =
             setShowStartupOverlay(true);
           }
           if (restored.length > 0) {
+            setProjectHasSources(true);
             setSources(restored);
           } else {
+            setProjectHasSources(false);
             local?.removeItem(key);
             setError("We couldn't restore your previous workspace. Please re-upload your PDFs.");
           }
@@ -4344,6 +4363,9 @@ const timer =
       } catch (err) {
         console.error("Failed to parse stored workspace", err);
         local?.removeItem(key);
+        if (!cancelled) {
+          setProjectHasSources(null);
+        }
       } finally {
         if (!cancelled) {
           hasHydratedSources.current = true;
@@ -5406,7 +5428,7 @@ const timer =
   const computeStartupProgress = useCallback(() => {
     const pageList = pagesRef.current;
     if (pageList.length === 0) return 0;
-    const targetCount = getInitialPreviewRenderCount(pageList.length, largeDocMode);
+    const targetCount = Math.min(STARTUP_OVERLAY_PREVIEW_TARGET, pageList.length);
     if (targetCount === 0) return 0;
     const readyCount = pageList.slice(0, targetCount).reduce((count, page) => count + (page.preview ? 1 : 0), 0);
     const renderProgress = readyCount / targetCount;
@@ -5472,12 +5494,17 @@ const timer =
     if (!showStartupOverlay) return;
     if (!sourcesHydrated) return;
     if (loading) return;
+    const targetCount = Math.min(STARTUP_OVERLAY_PREVIEW_TARGET, pages.length);
+    if (targetCount > 0) {
+      const readyCount = pages.slice(0, targetCount).filter((page) => page.preview).length;
+      if (readyCount < targetCount) return;
+    }
     const timer = setTimeout(() => {
       setShowStartupOverlay(false);
       startupOverlayActiveRef.current = false;
     }, 400);
     return () => clearTimeout(timer);
-  }, [loading, showStartupOverlay, sourcesHydrated]);
+  }, [loading, pages, showStartupOverlay, sourcesHydrated]);
 
   useEffect(() => {
     if (!showStartupOverlay) return;
@@ -5530,7 +5557,7 @@ const timer =
   useEffect(() => {
     if (!startupOverlayActiveRef.current || !showStartupOverlay) return;
     if (pages.length === 0) return;
-    const targetCount = getInitialPreviewRenderCount(pages.length, largeDocMode);
+    const targetCount = Math.min(STARTUP_OVERLAY_PREVIEW_TARGET, pages.length);
     const readyCount = pages.slice(0, targetCount).filter((page) => page.preview).length;
     if (readyCount < targetCount) return;
     const startedAt = startupOverlayStartRef.current ?? performance.now();
@@ -10362,34 +10389,44 @@ const timer =
   return (
     <main className="flex h-screen flex-col overflow-hidden bg-[#f3f6fb]">
       {showStartupOverlay ? (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/50 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-[28px] border border-white/60 bg-white/85 px-8 py-7 text-center shadow-[0_28px_80px_rgba(15,23,42,0.35)] backdrop-blur-xl">
-            <p className="text-[15px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-              MergifyPDF
-            </p>
-            <p className="mt-2 text-lg font-semibold text-slate-900">{startupOverlayMessage}</p>
-            <div className="mt-5 h-2.5 w-full overflow-hidden rounded-full bg-slate-200/80">
-              <div
-                className="relative h-full overflow-hidden rounded-full bg-gradient-to-r from-[#0f172a] via-[#1d4ed8] to-[#38bdf8] transition-[width] duration-200 ease-out"
-                style={{ width: `${Math.round(startupProgress * 100)}%` }}
-              >
+        startupOverlayVariant === "existing" ? (
+          <div className="pointer-events-none fixed inset-0 z-[120] flex items-center justify-center">
+            <div
+              className="h-10 w-10 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700"
+              aria-hidden
+            />
+            <span className="sr-only">Loading</span>
+          </div>
+        ) : (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/50 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-[28px] border border-white/60 bg-white/85 px-8 py-7 text-center shadow-[0_28px_80px_rgba(15,23,42,0.35)] backdrop-blur-xl">
+              <p className="text-[15px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                MergifyPDF
+              </p>
+              <p className="mt-2 text-lg font-semibold text-slate-900">{startupOverlayMessage}</p>
+              <div className="mt-5 h-2.5 w-full overflow-hidden rounded-full bg-slate-200/80">
                 <div
-                  className="absolute inset-0 opacity-70"
-                  style={{
-                    backgroundImage:
-                      "linear-gradient(120deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.12) 45%, rgba(255,255,255,0.35) 70%, rgba(255,255,255,0.12) 100%)",
-                    backgroundSize: "220% 100%",
-                    animation: "mpdf-water 2.8s ease-in-out infinite",
-                  }}
-                />
+                  className="relative h-full overflow-hidden rounded-full bg-gradient-to-r from-[#0f172a] via-[#1d4ed8] to-[#38bdf8] transition-[width] duration-200 ease-out"
+                  style={{ width: `${Math.round(startupProgress * 100)}%` }}
+                >
+                  <div
+                    className="absolute inset-0 opacity-70"
+                    style={{
+                      backgroundImage:
+                        "linear-gradient(120deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.12) 45%, rgba(255,255,255,0.35) 70%, rgba(255,255,255,0.12) 100%)",
+                      backgroundSize: "220% 100%",
+                      animation: "mpdf-water 2.8s ease-in-out infinite",
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="mt-4 flex items-center justify-center gap-2 text-xs font-medium text-slate-500">
+                <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+                <span>Optimizing previews for speed</span>
               </div>
             </div>
-            <div className="mt-4 flex items-center justify-center gap-2 text-xs font-medium text-slate-500">
-              <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
-              <span>Optimizing previews for speed</span>
-            </div>
           </div>
-        </div>
+        )
       ) : null}
       <header className="sticky top-0 z-40 border-b border-slate-200/60 bg-white shadow-[0_1px_4px_rgba(15,23,42,0.06)]">
         {/* Top row */}
@@ -10526,11 +10563,13 @@ const timer =
 
 	                  <button
 	                    type="button"
-	                    disabled={loading}
+	                    disabled={toolbarLoading}
 	                    aria-pressed={selectButtonOn}
-	                    className={`${toolButtonBase} ${selectButtonOn ? toolButtonActive : toolButtonInactiveBlack}`}
+	                    className={`${toolButtonBase} ${
+	                      toolbarLoading || selectButtonOn ? toolButtonActive : toolButtonInactiveBlack
+	                    }`}
 	                    onClick={() => {
-	                      if (loading) return;
+	                      if (toolbarLoading) return;
 	                      setSelectMode(true);
 	                      setPenMode(false);
 	                      setShapeMode(false);
@@ -12059,7 +12098,11 @@ const timer =
 		                ) : null}
               </AnimatePresence>
 
-	              {!loading && pages.length === 0 && (
+	              {!loading &&
+                  !showStartupOverlay &&
+                  sourcesHydrated &&
+                  pages.length === 0 &&
+                  (!projectParam || projectHasSources === false) && (
 	                <div className="rounded-3xl border border-dashed border-slate-200 bg-white/80 p-12 text-center shadow-sm">
 	                  <p className="text-base font-semibold text-gray-800">No pages yet</p>
 	                  <p className="mt-2 text-sm text-gray-500">

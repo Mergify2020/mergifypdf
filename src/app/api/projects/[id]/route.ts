@@ -58,6 +58,29 @@ async function uploadPreviewFromDataUrl(
   return objectKey;
 }
 
+async function uploadPreviewWithRetry(
+  dataUrl: string,
+  projectId: string,
+  r2: ReturnType<typeof getR2Config>,
+  attempts = 3,
+) {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return await uploadPreviewFromDataUrl(dataUrl, projectId, r2);
+    } catch (err) {
+      if (err instanceof Error && err.message === "Invalid preview data URL") {
+        throw err;
+      }
+      lastError = err;
+      if (attempt < attempts - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 200 * (attempt + 1)));
+      }
+    }
+  }
+  throw lastError;
+}
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -212,7 +235,19 @@ export async function PUT(
           { status: 500 }
         );
       }
-      resolvedPreviewKey = await uploadPreviewFromDataUrl(previewUrlRaw, id, r2Config);
+      try {
+        resolvedPreviewKey = await uploadPreviewWithRetry(previewUrlRaw, id, r2Config);
+      } catch (err) {
+        console.error("Preview upload failed after retries.", {
+          projectId: id,
+          env: process.env.NODE_ENV,
+          error: err,
+        });
+        return NextResponse.json(
+          { error: "Preview upload failed. Please try again." },
+          { status: 502 }
+        );
+      }
       console.info("Uploaded preview image to R2.", { projectId: id, env: process.env.NODE_ENV });
     } else {
       return NextResponse.json({ error: "Invalid preview payload" }, { status: 400 });

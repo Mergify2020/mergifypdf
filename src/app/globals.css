@@ -414,3 +414,54 @@ html.theme-scroll-reveal:not(.dark) ::-webkit-scrollbar-thumb {
   width: 0;
   height: 0;
 }
+
+.scrollbar-thumb-only {
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+.scrollbar-thumb-only::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thumb-only::-webkit-scrollbar-thumb {
+  border-color: transparent;
+}
+
+.home-sidebar-scroll {
+  scrollbar-width: auto;
+}
+
+.home-sidebar-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.project-card:has(.project-card-preview:hover) {
+  transform: translateY(-4px);
+}
+
+.project-card:has(.project-card-preview:hover) .project-card-preview {
+  background-color: #e3e8ef;
+}
+
+.dark .project-card:has(.project-card-preview:hover) .project-card-preview {
+  background-color: rgb(39 39 42 / 0.7);
+}
+
+.project-card:has(.project-card-preview:hover) .project-card-pages {
+  opacity: 1;
+}
+
+.project-card:has(.project-card-preview:hover) .project-card-overlay {
+  opacity: 1;
+}
+
+.project-card:has(.project-card-preview:hover, .project-card-select:hover) .project-card-select {
+  opacity: 1;
+  transform: scale(1);
+  border-color: #94a3b8;
+}
+
+.project-card:has(.project-card-preview:hover, .project-card-actions:hover) .project-card-actions {
+  opacity: 1;
+  transform: scale(1);
+}

@@ -22,6 +22,7 @@ type ProjectCardProps = {
   project: Project;
   isSelected: boolean;
   hasSelection: boolean;
+  showResumeBadge?: boolean;
   onToggleSelected: (id: string) => void;
   onRenamed?: (id: string, title: string) => void;
   onCopied?: (
@@ -40,6 +41,7 @@ export default function ProjectCard({
   project,
   isSelected,
   hasSelection,
+  showResumeBadge = false,
   onToggleSelected,
   onRenamed,
   onCopied,
@@ -127,7 +129,7 @@ export default function ProjectCard({
   };
 
   const cardClasses = [
-    "relative rounded-[10px] bg-[#F9FAFC] transition dark:bg-zinc-900 dark:ring-0",
+    "relative rounded-[10px] bg-[#F9FAFC] transition dark:bg-zinc-900 dark:shadow-[0_8px_18px_rgba(0,0,0,0.22)] dark:ring-0",
     isSelected
       ? "ring-[3px] ring-[#4C6FFF] shadow-[0_0_0_4px_rgba(76,111,255,0.15)] dark:ring-zinc-200 dark:shadow-none"
       : "",
@@ -142,7 +144,7 @@ export default function ProjectCard({
       : [
           // Always visible on very small screens (no hover), hover-only from sm and up.
           "bg-white/90 border-slate-200 text-slate-500 opacity-100 scale-100 dark:bg-zinc-900/90 dark:border-zinc-700 dark:text-zinc-300",
-          "sm:opacity-0 sm:scale-90 sm:group-hover:opacity-100 sm:group-hover:scale-100 sm:group-hover:border-slate-400",
+          "sm:opacity-0 sm:scale-90",
         ].join(" "),
   ]
     .filter(Boolean)
@@ -150,7 +152,7 @@ export default function ProjectCard({
   const actionsContainerClasses = [
     "absolute right-3 top-2 z-10 inline-flex items-center overflow-hidden rounded-[10px] bg-white/95 text-slate-400 shadow-[0_4px_12px_rgba(15,23,42,0.18)] dark:bg-zinc-900/95 dark:text-zinc-200 dark:shadow-none",
     "opacity-100 scale-100 transition-transform transition-opacity duration-150",
-    "sm:opacity-0 sm:scale-90 sm:group-hover:opacity-100 sm:group-hover:scale-100",
+    "sm:opacity-0 sm:scale-90",
   ]
     .filter(Boolean)
     .join(" ");
@@ -186,6 +188,8 @@ export default function ProjectCard({
       setRenameError(null);
       const previousTitle = project.title;
       onRenamed?.(project.id, next);
+      setRenaming(false);
+      setDraftName("");
 
       const res = await fetch(`/api/projects/${encodeURIComponent(project.id)}`, {
         method: "PUT",
@@ -204,8 +208,6 @@ export default function ProjectCard({
         return;
       }
       void refreshProjectsSummary(ownerKey);
-      setRenaming(false);
-      setDraftName("");
     } finally {
       setRenameBusy(false);
     }
@@ -226,29 +228,11 @@ export default function ProjectCard({
   };
 
   return (
-    <Link
-      href={`/studio?project=${encodeURIComponent(project.id)}`}
-      className="group flex flex-col text-left transition hover:-translate-y-1"
-      aria-label={project.title}
-      aria-disabled={hasSelection}
-      onClick={(event) => {
-        if (renaming) {
-          event.preventDefault();
-          event.stopPropagation();
-          void submitRename();
-          return;
-        }
-        if (hasSelection) {
-          event.preventDefault();
-          event.stopPropagation();
-          onToggleSelected(project.id);
-        }
-      }}
-    >
+    <div className="project-card group flex flex-col text-left transition" aria-label={project.title}>
       <div ref={cardRef} className={cardClasses}>
         <button
           type="button"
-          className={checkboxClasses}
+          className={`${checkboxClasses} project-card-select`}
           onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
@@ -263,7 +247,7 @@ export default function ProjectCard({
         </button>
         {!hasSelection && (
           <>
-            <div className={actionsContainerClasses}>
+            <div className={`${actionsContainerClasses} project-card-actions`}>
               <button
                 type="button"
                 className={`${actionButtonBase} ${starred ? "text-yellow-400" : ""}`}
@@ -445,15 +429,26 @@ export default function ProjectCard({
               )}
           </>
         )}
-        <div className="relative m-[3px] w-[calc(100%-6px)] aspect-square bg-[#EEF1F5] border border-[rgba(0,0,0,0.06)] transition-colors group-hover:bg-[#E3E8EF] dark:border-transparent dark:bg-zinc-800/70 dark:group-hover:bg-zinc-800">
+        <div className="project-card-preview relative m-[3px] w-[calc(100%-6px)] aspect-square rounded-[10px] bg-[#EEF1F5] border border-[rgba(0,0,0,0.06)] transition-colors dark:border-transparent dark:bg-zinc-800/70">
+          <Link
+            href={`/studio?project=${encodeURIComponent(project.id)}`}
+            className="absolute inset-0"
+            aria-label={`Open ${project.title}`}
+            onClick={(event) => {
+              if (renaming || hasSelection) {
+                event.preventDefault();
+                event.stopPropagation();
+              }
+            }}
+          />
           {typeof project.pagesCount === "number" && project.pagesCount > 0 ? (
-            <div className="pointer-events-none absolute bottom-2.5 right-2.5 z-10 rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold leading-none text-white opacity-0 shadow-sm dark:shadow-none backdrop-blur-sm transition-opacity group-hover:opacity-100 dark:bg-zinc-800/80 dark:text-zinc-100">
+            <div className="project-card-pages pointer-events-none absolute bottom-2.5 left-2.5 z-10 rounded-full bg-black/60 px-3.5 py-1 text-[12px] font-semibold text-white opacity-0 shadow-sm dark:shadow-none backdrop-blur-sm transition-opacity dark:bg-zinc-800/80 dark:text-zinc-100">
               {project.pagesCount} {project.pagesCount === 1 ? "page" : "pages"}
             </div>
           ) : null}
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 z-[5] bg-black/[0.03] opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+            className="project-card-overlay pointer-events-none absolute inset-0 z-[5] bg-black/[0.03] opacity-0 transition-opacity duration-150"
           />
           <div className="flex h-full w-full items-center justify-center p-3 sm:p-4">
             {previewUrl ? (
@@ -497,52 +492,76 @@ export default function ProjectCard({
               </div>
             )}
           </div>
+          {showResumeBadge ? (
+            <Link
+              href={`/studio?project=${encodeURIComponent(project.id)}`}
+              className="project-card-resume absolute bottom-2.5 right-2.5 rounded-full bg-[#2563EB] px-3.5 py-1 text-[12px] font-semibold text-white shadow-sm transition-colors hover:bg-[#1D4ED8]"
+              aria-label={`Resume ${project.title}`}
+            >
+              Resume
+            </Link>
+          ) : null}
         </div>
       </div>
       <div className="mt-2 space-y-0.5">
         {renaming ? (
-          <input
-            value={draftName}
-            autoFocus
-            disabled={renameBusy}
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-            }}
-            onMouseDown={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-            }}
-            onChange={(event) => {
-              setDraftName(event.target.value);
-              if (renameError) setRenameError(null);
-            }}
-            onKeyDown={handleRenameKeyDown}
-            onBlur={() => {
-              void submitRename();
-            }}
-            className="w-full rounded-lg border-2 border-[#019dfd] bg-white px-2 py-1 text-base font-semibold text-slate-900 shadow-sm dark:shadow-none outline-none focus:border-[#019dfd] focus:ring-0 disabled:opacity-70 dark:bg-zinc-900 dark:text-zinc-100"
-          />
+          <div className="flex min-h-[32px] items-center gap-2">
+            <input
+              value={draftName}
+              autoFocus
+              spellCheck={false}
+              autoComplete="off"
+              disabled={renameBusy}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+              onMouseDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+              onChange={(event) => {
+                setDraftName(event.target.value);
+                if (renameError) setRenameError(null);
+              }}
+              onKeyDown={handleRenameKeyDown}
+              onBlur={() => {
+                void submitRename();
+              }}
+              className="w-full rounded-md border-2 border-[#E6EBF2] bg-slate-50/70 px-2 py-1 text-base font-semibold leading-tight text-slate-900 outline-none focus:border-[rgba(37,99,235,0.35)] focus:ring-0 disabled:opacity-70 dark:border-zinc-700 dark:bg-zinc-900/60 dark:text-zinc-100"
+            />
+            <button
+              type="button"
+              aria-label="Confirm rename"
+              disabled={renameBusy}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                void submitRename();
+              }}
+              className="inline-flex h-6 w-6 items-center justify-center text-slate-500 transition hover:text-slate-700 disabled:opacity-60 dark:text-zinc-400 dark:hover:text-zinc-100"
+            >
+              <Check className="h-4 w-4" strokeWidth={2.5} aria-hidden />
+            </button>
+          </div>
         ) : (
-          <div className="group/title flex items-center gap-2">
+          <div className="project-card-title flex items-center gap-2">
             <button
               type="button"
               onClick={startRenaming}
-              className="min-w-0 flex-1 truncate py-1 text-left text-base font-semibold text-slate-900 dark:text-zinc-100"
               aria-label="Rename project"
+              className="project-card-rename group/rename inline-flex min-w-0 flex-1 items-center gap-2 py-1 text-left"
             >
-              {project.title}
+              <span className="min-w-0 truncate text-base font-semibold text-slate-900 dark:text-zinc-100">
+                {project.title}
+              </span>
+              {!hasSelection ? (
+                <span className="project-card-pencil inline-flex items-center justify-center text-black opacity-0 transition-opacity group-hover/rename:opacity-100 dark:text-zinc-200">
+                  <Pencil className="h-4 w-4" aria-hidden />
+                </span>
+              ) : null}
             </button>
-            {!hasSelection ? (
-              <button
-                type="button"
-                onClick={startRenaming}
-                aria-label="Rename project"
-                className="inline-flex items-center justify-center text-black opacity-0 transition-opacity group-hover/title:opacity-100 dark:text-zinc-200"
-              >
-                <Pencil className="h-4 w-4" aria-hidden />
-              </button>
-            ) : null}
+            {showResumeBadge ? <span className="ml-auto shrink-0" /> : null}
           </div>
         )}
         {renameError ? (
@@ -552,6 +571,6 @@ export default function ProjectCard({
           {project.updated}
         </p>
       </div>
-    </Link>
+    </div>
   );
 }

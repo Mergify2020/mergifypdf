@@ -20,6 +20,8 @@ type Props = {
   query?: string;
   ownerFilter?: "any" | "shared" | "you";
   sortOption?: "activity" | "az" | "za";
+  showAllProjects?: boolean;
+  showResumeBadge?: boolean;
 };
 
 export default function RecentProjectsRow({
@@ -27,6 +29,8 @@ export default function RecentProjectsRow({
   query = "",
   ownerFilter = "any",
   sortOption = "activity",
+  showAllProjects = false,
+  showResumeBadge = false,
 }: Props) {
   const [projects, setProjects] = useState<SummaryProject[]>(initialProjects ?? []);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
@@ -38,7 +42,7 @@ export default function RecentProjectsRow({
 
   if (!projects.length && !loading) {
     return (
-      <div className="mt-6 flex min-h-[260px] w-full flex-col items-center justify-center rounded-[24px] border-[3px] border-dashed border-[#51bdff] bg-white/70 px-8 py-12 text-center shadow-sm dark:shadow-none dark:border-zinc-700 dark:bg-zinc-900/60">
+      <div className="mt-6 flex min-h-[260px] w-full flex-col items-center justify-center rounded-[24px] border-[3px] border-dashed border-[#51bdff] bg-white/70 px-8 py-12 text-center shadow-sm dark:shadow-[0_8px_20px_rgba(0,0,0,0.3)] dark:border-zinc-700 dark:bg-zinc-900/60">
         <p className="text-lg font-semibold text-slate-900 dark:text-zinc-100 sm:text-xl">No projects yet</p>
         <p className="mt-2 max-w-sm text-sm text-slate-600 dark:text-zinc-400 sm:text-base">Start a new project to see it here.</p>
       </div>
@@ -80,7 +84,7 @@ export default function RecentProjectsRow({
     const cmp = aName.localeCompare(bName);
     return sortOption === "az" ? cmp : -cmp;
   });
-  const displayProjects = sortedProjects.slice(0, trimmed ? 24 : 9);
+  const displayProjects = showAllProjects ? sortedProjects : sortedProjects.slice(0, trimmed ? 24 : 9);
   const mapped = displayProjects.map((project) => ({
     id: project.id,
     title: project.name?.trim() || "Untitled project",
@@ -130,6 +134,7 @@ export default function RecentProjectsRow({
             project={project}
             isSelected={isSelected}
             hasSelection={hasSelection}
+            showResumeBadge={showResumeBadge && sortOption === "activity" && index === 0}
             onToggleSelected={(id) =>
               setSelected((prev) => ({ ...prev, [id]: !prev[id] }))
             }

@@ -7,6 +7,7 @@ import { FileText, FileUp, Plus, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import { PROJECT_NAME_STORAGE_KEY, sanitizeProjectName } from "@/lib/projectName";
 import { useWorkspaceFilePreloader, type PendingWorkspaceFile } from "@/components/useWorkspaceFilePreloader";
+import { uploadProjectPreviewFromFile } from "@/lib/projectPreview";
 
 const WORKSPACE_META_KEY = "mpdf:files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
@@ -16,6 +17,7 @@ const STARTUP_OVERLAY_CONTEXT_KEY = "mpdf:startup-overlay-context";
 type Props = {
   className?: string;
   variant?: "default" | "custom";
+  iconOnly?: boolean;
 };
 
 async function resetWorkspaceStorage() {
@@ -36,7 +38,7 @@ async function resetWorkspaceStorage() {
   }
 }
 
-export default function StartProjectButton({ className, variant = "default" }: Props) {
+export default function StartProjectButton({ className, variant = "default", iconOnly = false }: Props) {
   const router = useRouter();
   const { data: session } = useSession();
   const { queuePreload } = useWorkspaceFilePreloader();
@@ -141,15 +143,10 @@ export default function StartProjectButton({ className, variant = "default" }: P
   }
 
   async function handleStart() {
+    const startedAt = Date.now();
     setShowValidation(true);
     if (missingName || missingFiles) {
-      if (missingName && missingFiles) {
-        setError("Enter a project name to continue.");
-      } else if (missingName) {
-        setError("Please name your project.");
-      } else {
-        setError("Please upload at least one document to continue.");
-      }
+      setError(null);
       return;
     }
     const clean = sanitizeProjectName(value);
@@ -178,7 +175,12 @@ export default function StartProjectButton({ className, variant = "default" }: P
         setBusy(false);
         return;
       }
+      void uploadProjectPreviewFromFile(pendingFiles[0]?.file, id);
       queuePreload(pendingFiles, id);
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < 2000) {
+        await new Promise((resolve) => setTimeout(resolve, 2000 - elapsed));
+      }
       setBusy(false);
       setOpen(false);
       window.sessionStorage?.setItem(STARTUP_OVERLAY_KEY, "1");
@@ -197,8 +199,18 @@ export default function StartProjectButton({ className, variant = "default" }: P
         onClick={launchModal}
         className={`${variant === "custom" ? "" : "btn-primary px-8 text-base"} ${className ?? ""}`}
       >
-        <Plus className="mr-2 h-5 w-5" aria-hidden />
-        Start a new project
+        <Plus className={`${iconOnly ? "h-7 w-7" : "mr-2 h-7 w-7"}`} aria-hidden />
+        <span
+          className={`overflow-hidden whitespace-nowrap text-sm transition-[max-width,opacity,transform] duration-200 ease-out ${
+            iconOnly
+              ? "max-w-0 opacity-0 translate-x-1"
+              : "max-w-[160px] opacity-100 translate-x-0"
+          }`}
+          aria-hidden={iconOnly}
+        >
+          Start a new project
+        </span>
+        {iconOnly ? <span className="sr-only">Start a new project</span> : null}
       </button>
 
       {open
@@ -231,7 +243,7 @@ export default function StartProjectButton({ className, variant = "default" }: P
                         if (error) setError(null);
                       }}
                       aria-label="Project name (required)"
-                      className={`peer w-full rounded-2xl border-[3px] bg-white py-4 pl-8 pr-5 text-lg text-slate-900 shadow-sm transition focus:outline-none focus:ring-0 ${
+                      className={`peer w-full rounded-2xl border-[3px] bg-white py-4 pl-[29px] pr-5 text-lg text-slate-900 shadow-sm transition focus:outline-none focus:ring-0 ${
                         showNameError
                           ? "border-rose-400 hover:border-rose-500 focus:border-rose-500"
                           : "border-slate-300 hover:border-[#51bdff] focus:border-[#51bdff]"
@@ -241,13 +253,22 @@ export default function StartProjectButton({ className, variant = "default" }: P
                     {!value ? (
                       <div
                         aria-hidden
-                        className="pointer-events-none absolute inset-y-0 left-5 flex items-center gap-1 text-base"
+                        className="pointer-events-none absolute inset-y-0 left-[29px] flex items-center text-base"
                       >
-                        <span className="font-bold text-rose-500">*</span>
-                        <span className="text-slate-500">Name your project</span>
+                        <span
+                          className={`relative pl-1 ${
+                            showNameError ? "text-rose-500" : "text-slate-500"
+                          }`}
+                        >
+                          {showNameError ? (
+                            <span className="absolute -left-3 font-bold text-rose-500">*</span>
+                          ) : null}
+                          <span>Name your project</span>
+                        </span>
                       </div>
                     ) : null}
                   </div>
+                  <p className="text-xs text-slate-500">This helps you find and organize projects later.</p>
                   {error ? <p className="text-sm text-rose-500">{error}</p> : null}
                 </div>
 
@@ -272,8 +293,11 @@ export default function StartProjectButton({ className, variant = "default" }: P
                       if (event.dataTransfer?.files?.length) addFiles(event.dataTransfer.files);
                     }}
                   >
-                    <FileUp className="h-9 w-9 text-slate-500" aria-hidden />
-                    <p className="mt-3 text-base font-semibold text-slate-900">
+                    <FileUp
+                      className={`h-9 w-9 ${showFilesError ? "text-rose-500" : "text-slate-500"}`}
+                      aria-hidden
+                    />
+                    <p className={`mt-3 text-base font-semibold ${showFilesError ? "text-rose-600" : "text-slate-900"}`}>
                       Drop document here to upload
                     </p>
                     <button
@@ -297,11 +321,6 @@ export default function StartProjectButton({ className, variant = "default" }: P
                       }}
                       disabled={busy}
                     />
-                    {showFilesError ? (
-                      <p className="mt-2 text-xs font-semibold text-rose-600">
-                        Upload at least one PDF to continue.
-                      </p>
-                    ) : null}
                   </div>
 
                   {pendingFiles.length > 0 ? (
@@ -391,7 +410,7 @@ export default function StartProjectButton({ className, variant = "default" }: P
                         <span>Preparing…</span>
                       </span>
                     ) : (
-                      "Start editing"
+                      "Open Workspace"
                     )}
                   </button>
                 </div>
