@@ -414,7 +414,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
 
     const preloadImages = (urls: string[]) => {
       urls.forEach((url) => {
-        const img = new Image();
+        const img = new window.Image();
         img.decoding = "async";
         img.src = url;
       });
