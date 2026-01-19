@@ -415,8 +415,8 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
       });
     };
     if ("requestIdleCallback" in globalThis) {
-      const handle = (globalThis as Window).requestIdleCallback(prefetch, { timeout: 1200 });
-      return () => (globalThis as Window).cancelIdleCallback(handle);
+      const handle = (globalThis as Window & typeof globalThis).requestIdleCallback(prefetch, { timeout: 1200 });
+      return () => (globalThis as Window & typeof globalThis).cancelIdleCallback(handle);
     }
     const timer = setTimeout(prefetch, 200);
     return () => clearTimeout(timer);
