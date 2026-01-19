@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 async function ensureDbConnection() {
@@ -64,7 +65,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     data: {
       userId,
       name: copyName,
-      data: existing.data,
+      data: existing.data ?? Prisma.JsonNull,
       previewKey: null,
       pdfKey: existing.pdfKey,
       pagesCount: existing.pagesCount ?? 0,
