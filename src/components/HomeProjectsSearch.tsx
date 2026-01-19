@@ -71,7 +71,8 @@ const mapProjectsFromSummary = (projects: ProjectsSummaryProject[]): SummaryProj
   projects.map((project) => ({
     id: project.id,
     name: project.name?.trim() || "Untitled project",
-    updatedAt: project.updatedAt,
+    updatedAt:
+      typeof project.updatedAt === "number" ? new Date(project.updatedAt) : project.updatedAt,
     pdfUrl: null,
     pagesCount: project.pagesCount ?? 0,
     rotation: project.rotation ?? 0,
