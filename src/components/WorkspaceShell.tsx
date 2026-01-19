@@ -469,12 +469,10 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
             void refreshPreviewUrl(project.id);
           }
         });
-      preloadImages(
-        mapped
-          .map((project) => project.previewUrl ?? null)
-          .filter((url): url is string => typeof url === "string" && url.length > 0)
-          .slice(0, 12),
-      );
+      const previewUrls = mapped
+        .flatMap((project) => (project.previewUrl ? [project.previewUrl] : []))
+        .slice(0, 12);
+      preloadImages(previewUrls);
     };
 
     const cached = getProjectsSummaryCache(ownerKey);
