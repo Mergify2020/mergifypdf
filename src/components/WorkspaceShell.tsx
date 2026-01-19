@@ -471,7 +471,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
         });
       preloadImages(
         mapped
-          .map((project) => project.previewUrl)
+          .map((project) => project.previewUrl ?? null)
           .filter((url): url is string => typeof url === "string" && url.length > 0)
           .slice(0, 12),
       );
