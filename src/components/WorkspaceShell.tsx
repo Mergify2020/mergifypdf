@@ -414,12 +414,12 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
         router.prefetch(route);
       });
     };
-    if ("requestIdleCallback" in window) {
-      const handle = window.requestIdleCallback(prefetch, { timeout: 1200 });
-      return () => window.cancelIdleCallback(handle);
+    if ("requestIdleCallback" in globalThis) {
+      const handle = (globalThis as Window).requestIdleCallback(prefetch, { timeout: 1200 });
+      return () => (globalThis as Window).cancelIdleCallback(handle);
     }
-    const timer = window.setTimeout(prefetch, 200);
-    return () => window.clearTimeout(timer);
+    const timer = setTimeout(prefetch, 200);
+    return () => clearTimeout(timer);
   }, [router]);
 
   useEffect(() => {
