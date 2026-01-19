@@ -17,6 +17,11 @@ import {
 } from "lucide-react";
 import RecentProjectsRow from "@/components/RecentProjectsRow";
 import SettingsMenu from "@/components/SettingsMenu";
+import {
+  getProjectsSummaryCache,
+  subscribeProjectsSummary,
+  type ProjectsSummaryProject,
+} from "@/lib/projectsSummaryCache";
 
 type SummaryProject = {
   id: string;
@@ -32,6 +37,7 @@ type Props = {
   firstName: string;
   accountName: string;
   accountEmail?: string | null;
+  ownerKey?: string | null;
   projects: SummaryProject[];
   headline?: string;
   sectionLabel?: string;
@@ -61,10 +67,22 @@ const measureScrollbarWidth = () => {
   return width;
 };
 
+const mapProjectsFromSummary = (projects: ProjectsSummaryProject[]): SummaryProject[] =>
+  projects.map((project) => ({
+    id: project.id,
+    name: project.name?.trim() || "Untitled project",
+    updatedAt: project.updatedAt,
+    pdfUrl: null,
+    pagesCount: project.pagesCount ?? 0,
+    rotation: project.rotation ?? 0,
+    hasPreview: project.hasPreview ?? false,
+  }));
+
 export default function HomeProjectsSearch({
   firstName,
   accountName,
   accountEmail,
+  ownerKey,
   projects,
   headline,
   sectionLabel = "Recent projects",
@@ -74,7 +92,9 @@ export default function HomeProjectsSearch({
   showResumeBadge = false,
 }: Props) {
   const [query, setQuery] = useState("");
-  const initialProjects = useMemo(() => projects, [projects]);
+  const [projectsState, setProjectsState] = useState<SummaryProject[]>(projects);
+  const initialProjects = useMemo(() => projectsState, [projectsState]);
+  const hasProjects = (projectsState.length ?? 0) > 0;
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [sortOption, setSortOption] = useState<SortOption>("activity");
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
@@ -91,6 +111,27 @@ export default function HomeProjectsSearch({
   const [recentScrollbarWidth, setRecentScrollbarWidth] = useState(0);
   const [forceStableScrollbar, setForceStableScrollbar] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
+
+  useEffect(() => {
+    setProjectsState(projects);
+  }, [projects]);
+
+  useEffect(() => {
+    if (!ownerKey) return;
+    const cached = getProjectsSummaryCache(ownerKey);
+    if (cached) {
+      setProjectsState(mapProjectsFromSummary(cached));
+    }
+
+    const unsubscribe = subscribeProjectsSummary((update) => {
+      if (update.ownerKey !== ownerKey || !update.projects) return;
+      setProjectsState(mapProjectsFromSummary(update.projects));
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [ownerKey]);
 
   const accountInitials = useMemo(() => {
     const parts = accountName
@@ -381,7 +422,7 @@ export default function HomeProjectsSearch({
               <div className={`flex w-full items-center ${hideHeadline ? "gap-3" : "gap-6"}`}>
                 <div className={`flex w-full ${hideHeadline ? "max-w-xl" : "max-w-sm"}`}>
                   <div
-                    className="flex h-11 w-full cursor-text rounded-full border border-[#E5E7EB] bg-transparent p-[1px] shadow-[12px_0_36px_rgba(15,23,42,0.10)] focus-within:border-transparent focus-within:bg-gradient-to-r focus-within:from-[#009DFD] focus-within:to-[#4F46E5] dark:border-zinc-700 dark:bg-zinc-900/60 dark:shadow-[12px_0_36px_rgba(0,0,0,0.45)] dark:focus-within:from-zinc-700 dark:focus-within:to-zinc-600"
+                    className="flex h-11 w-full cursor-text rounded-full border-2 border-[#E5E7EB] bg-transparent p-[1px] shadow-[12px_0_36px_rgba(15,23,42,0.10)] focus-within:border-[#2563EB] dark:border-zinc-700 dark:bg-zinc-900/60 dark:shadow-[12px_0_36px_rgba(0,0,0,0.45)] dark:focus-within:border-[#2563EB]"
                     onMouseDown={(event) => {
                       const target = event.target;
                       if (target instanceof HTMLInputElement) return;
@@ -392,23 +433,17 @@ export default function HomeProjectsSearch({
                       searchInputRef.current?.focus();
                     }}
                   >
-                    <div className="flex h-full w-full items-center gap-2 rounded-full bg-white px-4 text-[#1F2A37] [--search-gradient-start:#009DFD] [--search-gradient-end:#4F46E5] dark:bg-zinc-900 dark:text-zinc-100 dark:[--search-gradient-start:#e4e4e7] dark:[--search-gradient-end:#a1a1aa]">
+                    <div className="flex h-full w-full items-center gap-2 rounded-full bg-white px-4 text-[#1F2A37] dark:bg-zinc-900 dark:text-zinc-100">
                       <svg
                         aria-hidden="true"
                         viewBox="0 0 24 24"
                         className="h-4 w-4"
                         fill="none"
-                        stroke="url(#searchGradient)"
+                        stroke="var(--color-primary)"
                         strokeWidth="2"
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       >
-                        <defs>
-                          <linearGradient id="searchGradient" x1="0" y1="0" x2="1" y2="0">
-                            <stop offset="0%" stopColor="var(--search-gradient-start)" />
-                            <stop offset="100%" stopColor="var(--search-gradient-end)" />
-                          </linearGradient>
-                        </defs>
                         <circle cx="11" cy="11" r="8" />
                         <path d="m21 21-4.35-4.35" />
                       </svg>
@@ -666,7 +701,7 @@ export default function HomeProjectsSearch({
             ref={recentListRef}
             className={`mt-6 flex-1 ${
               forceStableScrollbar || recentHasOverflow ? "overflow-y-auto" : "overflow-y-hidden"
-            }`}
+            } overflow-x-hidden`}
             style={{
               paddingRight:
                 forceStableScrollbar || recentHasOverflow ? 4 : 4 + recentScrollbarWidth,
@@ -684,11 +719,11 @@ export default function HomeProjectsSearch({
               showResumeBadge={showResumeBadge}
             />
           </div>
-          {!showAllProjects ? (
+          {!showAllProjects && hasProjects ? (
             <div className="mt-4 flex items-center">
               <Link
                 href="/projects/all"
-                className="inline-flex items-center rounded-full border-2 border-[#E6EBF2] px-4 py-2 text-xs font-semibold text-[#1F2A37] transition hover:border-[#D8DEE8] dark:border-zinc-700 dark:text-zinc-100 dark:hover:border-zinc-600"
+                className="inline-flex items-center rounded-full border-2 border-[#E6EBF2] px-4 py-2 text-xs font-semibold text-[#1F2A37] transition hover:border-[#D8DEE8] active:translate-y-[1px] active:scale-[0.98] active:bg-[#2563EB]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#51bdff]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F1F4F9] dark:border-zinc-700 dark:text-zinc-100 dark:hover:border-zinc-600 dark:active:bg-[#2563EB]/20 dark:focus-visible:ring-offset-[#222224]"
               >
                 View all projects
               </Link>

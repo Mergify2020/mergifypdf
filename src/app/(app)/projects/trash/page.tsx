@@ -1,122 +1,96 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { useSession } from "next-auth/react";
-import AllProjectsGrid from "@/components/AllProjectsGrid";
+import Image from "next/image";
+import TrashHeaderControls from "@/components/TrashHeaderControls";
+import { redirect } from "next/navigation";
+import { getServerSessionSafe } from "@/lib/serverSession";
+import { prisma } from "@/lib/prisma";
 import { formatProjectLastEdited } from "@/lib/formatProjectLastEdited";
-
-type ApiProject = {
-  id: string;
-  name: string | null;
-  updatedAt: string | number | Date;
-  pdfUrl?: string | null;
-  pagesCount?: number | null;
-  rotation?: number | null;
-};
-
-type ProjectCard = {
-  id: string;
-  title: string;
-  updated: string;
-  pdfUrl?: string | null;
-  pagesCount?: number;
-  rotation?: number | null;
-};
+import TrashProjectActions from "@/components/TrashProjectActions";
 
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
-export default function TrashProjectsPage() {
-  const { data: session } = useSession();
-  const ownerId = session?.user?.id ?? null;
-  const [projects, setProjects] = useState<ProjectCard[]>([]);
-  const [loading, setLoading] = useState(true);
+export default async function TrashProjectsPage() {
+  const session = await getServerSessionSafe();
 
-  useEffect(() => {
-    if (!ownerId) {
-      setProjects([]);
-      setLoading(false);
-      return;
-    }
-    setProjects([]);
-    setLoading(true);
-    let cancelled = false;
+  if (!session?.user) {
+    redirect("/login");
+  }
 
-    const load = async () => {
-      try {
-        const res = await fetch("/api/projects?summary=1&trashed=1", { cache: "no-store" });
-        if (!res.ok) return;
-        const data = (await res.json()) as { projects?: ApiProject[] };
-        if (!Array.isArray(data.projects) || cancelled) return;
+  if (session.user.twoFactorEnabled && !session.user.twoFactorPassed) {
+    redirect("/2fa");
+  }
 
-        const mapped: ProjectCard[] = data.projects.map((project) => ({
-          id: project.id,
-          title: project.name?.trim() || "Untitled project",
-          updated: formatProjectLastEdited(project.updatedAt),
-          pdfUrl: project.pdfUrl ?? null,
-          pagesCount: project.pagesCount ?? 0,
-          rotation: project.rotation ?? 0,
-        }));
+  const userId = session.user.id;
+  if (!userId) {
+    redirect("/login");
+  }
 
-        if (!cancelled) {
-          setProjects(mapped);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    };
-
-    void load();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [ownerId]);
+  const projects = await prisma.project.findMany({
+    where: { userId, trashedAt: { not: null } },
+    orderBy: { trashedAt: "desc" },
+    select: {
+      id: true,
+      name: true,
+      updatedAt: true,
+      trashedAt: true,
+    },
+  });
 
   return (
-    <div className="min-h-screen bg-[#F9FAFC] px-2 pb-10 pt-10 sm:px-4 sm:pt-12 lg:px-6 lg:pt-14">
+    <div className="min-h-screen bg-transparent px-2 pb-10 pt-6 sm:px-4 sm:pt-6 lg:px-6 lg:pt-6 lg:pr-6">
       <div className="mx-auto w-full pb-16">
-        <div className="flex items-center justify-between">
+        <div className="grid h-full w-full min-h-0 gap-[24px] lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start">
           <div>
-            <h1 className="text-3xl font-semibold text-slate-900 sm:text-4xl">Trash</h1>
-            <p className="mt-2 text-sm text-slate-500">
-              Projects you move here will appear in this space. Items may be permanently removed
-              after a period of time.
-            </p>
-          </div>
-          <Link
-            href="/projects/all"
-            className="hidden rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 sm:inline-flex"
-          >
-            Back to all projects
-          </Link>
-        </div>
-
-        {loading ? (
-          <div className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 sm:gap-6 lg:gap-8">
-            {Array.from({ length: 12 }).map((_, index) => (
-              <div
-                key={`trash-loading-${index}`}
-                className="animate-pulse rounded-2xl border border-slate-200 bg-white p-3"
-              >
-                <div className="aspect-[1.23/1] rounded-xl bg-slate-100" />
-                <div className="mt-4 space-y-2">
-                  <div className="h-3 w-3/4 rounded-full bg-slate-100" />
-                  <div className="h-3 w-1/2 rounded-full bg-slate-100" />
-                </div>
+          <div className="flex w-full items-start justify-between gap-3 lg:mr-[-304px] lg:w-[calc(100%+304px)]">
+              <div>
+                <h1 className="text-3xl font-semibold text-slate-900 sm:text-4xl">Trash</h1>
+                <p className="mt-2 text-sm text-slate-500">
+                  Projects you move here can be restored or permanently deleted.
+                </p>
               </div>
-            ))}
+              <div className="lg:mr-[calc(var(--shell-left)-24px)]">
+                <TrashHeaderControls
+                  accountName={session.user.name ?? "Account"}
+                  accountEmail={session.user.email ?? null}
+                />
+              </div>
+            </div>
+
+            {projects.length === 0 ? (
+              <div className="mt-10 flex flex-col items-center justify-center px-6 py-10 text-center text-sm text-slate-500">
+                <Image
+                  src="/nothingdeletedyet.svg"
+                  alt=""
+                  width={405}
+                  height={405}
+                  className="mt-[-100px] h-[318px] w-[318px] opacity-90 sm:h-[405px] sm:w-[405px]"
+                  priority
+                />
+                <p className="mt-0 text-lg font-semibold text-slate-900">Trash is currently empty.</p>
+                <p className="mt-2 text-sm text-slate-500">Restore a project or keep things tidy here.</p>
+              </div>
+            ) : (
+              <div className="mt-10 space-y-4">
+                {projects.map((project) => (
+                  <div
+                    key={project.id}
+                    className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-base font-semibold text-slate-900">
+                        {project.name?.trim() || "Untitled project"}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-500">
+                        Last updated {formatProjectLastEdited(project.updatedAt)}
+                      </p>
+                    </div>
+                    <TrashProjectActions projectId={project.id} />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        ) : projects.length === 0 ? (
-          <div className="mt-10 rounded-2xl border border-dashed border-slate-200 bg-white/60 px-6 py-10 text-center text-sm text-slate-500">
-            Trash is currently empty.
-          </div>
-        ) : (
-          <AllProjectsGrid projects={projects} />
-        )}
+          <div aria-hidden="true" />
+        </div>
       </div>
     </div>
   );

@@ -162,6 +162,16 @@ body {
   background-image: linear-gradient(90deg, #2a2a2e 0%, #3f3f46 50%, #2a2a2e 100%);
 }
 
+.templates-skeleton {
+  background-image: linear-gradient(90deg, #f6f8fb 0%, #eef1f6 50%, #f6f8fb 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2.2s ease-in-out infinite;
+}
+
+.dark .templates-skeleton {
+  background-image: linear-gradient(90deg, #2a2a2f 0%, #303038 50%, #2a2a2f 100%);
+}
+
 @keyframes page-fade-in {
   0% {
     opacity: 0;
@@ -396,13 +406,13 @@ html.theme-scroll-reveal:not(.dark) ::-webkit-scrollbar-thumb {
    reduce the projects grid column count so previews stay large. */
 @media (min-width: 1280px) {
   .with-sidebar-panel .projects-grid {
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)) !important;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 320px)) !important;
   }
 }
 
 @media (min-width: 1536px) {
   .with-sidebar-panel .projects-grid {
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)) !important;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 320px)) !important;
   }
 }
 
@@ -464,4 +474,26 @@ html.theme-scroll-reveal:not(.dark) ::-webkit-scrollbar-thumb {
 .project-card:has(.project-card-preview:hover, .project-card-actions:hover) .project-card-actions {
   opacity: 1;
   transform: scale(1);
+}
+
+.sidebar-collapsed .recent-projects-grid {
+  max-width: 100% !important;
+}
+
+.sidebar-minimized .recent-projects-grid {
+  max-width: 100% !important;
+}
+
+.sidebar-collapsed .home-content-grid,
+.sidebar-collapsed .projects-content-grid {
+  max-width: 1960px;
+}
+
+.sidebar-minimized .home-content-grid,
+.sidebar-minimized .projects-content-grid {
+  max-width: 1960px;
+}
+
+.sidebar-collapsed .workspace-content-shell {
+  max-width: 1960px;
 }

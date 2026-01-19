@@ -24,12 +24,6 @@ function extractRotationFromData(data: unknown): number | null {
   return rotation;
 }
 
-function isTrashedProject(data: unknown) {
-  if (!data || typeof data !== "object") return false;
-  const record = data as Record<string, unknown>;
-  return record.trashed === true;
-}
-
 async function ensureDbConnection() {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
@@ -67,11 +61,12 @@ export async function GET(request: NextRequest) {
   const summary = request.nextUrl.searchParams.get("summary");
   const trashedParam = request.nextUrl.searchParams.get("trashed");
   const trashed = trashedParam === "1" || trashedParam === "true";
+  const trashedFilter = trashed ? { not: null } : null;
 
   // Lightweight summary payload used by the All Projects grid.
   if (summary === "1") {
     const projects = await prisma.project.findMany({
-      where: { userId },
+      where: { userId, trashedAt: trashedFilter },
       orderBy: { updatedAt: "desc" },
       take: 60,
       select: {
@@ -84,13 +79,10 @@ export async function GET(request: NextRequest) {
         data: true,
       },
     });
-    const visible = projects.filter((project) =>
-      trashed ? isTrashedProject(project.data) : !isTrashedProject(project.data)
-    );
 
     return NextResponse.json(
       {
-        projects: visible.map((project) => {
+        projects: projects.map((project) => {
           const derivedPagesCount = extractPagesCountFromData(project.data);
           return {
             id: project.id,
@@ -112,7 +104,7 @@ export async function GET(request: NextRequest) {
   }
 
   const projects = await prisma.project.findMany({
-    where: { userId },
+    where: { userId, trashedAt: trashedFilter },
     orderBy: { createdAt: "desc" },
     select: {
       id: true,

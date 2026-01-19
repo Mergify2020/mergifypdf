@@ -9,7 +9,7 @@ import StartProjectButton from "@/components/StartProjectButton";
 import {
   getProjectsSummaryCache,
   refreshProjectsSummary,
-  setProjectsSummaryCache,
+  subscribeProjectsSummary,
   type ProjectsSummaryProject,
 } from "@/lib/projectsSummaryCache";
 import { matchesSearch } from "@/lib/search";
@@ -157,6 +157,17 @@ export default function AllProjectsClient() {
           }
         }
 
+        if (ownerKey) {
+          const fresh = await refreshProjectsSummary(ownerKey);
+          if (!fresh || cancelled) return;
+          const mapped = mapSummaryProjects(fresh);
+          if (!cancelled) {
+            setProjects(mapped);
+            setLoading(false);
+          }
+          return;
+        }
+
         const res = await fetch("/api/projects?summary=1", { cache: "no-store" });
         if (!res.ok) return;
         const data = (await res.json()) as { projects?: ApiProject[] };
@@ -166,9 +177,6 @@ export default function AllProjectsClient() {
 
         if (!cancelled) {
           setProjects(mapped);
-          if (ownerKey) {
-            setProjectsSummaryCache(ownerKey, data.projects as ProjectsSummaryProject[]);
-          }
           setLoading(false);
         }
       } catch {
@@ -183,6 +191,25 @@ export default function AllProjectsClient() {
 
     return () => {
       cancelled = true;
+    };
+  }, [ownerKey]);
+
+  useEffect(() => {
+    if (!ownerKey) return;
+    const cached = getProjectsSummaryCache(ownerKey);
+    if (cached) {
+      setProjects(mapSummaryProjects(cached));
+      setLoading(false);
+    }
+
+    const unsubscribe = subscribeProjectsSummary((update) => {
+      if (update.ownerKey !== ownerKey || !update.projects) return;
+      setProjects(mapSummaryProjects(update.projects));
+      setLoading(false);
+    });
+
+    return () => {
+      unsubscribe();
     };
   }, [ownerKey]);
 
@@ -405,11 +432,11 @@ export default function AllProjectsClient() {
               </div>
               </div>
             </div>
-            <div className="projects-grid mt-10 grid w-full grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-5 sm:gap-6">
+          <div className="projects-grid mt-10 flex w-full flex-wrap justify-start gap-5 [--projects-card-width:clamp(240px,22vw,300px)] sm:gap-6">
               {Array.from({ length: 18 }).map((_, index) => (
                 <div
                   key={index}
-                  className="rounded-[10px] bg-white/60 p-3 shadow-sm ring-1 ring-slate-200/60"
+                  className="w-[var(--projects-card-width)] flex-[0_0_var(--projects-card-width)] rounded-[10px] bg-white/60 p-3 shadow-sm ring-1 ring-slate-200/60"
                 >
                   <div className="relative m-[3px] aspect-[1.23/1] w-[calc(100%-6px)] overflow-hidden rounded-[10px] border border-[rgba(0,0,0,0.06)] bg-[#EEF1F5]">
                     <div className="absolute inset-0 skeleton-shimmer" />
@@ -891,9 +918,6 @@ export default function AllProjectsClient() {
           </div>
           <AllProjectsGrid
             projects={filteredProjects}
-            onProjectTrashed={(id) => {
-              setProjects((prev) => prev.filter((project) => project.id !== id));
-            }}
             onProjectRenamed={(id, title) => {
               setProjects((prev) =>
                 prev.map((project) => (project.id === id ? { ...project, title } : project))

@@ -57,6 +57,7 @@ export default function ProjectCard({
   const previewRefreshInFlight = useRef(false);
   const lastFailedPreviewRef = useRef<string | null>(null);
   const [renaming, setRenaming] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [renameBusy, setRenameBusy] = useState(false);
   const [renameError, setRenameError] = useState<string | null>(null);
@@ -129,7 +130,8 @@ export default function ProjectCard({
   };
 
   const cardClasses = [
-    "relative rounded-[10px] bg-[#F9FAFC] transition dark:bg-zinc-900 dark:shadow-[0_8px_18px_rgba(0,0,0,0.22)] dark:ring-0",
+    "relative overflow-hidden rounded-[10px] bg-[#F9FAFC] transition dark:bg-zinc-900 dark:shadow-[0_8px_18px_rgba(0,0,0,0.22)] dark:ring-0",
+    isDeleting ? "pointer-events-none opacity-70 ring-2 ring-rose-500/70" : "",
     isSelected
       ? "ring-[3px] ring-[#4C6FFF] shadow-[0_0_0_4px_rgba(76,111,255,0.15)] dark:ring-zinc-200 dark:shadow-none"
       : "",
@@ -157,7 +159,7 @@ export default function ProjectCard({
     .filter(Boolean)
     .join(" ");
   const actionButtonBase =
-    "flex h-9 w-9 items-center justify-center text-sm hover:bg-slate-100/80 transition dark:hover:bg-zinc-800/80 xl:h-10 xl:w-10";
+    "flex h-9 w-9 items-center justify-center text-sm transition hover:bg-slate-100/80 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-zinc-800/80 xl:h-10 xl:w-10";
 
   const startRenaming = (event: { preventDefault: () => void; stopPropagation: () => void }) => {
     event.preventDefault();
@@ -233,6 +235,7 @@ export default function ProjectCard({
         <button
           type="button"
           className={`${checkboxClasses} project-card-select`}
+          disabled={isDeleting}
           onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
@@ -251,6 +254,7 @@ export default function ProjectCard({
               <button
                 type="button"
                 className={`${actionButtonBase} ${starred ? "text-yellow-400" : ""}`}
+                disabled={isDeleting}
                 onClick={(event) => {
                   event.preventDefault();
                   event.stopPropagation();
@@ -269,6 +273,7 @@ export default function ProjectCard({
               <button
                 type="button"
                 className={actionButtonBase}
+                disabled={isDeleting}
                 onClick={(event) => {
                   event.preventDefault();
                   event.stopPropagation();
@@ -401,41 +406,66 @@ export default function ProjectCard({
                   <button
                     type="button"
                     role="menuitem"
-                    className="mx-3 mb-2 flex w-[calc(100%-1.5rem)] items-center gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-rose-50 dark:hover:bg-zinc-800/60"
-                    onClick={(event) => {
+                    disabled={isDeleting}
+                    className="mx-3 mb-2 flex w-[calc(100%-1.5rem)] items-center gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-zinc-800/60"
+                    onClick={async (event) => {
                       event.preventDefault();
                       event.stopPropagation();
+                      if (isDeleting) return;
                       setMenuOpen(false);
                       setMenuPosition(null);
-                      void fetch(`/api/projects/${encodeURIComponent(project.id)}/trash`, {
-                        method: "POST",
-                      })
-                        .then(() => {
-                          return refreshProjectsSummary(ownerKey);
-                        })
-                        .catch(() => {});
-                      if (onTrashed) {
-                        onTrashed(project.id);
+                      setIsDeleting(true);
+                      try {
+                        const res = await fetch(`/api/projects/${encodeURIComponent(project.id)}/trash`, {
+                          method: "POST",
+                        });
+                        if (!res.ok) {
+                          throw new Error(`Trash request failed with status ${res.status}`);
+                        }
+                        await refreshProjectsSummary(ownerKey);
+                        if (onTrashed) {
+                          onTrashed(project.id);
+                        }
+                      } catch (err) {
+                        console.error("Failed to move project to trash.", err);
+                        setIsDeleting(false);
                       }
                     }}
                   >
                     <span className="flex h-10 w-10 items-center justify-center rounded-full bg-rose-100 text-rose-700">
-                      <Trash2 className="h-5 w-5" aria-hidden />
+                      {isDeleting ? (
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-rose-300 border-t-rose-700" />
+                      ) : (
+                        <Trash2 className="h-5 w-5" aria-hidden />
+                      )}
                     </span>
-                    <span className="text-base font-semibold text-rose-700">Move to trash</span>
+                    <span className="text-base font-semibold text-rose-700">
+                      {isDeleting ? "Moving to trash..." : "Move to trash"}
+                    </span>
                   </button>
                 </div>,
                 document.body
               )}
           </>
         )}
+        {isDeleting ? (
+          <span
+            className="absolute inset-0 z-10 flex items-center justify-center"
+            aria-hidden="true"
+          >
+            <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-white/90 shadow-sm">
+              <span className="absolute h-12 w-12 animate-spin rounded-full border-2 border-rose-300 border-t-rose-600" />
+              <Trash2 className="h-5 w-5 text-rose-600" aria-hidden="true" />
+            </span>
+          </span>
+        ) : null}
         <div className="project-card-preview relative m-[3px] w-[calc(100%-6px)] aspect-square rounded-[10px] bg-[#EEF1F5] border border-[rgba(0,0,0,0.06)] transition-colors dark:border-transparent dark:bg-zinc-800/70">
           <Link
             href={`/studio?project=${encodeURIComponent(project.id)}`}
             className="absolute inset-0"
             aria-label={`Open ${project.title}`}
             onClick={(event) => {
-              if (renaming || hasSelection) {
+              if (isDeleting || renaming || hasSelection) {
                 event.preventDefault();
                 event.stopPropagation();
               }
@@ -449,6 +479,7 @@ export default function ProjectCard({
           <div
             aria-hidden="true"
             className="project-card-overlay pointer-events-none absolute inset-0 z-[5] bg-black/[0.03] opacity-0 transition-opacity duration-150"
+            style={isDeleting ? { opacity: 0 } : undefined}
           />
           <div className="flex h-full w-full items-center justify-center p-3 sm:p-4">
             {previewUrl ? (
@@ -492,7 +523,7 @@ export default function ProjectCard({
               </div>
             )}
           </div>
-          {showResumeBadge ? (
+          {showResumeBadge && !isDeleting ? (
             <Link
               href={`/studio?project=${encodeURIComponent(project.id)}`}
               className="project-card-resume absolute bottom-2.5 right-2.5 rounded-full bg-[#2563EB] px-3.5 py-1 text-[12px] font-semibold text-white shadow-sm transition-colors hover:bg-[#1D4ED8]"
@@ -567,8 +598,11 @@ export default function ProjectCard({
         {renameError ? (
           <p className="text-xs font-semibold text-rose-600">{renameError}</p>
         ) : null}
-        <p className="text-xs text-slate-500 dark:text-zinc-400" suppressHydrationWarning>
-          {project.updated}
+        <p
+          className={`text-xs ${isDeleting ? "font-semibold text-rose-600 dark:text-rose-300" : "text-slate-500 dark:text-zinc-400"}`}
+          suppressHydrationWarning
+        >
+          {isDeleting ? "Deleting..." : project.updated}
         </p>
       </div>
     </div>

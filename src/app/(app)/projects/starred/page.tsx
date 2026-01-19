@@ -31,7 +31,7 @@ export default async function StarredProjectsPage() {
 
   try {
     dbProjects = await prisma.project.findMany({
-      where: { userId: session.user.id },
+      where: { userId: session.user.id, trashedAt: null },
       select: { id: true, name: true, updatedAt: true, data: true, pdfKey: true },
       orderBy: { updatedAt: "desc" },
     });

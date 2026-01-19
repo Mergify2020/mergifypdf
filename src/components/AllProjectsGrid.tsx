@@ -48,20 +48,24 @@ export default function AllProjectsGrid({
   }, []);
 
   return (
-    <div className="projects-grid mt-10 grid w-full grid-cols-[repeat(auto-fill,minmax(max(300px,calc(100%/6)),1fr))] gap-5 sm:gap-6">
+    <div className="projects-grid mt-10 flex w-full flex-wrap justify-start gap-5 [--projects-card-width:clamp(240px,22vw,300px)] sm:gap-6">
       {projects.map((project, index) => {
         const isSelected = !!selected[project.id];
         return (
-          <ProjectCard
+          <div
             key={project.id}
-            project={project}
-            isSelected={isSelected}
-            hasSelection={hasSelection}
-            onToggleSelected={toggleSelected}
-            onTrashed={onProjectTrashed}
-            onRenamed={onProjectRenamed}
-            onCopied={onProjectCopied}
-          />
+            className="w-[var(--projects-card-width)] flex-[0_0_var(--projects-card-width)]"
+          >
+            <ProjectCard
+              project={project}
+              isSelected={isSelected}
+              hasSelection={hasSelection}
+              onToggleSelected={toggleSelected}
+              onTrashed={onProjectTrashed}
+              onRenamed={onProjectRenamed}
+              onCopied={onProjectCopied}
+            />
+          </div>
         );
       })}
     </div>

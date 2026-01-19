@@ -146,12 +146,6 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
   );
 }
 
-function isTrashedProject(data: unknown) {
-  if (!data || typeof data !== "object") return false;
-  const record = data as Record<string, unknown>;
-  return record.trashed === true;
-}
-
 async function ProjectsDashboard({
   displayName,
   email,
@@ -163,7 +157,7 @@ async function ProjectsDashboard({
 }) {
   const firstName = displayName.split(" ")[0] ?? "there";
   const shapedProjects = await prisma.project.findMany({
-    where: { userId },
+    where: { userId, trashedAt: null },
     orderBy: { updatedAt: "desc" },
     take: 60,
     select: {
@@ -176,8 +170,7 @@ async function ProjectsDashboard({
       data: true,
     },
   });
-  const visibleProjects = shapedProjects.filter((project) => !isTrashedProject(project.data));
-  const summaryProjects = visibleProjects.map((project) => ({
+  const summaryProjects = shapedProjects.map((project) => ({
     id: project.id,
     name: project.name,
     updatedAt: project.updatedAt,
@@ -200,7 +193,7 @@ async function ProjectsDashboard({
   return (
     <main className="h-screen w-full bg-[#F1F4F9] py-6 dark:bg-[#222224]">
       <div className="w-full">
-        <div className="grid h-full w-full max-w-[1680px] min-h-0 gap-[24px] lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start">
+        <div className="home-content-grid grid h-full w-full max-w-[1680px] min-h-0 gap-[24px] lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start">
           <div
             id="home-projects-container"
             className="relative z-40 flex h-full min-h-0 w-full flex-col px-1 pb-10 pt-0 data-[shadow-overlay=true]:border-transparent data-[shadow-overlay=true]:shadow-none"
@@ -210,6 +203,7 @@ async function ProjectsDashboard({
                 firstName={firstName}
                 accountName={displayName}
                 accountEmail={email}
+                ownerKey={userId}
                 projects={summaryProjects}
                 showOwnerFilter={false}
                 showResumeBadge

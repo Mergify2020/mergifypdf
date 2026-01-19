@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
 
 async function ensureDbConnection() {
   for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -26,19 +25,6 @@ async function ensureDbConnection() {
   }
 }
 
-function withoutTrashedFlag(data: Prisma.JsonValue): Prisma.InputJsonValue | Prisma.NullTypes.JsonNull {
-  if (data === null) return Prisma.JsonNull;
-  if (Array.isArray(data)) return data as Prisma.InputJsonArray;
-  if (typeof data !== "object") return data as Prisma.InputJsonValue;
-
-  const record = data as Record<string, Prisma.JsonValue>;
-  if (!Object.prototype.hasOwnProperty.call(record, "trashed")) return data as Prisma.InputJsonObject;
-
-  const { trashed: _trashed, ...rest } = record;
-  void _trashed;
-  return rest as Prisma.InputJsonObject;
-}
-
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
@@ -56,7 +42,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   const userId = session.user.id;
 
   const existing = await prisma.project.findFirst({
-    where: { id, userId },
+    where: { id, userId, trashedAt: null },
     select: {
       id: true,
       userId: true,
@@ -78,7 +64,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     data: {
       userId,
       name: copyName,
-      data: withoutTrashedFlag(existing.data),
+      data: existing.data,
       previewKey: null,
       pdfKey: existing.pdfKey,
       pagesCount: existing.pagesCount ?? 0,

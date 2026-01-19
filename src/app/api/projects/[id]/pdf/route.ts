@@ -45,7 +45,7 @@ export async function POST(
 
   const userId = session.user.id;
   const project = await prisma.project.findFirst({
-    where: { id, userId },
+    where: { id, userId, trashedAt: null },
     select: { id: true, userId: true, previewKey: true, pdfKey: true },
   });
 
@@ -114,7 +114,7 @@ export async function GET(
 
   const userId = session.user.id;
   const project = await prisma.project.findFirst({
-    where: { id, userId },
+    where: { id, userId, trashedAt: null },
     select: { pdfKey: true },
   });
 

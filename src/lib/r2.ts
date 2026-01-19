@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectsCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 export type R2Config = {
@@ -75,5 +75,18 @@ export async function createSignedR2UploadUrl(
     config.client,
     new PutObjectCommand({ Bucket: config.bucket, Key: key, ContentType: contentType }),
     { expiresIn }
+  );
+}
+
+export async function deleteR2Objects(config: R2Config, keys: string[]) {
+  if (keys.length === 0) return;
+  await config.client.send(
+    new DeleteObjectsCommand({
+      Bucket: config.bucket,
+      Delete: {
+        Objects: keys.map((key) => ({ Key: key })),
+        Quiet: true,
+      },
+    })
   );
 }

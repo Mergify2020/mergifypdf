@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
-import { createSignedR2Url, getR2Config, uploadR2Object } from "@/lib/r2";
+import { createSignedR2Url, deleteR2Objects, getR2Config, uploadR2Object } from "@/lib/r2";
 import { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -100,7 +100,7 @@ export async function GET(
 
   const userId = session.user.id;
 
-  const project = await prisma.project.findFirst({ where: { id, userId } });
+  const project = await prisma.project.findFirst({ where: { id, userId, trashedAt: null } });
 
   if (!project) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -139,7 +139,9 @@ export async function GET(
         where: { id: project.id, userId },
         data: { pagesCount: nextPagesCount },
       });
-      const updated = await prisma.project.findFirst({ where: { id: project.id, userId } });
+      const updated = await prisma.project.findFirst({
+        where: { id: project.id, userId, trashedAt: null },
+      });
       if (!updated) {
         return NextResponse.json({ error: "Not found" }, { status: 404 });
       }
@@ -207,11 +209,11 @@ export async function PUT(
   const existing =
     data === undefined
       ? await prisma.project.findFirst({
-          where: { id, userId },
+          where: { id, userId, trashedAt: null },
           select: { id: true, userId: true, name: true, previewKey: true },
         })
       : await prisma.project.findFirst({
-          where: { id, userId },
+          where: { id, userId, trashedAt: null },
         });
 
   if (!existing) {
@@ -329,9 +331,25 @@ export async function DELETE(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  // Hard delete: remove the project record first, then clean up R2 assets.
   await prisma.project.deleteMany({
     where: { id: existing.id, userId },
   });
+
+  const keysToDelete = [existing.pdfKey, existing.previewKey].filter(
+    (key): key is string => typeof key === "string" && key.length > 0
+  );
+  if (keysToDelete.length > 0) {
+    try {
+      const r2Config = getR2Config();
+      await deleteR2Objects(r2Config, keysToDelete);
+    } catch (err) {
+      console.error("Failed to delete R2 objects for hard-deleted project.", {
+        projectId: existing.id,
+        error: err,
+      });
+    }
+  }
 
   return NextResponse.json({ success: true });
 }

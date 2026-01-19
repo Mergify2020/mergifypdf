@@ -52,6 +52,12 @@ import { useAvatarPreference } from "@/lib/useAvatarPreference";
 import { getAvatarFallback } from "@/lib/avatarFallback";
 import { useWorkspaceFilePreloader, type PendingWorkspaceFile } from "@/components/useWorkspaceFilePreloader";
 import { uploadProjectPreviewFromFile } from "@/lib/projectPreview";
+import {
+  getProjectsSummaryCache,
+  refreshProjectsSummary,
+  subscribeProjectsSummary,
+  type ProjectsSummaryProject,
+} from "@/lib/projectsSummaryCache";
 
 const WORKSPACE_META_KEY = "mpdf:files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
@@ -95,7 +101,7 @@ const navigationItems: SidebarItem[] = [
   { label: "Home", icon: PhHouse, href: "/" },
   { label: "Projects", icon: PhFolders, href: "/projects" },
   { label: "Signatures", icon: PhSignature, href: "/signature-center" },
-  { label: "Templates", icon: PhFileText, href: "/signature-center", disabled: true },
+  { label: "Templates", icon: PhFileText, href: "/templates" },
   { label: "Trash", icon: PhTrash, href: "/projects/trash" },
 ];
 
@@ -366,16 +372,20 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
 
   const [activeProjectsFilter, setActiveProjectsFilter] = useState("all");
   const itemLabelClasses = "opacity-100 translate-x-0 max-w-full";
+  const isTrashRoute = pathname?.startsWith("/projects/trash") ?? false;
+  const isProjectsRoute = (pathname?.startsWith("/projects") ?? false) && !isTrashRoute;
   const panelKey =
-    pathname === "/" || pathname === "/projects/all"
+    pathname === "/" || pathname === "/projects/all" || isTrashRoute
       ? "home"
-      : pathname?.startsWith("/projects")
+      : isProjectsRoute
         ? "projects"
         : pathname?.startsWith("/signature-center")
           ? "signatures"
-          : "default";
+          : pathname?.startsWith("/templates")
+            ? "templates"
+            : "default";
   const homeSidebarLocked = panelKey === "home";
-  const panelExpanded = homeSidebarLocked ? false : expanded;
+  const panelExpanded = homeSidebarLocked || panelKey === "templates" ? false : expanded;
   const navExpanded = expanded;
   const activePanel = sidebarPanels[panelKey] ?? sidebarPanels.default;
   const simplePanelList =
@@ -386,6 +396,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
   const isStudioRoute = pathname?.startsWith("/studio");
   const isProjectsPanel = panelKey === "projects";
   const isHomePanel = panelKey === "home";
+  const isTemplatesPanel = panelKey === "templates";
   const PanelTitleIcon: LucideIcon =
     panelKey === "home"
       ? FolderKanban
@@ -396,8 +407,19 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
           : BookOpen;
 
   useEffect(() => {
-    router.prefetch("/");
-    router.prefetch("/projects/all");
+    if (typeof window === "undefined") return;
+    const routes = ["/", "/projects/all", "/signature-center", "/templates", "/projects/trash"];
+    const prefetch = () => {
+      routes.forEach((route) => {
+        router.prefetch(route);
+      });
+    };
+    if ("requestIdleCallback" in window) {
+      const handle = window.requestIdleCallback(prefetch, { timeout: 1200 });
+      return () => window.cancelIdleCallback(handle);
+    }
+    const timer = window.setTimeout(prefetch, 200);
+    return () => window.clearTimeout(timer);
   }, [router]);
 
   useEffect(() => {
@@ -420,61 +442,59 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
       });
     };
 
-    const load = async () => {
-      try {
-        const res = await fetch("/api/projects?summary=1", { cache: "no-store" });
-        if (!res.ok) {
-          if (!cancelled) setHomeRecentProjects([]);
-          return;
-        }
-        const data = (await res.json()) as {
-          projects?: {
-            id: string;
-            name: string | null;
-            updatedAt: string | number | Date;
-            previewUrl?: string | null;
-            hasPreview?: boolean;
-          }[];
-        };
-        if (!Array.isArray(data.projects) || cancelled) {
-          if (!cancelled) setHomeRecentProjects([]);
-          return;
-        }
-        const mapped = data.projects
-          .map((project) => ({
-            id: project.id,
-            title: project.name?.trim() || "Untitled project",
-            updatedAt: new Date(project.updatedAt).getTime(),
-            previewUrl: project.previewUrl ?? null,
-            hasPreview: project.hasPreview ?? false,
-          }))
-          .filter((entry) => Boolean(entry.id) && entry.title.length > 0)
-          .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
-        if (!cancelled) {
-          setHomeRecentProjects(mapped);
-        }
+    const mapSummary = (projects: ProjectsSummaryProject[]) => {
+      const mapped = projects
+        .map((project) => ({
+          id: project.id,
+          title: project.name?.trim() || "Untitled project",
+          updatedAt: new Date(project.updatedAt).getTime(),
+          previewUrl: null,
+          hasPreview: project.hasPreview ?? false,
+        }))
+        .filter((entry) => Boolean(entry.id) && entry.title.length > 0)
+        .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+
+      return mapped;
+    };
+
+    const hydrate = (projects: ProjectsSummaryProject[]) => {
+      const mapped = mapSummary(projects);
+      if (cancelled) return;
+      setHomeRecentProjects(mapped);
+      mapped
+        .filter((project) => project.hasPreview && !project.previewUrl && project.id)
+        .slice(0, 12)
+        .forEach((project) => {
+          if (project.id) {
+            void refreshPreviewUrl(project.id);
+          }
+        });
+      preloadImages(
         mapped
-          .filter((project) => project.hasPreview && !project.previewUrl && project.id)
-          .slice(0, 12)
-          .forEach((project) => {
-            if (project.id) {
-              void refreshPreviewUrl(project.id);
-            }
-          });
-        preloadImages(
-          mapped
-            .map((project) => project.previewUrl)
-            .filter((url): url is string => typeof url === "string" && url.length > 0)
-            .slice(0, 12),
-        );
-      } catch {
-        if (!cancelled) {
-          setHomeRecentProjects([]);
-        }
+          .map((project) => project.previewUrl)
+          .filter((url): url is string => typeof url === "string" && url.length > 0)
+          .slice(0, 12),
+      );
+    };
+
+    const cached = getProjectsSummaryCache(ownerKey);
+    if (cached) {
+      hydrate(cached);
+    }
+
+    const load = async () => {
+      const fresh = await refreshProjectsSummary(ownerKey);
+      if (fresh && !cancelled) {
+        hydrate(fresh);
       }
     };
 
     void load();
+
+    const unsubscribe = subscribeProjectsSummary((update) => {
+      if (update.ownerKey !== ownerKey || !update.projects || cancelled) return;
+      hydrate(update.projects);
+    });
 
     const handleFocus = () => {
       void load();
@@ -490,6 +510,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
     document.addEventListener("visibilitychange", handleVisibility);
     return () => {
       cancelled = true;
+      unsubscribe();
       window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
@@ -678,12 +699,14 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
   const shouldOverlay = overlaySidebar;
   const railWidthClass = "w-full";
   const panelLeftClass = "left-[calc(var(--shell-left)+var(--shell-sidebar-width)+24px)]";
-  const baseContentOffsetClass = "md:pl-[calc(var(--shell-left)+var(--shell-sidebar-width)+24px)]";
+  const baseContentOffsetClass = expanded
+    ? "md:pl-[calc(var(--shell-left)+256px+24px)]"
+    : "md:pl-[calc(var(--shell-left)+80px+24px)]";
   const expandedContentOffsetClass =
     panelExpanded && !shouldOverlay
-      ? sidebarCompact
-        ? "md:pl-[calc(var(--shell-left)+var(--shell-sidebar-width)+24px+240px)]"
-        : "md:pl-[calc(var(--shell-left)+var(--shell-sidebar-width)+24px+320px)]"
+      ? expanded
+        ? "md:pl-[calc(var(--shell-left)+256px+24px+320px)]"
+        : "md:pl-[calc(var(--shell-left)+80px+24px+240px)]"
       : "";
   const sidebarExpandedClass = panelExpanded && !shouldOverlay ? "with-sidebar-panel" : "";
   const contentOffsetClass = `${baseContentOffsetClass} ${expandedContentOffsetClass} ${sidebarExpandedClass}`.trim();
@@ -798,9 +821,13 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
       const isLogout = label === "Log out";
       const isActive =
         !disabled &&
-        (href === "/"
-          ? pathname === "/"
-          : pathname?.startsWith(href) || false);
+        (label === "Trash"
+          ? isTrashRoute
+          : label === "Projects"
+            ? isProjectsRoute || pathname === "/projects/all"
+            : href === "/"
+              ? pathname === "/"
+              : pathname?.startsWith(href) || false);
       const iconWrapperBase = isExpanded
         ? `flex ${sidebarCompact ? "w-9" : "w-10"} items-center justify-center rounded-2xl transition`
         : "flex h-8 w-full items-center justify-center rounded-2xl transition";
@@ -973,9 +1000,13 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
     items.map(({ label, icon: Icon, href, disabled, onClick }) => {
       const isActive =
         !disabled &&
-        (href === "/"
-          ? pathname === "/"
-          : pathname?.startsWith(href) || false);
+        (label === "Trash"
+          ? isTrashRoute
+          : label === "Projects"
+            ? isProjectsRoute || pathname === "/projects/all"
+            : href === "/"
+              ? pathname === "/"
+              : pathname?.startsWith(href) || false);
       const targetHref = label === "Projects" ? "/projects/all" : href;
       const baseClasses =
         "flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-medium transition-[background-color,color] duration-[120ms] ease-out";
@@ -1034,10 +1065,12 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
   const workspaceShell = (
     <>
     <div
-      className={`flex min-h-screen ${isHomePanel ? "bg-[#F1F4F9]" : "bg-slate-100"} dark:bg-[#222224]`}
+      className={`flex min-h-screen ${isHomePanel ? "bg-[#F1F4F9]" : "bg-slate-100"} ${sidebarCompact ? "sidebar-collapsed" : ""} ${expanded ? "" : "sidebar-minimized"} dark:bg-[#222224]`}
       style={
         {
-          "--shell-left": "max(24px, calc((100vw - 1960px) / 2))",
+          "--shell-content-width": expanded ? "1680px" : "1960px",
+          "--shell-left":
+            "max(24px, calc((100vw - (var(--shell-content-width) + var(--shell-sidebar-width) + 24px)) / 2))",
           "--shell-sidebar-width": expanded ? "256px" : "80px",
         } as React.CSSProperties
       }
@@ -1173,7 +1206,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
             </div>
             </div>
 
-            {!isHomePanel ? (
+            {!isHomePanel && !isTemplatesPanel ? (
               <div
                 ref={profileRef}
                 className={`relative z-50 px-3 pb-6 ${
@@ -1300,11 +1333,10 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                             </div>
                             <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
                           </button>
-                          <button
-                            type="button"
+                          <Link
+                            href="/projects/trash"
                             onClick={() => {
                               setProfileOpen(false);
-                              router.push("/projects/trash");
                             }}
                             className="flex w-full items-center justify-between rounded-2xl px-4 py-3.5 text-left text-2xl font-semibold text-slate-800 transition hover:bg-slate-50"
                           >
@@ -1313,7 +1345,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                               <span>Trash</span>
                             </div>
                             <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
-                          </button>
+                          </Link>
                           <button
                             type="button"
                             disabled={signingOut}
@@ -1376,11 +1408,10 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                             </div>
                             <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
                           </button>
-                          <button
-                            type="button"
+                          <Link
+                            href="/projects/trash"
                             onClick={() => {
                               setProfileOpen(false);
-                              router.push("/projects/trash");
                             }}
                             className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-2xl font-semibold text-slate-700 transition hover:bg-slate-50"
                           >
@@ -1389,7 +1420,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                               <span>Trash</span>
                             </div>
                             <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
-                          </button>
+                          </Link>
                           <button
                             type="button"
                             disabled={signingOut}
@@ -1466,18 +1497,17 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                       <FileText className="h-6 w-6 text-slate-600" aria-hidden />
                       <span>Plans &amp; Pricing</span>
                     </button>
-                    <button
-                      type="button"
+                    <Link
+                      href="/projects/trash"
                       onClick={() => {
                         setExpanded(false);
                         setProfileOpen(false);
-                        router.push("/projects/trash");
                       }}
                       className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-left text-2xl font-semibold text-slate-800 transition hover:bg-slate-50"
                     >
                       <Trash2 className="h-6 w-6 text-slate-600" aria-hidden />
                       <span>Trash</span>
-                    </button>
+                    </Link>
                     <button
                       type="button"
                       disabled={signingOut}
@@ -1840,17 +1870,16 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                   <FileText className="h-6 w-6 text-slate-500" aria-hidden />
                   <span>Plans &amp; Pricing</span>
                 </button>
-                <button
-                  type="button"
+                <Link
+                  href="/projects/trash"
                   onClick={() => {
                     setMobileOpen(false);
-                    router.push("/projects/trash");
                   }}
                   className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold transition hover:bg-slate-100"
                 >
                   <Trash2 className="h-6 w-6 text-slate-500" aria-hidden />
                   <span>Trash</span>
-                </button>
+                </Link>
                 <button
                   type="button"
                   disabled={signingOut}
@@ -1900,7 +1929,10 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
         <Suspense fallback={<PageLoadingSkeleton />}>
           <main className="page-fade-in relative z-0 flex-1 lg:z-40">
             <div className="flex w-full justify-start pr-6">
-              <div className="w-full max-w-[1680px]">
+              <div
+                className="workspace-content-shell w-full"
+                style={{ maxWidth: "var(--shell-content-width)" }}
+              >
                 {children}
               </div>
             </div>

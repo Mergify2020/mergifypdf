@@ -77,6 +77,7 @@ model Project {
   pdfKey    String?
   previewKey String?
   pagesCount Int?     @default(0)
+  trashedAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

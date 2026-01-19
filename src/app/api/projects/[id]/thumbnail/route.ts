@@ -21,7 +21,7 @@ export async function GET(
   const userId = session.user.id;
 
   const project = await prisma.project.findFirst({
-    where: { id, userId },
+    where: { id, userId, trashedAt: null },
     select: { previewKey: true },
   });
 
