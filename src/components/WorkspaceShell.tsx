@@ -1094,10 +1094,10 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                   <>
                     <AppHeaderBrand
                       logoLightSrc={
-                        isHomePanel ? "/logos/home-expanded-sidebar-logo-light-v3.svg" : undefined
+                        isHomePanel ? "/logos/home-expanded-sidebar-logo-light-v4.svg" : undefined
                       }
                       logoDarkSrc={
-                        isHomePanel ? "/logos/home-expanded-sidebar-logo-dark-v3.svg" : undefined
+                        isHomePanel ? "/logos/home-expanded-sidebar-logo-dark-v4.svg" : undefined
                       }
                     />
                     <button
