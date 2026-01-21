@@ -440,7 +440,7 @@ export default function HomeProjectsSearch({
                         viewBox="0 0 24 24"
                         className="h-4 w-4"
                         fill="none"
-                        stroke="var(--color-primary)"
+                        stroke="#4F46E5"
                         strokeWidth="2"
                         strokeLinecap="round"
                         strokeLinejoin="round"

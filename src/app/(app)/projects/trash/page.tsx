@@ -36,7 +36,7 @@ export default async function TrashProjectsPage() {
   });
 
   return (
-    <div className="min-h-screen bg-transparent px-2 pb-10 pt-6 sm:px-4 sm:pt-6 lg:px-6 lg:pt-6 lg:pr-6">
+    <div className="min-h-screen bg-transparent pl-2 pr-0 pb-10 pt-6 sm:pl-4 sm:pr-0 sm:pt-6 lg:pl-6 lg:pr-0 lg:pt-6">
       <div className="mx-auto w-full pb-16">
         <div className="grid h-full w-full min-h-0 gap-[24px] lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start">
           <div>
@@ -47,7 +47,7 @@ export default async function TrashProjectsPage() {
                   Projects you move here can be restored or permanently deleted.
                 </p>
               </div>
-              <div className="lg:mr-[calc(var(--shell-left)-24px)]">
+              <div>
                 <TrashHeaderControls
                   accountName={session.user.name ?? "Account"}
                   accountEmail={session.user.email ?? null}

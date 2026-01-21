@@ -12,13 +12,15 @@ export const metadata: Metadata = {
   description: "Fast, simple PDF tools — all in your browser.",
   icons: {
     icon: [
-      { url: "/favicon2080.svg", type: "image/svg+xml" },
-      { url: "/favicon-32-2080.png", sizes: "32x32", type: "image/png" },
-      { url: "/favicon-16-2080.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicons/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicons/favicon-48x48.png", sizes: "48x48", type: "image/png" },
+      { url: "/favicons/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicons/favicon-16x16.png", sizes: "16x16", type: "image/png" },
     ],
-    apple: [{ url: "/apple-touch-icon-2080.png", sizes: "180x180" }],
-    other: [{ rel: "mask-icon", url: "/safari-pinned-tab-2080.svg", color: "#024d7c" }],
+    apple: [{ url: "/favicons/apple-touch-icon.png", sizes: "180x180" }],
+    other: [{ rel: "mask-icon", url: "/favicons/safari-pinned-tab.svg", color: "#024d7c" }],
   },
+  manifest: "/favicons/site.webmanifest",
 };
 
 export const dynamic = "force-dynamic";
@@ -58,11 +60,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         />
 
         {/* Explicit links (helps stubborn Safari/iOS) */}
-        <link rel="icon" type="image/svg+xml" href="/favicon2080.svg" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32-2080.png" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16-2080.png" />
-        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-2080.png" />
-        <link rel="mask-icon" href="/safari-pinned-tab-2080.svg" color="#024d7c" />
+        <link rel="icon" href="/favicons/favicon.ico" sizes="any" />
+        <link rel="icon" type="image/svg+xml" href="/favicons/favicon.svg" />
+        <link rel="icon" type="image/png" sizes="48x48" href="/favicons/favicon-48x48.png" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicons/favicon-32x32.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicons/favicon-16x16.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/favicons/apple-touch-icon.png" />
+        <link rel="mask-icon" href="/favicons/safari-pinned-tab.svg" color="#024d7c" />
+        <link rel="manifest" href="/favicons/site.webmanifest" />
       </head>
 
       <body className="min-h-screen bg-white text-gray-900 dark:bg-[#222224] dark:text-zinc-100">

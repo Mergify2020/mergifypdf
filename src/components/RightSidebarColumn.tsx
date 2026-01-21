@@ -10,7 +10,7 @@ const shadowClasses = "";
 export default function RightSidebarColumn() {
   return (
     <aside
-      className="relative z-10 w-full min-h-0 overflow-visible"
+      className="relative z-10 w-full min-h-0 overflow-visible pl-1 pr-0 lg:px-0"
       style={
         {
           "--home-sidebar-scrollbar": "0px",
