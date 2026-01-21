@@ -6,9 +6,15 @@ import { usePathname } from "next/navigation";
 
 type Props = {
   variant?: "default" | "sidebarPanel";
+  logoLightSrc?: string;
+  logoDarkSrc?: string;
 };
 
-export default function AppHeaderBrand({ variant = "default" }: Props) {
+export default function AppHeaderBrand({
+  variant = "default",
+  logoLightSrc,
+  logoDarkSrc,
+}: Props) {
   const pathname = usePathname();
   const isSignatureExperience = pathname?.startsWith("/signature-center") ?? false;
   const isStudio = pathname?.startsWith("/studio") ?? false;
@@ -23,6 +29,8 @@ export default function AppHeaderBrand({ variant = "default" }: Props) {
   const scale = variant === "sidebarPanel" ? 1.35 : autoScale;
   const logoWidth = Math.round(baseWidth * scale);
   const logoHeight = Math.round(baseHeight * scale);
+  const lightLogo = logoLightSrc ?? "/logo-wording.2026.2.svg";
+  const darkLogo = logoDarkSrc ?? "/Merg.dark-logo.2026.svg";
 
   if (isSignatureExperience) {
     return (
@@ -53,7 +61,7 @@ export default function AppHeaderBrand({ variant = "default" }: Props) {
   return useHardNav ? (
     <a href="/" className="inline-flex items-center gap-2" aria-label="Back to dashboard">
       <Image
-        src="/logo-wording.2026.2.svg"
+        src={lightLogo}
         alt="MergifyPDF"
         width={logoWidth}
         height={logoHeight}
@@ -61,7 +69,7 @@ export default function AppHeaderBrand({ variant = "default" }: Props) {
         className="block dark:hidden"
       />
       <Image
-        src="/Merg.dark-logo.2026.svg"
+        src={darkLogo}
         alt="MergifyPDF"
         width={logoWidth}
         height={logoHeight}
@@ -72,7 +80,7 @@ export default function AppHeaderBrand({ variant = "default" }: Props) {
   ) : (
     <Link href="/" className="inline-flex items-center gap-2" aria-label="Back to dashboard">
       <Image
-        src="/logo-wording.2026.2.svg"
+        src={lightLogo}
         alt="MergifyPDF"
         width={logoWidth}
         height={logoHeight}
@@ -80,7 +88,7 @@ export default function AppHeaderBrand({ variant = "default" }: Props) {
         className="block dark:hidden"
       />
       <Image
-        src="/Merg.dark-logo.2026.svg"
+        src={darkLogo}
         alt="MergifyPDF"
         width={logoWidth}
         height={logoHeight}
