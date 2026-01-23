@@ -44,11 +44,9 @@ export async function sendResetEmail({ to, code }: SendArgs): Promise<ResetEmail
         subject: "Reset your MergifyPDF password",
         html: `
           <div style="font-family: Inter, Arial, sans-serif; line-height:1.6;">
-            <h2 style="margin:0 0 12px;">Reset your MergifyPDF password</h2>
-            <p>
-              Use the 6-digit code below to reset your password:
-            </p>
-            <p style="display:inline-block;padding:12px 20px;border-radius:10px;background:#024d7c;color:#fff;font-size:24px;letter-spacing:6px;font-weight:600;">
+            <div style="height:3px;background-color:#6D6AF4;margin:0 0 16px;"></div>
+            <p>Your verification code is:</p>
+            <p style="font-size:24px;letter-spacing:6px;font-weight:700;margin:0 0 8px;">
               ${code}
             </p>
             <p style="margin-top:18px;color:#4B5563;">
