@@ -220,6 +220,12 @@ html.theme-transition body {
   transition: background-color 200ms ease, color 200ms ease;
 }
 
+@media (min-width: 768px) and (max-width: 1024px) {
+  body:has(main[data-login-page]) {
+    overflow: hidden;
+  }
+}
+
 main[data-login-page] input[type="password"]::-ms-reveal,
 main[data-login-page] input[type="password"]::-ms-clear {
   display: none;

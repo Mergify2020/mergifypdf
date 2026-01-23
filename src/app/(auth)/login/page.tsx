@@ -115,7 +115,8 @@ export default function LoginPage() {
     <>
       <main
         data-login-page
-        className="relative flex flex-1 w-full items-center justify-center overflow-hidden bg-white px-0 py-4 sm:py-6"
+        className="relative flex w-full items-center justify-center overflow-hidden bg-white px-0 py-4 sm:py-6"
+        style={{ height: "calc(100vh - 46px)" }}
       >
         {/* Darkened hero team background, behind card but above base color */}
         <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
