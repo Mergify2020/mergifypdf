@@ -237,19 +237,6 @@ html.theme-transition body {
   }
 }
 
-body:has(main[data-login-page]) {
-  position: relative;
-}
-
-body:has(main[data-login-page])::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  background: url("/backgrounds/login-page-background-v5.svg") center/cover no-repeat;
-  z-index: -1;
-  pointer-events: none;
-}
-
 main[data-login-page] input[type="password"]::-ms-reveal,
 main[data-login-page] input[type="password"]::-ms-clear {
   display: none;
