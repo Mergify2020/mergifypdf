@@ -248,6 +248,67 @@ main[data-login-page] input[type="password"]::-webkit-credentials-auto-fill-butt
   right: 0;
 }
 
+main[data-login-page] input[type="password"]:-webkit-autofill,
+main[data-login-page] input[type="password"]:-webkit-autofill:hover,
+main[data-login-page] input[type="password"]:-webkit-autofill:focus {
+  -webkit-text-fill-color: #0f172a;
+  transition: background-color 9999s ease-in-out 0s;
+  box-shadow: 0 0 0 1000px #ffffff inset;
+}
+
+main[data-login-page] input:-webkit-autofill,
+main[data-login-page] input:-webkit-autofill:hover,
+main[data-login-page] input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #0f172a !important;
+  caret-color: #0f172a;
+  transition: background-color 9999s ease-in-out 0s;
+  box-shadow: 0 0 0 1000px #ffffff inset !important;
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+  background-color: #ffffff !important;
+}
+
+@keyframes auth-card-enter {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes auth-card-enter-left {
+  from {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-card-animate {
+    animation: none !important;
+  }
+}
+
+.auth-card-animate {
+  animation: auth-card-enter 240ms ease-out;
+  backface-visibility: hidden;
+  transform: translateX(0);
+  -webkit-font-smoothing: antialiased;
+}
+
+.auth-card-animate-left {
+  animation: auth-card-enter-left 240ms ease-out;
+  backface-visibility: hidden;
+  transform: translateX(0);
+  -webkit-font-smoothing: antialiased;
+}
+
 html.theme-transition body * {
   transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease;
 }

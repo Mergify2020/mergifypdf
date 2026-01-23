@@ -9,10 +9,10 @@ export async function GET(req: Request) {
     if (!to) {
       return NextResponse.json({ ok: false, error: "Missing ?to=" }, { status: 400 });
     }
-    // Use a fake token just to test deliverability/link
-    const token = "test-token-" + Math.random().toString(36).slice(2);
+    // Use a fake code just to test deliverability
+    const code = "123456";
 
-    const result = await sendResetEmail({ to, token });
+    const result = await sendResetEmail({ to, code });
 
     return NextResponse.json({
       ok: result.ok,

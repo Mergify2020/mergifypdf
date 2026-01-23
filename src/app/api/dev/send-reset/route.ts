@@ -3,7 +3,7 @@ import { sendResetEmail } from "@/lib/email";
 
 export async function GET() {
   const to = "morrisalan2020@gmail.com";
-  const token = "debug-" + Date.now();
-  const result = await sendResetEmail({ to, token });
+  const code = "123456";
+  const result = await sendResetEmail({ to, code });
   return NextResponse.json({ ok: true, result });
 }

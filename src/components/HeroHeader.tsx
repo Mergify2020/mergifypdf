@@ -12,6 +12,8 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
   const isHomePage = pathname === "/";
   const isPricingPage = pathname === "/pricing";
   const isLoginPage = pathname === "/login";
+  const isRegisterPage = pathname === "/register";
+  const isForgotPasswordPage = pathname === "/forgot-password";
   const isAnimatedPage = isHomePage || isPricingPage;
 
   const [scrolledPastHero, setScrolledPastHero] = useState(false);
@@ -63,7 +65,7 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
       : "translate-y-0 opacity-100"
     : "translate-y-0";
 
-  if (isLoginPage) {
+  if (isLoginPage || isRegisterPage || isForgotPasswordPage) {
     return null;
   }
 

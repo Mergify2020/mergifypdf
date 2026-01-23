@@ -1,19 +1,19 @@
 ﻿// src/lib/email.tsx — REPLACE EVERYTHING
 import React from "react";
 import { Resend } from "resend";
-import { ResetPasswordEmail } from "@/emails/ResetPasswordEmail";
+import { ResetPasswordCodeEmail } from "@/emails/ResetPasswordCodeEmail";
 import { SignupCodeEmail } from "@/emails/SignupCodeEmail";
 import { SignatureRequestEmail } from "@/emails/SignatureRequestEmail";
 import { TwoFactorCodeEmail } from "@/emails/TwoFactorCodeEmail";
 import { TwoFactorSignInEmail } from "@/emails/TwoFactorSignInEmail";
 
-type SendArgs = { to: string; token: string };
+type SendArgs = { to: string; code: string };
 
 type ResetEmailSuccess = { ok: true; id?: string | null; fallback?: boolean };
 type ResetEmailFailure = { ok: false; error: string };
 export type ResetEmailResult = ResetEmailSuccess | ResetEmailFailure;
 
-export async function sendResetEmail({ to, token }: SendArgs): Promise<ResetEmailResult> {
+export async function sendResetEmail({ to, code }: SendArgs): Promise<ResetEmailResult> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     console.error("[email] Missing RESEND_API_KEY");
@@ -23,21 +23,12 @@ export async function sendResetEmail({ to, token }: SendArgs): Promise<ResetEmai
   const resend = new Resend(apiKey);
   const from = process.env.FROM_EMAIL || "MergifyPDF <onboarding@resend.dev>";
 
-  // Build absolute reset URL
-  let base =
-    process.env.NEXTAUTH_URL ||
-    process.env.NEXT_PUBLIC_APP_URL ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "") ||
-    "http://localhost:3000";
-  base = base.replace(/\/+$/, "");
-  const url = `${base}/reset-password?token=${encodeURIComponent(token)}`;
-
   try {
     const { data, error } = await resend.emails.send({
       from,
       to,
       subject: "Reset your MergifyPDF password",
-      react: <ResetPasswordEmail resetUrl={url} />,
+      react: <ResetPasswordCodeEmail code={code} />,
     });
 
     if (error) {
@@ -54,15 +45,15 @@ export async function sendResetEmail({ to, token }: SendArgs): Promise<ResetEmai
         html: `
           <div style="font-family: Inter, Arial, sans-serif; line-height:1.6;">
             <h2 style="margin:0 0 12px;">Reset your MergifyPDF password</h2>
-            <p>Click the button below:</p>
             <p>
-              <a href="${url}"
-                 style="display:inline-block;padding:10px 16px;border-radius:10px;text-decoration:none;background:#2563eb;color:#fff;font-weight:600;">
-                Reset password
-              </a>
+              Use the 6-digit code below to reset your password:
             </p>
-            <p>If the button doesn’t work, copy this link:</p>
-            <p style="word-break:break-all;color:#374151;">${url}</p>
+            <p style="display:inline-block;padding:12px 20px;border-radius:10px;background:#024d7c;color:#fff;font-size:24px;letter-spacing:6px;font-weight:600;">
+              ${code}
+            </p>
+            <p style="margin-top:18px;color:#4B5563;">
+              This code expires in 10 minutes. If you didn’t request it, you can safely ignore this email.
+            </p>
           </div>
         `,
       });
@@ -315,4 +306,3 @@ export async function sendTwoFactorLoginEmail({
     }
   }
 }
-

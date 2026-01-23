@@ -1,7 +1,7 @@
 // src/app/api/auth/request-reset/route.ts — REPLACE EVERYTHING
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { generateToken } from "@/lib/tokens";
+import { generateSixDigitCode, hashVerificationCode } from "@/lib/verificationCode";
 import { sendResetEmail } from "@/lib/email";
 import { randomUUID } from "crypto";
 
@@ -68,13 +68,16 @@ export async function POST(req: Request) {
       return err("EMAIL_NOT_FOUND", "This email isn’t associated with an account.");
     }
 
-    // 2) generate a token (string)
-    let token: string = await generateToken(user.id);
+    // 2) generate a 6-digit code and hash it
+    let code = generateSixDigitCode();
+    let token: string = hashVerificationCode(code);
 
     // 3) write row to public.ResetToken with required columns
     //    (id, token, userId, expiresAt, createdAt, updatedAt)
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
     const now = new Date();
+
+    await prisma.resetToken.deleteMany({ where: { userId: user.id } });
 
     for (let attempt = 1; attempt <= MAX_TOKEN_RETRIES; attempt++) {
       try {
@@ -96,7 +99,8 @@ export async function POST(req: Request) {
           details?.code === "P2002" ||
           (details?.message ? details.message.toLowerCase().includes("unique") : false);
         if (isUnique && attempt < MAX_TOKEN_RETRIES) {
-          token = await generateToken(user.id);
+          code = generateSixDigitCode();
+          token = hashVerificationCode(code);
           continue;
         }
         // any other error (or retries exhausted)
@@ -107,7 +111,7 @@ export async function POST(req: Request) {
     }
 
     // 4) send the email
-    const emailRes = await sendResetEmail({ to: user.email!, token });
+    const emailRes = await sendResetEmail({ to: user.email!, code });
 
     if (!emailRes.ok) {
       return err(
@@ -121,8 +125,8 @@ export async function POST(req: Request) {
 
     // 5) success response (your wording)
     return ok({
-      code: "EMAIL_SENT",
-      message: "Reset link has been sent. It may take a few minutes to arrive.",
+      code: "CODE_SENT",
+      message: "Reset code has been sent. It may take a few minutes to arrive.",
     });
   } catch (error) {
     return err("UNEXPECTED", "Something went wrong. Please try again.", {

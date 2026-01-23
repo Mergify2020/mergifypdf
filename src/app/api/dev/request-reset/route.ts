@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { createFreshResetTokenForUser } from "@/lib/resetTokenWriter";
 import { sendResetEmail } from "@/lib/email";
+import { generateSixDigitCode, hashVerificationCode } from "@/lib/verificationCode";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -18,22 +18,25 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: false, steps, email, userFound: false });
     }
 
-    steps.push("create-token-row");
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
-    const created = await createFreshResetTokenForUser(user.id, expiresAt);
-    if (!created.ok) {
-      return NextResponse.json({ ok: false, steps, email, userFound: true, createRes: created });
-    }
+    steps.push("create-code-row");
+    const code = generateSixDigitCode();
+    const token = hashVerificationCode(code);
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    await prisma.resetToken.deleteMany({ where: { userId: user.id } });
+    const created = await prisma.resetToken.create({
+      data: { token, userId: user.id, expiresAt },
+      select: { id: true, token: true, userId: true, createdAt: true, expiresAt: true },
+    });
 
     steps.push("send-email");
-    const sent = await sendResetEmail({ to: user.email as string, token: created.row.token });
+    const sent = await sendResetEmail({ to: user.email as string, code });
 
     return NextResponse.json({
       ok: true,
       steps,
       email,
       userFound: true,
-      tokenLen: created.row.token.length,
+      tokenLen: created.token.length,
       createRes: created,
       sent,
     });

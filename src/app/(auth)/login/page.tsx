@@ -136,9 +136,7 @@ export default function LoginPage() {
         <div className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-center px-4 lg:px-6">
           {/* Login card centered */}
           <div className="flex w-full justify-center">
-            <div
-              className="w-full max-w-lg min-h-[620px] rounded-[5px] border border-white/25 bg-white px-7 py-12 shadow-[0_30px_90px_rgba(15,23,42,0.22)] sm:px-9 sm:py-14"
-            >
+            <div className="auth-card-animate w-full max-w-lg min-h-[620px] rounded-[5px] border border-white/25 bg-white px-7 py-12 shadow-[0_30px_90px_rgba(15,23,42,0.22)] sm:px-9 sm:py-14">
               <div className="mb-4 flex items-center">
                 <Image
                   src="/logos/home-expanded-sidebar-logo-light-v6.svg"

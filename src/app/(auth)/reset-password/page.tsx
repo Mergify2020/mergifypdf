@@ -41,7 +41,7 @@ function ResetPasswordInner() {
     <main className="mx-auto max-w-sm p-6">
       <h1 className="text-2xl font-semibold">Set a new password</h1>
       <p className="text-sm text-gray-600 mt-1">
-        This link came from your email. It includes a one-time token.
+        Enter a new password for your account.
       </p>
 
       {!token && (
