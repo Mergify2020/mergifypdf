@@ -221,8 +221,19 @@ html.theme-transition body {
 }
 
 @media (min-width: 768px) and (max-width: 1024px) {
+  html:has(main[data-login-page]),
   body:has(main[data-login-page]) {
+    height: 100%;
     overflow: hidden;
+  }
+
+  body:has(main[data-login-page]) {
+    position: fixed;
+    width: 100%;
+  }
+
+  main[data-login-page] {
+    overscroll-behavior: none;
   }
 }
 
