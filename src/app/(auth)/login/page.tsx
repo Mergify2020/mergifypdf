@@ -35,6 +35,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [err, setErr] = useState<string | null>(() => getAuthError(queryError));
   const [busy, setBusy] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({ email: false, password: false });
 
   useEffect(() => {
     if (!queryError) return;
@@ -47,6 +48,14 @@ export default function LoginPage() {
     setErr(null);
 
     const normalizedEmail = email.trim().toLowerCase();
+    const emailEmpty = normalizedEmail.length === 0;
+    const passwordEmpty = password.trim().length === 0;
+
+    if (emailEmpty || passwordEmpty) {
+      setFieldErrors({ email: emailEmpty, password: passwordEmpty });
+      setBusy(false);
+      return;
+    }
 
     try {
       const res = await signIn("credentials", {
@@ -90,70 +99,103 @@ export default function LoginPage() {
     <>
       <main
         data-login-page
-        className="relative flex min-h-[calc(100vh-76px)] w-full items-center justify-center overflow-hidden bg-white px-0 py-4 sm:py-6"
+        className="relative flex flex-1 w-full items-center justify-center overflow-hidden bg-white px-0 py-4 sm:py-6"
       >
         {/* Darkened hero team background, behind card but above base color */}
         <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
           <Image
-            src="/login-picture.svg"
+            src="/backgrounds/login-page-background-v5.svg"
             alt="MergifyPDF login background"
             fill
             className="object-cover object-left sm:object-center"
             priority={false}
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-950/55 via-slate-950/25 to-slate-950/5" />
         </div>
 
-        {/* Layout container to keep card on the left, aligned with header/footer grid */}
-        <div className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-4 lg:px-6">
-          {/* Frosted-glass login card on the left */}
-          <div className="flex w-full flex-1 justify-start">
+        {/* Layout container to keep card centered */}
+        <div className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-center px-4 lg:px-6">
+          {/* Login card centered */}
+          <div className="flex w-full justify-center">
             <div
-              className="w-full max-w-md rounded-[26px] border border-white/60 bg-white/80 px-6 py-8 shadow-[0_24px_70px_rgba(15,23,42,0.55)] backdrop-blur-xl sm:px-8 sm:py-9"
-              style={{ backdropFilter: "blur(20px)" }}
+              className="w-full max-w-lg min-h-[620px] rounded-[5px] border border-white/25 bg-white px-7 py-12 shadow-[0_30px_90px_rgba(15,23,42,0.22)] sm:px-9 sm:py-14"
             >
-              <h1 className="text-2xl font-semibold text-slate-900">
-                Log in to your account
+              <div className="mb-4 flex items-center">
+                <Image
+                  src="/logos/home-expanded-sidebar-logo-light-v6.svg"
+                  alt="MergifyPDF"
+                  width={120}
+                  height={30}
+                  className="h-[47px] w-auto"
+                />
+              </div>
+              <h1 className="text-3xl font-semibold text-slate-900">
+                Sign in
               </h1>
+              <p className="mt-2 text-sm text-slate-700">
+                Don&apos;t have an account?{" "}
+                <Link
+                  className="font-normal text-[#1b6fd1] underline underline-offset-2 hover:text-[#1457a3]"
+                  href="/register"
+                >
+                  Create an account
+                </Link>
+              </p>
 
               <form
                 onSubmit={onSubmit}
                 className="mt-6 flex flex-col gap-6"
+                noValidate
               >
                 {/* Fields */}
                 <div className="space-y-4">
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-700">
-                      Email
+                    <label
+                      className={`mb-1 block text-xs font-medium ${
+                        fieldErrors.email ? "text-red-500" : "text-slate-700"
+                      }`}
+                    >
+                      Email address
                     </label>
                     <input
-                      className="w-full rounded-full border border-white/60 bg-white/85 px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus-visible:border-[#024d7c] focus-visible:ring-2 focus-visible:ring-[#024d7c]/70"
+                      className={`w-full rounded-md border-2 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus-visible:border-[#6D6AF4] focus-visible:ring-0 ${
+                        fieldErrors.email ? "border-red-500" : "border-slate-300 hover:border-slate-400"
+                      }`}
                       type="email"
                       placeholder="you@example.com"
                       value={email}
                       onChange={(e) => {
                         setEmail(e.target.value);
+                        if (fieldErrors.email && e.target.value.trim().length > 0) {
+                          setFieldErrors((prev) => ({ ...prev, email: false }));
+                        }
                         if (err) setErr(null);
                       }}
-                      required
                       autoComplete="email"
                     />
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-700">
+                    <label
+                      className={`mb-1 block text-xs font-medium ${
+                        fieldErrors.password ? "text-red-500" : "text-slate-700"
+                      }`}
+                    >
                       Password
                     </label>
                     <input
-                      className="w-full rounded-full border border-white/60 bg-white/85 px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus-visible:border-[#024d7c] focus-visible:ring-2 focus-visible:ring-[#024d7c]/70"
+                      className={`w-full rounded-md border-2 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus-visible:border-[#6D6AF4] focus-visible:ring-0 ${
+                        fieldErrors.password ? "border-red-500" : "border-slate-300 hover:border-slate-400"
+                      }`}
                       type="password"
                       placeholder="••••••••"
                       value={password}
                       onChange={(e) => {
                         setPassword(e.target.value);
+                        if (fieldErrors.password && e.target.value.trim().length > 0) {
+                          setFieldErrors((prev) => ({ ...prev, password: false }));
+                        }
                         if (err) setErr(null);
                       }}
-                      required
                       autoComplete="current-password"
                     />
                   </div>
@@ -167,15 +209,15 @@ export default function LoginPage() {
                     type="submit"
                     disabled={busy}
                     aria-disabled={busy}
-                    className="w-full rounded-full bg-[#024d7c] py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-[#013a60] hover:shadow-lg disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c]/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+                    className="w-full rounded-md bg-[#1F2937] py-2.5 text-sm font-semibold text-white transition hover:-translate-y-[1px] hover:bg-[#111827] active:scale-[0.985] active:bg-[#0B1220] active:brightness-95 active:transition active:duration-100 disabled:opacity-60 disabled:hover:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F2937]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
                   >
                     {busy ? "Signing in…" : "Continue"}
                   </button>
 
-                  <div className="my-5 flex items-center gap-2 text-gray-700">
-                    <div className="h-[2px] flex-1 bg-gray-400" />
-                    <span className="text-xs uppercase tracking-wide text-black">OR</span>
-                    <div className="h-[2px] flex-1 bg-gray-400" />
+                  <div className="my-6 flex items-center gap-2 text-gray-700">
+                    <div className="h-px flex-1 bg-gray-400/50" />
+                    <span className="text-sm text-black/70">Or</span>
+                    <div className="h-px flex-1 bg-gray-400/50" />
                   </div>
 
                   <button
@@ -183,37 +225,25 @@ export default function LoginPage() {
                     onClick={handleGoogleLogin}
                     disabled={busy}
                     aria-disabled={busy}
-                    className="flex w-full items-center justify-center gap-3 rounded-full border border-white/70 bg-white/85 px-4 py-2 text-sm font-medium text-slate-800 shadow-sm transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+                    className="flex w-full items-center justify-center gap-3 rounded-md border-2 border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 transition hover:-translate-y-[1px] hover:border-slate-400 hover:shadow-md active:scale-[0.985] active:brightness-95 active:transition active:duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
                     aria-label="Continue with Google"
                   >
                     <img src="/google.svg" alt="Google logo" className="h-5 w-5" />
                     <span>Continue with Google</span>
                   </button>
 
-                  <div className="space-y-1 text-center text-xs text-slate-800">
-                    <p>
-                      Don&apos;t have an account?{" "}
-                      <Link
-                        className="font-medium text-[#024d7c] underline-offset-2 hover:text-[#013a60] hover:underline"
-                        href="/register"
-                      >
-                        Create one
-                      </Link>
-                    </p>
-                    <p>
-                      <Link
-                        className="font-medium text-[#024d7c] underline-offset-2 hover:text-[#013a60] hover:underline"
-                        href="/forgot-password"
-                      >
-                        Forgot your password?
-                      </Link>
-                    </p>
+                  <div className="text-center text-sm text-slate-800">
+                    <Link
+                      className="font-normal text-[#1b6fd1] underline underline-offset-2 hover:text-[#1457a3]"
+                      href="/forgot-password"
+                    >
+                      Forgot your password?
+                    </Link>
                   </div>
                 </div>
               </form>
             </div>
           </div>
-          <div className="hidden flex-1 lg:block" />
         </div>
       </main>
 

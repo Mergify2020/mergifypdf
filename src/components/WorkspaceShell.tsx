@@ -1094,10 +1094,10 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                   <>
                     <AppHeaderBrand
                       logoLightSrc={
-                        isHomePanel ? "/logos/home-expanded-sidebar-logo-light-v4.svg" : undefined
+                        isHomePanel ? "/logos/home-expanded-sidebar-logo-light-v6.svg" : undefined
                       }
                       logoDarkSrc={
-                        isHomePanel ? "/logos/home-expanded-sidebar-logo-dark-v4.svg" : undefined
+                        isHomePanel ? "/logos/home-expanded-sidebar-logo-dark-v6.svg" : undefined
                       }
                     />
                     <button
@@ -1153,7 +1153,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                     }}
                   >
                     <Image
-                      src="/collapsed.sidebar.logo2.svg"
+                      src="/logos/home-collapsed-sidebar-logo-light-dark.svg"
                       alt="MergifyPDF"
                       width={187}
                       height={49}
