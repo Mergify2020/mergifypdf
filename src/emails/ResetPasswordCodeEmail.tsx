@@ -9,20 +9,9 @@ type Props = {
 export function ResetPasswordCodeEmail({ code }: Props) {
   return (
     <div style={{ fontFamily: "Inter, Arial, sans-serif", lineHeight: 1.6 }}>
-      <h2 style={{ margin: "0 0 12px" }}>Reset your MergifyPDF password</h2>
-      <p>Use the 6-digit code below to reset your password:</p>
-      <p
-        style={{
-          display: "inline-block",
-          padding: "12px 20px",
-          borderRadius: "10px",
-          background: "#024d7c",
-          color: "#ffffff",
-          fontSize: "24px",
-          letterSpacing: "6px",
-          fontWeight: 600,
-        }}
-      >
+      <div style={{ height: 3, backgroundColor: "#6D6AF4", margin: "0 0 16px" }} />
+      <p>Your verification code is:</p>
+      <p style={{ fontSize: "24px", letterSpacing: "6px", fontWeight: 700, margin: "0 0 8px" }}>
         {code}
       </p>
       <p style={{ marginTop: "18px", color: "#4B5563" }}>
