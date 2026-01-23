@@ -220,6 +220,17 @@ html.theme-transition body {
   transition: background-color 200ms ease, color 200ms ease;
 }
 
+main[data-login-page] input[type="password"]::-ms-reveal,
+main[data-login-page] input[type="password"]::-ms-clear {
+  display: none;
+}
+
+main[data-login-page] input[type="password"]::-webkit-credentials-auto-fill-button {
+  visibility: hidden;
+  position: absolute;
+  right: 0;
+}
+
 html.theme-transition body * {
   transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease;
 }

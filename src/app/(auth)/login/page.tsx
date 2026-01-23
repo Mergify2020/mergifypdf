@@ -1,7 +1,7 @@
 // src/app/login/page.tsx
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -36,6 +36,8 @@ export default function LoginPage() {
   const [err, setErr] = useState<string | null>(() => getAuthError(queryError));
   const [busy, setBusy] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({ email: false, password: false });
+  const [showPassword, setShowPassword] = useState(false);
+  const passwordInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!queryError) return;
@@ -93,6 +95,20 @@ export default function LoginPage() {
       setBusy(false);
       setErr("Google sign-in failed. Please try again.");
     }
+  }
+
+  function togglePasswordVisibility() {
+    const input = passwordInputRef.current;
+    if (!input) return;
+    const start = input.selectionStart ?? input.value.length;
+    const end = input.selectionEnd ?? start;
+
+    setShowPassword((prev) => !prev);
+
+    requestAnimationFrame(() => {
+      input.focus();
+      input.setSelectionRange(start, end);
+    });
   }
 
   return (
@@ -157,7 +173,7 @@ export default function LoginPage() {
                       Email address
                     </label>
                     <input
-                      className={`w-full rounded-md border-2 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus-visible:border-[#6D6AF4] focus-visible:ring-0 ${
+                      className={`w-full rounded-md border-2 bg-white py-2.5 pl-[18px] pr-4 text-sm text-slate-900 outline-none transition focus-visible:border-[#6D6AF4] focus-visible:ring-0 ${
                         fieldErrors.email ? "border-red-500" : "border-slate-300 hover:border-slate-400"
                       }`}
                       type="email"
@@ -182,22 +198,62 @@ export default function LoginPage() {
                     >
                       Password
                     </label>
-                    <input
-                      className={`w-full rounded-md border-2 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus-visible:border-[#6D6AF4] focus-visible:ring-0 ${
-                        fieldErrors.password ? "border-red-500" : "border-slate-300 hover:border-slate-400"
-                      }`}
-                      type="password"
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => {
-                        setPassword(e.target.value);
-                        if (fieldErrors.password && e.target.value.trim().length > 0) {
-                          setFieldErrors((prev) => ({ ...prev, password: false }));
-                        }
-                        if (err) setErr(null);
-                      }}
-                      autoComplete="current-password"
-                    />
+                    <div className="relative">
+                      <input
+                        ref={passwordInputRef}
+                        className={`w-full rounded-md border-2 bg-white py-2.5 pl-[18px] pr-10 text-[15px] text-slate-900 outline-none transition focus-visible:border-[#6D6AF4] focus-visible:ring-0 ${
+                          fieldErrors.password ? "border-red-500" : "border-slate-300 hover:border-slate-400"
+                        }`}
+                        type={showPassword ? "text" : "password"}
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => {
+                          setPassword(e.target.value);
+                          if (fieldErrors.password && e.target.value.trim().length > 0) {
+                            setFieldErrors((prev) => ({ ...prev, password: false }));
+                          }
+                          if (err) setErr(null);
+                        }}
+                        autoComplete="current-password"
+                      />
+                      <button
+                        type="button"
+                        onClick={togglePasswordVisibility}
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                        className="absolute inset-y-0 right-3 flex h-full items-center justify-center text-slate-500 transition hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6D6AF4]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+                      >
+                      {showPassword ? (
+                        <svg
+                          aria-hidden="true"
+                          viewBox="0 0 24 24"
+                          className="h-5 w-5"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.4"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M3 3l18 18" />
+                          <path d="M9.6 9.6A3 3 0 0 0 12 15a3 3 0 0 0 2.4-1.2" />
+                          <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z" />
+                        </svg>
+                      ) : (
+                        <svg
+                          aria-hidden="true"
+                          viewBox="0 0 24 24"
+                          className="h-5 w-5"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.4"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z" />
+                          <circle cx="12" cy="12" r="3" />
+                        </svg>
+                      )}
+                    </button>
+                    </div>
                   </div>
 
                   {err && <div className="text-sm text-red-600">{err}</div>}
