@@ -40,7 +40,7 @@ export function ResetPasswordCodeEmail({ code }: Props) {
                 <tr>
                   <td style={{ padding: "28px 30px 24px" }}>
                     <img
-                      src="https://mergifypdf.com/logos/email-logo-expanded-v2.png"
+                      src="https://mergifypdf.com/.well-known/email-logo-expanded-v2.png"
                       alt="MergifyPDF"
                       width={160}
                       style={{ display: "block", marginBottom: "20px", height: "auto" }}
