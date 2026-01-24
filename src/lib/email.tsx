@@ -43,36 +43,36 @@ export async function sendResetEmail({ to, code }: SendArgs): Promise<ResetEmail
         to,
         subject: "Reset your MergifyPDF password",
         html: `
-          <div style="font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; line-height:1.6; background-color:#F1F5FF; padding:32px 0; font-size:16px; color:#111827;">
-            <div style="max-width:560px;margin:0 auto;background-color:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 8px 24px rgba(15,23,42,0.08);">
-              <div style="height:2px;background-color:#6D6AF4;"></div>
-              <div style="padding:30px 32px 26px;">
+          <div style="font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; line-height:1.6; background-color:#F6F7FB; padding:30px 0; font-size:16px; color:#1f2937;">
+            <div style="max-width:560px;margin:0 auto;background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 6px rgba(15,23,42,0.06);">
+              <div style="height:1px;background-color:#6D6AF4;"></div>
+              <div style="padding:28px 30px 24px;">
                 <img src="https://mergifypdf.com/logos/email-expanded-logo.png" alt="MergifyPDF" width="160" style="display:block;margin-bottom:20px;height:auto;" />
                 <p style="margin:0 0 10px;color:#1f2937;font-size:16px;">Your verification code is:</p>
-                <p style="font-size:26px;letter-spacing:7px;font-weight:700;margin:0 0 16px;color:#111827;font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;">${code}</p>
-                <p style="margin:0 0 16px;color:#475569;font-size:14px;">
+                <p style="font-size:28px;letter-spacing:6px;font-weight:700;margin:0 0 18px;color:#111827;font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;">${code}</p>
+                <p style="margin:0 0 16px;color:#4b5563;font-size:14px;">
                   Don’t share this code with anyone.
                 </p>
-                <p style="margin:0 0 16px;color:#374151;font-size:15px;">
+                <p style="margin:0 0 18px;color:#374151;font-size:15px;">
                   To protect your account, we recommend using a unique password and enabling two-factor authentication. This adds an additional layer of security to help prevent unauthorized access.
                 </p>
-                <div style="height:1px;background-color:#e2e8f0;margin:18px 0;"></div>
-                <p style="margin:0 0 6px;color:#111827;font-weight:600;">
+                <div style="height:1px;background-color:#e5e7eb;margin:18px 0;"></div>
+                <p style="margin:0 0 6px;color:#1f2937;font-weight:600;">
                   Didn’t request this?
                 </p>
-                <p style="margin:0;color:#64748b;font-size:14px;">
+                <p style="margin:0;color:#6b7280;font-size:14px;">
                   If you didn’t try to reset your password, you can safely ignore this email.
                 </p>
               </div>
-              <div style="border-top:1px solid #e2e8f0;padding:18px 32px 24px;background-color:#f8fafc;">
-                <div style="color:#64748b;font-size:13px;margin-bottom:10px;">Manage Account</div>
-                <div style="color:#64748b;font-size:13px;margin-bottom:10px;">Support</div>
-                <div style="color:#64748b;font-size:13px;margin-bottom:10px;">Privacy Policy</div>
-                <div style="color:#64748b;font-size:13px;margin-bottom:12px;">Terms of Service</div>
-                <div style="color:#94a3b8;font-size:12px;margin-bottom:12px;">
+              <div style="border-top:1px solid #e2e8f0;padding:16px 30px 22px;background-color:#f9fafb;">
+                <div style="color:#6b7280;font-size:13px;margin-bottom:8px;">Manage Account</div>
+                <div style="color:#6b7280;font-size:13px;margin-bottom:8px;">Support</div>
+                <div style="color:#6b7280;font-size:13px;margin-bottom:8px;">Privacy Policy</div>
+                <div style="color:#6b7280;font-size:13px;margin-bottom:10px;">Terms of Service</div>
+                <div style="color:#9ca3af;font-size:12px;margin-bottom:10px;">
                   To help keep your account secure, please don’t forward this email.
                 </div>
-                <div style="color:#94a3b8;font-size:12px;">
+                <div style="color:#9ca3af;font-size:12px;">
                   Copyright © 2026 MergifyPDF. All rights reserved.
                 </div>
               </div>
