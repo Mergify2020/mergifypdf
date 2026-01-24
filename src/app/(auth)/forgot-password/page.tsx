@@ -239,36 +239,7 @@ export default function ForgotPasswordPage() {
                 height={30}
                 className="h-[47px] w-auto"
               />
-              {step === "verify" ? (
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  className="h-[37px] w-[37px] text-slate-400"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M7 11V8a5 5 0 0 1 10 0v3" />
-                  <rect x="5" y="11" width="14" height="10" rx="2" />
-                  <circle cx="12" cy="16" r="1.6" />
-                </svg>
-              ) : (
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  className="h-[43px] w-[43px] text-slate-400"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <rect x="3" y="6" width="18" height="12" rx="2" />
-                  <path d="M3 7l9 6 9-6" />
-                </svg>
-              )}
+              <div aria-hidden="true" />
             </div>
             {step === "verify" && (
               <button
