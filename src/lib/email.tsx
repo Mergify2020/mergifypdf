@@ -51,7 +51,7 @@ export async function sendResetEmail({ to, code }: SendArgs): Promise<ResetEmail
                     <tbody>
                       <tr>
                         <td style="padding:28px 30px 24px;">
-                          <img src="https://mergifypdf.com/logos/email-expanded-logo.png" alt="MergifyPDF" width="160" style="display:block;margin-bottom:20px;height:auto;" />
+                          <img src="https://mergifypdf.com/logos/email-logo-expanded-v2.png" alt="MergifyPDF" width="160" style="display:block;margin-bottom:20px;height:auto;" />
                           <p style="margin:0 0 10px;color:#1f2937;font-size:16px;">Your verification code is:</p>
                           <p style="font-size:28px;letter-spacing:6px;font-weight:700;margin:0 0 18px;color:#111827;font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;">${code}</p>
                           <p style="margin:0 0 16px;color:#4b5563;font-size:14px;">Don’t share this code with anyone.</p>
