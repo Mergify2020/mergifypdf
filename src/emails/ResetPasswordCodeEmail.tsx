@@ -14,6 +14,8 @@ export function ResetPasswordCodeEmail({ code }: Props) {
         lineHeight: 1.6,
         backgroundColor: "#EEF2FF",
         padding: "28px 0",
+        fontSize: "16px",
+        color: "#0f172a",
       }}
     >
       <div
@@ -29,13 +31,13 @@ export function ResetPasswordCodeEmail({ code }: Props) {
         <div style={{ height: 3, backgroundColor: "#6D6AF4" }} />
         <div style={{ padding: "28px 30px 24px" }}>
           <img
-            src="https://mergifypdf.com/logos/home-expanded-sidebar-logo-light-v6.svg"
+            src="https://mergifypdf.com/logos/email-expanded-logo.png"
             alt="MergifyPDF"
-            width={140}
-            height={36}
+            width={160}
+            height={40}
             style={{ display: "block", marginBottom: "18px" }}
           />
-          <p style={{ margin: "0 0 8px", color: "#0f172a" }}>
+          <p style={{ margin: "0 0 8px", color: "#0f172a", fontSize: "16px" }}>
             Your verification code is:
           </p>
           <p
@@ -49,12 +51,12 @@ export function ResetPasswordCodeEmail({ code }: Props) {
           >
             {code}
           </p>
-          <p style={{ margin: "0 0 14px", color: "#334155" }}>
+          <p style={{ margin: "0 0 14px", color: "#334155", fontSize: "15px" }}>
             To protect your account, we recommend using a unique password and enabling two-factor
             authentication. This adds an additional layer of security to help prevent unauthorized
             access.
           </p>
-          <p style={{ margin: 0, color: "#64748b" }}>
+          <p style={{ margin: 0, color: "#64748b", fontSize: "14px" }}>
             This code expires in 10 minutes. If you didn&apos;t request it, you can safely ignore
             this email.
           </p>
@@ -67,10 +69,10 @@ export function ResetPasswordCodeEmail({ code }: Props) {
           }}
         >
           <img
-            src="https://mergifypdf.com/logos/home-expanded-sidebar-logo-light-v6.svg"
+            src="https://mergifypdf.com/logos/email-expanded-logo.png"
             alt="MergifyPDF"
-            width={120}
-            height={30}
+            width={130}
+            height={32}
             style={{ display: "block", marginBottom: "12px" }}
           />
           <div style={{ color: "#475569", fontSize: "14px", marginBottom: "12px" }}>
