@@ -34,8 +34,7 @@ export function ResetPasswordCodeEmail({ code }: Props) {
             src="https://mergifypdf.com/logos/email-expanded-logo.png"
             alt="MergifyPDF"
             width={160}
-            height={40}
-            style={{ display: "block", marginBottom: "18px" }}
+            style={{ display: "block", marginBottom: "18px", height: "auto" }}
           />
           <p style={{ margin: "0 0 8px", color: "#0f172a", fontSize: "16px" }}>
             Your verification code is:
@@ -51,14 +50,19 @@ export function ResetPasswordCodeEmail({ code }: Props) {
           >
             {code}
           </p>
+          <p style={{ margin: "0 0 14px", color: "#475569", fontSize: "14px" }}>
+            Don&apos;t share this code with anyone.
+          </p>
           <p style={{ margin: "0 0 14px", color: "#334155", fontSize: "15px" }}>
             To protect your account, we recommend using a unique password and enabling two-factor
             authentication. This adds an additional layer of security to help prevent unauthorized
             access.
           </p>
-          <p style={{ margin: 0, color: "#64748b", fontSize: "14px" }}>
-            This code expires in 10 minutes. If you didn&apos;t request it, you can safely ignore
-            this email.
+          <p style={{ margin: "0 0 6px", color: "#0f172a", fontWeight: 600 }}>
+            Didn&apos;t request this?
+          </p>
+          <p style={{ margin: "0 0 14px", color: "#64748b", fontSize: "14px" }}>
+            If you didn&apos;t try to reset your password, you can safely ignore this email.
           </p>
         </div>
         <div
@@ -68,18 +72,14 @@ export function ResetPasswordCodeEmail({ code }: Props) {
             backgroundColor: "#f8fafc",
           }}
         >
-          <img
-            src="https://mergifypdf.com/logos/email-expanded-logo.png"
-            alt="MergifyPDF"
-            width={130}
-            height={32}
-            style={{ display: "block", marginBottom: "12px" }}
-          />
           <div style={{ color: "#475569", fontSize: "14px", marginBottom: "12px" }}>
             <div>Manage Account</div>
             <div>Support</div>
             <div>Privacy Policy</div>
             <div>Terms of Service</div>
+          </div>
+          <div style={{ color: "#64748b", fontSize: "13px", marginBottom: "12px" }}>
+            To help keep your account secure, please don&apos;t forward this email.
           </div>
           <div style={{ color: "#94a3b8", fontSize: "12px" }}>
             Copyright © 2026 MergifyPDF. All rights reserved.

@@ -47,23 +47,31 @@ export async function sendResetEmail({ to, code }: SendArgs): Promise<ResetEmail
             <div style="max-width:560px;margin:0 auto;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 10px 28px rgba(15,23,42,0.12);">
               <div style="height:3px;background-color:#6D6AF4;"></div>
               <div style="padding:28px 30px 24px;">
-                <img src="https://mergifypdf.com/logos/email-expanded-logo.png" alt="MergifyPDF" width="160" height="40" style="display:block;margin-bottom:18px;" />
+                <img src="https://mergifypdf.com/logos/email-expanded-logo.png" alt="MergifyPDF" width="160" style="display:block;margin-bottom:18px;height:auto;" />
                 <p style="margin:0 0 8px;color:#0f172a;font-size:16px;">Your verification code is:</p>
                 <p style="font-size:24px;letter-spacing:6px;font-weight:700;margin:0 0 16px;color:#111827;">${code}</p>
+                <p style="margin:0 0 14px;color:#475569;font-size:14px;">
+                  Don’t share this code with anyone.
+                </p>
                 <p style="margin:0 0 14px;color:#334155;font-size:15px;">
                   To protect your account, we recommend using a unique password and enabling two-factor authentication. This adds an additional layer of security to help prevent unauthorized access.
                 </p>
-                <p style="margin:0;color:#64748b;font-size:14px;">
-                  This code expires in 10 minutes. If you didn’t request it, you can safely ignore this email.
+                <p style="margin:0 0 6px;color:#0f172a;font-weight:600;">
+                  Didn’t request this?
+                </p>
+                <p style="margin:0 0 14px;color:#64748b;font-size:14px;">
+                  If you didn’t try to reset your password, you can safely ignore this email.
                 </p>
               </div>
               <div style="border-top:1px solid #e2e8f0;padding:18px 30px 24px;background-color:#f8fafc;">
-                <img src="https://mergifypdf.com/logos/email-expanded-logo.png" alt="MergifyPDF" width="130" height="32" style="display:block;margin-bottom:12px;" />
                 <div style="color:#475569;font-size:14px;margin-bottom:12px;">
                   <div>Manage Account</div>
                   <div>Support</div>
                   <div>Privacy Policy</div>
                   <div>Terms of Service</div>
+                </div>
+                <div style="color:#64748b;font-size:13px;margin-bottom:12px;">
+                  To help keep your account secure, please don’t forward this email.
                 </div>
                 <div style="color:#94a3b8;font-size:12px;">
                   Copyright © 2026 MergifyPDF. All rights reserved.
