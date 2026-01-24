@@ -27,10 +27,9 @@ export function ResetPasswordCodeEmail({ code }: Props) {
           borderRadius: "8px",
           overflow: "hidden",
           boxShadow: "none",
-          border: "1px solid #e5e7eb",
+          border: "2px solid #e5e7eb",
         }}
       >
-        <div style={{ height: 1, backgroundColor: "rgba(109, 106, 244, 0.18)" }} />
         <div style={{ padding: "28px 30px 24px" }}>
           <img
             src="https://mergifypdf.com/logos/email-expanded-logo.png"
