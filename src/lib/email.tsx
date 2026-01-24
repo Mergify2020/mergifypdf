@@ -43,9 +43,9 @@ export async function sendResetEmail({ to, code }: SendArgs): Promise<ResetEmail
         to,
         subject: "Reset your MergifyPDF password",
         html: `
-          <div style="font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; line-height:1.6; background-color:#F6F7FB; padding:30px 0; font-size:16px; color:#1f2937;">
-            <div style="max-width:560px;margin:0 auto;background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 6px rgba(15,23,42,0.06);">
-              <div style="height:1px;background-color:#6D6AF4;"></div>
+          <div style="font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; line-height:1.6; background-color:#F7F7F9; padding:28px 0; font-size:16px; color:#1f2937;">
+            <div style="max-width:560px;margin:0 auto;background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:none;">
+              <div style="height:1px;background-color:rgba(109,106,244,0.18);"></div>
               <div style="padding:28px 30px 24px;">
                 <img src="https://mergifypdf.com/logos/email-expanded-logo.png" alt="MergifyPDF" width="160" style="display:block;margin-bottom:20px;height:auto;" />
                 <p style="margin:0 0 10px;color:#1f2937;font-size:16px;">Your verification code is:</p>
@@ -64,7 +64,7 @@ export async function sendResetEmail({ to, code }: SendArgs): Promise<ResetEmail
                   If you didn’t try to reset your password, you can safely ignore this email.
                 </p>
               </div>
-              <div style="border-top:1px solid #e2e8f0;padding:16px 30px 22px;background-color:#f9fafb;">
+              <div style="border-top:1px solid #e5e7eb;padding:16px 30px 22px;background-color:#fafafa;">
                 <div style="color:#6b7280;font-size:13px;margin-bottom:8px;">Manage Account</div>
                 <div style="color:#6b7280;font-size:13px;margin-bottom:8px;">Support</div>
                 <div style="color:#6b7280;font-size:13px;margin-bottom:8px;">Privacy Policy</div>

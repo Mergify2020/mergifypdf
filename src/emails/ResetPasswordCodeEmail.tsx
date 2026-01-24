@@ -13,8 +13,8 @@ export function ResetPasswordCodeEmail({ code }: Props) {
         fontFamily:
           "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif",
         lineHeight: 1.6,
-        backgroundColor: "#F6F7FB",
-        padding: "30px 0",
+        backgroundColor: "#F7F7F9",
+        padding: "28px 0",
         fontSize: "16px",
         color: "#1f2937",
       }}
@@ -26,10 +26,10 @@ export function ResetPasswordCodeEmail({ code }: Props) {
           backgroundColor: "#ffffff",
           borderRadius: "8px",
           overflow: "hidden",
-          boxShadow: "0 2px 6px rgba(15, 23, 42, 0.06)",
+          boxShadow: "none",
         }}
       >
-        <div style={{ height: 1, backgroundColor: "#6D6AF4" }} />
+        <div style={{ height: 1, backgroundColor: "rgba(109, 106, 244, 0.18)" }} />
         <div style={{ padding: "28px 30px 24px" }}>
           <img
             src="https://mergifypdf.com/logos/email-expanded-logo.png"
@@ -71,9 +71,9 @@ export function ResetPasswordCodeEmail({ code }: Props) {
         </div>
         <div
           style={{
-            borderTop: "1px solid #e2e8f0",
+            borderTop: "1px solid #e5e7eb",
             padding: "16px 30px 22px",
-            backgroundColor: "#f9fafb",
+            backgroundColor: "#fafafa",
           }}
         >
           <div style={{ color: "#6b7280", fontSize: "13px", marginBottom: "8px" }}>
