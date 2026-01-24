@@ -43,40 +43,48 @@ export async function sendResetEmail({ to, code }: SendArgs): Promise<ResetEmail
         to,
         subject: "Reset your MergifyPDF password",
         html: `
-          <div style="font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; line-height:1.6; background-color:#F7F7F9; padding:28px 0; font-size:16px; color:#1f2937;">
-            <div style="max-width:560px;margin:0 auto;background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:none;border:2px solid #e5e7eb;">
-              <div style="padding:28px 30px 24px;">
-                <img src="https://mergifypdf.com/logos/email-expanded-logo.png" alt="MergifyPDF" width="160" style="display:block;margin-bottom:20px;height:auto;" />
-                <p style="margin:0 0 10px;color:#1f2937;font-size:16px;">Your verification code is:</p>
-                <p style="font-size:28px;letter-spacing:6px;font-weight:700;margin:0 0 18px;color:#111827;font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;">${code}</p>
-                <p style="margin:0 0 16px;color:#4b5563;font-size:14px;">
-                  Don’t share this code with anyone.
-                </p>
-                <p style="margin:0 0 18px;color:#374151;font-size:15px;">
-                  To protect your account, we recommend using a unique password and enabling two-factor authentication. This adds an additional layer of security to help prevent unauthorized access.
-                </p>
-                <div style="height:1px;background-color:#e5e7eb;margin:18px 0;"></div>
-                <p style="margin:0 0 6px;color:#1f2937;font-weight:600;">
-                  Didn’t request this?
-                </p>
-                <p style="margin:0;color:#6b7280;font-size:14px;">
-                  If you didn’t try to reset your password, you can safely ignore this email.
-                </p>
-              </div>
-              <div style="border-top:1px solid #e5e7eb;padding:16px 30px 22px;background-color:#f4f5f7;">
-                <div style="color:#6b7280;font-size:13px;margin-bottom:8px;">Manage Account</div>
-                <div style="color:#6b7280;font-size:13px;margin-bottom:8px;">Support</div>
-                <div style="color:#6b7280;font-size:13px;margin-bottom:8px;">Privacy Policy</div>
-                <div style="color:#6b7280;font-size:13px;margin-bottom:10px;">Terms of Service</div>
-                <div style="color:#9ca3af;font-size:12px;margin-bottom:10px;">
-                  To help keep your account secure, please don’t forward this email.
-                </div>
-                <div style="color:#9ca3af;font-size:12px;">
-                  Copyright © 2026 MergifyPDF. All rights reserved.
-                </div>
-              </div>
-            </div>
-          </div>
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#F7F7F9;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;line-height:1.6;font-size:16px;color:#1f2937;">
+            <tbody>
+              <tr>
+                <td align="center" style="padding:28px 16px;">
+                  <table role="presentation" width="560" cellspacing="0" cellpadding="0" style="background-color:#ffffff;border-radius:8px;border:2px solid #e5e7eb;">
+                    <tbody>
+                      <tr>
+                        <td style="padding:28px 30px 24px;">
+                          <img src="https://mergifypdf.com/logos/email-expanded-logo.png" alt="MergifyPDF" width="160" style="display:block;margin-bottom:20px;height:auto;" />
+                          <p style="margin:0 0 10px;color:#1f2937;font-size:16px;">Your verification code is:</p>
+                          <p style="font-size:28px;letter-spacing:6px;font-weight:700;margin:0 0 18px;color:#111827;font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;">${code}</p>
+                          <p style="margin:0 0 16px;color:#4b5563;font-size:14px;">Don’t share this code with anyone.</p>
+                          <p style="margin:0 0 18px;color:#374151;font-size:15px;">
+                            To protect your account, we recommend using a unique password and enabling two-factor authentication. This adds an additional layer of security to help prevent unauthorized access.
+                          </p>
+                          <div style="height:1px;background-color:#e5e7eb;margin:18px 0;"></div>
+                          <p style="margin:0 0 6px;color:#1f2937;font-weight:600;">Didn’t request this?</p>
+                          <p style="margin:0;color:#6b7280;font-size:14px;">
+                            If you didn’t try to reset your password, you can safely ignore this email.
+                          </p>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="border-top:1px solid #e5e7eb;padding:16px 30px 22px;background-color:#f4f5f7;border-bottom-left-radius:8px;border-bottom-right-radius:8px;">
+                          <div style="color:#6b7280;font-size:13px;margin-bottom:8px;">Manage Account</div>
+                          <div style="color:#6b7280;font-size:13px;margin-bottom:8px;">Support</div>
+                          <div style="color:#6b7280;font-size:13px;margin-bottom:8px;">Privacy Policy</div>
+                          <div style="color:#6b7280;font-size:13px;margin-bottom:10px;">Terms of Service</div>
+                          <div style="color:#9ca3af;font-size:12px;margin-bottom:10px;">
+                            To help keep your account secure, please don’t forward this email.
+                          </div>
+                          <div style="color:#9ca3af;font-size:12px;">
+                            Copyright © 2026 MergifyPDF. All rights reserved.
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         `,
       });
       if (error) {
