@@ -93,7 +93,7 @@ export default function UploadCta({ usedToday, variant = "default", className }:
     .trim();
 
   const buttonClass = isHero
-    ? "press-bounce w-full rounded-full border-2 border-slate-300 bg-[#024d7c] px-14 py-4 text-xl font-semibold text-white shadow-lg transition hover:-translate-y-1 hover:bg-[#013a60] disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
+    ? "press-bounce w-full rounded-full border border-violet-500/70 bg-gradient-to-b from-[#7C5CFF] via-[#6A4EE8] to-[#5A3FD8] px-12 py-3 text-base font-semibold text-white shadow-[0_8px_0_rgba(58,39,132,0.28),0_16px_26px_rgba(90,63,216,0.28)] ring-1 ring-white/30 transition hover:-translate-y-1 hover:from-[#8667FF] hover:via-[#7357F0] hover:to-[#5F46E6] disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
     : "press-bounce w-full max-w-xl rounded-full border-2 border-slate-300 bg-[#024d7c] px-12 py-5 text-2xl font-semibold text-white shadow-2xl transition hover:-translate-y-1 hover:bg-[#013a60] hover:shadow-[0_20px_35px_rgba(2,77,124,0.35)] disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60";
 
   return (

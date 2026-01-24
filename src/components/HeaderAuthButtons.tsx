@@ -35,37 +35,25 @@ export default function HeaderAuthButtons() {
   const gradientHero = isHome;
 
   return (
-    <div className="flex items-center gap-3">
-      {/* Pricing pill - hidden on pricing page */}
-      {!isPricingPage && (
-        <Link
-          href="/pricing"
-          className="inline-flex items-center rounded-full border-2 border-slate-300 bg-[#6A4EE8] px-7 py-2 text-xs font-semibold text-white shadow-md transition-all hover:-translate-y-0.5 hover:bg-[#5A3FD8] hover:shadow-lg"
-        >
-          Pricing
-        </Link>
-      )}
+    <div className="flex items-center gap-3 ml-auto">
 
       {/* Desktop / tablet auth buttons */}
       <div className="hidden items-center gap-3 sm:flex">
-        {!isRegisterPage && (
-          <Link
-            href="/register"
-            className={`inline-flex items-center rounded-full border border-slate-300 px-4 py-2 text-xs font-semibold shadow-sm transition hover:-translate-y-0.5 ${
-              gradientHero ? "bg-white text-slate-900 hover:bg-white/90" : "bg-transparent text-slate-800 hover:bg-white/70"
-            }`}
-          >
-            Sign up
-          </Link>
-        )}
         {!isLoginPage && (
           <Link
             href="/login"
-            className={`inline-flex items-center rounded-full border border-slate-300 px-4 py-2 text-xs font-semibold shadow-sm transition hover:-translate-y-0.5 ${
-              gradientHero ? "bg-white text-slate-900 hover:bg-white/90" : "bg-transparent text-slate-800 hover:bg-white/70"
-            }`}
+            className="inline-flex items-center text-base font-semibold text-slate-700 transition hover:text-slate-900"
           >
             Log in
+          </Link>
+        )}
+        {!isRegisterPage && (
+          <Link
+            href="/register"
+            className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-base font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-800"
+          >
+            Get Started
+            <span aria-hidden>→</span>
           </Link>
         )}
       </div>
@@ -117,20 +105,21 @@ export default function HeaderAuthButtons() {
       ) : (
         // On all other pages (including login/register), show inline buttons on mobile too
         <div className="flex items-center gap-3 sm:hidden">
-          {!isRegisterPage && (
-            <Link
-              href="/register"
-              className="inline-flex items-center rounded-full border border-slate-300 bg-transparent px-4 py-2 text-xs font-semibold text-slate-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-white/70"
-            >
-              Sign up
-            </Link>
-          )}
           {!isLoginPage && (
             <Link
               href="/login"
-              className="inline-flex items-center rounded-full border border-slate-300 bg-transparent px-4 py-2 text-xs font-semibold text-slate-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-white/70"
+              className="inline-flex items-center text-xs font-semibold text-slate-700 transition hover:text-slate-900"
             >
               Log in
+            </Link>
+          )}
+          {!isRegisterPage && (
+            <Link
+              href="/register"
+              className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-base font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-800"
+            >
+              Get Started
+              <span aria-hidden>→</span>
             </Link>
           )}
         </div>

@@ -81,11 +81,11 @@ export default async function Home({
 function MarketingLanding({ usedToday }: { usedToday: boolean }) {
   return (
     <>
-      <section className="w-full bg-gradient-to-r from-[rgba(0,138,222,0.10)] via-[rgba(81,189,255,0.16)] to-[rgba(0,138,222,0.08)]">
-        <div className="mx-auto w-full max-w-7xl px-6 py-10 sm:py-14 lg:py-16">
-          <div className="relative grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.1fr)] lg:items-center lg:gap-12">
-            <div className="relative z-10 space-y-6 text-center lg:text-left">
-              <h1 className="text-3xl font-semibold leading-tight tracking-tight sm:text-4xl lg:text-4xl xl:text-5xl">
+      <section className="relative w-full bg-gradient-to-r from-[rgba(235,246,255,0.9)] via-[rgba(232,239,255,0.55)] to-[rgba(220,222,255,0.65)]">
+        <div className="relative mx-auto w-full max-w-7xl px-6 pt-10 pb-0 sm:pt-14 sm:pb-0 lg:pt-16 lg:pb-0">
+          <div className="grid gap-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:items-center lg:gap-20 xl:gap-24">
+            <div className="relative z-10 space-y-6 text-center lg:pb-12 lg:text-left">
+              <h1 className="text-3xl font-semibold leading-[1.12] tracking-tight sm:text-4xl lg:text-4xl xl:text-5xl">
                 <span className="block md:whitespace-nowrap">
                   The fastest way to edit, sign,
                 </span>
@@ -93,7 +93,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
                   and manage PDFs online.
                 </span>
               </h1>
-              <p className="text-base text-gray-700 sm:text-lg">
+              <p className="max-w-lg text-base font-normal text-gray-700 sm:text-lg">
                 Edit, manage, and sign your documents from anywhere with ease.
               </p>
               <div className="mt-4 flex w-full justify-center lg:justify-start">
@@ -116,24 +116,17 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
               </p>
             </div>
 
-            <div className="relative z-10 mt-4 flex items-center justify-center sm:mt-8 lg:mt-0 lg:justify-end">
-              <Image
-                src="/visual-hero3.png"
-                alt="Preview of the MergifyPDF workspace"
-                width={880}
-                height={640}
-                className="w-full max-w-xl rounded-xl object-cover shadow-[0_40px_120px_rgba(9,20,45,0.25)] dark:shadow-none"
-                priority
-              />
-              {/* Sparkles anchored to the screenshot card */}
-              <Sparkle
-                gradientId="sparkle-right-bottom"
-                className="pointer-events-none absolute bottom-6 right-10 h-12 w-12 opacity-70 sm:bottom-7 sm:right-12 sm:h-14 sm:w-14 md:bottom-8 md:right-16 md:h-16 md:w-16"
-              />
-              <Sparkle
-                gradientId="sparkle-right-bottom-small"
-                className="pointer-events-none absolute bottom-3 right-4 h-6 w-6 opacity-80 sm:bottom-4 sm:right-6 sm:h-7 sm:w-7 md:bottom-5 md:right-10 md:h-8 md:w-8"
-              />
+            <div className="relative z-10 mt-6 flex items-center justify-center sm:mt-10 lg:absolute lg:bottom-0 lg:right-0 lg:mt-0 lg:w-[58%] lg:items-end lg:justify-end">
+              <div className="relative w-full max-w-lg lg:max-w-none lg:h-[456px] lg:w-[620px] lg:flex-none lg:origin-bottom-right lg:scale-100">
+                <Image
+                  src="/backgrounds/hero-page-laptop-v6.png"
+                  alt="Preview of the MergifyPDF workspace"
+                  width={880}
+                  height={640}
+                  className="w-full object-contain lg:h-full lg:w-full lg:object-bottom drop-shadow-[0_14px_30px_rgba(15,23,42,0.12)]"
+                  priority
+                />
+              </div>
             </div>
           </div>
         </div>

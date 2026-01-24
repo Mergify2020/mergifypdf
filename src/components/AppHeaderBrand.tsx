@@ -25,7 +25,7 @@ export default function AppHeaderBrand({
 
   const baseWidth = 168;
   const baseHeight = 42;
-  const autoScale = isPricingPage || isAccountSettings ? 1.35 : 1;
+  const autoScale = isPricingPage || isAccountSettings ? 1.35 : 1.12;
   const scale = variant === "sidebarPanel" ? 1.35 : autoScale;
   const logoWidth = Math.round(baseWidth * scale);
   const logoHeight = Math.round(baseHeight * scale);
