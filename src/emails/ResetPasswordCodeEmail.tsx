@@ -27,6 +27,7 @@ export function ResetPasswordCodeEmail({ code }: Props) {
           borderRadius: "8px",
           overflow: "hidden",
           boxShadow: "none",
+          border: "1px solid #e5e7eb",
         }}
       >
         <div style={{ height: 1, backgroundColor: "rgba(109, 106, 244, 0.18)" }} />
@@ -73,7 +74,7 @@ export function ResetPasswordCodeEmail({ code }: Props) {
           style={{
             borderTop: "1px solid #e5e7eb",
             padding: "16px 30px 22px",
-            backgroundColor: "#fafafa",
+            backgroundColor: "#f4f5f7",
           }}
         >
           <div style={{ color: "#6b7280", fontSize: "13px", marginBottom: "8px" }}>
