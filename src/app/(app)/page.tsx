@@ -81,39 +81,34 @@ export default async function Home({
 function MarketingLanding({ usedToday }: { usedToday: boolean }) {
   return (
     <>
-      <section className="relative w-full bg-gradient-to-r from-[rgba(235,246,255,0.9)] via-[rgba(232,239,255,0.55)] to-[rgba(220,222,255,0.65)]">
+      <section className="relative w-full bg-gradient-to-r from-[rgba(218,236,255,0.95)] via-[rgba(224,230,255,0.7)] to-[rgba(206,210,255,0.85)]">
         <div className="relative mx-auto w-full max-w-7xl px-6 pt-10 pb-0 sm:pt-14 sm:pb-0 lg:pt-16 lg:pb-0">
           <div className="grid gap-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:items-center lg:gap-20 xl:gap-24">
             <div className="relative z-10 space-y-6 text-center lg:pb-12 lg:text-left">
-              <h1 className="text-3xl font-semibold leading-[1.12] tracking-tight sm:text-4xl lg:text-4xl xl:text-5xl">
+              <h1 className="text-3xl font-semibold leading-[1.08] tracking-tight sm:text-4xl lg:text-[2.75rem] xl:text-[3.25rem]">
                 <span className="block md:whitespace-nowrap">
-                  The fastest way to edit, sign,
-                </span>
-                <span className="block md:whitespace-nowrap">
-                  and manage PDFs online.
+                  Finish document work in minutes
                 </span>
               </h1>
-              <p className="max-w-lg text-base font-normal text-gray-700 sm:text-lg">
-                Edit, manage, and sign your documents from anywhere with ease.
+              <p className="max-w-2xl text-base font-normal text-gray-700 sm:text-lg lg:whitespace-nowrap">
+                No installs. No clutter. Just edit, sign, and go. Your work stays saved.
               </p>
-              <div className="mt-4 flex w-full justify-center lg:justify-start">
+              <div className="mt-14 flex w-full justify-center lg:justify-start">
                 <UploadCta usedToday={usedToday} variant="hero" className="w-full max-w-md" />
               </div>
-              <div className="mt-6 sm:mt-14 flex flex-wrap items-center justify-center gap-3 text-sm text-slate-600 lg:justify-start">
+              <div className="mt-16 flex flex-wrap items-center justify-center gap-4 text-sm text-slate-600 lg:justify-start">
                 {["1 free upload per day", "Fast performance", "Simple to use"].map((badge) => (
                   <span
                     key={badge}
-                    className="inline-flex cursor-default items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-4 py-1.5 text-slate-700 shadow-sm dark:shadow-none"
+                    className="inline-flex cursor-default items-center rounded-lg border border-slate-300/60 bg-white/20 px-3 py-1 text-[13px] font-medium text-slate-600/90 shadow-none"
                   >
-                    <span className="h-2 w-2 rounded-full bg-[#024d7c]" />
                     {badge}
                   </span>
                 ))}
               </div>
-              <HeroStats />
-              <p className="mt-3 text-xs font-semibold text-slate-500 sm:text-sm md:text-base">
-                * Upgrade to get unlimited access to document editing and signing.
-              </p>
+              <div className="mt-10">
+                <HeroStats />
+              </div>
             </div>
 
             <div className="relative z-10 mt-6 flex items-center justify-center sm:mt-10 lg:absolute lg:bottom-0 lg:right-0 lg:mt-0 lg:w-[58%] lg:items-end lg:justify-end">
@@ -130,11 +125,13 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
             </div>
           </div>
         </div>
+        <div className="w-full border-t border-slate-200/40 bg-[#F4F6FF]">
+          <LogoCarousel />
+        </div>
       </section>
 
       <HeroFeatureArea />
       <PersonaHighlight />
-      <LogoCarousel />
     </>
   );
 }

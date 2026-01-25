@@ -479,6 +479,29 @@ html.theme-scroll-reveal:not(.dark) ::-webkit-scrollbar-thumb {
   }
 }
 
+.logo-marquee {
+  position: relative;
+  overflow: hidden;
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+
+.logo-marquee-track {
+  display: flex;
+  align-items: center;
+  gap: 3rem;
+  width: max-content;
+  animation: logo-marquee-scroll 45s linear infinite;
+}
+
+@keyframes logo-marquee-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
 .all-projects-title {
   font-size: clamp(26px, 4.5vw, 52px);
 }

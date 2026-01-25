@@ -21,7 +21,7 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
   const lastScroll = useRef(0);
 
   useEffect(() => {
-    if (!isAnimatedPage || isHomePage) {
+    if (!isAnimatedPage) {
       setScrolledPastHero(false);
       setIsHidden(false);
       return;
@@ -33,9 +33,9 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
       const goingDown = current > lastScroll.current;
       const threshold = 120;
 
-      if (goingDown && current > threshold) {
+      if (!isHomePage && goingDown && current > threshold) {
         setIsHidden(true);
-      } else if (!goingDown || current <= threshold) {
+      } else if (!isHomePage || !goingDown || current <= threshold) {
         setIsHidden(false);
       }
 
@@ -47,16 +47,16 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
     return () => window.removeEventListener("scroll", handleScroll);
   }, [isAnimatedPage]);
 
-  const gradientActive = isHomePage ? true : isAnimatedPage && !scrolledPastHero;
+  const gradientActive = isHomePage ? !scrolledPastHero : isAnimatedPage && !scrolledPastHero;
   let backgroundClass: string;
   if (gradientActive) {
     backgroundClass = isPricingPage
       ? "bg-[#e3edf9]"
       : isHomePage
-        ? "bg-gradient-to-r from-[rgba(235,246,255,0.9)] via-[rgba(232,239,255,0.55)] to-[rgba(220,222,255,0.65)]"
+        ? "bg-gradient-to-r from-[rgba(218,236,255,0.95)] via-[rgba(224,230,255,0.7)] to-[rgba(206,210,255,0.85)]"
         : "bg-gradient-to-r from-[#FDF2FF] via-[#EEF2FF] to-[#E0F7FF]";
   } else {
-    backgroundClass = "bg-white/95 backdrop-blur";
+    backgroundClass = "bg-white";
   }
 
   const shadowClass = gradientActive ? "" : "shadow-sm";

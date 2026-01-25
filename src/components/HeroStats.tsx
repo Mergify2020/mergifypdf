@@ -54,8 +54,8 @@ export default function HeroStats() {
 
   return (
     <div className="mt-6 flex justify-center lg:justify-start">
-      <div className="grid w-full max-w-xl grid-cols-2 divide-x divide-slate-200 overflow-hidden rounded-2xl border border-slate-200/70 bg-white/70 shadow-[0_20px_60px_-35px_rgba(30,41,59,0.5)] backdrop-blur">
-        <div className="px-5 py-3 text-center sm:px-7 sm:py-4">
+      <div className="flex w-full max-w-2xl items-start justify-center gap-6 lg:justify-start">
+        <div className="text-center">
           <div
             key={editedTick}
             className="text-lg font-semibold leading-none text-slate-900 sm:text-xl md:text-2xl animate-numberRoll"
@@ -67,7 +67,7 @@ export default function HeroStats() {
           </p>
         </div>
 
-        <div className="px-5 py-3 text-center sm:px-7 sm:py-4">
+        <div className="text-center border-l-2 border-slate-400/80 pl-6">
           <div
             key={signedTick}
             className="text-lg font-semibold leading-none text-slate-900 sm:text-xl md:text-2xl animate-numberRoll"
@@ -76,6 +76,15 @@ export default function HeroStats() {
           </div>
           <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 sm:text-xs">
             Documents signed
+          </p>
+        </div>
+
+        <div className="text-center border-l-2 border-slate-400/80 pl-6">
+          <div className="text-lg font-semibold leading-none text-slate-900 sm:text-xl md:text-2xl">
+            16,000+
+          </div>
+          <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 sm:text-xs">
+            Monthly users
           </p>
         </div>
       </div>

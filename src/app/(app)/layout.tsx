@@ -29,7 +29,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             />
           </div>
           <div className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-6 text-base font-semibold text-slate-700 md:flex">
-            <span className="cursor-default text-slate-700 hover:text-slate-900">About</span>
             <Link
               href="/pricing"
               className="transition hover:text-slate-900 hover:underline hover:underline-offset-8"
@@ -37,6 +36,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               Pricing
             </Link>
             <span className="cursor-default text-slate-700 hover:text-slate-900">Features</span>
+            <span className="cursor-default text-slate-700 hover:text-slate-900">About</span>
             <span className="cursor-default text-slate-700 hover:text-slate-900">Contact</span>
           </div>
           {!session?.user || lockedByTwoFactor ? (
