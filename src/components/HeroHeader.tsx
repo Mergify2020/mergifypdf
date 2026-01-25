@@ -33,9 +33,9 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
       const goingDown = current > lastScroll.current;
       const threshold = 120;
 
-      if (!isHomePage && goingDown && current > threshold) {
+      if (goingDown && current > threshold) {
         setIsHidden(true);
-      } else if (!isHomePage || !goingDown || current <= threshold) {
+      } else if (!goingDown || current <= threshold) {
         setIsHidden(false);
       }
 

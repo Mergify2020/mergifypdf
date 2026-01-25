@@ -68,6 +68,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <link rel="apple-touch-icon" sizes="180x180" href="/favicons/apple-touch-icon.png" />
         <link rel="mask-icon" href="/favicons/safari-pinned-tab.svg" color="#024d7c" />
         <link rel="manifest" href="/favicons/site.webmanifest" />
+
+        {/* TrustBox script */}
+        <Script
+          src="//widget.trustpilot.com/bootstrap/v5/tp.widget.bootstrap.min.js"
+          strategy="afterInteractive"
+        />
       </head>
 
       <body className="min-h-screen bg-white text-gray-900 dark:bg-[#222224] dark:text-zinc-100">

@@ -86,9 +86,8 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
           <div className="grid gap-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:items-center lg:gap-20 xl:gap-24">
             <div className="relative z-10 space-y-6 text-center lg:pb-12 lg:text-left">
               <h1 className="text-3xl font-semibold leading-[1.08] tracking-tight sm:text-4xl lg:text-[2.75rem] xl:text-[3.25rem]">
-                <span className="block md:whitespace-nowrap">
-                  Finish document work in minutes
-                </span>
+                <span className="block">All-in-one online document</span>
+                <span className="block">editor tool.</span>
               </h1>
               <p className="max-w-2xl text-base font-normal text-gray-700 sm:text-lg lg:whitespace-nowrap">
                 No installs. No clutter. Just edit, sign, and go. Your work stays saved.
@@ -96,14 +95,17 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
               <div className="mt-14 flex w-full justify-center lg:justify-start">
                 <UploadCta usedToday={usedToday} variant="hero" className="w-full max-w-md" />
               </div>
-              <div className="mt-16 flex flex-wrap items-center justify-center gap-4 text-sm text-slate-600 lg:justify-start">
+              <div className="mt-10 flex flex-col items-center gap-7 text-sm text-slate-600 lg:items-start">
                 {["1 free upload per day", "Fast performance", "Simple to use"].map((badge) => (
-                  <span
-                    key={badge}
-                    className="inline-flex cursor-default items-center rounded-lg border border-slate-300/60 bg-white/20 px-3 py-1 text-[13px] font-medium text-slate-600/90 shadow-none"
-                  >
-                    {badge}
-                  </span>
+                  <div key={badge} className="flex items-center gap-4 text-base font-semibold text-slate-700">
+                    <span
+                      className="flex h-6 w-6 items-center justify-center rounded-full bg-[#6D5EF3] text-[12px] text-white shadow-[0_6px_16px_rgba(109,94,243,0.25)]"
+                      aria-hidden="true"
+                    >
+                      ✓
+                    </span>
+                    <span>{badge}</span>
+                  </div>
                 ))}
               </div>
               <div className="mt-10">
@@ -131,7 +133,6 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
       </section>
 
       <HeroFeatureArea />
-      <PersonaHighlight />
     </>
   );
 }

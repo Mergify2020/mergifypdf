@@ -1,4 +1,5 @@
- "use client";
+"use client";
+
 
 type Logo = {
   name: string;
@@ -6,6 +7,7 @@ type Logo = {
 };
 
 export default function LogoCarousel() {
+
   const logos: Logo[] = [
     { name: "Netflix", url: "/netflix.png" },
     { name: "Target", url: "/target.png" },
@@ -48,6 +50,7 @@ export default function LogoCarousel() {
             </div>
           </div>
         </div>
+
       </div>
     </section>
   );
