@@ -95,19 +95,39 @@ export default function HeroFeatureArea() {
           ))}
         </div>
 
-        <div className="mt-8 flex justify-center">
+        <div className="mt-6 mb-20 flex justify-center">
           <a
             href="/pricing"
-            className="inline-flex items-center justify-center rounded-full border border-white/20 bg-gradient-to-r from-[#6D5EF3] to-[#8B7CFF] px-7 py-2.5 text-sm font-semibold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.18),0_10px_18px_rgba(109,94,243,0.24)] ring-1 ring-white/20 transition hover:-translate-y-0.5 hover:from-[#7567F5] hover:to-[#9486FF]"
+            className="inline-flex items-center justify-center rounded-full border border-white/20 bg-gradient-to-r from-[#6D5EF3] to-[#8B7CFF] px-7 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:from-[#7567F5] hover:to-[#9486FF]"
           >
             Compare plans
           </a>
         </div>
 
-        <div className="mt-6 flex w-full justify-end">
-          <p className="text-right text-base font-semibold text-slate-900">
-            Do more with your documents — for less.
-          </p>
+        <div className="mt-10 mb-20 grid w-full items-center gap-8 lg:grid-cols-[1.1fr_0.9fr] xl:grid-cols-[1fr_1fr]">
+          <div className="flex justify-start">
+            <img
+              src="/illustrations/hero-ipad-illustration.png"
+              alt=""
+              className="h-auto w-auto max-h-72 sm:max-h-80 lg:max-h-96"
+              aria-hidden="true"
+            />
+          </div>
+          <div className="flex flex-col items-start gap-4 text-left">
+            <p className="text-left text-3xl font-semibold text-slate-900 sm:text-4xl lg:text-[2.75rem] xl:text-[3.25rem]">
+              <span className="block">Do more with your</span>
+              <span className="block whitespace-nowrap">documents — for less.</span>
+            </p>
+            <p className="text-left text-base text-slate-600 sm:text-lg">
+              No installs. No delays. Just the tools you need, at a fraction of the cost.
+            </p>
+            <a
+              href="/pricing"
+              className="inline-flex items-center justify-center rounded-full border border-white/20 bg-gradient-to-r from-[#6D5EF3] to-[#8B7CFF] px-7 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:from-[#7567F5] hover:to-[#9486FF]"
+            >
+              Start free trial
+            </a>
+          </div>
         </div>
 
       </div>

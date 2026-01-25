@@ -52,7 +52,7 @@ export default function HeaderAuthButtons() {
             href="/register"
             className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-base font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-800"
           >
-            Get Started
+            Start free trial
             <span aria-hidden>→</span>
           </Link>
         )}
@@ -118,8 +118,8 @@ export default function HeaderAuthButtons() {
               href="/register"
               className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-base font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-800"
             >
-              Get Started
-              <span aria-hidden>→</span>
+            Start free trial
+            <span aria-hidden>→</span>
             </Link>
           )}
         </div>
