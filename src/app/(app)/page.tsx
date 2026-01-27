@@ -113,13 +113,13 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
               </div>
             </div>
 
-            <div className="relative z-10 mt-6 flex items-center justify-center sm:mt-10 lg:absolute lg:bottom-0 lg:right-0 lg:mt-0 lg:w-[58%] lg:items-end lg:justify-end">
-              <div className="relative w-full max-w-lg lg:max-w-none lg:h-[456px] lg:w-[620px] lg:flex-none lg:origin-bottom-right lg:scale-100">
+            <div className="relative z-10 mt-6 flex items-center justify-center sm:mt-10 lg:absolute lg:bottom-[-48px] lg:right-[-12%] lg:mt-0 lg:w-[82%] lg:items-end lg:justify-end">
+              <div className="relative w-full max-w-3xl lg:max-w-none lg:h-[750px] lg:w-[975px] lg:flex-none lg:origin-bottom-right lg:scale-100">
                 <Image
-                  src="/backgrounds/hero-page-laptop-v6.png"
+                  src="/backgrounds/hero-page-laptop-frontview-v1.png"
                   alt="Preview of the MergifyPDF workspace"
-                  width={880}
-                  height={640}
+                  width={1400}
+                  height={1025}
                   className="w-full object-contain lg:h-full lg:w-full lg:object-bottom drop-shadow-[0_14px_30px_rgba(15,23,42,0.12)]"
                   priority
                 />
