@@ -25,17 +25,14 @@ export default function LogoCarousel() {
 
   return (
     <section className="bg-transparent">
-      <div className="mx-auto w-full max-w-7xl px-6 py-8 lg:py-10">
+      <div className="mx-auto w-full max-w-[1400px] px-4 pt-4 pb-6 sm:px-6 lg:px-8 lg:pt-6 lg:pb-8">
         <div className="text-center">
           <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl md:text-3xl">
-            Used by professionals from leading companies
+            Trusted by professionals worldwide
           </h2>
-          <p className="mt-1.5 text-sm text-slate-500/90 md:text-base">
-            Designed to make everyday work simpler and efficient.
-          </p>
         </div>
 
-        <div className="mt-6">
+        <div className="mt-5">
           <div className="logo-marquee">
             <div className="logo-marquee-track">
               {[...logos, ...logos].map((logo, index) => (
@@ -43,7 +40,7 @@ export default function LogoCarousel() {
                   key={`${logo.name}-${index}`}
                   src={logo.url}
                   alt={`${logo.name} logo`}
-                  className="h-9 w-auto opacity-70 grayscale md:h-10"
+                  className="h-9 w-auto opacity-70 grayscale md:h-10 lg:h-11"
                   loading="lazy"
                 />
               ))}

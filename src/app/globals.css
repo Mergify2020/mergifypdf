@@ -488,7 +488,7 @@ html.theme-scroll-reveal:not(.dark) ::-webkit-scrollbar-thumb {
 .logo-marquee-track {
   display: flex;
   align-items: center;
-  gap: 3rem;
+  gap: 1.25rem;
   width: max-content;
   animation: logo-marquee-scroll 45s linear infinite;
 }

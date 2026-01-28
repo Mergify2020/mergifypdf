@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { FileUp } from "lucide-react";
 import { redirect } from "next/navigation";
 import { getServerSessionSafe } from "@/lib/serverSession";
 import UploadCta from "@/components/UploadCta";
@@ -81,56 +82,78 @@ export default async function Home({
 function MarketingLanding({ usedToday }: { usedToday: boolean }) {
   return (
     <>
-      <section className="relative w-full bg-gradient-to-r from-[rgba(218,236,255,0.95)] via-[rgba(224,230,255,0.7)] to-[rgba(206,210,255,0.85)]">
-        <div className="relative mx-auto w-full max-w-7xl px-6 pt-10 pb-0 sm:pt-14 sm:pb-0 lg:pt-16 lg:pb-0">
-          <div className="grid gap-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:items-center lg:gap-20 xl:gap-24">
-            <div className="relative z-10 space-y-6 text-center lg:pb-12 lg:text-left">
-              <h1 className="text-3xl font-semibold leading-[1.08] tracking-tight sm:text-4xl lg:text-[2.75rem] xl:text-[3.25rem]">
-                <span className="block">All-in-one online document</span>
-                <span className="block">editor tool.</span>
+      <section className="relative w-full overflow-x-hidden bg-gradient-to-r from-[rgba(218,236,255,0.95)] via-[rgba(224,230,255,0.7)] to-[rgba(206,210,255,0.85)]">
+        <div className="relative mx-auto w-full max-w-[1400px] px-4 pt-6 pb-8 sm:px-6 sm:pt-10 sm:pb-10 lg:px-8 lg:pt-12 lg:pb-12">
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,640px)_minmax(0,600px)] lg:items-stretch">
+            <div className="space-y-6 text-center lg:col-start-1 lg:text-left">
+              <h1 className="text-[2.85rem] font-bold leading-[1.1] tracking-tight">
+                Merge, edit, and sign documents in minutes.
               </h1>
-              <p className="max-w-2xl text-base font-normal text-gray-700 sm:text-lg lg:whitespace-nowrap">
-                No installs. No clutter. Just edit, sign, and go. Your work stays saved.
+              <p className="text-[1.125rem] font-medium leading-relaxed text-slate-700">
+                No installs. No clutter. Just upload and go.{" "}
+                <span className="whitespace-nowrap">Your work stays saved.</span>
               </p>
-              <div className="mt-14 flex w-full justify-center lg:justify-start">
-                <UploadCta usedToday={usedToday} variant="hero" className="w-full max-w-md" />
-              </div>
-              <div className="mt-10 flex flex-col items-center gap-7 text-sm text-slate-600 lg:items-start">
-                {["1 free upload per day", "Fast performance", "Simple to use"].map((badge) => (
-                  <div key={badge} className="flex items-center gap-4 text-base font-semibold text-slate-700">
-                    <span
-                      className="flex h-6 w-6 items-center justify-center rounded-full bg-[#6D5EF3] text-[12px] text-white shadow-[0_6px_16px_rgba(109,94,243,0.25)]"
-                      aria-hidden="true"
-                    >
-                      ✓
-                    </span>
-                    <span>{badge}</span>
+            </div>
+
+            <div className="flex justify-center lg:col-start-2 lg:row-span-2 lg:justify-end lg:self-stretch">
+              <div className="w-full max-w-[600px] rounded-[28px] border border-white/70 bg-white/35 p-2 shadow-[0_0_0_1px_rgba(255,255,255,0.7),0_0_18px_rgba(15,23,42,0.12)] backdrop-blur-xl lg:h-full">
+                <div className="flex h-full flex-col rounded-2xl border border-white/70 bg-white/70 p-7 text-center shadow-[0_24px_60px_rgba(15,23,42,0.12)] backdrop-blur sm:p-8">
+                  <div className="flex flex-1 flex-col justify-center rounded-[18px] border-[3px] border-dashed border-[#6D5EF3] bg-gradient-to-b from-white/85 via-slate-50/90 to-white/80 px-8 py-12 shadow-[0_0_0_1px_rgba(148,163,184,0.18),0_18px_40px_rgba(15,23,42,0.08)]">
+                    <div className="mb-5 flex justify-center">
+                      <FileUp
+                        className="h-16 w-16 text-[#6D5EF3] drop-shadow-[0_10px_26px_rgba(109,94,243,0.35)]"
+                        aria-hidden="true"
+                      />
+                    </div>
+                    <p className="text-lg font-semibold text-slate-900">Drag & drop to upload</p>
+                    <div className="mt-4 flex w-full items-center justify-center gap-3">
+                      <span className="h-[2px] w-20 bg-slate-400/90" aria-hidden="true" />
+                      <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                        OR
+                      </span>
+                      <span className="h-[2px] w-20 bg-slate-400/90" aria-hidden="true" />
+                    </div>
+                    <div className="mt-4 flex justify-center">
+                      <label
+                        htmlFor="hero-upload-input"
+                        className="inline-flex items-center justify-center rounded-[12px] bg-[#6D5EF3] px-6 py-2.5 text-base font-semibold text-white shadow-[0_12px_24px_rgba(109,94,243,0.25)] transition hover:-translate-y-0.5 hover:bg-[#7567F5]"
+                      >
+                        Browse files
+                      </label>
+                    </div>
                   </div>
-                ))}
-              </div>
-              <div className="mt-10">
-                <HeroStats />
+                  <input id="hero-upload-input" type="file" accept="application/pdf" className="hidden" />
+                </div>
               </div>
             </div>
 
-            <div className="relative z-10 mt-6 flex items-center justify-center sm:mt-10 lg:absolute lg:bottom-[-48px] lg:right-[-12%] lg:mt-0 lg:w-[82%] lg:items-end lg:justify-end">
-              <div className="relative w-full max-w-3xl lg:max-w-none lg:h-[750px] lg:w-[975px] lg:flex-none lg:origin-bottom-right lg:scale-100">
-                <Image
-                  src="/backgrounds/hero-page-laptop-frontview-v1.png"
-                  alt="Preview of the MergifyPDF workspace"
-                  width={1400}
-                  height={1025}
-                  className="w-full object-contain lg:h-full lg:w-full lg:object-bottom drop-shadow-[0_14px_30px_rgba(15,23,42,0.12)]"
-                  priority
-                />
+            <div className="space-y-5 text-center lg:col-start-1 lg:text-left">
+              <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm text-slate-600 lg:flex-col lg:items-start lg:gap-y-5">
+                {["Upload and start instantly", "Fast, reliable performance", "Works directly in your browser"].map(
+                  (badge) => (
+                    <div key={badge} className="flex items-center gap-4 text-[1rem] font-semibold text-slate-700">
+                      <span
+                        className="flex h-6 w-6 items-center justify-center rounded-full bg-[#6D5EF3] text-[12px] text-white shadow-[0_6px_16px_rgba(109,94,243,0.25)]"
+                        aria-hidden="true"
+                      >
+                        ✓
+                      </span>
+                      <span>{badge}</span>
+                    </div>
+                  ),
+                )}
+              </div>
+              <div className="flex justify-center lg:justify-start">
+                <HeroStats />
               </div>
             </div>
           </div>
         </div>
-        <div className="w-full border-t border-slate-200/40 bg-[#F4F6FF]">
-          <LogoCarousel />
-        </div>
       </section>
+
+      <div className="w-full border-t border-slate-200/40 bg-[#F4F6FF]">
+        <LogoCarousel />
+      </div>
 
       <HeroFeatureArea />
     </>

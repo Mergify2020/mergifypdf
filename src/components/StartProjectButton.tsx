@@ -51,6 +51,7 @@ export default function StartProjectButton({ className, variant = "default", ico
   const [removeConfirmId, setRemoveConfirmId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const dragDepthRef = useRef(0);
 
   useEffect(() => {
     if (!open) return;
@@ -274,40 +275,63 @@ export default function StartProjectButton({ className, variant = "default", ico
 
                 <div className="mt-6">
                   <div
-                    className={`flex flex-col items-center justify-center rounded-[18px] border-[3px] border-dashed px-6 py-10 text-center transition ${
+                    role="button"
+                    tabIndex={busy ? -1 : 0}
+                    className={`group relative flex w-full flex-col items-center justify-center rounded-[18px] border border-solid px-6 py-12 text-center transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#51bdff] focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
                       showFilesError
-                        ? "border-rose-400 bg-rose-50/40"
+                        ? "border-rose-300 bg-gradient-to-b from-rose-50/70 via-white/90 to-white text-rose-600 shadow-[0_0_0_1px_rgba(251,113,133,0.15)]"
                         : dragActive
-                          ? "border-[#51bdff] bg-sky-50/60"
-                          : "border-slate-300 bg-white/60 hover:border-[#51bdff]"
-                    } ${busy ? "opacity-70" : ""}`}
+                          ? "scale-[1.01] border-sky-400/80 bg-gradient-to-b from-white/80 via-sky-50/70 to-white shadow-[0_0_0_1px_rgba(56,189,248,0.35),0_0_30px_rgba(56,189,248,0.25)]"
+                          : "border-slate-200/80 bg-gradient-to-b from-white/70 via-slate-50/80 to-white/90 shadow-[0_0_0_1px_rgba(148,163,184,0.15),0_18px_40px_rgba(15,23,42,0.06)] hover:border-slate-300/80"
+                    } ${busy ? "opacity-70" : "cursor-pointer"}`}
+                    onClick={() => fileInputRef.current?.click()}
+                    onKeyDown={(event) => {
+                      if (busy) return;
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        fileInputRef.current?.click();
+                      }
+                    }}
+                    onDragEnter={(event) => {
+                      event.preventDefault();
+                      if (busy) return;
+                      dragDepthRef.current += 1;
+                      setDragActive(true);
+                    }}
                     onDragOver={(event) => {
                       event.preventDefault();
                       if (!busy) setDragActive(true);
                     }}
-                    onDragLeave={() => setDragActive(false)}
+                    onDragLeave={(event) => {
+                      event.preventDefault();
+                      if (busy) return;
+                      dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+                      if (dragDepthRef.current === 0) setDragActive(false);
+                    }}
                     onDrop={(event) => {
                       event.preventDefault();
+                      dragDepthRef.current = 0;
                       setDragActive(false);
                       if (busy) return;
                       if (event.dataTransfer?.files?.length) addFiles(event.dataTransfer.files);
                     }}
+                    aria-label="Upload PDF files"
+                    aria-disabled={busy}
                   >
                     <FileUp
-                      className={`h-9 w-9 ${showFilesError ? "text-rose-500" : "text-slate-500"}`}
+                      className={`h-12 w-12 ${
+                        showFilesError ? "text-rose-500" : "text-slate-700"
+                      } drop-shadow-[0_0_14px_rgba(56,189,248,0.25)]`}
                       aria-hidden
                     />
-                    <p className={`mt-3 text-base font-semibold ${showFilesError ? "text-rose-600" : "text-slate-900"}`}>
-                      Drop document here to upload
-                    </p>
-                    <button
-                      type="button"
-                      className="mt-4 inline-flex items-center justify-center rounded-[12px] border-[3px] border-[#51bdff] bg-white px-5 py-2 text-sm font-semibold text-[#013d63] shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-50"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={busy}
+                    <p
+                      className={`mt-4 text-base font-semibold ${
+                        showFilesError ? "text-rose-600" : "text-slate-900"
+                      }`}
                     >
-                      Select from device
-                    </button>
+                      {dragActive ? "Release to upload" : "Drag & drop or click to upload"}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-500">PDF files only</p>
                     <input
                       ref={fileInputRef}
                       type="file"
