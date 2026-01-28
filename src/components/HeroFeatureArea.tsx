@@ -104,8 +104,8 @@ export default function HeroFeatureArea() {
           </a>
         </div>
 
-        <div className="mt-10 mb-20 grid w-full items-center gap-8 lg:grid-cols-[1.1fr_0.9fr] xl:grid-cols-[1fr_1fr]">
-          <div className="flex justify-start">
+        <div className="mt-10 mb-20 grid w-full items-center gap-8 text-center lg:grid-cols-[1.1fr_0.9fr] lg:text-left xl:grid-cols-[1fr_1fr]">
+          <div className="flex justify-center lg:justify-start">
             <img
               src="/illustrations/hero-ipad-illustration.png"
               alt=""
@@ -113,12 +113,12 @@ export default function HeroFeatureArea() {
               aria-hidden="true"
             />
           </div>
-          <div className="flex flex-col items-start gap-4 text-left">
-            <p className="text-left text-3xl font-semibold text-slate-900 sm:text-4xl lg:text-[2.75rem] xl:text-[3.25rem]">
+          <div className="flex flex-col items-center gap-4 text-center lg:items-start lg:text-left">
+            <p className="text-center text-3xl font-semibold text-slate-900 sm:text-4xl lg:text-[2.75rem] xl:text-[3.25rem] lg:text-left">
               <span className="block">Do more with your</span>
               <span className="block whitespace-nowrap">documents — for less.</span>
             </p>
-            <p className="text-left text-base text-slate-600 sm:text-lg">
+            <p className="text-center text-base text-slate-600 sm:text-lg lg:text-left">
               No installs. No delays. Just the tools you need, at a fraction of the cost.
             </p>
             <a

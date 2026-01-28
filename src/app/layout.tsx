@@ -1,11 +1,13 @@
 ﻿// src/app/layout.tsx
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import Script from "next/script";
 import { cookies } from "next/headers";
 import Providers from "@/components/Providers";
 import { getServerSessionSafe } from "@/lib/serverSession";
 import "./globals.css";
 
+const inter = Inter({ subsets: ["latin"], display: "swap" });
 
 export const metadata: Metadata = {
   title: "MergifyPDF",
@@ -76,7 +78,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         />
       </head>
 
-      <body className="min-h-screen bg-white text-gray-900 dark:bg-[#222224] dark:text-zinc-100">
+      <body className={`${inter.className} min-h-screen bg-white text-gray-900 dark:bg-[#222224] dark:text-zinc-100`}>
         <Providers session={session}>
           {children}
         </Providers>
