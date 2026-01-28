@@ -41,7 +41,8 @@ export default function LogoCarousel() {
                   src={logo.url}
                   alt={`${logo.name} logo`}
                   className="h-9 w-auto opacity-70 grayscale md:h-10 lg:h-11"
-                  loading="lazy"
+                  loading="eager"
+                  decoding="async"
                 />
               ))}
             </div>
