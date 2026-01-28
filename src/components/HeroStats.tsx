@@ -53,9 +53,9 @@ export default function HeroStats() {
   }, []);
 
   return (
-    <div className="mt-6 flex justify-start">
+    <div className="mt-6 flex justify-center sm:justify-start">
       <div className="flex w-full max-w-2xl flex-row items-start gap-4 sm:gap-6">
-        <div className="text-left">
+        <div className="text-center sm:text-left">
           <div
             key={editedTick}
             className="text-lg font-semibold leading-none text-slate-900 sm:text-xl md:text-2xl animate-numberRoll"
@@ -67,7 +67,7 @@ export default function HeroStats() {
           </p>
         </div>
 
-        <div className="border-l-2 border-slate-400/80 pl-6 text-left">
+        <div className="border-l-2 border-slate-400/80 pl-6 text-center sm:text-left">
           <div
             key={signedTick}
             className="text-lg font-semibold leading-none text-slate-900 sm:text-xl md:text-2xl animate-numberRoll"
@@ -79,7 +79,7 @@ export default function HeroStats() {
           </p>
         </div>
 
-        <div className="border-l-2 border-slate-400/80 pl-6 text-left">
+        <div className="border-l-2 border-slate-400/80 pl-6 text-center sm:text-left">
           <div className="text-lg font-semibold leading-none text-slate-900 sm:text-xl md:text-2xl">
             16,000+
           </div>

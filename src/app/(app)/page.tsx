@@ -86,7 +86,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
         <div className="relative mx-auto w-full max-w-[1400px] px-4 pt-6 pb-8 sm:px-6 sm:pt-10 sm:pb-10 lg:px-8 lg:pt-12 lg:pb-12">
           <div className="grid gap-8 lg:grid-cols-[minmax(0,640px)_minmax(0,600px)] lg:items-stretch">
             <div className="space-y-6 text-center lg:col-start-1 lg:text-left">
-              <h1 className="text-[2.85rem] font-bold leading-[1.1] tracking-tight">
+              <h1 className="text-balance text-[clamp(2rem,3.2vw,2.8rem)] font-bold leading-[1.08] tracking-tight">
                 Merge, edit, and sign documents in minutes.
               </h1>
               <p className="text-[1.125rem] font-medium leading-relaxed text-slate-700">
