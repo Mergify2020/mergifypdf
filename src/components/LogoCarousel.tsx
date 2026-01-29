@@ -70,7 +70,7 @@ export default function LogoCarousel() {
                   key={`${logo.name}-${index}`}
                   src={logo.url}
                   alt={`${logo.name} logo`}
-                  className="h-9 w-auto opacity-70 grayscale md:h-10 lg:h-11"
+                  className="h-9 w-28 flex-shrink-0 object-contain opacity-70 grayscale md:h-10 md:w-32 lg:h-11 lg:w-36"
                   loading="eager"
                   decoding="async"
                 />
