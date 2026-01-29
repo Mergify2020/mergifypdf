@@ -513,7 +513,18 @@ html.theme-scroll-reveal:not(.dark) ::-webkit-scrollbar-thumb {
   width: max-content;
   transform: translate3d(0, 0, 0);
   will-change: transform;
+  animation: none;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+
+.logo-marquee-track--ready {
   animation: logo-marquee-scroll 45s linear infinite;
+  opacity: 1;
+}
+
+.logo-marquee-track--idle {
+  opacity: 1;
 }
 
 @keyframes logo-marquee-scroll {

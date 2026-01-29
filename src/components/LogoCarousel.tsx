@@ -1,12 +1,13 @@
 "use client";
 
-
+import { useEffect, useState } from "react";
 type Logo = {
   name: string;
   url: string;
 };
 
 export default function LogoCarousel() {
+  const [ready, setReady] = useState(false);
 
   const logos: Logo[] = [
     { name: "Netflix", url: "/netflix.png" },
@@ -23,6 +24,35 @@ export default function LogoCarousel() {
     { name: "State Farm", url: "/statefarm.png" },
   ];
 
+  useEffect(() => {
+    let cancelled = false;
+    const unique = Array.from(new Set(logos.map((logo) => logo.url)));
+    let loaded = 0;
+
+    function markLoaded() {
+      loaded += 1;
+      if (!cancelled && loaded >= unique.length) {
+        setReady(true);
+      }
+    }
+
+    unique.forEach((url) => {
+      const img = new Image();
+      img.onload = markLoaded;
+      img.onerror = markLoaded;
+      img.src = url;
+    });
+
+    const fallback = window.setTimeout(() => {
+      if (!cancelled) setReady(true);
+    }, 1500);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(fallback);
+    };
+  }, []);
+
   return (
     <section className="bg-transparent">
       <div className="mx-auto w-full max-w-[1400px] px-4 pt-4 pb-6 sm:px-6 lg:px-8 lg:pt-6 lg:pb-8">
@@ -34,7 +64,7 @@ export default function LogoCarousel() {
 
         <div className="mt-5">
           <div className="logo-marquee">
-            <div className="logo-marquee-track">
+            <div className={`logo-marquee-track ${ready ? "logo-marquee-track--ready" : "logo-marquee-track--idle"}`}>
               {[...logos, ...logos].map((logo, index) => (
                 <img
                   key={`${logo.name}-${index}`}
