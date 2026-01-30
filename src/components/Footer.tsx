@@ -4,6 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { siInstagram, siTiktok, siYoutube, siThreads, siX } from "simple-icons";
+import RevealOnScroll from "@/components/RevealOnScroll";
 
 type IconProps = React.SVGProps<SVGSVGElement>;
 
@@ -98,7 +99,7 @@ export default function Footer() {
   const { data: session } = useSession();
 
   return (
-    <footer className="border-t border-slate-200 bg-[#F3F4F6] text-slate-600">
+    <RevealOnScroll as="footer" variant="fade" className="border-t border-slate-200 bg-[#F3F4F6] text-slate-600">
       <div className="mx-auto max-w-[1800px] px-6 py-12">
         {/* Top grid */}
         <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-4">
@@ -247,6 +248,6 @@ export default function Footer() {
           </div>
         </div>
       </div>
-    </footer>
+    </RevealOnScroll>
   );
 }

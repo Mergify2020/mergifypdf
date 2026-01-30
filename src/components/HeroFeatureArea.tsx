@@ -1,3 +1,5 @@
+import RevealOnScroll from "@/components/RevealOnScroll";
+
 type FeatureBox = {
   title: string;
   description: string;
@@ -64,9 +66,10 @@ export default function HeroFeatureArea() {
       <div className="mx-auto w-full max-w-[1400px] px-4 py-10 sm:px-6 lg:px-8">
         {/* Feature grid */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 sm:gap-5">
-          {FEATURE_BOXES.map((feature) => (
-            <div
+          {FEATURE_BOXES.map((feature, index) => (
+            <RevealOnScroll
               key={feature.title}
+              delayMs={index * 80}
               className="relative flex h-full flex-col items-center rounded-2xl border border-slate-200 bg-white/80 p-4 text-center shadow-[0_1px_3px_rgba(15,23,42,0.08)] backdrop-blur-sm transition-shadow duration-200 hover:border-slate-300 hover:shadow-[0_0_0_1px_rgba(148,163,184,0.35)] sm:p-5"
             >
               <div className="mb-5 flex h-28 w-full items-center justify-center sm:h-32">
@@ -91,36 +94,153 @@ export default function HeroFeatureArea() {
               <p className="mt-1 text-xs leading-[1.7] text-slate-600 sm:text-sm mb-0">
                 {feature.description}
               </p>
-            </div>
+            </RevealOnScroll>
           ))}
         </div>
 
-        <div className="mt-6 mb-20 flex justify-center">
+        <RevealOnScroll as="div" className="mt-6 mb-20 flex justify-center">
           <a
             href="/pricing"
             className="inline-flex items-center justify-center rounded-full border border-white/20 bg-gradient-to-r from-[#6D5EF3] to-[#8B7CFF] px-7 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:from-[#7567F5] hover:to-[#9486FF]"
           >
             Compare plans
           </a>
+        </RevealOnScroll>
+
+        <div className="mt-10 rounded-3xl border border-slate-200/60 bg-gradient-to-br from-slate-50/90 via-white to-slate-50/80 px-6 py-8 sm:px-8 sm:py-10 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+          <RevealOnScroll as="div">
+            <h2 className="text-center text-[1.65rem] font-semibold tracking-tight text-slate-900 sm:text-3xl">
+              Why choose MergifyPDF
+            </h2>
+          </RevealOnScroll>
+          <div className="mt-8 grid grid-cols-1 gap-6 text-center sm:grid-cols-2 lg:grid-cols-4 lg:text-left">
+            <RevealOnScroll className="flex h-full flex-col items-center gap-4 rounded-2xl border border-slate-200/70 bg-white/90 p-6 text-center shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(15,23,42,0.08)] sm:items-start sm:text-left" delayMs={0}>
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-indigo-50 via-white to-indigo-100 text-indigo-600/70 ring-1 ring-indigo-100/70">
+                <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6">
+                  <path
+                    d="M5 7.5 12 12l7-4.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.6"
+                  />
+                  <path
+                    d="M5 12.5 12 17l7-4.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.6"
+                  />
+                </svg>
+              </div>
+              <p className="text-sm font-semibold text-slate-900">Quick to start.</p>
+              <p className="mt-2 text-sm leading-relaxed text-slate-500">
+                Start working instantly — directly in your browser.
+              </p>
+            </RevealOnScroll>
+            <RevealOnScroll className="flex h-full flex-col items-center gap-4 rounded-2xl border border-slate-200/70 bg-white/90 p-6 text-center shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(15,23,42,0.08)] sm:items-start sm:text-left" delayMs={80}>
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-indigo-50 via-white to-indigo-100 text-indigo-600/70 ring-1 ring-indigo-100/70">
+                <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6">
+                  <path
+                    d="M4 8l8-4 8 4-8 4-8-4Z"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinejoin="round"
+                    strokeWidth="1.6"
+                  />
+                  <path
+                    d="M4 12l8 4 8-4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinejoin="round"
+                    strokeWidth="1.6"
+                  />
+                  <path
+                    d="M4 16l8 4 8-4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinejoin="round"
+                    strokeWidth="1.6"
+                  />
+                </svg>
+              </div>
+              <p className="text-sm font-semibold text-slate-900">One workspace for everything.</p>
+              <p className="mt-2 text-sm leading-relaxed text-slate-500">
+                Upload once and manage every task in one place.
+              </p>
+            </RevealOnScroll>
+            <RevealOnScroll className="flex h-full flex-col items-center gap-4 rounded-2xl border border-slate-200/70 bg-white/90 p-6 text-center shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(15,23,42,0.08)] sm:items-start sm:text-left" delayMs={160}>
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-indigo-50 via-white to-indigo-100 text-indigo-600/70 ring-1 ring-indigo-100/70">
+                <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6">
+                  <path
+                    d="M6 5h12a2 2 0 0 1 2 2v11a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V7a2 2 0 0 1 2-2Z"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinejoin="round"
+                    strokeWidth="1.6"
+                  />
+                  <path
+                    d="M8 3v4M16 3v4M4 10h16M8 14h3M13 14h3"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.6"
+                  />
+                </svg>
+              </div>
+              <p className="text-sm font-semibold text-slate-900">Free 7-day trial.</p>
+              <p className="mt-2 text-sm leading-relaxed text-slate-500">
+                Explore every feature free for 7 days. Cancel anytime.
+              </p>
+              <a
+                href="/pricing"
+                className="mt-3 inline-flex items-center text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600 transition hover:text-indigo-700"
+              >
+                Learn more
+              </a>
+            </RevealOnScroll>
+            <RevealOnScroll className="flex h-full flex-col items-center gap-4 rounded-2xl border border-slate-200/70 bg-white/90 p-6 text-center shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(15,23,42,0.08)] sm:items-start sm:text-left" delayMs={240}>
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-indigo-50 via-white to-indigo-100 text-indigo-600/70 ring-1 ring-indigo-100/70">
+                <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6">
+                  <path
+                    d="M13.5 2 5 13h5l-1 9 9.5-12h-5L13.5 2Z"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinejoin="round"
+                    strokeWidth="1.6"
+                  />
+                </svg>
+              </div>
+              <p className="text-sm font-semibold text-slate-900">Fast and reliable.</p>
+              <p className="mt-2 text-sm leading-relaxed text-slate-500">
+                Designed for speed, even with large or complex documents.
+              </p>
+            </RevealOnScroll>
+          </div>
         </div>
 
         <div className="mt-10 mb-20 grid w-full items-center gap-8 text-center lg:grid-cols-[1.1fr_0.9fr] lg:text-left xl:grid-cols-[1fr_1fr]">
-          <div className="flex justify-center lg:justify-start">
+          <RevealOnScroll as="div" className="flex justify-center lg:justify-start">
             <img
               src="/illustrations/hero-ipad-illustration.png"
               alt=""
               className="h-auto w-auto max-h-72 sm:max-h-80 lg:max-h-96"
               aria-hidden="true"
             />
-          </div>
+          </RevealOnScroll>
           <div className="flex flex-col items-center gap-4 text-center lg:items-start lg:text-left">
-            <p className="text-center text-3xl font-semibold text-slate-900 sm:text-4xl lg:text-[2.75rem] xl:text-[3.25rem] lg:text-left">
-              <span className="block">Do more with your</span>
-              <span className="block whitespace-nowrap">documents — for less.</span>
-            </p>
-            <p className="text-center text-base text-slate-600 sm:text-lg lg:text-left">
-              No installs. No delays. Just the tools you need, at a fraction of the cost.
-            </p>
+            <RevealOnScroll as="div">
+              <p className="text-center text-3xl font-semibold text-slate-900 sm:text-4xl lg:text-[2.75rem] xl:text-[3.25rem] lg:text-left">
+                <span className="block">Do more with your</span>
+                <span className="block whitespace-nowrap">documents — for less.</span>
+              </p>
+              <p className="text-center text-base text-slate-600 sm:text-lg lg:text-left">
+                No installs. No delays. Just the tools you need, at a fraction of the cost.
+              </p>
+            </RevealOnScroll>
             <a
               href="/pricing"
               className="inline-flex items-center justify-center rounded-full border border-white/20 bg-gradient-to-r from-[#6D5EF3] to-[#8B7CFF] px-7 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:from-[#7567F5] hover:to-[#9486FF]"

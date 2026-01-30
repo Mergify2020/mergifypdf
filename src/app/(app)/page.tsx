@@ -11,6 +11,7 @@ import ContainerShadowOverlay from "@/components/ContainerShadowOverlay";
 import RightSidebarColumn from "@/components/RightSidebarColumn";
 import HomeProjectsSearch from "@/components/HomeProjectsSearch";
 import HeroUploadCard from "@/components/HeroUploadCard";
+import RevealOnScroll from "@/components/RevealOnScroll";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -85,24 +86,31 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
         <div className="relative mx-auto w-full max-w-[1400px] px-4 pt-6 pb-8 sm:px-6 sm:pt-10 sm:pb-10 lg:px-8 lg:pt-12 lg:pb-12">
           <div className="grid gap-8 lg:grid-cols-[minmax(0,640px)_minmax(0,600px)] lg:items-stretch">
             <div className="space-y-6 text-center lg:col-start-1 lg:text-left">
-              <h1 className="text-balance text-[clamp(2rem,3.2vw,2.8rem)] font-bold leading-[1.08] tracking-tight">
-                Merge, edit, and sign documents in minutes.
-              </h1>
-              <p className="text-[1.125rem] font-medium leading-relaxed text-slate-700">
-                No installs. No clutter. Just upload and go.{" "}
-                <span className="whitespace-nowrap">Your work stays saved.</span>
-              </p>
+              <RevealOnScroll as="div">
+                <h1 className="text-balance text-[clamp(2rem,3.2vw,2.8rem)] font-bold leading-[1.08] tracking-tight">
+                  Merge, edit, and sign documents in minutes.
+                </h1>
+              </RevealOnScroll>
+              <RevealOnScroll as="div">
+                <p className="text-[1.125rem] font-medium leading-relaxed text-slate-700">
+                  No installs. No clutter. Just upload and go.{" "}
+                  <span className="whitespace-nowrap">Your work stays saved.</span>
+                </p>
+              </RevealOnScroll>
             </div>
 
             <div className="flex justify-center lg:col-start-2 lg:row-span-2 lg:justify-end lg:self-stretch">
-              <div className="w-full max-w-[600px] rounded-[18px] border border-white/70 bg-white/35 p-2 shadow-[0_0_0_1px_rgba(255,255,255,0.7),0_0_18px_rgba(15,23,42,0.12)] backdrop-blur-xl lg:h-full">
+              <RevealOnScroll
+                as="div"
+                className="w-full max-w-[600px] rounded-[18px] border border-white/70 bg-white/35 p-2 shadow-[0_0_0_1px_rgba(255,255,255,0.7),0_0_18px_rgba(15,23,42,0.12)] backdrop-blur-xl lg:h-full"
+              >
                 <div className="flex h-full flex-col rounded-[18px] border border-white/70 bg-white/70 p-7 text-center shadow-[0_24px_60px_rgba(15,23,42,0.12)] backdrop-blur sm:p-8">
                   <HeroUploadCard />
                 </div>
-              </div>
+              </RevealOnScroll>
             </div>
 
-            <div className="space-y-5 text-center lg:col-start-1 lg:text-left">
+            <RevealOnScroll as="div" className="space-y-5 text-center lg:col-start-1 lg:text-left">
               <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm text-slate-600 lg:flex-col lg:items-start lg:gap-y-5">
                 {["Upload and start instantly", "Fast, reliable performance", "Works directly in your browser"].map(
                   (badge) => (
@@ -121,14 +129,14 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
               <div className="flex justify-center lg:justify-start">
                 <HeroStats />
               </div>
-            </div>
+            </RevealOnScroll>
           </div>
         </div>
       </section>
 
-      <div className="w-full border-t border-slate-200/40 bg-[#F4F6FF]">
+      <RevealOnScroll as="div" className="w-full border-t border-slate-200/40 bg-[#F4F6FF]">
         <LogoCarousel />
-      </div>
+      </RevealOnScroll>
 
       <HeroFeatureArea />
     </>
