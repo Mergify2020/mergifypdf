@@ -1,12 +1,12 @@
 "use client";
 
-import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
+import { type CSSProperties, type ElementType, type ReactNode, useEffect, useRef, useState } from "react";
 
 type RevealOnScrollProps = {
   children: ReactNode;
   className?: string;
   delayMs?: number;
-  as?: keyof JSX.IntrinsicElements;
+  as?: ElementType;
   variant?: "default" | "fade";
 };
 
