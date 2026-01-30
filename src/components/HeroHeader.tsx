@@ -105,7 +105,7 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
   let backgroundClass: string;
   if (gradientActive) {
     backgroundClass = isHomePage
-      ? "bg-transparent"
+      ? "bg-gradient-to-r from-[rgba(218,236,255,0.95)] via-[rgba(224,230,255,0.7)] to-[rgba(206,210,255,0.85)]"
       : isPricingPage
         ? "bg-[#e3edf9]"
         : "bg-gradient-to-r from-[#FDF2FF] via-[#EEF2FF] to-[#E0F7FF]";
