@@ -19,11 +19,17 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
   const [scrolledPastHero, setScrolledPastHero] = useState(false);
   const lastScrolledState = useRef(false);
   const rafId = useRef<number | null>(null);
+  const revertTimeoutId = useRef<number | null>(null);
+  const revertDelayMs = 1000;
 
   useEffect(() => {
     if (!isAnimatedPage) {
       setScrolledPastHero(false);
       lastScrolledState.current = false;
+      if (revertTimeoutId.current !== null) {
+        window.clearTimeout(revertTimeoutId.current);
+        revertTimeoutId.current = null;
+      }
       return;
     }
 
@@ -31,10 +37,27 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
       if (rafId.current !== null) return;
       rafId.current = window.requestAnimationFrame(() => {
         rafId.current = null;
-        const nextState = window.scrollY > 0;
-        if (nextState !== lastScrolledState.current) {
-          lastScrolledState.current = nextState;
-          setScrolledPastHero(nextState);
+        const scrolled = window.scrollY > 0;
+        if (scrolled) {
+          if (revertTimeoutId.current !== null) {
+            window.clearTimeout(revertTimeoutId.current);
+            revertTimeoutId.current = null;
+          }
+          if (!lastScrolledState.current) {
+            lastScrolledState.current = true;
+            setScrolledPastHero(true);
+          }
+          return;
+        }
+
+        if (lastScrolledState.current && revertTimeoutId.current === null) {
+          revertTimeoutId.current = window.setTimeout(() => {
+            revertTimeoutId.current = null;
+            if (window.scrollY <= 0) {
+              lastScrolledState.current = false;
+              setScrolledPastHero(false);
+            }
+          }, revertDelayMs);
         }
       });
     };
@@ -47,16 +70,20 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
         window.cancelAnimationFrame(rafId.current);
         rafId.current = null;
       }
+      if (revertTimeoutId.current !== null) {
+        window.clearTimeout(revertTimeoutId.current);
+        revertTimeoutId.current = null;
+      }
     };
   }, [isAnimatedPage]);
 
   const gradientActive = isHomePage ? !scrolledPastHero : isAnimatedPage && !scrolledPastHero;
   let backgroundClass: string;
   if (gradientActive) {
-    backgroundClass = isPricingPage
-      ? "bg-[#e3edf9]"
-      : isHomePage
-        ? "bg-gradient-to-r from-[rgba(218,236,255,0.95)] via-[rgba(224,230,255,0.7)] to-[rgba(206,210,255,0.85)]"
+    backgroundClass = isHomePage
+      ? "bg-transparent"
+      : isPricingPage
+        ? "bg-[#e3edf9]"
         : "bg-gradient-to-r from-[#FDF2FF] via-[#EEF2FF] to-[#E0F7FF]";
   } else {
     backgroundClass = "bg-white/95 backdrop-blur-md";
