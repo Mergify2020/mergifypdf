@@ -101,6 +101,14 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
     };
   }, [isAnimatedPage]);
 
+  useEffect(() => {
+    if (!isHomePage && !isPricingPage) return;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (!meta) return;
+    const color = isHomePage && !scrolledPastHero ? "#DAECFF" : "#FFFFFF";
+    meta.setAttribute("content", color);
+  }, [isHomePage, isPricingPage, scrolledPastHero]);
+
   const gradientActive = isHomePage ? !scrolledPastHero : isAnimatedPage && !scrolledPastHero;
   let backgroundClass: string;
   if (gradientActive) {
