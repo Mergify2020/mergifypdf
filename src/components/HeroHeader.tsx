@@ -17,18 +17,25 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
   const isAnimatedPage = isHomePage || isPricingPage;
 
   const [scrolledPastHero, setScrolledPastHero] = useState(false);
+  const [fadeToGradient, setFadeToGradient] = useState(false);
   const lastScrolledState = useRef(false);
   const rafId = useRef<number | null>(null);
   const revertTimeoutId = useRef<number | null>(null);
+  const fadeTimeoutId = useRef<number | null>(null);
   const revertDelayMs = 1000;
 
   useEffect(() => {
     if (!isAnimatedPage) {
       setScrolledPastHero(false);
       lastScrolledState.current = false;
+      setFadeToGradient(false);
       if (revertTimeoutId.current !== null) {
         window.clearTimeout(revertTimeoutId.current);
         revertTimeoutId.current = null;
+      }
+      if (fadeTimeoutId.current !== null) {
+        window.clearTimeout(fadeTimeoutId.current);
+        fadeTimeoutId.current = null;
       }
       return;
     }
@@ -43,6 +50,11 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
             window.clearTimeout(revertTimeoutId.current);
             revertTimeoutId.current = null;
           }
+          if (fadeTimeoutId.current !== null) {
+            window.clearTimeout(fadeTimeoutId.current);
+            fadeTimeoutId.current = null;
+          }
+          setFadeToGradient(false);
           if (!lastScrolledState.current) {
             lastScrolledState.current = true;
             setScrolledPastHero(true);
@@ -55,7 +67,15 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
             revertTimeoutId.current = null;
             if (window.scrollY <= 0) {
               lastScrolledState.current = false;
+              setFadeToGradient(true);
               setScrolledPastHero(false);
+              if (fadeTimeoutId.current !== null) {
+                window.clearTimeout(fadeTimeoutId.current);
+              }
+              fadeTimeoutId.current = window.setTimeout(() => {
+                setFadeToGradient(false);
+                fadeTimeoutId.current = null;
+              }, 400);
             }
           }, revertDelayMs);
         }
@@ -74,6 +94,10 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
         window.clearTimeout(revertTimeoutId.current);
         revertTimeoutId.current = null;
       }
+      if (fadeTimeoutId.current !== null) {
+        window.clearTimeout(fadeTimeoutId.current);
+        fadeTimeoutId.current = null;
+      }
     };
   }, [isAnimatedPage]);
 
@@ -86,7 +110,7 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
         ? "bg-[#e3edf9]"
         : "bg-gradient-to-r from-[#FDF2FF] via-[#EEF2FF] to-[#E0F7FF]";
   } else {
-    backgroundClass = "bg-white/95 backdrop-blur-md";
+    backgroundClass = "bg-white";
   }
 
   const shadowClass = gradientActive ? "" : "shadow-sm";
@@ -99,9 +123,13 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
     return null;
   }
 
+  const transitionClass = fadeToGradient
+    ? "transition-[background-color,box-shadow,border-color,backdrop-filter] duration-400 ease-out"
+    : "";
+
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-50 w-full ${gradientActive ? "" : "border-b"} ${backgroundClass} ${shadowClass} ${borderColorClass} ${visibilityClass} ${homeHeaderOverlay}`}
+      className={`fixed top-0 left-0 right-0 z-50 w-full ${gradientActive ? "" : "border-b"} ${backgroundClass} ${shadowClass} ${borderColorClass} ${visibilityClass} ${homeHeaderOverlay} ${transitionClass}`}
     >
       {children}
     </header>
