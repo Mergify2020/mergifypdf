@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 
 interface HeroHeaderProps {
@@ -17,20 +17,37 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
   const isAnimatedPage = isHomePage || isPricingPage;
 
   const [scrolledPastHero, setScrolledPastHero] = useState(false);
+  const lastScrolledState = useRef(false);
+  const rafId = useRef<number | null>(null);
 
   useEffect(() => {
     if (!isAnimatedPage) {
       setScrolledPastHero(false);
+      lastScrolledState.current = false;
       return;
     }
 
     const handleScroll = () => {
-      setScrolledPastHero(window.scrollY > 0);
+      if (rafId.current !== null) return;
+      rafId.current = window.requestAnimationFrame(() => {
+        rafId.current = null;
+        const nextState = window.scrollY > 0;
+        if (nextState !== lastScrolledState.current) {
+          lastScrolledState.current = nextState;
+          setScrolledPastHero(nextState);
+        }
+      });
     };
 
     handleScroll();
     window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      if (rafId.current !== null) {
+        window.cancelAnimationFrame(rafId.current);
+        rafId.current = null;
+      }
+    };
   }, [isAnimatedPage]);
 
   const gradientActive = isHomePage ? !scrolledPastHero : isAnimatedPage && !scrolledPastHero;

@@ -81,7 +81,7 @@ export default async function Home({
 function MarketingLanding({ usedToday }: { usedToday: boolean }) {
   return (
     <>
-      <section className="relative w-full overflow-x-hidden bg-gradient-to-r from-[rgba(218,236,255,0.95)] via-[rgba(224,230,255,0.7)] to-[rgba(206,210,255,0.85)]">
+      <section className="relative -mt-[76px] w-full overflow-x-hidden bg-gradient-to-r from-[rgba(218,236,255,0.95)] via-[rgba(224,230,255,0.7)] to-[rgba(206,210,255,0.85)] pt-[76px]">
         <div className="relative mx-auto w-full max-w-[1400px] px-4 pt-6 pb-8 sm:px-6 sm:pt-10 sm:pb-10 lg:px-8 lg:pt-12 lg:pb-12">
           <div className="grid gap-8 lg:grid-cols-[minmax(0,640px)_minmax(0,600px)] lg:items-stretch">
             <div className="space-y-6 text-center lg:col-start-1 lg:text-left">
