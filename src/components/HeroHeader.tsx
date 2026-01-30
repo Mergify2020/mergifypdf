@@ -142,7 +142,7 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
       {gradientActive && isHomePage ? (
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 z-0 h-10 bg-gradient-to-b from-white/80 via-white/30 to-transparent blur-[0.5px]"
+          className="pointer-events-none absolute inset-x-0 top-0 z-0 h-12 bg-gradient-to-b from-white/100 via-white/40 to-transparent"
         />
       ) : null}
       <div className="relative z-10">{children}</div>
