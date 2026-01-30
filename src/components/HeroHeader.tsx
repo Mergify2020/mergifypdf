@@ -113,7 +113,7 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
   let backgroundClass: string;
   if (gradientActive) {
     backgroundClass = isHomePage
-      ? "bg-gradient-to-r from-[rgba(218,236,255,0.95)] via-[rgba(224,230,255,0.7)] to-[rgba(206,210,255,0.85)]"
+      ? "bg-transparent"
       : isPricingPage
         ? "bg-[#e3edf9]"
         : "bg-gradient-to-r from-[#FDF2FF] via-[#EEF2FF] to-[#E0F7FF]";
@@ -139,6 +139,12 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
     <header
       className={`fixed top-0 left-0 right-0 z-50 w-full pt-[env(safe-area-inset-top)] ${gradientActive ? "" : "border-b"} ${backgroundClass} ${shadowClass} ${borderColorClass} ${visibilityClass} ${homeHeaderOverlay} ${transitionClass}`}
     >
+      {gradientActive && isHomePage ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 h-6 bg-gradient-to-b from-white/70 to-transparent"
+        />
+      ) : null}
       {children}
     </header>
   );
