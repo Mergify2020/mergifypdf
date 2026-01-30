@@ -47,6 +47,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <meta name="color-scheme" content="light" />
         <meta name="supported-color-schemes" content="light" />
         <meta name="theme-color" content="#ffffff" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 
         <Script
           id="theme-init"
