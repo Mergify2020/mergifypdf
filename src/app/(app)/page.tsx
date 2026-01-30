@@ -1,8 +1,6 @@
 import Image from "next/image";
-import { FileUp } from "lucide-react";
 import { redirect } from "next/navigation";
 import { getServerSessionSafe } from "@/lib/serverSession";
-import UploadCta from "@/components/UploadCta";
 import HeroStats from "@/components/HeroStats";
 import HeroFeatureArea from "@/components/HeroFeatureArea";
 import PersonaHighlight from "@/components/PersonaHighlight";
@@ -12,6 +10,7 @@ import { prisma } from "@/lib/prisma";
 import ContainerShadowOverlay from "@/components/ContainerShadowOverlay";
 import RightSidebarColumn from "@/components/RightSidebarColumn";
 import HomeProjectsSearch from "@/components/HomeProjectsSearch";
+import HeroUploadCard from "@/components/HeroUploadCard";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -98,37 +97,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
             <div className="flex justify-center lg:col-start-2 lg:row-span-2 lg:justify-end lg:self-stretch">
               <div className="w-full max-w-[600px] rounded-[18px] border border-white/70 bg-white/35 p-2 shadow-[0_0_0_1px_rgba(255,255,255,0.7),0_0_18px_rgba(15,23,42,0.12)] backdrop-blur-xl lg:h-full">
                 <div className="flex h-full flex-col rounded-[18px] border border-white/70 bg-white/70 p-7 text-center shadow-[0_24px_60px_rgba(15,23,42,0.12)] backdrop-blur sm:p-8">
-                  <div className="flex flex-1 flex-col justify-center rounded-[18px] border-[3px] border-dashed border-[#6D5EF3] bg-gradient-to-b from-white/85 via-slate-50/90 to-white/80 px-8 py-12 shadow-[0_0_0_1px_rgba(148,163,184,0.18),0_18px_40px_rgba(15,23,42,0.08)]">
-                    <div className="mb-5 flex justify-center">
-                      <FileUp
-                        className="h-16 w-16 text-[#6D5EF3] drop-shadow-[0_10px_26px_rgba(109,94,243,0.35)]"
-                        aria-hidden="true"
-                      />
-                    </div>
-                    <p className="hidden text-lg font-semibold text-slate-900 md:block">Drag & drop to upload</p>
-                    <div className="mt-4 hidden w-full items-center justify-center gap-3 md:flex">
-                      <span className="h-[2px] w-20 bg-slate-400/90" aria-hidden="true" />
-                      <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                        OR
-                      </span>
-                      <span className="h-[2px] w-20 bg-slate-400/90" aria-hidden="true" />
-                    </div>
-                    <div className="mt-4 flex justify-center md:mt-4">
-                      <label
-                        htmlFor="hero-upload-input"
-                        className="inline-flex items-center justify-center rounded-[12px] bg-[#6D5EF3] px-6 py-2.5 text-base font-semibold text-white shadow-[0_12px_24px_rgba(109,94,243,0.25)] transition hover:-translate-y-0.5 hover:bg-[#7567F5] md:hidden"
-                      >
-                        Select files
-                      </label>
-                      <label
-                        htmlFor="hero-upload-input"
-                        className="hidden items-center justify-center rounded-[12px] bg-[#6D5EF3] px-6 py-2.5 text-base font-semibold text-white shadow-[0_12px_24px_rgba(109,94,243,0.25)] transition hover:-translate-y-0.5 hover:bg-[#7567F5] md:inline-flex"
-                      >
-                        Browse files
-                      </label>
-                    </div>
-                  </div>
-                  <input id="hero-upload-input" type="file" accept="application/pdf" className="hidden" />
+                  <HeroUploadCard />
                 </div>
               </div>
             </div>

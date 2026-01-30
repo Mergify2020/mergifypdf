@@ -58,7 +58,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
         </div>
       </HeroHeader>
-      <main className="page-fade-in">{children}</main>
+      <main className="page-fade-in pt-[76px]">{children}</main>
       <Footer />
     </>
   );

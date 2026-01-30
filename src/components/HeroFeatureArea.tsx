@@ -18,42 +18,42 @@ const FEATURE_ILLUSTRATIONS: Record<string, string> = {
 const FEATURE_BOXES: FeatureBox[] = [
   {
     title: "Merge Documents",
-    description: "Combine multiple PDFs into one file.",
+    description: "Deliver one polished PDF from multiple files.",
     icon: "🧩",
   },
   {
     title: "Edit & Annotate",
-    description: "Highlight, draw, and add text.",
+    description: "Clarify feedback and approvals in one place.",
     icon: "✏️",
   },
   {
     title: "Sign Documents",
-    description: "Draw, upload, or type your signature.",
+    description: "Collect signatures quickly without leaving the browser.",
     icon: "✍️",
   },
   {
     title: "Reorder Pages",
-    description: "Drag and drop pages into the perfect order.",
+    description: "Present documents in the right story order.",
     icon: "🔀",
   },
   {
     title: "Add or Remove Pages",
-    description: "Insert new pages or delete unwanted ones.",
+    description: "Keep only what matters in the final file.",
     icon: "➕",
   },
   {
     title: "Extract Pages",
-    description: "Select pages and export them separately.",
+    description: "Share just the pages people actually need.",
     icon: "📤",
   },
   {
     title: "Rotate Pages",
-    description: "Change page rotations as needed.",
+    description: "Ensure every page reads perfectly.",
     icon: "🔁",
   },
   {
     title: "Split Documents",
-    description: "Split one PDF into multiple smaller files.",
+    description: "Break large PDFs into ready-to-send parts.",
     icon: "✂️",
   },
 ];
@@ -67,7 +67,7 @@ export default function HeroFeatureArea() {
           {FEATURE_BOXES.map((feature) => (
             <div
               key={feature.title}
-              className="group relative flex h-full flex-col items-center rounded-2xl border border-slate-200 bg-white/80 p-4 text-center shadow-sm backdrop-blur-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md sm:p-5"
+              className="relative flex h-full flex-col items-center rounded-2xl border border-slate-200 bg-white/80 p-4 text-center shadow-[0_1px_3px_rgba(15,23,42,0.08)] backdrop-blur-sm transition-shadow duration-200 hover:border-slate-300 hover:shadow-[0_0_0_1px_rgba(148,163,184,0.35)] sm:p-5"
             >
               <div className="mb-5 flex h-28 w-full items-center justify-center sm:h-32">
                 {FEATURE_ILLUSTRATIONS[feature.title] ? (

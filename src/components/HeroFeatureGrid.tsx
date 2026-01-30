@@ -70,7 +70,7 @@ export default function HeroFeatureGrid() {
           {FEATURES.map((feature) => (
             <article
               key={feature.title}
-              className="relative overflow-hidden rounded-2xl border border-slate-100 bg-white px-7 py-6 pt-9 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
+              className="relative overflow-hidden rounded-2xl border border-slate-100 bg-white px-7 py-6 pt-9 shadow-sm"
             >
               <div className="pointer-events-none absolute inset-x-0 top-0 h-10 bg-slate-900/90" />
 
