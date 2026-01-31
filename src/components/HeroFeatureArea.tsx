@@ -67,9 +67,9 @@ const FAQS = [
       "MergifyPDF is a browser-based workspace for working with documents. It brings essential document tools into one place so you can get things done quickly—without installs or complicated software.",
   },
   {
-    question: "What’s included in the 7-day trial?",
+    question: "What’s included in the 7-day free trial?",
     answer:
-      "You get full access to every tool and workspace feature for 7 days. We’ll remind you before the trial ends.",
+      "You get full access to every tool and workspace feature for 7 days—free. We’ll remind you before the trial ends.",
   },
   {
     question: "Is MergifyPDF secure?",
@@ -129,7 +129,7 @@ export default function HeroFeatureArea() {
         <RevealOnScroll as="div" className="mt-6 mb-20 flex justify-center">
           <a
             href="/pricing"
-            className="inline-flex items-center justify-center rounded-full border border-white/20 bg-gradient-to-r from-[#6D5EF3] to-[#8B7CFF] px-7 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:from-[#7567F5] hover:to-[#9486FF]"
+            className="inline-flex items-center justify-center rounded-full border border-white/20 bg-gradient-to-r from-[#6D5EF3] to-[#8B7CFF] px-8 py-2.5 text-base font-semibold text-white shadow-[0_12px_26px_rgba(109,94,243,0.25)] transition hover:-translate-y-0.5 hover:from-[#7567F5] hover:to-[#9486FF]"
           >
             Compare plans
           </a>
@@ -266,7 +266,7 @@ export default function HeroFeatureArea() {
             <RevealOnScroll as="div" delayMs={120}>
               <a
                 href="/pricing"
-                className="inline-flex items-center justify-center rounded-full border border-white/20 bg-gradient-to-r from-[#6D5EF3] to-[#8B7CFF] px-7 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:from-[#7567F5] hover:to-[#9486FF]"
+                className="inline-flex items-center justify-center rounded-full border border-white/20 bg-gradient-to-r from-[#6D5EF3] to-[#8B7CFF] px-8 py-2.5 text-base font-semibold text-white shadow-[0_12px_26px_rgba(109,94,243,0.25)] transition hover:-translate-y-0.5 hover:from-[#7567F5] hover:to-[#9486FF]"
               >
                 Start free trial
               </a>
@@ -283,7 +283,7 @@ export default function HeroFeatureArea() {
           <div className="mx-auto mt-8 flex max-w-3xl flex-col">
             {FAQS.map((faq, index) => (
               <RevealOnScroll key={faq.question} delayMs={index * 60}>
-                <details className="group border-b border-slate-200/60 py-4">
+                <details className="faq-item group border-b border-slate-200/60 py-4">
                   <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-[15px] font-semibold text-slate-900 outline-none sm:text-base">
                     <span>{faq.question}</span>
                     <span className="flex h-6 w-6 items-center justify-center text-slate-400 transition-colors duration-200 group-open:text-slate-700 group-hover:text-slate-700">
@@ -303,9 +303,11 @@ export default function HeroFeatureArea() {
                       </svg>
                     </span>
                   </summary>
-                  <p className="mt-2 text-sm leading-relaxed text-slate-600">
-                    {faq.answer}
-                  </p>
+                  <div className="faq-answer">
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      {faq.answer}
+                    </p>
+                  </div>
                 </details>
               </RevealOnScroll>
             ))}

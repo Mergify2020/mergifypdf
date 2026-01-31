@@ -216,7 +216,7 @@ export default function Footer() {
               </p>
             </div>
 
-            <div className="flex items-center gap-3 text-slate-500">
+            <div className="flex items-center gap-2 text-slate-500">
               <SocialIcon
                 label="MergifyPDF on TikTok"
                 href="https://www.tiktok.com/@mergify.pdf"
@@ -234,9 +234,6 @@ export default function Footer() {
                 href="https://www.instagram.com/mergifypdf/"
               >
                 <InstagramIcon />
-              </SocialIcon>
-              <SocialIcon label="MergifyPDF on YouTube">
-                <YoutubeIcon />
               </SocialIcon>
               <SocialIcon
                 label="MergifyPDF on X (Twitter)"

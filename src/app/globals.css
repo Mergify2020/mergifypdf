@@ -442,6 +442,25 @@ html.theme-scroll-reveal:not(.dark) ::-webkit-scrollbar-thumb {
   paint-order: stroke fill;
 }
 
+.faq-item > :not(summary) {
+  display: block;
+}
+
+.faq-answer {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-2px);
+  overflow: hidden;
+  transition: max-height 220ms ease, opacity 180ms ease, transform 220ms ease;
+  will-change: max-height, opacity, transform;
+}
+
+.faq-item[open] .faq-answer {
+  max-height: 200px;
+  opacity: 1;
+  transform: translateY(0);
+}
+
 
 @keyframes press-bounce {
   0% {
