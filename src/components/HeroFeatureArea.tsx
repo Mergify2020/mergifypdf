@@ -136,7 +136,7 @@ export default function HeroFeatureArea() {
           </a>
         </RevealOnScroll>
 
-        <div className="mt-10 rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-50/95 via-white to-slate-50/90 px-6 py-8 sm:px-8 sm:py-10 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+        <div className="mt-10 rounded-3xl border border-slate-200 bg-slate-50 px-6 py-8 sm:px-8 sm:py-10 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
           <RevealOnScroll as="div">
             <h2 className="text-center text-[1.65rem] font-semibold tracking-tight text-slate-900 sm:text-3xl">
               Why choose MergifyPDF
