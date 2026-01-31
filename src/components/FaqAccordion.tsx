@@ -44,7 +44,7 @@ export default function FaqAccordion({ items }: FaqAccordionProps) {
 
         return (
           <RevealOnScroll key={item.question} delayMs={index * 60}>
-            <div className="border-b border-slate-200/60 py-4">
+            <div className="border-b border-slate-300/80 py-4">
               <button
                 type="button"
                 id={buttonId}

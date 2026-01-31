@@ -136,14 +136,14 @@ export default function HeroFeatureArea() {
           </a>
         </RevealOnScroll>
 
-        <div className="mt-10 rounded-2xl border border-slate-200/60 bg-gradient-to-br from-slate-50/90 via-white to-slate-50/80 px-6 py-8 sm:px-8 sm:py-10 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+        <div className="mt-10 rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-50/95 via-white to-slate-50/90 px-6 py-8 sm:px-8 sm:py-10 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
           <RevealOnScroll as="div">
             <h2 className="text-center text-[1.65rem] font-semibold tracking-tight text-slate-900 sm:text-3xl">
               Why choose MergifyPDF
             </h2>
           </RevealOnScroll>
           <div className="mt-8 grid grid-cols-1 gap-6 text-center sm:grid-cols-2 lg:grid-cols-4 lg:text-left">
-            <RevealOnScroll className="flex h-full flex-col items-center gap-4 rounded-2xl border border-slate-200/70 bg-white/90 p-6 text-center shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(15,23,42,0.08)] sm:items-start sm:text-left" delayMs={0}>
+            <RevealOnScroll className="flex h-full flex-col items-center gap-4 rounded-2xl border border-slate-200/90 bg-white/90 p-6 text-center shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(15,23,42,0.08)] sm:items-start sm:text-left" delayMs={0}>
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-indigo-50 via-white to-indigo-100 text-indigo-600/70 ring-1 ring-indigo-100/70">
                 <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6">
                   <path
@@ -168,7 +168,7 @@ export default function HeroFeatureArea() {
                 Explore every feature free for 7 days. Cancel anytime.
               </p>
             </RevealOnScroll>
-            <RevealOnScroll className="flex h-full flex-col items-center gap-4 rounded-2xl border border-slate-200/70 bg-white/90 p-6 text-center shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(15,23,42,0.08)] sm:items-start sm:text-left" delayMs={80}>
+            <RevealOnScroll className="flex h-full flex-col items-center gap-4 rounded-2xl border border-slate-200/90 bg-white/90 p-6 text-center shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(15,23,42,0.08)] sm:items-start sm:text-left" delayMs={80}>
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-indigo-50 via-white to-indigo-100 text-indigo-600/70 ring-1 ring-indigo-100/70">
                 <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6">
                   <path
@@ -194,7 +194,7 @@ export default function HeroFeatureArea() {
                 Start working instantly — directly in your browser.
               </p>
             </RevealOnScroll>
-            <RevealOnScroll className="flex h-full flex-col items-center gap-4 rounded-2xl border border-slate-200/70 bg-white/90 p-6 text-center shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(15,23,42,0.08)] sm:items-start sm:text-left" delayMs={160}>
+            <RevealOnScroll className="flex h-full flex-col items-center gap-4 rounded-2xl border border-slate-200/90 bg-white/90 p-6 text-center shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(15,23,42,0.08)] sm:items-start sm:text-left" delayMs={160}>
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-indigo-50 via-white to-indigo-100 text-indigo-600/70 ring-1 ring-indigo-100/70">
                 <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6">
                   <path
@@ -211,7 +211,7 @@ export default function HeroFeatureArea() {
                 Designed for speed, even with large or complex documents.
               </p>
             </RevealOnScroll>
-            <RevealOnScroll className="flex h-full flex-col items-center gap-4 rounded-2xl border border-slate-200/70 bg-white/90 p-6 text-center shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(15,23,42,0.08)] sm:items-start sm:text-left" delayMs={240}>
+            <RevealOnScroll className="flex h-full flex-col items-center gap-4 rounded-2xl border border-slate-200/90 bg-white/90 p-6 text-center shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(15,23,42,0.08)] sm:items-start sm:text-left" delayMs={240}>
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-indigo-50 via-white to-indigo-100 text-indigo-600/70 ring-1 ring-indigo-100/70">
                 <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6">
                   <path
