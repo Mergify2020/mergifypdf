@@ -102,9 +102,9 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
             <div className="flex justify-center lg:col-start-2 lg:row-span-2 lg:justify-end lg:self-stretch">
               <RevealOnScroll
                 as="div"
-                className="w-full max-w-[600px] rounded-[18px] border border-white/70 bg-white/35 p-2 shadow-[0_0_0_1px_rgba(255,255,255,0.7),0_0_18px_rgba(15,23,42,0.12)] backdrop-blur-xl lg:h-full"
+                className="w-full max-w-[600px] rounded-2xl border border-white/70 bg-white/35 p-2 shadow-[0_0_0_1px_rgba(255,255,255,0.7),0_0_18px_rgba(15,23,42,0.12)] backdrop-blur-xl lg:h-full"
               >
-                <div className="flex h-full flex-col rounded-[18px] border border-white/70 bg-white/70 p-7 text-center shadow-[0_24px_60px_rgba(15,23,42,0.12)] backdrop-blur sm:p-8">
+                <div className="flex h-full flex-col rounded-2xl border border-white/70 bg-white/70 p-7 text-center shadow-[0_24px_60px_rgba(15,23,42,0.12)] backdrop-blur sm:p-8">
                   <HeroUploadCard />
                 </div>
               </RevealOnScroll>

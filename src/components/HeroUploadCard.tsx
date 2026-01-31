@@ -60,7 +60,7 @@ export default function HeroUploadCard() {
 
   return (
     <div
-      className="flex flex-1 flex-col justify-center rounded-[18px] border-[3px] border-dashed border-[#6D5EF3] bg-gradient-to-b from-white/85 via-slate-50/90 to-white/80 px-8 py-12 shadow-[0_0_0_1px_rgba(148,163,184,0.18),0_18px_40px_rgba(15,23,42,0.08)] transition-shadow duration-200 hover:shadow-[0_0_0_1px_rgba(109,94,243,0.2),0_18px_40px_rgba(15,23,42,0.08)]"
+      className="flex flex-1 flex-col justify-center rounded-2xl border-[3px] border-dashed border-[#6D5EF3] bg-gradient-to-b from-white/85 via-slate-50/90 to-white/80 px-8 py-12 shadow-[0_0_0_1px_rgba(148,163,184,0.18),0_18px_40px_rgba(15,23,42,0.08)] transition-shadow duration-200 hover:shadow-[0_0_0_1px_rgba(109,94,243,0.2),0_18px_40px_rgba(15,23,42,0.08)]"
       role="button"
       tabIndex={0}
       onClick={openFilePicker}
@@ -82,13 +82,13 @@ export default function HeroUploadCard() {
       <div className="mt-4 flex justify-center md:mt-4">
         <label
           htmlFor={inputId}
-          className="inline-flex items-center justify-center rounded-[12px] bg-[#6D5EF3] px-6 py-2.5 text-base font-semibold text-white shadow-[0_12px_24px_rgba(109,94,243,0.25)] transition hover:bg-[#7567F5] md:hidden"
+          className="inline-flex items-center justify-center rounded-xl bg-[#6D5EF3] px-6 py-2.5 text-base font-semibold text-white shadow-[0_12px_24px_rgba(109,94,243,0.25)] transition hover:bg-[#7567F5] md:hidden"
         >
           Select files
         </label>
         <label
           htmlFor={inputId}
-          className="hidden items-center justify-center rounded-[12px] bg-[#6D5EF3] px-6 py-2.5 text-base font-semibold text-white shadow-[0_12px_24px_rgba(109,94,243,0.25)] transition hover:bg-[#7567F5] md:inline-flex"
+          className="hidden items-center justify-center rounded-xl bg-[#6D5EF3] px-6 py-2.5 text-base font-semibold text-white shadow-[0_12px_24px_rgba(109,94,243,0.25)] transition hover:bg-[#7567F5] md:inline-flex"
         >
           Browse files
         </label>

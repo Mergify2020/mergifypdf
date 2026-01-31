@@ -60,6 +60,34 @@ const FEATURE_BOXES: FeatureBox[] = [
   },
 ];
 
+const FAQS = [
+  {
+    question: "What is MergifyPDF?",
+    answer:
+      "MergifyPDF is a browser-based workspace for working with documents. It brings essential document tools into one place so you can get things done quickly—without installs or complicated software.",
+  },
+  {
+    question: "What’s included in the 7-day trial?",
+    answer:
+      "You get full access to every tool and workspace feature for 7 days. We’ll remind you before the trial ends.",
+  },
+  {
+    question: "Is MergifyPDF secure?",
+    answer:
+      "Yes. Your documents are protected using encryption and strict access controls designed to keep your files private.",
+  },
+  {
+    question: "Does MergifyPDF have an app?",
+    answer:
+      "No app is required. MergifyPDF works directly in your browser on desktop and mobile, so you can start instantly. We’re actively developing a dedicated app.",
+  },
+  {
+    question: "Who is MergifyPDF best for?",
+    answer:
+      "MergifyPDF is ideal for anyone who works with documents regularly and wants powerful tools without the complexity of traditional document software.",
+  },
+];
+
 export default function HeroFeatureArea() {
   return (
     <section className="bg-white">
@@ -107,7 +135,7 @@ export default function HeroFeatureArea() {
           </a>
         </RevealOnScroll>
 
-        <div className="mt-10 rounded-3xl border border-slate-200/60 bg-gradient-to-br from-slate-50/90 via-white to-slate-50/80 px-6 py-8 sm:px-8 sm:py-10 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+        <div className="mt-10 rounded-2xl border border-slate-200/60 bg-gradient-to-br from-slate-50/90 via-white to-slate-50/80 px-6 py-8 sm:px-8 sm:py-10 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
           <RevealOnScroll as="div">
             <h2 className="text-center text-[1.65rem] font-semibold tracking-tight text-slate-900 sm:text-3xl">
               Why choose MergifyPDF
@@ -235,12 +263,52 @@ export default function HeroFeatureArea() {
                 No installs. No delays. Just the tools you need, at a fraction of the cost.
               </p>
             </RevealOnScroll>
-            <a
-              href="/pricing"
-              className="inline-flex items-center justify-center rounded-full border border-white/20 bg-gradient-to-r from-[#6D5EF3] to-[#8B7CFF] px-7 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:from-[#7567F5] hover:to-[#9486FF]"
-            >
-              Start free trial
-            </a>
+            <RevealOnScroll as="div" delayMs={120}>
+              <a
+                href="/pricing"
+                className="inline-flex items-center justify-center rounded-full border border-white/20 bg-gradient-to-r from-[#6D5EF3] to-[#8B7CFF] px-7 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:from-[#7567F5] hover:to-[#9486FF]"
+              >
+                Start free trial
+              </a>
+            </RevealOnScroll>
+          </div>
+        </div>
+
+        <div className="mt-16 mb-20">
+          <RevealOnScroll as="div">
+            <h2 className="text-center text-2xl font-semibold text-slate-900 sm:text-3xl">
+              Frequently Asked Questions
+            </h2>
+          </RevealOnScroll>
+          <div className="mx-auto mt-8 flex max-w-3xl flex-col">
+            {FAQS.map((faq, index) => (
+              <RevealOnScroll key={faq.question} delayMs={index * 60}>
+                <details className="group border-b border-slate-200/60 py-4">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-[15px] font-semibold text-slate-900 outline-none sm:text-base">
+                    <span>{faq.question}</span>
+                    <span className="flex h-6 w-6 items-center justify-center text-slate-400 transition-colors duration-200 group-open:text-slate-700 group-hover:text-slate-700">
+                      <svg
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                        className="h-4 w-4 transition-transform duration-200 group-open:rotate-180"
+                      >
+                        <path
+                          d="M7 10l5 5 5-5"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                        />
+                      </svg>
+                    </span>
+                  </summary>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                    {faq.answer}
+                  </p>
+                </details>
+              </RevealOnScroll>
+            ))}
           </div>
         </div>
 
