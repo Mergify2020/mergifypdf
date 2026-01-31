@@ -23,6 +23,14 @@ export default function AppHeaderBrand({
   const isProjectsPage = pathname?.startsWith("/projects") ?? false;
   const useHardNav = process.env.NODE_ENV === "development" && isStudio;
 
+  const handleBrandClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (pathname === "/") {
+      event.preventDefault();
+      window.history.replaceState(null, "", "/");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
   const baseWidth = 168;
   const baseHeight = 42;
   const autoScale = isPricingPage || isAccountSettings ? 1.35 : 1.12;
@@ -59,7 +67,12 @@ export default function AppHeaderBrand({
   }
 
   return useHardNav ? (
-    <a href="/" className="inline-flex items-center gap-2" aria-label="Back to dashboard">
+    <a
+      href="/"
+      className="inline-flex items-center gap-2"
+      aria-label="Back to dashboard"
+      onClick={handleBrandClick}
+    >
       <Image
         src={lightLogo}
         alt="MergifyPDF"
@@ -78,7 +91,12 @@ export default function AppHeaderBrand({
       />
     </a>
   ) : (
-    <Link href="/" className="inline-flex items-center gap-2" aria-label="Back to dashboard">
+    <Link
+      href="/"
+      className="inline-flex items-center gap-2"
+      aria-label="Back to dashboard"
+      onClick={handleBrandClick}
+    >
       <Image
         src={lightLogo}
         alt="MergifyPDF"

@@ -11,6 +11,14 @@ export default function HeaderAuthButtons() {
   const isRegisterPage = pathname === "/register";
   const isPricingPage = pathname === "/account" && searchParams.get("view") === "pricing";
 
+  const markSkipFeatureScroll = () => {
+    try {
+      window.sessionStorage.setItem("skipFeatureAutoScroll", "1");
+    } catch {
+      // no-op
+    }
+  };
+
   return (
       <div className="flex items-center gap-3 ml-auto">
       {/* Desktop / tablet auth buttons */}
@@ -18,6 +26,7 @@ export default function HeaderAuthButtons() {
         {!isLoginPage && (
           <Link
             href="/login"
+            onClick={markSkipFeatureScroll}
             className="inline-flex items-center text-base font-semibold text-slate-700 transition hover:text-slate-900"
           >
             Log in
@@ -26,6 +35,7 @@ export default function HeaderAuthButtons() {
         {!isRegisterPage && (
           <Link
             href="/register"
+            onClick={markSkipFeatureScroll}
             className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-base font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-800"
           >
             Start free trial
@@ -39,6 +49,7 @@ export default function HeaderAuthButtons() {
         {!isRegisterPage && (
           <Link
             href="/register"
+            onClick={markSkipFeatureScroll}
             className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-800 min-[715px]:gap-2"
           >
             <span className="min-[700px]:inline">Start free trial</span>

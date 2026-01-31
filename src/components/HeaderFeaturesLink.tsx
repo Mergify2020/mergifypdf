@@ -22,12 +22,6 @@ export default function HeaderFeaturesLink({ className, onNavigate }: HeaderFeat
         const targetY = window.scrollY + rect.top - headerHeight - 12 + 24;
         window.scrollTo({ top: Math.max(0, targetY), behavior: "smooth" });
       }
-    } else {
-      try {
-        window.sessionStorage.setItem("scrollToFeatures", "1");
-      } catch {
-        // no-op
-      }
     }
     onNavigate?.();
   };

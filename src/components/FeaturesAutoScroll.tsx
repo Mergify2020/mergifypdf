@@ -4,17 +4,18 @@ import { useEffect } from "react";
 
 export default function FeaturesAutoScroll() {
   useEffect(() => {
-    const shouldScroll =
-      window.location.hash === "#features" ||
-      window.sessionStorage.getItem("scrollToFeatures") === "1";
-
-    if (!shouldScroll) return;
+    const shouldScroll = window.location.hash === "#features";
 
     try {
-      window.sessionStorage.removeItem("scrollToFeatures");
+      if (window.sessionStorage.getItem("skipFeatureAutoScroll") === "1") {
+        window.sessionStorage.removeItem("skipFeatureAutoScroll");
+        return;
+      }
     } catch {
       // no-op
     }
+
+    if (!shouldScroll) return;
 
     const runScroll = () => {
       const section = document.getElementById("features");
