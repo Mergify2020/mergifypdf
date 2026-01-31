@@ -118,6 +118,31 @@ export default function HeroFeatureArea() {
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-indigo-50 via-white to-indigo-100 text-indigo-600/70 ring-1 ring-indigo-100/70">
                 <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6">
                   <path
+                    d="M6 5h12a2 2 0 0 1 2 2v11a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V7a2 2 0 0 1 2-2Z"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinejoin="round"
+                    strokeWidth="1.6"
+                  />
+                  <path
+                    d="M8 3v4M16 3v4M4 10h16M8 14h3M13 14h3"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.6"
+                  />
+                </svg>
+              </div>
+              <p className="text-sm font-semibold text-slate-900">Free 7-day trial.</p>
+              <p className="mt-2 text-sm leading-relaxed text-slate-500">
+                Explore every feature free for 7 days. Cancel anytime.
+              </p>
+            </RevealOnScroll>
+            <RevealOnScroll className="flex h-full flex-col items-center gap-4 rounded-2xl border border-slate-200/70 bg-white/90 p-6 text-center shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(15,23,42,0.08)] sm:items-start sm:text-left" delayMs={80}>
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-indigo-50 via-white to-indigo-100 text-indigo-600/70 ring-1 ring-indigo-100/70">
+                <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6">
+                  <path
                     d="M5 7.5 12 12l7-4.5"
                     fill="none"
                     stroke="currentColor"
@@ -140,7 +165,24 @@ export default function HeroFeatureArea() {
                 Start working instantly — directly in your browser.
               </p>
             </RevealOnScroll>
-            <RevealOnScroll className="flex h-full flex-col items-center gap-4 rounded-2xl border border-slate-200/70 bg-white/90 p-6 text-center shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(15,23,42,0.08)] sm:items-start sm:text-left" delayMs={80}>
+            <RevealOnScroll className="flex h-full flex-col items-center gap-4 rounded-2xl border border-slate-200/70 bg-white/90 p-6 text-center shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(15,23,42,0.08)] sm:items-start sm:text-left" delayMs={160}>
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-indigo-50 via-white to-indigo-100 text-indigo-600/70 ring-1 ring-indigo-100/70">
+                <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6">
+                  <path
+                    d="M13.5 2 5 13h5l-1 9 9.5-12h-5L13.5 2Z"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinejoin="round"
+                    strokeWidth="1.6"
+                  />
+                </svg>
+              </div>
+              <p className="text-sm font-semibold text-slate-900">Fast and reliable.</p>
+              <p className="mt-2 text-sm leading-relaxed text-slate-500">
+                Designed for speed, even with large or complex documents.
+              </p>
+            </RevealOnScroll>
+            <RevealOnScroll className="flex h-full flex-col items-center gap-4 rounded-2xl border border-slate-200/70 bg-white/90 p-6 text-center shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(15,23,42,0.08)] sm:items-start sm:text-left" delayMs={240}>
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-indigo-50 via-white to-indigo-100 text-indigo-600/70 ring-1 ring-indigo-100/70">
                 <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6">
                   <path
@@ -171,54 +213,6 @@ export default function HeroFeatureArea() {
                 Upload once and manage every task in one place.
               </p>
             </RevealOnScroll>
-            <RevealOnScroll className="flex h-full flex-col items-center gap-4 rounded-2xl border border-slate-200/70 bg-white/90 p-6 text-center shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(15,23,42,0.08)] sm:items-start sm:text-left" delayMs={160}>
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-indigo-50 via-white to-indigo-100 text-indigo-600/70 ring-1 ring-indigo-100/70">
-                <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6">
-                  <path
-                    d="M6 5h12a2 2 0 0 1 2 2v11a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V7a2 2 0 0 1 2-2Z"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeLinejoin="round"
-                    strokeWidth="1.6"
-                  />
-                  <path
-                    d="M8 3v4M16 3v4M4 10h16M8 14h3M13 14h3"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="1.6"
-                  />
-                </svg>
-              </div>
-              <p className="text-sm font-semibold text-slate-900">Free 7-day trial.</p>
-              <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                Explore every feature free for 7 days. Cancel anytime.
-              </p>
-              <a
-                href="/pricing"
-                className="mt-3 inline-flex items-center text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600 transition hover:text-indigo-700"
-              >
-                Learn more
-              </a>
-            </RevealOnScroll>
-            <RevealOnScroll className="flex h-full flex-col items-center gap-4 rounded-2xl border border-slate-200/70 bg-white/90 p-6 text-center shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(15,23,42,0.08)] sm:items-start sm:text-left" delayMs={240}>
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-indigo-50 via-white to-indigo-100 text-indigo-600/70 ring-1 ring-indigo-100/70">
-                <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6">
-                  <path
-                    d="M13.5 2 5 13h5l-1 9 9.5-12h-5L13.5 2Z"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeLinejoin="round"
-                    strokeWidth="1.6"
-                  />
-                </svg>
-              </div>
-              <p className="text-sm font-semibold text-slate-900">Fast and reliable.</p>
-              <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                Designed for speed, even with large or complex documents.
-              </p>
-            </RevealOnScroll>
           </div>
         </div>
 
@@ -227,7 +221,7 @@ export default function HeroFeatureArea() {
             <img
               src="/illustrations/hero-ipad-illustration.png"
               alt=""
-              className="h-auto w-auto max-h-72 sm:max-h-80 lg:max-h-96"
+              className="h-auto w-auto max-h-72 rounded-xl border border-slate-200/70 shadow-[0_10px_28px_rgba(15,23,42,0.10)] sm:max-h-80 lg:max-h-96"
               aria-hidden="true"
             />
           </RevealOnScroll>
