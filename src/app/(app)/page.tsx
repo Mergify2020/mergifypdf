@@ -12,6 +12,7 @@ import RightSidebarColumn from "@/components/RightSidebarColumn";
 import HomeProjectsSearch from "@/components/HomeProjectsSearch";
 import HeroUploadCard from "@/components/HeroUploadCard";
 import RevealOnScroll from "@/components/RevealOnScroll";
+import FeaturesAutoScroll from "@/components/FeaturesAutoScroll";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -82,6 +83,7 @@ export default async function Home({
 function MarketingLanding({ usedToday }: { usedToday: boolean }) {
   return (
     <>
+      <FeaturesAutoScroll />
       <section className="relative -mt-[calc(76px+env(safe-area-inset-top))] w-full overflow-x-hidden bg-gradient-to-r from-[rgba(218,236,255,0.95)] via-[rgba(224,230,255,0.7)] to-[rgba(206,210,255,0.85)] pt-[calc(76px+env(safe-area-inset-top))]">
         <div className="relative mx-auto w-full max-w-[1400px] px-4 pt-6 pb-8 sm:px-6 sm:pt-10 sm:pb-10 lg:px-8 lg:pt-12 lg:pb-12">
           <div className="grid gap-8 lg:grid-cols-[minmax(0,640px)_minmax(0,600px)] lg:items-stretch">
@@ -93,7 +95,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
               </RevealOnScroll>
               <RevealOnScroll as="div">
                 <p className="text-[1.125rem] font-medium leading-relaxed text-slate-700">
-                  No installs. No clutter. Just upload and go.{" "}
+                  No installs. No clutter. Upload and finish fast.{" "}
                   <span className="whitespace-nowrap">Your work stays saved.</span>
                 </p>
               </RevealOnScroll>

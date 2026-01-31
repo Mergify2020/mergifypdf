@@ -1,6 +1,7 @@
 import Link from "next/link";
 import AppHeaderBrand from "@/components/AppHeaderBrand";
 import Footer from "@/components/Footer";
+import HeaderFeaturesLink from "@/components/HeaderFeaturesLink";
 import HeaderAuthButtons from "@/components/HeaderAuthButtons";
 import HeroHeader from "@/components/HeroHeader";
 import WorkspaceSettingsMenu from "@/components/WorkspaceSettingsMenu";
@@ -35,7 +36,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             >
               Pricing
             </Link>
-            <span className="cursor-default text-slate-700 hover:text-slate-900">Features</span>
+            <HeaderFeaturesLink className="transition hover:text-slate-900 hover:underline hover:underline-offset-8" />
             <span className="cursor-default text-slate-700 hover:text-slate-900">About</span>
             <span className="cursor-default text-slate-700 hover:text-slate-900">Contact</span>
           </div>
@@ -46,7 +47,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             >
               Pricing
             </Link>
-            <span className="cursor-default text-slate-700 hover:text-slate-900">Features</span>
+            <HeaderFeaturesLink className="transition hover:text-slate-900 hover:underline hover:underline-offset-8" />
             <span className="cursor-default text-slate-700 hover:text-slate-900">About</span>
           </div>
           <div className="justify-self-end">

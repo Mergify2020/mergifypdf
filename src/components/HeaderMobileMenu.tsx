@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import HeaderFeaturesLink from "@/components/HeaderFeaturesLink";
 
 export default function HeaderMobileMenu() {
   const pathname = usePathname();
@@ -111,9 +112,10 @@ export default function HeaderMobileMenu() {
                   Pricing
                 </span>
               </Link>
-              <span className="cursor-pointer rounded-xl px-2 py-3 text-slate-800 transition-transform duration-200 hover:translate-x-1 hover:bg-slate-50 active:translate-x-0.5 active:bg-slate-100">
-                Features
-              </span>
+              <HeaderFeaturesLink
+                className="cursor-pointer rounded-xl px-2 py-3 text-slate-800 transition-transform duration-200 hover:translate-x-1 hover:bg-slate-50 active:translate-x-0.5 active:bg-slate-100"
+                onNavigate={() => setMenuOpen(false)}
+              />
               <span className="cursor-pointer rounded-xl px-2 py-3 text-slate-800 transition-transform duration-200 hover:translate-x-1 hover:bg-slate-50 active:translate-x-0.5 active:bg-slate-100">
                 About
               </span>

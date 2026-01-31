@@ -442,24 +442,6 @@ html.theme-scroll-reveal:not(.dark) ::-webkit-scrollbar-thumb {
   paint-order: stroke fill;
 }
 
-.faq-item > :not(summary) {
-  display: block;
-}
-
-.faq-answer {
-  max-height: 0;
-  opacity: 0;
-  transform: translateY(-2px);
-  overflow: hidden;
-  transition: max-height 220ms ease, opacity 180ms ease, transform 220ms ease;
-  will-change: max-height, opacity, transform;
-}
-
-.faq-item[open] .faq-answer {
-  max-height: 200px;
-  opacity: 1;
-  transform: translateY(0);
-}
 
 
 @keyframes press-bounce {
@@ -535,6 +517,27 @@ html.theme-scroll-reveal:not(.dark) ::-webkit-scrollbar-thumb {
   animation: none;
   opacity: 0;
   transition: opacity 200ms ease;
+}
+
+@keyframes upload-card-glow {
+  0% {
+    box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.18), 0 18px 40px rgba(15, 23, 42, 0.08);
+    border-color: rgba(109, 94, 243, 0.55);
+  }
+  100% {
+    box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.18), 0 18px 40px rgba(15, 23, 42, 0.08);
+    border-color: #6d5ef3;
+  }
+}
+
+.upload-card-animate {
+  animation: upload-card-glow 900ms ease-out 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .upload-card-animate {
+    animation: none;
+  }
 }
 
 .reveal-on-scroll {

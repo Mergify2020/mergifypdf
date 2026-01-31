@@ -1,4 +1,5 @@
 import RevealOnScroll from "@/components/RevealOnScroll";
+import FaqAccordion from "@/components/FaqAccordion";
 
 type FeatureBox = {
   title: string;
@@ -90,7 +91,7 @@ const FAQS = [
 
 export default function HeroFeatureArea() {
   return (
-    <section className="bg-white">
+    <section id="features" className="bg-white">
       <div className="mx-auto w-full max-w-[1400px] px-4 py-10 sm:px-6 lg:px-8">
         {/* Feature grid */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 sm:gap-5">
@@ -280,38 +281,7 @@ export default function HeroFeatureArea() {
               Frequently Asked Questions
             </h2>
           </RevealOnScroll>
-          <div className="mx-auto mt-8 flex max-w-3xl flex-col">
-            {FAQS.map((faq, index) => (
-              <RevealOnScroll key={faq.question} delayMs={index * 60}>
-                <details className="faq-item group border-b border-slate-200/60 py-4">
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-[15px] font-semibold text-slate-900 outline-none sm:text-base">
-                    <span>{faq.question}</span>
-                    <span className="flex h-6 w-6 items-center justify-center text-slate-400 transition-colors duration-200 group-open:text-slate-700 group-hover:text-slate-700">
-                      <svg
-                        viewBox="0 0 24 24"
-                        aria-hidden="true"
-                        className="h-4 w-4 transition-transform duration-200 group-open:rotate-180"
-                      >
-                        <path
-                          d="M7 10l5 5 5-5"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                        />
-                      </svg>
-                    </span>
-                  </summary>
-                  <div className="faq-answer">
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
-                      {faq.answer}
-                    </p>
-                  </div>
-                </details>
-              </RevealOnScroll>
-            ))}
-          </div>
+          <FaqAccordion items={FAQS} />
         </div>
 
       </div>

@@ -1,26 +1,23 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
-import { useSession } from "next-auth/react";
-import { siInstagram, siTiktok, siYoutube, siThreads, siX } from "simple-icons";
+import { siInstagram, siTiktok, siX } from "simple-icons";
 import RevealOnScroll from "@/components/RevealOnScroll";
 
 type IconProps = React.SVGProps<SVGSVGElement>;
 
-function SocialIcon(
-  props: React.PropsWithChildren<{ label: string; href?: string }>
-) {
-  const { label, href = "#", children } = props;
+function SocialIcon(props: { label: string; href?: string; name: string; icon: React.ReactNode }) {
+  const { label, href = "#", name, icon } = props;
   return (
     <a
       href={href}
       aria-label={label}
       target="_blank"
       rel="noreferrer"
-      className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
+      className="inline-flex items-center gap-3 text-[13px] text-slate-300 transition hover:text-white"
     >
-      {children}
+      <span className="text-slate-200">{icon}</span>
+      <span>{name}</span>
     </a>
   );
 }
@@ -39,20 +36,6 @@ function TikTokIcon(props: IconProps) {
   );
 }
 
-function ThreadsIcon(props: IconProps) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width={20}
-      height={20}
-      aria-hidden="true"
-      {...props}
-    >
-      <path fill="currentColor" d={siThreads.path} />
-    </svg>
-  );
-}
-
 function InstagramIcon(props: IconProps) {
   return (
     <svg
@@ -67,26 +50,12 @@ function InstagramIcon(props: IconProps) {
   );
 }
 
-function YoutubeIcon(props: IconProps) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width={20}
-      height={20}
-      aria-hidden="true"
-      {...props}
-    >
-      <path fill="currentColor" d={siYoutube.path} />
-    </svg>
-  );
-}
-
 function XIcon(props: IconProps) {
   return (
     <svg
       viewBox="0 0 24 24"
-      width={20}
-      height={20}
+      width={17}
+      height={17}
       aria-hidden="true"
       {...props}
     >
@@ -96,152 +65,108 @@ function XIcon(props: IconProps) {
 }
 
 export default function Footer() {
-  const { data: session } = useSession();
-
   return (
-    <RevealOnScroll as="footer" variant="fade" className="border-t border-slate-200 bg-[#F3F4F6] text-slate-600">
-      <div className="mx-auto max-w-[1800px] px-6 py-12">
+    <RevealOnScroll
+      as="footer"
+      variant="fade"
+      className="border-t border-slate-700/40 bg-[#1E2230] text-slate-300"
+    >
+      <div className="mx-auto w-full max-w-[1400px] px-4 pt-12 pb-8 sm:px-6 lg:px-8">
         {/* Top grid */}
-        <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-4">
-          {/* PDF Tools */}
+        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-5 lg:gap-10">
+          {/* Features */}
           <div>
-            <h3 className="text-sm font-semibold text-slate-900">PDF Tools</h3>
+            <h3 className="text-sm font-semibold text-slate-100">Features</h3>
             <div className="mt-4 space-y-2">
-              <a href="#" className="block text-sm text-slate-600 transition hover:text-slate-900">
-                Merge PDFs
+              <a href="#" className="block text-[13px] text-slate-300 transition hover:text-white">
+                Merge Documents
               </a>
-              <a href="#" className="block text-sm text-slate-600 transition hover:text-slate-900">
+              <a href="#" className="block text-[13px] text-slate-300 transition hover:text-white">
                 Edit &amp; Annotate
               </a>
-              <a href="#" className="block text-sm text-slate-600 transition hover:text-slate-900">
+              <a href="#" className="block text-[13px] text-slate-300 transition hover:text-white">
                 Sign Documents
               </a>
-              <a href="#" className="block text-sm text-slate-600 transition hover:text-slate-900">
-                Reorder Pages
-              </a>
-              <a href="#" className="block text-sm text-slate-600 transition hover:text-slate-900">
-                Split PDF
-              </a>
-              <a href="#" className="block text-sm text-slate-600 transition hover:text-slate-900">
-                Extract Pages
-              </a>
-            </div>
-          </div>
-
-          {/* Control Center */}
-          <div>
-            <h3 className="text-sm font-semibold text-slate-900">Control Center</h3>
-            <div className="mt-4 space-y-2">
-              <Link
-                href={session?.user ? "/" : "/login"}
-                className="block text-sm text-slate-600 transition hover:text-slate-900"
-              >
-                Project Dashboard
-              </Link>
-              <Link
-                href={session?.user ? "/signature-center" : "/login"}
-                className="block text-sm text-slate-600 transition hover:text-slate-900"
-              >
-                Signature Dashboard
-              </Link>
-              <Link
-                href="/pricing"
-                className="block text-sm text-slate-600 transition hover:text-slate-900"
-              >
-                Plans &amp; Pricing
-              </Link>
-              <a href="/register" className="block text-sm text-slate-600 transition hover:text-slate-900">
-                Sign Up
-              </a>
-              <a href="/login" className="block text-sm text-slate-600 transition hover:text-slate-900">
-                Log In
+              <a href="#" className="block text-[13px] text-slate-300 transition hover:text-white">
+                Split &amp; Reorder
               </a>
             </div>
           </div>
 
           {/* Support */}
           <div>
-            <h3 className="text-sm font-semibold text-slate-900">Support</h3>
+            <h3 className="text-sm font-semibold text-slate-100">Support</h3>
             <div className="mt-4 space-y-2">
-              <a href="#" className="block text-sm text-slate-600 transition hover:text-slate-900">
+              <a href="#" className="block text-[13px] text-slate-300 transition hover:text-white">
                 Help Center
               </a>
-              <a href="#" className="block text-sm text-slate-600 transition hover:text-slate-900">
-                Tutorials
-              </a>
-              <a href="#" className="block text-sm text-slate-600 transition hover:text-slate-900">
+              <a href="#" className="block text-[13px] text-slate-300 transition hover:text-white">
                 FAQ
               </a>
-              <a href="#" className="block text-sm text-slate-600 transition hover:text-slate-900">
+              <a href="#" className="block text-[13px] text-slate-300 transition hover:text-white">
                 Contact Support
-              </a>
-              <a href="#" className="block text-sm text-slate-600 transition hover:text-slate-900">
-                Report an Issue
               </a>
             </div>
           </div>
 
-          {/* Company */}
+          {/* Product */}
           <div>
-            <h3 className="text-sm font-semibold text-slate-900">Company</h3>
+            <h3 className="text-sm font-semibold text-slate-100">Product</h3>
             <div className="mt-4 space-y-2">
-              <a href="#" className="block text-sm text-slate-600 transition hover:text-slate-900">
-                About MergifyPDF
+              <a href="#" className="block text-[13px] text-slate-300 transition hover:text-white">
+                Pricing
               </a>
-              <a href="#" className="block text-sm text-slate-600 transition hover:text-slate-900">
-                Careers
+              <a href="#" className="block text-[13px] text-slate-300 transition hover:text-white">
+                About Us
               </a>
-              <a href="#" className="block text-sm text-slate-600 transition hover:text-slate-900">
-                Blog
-              </a>
-              <a href="#" className="block text-sm text-slate-600 transition hover:text-slate-900">
+            </div>
+          </div>
+
+          {/* Legal */}
+          <div>
+            <h3 className="text-sm font-semibold text-slate-100">Legal</h3>
+            <div className="mt-4 space-y-2">
+              <a href="#" className="block text-[13px] text-slate-300 transition hover:text-white">
                 Terms of Service
               </a>
-              <a href="#" className="block text-sm text-slate-600 transition hover:text-slate-900">
+              <a href="#" className="block text-[13px] text-slate-300 transition hover:text-white">
                 Privacy Policy
               </a>
+            </div>
+          </div>
+
+          {/* Social */}
+          <div className="text-left">
+            <h3 className="text-sm font-semibold text-slate-100">Follow us</h3>
+            <div className="mt-4 flex flex-col gap-3 text-slate-300">
+              <SocialIcon
+                label="MergifyPDF on TikTok"
+                href="https://www.tiktok.com/@mergify.pdf"
+                name="TikTok"
+                icon={<TikTokIcon />}
+              />
+              <SocialIcon
+                label="MergifyPDF on Instagram"
+                href="https://www.instagram.com/mergifypdf/"
+                name="Instagram"
+                icon={<InstagramIcon />}
+              />
+              <SocialIcon
+                label="MergifyPDF on X (Twitter)"
+                href="https://x.com/MergifyPDF"
+                name="X"
+                icon={<XIcon />}
+              />
             </div>
           </div>
         </div>
 
         {/* Bottom bar */}
-        <div className="mt-10 border-t border-slate-200 pt-6">
-          <div className="flex flex-col items-start justify-between gap-4 lg:flex-row lg:items-center">
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-slate-900">MergifyPDF</span>
-              </div>
-              <p className="text-xs text-slate-500 sm:text-sm">
-                © 2025 MergifyPDF. All rights reserved.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2 text-slate-500">
-              <SocialIcon
-                label="MergifyPDF on TikTok"
-                href="https://www.tiktok.com/@mergify.pdf"
-              >
-                <TikTokIcon />
-              </SocialIcon>
-              <SocialIcon
-                label="MergifyPDF on Threads"
-                href="https://www.threads.com/@mergifypdf"
-              >
-                <ThreadsIcon />
-              </SocialIcon>
-              <SocialIcon
-                label="MergifyPDF on Instagram"
-                href="https://www.instagram.com/mergifypdf/"
-              >
-                <InstagramIcon />
-              </SocialIcon>
-              <SocialIcon
-                label="MergifyPDF on X (Twitter)"
-                href="https://x.com/MergifyPDF"
-              >
-                <XIcon />
-              </SocialIcon>
-            </div>
+        <div className="mt-8 border-t border-slate-700/40 pt-4">
+          <div className="flex flex-col items-start justify-between gap-3 lg:flex-row lg:items-center">
+            <p className="text-xs text-slate-400 sm:text-sm">
+              © 2026 MergifyPDF. All rights reserved.
+            </p>
           </div>
         </div>
       </div>
