@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { getServerSessionSafe } from "@/lib/serverSession";
 import { prisma } from "@/lib/prisma";
 import StudioClient from "./StudioClient";
