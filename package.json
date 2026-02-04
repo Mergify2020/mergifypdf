@@ -6,7 +6,7 @@
     "node": "20.x"
   },
   "scripts": {
-    "dev": "next dev --hostname 0.0.0.0",
+    "dev": "NEXT_DISABLE_TURBOPACK=1 next dev --hostname 127.0.0.1 --port 3001",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",

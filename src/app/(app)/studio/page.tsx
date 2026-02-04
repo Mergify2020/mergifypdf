@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import { getServerSessionSafe } from "@/lib/serverSession";
 import { prisma } from "@/lib/prisma";
 import StudioClient from "./StudioClient";
@@ -15,9 +14,6 @@ export default async function StudioPage({
 }) {
   const resolved = ((await searchParams) ?? {}) as StudioSearchParams;
   const session = await getServerSessionSafe();
-  if (!session?.user) {
-    redirect("/login");
-  }
 
   const projectParam = resolved.project;
   const projectId =
@@ -27,7 +23,7 @@ export default async function StudioPage({
         ? projectParam[0]
         : null;
 
-  if (projectId) {
+  if (session?.user && projectId) {
     const owned = await prisma.project.findFirst({
       where: { id: projectId, userId: session.user.id },
       select: { id: true },

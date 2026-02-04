@@ -534,8 +534,27 @@ html.theme-scroll-reveal:not(.dark) ::-webkit-scrollbar-thumb {
   animation: upload-card-glow 900ms ease-out 1;
 }
 
+@keyframes hero-upload-swap {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.hero-upload-transition {
+  animation: hero-upload-swap 260ms ease-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .upload-card-animate {
+    animation: none;
+  }
+
+  .hero-upload-transition {
     animation: none;
   }
 }

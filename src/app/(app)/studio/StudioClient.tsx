@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { useSession } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type {
   CSSProperties,
@@ -87,6 +87,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import WorkspaceSettingsMenu from "@/components/WorkspaceSettingsMenu";
+import { GUEST_PROJECT_STORAGE_KEY, type GuestProject } from "@/lib/guestProject";
 import { PROJECT_NAME_STORAGE_KEY, projectNameToFile, sanitizeProjectName } from "@/lib/projectName";
 import { PENDING_UPLOAD_STORAGE_KEY } from "@/lib/pendingUpload";
 import { refreshProjectsSummary } from "@/lib/projectsSummaryCache";
@@ -891,7 +892,7 @@ function normalizeCssColor(value: string) {
   return null;
 }
 
-function useProjects() {
+function useProjects(enabled = true) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const projectParam = typeof window !== "undefined" ? searchParams.get("project") : null;
@@ -908,6 +909,7 @@ function useProjects() {
   }, [projectParam]);
 
   useEffect(() => {
+    if (!enabled) return;
     let cancelled = false;
     const hydrate = async () => {
       setLoadingProjects(true);
@@ -930,7 +932,7 @@ function useProjects() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [enabled]);
 
   const saveProject = useCallback(
     async (
@@ -1835,13 +1837,24 @@ function SortableOrganizeTile({
 
 function WorkspaceClient() {
   const { data: authSession } = useSession();
+  const isGuest = !authSession?.user;
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { saveProject, savingProject, currentProjectId } = useProjects();
+  const { saveProject, savingProject, currentProjectId } = useProjects(Boolean(authSession?.user));
   const projectParam = searchParams.get("project");
   const projectKey = projectParam ?? currentProjectId ?? "local";
-  const [showDownloadGate, setShowDownloadGate] = useState(false);
-  const [showDelayOverlay, setShowDelayOverlay] = useState<"intro" | "progress" | null>(null);
+  const [showAuthGate, setShowAuthGate] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "signup">("login");
+  const [authStep, setAuthStep] = useState<"form" | "verify">("form");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authName, setAuthName] = useState("");
+  const [authCode, setAuthCode] = useState("");
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authInfo, setAuthInfo] = useState<string | null>(null);
+  const [authBusy, setAuthBusy] = useState(false);
+  const [pendingExportAfterAuth, setPendingExportAfterAuth] = useState(false);
+  const [guestProject, setGuestProject] = useState<GuestProject | null>(null);
   const [sources, setSources] = useState<SourceRef[]>([]);
   const [pages, setPages] = useState<PageItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -3650,10 +3663,76 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   const [nearPageIds, setNearPageIds] = useState<string[]>([]);
   const visiblePageIdsRef = useRef<Set<string>>(new Set());
   const [visiblePageIds, setVisiblePageIds] = useState<string[]>([]);
+  const ensureGuestProjectMetadata = useCallback(
+    (sourceIds?: string[]) => {
+      if (!isGuest) return null;
+      const storage = getLocalStorage();
+      if (!storage) return null;
+      try {
+        const existingRaw = storage.getItem(GUEST_PROJECT_STORAGE_KEY);
+        const existing = existingRaw ? (JSON.parse(existingRaw) as GuestProject) : null;
+        let next: GuestProject;
+        if (existing && existing.mode === "guest" && typeof existing.id === "string") {
+          next = { ...existing };
+        } else {
+          const id =
+            typeof crypto !== "undefined" && "randomUUID" in crypto
+              ? crypto.randomUUID()
+              : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+          next = {
+            id,
+            createdAt: Date.now(),
+            mode: "guest",
+            isPersisted: false,
+            ownerId: null,
+          };
+        }
+        if (sourceIds && sourceIds.length > 0) {
+          next.sourceIds = sourceIds;
+        }
+        storage.setItem(GUEST_PROJECT_STORAGE_KEY, JSON.stringify(next));
+        setGuestProject(next);
+        return next;
+      } catch {
+        return null;
+      }
+    },
+    [isGuest]
+  );
+  const claimInFlightRef = useRef(false);
+  const clearGuestStorage = useCallback(() => {
+    const storage = getLocalStorage();
+    if (!storage) return;
+    storage.removeItem(GUEST_PROJECT_STORAGE_KEY);
+    storage.removeItem(workspaceFilesKey(null));
+    storage.removeItem(workspacePreviewCacheKey("local"));
+    storage.removeItem(PENDING_UPLOAD_STORAGE_KEY);
+    const session = getSessionStorage();
+    session?.removeItem(workspaceFilesKey(null));
+    session?.removeItem(workspacePreviewCacheKey("local"));
+  }, []);
   useEffect(() => {
     pagesRef.current = pages;
     pagesByIdRef.current = new Map(pages.map((page) => [page.id, page]));
   }, [pages]);
+  useEffect(() => {
+    if (!isGuest) {
+      setGuestProject(null);
+      return;
+    }
+    const storage = getLocalStorage();
+    if (!storage) return;
+    try {
+      const raw = storage.getItem(GUEST_PROJECT_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as GuestProject;
+      if (parsed && parsed.mode === "guest" && typeof parsed.id === "string") {
+        setGuestProject(parsed);
+      }
+    } catch {
+      // ignore
+    }
+  }, [isGuest]);
   useEffect(() => {
     const win = typeof window === "undefined" ? null : window;
     if (!win) return;
@@ -3912,6 +3991,7 @@ const timer =
   /** Rehydrate annotations from the cloud project when editing an existing one */
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (!authSession?.user) return;
     if (hasHydratedCloudAnnotationsRef.current) return;
     const projectId = searchParams.get("project");
     if (!projectId) return;
@@ -4068,11 +4148,12 @@ const timer =
     return () => {
       cancelled = true;
     };
-  }, [pages.length, searchParams]);
+  }, [authSession?.user, pages.length, searchParams]);
 
   
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (!authSession?.user) return;
     const projectId = projectParam ?? currentProjectId ?? null;
     if (!projectId) return;
     if (previewSyncRef.current.has(projectId)) return;
@@ -4151,7 +4232,7 @@ const timer =
     return () => {
       cancelled = true;
     };
-  }, [currentProjectId, projectParam, sources]);
+  }, [authSession?.user, currentProjectId, projectParam, sources]);
 
   /** Rehydrate any stored PDFs from IndexedDB so refreshes survive deployments */
   useEffect(() => {
@@ -4203,7 +4284,7 @@ const timer =
       if (!raw) {
         // If this is a saved cloud project, try to hydrate the source list
         // from the cloud project data (files live in IndexedDB or R2).
-        if (projectId) {
+        if (projectId && authSession?.user) {
           try {
             const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}`, { cache: "no-store" });
             if (!res.ok) {
@@ -4378,7 +4459,7 @@ const timer =
     return () => {
       cancelled = true;
     };
-  }, [currentProjectId, projectParam]);
+  }, [authSession?.user, currentProjectId, projectParam]);
 
   /** Persist source metadata whenever it changes (after hydration) */
   useEffect(() => {
@@ -5393,36 +5474,50 @@ const timer =
     };
 
     const session = getSessionStorage();
+    let cleanup: (() => void) | undefined;
     if (session?.getItem(STARTUP_OVERLAY_KEY)) {
       session.removeItem(STARTUP_OVERLAY_KEY);
       const context = session.getItem(STARTUP_OVERLAY_CONTEXT_KEY) as "new" | "existing" | null;
       if (context) {
         session.removeItem(STARTUP_OVERLAY_CONTEXT_KEY);
       }
-      const cleanup = startOverlay(context === "new" ? "new" : "existing");
-      return cleanup;
-      return;
+      cleanup = startOverlay(context === "new" ? "new" : "existing");
     }
 
     const storage = getLocalStorage();
     if (!storage) return;
-    const pending = storage.getItem(PENDING_UPLOAD_STORAGE_KEY);
-    if (pending) {
-      const cleanup = startOverlay("new");
-      storage.removeItem(PENDING_UPLOAD_STORAGE_KEY);
-      try {
-        const parsed = JSON.parse(pending);
-        if (!parsed?.data || !parsed?.name) return;
-        const blob = dataURLToBlob(parsed.data as string);
-        const file = new File([blob], parsed.name as string, { type: blob.type ?? "application/pdf" });
-        processSelectedFiles([file]);
-      } catch (err) {
-        console.error("Failed to import pending upload", err);
-      }
-      return cleanup;
+      const pending = storage.getItem(PENDING_UPLOAD_STORAGE_KEY);
+      if (pending) {
+        ensureGuestProjectMetadata();
+        if (!cleanup) {
+          cleanup = startOverlay("new");
+        }
+        storage.removeItem(PENDING_UPLOAD_STORAGE_KEY);
+        try {
+          const parsed = JSON.parse(pending);
+          if (Array.isArray(parsed?.files)) {
+            const files = (parsed.files as Array<{ name?: string; data?: string }>)
+              .filter((entry) => entry && typeof entry.data === "string" && typeof entry.name === "string")
+              .map((entry) => {
+                const blob = dataURLToBlob(entry.data as string);
+                return new File([blob], entry.name as string, { type: blob.type ?? "application/pdf" });
+              });
+            if (files.length > 0) {
+              processSelectedFiles(files);
+            }
+          } else if (parsed?.data && parsed?.name) {
+            const blob = dataURLToBlob(parsed.data as string);
+            const file = new File([blob], parsed.name as string, { type: blob.type ?? "application/pdf" });
+            processSelectedFiles([file]);
+          }
+        } catch (err) {
+          console.error("Failed to import pending upload", err);
+        }
+        return cleanup;
     }
 
     if (projectParam) return;
+    if (cleanup) return cleanup;
   }, [projectParam]);
 
   const computeStartupProgress = useCallback(() => {
@@ -5670,7 +5765,13 @@ const timer =
       if (!hadPersistError) {
         setError(null);
       }
-      setSources((prev) => [...prev, ...created]);
+      setSources((prev) => {
+        const next = [...prev, ...created];
+        if (isGuest) {
+          ensureGuestProjectMetadata(next.map((source) => source.storageId));
+        }
+        return next;
+      });
     }
   }
 
@@ -9254,7 +9355,6 @@ const timer =
 
   async function handleSaveProject() {
     if (!authSession?.user) {
-      setShowDownloadGate(true);
       return;
     }
     const projectData = buildCloudProjectData();
@@ -9267,7 +9367,20 @@ const timer =
   }
 
   /** Build final PDF respecting order + keep flags */
-  async function handleDownload(forceBypass = false) {
+  async function handleDownload() {
+    if (pages.length === 0) {
+      setError("Add at least one page first.");
+      return;
+    }
+    if (isGuest) {
+      if (!guestProject?.id) {
+        ensureGuestProjectMetadata();
+      }
+      setPendingExportAfterAuth(true);
+      resetAuthState("login");
+      setShowAuthGate(true);
+      return;
+    }
     if (authSession?.user) {
       const projectData = buildCloudProjectData();
       if (projectData) {
@@ -9279,15 +9392,7 @@ const timer =
         });
       }
     }
-    if (!forceBypass && !authSession?.user) {
-      // Allow anonymous downloads; still surface the gate UI without blocking the flow.
-      setShowDownloadGate(true);
-    }
     try {
-      if (pages.length === 0) {
-        setError("Add at least one page first.");
-        return;
-      }
       setBusy(true);
       setError(null);
 
@@ -9684,20 +9789,190 @@ const timer =
     }
   }
 
-  function handleDownloadGateSignUp() {
-    setShowDownloadGate(false);
-    router.push("/register");
+  function resetAuthState(nextMode: "login" | "signup") {
+    setAuthMode(nextMode);
+    setAuthStep("form");
+    setAuthCode("");
+    setAuthError(null);
+    setAuthInfo(null);
+    setAuthBusy(false);
   }
 
-  function handleDownloadGateUpgrade() {
-    setShowDownloadGate(false);
-    router.push("/pricing");
+  function handleAuthGateClose() {
+    resetAuthState(authMode);
+    setShowAuthGate(false);
+    setPendingExportAfterAuth(false);
   }
 
-  function handleDownloadGateBypass() {
-    setShowDownloadGate(false);
-    setShowDelayOverlay("intro");
+  async function handleAuthLoginSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    if (authBusy) return;
+    const email = authEmail.trim().toLowerCase();
+    const password = authPassword.trim();
+    if (!email || !password) {
+      setAuthError("Email and password are required.");
+      return;
+    }
+    setAuthBusy(true);
+    setAuthError(null);
+    setAuthInfo(null);
+    try {
+      const res = await signIn("credentials", {
+        redirect: false,
+        email,
+        password,
+        callbackUrl: "/studio",
+      });
+      if (res?.error) {
+        setAuthError("Unable to sign in. Check your credentials and try again.");
+        setAuthBusy(false);
+        return;
+      }
+      setAuthInfo("Signed in. Preparing your export...");
+    } catch (err) {
+      console.error(err);
+      setAuthError("Unable to sign in. Please try again.");
+    } finally {
+      setAuthBusy(false);
+    }
   }
+
+  async function handleAuthSignupSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    if (authBusy) return;
+    setAuthError(null);
+    setAuthInfo(null);
+
+    if (authStep === "form") {
+      const name = authName.trim();
+      const email = authEmail.trim().toLowerCase();
+      const password = authPassword.trim();
+      if (!name || !email || !password) {
+        setAuthError("Name, email, and password are required.");
+        return;
+      }
+      const hasUppercase = /[A-Z]/.test(password);
+      const hasLowercase = /[a-z]/.test(password);
+      const hasSpecial = /[^A-Za-z0-9]/.test(password);
+      if (password.length < 8 || !hasUppercase || !hasLowercase || !hasSpecial) {
+        setAuthError("Password must be at least 8 characters and include uppercase, lowercase, and a special character.");
+        return;
+      }
+      setAuthBusy(true);
+      try {
+        const res = await fetch("/api/signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, email, password }),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setAuthError(body?.error ?? "Sign up failed.");
+          return;
+        }
+        setAuthStep("verify");
+        setAuthCode("");
+        setAuthInfo("We sent a 6-digit code to your email.");
+      } catch (err) {
+        console.error(err);
+        setAuthError("Sign up failed. Please try again.");
+      } finally {
+        setAuthBusy(false);
+      }
+      return;
+    }
+
+    const email = authEmail.trim().toLowerCase();
+    const code = authCode.trim();
+    if (!email || !code) {
+      setAuthError("Enter the 6-digit code we sent.");
+      return;
+    }
+    setAuthBusy(true);
+    try {
+      const res = await fetch("/api/signup/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, code }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (body?.error === "invalid_code") {
+          setAuthError("That code does not match. Please try again.");
+        } else if (body?.error === "expired") {
+          setAuthError("That code has expired. Request a new one.");
+        } else {
+          setAuthError(body?.error ?? "Verification failed.");
+        }
+        return;
+      }
+      const signInRes = await signIn("credentials", {
+        redirect: false,
+        email,
+        password: authPassword,
+        callbackUrl: "/studio",
+      });
+      if (signInRes?.error) {
+        setAuthError("Account created, but sign in failed. Please log in.");
+        setAuthMode("login");
+        setAuthStep("form");
+        return;
+      }
+      setAuthInfo("Account created. Preparing your export...");
+    } catch (err) {
+      console.error(err);
+      setAuthError("Verification failed. Please try again.");
+    } finally {
+      setAuthBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!authSession?.user) return;
+    if (!pendingExportAfterAuth) return;
+    if (claimInFlightRef.current) return;
+
+    claimInFlightRef.current = true;
+    const claim = async () => {
+      const projectData = buildCloudProjectData();
+      if (!projectData) {
+        setAuthError("Upload a PDF before exporting.");
+        setPendingExportAfterAuth(false);
+        claimInFlightRef.current = false;
+        return;
+      }
+      const previewUrl = getProjectCoverPreview(pagesRef.current);
+      const saved = await saveProject(projectName, projectData, previewUrl);
+      if (!saved) {
+        setAuthError("We couldn't save your project. Please try again.");
+        setPendingExportAfterAuth(false);
+        claimInFlightRef.current = false;
+        return;
+      }
+      clearGuestStorage();
+      setGuestProject(null);
+      setPendingExportAfterAuth(false);
+      setShowAuthGate(false);
+      claimInFlightRef.current = false;
+      await handleDownload();
+    };
+    void claim();
+  }, [
+    authSession?.user,
+    buildCloudProjectData,
+    clearGuestStorage,
+    handleDownload,
+    pendingExportAfterAuth,
+    projectName,
+    saveProject,
+  ]);
+
+  useEffect(() => {
+    if (!authSession?.user) return;
+    if (!showAuthGate) return;
+    if (pendingExportAfterAuth) return;
+    setShowAuthGate(false);
+  }, [authSession?.user, pendingExportAfterAuth, showAuthGate]);
 
   function handleProjectNameSave() {
     const clean = sanitizeProjectName(projectNameDraft);
@@ -9769,21 +10044,6 @@ const timer =
     }
     computeBaseScale();
   }, [computeBaseScale, pages.length, userAdjustedZoom]);
-
-  useEffect(() => {
-    if (!showDelayOverlay) return;
-    if (showDelayOverlay === "intro") {
-      const timer = setTimeout(() => setShowDelayOverlay("progress"), 1000);
-      return () => clearTimeout(timer);
-    }
-    if (showDelayOverlay === "progress") {
-      const timer = setTimeout(() => {
-        setShowDelayOverlay(null);
-        handleDownload(true);
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [showDelayOverlay]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -12792,58 +13052,171 @@ const timer =
         </div>
       ) : null}
 
-      {showDownloadGate ? (
+      {showAuthGate ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowDownloadGate(false)} />
-          <div className="relative z-10 w-full max-w-xl rounded-[32px] bg-white p-8 text-slate-900 shadow-[0_40px_120px_rgba(5,10,30,0.45)]">
-            <h2 className="text-2xl font-semibold">Save your work & get another free upload</h2>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleAuthGateClose} />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Sign in to export"
+            className="relative z-10 w-full max-w-xl rounded-[32px] bg-white p-8 text-slate-900 shadow-[0_40px_120px_rgba(5,10,30,0.45)]"
+          >
+            <h2 className="text-2xl font-semibold">Sign in to export</h2>
             <p className="mt-3 text-sm text-slate-600">
-              Your PDF is ready. Create a free account to save this project and unlock one more free upload, or upgrade
-              to Pro for unlimited uploads.
+              Your edits are safe. Log in or create an account to finish exporting your PDF.
             </p>
-            <div className="mt-6 flex flex-col gap-3">
+            <div className="mt-5 flex items-center gap-2">
               <button
                 type="button"
-                onClick={handleDownloadGateSignUp}
-                className="inline-flex w-full items-center justify-center rounded-full bg-[#024d7c] px-5 py-3 text-base font-semibold text-white shadow-lg shadow-[#012a44]/30 transition hover:-translate-y-0.5"
+                onClick={() => resetAuthState("login")}
+                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                  authMode === "login"
+                    ? "bg-[#024d7c] text-white shadow-lg shadow-[#012a44]/30"
+                    : "border border-slate-200 text-slate-700"
+                }`}
               >
-                Sign up free – Save your projects + 1 more free upload
+                Log in
               </button>
               <button
                 type="button"
-                onClick={handleDownloadGateUpgrade}
-                className="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-base font-semibold text-[#024d7c] shadow-sm transition hover:-translate-y-0.5"
+                onClick={() => resetAuthState("signup")}
+                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                  authMode === "signup"
+                    ? "bg-[#024d7c] text-white shadow-lg shadow-[#012a44]/30"
+                    : "border border-slate-200 text-slate-700"
+                }`}
               >
-                Upgrade to Pro – Unlimited uploads & faster processing
-              </button>
-              <button
-                type="button"
-                onClick={handleDownloadGateBypass}
-                className="text-center text-sm font-semibold text-slate-500 underline-offset-4 hover:underline"
-              >
-                Not now (just download this one)
+                Create account
               </button>
             </div>
-          </div>
-        </div>
-      ) : null}
 
-      {showDelayOverlay ? (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-white/70 backdrop-blur">
-          <div className="flex w-full max-w-md flex-col items-center gap-5 rounded-[32px] bg-white p-8 text-center text-slate-900 shadow-[0_35px_90px_rgba(9,14,35,0.25)]">
-            <img src="/logo-wordmark2.svg" alt="MergifyPDF" className="h-10 w-auto" />
-            <p className="text-lg font-semibold">Preparing your download…</p>
-            {showDelayOverlay === "progress" ? (
-              <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100">
-                <div
-                  className="h-full w-full rounded-full bg-gradient-to-r from-[#0ea5e9] via-[#2563eb] to-[#1c80d6]"
-                  style={{ animation: "mpdf-progress 3s linear forwards" }}
-                />
-              </div>
-            ) : null}
-            <p className="text-sm text-slate-500">
-              Create a free account to remove this delay and get another free upload.
-            </p>
+            {authMode === "login" ? (
+              <form onSubmit={handleAuthLoginSubmit} className="mt-6 space-y-4">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-700">Email</label>
+                  <input
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus-visible:border-[#6D6AF4]"
+                    type="email"
+                    autoComplete="email"
+                    value={authEmail}
+                    onChange={(event) => setAuthEmail(event.target.value)}
+                    disabled={authBusy}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-700">Password</label>
+                  <input
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus-visible:border-[#6D6AF4]"
+                    type="password"
+                    autoComplete="current-password"
+                    value={authPassword}
+                    onChange={(event) => setAuthPassword(event.target.value)}
+                    disabled={authBusy}
+                  />
+                </div>
+                {authError ? (
+                  <p className="text-sm font-semibold text-rose-600" role="alert">
+                    {authError}
+                  </p>
+                ) : null}
+                {authInfo ? (
+                  <p className="text-sm text-emerald-600" aria-live="polite">
+                    {authInfo}
+                  </p>
+                ) : null}
+                <button
+                  type="submit"
+                  disabled={authBusy}
+                  className="inline-flex w-full items-center justify-center rounded-full bg-[#024d7c] px-5 py-3 text-base font-semibold text-white shadow-lg shadow-[#012a44]/30 transition hover:-translate-y-0.5 disabled:opacity-60"
+                >
+                  {authBusy ? "Signing in..." : "Sign in"}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleAuthSignupSubmit} className="mt-6 space-y-4">
+                {authStep === "form" ? (
+                  <>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-700">Name</label>
+                      <input
+                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus-visible:border-[#6D6AF4]"
+                        type="text"
+                        value={authName}
+                        onChange={(event) => setAuthName(event.target.value)}
+                        disabled={authBusy}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-700">Email</label>
+                      <input
+                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus-visible:border-[#6D6AF4]"
+                        type="email"
+                        autoComplete="email"
+                        value={authEmail}
+                        onChange={(event) => setAuthEmail(event.target.value)}
+                        disabled={authBusy}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-700">Password</label>
+                      <input
+                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus-visible:border-[#6D6AF4]"
+                        type="password"
+                        autoComplete="new-password"
+                        value={authPassword}
+                        onChange={(event) => setAuthPassword(event.target.value)}
+                        disabled={authBusy}
+                      />
+                      <p className="mt-1 text-xs text-slate-500">
+                        At least 8 characters, including uppercase, lowercase, and a special character.
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-700">
+                      Verification code
+                    </label>
+                    <input
+                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus-visible:border-[#6D6AF4]"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="\\d{6}"
+                      maxLength={6}
+                      value={authCode}
+                      onChange={(event) => setAuthCode(event.target.value.replace(/\\D/g, "").slice(0, 6))}
+                      disabled={authBusy}
+                    />
+                    <p className="mt-1 text-xs text-slate-500">
+                      Enter the 6-digit code sent to {authEmail || "your email"}.
+                    </p>
+                  </div>
+                )}
+                {authError ? (
+                  <p className="text-sm font-semibold text-rose-600" role="alert">
+                    {authError}
+                  </p>
+                ) : null}
+                {authInfo ? (
+                  <p className="text-sm text-emerald-600" aria-live="polite">
+                    {authInfo}
+                  </p>
+                ) : null}
+                <button
+                  type="submit"
+                  disabled={authBusy}
+                  className="inline-flex w-full items-center justify-center rounded-full bg-[#024d7c] px-5 py-3 text-base font-semibold text-white shadow-lg shadow-[#012a44]/30 transition hover:-translate-y-0.5 disabled:opacity-60"
+                >
+                  {authBusy
+                    ? authStep === "form"
+                      ? "Creating account..."
+                      : "Verifying..."
+                    : authStep === "form"
+                      ? "Create account"
+                      : "Verify & continue"}
+                </button>
+              </form>
+            )}
           </div>
         </div>
       ) : null}

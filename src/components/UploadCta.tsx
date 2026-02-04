@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
+import { GUEST_PROJECT_STORAGE_KEY, type GuestProject } from "@/lib/guestProject";
 import { PENDING_UPLOAD_STORAGE_KEY } from "@/lib/pendingUpload";
 
 type UploadCtaProps = {
@@ -40,6 +41,29 @@ export default function UploadCta({
     if (!file) {
       setBusy(false);
       return;
+    }
+
+    if (typeof window !== "undefined") {
+      try {
+        const existingRaw = window.localStorage?.getItem(GUEST_PROJECT_STORAGE_KEY);
+        const existing = existingRaw ? (JSON.parse(existingRaw) as GuestProject) : null;
+        if (!existing || existing.mode !== "guest" || typeof existing.id !== "string") {
+          const id =
+            typeof crypto !== "undefined" && "randomUUID" in crypto
+              ? crypto.randomUUID()
+              : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+          const guestProject: GuestProject = {
+            id,
+            createdAt: Date.now(),
+            mode: "guest",
+            isPersisted: false,
+            ownerId: null,
+          };
+          window.localStorage?.setItem(GUEST_PROJECT_STORAGE_KEY, JSON.stringify(guestProject));
+        }
+      } catch {
+        // ignore storage failures
+      }
     }
 
     const reader = new FileReader();
