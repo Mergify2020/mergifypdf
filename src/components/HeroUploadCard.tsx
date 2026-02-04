@@ -605,7 +605,9 @@ export default function HeroUploadCard() {
                         <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden">
                           <div className="flex items-center gap-2">
                             <span
-                              onPointerDown={(event) => beginReorder(index, event)}
+                              onPointerDown={(event) =>
+                                beginReorder(index, event as unknown as React.PointerEvent<HTMLDivElement>)
+                              }
                               className={`hidden h-8 w-8 items-center justify-center rounded-lg border-2 border-slate-200/80 bg-slate-50 text-slate-400 transition-colors group-hover:bg-slate-100 group-hover:text-slate-500 lg:flex ${
                                 busy ? "" : "cursor-grab active:cursor-grabbing active:bg-slate-200"
                               }`}
