@@ -541,7 +541,7 @@ export default function HeroUploadCard() {
             <div className="mt-0 overflow-hidden rounded-xl border-2 border-slate-200/80 bg-white/75 p-1">
               <div
                 ref={listRef}
-                className="relative w-full max-w-full min-w-0 space-y-2 overflow-hidden"
+                className="ios-scroll-padding relative w-full max-w-full min-w-0 space-y-2 overflow-hidden"
                 style={{
                   height: `${listHeight}px`,
                   overflowY: readyCount > 6 ? "auto" : "hidden",

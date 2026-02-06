@@ -549,6 +549,12 @@ html.theme-scroll-reveal:not(.dark) ::-webkit-scrollbar-thumb {
   animation: hero-upload-swap 260ms ease-out;
 }
 
+@supports (-webkit-overflow-scrolling: touch) {
+  .ios-scroll-padding {
+    padding-right: 8px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .upload-card-animate {
     animation: none;
