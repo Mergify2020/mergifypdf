@@ -114,7 +114,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
 
             <RevealOnScroll as="div" className="space-y-5 text-center lg:col-start-1 lg:text-left">
               <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm text-slate-600 lg:flex-col lg:items-start lg:gap-y-5">
-                {["Upload and start instantly", "Fast, reliable, and secure", "Works directly in your browser"].map(
+                {["Upload and start instantly", "Fast, reliable, and secure"].map(
                   (badge) => (
                     <div key={badge} className="flex items-center gap-4 text-[1rem] font-semibold text-slate-700">
                       <span

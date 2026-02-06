@@ -449,7 +449,7 @@ export default function HeroUploadCard() {
     ? `upload-card-animate flex h-[320px] flex-col justify-start overflow-hidden rounded-2xl border-[3px] ${
         isIdle ? "border-dashed border-[#6D5EF3] py-0 sm:py-9" : "border-solid border-white/70 py-6"
       } bg-gradient-to-b from-white/85 via-slate-50/90 to-white/80 px-8 shadow-[0_0_0_1px_rgba(148,163,184,0.18),0_18px_40px_rgba(15,23,42,0.08)] transition-shadow duration-200 hover:shadow-[0_0_0_1px_rgba(109,94,243,0.2),0_22px_46px_rgba(15,23,42,0.12)] active:shadow-[0_0_0_1px_rgba(109,94,243,0.2),0_16px_34px_rgba(15,23,42,0.1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6D5EF3]/40`
-    : "flex min-h-[320px] flex-col justify-start text-left";
+    : "flex min-h-[320px] max-w-full flex-col justify-start overflow-hidden text-left";
 
   return (
     <div
@@ -518,19 +518,19 @@ export default function HeroUploadCard() {
           key="hero-upload-ready"
           className="hero-upload-transition flex h-full flex-col text-left"
         >
-          <div className="flex w-full flex-col px-1">
+          <div className="flex w-full max-w-full flex-col px-1">
             {error ? (
               <div
-                className="-mt-3 mb-2 flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700"
+                className="mb-2 flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700"
                 aria-live="polite"
               >
                 <Info className="h-4 w-4" aria-hidden />
                 <span>{error}</span>
               </div>
             ) : (
-              <div className="-mt-3 pb-2" />
+              <div className="pb-2" />
             )}
-            <div className="flex items-center justify-between pb-2">
+            <div className="flex items-center justify-between pb-2 pt-1">
               <p className="flex items-center gap-2 text-base font-semibold text-slate-900">
                 <CheckCircle2 className="h-5 w-5 text-emerald-500" aria-hidden />
                 Ready to upload
@@ -538,13 +538,14 @@ export default function HeroUploadCard() {
               <span className="text-base font-semibold text-slate-900">{readyCount}/12</span>
             </div>
 
-            <div className="mt-0 overflow-hidden rounded-xl border border-slate-200/80 bg-white/75 p-1 shadow-[0_10px_22px_rgba(15,23,42,0.08)]">
+            <div className="mt-0 overflow-hidden rounded-xl border-2 border-slate-200/80 bg-white/75 p-1">
               <div
                 ref={listRef}
-                className="relative w-full max-w-full space-y-2 overflow-hidden"
+                className="relative w-full max-w-full min-w-0 space-y-2 overflow-hidden"
                 style={{
                   height: `${listHeight}px`,
                   overflowY: readyCount > 6 ? "auto" : "hidden",
+                  boxSizing: "border-box",
                 }}
               >
               {(() => {
@@ -598,11 +599,11 @@ export default function HeroUploadCard() {
                         ref={(node) => {
                           rowRefs.current[index] = node;
                         }}
-                        className={`group relative flex h-[56px] w-full max-w-full min-w-0 items-center justify-between gap-3 overflow-hidden rounded-lg border-2 border-slate-200/90 bg-white px-3 py-2 transition-colors hover:border-slate-300/80 hover:bg-slate-50/40 ${
+                        className={`group relative grid h-[56px] w-full max-w-full min-w-0 grid-cols-[auto_1fr_auto] items-center gap-3 overflow-hidden rounded-lg border-2 border-slate-200/90 bg-white px-3 py-2 transition-colors hover:border-slate-300/80 hover:bg-slate-50/40 ${
                           busy ? "opacity-70" : ""
                         }`}
                       >
-                        <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden">
+                        <div className="flex items-center gap-3">
                           <div className="flex items-center gap-2">
                             <span
                               onPointerDown={(event) =>
@@ -638,33 +639,33 @@ export default function HeroUploadCard() {
                           <span className="shrink-0 text-[15px] font-semibold text-slate-400">
                             {orderMap.get(index) ?? index + 1}
                           </span>
-                          <div className="min-w-0 flex-1 overflow-hidden">
-                            <div className="flex min-w-0 items-center gap-2">
-                              <FileText className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
-                              <span className="min-w-0 truncate whitespace-nowrap text-sm font-semibold text-slate-800">
-                                {file.name}
-                              </span>
-                            </div>
-                            <p className="text-[10px] text-slate-400">{formatBytes(file.size)}</p>
+                        </div>
+                        <div className="min-w-0 overflow-hidden">
+                          <div className="flex min-w-0 items-center gap-2 overflow-hidden">
+                            <FileText className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
+                            <span className="block min-w-0 truncate whitespace-nowrap text-sm font-semibold text-slate-800">
+                              {file.name}
+                            </span>
                           </div>
+                          <p className="text-[10px] text-slate-400">{formatBytes(file.size)}</p>
                         </div>
                         {confirmDeleteIndex === index ? (
-                          <div className="flex shrink-0 items-center gap-2 max-w-[120px] sm:max-w-none">
+                          <div className="flex items-center justify-end gap-2 self-center pb-[6px] md:pb-0 md:-translate-y-[2px]">
                             <button
                               type="button"
                               onClick={() => setConfirmDeleteIndex(null)}
-                              className="rounded-md border-2 border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-800 sm:px-2 sm:py-1 sm:text-[11px]"
+                              className="flex-1 min-w-0 rounded-md border-2 border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-800"
                               disabled={uiState === "staging"}
                             >
-                              Cancel
+                              <span className="block min-w-0">Cancel</span>
                             </button>
                             <button
                               type="button"
                               onClick={() => cancelPendingFile(index)}
-                              className="rounded-md border-2 border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-600 transition hover:border-rose-300 hover:bg-rose-100 sm:px-2 sm:py-1 sm:text-[11px]"
+                              className="flex-1 min-w-0 rounded-md border-2 border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-semibold text-rose-600 transition hover:border-rose-300 hover:bg-rose-100"
                               disabled={uiState === "staging"}
                             >
-                              Delete
+                              <span className="block min-w-0">Delete</span>
                             </button>
                           </div>
                         ) : (
@@ -736,7 +737,7 @@ export default function HeroUploadCard() {
                 <label
                   htmlFor={inputId}
                   aria-disabled={busy}
-                  className={`inline-flex w-fit items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-sm font-semibold text-slate-600 shadow-[0_6px_14px_rgba(15,23,42,0.06)] transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-800 ${
+                  className={`inline-flex w-fit items-center gap-2 rounded-full border-2 border-slate-200 bg-white px-3.5 py-1.5 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-800 ${
                     busy ? "pointer-events-none opacity-60" : "cursor-pointer"
                   }`}
                 >
