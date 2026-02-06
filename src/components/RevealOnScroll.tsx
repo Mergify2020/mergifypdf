@@ -8,6 +8,8 @@ type RevealOnScrollProps = {
   delayMs?: number;
   as?: ElementType;
   variant?: "default" | "fade";
+  forceVisible?: boolean;
+  onVisible?: () => void;
 };
 
 export default function RevealOnScroll({
@@ -16,11 +18,17 @@ export default function RevealOnScroll({
   delayMs = 0,
   as: Component = "div",
   variant = "default",
+  forceVisible = false,
+  onVisible,
 }: RevealOnScrollProps) {
   const ref = useRef<HTMLElement | null>(null);
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
+    if (forceVisible) {
+      setIsVisible(true);
+      return;
+    }
     if (typeof window === "undefined") return;
     const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (prefersReduced) {
@@ -36,6 +44,7 @@ export default function RevealOnScroll({
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
             setIsVisible(true);
+            if (onVisible) onVisible();
             observer.unobserve(entry.target);
           }
         });
@@ -45,7 +54,7 @@ export default function RevealOnScroll({
 
     observer.observe(node);
     return () => observer.disconnect();
-  }, []);
+  }, [forceVisible, onVisible]);
 
   const style: CSSProperties = {
     ["--reveal-delay" as keyof CSSProperties]: `${delayMs}ms`,
