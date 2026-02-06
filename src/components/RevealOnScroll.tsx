@@ -40,7 +40,7 @@ export default function RevealOnScroll({
           }
         });
       },
-      { threshold: 0.04, rootMargin: "0px 0px 12% 0px" }
+      { threshold: 0.1, rootMargin: "0px 0px 0px" }
     );
 
     observer.observe(node);
