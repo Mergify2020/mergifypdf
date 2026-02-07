@@ -2,10 +2,14 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
+import { isSameOrigin } from "@/lib/requestGuards";
 
 const MAX_IMAGE_LENGTH = 1_000_000;
 
 export async function POST(req: Request) {
+  if (!isSameOrigin(req)) {
+    return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
+  }
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

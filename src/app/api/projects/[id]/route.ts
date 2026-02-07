@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
 import { createSignedR2Url, deleteR2Objects, getR2Config, uploadR2Object } from "@/lib/r2";
 import { Prisma } from "@prisma/client";
+import { isSameOrigin } from "@/lib/requestGuards";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -188,6 +189,9 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!isSameOrigin(req)) {
+    return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
+  }
   const { id } = await params;
 
   const session = await getServerSession(authOptions);
@@ -310,6 +314,9 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!isSameOrigin(req)) {
+    return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
+  }
   const { id } = await params;
 
   const session = await getServerSession(authOptions);

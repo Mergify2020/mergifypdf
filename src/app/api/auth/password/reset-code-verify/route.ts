@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateToken } from "@/lib/tokens";
 import { hashVerificationCode } from "@/lib/verificationCode";
+import { isSameOrigin } from "@/lib/requestGuards";
+import { rateLimit } from "@/lib/rateLimit";
 
 type Json = Record<string, unknown>;
 
@@ -23,6 +25,13 @@ function asPrismaError(value: unknown): MaybePrismaError | null {
 }
 
 export async function POST(req: Request) {
+  if (!isSameOrigin(req)) {
+    return NextResponse.json({ ok: false, code: "INVALID_ORIGIN", message: "Invalid origin." }, { status: 403 });
+  }
+  const limit = await rateLimit(req, { keyPrefix: "reset-code-verify", windowMs: 60_000, max: 8 });
+  if (!limit.ok) {
+    return err("INVALID_CODE", "That code is invalid or expired.");
+  }
   try {
     const rawBody: unknown = await req.json().catch(() => null);
     const email =
@@ -43,7 +52,7 @@ export async function POST(req: Request) {
       select: { id: true },
     });
     if (!user) {
-      return err("EMAIL_NOT_FOUND", "This email isn’t associated with an account.");
+      return err("INVALID_CODE", "That code is invalid or expired.");
     }
 
     const hashed = hashVerificationCode(code);

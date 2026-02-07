@@ -3,6 +3,9 @@ import { NextResponse } from "next/server";
 import { sendResetEmail } from "@/lib/email";
 
 export async function GET(req: Request) {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
   try {
     const { searchParams } = new URL(req.url);
     const to = searchParams.get("to");

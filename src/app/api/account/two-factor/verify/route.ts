@@ -1,12 +1,21 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyTwoFactorSetupCode } from "@/lib/twoFactorVerification";
+import { isSameOrigin } from "@/lib/requestGuards";
+import { rateLimit } from "@/lib/rateLimit";
 
 function unauthorized() {
   return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 }
 
 export async function POST(req: Request) {
+  if (!isSameOrigin(req)) {
+    return NextResponse.json({ ok: false, error: "Invalid origin" }, { status: 403 });
+  }
+  const limit = await rateLimit(req, { keyPrefix: "2fa-setup-verify", windowMs: 60_000, max: 8 });
+  if (!limit.ok) {
+    return NextResponse.json({ ok: false, error: "Too many requests" }, { status: 429 });
+  }
   const { getServerSession } = await import("next-auth");
   const { authOptions } = await import("@/lib/authOptions");
   const session = await getServerSession(authOptions);

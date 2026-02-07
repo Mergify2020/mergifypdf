@@ -6,6 +6,7 @@ import {
   saveUserSignatures,
   type StoredSignature,
 } from "@/lib/signatureStore";
+import { isSameOrigin } from "@/lib/requestGuards";
 
 type IncomingSignature = {
   id?: unknown;
@@ -70,6 +71,9 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
+  if (!isSameOrigin(request)) {
+    return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
+  }
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -85,4 +89,3 @@ export async function PUT(request: Request) {
 
   return NextResponse.json({ ok: true });
 }
-

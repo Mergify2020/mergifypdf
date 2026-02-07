@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 
-const AUTH_FOOTER_ROUTES = new Set(["/login", "/register", "/forgot-password"]);
+const AUTH_FOOTER_ROUTES = new Set(["/login", "/register", "/forgot-password", "/reset-password"]);
 const LOGIN_ROUTE = "/login";
 
 export default function AuthFooter() {
@@ -15,7 +15,8 @@ export default function AuthFooter() {
   const isLogin = pathname === LOGIN_ROUTE;
   const isRegister = pathname === "/register";
   const isForgotPassword = pathname === "/forgot-password";
-  const usesFixedFooter = isLogin || isRegister || isForgotPassword;
+  const isResetPassword = pathname === "/reset-password";
+  const usesFixedFooter = isLogin || isRegister || isForgotPassword || isResetPassword;
 
   return (
     <footer

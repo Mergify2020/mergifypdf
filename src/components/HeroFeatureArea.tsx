@@ -275,7 +275,7 @@ export default function HeroFeatureArea() {
           </div>
         </div>
 
-        <div className="mt-16 mb-20">
+        <div className="mt-16 mb-10">
           <RevealOnScroll as="div">
             <h2 className="text-center text-2xl font-semibold text-slate-900 sm:text-3xl">
               Frequently Asked Questions

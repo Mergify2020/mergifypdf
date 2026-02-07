@@ -68,6 +68,11 @@ export default function ForgotPasswordPage() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!email.trim().includes("@")) {
+      setIsError(true);
+      setMessage("Please enter a valid email address.");
+      return;
+    }
     setBusy(true);
     setMessage(null);
     setIsError(false);
@@ -80,25 +85,18 @@ export default function ForgotPasswordPage() {
       });
       const data = await res.json().catch(() => ({}));
 
-      const ok = !!data?.ok;
-      setIsError(!ok);
-      if (ok) {
-        setPendingEmail(email.trim());
-        setCodeDigits(Array(6).fill(""));
-        setResendCooldown(25);
-        setRequestCooldown(10);
-        setStep("verify");
-        setMessage(null);
-      } else {
-        const code = typeof data?.code === "string" ? data.code : null;
-        if (code === "EMAIL_NOT_FOUND") {
-          setMessage("This email isn’t associated with an account.");
-        } else if (code === "OAUTH_ONLY") {
-          setMessage("This account uses Google Sign-In.");
-        } else {
-          setMessage(data?.message ?? "Request processed.");
-        }
+      if (!res.ok) {
+        setIsError(true);
+        setMessage(data?.message ?? "We couldn’t process the reset right now.");
+        return;
       }
+
+      setPendingEmail(email.trim());
+      setCodeDigits(Array(6).fill(""));
+      setResendCooldown(25);
+      setRequestCooldown(10);
+      setStep("verify");
+      setMessage("If an account exists, a reset code was sent.");
     } catch {
       setMessage("We couldn\u2019t process the reset right now. Please try again.");
       setIsError(true);
@@ -161,12 +159,12 @@ export default function ForgotPasswordPage() {
         body: JSON.stringify({ email: pendingEmail }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data?.ok) {
+      if (!res.ok) {
         setIsError(true);
         setMessage(data?.message ?? "Unable to resend code.");
         return;
       }
-      setMessage("We sent a new code. Check your inbox.");
+      setMessage("If an account exists, a reset code was sent.");
       setResendCooldown(25);
     } catch {
       setIsError(true);
@@ -235,9 +233,12 @@ export default function ForgotPasswordPage() {
               <Image
                 src="/logos/home-expanded-sidebar-logo-light-v6.svg"
                 alt="MergifyPDF"
-                width={120}
-                height={30}
-                className="h-[47px] w-auto"
+                width={164}
+                height={47}
+                priority
+                loading="eager"
+                className="block"
+                style={{ width: 164, height: 47 }}
               />
               <div aria-hidden="true" />
             </div>

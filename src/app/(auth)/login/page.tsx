@@ -141,9 +141,12 @@ export default function LoginPage() {
                 <Image
                   src="/logos/home-expanded-sidebar-logo-light-v6.svg"
                   alt="MergifyPDF"
-                  width={120}
-                  height={30}
-                  className="h-[47px] w-auto"
+                  width={164}
+                  height={47}
+                  priority
+                  loading="eager"
+                  className="block"
+                  style={{ width: 164, height: 47 }}
                 />
               </div>
               <h1 className="text-3xl font-semibold text-slate-900">

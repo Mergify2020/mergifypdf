@@ -79,7 +79,9 @@ export default function AppHeaderBrand({
         width={logoWidth}
         height={logoHeight}
         priority
+        loading="eager"
         className="block dark:hidden"
+        style={{ width: logoWidth, height: logoHeight }}
       />
       <Image
         src={darkLogo}
@@ -87,7 +89,9 @@ export default function AppHeaderBrand({
         width={logoWidth}
         height={logoHeight}
         priority
+        loading="eager"
         className="hidden dark:block"
+        style={{ width: logoWidth, height: logoHeight }}
       />
     </a>
   ) : (
@@ -103,7 +107,9 @@ export default function AppHeaderBrand({
         width={logoWidth}
         height={logoHeight}
         priority
+        loading="eager"
         className="block dark:hidden"
+        style={{ width: logoWidth, height: logoHeight }}
       />
       <Image
         src={darkLogo}
@@ -111,7 +117,9 @@ export default function AppHeaderBrand({
         width={logoWidth}
         height={logoHeight}
         priority
+        loading="eager"
         className="hidden dark:block"
+        style={{ width: logoWidth, height: logoHeight }}
       />
     </Link>
   );

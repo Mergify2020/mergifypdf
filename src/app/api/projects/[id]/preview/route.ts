@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
 import { createSignedR2Url, getR2Config } from "@/lib/r2";
+import { isSameOrigin } from "@/lib/requestGuards";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -33,6 +34,9 @@ export async function POST(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!isSameOrigin(_req)) {
+    return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
+  }
   const { id } = await params;
 
   const session = await getServerSession(authOptions);

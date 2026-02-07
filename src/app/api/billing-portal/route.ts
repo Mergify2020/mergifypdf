@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
-import { stripe } from "@/lib/stripe";
+import { getStripe } from "@/lib/stripe";
+import { isSameOrigin } from "@/lib/requestGuards";
 
 function safeReturnUrl(origin: string, candidate: unknown) {
   if (typeof candidate !== "string" || !candidate) return origin;
@@ -15,6 +16,10 @@ function safeReturnUrl(origin: string, candidate: unknown) {
 }
 
 export async function POST(req: NextRequest) {
+  if (!isSameOrigin(req)) {
+    return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
+  }
+  const stripe = getStripe();
   const session = await getServerSession(authOptions);
   const email = session?.user?.email ?? null;
 
@@ -52,4 +57,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Stripe billing portal error" }, { status: 500 });
   }
 }
-

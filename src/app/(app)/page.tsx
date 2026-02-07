@@ -10,7 +10,6 @@ import { prisma } from "@/lib/prisma";
 import ContainerShadowOverlay from "@/components/ContainerShadowOverlay";
 import RightSidebarColumn from "@/components/RightSidebarColumn";
 import HomeProjectsSearch from "@/components/HomeProjectsSearch";
-import HeroUploadCard from "@/components/HeroUploadCard";
 import RevealOnScroll from "@/components/RevealOnScroll";
 import HeroUploadAndBullets from "@/components/HeroUploadAndBullets";
 import FeaturesAutoScroll from "@/components/FeaturesAutoScroll";
@@ -87,8 +86,8 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
       <FeaturesAutoScroll />
       <section className="relative -mt-[calc(76px+env(safe-area-inset-top))] w-full overflow-x-hidden bg-gradient-to-r from-[rgba(218,236,255,0.95)] via-[rgba(224,230,255,0.7)] to-[rgba(206,210,255,0.85)] pt-[calc(76px+env(safe-area-inset-top))]">
         <div className="relative mx-auto w-full max-w-[1400px] px-4 pt-6 pb-8 sm:px-6 sm:pt-10 sm:pb-10 lg:px-8 lg:pt-12 lg:pb-12">
-          <div className="grid gap-8 lg:grid-cols-[minmax(0,620px)_minmax(0,760px)] lg:items-start">
-            <div className="space-y-6 text-center lg:col-start-1 lg:text-left">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,620px)_minmax(0,760px)] lg:items-start">
+            <div className="space-y-6 text-center lg:col-start-1 lg:pt-3 lg:text-left">
               <RevealOnScroll as="div">
                 <h1 className="text-balance text-[clamp(2rem,3.2vw,2.8rem)] font-bold leading-[1.08] tracking-tight">
                   Merge, edit, and sign documents in minutes.
@@ -99,6 +98,24 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
                   No installs. No clutter. Upload and finish fast.{" "}
                   <span className="whitespace-nowrap">Your work stays saved.</span>
                 </p>
+              </RevealOnScroll>
+              <RevealOnScroll as="div" className="hidden space-y-5 text-left lg:block">
+                <div className="flex flex-col items-start gap-y-3 text-sm text-slate-600">
+                  {["Upload and start instantly", "Fast, reliable, and secure", "Runs right in your browser"].map((badge) => (
+                    <div key={badge} className="flex items-center gap-3 text-[1rem] font-semibold text-slate-700">
+                      <span
+                        className="flex h-6 w-6 items-center justify-center rounded-full bg-[#6D5EF3] text-[12px] text-white shadow-[0_6px_16px_rgba(109,94,243,0.25)]"
+                        aria-hidden="true"
+                      >
+                        ✓
+                      </span>
+                      <span>{badge}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-start">
+                  <HeroStats />
+                </div>
               </RevealOnScroll>
             </div>
 

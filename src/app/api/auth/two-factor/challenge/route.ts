@@ -3,12 +3,21 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
 import { issueLoginTwoFactorCode } from "@/lib/twoFactorLogin";
+import { isSameOrigin } from "@/lib/requestGuards";
+import { rateLimit } from "@/lib/rateLimit";
 
 function unauthorized() {
   return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 }
 
 export async function POST(req: Request) {
+  if (!isSameOrigin(req)) {
+    return NextResponse.json({ ok: false, error: "Invalid origin" }, { status: 403 });
+  }
+  const limit = await rateLimit(req, { keyPrefix: "2fa-challenge", windowMs: 60_000, max: 5 });
+  if (!limit.ok) {
+    return NextResponse.json({ ok: false, error: "Too many requests" }, { status: 429 });
+  }
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return unauthorized();
 

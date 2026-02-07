@@ -1,9 +1,18 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifySignupCode, issueSignupVerificationCode } from "@/lib/signupVerification";
+import { isSameOrigin } from "@/lib/requestGuards";
+import { rateLimit } from "@/lib/rateLimit";
 
 export async function POST(req: Request) {
   try {
+    if (!isSameOrigin(req)) {
+      return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
+    }
+    const limit = await rateLimit(req, { keyPrefix: "signup-verify", windowMs: 60_000, max: 8 });
+    if (!limit.ok) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    }
     const { email, code } = await req.json();
     if (!email || !code || typeof email !== "string" || typeof code !== "string") {
       return NextResponse.json({ error: "Email and code are required" }, { status: 400 });
@@ -41,6 +50,13 @@ export async function POST(req: Request) {
 
 export async function PUT(req: Request) {
   try {
+    if (!isSameOrigin(req)) {
+      return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
+    }
+    const limit = await rateLimit(req, { keyPrefix: "signup-resend", windowMs: 60_000, max: 5 });
+    if (!limit.ok) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    }
     const { email } = await req.json();
     if (!email || typeof email !== "string") {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });

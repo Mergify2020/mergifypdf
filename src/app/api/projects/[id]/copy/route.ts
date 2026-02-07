@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { isSameOrigin } from "@/lib/requestGuards";
 
 async function ensureDbConnection() {
   for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -27,6 +28,9 @@ async function ensureDbConnection() {
 }
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  if (!isSameOrigin(_req)) {
+    return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
+  }
   const { id } = await params;
 
   const session = await getServerSession(authOptions);

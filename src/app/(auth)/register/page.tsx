@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -11,11 +11,15 @@ type Step = "form" | "verify";
 export default function RegisterPage() {
   const router = useRouter();
   const [step, setStep] = useState<Step>("form");
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [code, setCode] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [codeDigits, setCodeDigits] = useState<string[]>(() => Array(6).fill(""));
   const [pendingEmail, setPendingEmail] = useState("");
+  const codeValue = useMemo(() => codeDigits.join(""), [codeDigits]);
+  const codeRefs = useRef<Array<HTMLInputElement | null>>([]);
 
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -28,8 +32,8 @@ export default function RegisterPage() {
     setErr(null);
     setInfo(null);
 
-    if (!name.trim() || !email.trim() || !password.trim()) {
-      setErr("Name, email, and password are required.");
+    if (!firstName.trim() || !lastName.trim() || !email.trim() || !password.trim()) {
+      setErr("First name, last name, email, and password are required.");
       return;
     }
 
@@ -47,6 +51,7 @@ export default function RegisterPage() {
     setBusy(true);
 
     try {
+      const name = `${firstName.trim()} ${lastName.trim()}`.trim();
       const res = await fetch("/api/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -62,7 +67,7 @@ export default function RegisterPage() {
       setPendingEmail(email);
       setResendCooldown(25);
       setStep("verify");
-      setCode("");
+      setCodeDigits(Array(6).fill(""));
     } catch (error) {
       setErr("Sign up failed. Please try again.");
     } finally {
@@ -70,14 +75,33 @@ export default function RegisterPage() {
     }
   }
 
+  function togglePasswordVisibility() {
+    setShowPassword((prev) => !prev);
+  }
+
+  function updateCodeDigit(index: number, nextValue: string) {
+    setCodeDigits((prev) => {
+      const updated = [...prev];
+      updated[index] = nextValue;
+      return updated;
+    });
+  }
+
+  function focusCodeIndex(index: number) {
+    const el = codeRefs.current[index];
+    if (el) el.focus();
+  }
+
   function handleBackToForm() {
     setStep("form");
     setPassword("");
-    setCode("");
+    setCodeDigits(Array(6).fill(""));
     setErr(null);
     setInfo(null);
     setBusy(false);
     setResendBusy(false);
+    setFirstName("");
+    setLastName("");
   }
 
   async function onVerify(e: React.FormEvent) {
@@ -90,7 +114,7 @@ export default function RegisterPage() {
       const res = await fetch("/api/signup/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: pendingEmail, code }),
+        body: JSON.stringify({ email: pendingEmail, code: codeValue }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -177,9 +201,12 @@ export default function RegisterPage() {
               <Image
                 src="/logos/home-expanded-sidebar-logo-light-v6.svg"
                 alt="MergifyPDF"
-                width={120}
-                height={30}
-                className="h-[47px] w-auto"
+                width={164}
+                height={47}
+                priority
+                loading="eager"
+                className="block"
+                style={{ width: 164, height: 47 }}
               />
             </div>
 
@@ -201,17 +228,33 @@ export default function RegisterPage() {
             {step === "form" ? (
               <>
                 <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-6">
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-700">
-                      Name
-                    </label>
-                    <input
-                      className="w-full rounded-md border-2 bg-white py-2.5 pl-[18px] pr-4 text-sm text-slate-900 outline-none transition focus-visible:border-[#6D6AF4] focus-visible:ring-0 border-slate-300 hover:border-slate-400"
-                      type="text"
-                      placeholder="Your name"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                    />
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-700">
+                        First name
+                      </label>
+                      <input
+                        className="w-full rounded-md border-2 bg-white py-2.5 pl-[18px] pr-4 text-sm text-slate-900 outline-none transition focus-visible:border-[#6D6AF4] focus-visible:ring-0 border-slate-300 hover:border-slate-400"
+                        type="text"
+                        placeholder="First name"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        autoComplete="given-name"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-700">
+                        Last name
+                      </label>
+                      <input
+                        className="w-full rounded-md border-2 bg-white py-2.5 pl-[18px] pr-4 text-sm text-slate-900 outline-none transition focus-visible:border-[#6D6AF4] focus-visible:ring-0 border-slate-300 hover:border-slate-400"
+                        type="text"
+                        placeholder="Last name"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        autoComplete="family-name"
+                      />
+                    </div>
                   </div>
 
                   <div>
@@ -231,14 +274,54 @@ export default function RegisterPage() {
                     <label className="mb-1 block text-xs font-medium text-slate-700">
                       Password
                     </label>
-                    <input
-                      className="w-full rounded-md border-2 bg-white py-2.5 pl-[18px] pr-4 text-[15px] text-slate-900 outline-none transition focus-visible:border-[#6D6AF4] focus-visible:ring-0 border-slate-300 hover:border-slate-400"
-                      type="password"
-                      placeholder="Create a password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      minLength={8}
-                    />
+                    <div className="relative">
+                      <input
+                        className="w-full rounded-md border-2 bg-white py-2.5 pl-[18px] pr-10 text-[15px] text-slate-900 outline-none transition focus-visible:border-[#6D6AF4] focus-visible:ring-0 border-slate-300 hover:border-slate-400"
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Create a password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        minLength={8}
+                        autoComplete="new-password"
+                      />
+                      <button
+                        type="button"
+                        onClick={togglePasswordVisibility}
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                        className="absolute inset-y-0 right-3 flex h-full items-center justify-center text-slate-500 transition hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6D6AF4]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+                      >
+                        {showPassword ? (
+                          <svg
+                            aria-hidden="true"
+                            viewBox="0 0 24 24"
+                            className="h-5 w-5"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.4"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M3 3l18 18" />
+                            <path d="M9.6 9.6A3 3 0 0 0 12 15a3 3 0 0 0 2.4-1.2" />
+                            <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z" />
+                          </svg>
+                        ) : (
+                          <svg
+                            aria-hidden="true"
+                            viewBox="0 0 24 24"
+                            className="h-5 w-5"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.4"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z" />
+                            <circle cx="12" cy="12" r="3" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
                     <p className="mt-1 text-xs text-slate-600">
                       At least 8 characters, including uppercase, lowercase, and a special
                       character.
@@ -288,23 +371,67 @@ export default function RegisterPage() {
                   We sent a 6-digit code to{" "}
                   <span className="font-medium">{pendingEmail}</span>. Enter it below.
                 </p>
-                <input
-                  className="w-full rounded-md border-2 bg-white py-2.5 text-center text-lg tracking-[6px] text-slate-900 outline-none transition focus-visible:border-[#6D6AF4] focus-visible:ring-0 border-slate-300 hover:border-slate-400"
-                  type="text"
-                  inputMode="numeric"
-                  pattern="\d{6}"
-                  maxLength={6}
-                  placeholder="______"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                  required
-                />
+                <div className="mx-auto flex w-fit items-center gap-4">
+                  {codeDigits.map((digit, index) => (
+                    <input
+                      key={`code-${index}`}
+                      ref={(el) => {
+                        codeRefs.current[index] = el;
+                      }}
+                      autoFocus={index === 0}
+                      className="h-16 w-[60px] rounded-lg border-2 border-slate-300 bg-white text-center text-[1.375rem] text-slate-900 outline-none transition focus-visible:border-[#6D6AF4] focus-visible:ring-0 hover:border-slate-400"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="\d*"
+                      maxLength={1}
+                      value={digit}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, "");
+                        if (!value) {
+                          updateCodeDigit(index, "");
+                          return;
+                        }
+                        updateCodeDigit(index, value[0]);
+                        if (index < 5) {
+                          focusCodeIndex(index + 1);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Backspace" && !digit && index > 0) {
+                          updateCodeDigit(index - 1, "");
+                          focusCodeIndex(index - 1);
+                        }
+                        if (e.key === "ArrowLeft" && index > 0) {
+                          focusCodeIndex(index - 1);
+                        }
+                        if (e.key === "ArrowRight" && index < 5) {
+                          focusCodeIndex(index + 1);
+                        }
+                      }}
+                      onPaste={(e) => {
+                        const pasted = e.clipboardData.getData("text").replace(/\D/g, "");
+                        if (!pasted) return;
+                        e.preventDefault();
+                        const next = [...codeDigits];
+                        for (let i = 0; i < 6; i += 1) {
+                          const targetIndex = index + i;
+                          if (targetIndex > 5) break;
+                          next[targetIndex] = pasted[i] ?? "";
+                        }
+                        setCodeDigits(next);
+                        const lastIndex = Math.min(index + pasted.length - 1, 5);
+                        focusCodeIndex(Math.max(lastIndex, 0));
+                      }}
+                      aria-label={`Digit ${index + 1}`}
+                    />
+                  ))}
+                </div>
                 {err && <div className="text-sm text-red-600">{err}</div>}
                 {info && <div className="text-sm text-green-600">{info}</div>}
                 <button
                   className="w-full rounded-md bg-[#1F2937] py-2.5 text-sm font-semibold text-white transition hover:-translate-y-[1px] hover:bg-[#111827] active:scale-[0.985] active:bg-[#0B1220] active:brightness-95 active:transition active:duration-100 disabled:opacity-60 disabled:hover:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F2937]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
                   type="submit"
-                  disabled={busy || code.length !== 6}
+                  disabled={busy || codeValue.length !== 6}
                 >
                   {busy ? "Confirming..." : "Confirm"}
                 </button>

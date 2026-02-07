@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, ArrowUp, CheckCircle2, FileText, FileUp, GripVertical, Info, X } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronUp, FileText, FileUp, GripVertical, Info, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { GUEST_PROJECT_STORAGE_KEY, type GuestProject } from "@/lib/guestProject";
@@ -444,7 +444,9 @@ export default function HeroUploadCard() {
   const readyCount = selectedFiles.length;
   const minVisibleRows = readyCount > 0 ? 4 : 0;
   const visibleRows = Math.min(Math.max(readyCount, minVisibleRows), 6);
-  const listHeight = visibleRows > 0 ? visibleRows * 56 + Math.max(0, visibleRows - 1) * 8 : 0;
+  const rowHeight = 54;
+  const listHeight =
+    visibleRows > 0 ? visibleRows * rowHeight + Math.max(0, visibleRows - 1) * 8 : 0;
   const containerClassName = isIdle
     ? `upload-card-animate flex h-[320px] flex-col justify-start overflow-hidden rounded-2xl border-[3px] ${
         isIdle ? "border-dashed border-[#6D5EF3] pt-6 pb-3 sm:py-9" : "border-solid border-white/70 py-6"
@@ -599,11 +601,11 @@ export default function HeroUploadCard() {
                         ref={(node) => {
                           rowRefs.current[index] = node;
                         }}
-                        className={`group relative grid h-[56px] w-full max-w-full min-w-0 grid-cols-[auto_1fr_auto] items-center gap-3 overflow-hidden rounded-lg border-2 border-slate-200/90 bg-white px-3 py-2 transition-colors hover:border-slate-300/80 hover:bg-slate-50/40 ${
+                        className={`group relative grid h-[54px] w-full max-w-full min-w-0 grid-cols-[auto_1fr_auto] items-center gap-3 overflow-hidden rounded-lg border-2 border-slate-200/90 bg-white px-3 py-2 transition-colors hover:border-slate-300/80 hover:bg-slate-50/40 ${
                           busy ? "opacity-70" : ""
                         }`}
                       >
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 -translate-y-[6px] lg:translate-y-0">
                           <div className="flex items-center gap-2">
                             <span
                               onPointerDown={(event) =>
@@ -623,7 +625,7 @@ export default function HeroUploadCard() {
                                 aria-label={`Move ${file.name} up`}
                                 disabled={uiState === "staging" || index === 0}
                               >
-                                <ArrowUp className="h-5 w-5" aria-hidden />
+                                <ChevronUp className="h-5 w-5" aria-hidden />
                               </button>
                               <button
                                 type="button"
@@ -632,7 +634,7 @@ export default function HeroUploadCard() {
                                 aria-label={`Move ${file.name} down`}
                                 disabled={uiState === "staging" || index === selectedFiles.length - 1}
                               >
-                                <ArrowDown className="h-5 w-5" aria-hidden />
+                                <ChevronDown className="h-5 w-5" aria-hidden />
                               </button>
                             </div>
                           </div>
@@ -640,17 +642,19 @@ export default function HeroUploadCard() {
                             {orderMap.get(index) ?? index + 1}
                           </span>
                         </div>
-                        <div className="min-w-0 overflow-hidden">
+                        <div className="flex min-w-0 flex-col justify-center gap-0.5 overflow-hidden -translate-y-[6px] lg:translate-y-0">
                           <div className="flex min-w-0 items-center gap-2 overflow-hidden">
                             <FileText className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
-                            <span className="block min-w-0 truncate whitespace-nowrap text-sm font-semibold text-slate-800">
+                            <span className="block min-w-0 truncate whitespace-nowrap text-sm font-semibold leading-[1.1] text-slate-800">
                               {file.name}
                             </span>
                           </div>
-                          <p className="text-[10px] text-slate-400">{formatBytes(file.size)}</p>
+                          <p className="text-[10px] leading-[1.1] text-slate-400">
+                            {formatBytes(file.size)}
+                          </p>
                         </div>
                         {confirmDeleteIndex === index ? (
-                          <div className="flex items-center justify-end gap-2 self-center pb-[6px] md:pb-0 md:-translate-y-[2px]">
+                          <div className="flex items-center justify-end gap-2 self-center -translate-y-[6px] lg:translate-y-0">
                             <button
                               type="button"
                               onClick={() => setConfirmDeleteIndex(null)}
@@ -672,7 +676,7 @@ export default function HeroUploadCard() {
                           <button
                             type="button"
                             onClick={() => setConfirmDeleteIndex(index)}
-                            className="rounded-md border-2 border-transparent p-1 text-slate-400 transition hover:border-[#6D5EF3] hover:bg-slate-100 hover:text-slate-600"
+                            className="rounded-md border-2 border-transparent p-1 text-slate-400 transition hover:border-[#6D5EF3] hover:bg-slate-100 hover:text-slate-600 -translate-y-[6px] lg:translate-y-0"
                             aria-label={`Remove ${file.name}`}
                             disabled={uiState === "staging"}
                           >
@@ -706,10 +710,10 @@ export default function HeroUploadCard() {
                 >
                   <div className="flex items-center justify-between gap-3 rounded-lg border-2 border-[#6D5EF3]/80 bg-white px-3 py-2">
                     <div className="flex min-w-0 items-center gap-3">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200/80 bg-slate-50 text-slate-400">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200/80 bg-slate-200 text-slate-500">
                         <GripVertical className="h-4 w-4" aria-hidden />
                       </span>
-                      <span className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-200/80 bg-white text-[11px] font-semibold text-slate-500">
+                      <span className="shrink-0 text-[15px] font-semibold text-slate-500">
                         {dragIndex !== null && (insertIndexRef.current ?? insertIndex) !== null
                           ? (insertIndexRef.current ?? insertIndex)! + 1
                           : dragOverlay.index + 1}

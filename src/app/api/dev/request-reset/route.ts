@@ -4,6 +4,9 @@ import { sendResetEmail } from "@/lib/email";
 import { generateSixDigitCode, hashVerificationCode } from "@/lib/verificationCode";
 
 export async function GET(req: Request) {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
   const url = new URL(req.url);
   const email = url.searchParams.get("email") || "";
   const steps: string[] = [];

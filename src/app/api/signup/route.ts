@@ -2,9 +2,18 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { issueSignupVerificationCode } from "@/lib/signupVerification";
+import { isSameOrigin } from "@/lib/requestGuards";
+import { rateLimit } from "@/lib/rateLimit";
 
 export async function POST(req: Request) {
   try {
+    if (!isSameOrigin(req)) {
+      return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
+    }
+    const limit = await rateLimit(req, { keyPrefix: "signup", windowMs: 60_000, max: 5 });
+    if (!limit.ok) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    }
     const { email, password, name } = await req.json();
     const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
 

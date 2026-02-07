@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { generateSixDigitCode, hashVerificationCode } from "@/lib/verificationCode";
 import { sendResetEmail } from "@/lib/email";
 import { randomUUID } from "crypto";
+import { isSameOrigin } from "@/lib/requestGuards";
+import { rateLimit } from "@/lib/rateLimit";
 
 // how many times to retry if "token" hits the unique constraint
 const MAX_TOKEN_RETRIES = 3;
@@ -12,10 +14,6 @@ type Json = Record<string, unknown>;
 
 function ok(json: Json) {
   return NextResponse.json({ ok: true, ...json });
-}
-
-function err(code: string, message: string, extra?: Json) {
-  return NextResponse.json({ ok: false, code, message, ...(extra ?? {}) });
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -27,19 +25,26 @@ function asPrismaError(value: unknown): MaybePrismaError | null {
   return isRecord(value) ? (value as MaybePrismaError) : null;
 }
 
-function toMessage(error: unknown) {
-  if (error instanceof Error) return error.message;
-  return typeof error === "string" ? error : String(error);
-}
 
 export async function POST(req: Request) {
+  if (!isSameOrigin(req)) {
+    return NextResponse.json({ ok: false, code: "INVALID_ORIGIN", message: "Invalid origin." }, { status: 403 });
+  }
+  const limit = await rateLimit(req, { keyPrefix: "reset-request", windowMs: 60_000, max: 5 });
+  if (!limit.ok) {
+    return NextResponse.json(
+      { ok: true, code: "REQUESTED", message: "If an account exists for that email, a reset code has been sent." }
+    );
+  }
   try {
     const rawBody: unknown = await req.json().catch(() => null);
     const email =
       isRecord(rawBody) && typeof rawBody.email === "string" ? rawBody.email : undefined;
     if (!email || !email.includes("@")) {
-      // invalid payload
-      return err("BAD_REQUEST", "Please provide a valid email address.");
+      return ok({
+        code: "REQUESTED",
+        message: "If an account exists for that email, a reset code has been sent.",
+      });
     }
 
     // 1) find user
@@ -50,8 +55,10 @@ export async function POST(req: Request) {
     });
 
     if (!user) {
-      // Explicit message when no account exists for this email
-      return err("EMAIL_NOT_FOUND", "This email isn’t associated with an account.");
+      return ok({
+        code: "REQUESTED",
+        message: "If an account exists for that email, a reset code has been sent.",
+      });
     }
 
     const oauthLinks = await prisma.account.count({
@@ -59,13 +66,17 @@ export async function POST(req: Request) {
     });
 
     if (oauthLinks > 0) {
-      // Any account that uses Google / OAuth should reset via that provider, not here
-      return err("OAUTH_ONLY", "This account uses Google Sign-In.");
+      return ok({
+        code: "REQUESTED",
+        message: "If an account exists for that email, a reset code has been sent.",
+      });
     }
 
     if (!user.password || !user.emailVerified) {
-      // No credentials password, or signup not completed with verification
-      return err("EMAIL_NOT_FOUND", "This email isn’t associated with an account.");
+      return ok({
+        code: "REQUESTED",
+        message: "If an account exists for that email, a reset code has been sent.",
+      });
     }
 
     // 2) generate a 6-digit code and hash it
@@ -104,8 +115,9 @@ export async function POST(req: Request) {
           continue;
         }
         // any other error (or retries exhausted)
-        return err("DB_CREATE_FAILED", "We couldn’t save the reset token.", {
-          debug: { attempt, reason: toMessage(error) },
+        return ok({
+          code: "REQUESTED",
+          message: "If an account exists for that email, a reset code has been sent.",
         });
       }
     }
@@ -114,23 +126,21 @@ export async function POST(req: Request) {
     const emailRes = await sendResetEmail({ to: user.email!, code });
 
     if (!emailRes.ok) {
-      return err(
-        "EMAIL_SEND_FAILED",
-        "We couldn’t send the reset email right now. Please try again in a moment.",
-        {
-          debug: emailRes.error,
-        }
-      );
+      return ok({
+        code: "REQUESTED",
+        message: "If an account exists for that email, a reset code has been sent.",
+      });
     }
 
     // 5) success response (your wording)
     return ok({
-      code: "CODE_SENT",
-      message: "Reset code has been sent. It may take a few minutes to arrive.",
+      code: "REQUESTED",
+      message: "If an account exists for that email, a reset code has been sent.",
     });
   } catch (error) {
-    return err("UNEXPECTED", "Something went wrong. Please try again.", {
-      debug: toMessage(error),
+    return ok({
+      code: "REQUESTED",
+      message: "If an account exists for that email, a reset code has been sent.",
     });
   }
 }

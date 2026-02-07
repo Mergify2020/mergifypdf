@@ -5,12 +5,21 @@ import { verifyLoginTwoFactorCode } from "@/lib/twoFactorLogin";
 import { decode, encode } from "next-auth/jwt";
 import type { JWT } from "next-auth/jwt";
 import { cookies } from "next/headers";
+import { isSameOrigin } from "@/lib/requestGuards";
+import { rateLimit } from "@/lib/rateLimit";
 
 function unauthorized() {
   return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 }
 
 export async function POST(req: Request) {
+  if (!isSameOrigin(req)) {
+    return NextResponse.json({ ok: false, error: "Invalid origin" }, { status: 403 });
+  }
+  const limit = await rateLimit(req, { keyPrefix: "2fa-verify", windowMs: 60_000, max: 8 });
+  if (!limit.ok) {
+    return NextResponse.json({ ok: false, error: "Too many requests" }, { status: 429 });
+  }
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return unauthorized();
 

@@ -3,6 +3,35 @@ import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 import type { JWT } from "next-auth/jwt";
 
+function applySecurityHeaders(res: NextResponse) {
+  const csp = [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "form-action 'self'",
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
+    "style-src 'self' 'unsafe-inline'",
+    "script-src 'self' https://js.stripe.com",
+    "connect-src 'self' https://api.stripe.com",
+    "frame-src 'self' https://js.stripe.com https://checkout.stripe.com",
+  ].join("; ");
+
+  res.headers.set("Content-Security-Policy", csp);
+  res.headers.set("X-Frame-Options", "DENY");
+  res.headers.set("X-Content-Type-Options", "nosniff");
+  res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  if (process.env.NODE_ENV === "production") {
+    res.headers.set(
+      "Strict-Transport-Security",
+      "max-age=63072000; includeSubDomains; preload"
+    );
+  }
+  return res;
+}
+
 export async function middleware(req: NextRequest) {
   const { pathname, searchParams } = req.nextUrl;
 
@@ -15,7 +44,7 @@ export async function middleware(req: NextRequest) {
 
   // Always allow NextAuth internals (including 2FA APIs) to run
   if (isNextAuthApi) {
-    return NextResponse.next();
+    return applySecurityHeaders(NextResponse.next());
   }
 
   const secret = process.env.NEXTAUTH_SECRET;
@@ -31,13 +60,13 @@ export async function middleware(req: NextRequest) {
   if (!token) {
     if (isTwoFactorPage) {
       const url = new URL("/login", req.url);
-      return NextResponse.redirect(url);
+      return applySecurityHeaders(NextResponse.redirect(url));
     }
     if (isProtectedPath) {
       const url = new URL("/login", req.url);
-      return NextResponse.redirect(url);
+      return applySecurityHeaders(NextResponse.redirect(url));
     }
-    return NextResponse.next();
+    return applySecurityHeaders(NextResponse.next());
   }
 
   const twoFactorEnabled = !!token.twoFactorEnabled || token.twoFactorMethod === "email";
@@ -60,7 +89,7 @@ export async function middleware(req: NextRequest) {
 
     if (!isTwoFactorRoute && !isHeroLanding) {
       console.log("REDIRECTING TO 2FA");
-      return NextResponse.redirect(new URL("/2fa", req.url));
+      return applySecurityHeaders(NextResponse.redirect(new URL("/2fa", req.url)));
     }
   }
 
@@ -69,10 +98,10 @@ export async function middleware(req: NextRequest) {
   if (isTwoFactorPage && (!twoFactorEnabled || twoFactorPassed)) {
     const callback = req.nextUrl.searchParams.get("callbackUrl") || "/";
     const url = new URL(callback, req.url);
-    return NextResponse.redirect(url);
+    return applySecurityHeaders(NextResponse.redirect(url));
   }
 
-  return NextResponse.next();
+  return applySecurityHeaders(NextResponse.next());
 }
 
 export const config = {

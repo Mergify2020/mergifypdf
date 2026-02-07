@@ -1,6 +1,7 @@
 // src/app/api/quota/route.ts
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { isSameOrigin } from "@/lib/requestGuards";
 
 const COOKIE = "mpdf_free_used"; // stores YYYY-MM-DD when free used
 
@@ -26,7 +27,10 @@ async function markUsedToday() {
   });
 }
 
-export async function POST() {
+export async function POST(req: Request) {
+  if (!isSameOrigin(req)) {
+    return NextResponse.json({ ok: false, reason: "invalid_origin" }, { status: 403 });
+  }
   if (await hasUsedToday()) {
     return NextResponse.json({ ok: false, reason: "limit_reached" }, { status: 403 });
   }

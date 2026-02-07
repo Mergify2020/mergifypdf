@@ -14,6 +14,7 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
   const isLoginPage = pathname === "/login";
   const isRegisterPage = pathname === "/register";
   const isForgotPasswordPage = pathname === "/forgot-password";
+  const isResetPasswordPage = pathname === "/reset-password";
   const isAnimatedPage = isHomePage || isPricingPage;
 
   const [scrolledPastHero, setScrolledPastHero] = useState(false);
@@ -127,7 +128,7 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
     isHomePage && gradientActive ? "backdrop-blur-0 shadow-none border-transparent" : "";
   const visibilityClass = "translate-y-0 opacity-100";
 
-  if (isLoginPage || isRegisterPage || isForgotPasswordPage) {
+  if (isLoginPage || isRegisterPage || isForgotPasswordPage || isResetPasswordPage) {
     return null;
   }
 

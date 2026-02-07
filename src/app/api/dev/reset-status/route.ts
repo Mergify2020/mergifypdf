@@ -5,6 +5,9 @@ import { prisma } from "@/lib/prisma";
 const THROTTLE_MS = 2 * 60 * 1000; // 2 minutes
 
 export async function GET(req: Request) {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
   try {
     const url = new URL(req.url);
     const email = url.searchParams.get("email");
