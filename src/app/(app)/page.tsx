@@ -87,7 +87,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
       <section className="relative -mt-[calc(76px+env(safe-area-inset-top))] w-full min-h-[46vh] overflow-hidden bg-white pt-[calc(76px+env(safe-area-inset-top))] lg:min-h-[50vh]">
         <div className="pointer-events-none absolute inset-0">
           <Image
-            src="/backgrounds/hero-background-v10.svg"
+            src="/backgrounds/hero-background-v11.svg"
             alt=""
             fill
             className="object-cover object-[50%_50%]"
