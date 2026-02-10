@@ -332,15 +332,18 @@ html.theme-transition ::-webkit-scrollbar-thumb {
 }
 
 header[data-hero="true"] .hero-nav {
-  color: #0f172a;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(15, 23, 42, 0.6);
 }
 
 header[data-hero="true"] .hero-nav-link {
-  color: #0f172a;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(15, 23, 42, 0.6);
 }
 
 header[data-hero="true"] .hero-nav-link:hover {
-  color: #0f172a;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(15, 23, 42, 0.75);
 }
 
 header[data-hero="false"] .hero-nav,
@@ -353,11 +356,18 @@ header[data-hero="false"] .hero-nav-link:hover {
 }
 
 header[data-hero="true"] .hero-auth-link {
-  color: #0f172a;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(15, 23, 42, 0.6);
 }
 
 header[data-hero="true"] .hero-auth-link:hover {
-  color: #0f172a;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(15, 23, 42, 0.75);
+}
+
+header[data-hero="true"] .app-brand-light,
+header[data-hero="true"] .app-brand-dark {
+  filter: drop-shadow(0 0.5px 1px rgba(15, 23, 42, 0.8));
 }
 
 header[data-hero="false"] .hero-auth-link {
@@ -369,15 +379,17 @@ header[data-hero="false"] .hero-auth-link:hover {
 }
 
 .hero-stats .hero-stat-value {
-  color: #0f172a;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(15, 23, 42, 0.6);
 }
 
 .hero-stats .hero-stat-label {
-  color: rgba(15, 23, 42, 0.8);
+  color: rgba(255, 255, 255, 0.8);
+  text-shadow: 0 1px 2px rgba(15, 23, 42, 0.6);
 }
 
 .hero-stats .hero-stat-divider {
-  border-color: rgba(15, 23, 42, 0.2);
+  border-color: rgba(255, 255, 255, 0.35);
 }
 
 

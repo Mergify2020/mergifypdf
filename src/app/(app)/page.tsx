@@ -84,10 +84,10 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
   return (
     <>
       <FeaturesAutoScroll />
-      <div className="relative">
+      <section className="relative -mt-[calc(76px+env(safe-area-inset-top))] w-full min-h-[46vh] overflow-hidden pt-[calc(76px+env(safe-area-inset-top))] lg:min-h-[50vh]">
         <div className="pointer-events-none absolute inset-0">
           <Image
-            src="/backgrounds/hero-background-v17.svg"
+            src="/backgrounds/hero-background-v19.svg"
             alt=""
             fill
             className="object-cover object-[50%_100%]"
@@ -95,18 +95,16 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
             priority={false}
           />
         </div>
-
-        <section className="relative -mt-[calc(76px+env(safe-area-inset-top))] w-full min-h-[46vh] overflow-hidden pt-[calc(76px+env(safe-area-inset-top))] lg:min-h-[50vh]">
           <div className="relative mx-auto w-full max-w-[1400px] px-4 pt-6 pb-8 sm:px-6 sm:pt-10 sm:pb-10 lg:px-8 lg:pt-12 lg:pb-12">
             <div className="grid gap-3 lg:grid-cols-[minmax(0,620px)_minmax(0,760px)] lg:items-stretch">
-            <div className="space-y-6 text-center lg:space-y-8 lg:col-start-1 lg:flex lg:h-full lg:flex-col lg:pt-3 lg:text-left lg:self-stretch">
+              <div className="space-y-6 text-center lg:space-y-8 lg:col-start-1 lg:flex lg:h-full lg:flex-col lg:pt-3 lg:text-left lg:self-stretch">
                 <RevealOnScroll as="div">
-                <h1 className="text-[clamp(2rem,3.2vw,2.8rem)] font-bold leading-[1.08] tracking-tight text-[#0f172a] lg:text-balance">
+                <h1 className="text-[clamp(2rem,3.2vw,2.8rem)] font-bold leading-[1.08] tracking-tight text-white drop-shadow-[0_1px_2px_rgba(15,23,42,0.6)] lg:text-balance">
                     Merge, edit, and sign documents in minutes.
                   </h1>
                 </RevealOnScroll>
                 <RevealOnScroll as="div">
-                <p className="text-[1.125rem] font-bold leading-relaxed text-[#0f172a]">
+                <p className="text-[1.125rem] font-bold leading-relaxed text-white drop-shadow-[0_1px_2px_rgba(15,23,42,0.6)]">
                     No installs. No clutter. Upload and finish fast.{" "}
                   <span className="whitespace-nowrap lg:block lg:whitespace-normal">
                     Your work stays saved.
@@ -123,7 +121,9 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
                       >
                         ✓
                       </span>
-                      <span className="font-bold text-[#0f172a]">{badge}</span>
+                      <span className="font-bold text-white drop-shadow-[0_1px_2px_rgba(15,23,42,0.6)]">
+                        {badge}
+                      </span>
                     </div>
                   ))}
                   </div>
@@ -136,12 +136,11 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
               <HeroUploadAndBullets />
             </div>
           </div>
-        </section>
+      </section>
 
-        <RevealOnScroll as="div" className="relative w-full bg-transparent">
-          <LogoCarousel />
-        </RevealOnScroll>
-      </div>
+      <RevealOnScroll as="div" className="w-full bg-[#F4F6FF]">
+        <LogoCarousel />
+      </RevealOnScroll>
 
       <HeroFeatureArea />
     </>

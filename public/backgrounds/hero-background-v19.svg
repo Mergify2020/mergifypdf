@@ -1,0 +1,12 @@
+<svg viewBox="0 0 1440 900" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="0">
+      <!-- Dark SaaS purple (left) -->
+      <stop offset="0%" stop-color="#3730A3"></stop>
+      <!-- Light SaaS purple (right) -->
+      <stop offset="100%" stop-color="#A5B4FC"></stop>
+    </linearGradient>
+  </defs>
+
+  <rect width="1440" height="900" fill="url(#bg)"></rect>
+</svg>
