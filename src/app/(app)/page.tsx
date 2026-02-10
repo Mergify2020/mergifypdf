@@ -87,14 +87,15 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
       <section className="relative -mt-[calc(76px+env(safe-area-inset-top))] w-full min-h-[46vh] overflow-hidden pt-[calc(76px+env(safe-area-inset-top))] lg:min-h-[50vh]">
         <div className="pointer-events-none absolute inset-0">
           <Image
-            src="/backgrounds/hero-background-v19.svg"
+            src="/backgrounds/login-page-background-v5.svg"
             alt=""
             fill
-            className="object-cover object-[50%_100%]"
-            style={{ transform: "scale(1.08)" }}
+            className="object-cover object-left sm:object-center"
+            style={{ transform: "scaleX(-1)" }}
             priority={false}
           />
         </div>
+        <div className="pointer-events-none absolute inset-0 bg-black/20" />
           <div className="relative mx-auto w-full max-w-[1400px] px-4 pt-6 pb-8 sm:px-6 sm:pt-10 sm:pb-10 lg:px-8 lg:pt-12 lg:pb-12">
             <div className="grid gap-3 lg:grid-cols-[minmax(0,620px)_minmax(0,760px)] lg:items-stretch">
               <div className="space-y-6 text-center lg:space-y-8 lg:col-start-1 lg:flex lg:h-full lg:flex-col lg:pt-3 lg:text-left lg:self-stretch">
