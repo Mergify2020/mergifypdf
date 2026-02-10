@@ -211,7 +211,7 @@ export default function PricingPlans() {
             }
 
             const showAnnual = billingPeriod === "annual" && yearlyPrice;
-            const displayedPrice = showAnnual ? yearlyPrice : tier.price;
+            const displayedPrice = (showAnnual ? yearlyPrice : tier.price) ?? "";
             const [priceAmount, priceSuffix] = displayedPrice.split(" per ");
 
             const titleClass =
