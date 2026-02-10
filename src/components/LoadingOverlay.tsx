@@ -10,6 +10,8 @@ type Props = {
   variant?: "fullscreen" | "container";
   backdropClassName?: string;
   panelClassName?: string;
+  spinnerClassName?: string;
+  labelClassName?: string;
 };
 
 export default function LoadingOverlay({
@@ -19,6 +21,8 @@ export default function LoadingOverlay({
   variant = "fullscreen",
   backdropClassName,
   panelClassName,
+  spinnerClassName,
+  labelClassName,
 }: Props) {
   const [mounted, setMounted] = useState(false);
 
@@ -38,6 +42,12 @@ export default function LoadingOverlay({
       ? "rounded-2xl border border-white/15 bg-white/10 px-8 py-6 text-white shadow-[0_22px_60px_rgba(15,23,42,0.35)]"
       : "rounded-2xl border border-slate-200 bg-white px-8 py-6 text-slate-900 shadow-[0_22px_60px_rgba(15,23,42,0.12)]");
 
+  const resolvedSpinnerClassName =
+    spinnerClassName ??
+    (variant === "fullscreen"
+      ? "border-white/30 border-t-white"
+      : "border-slate-300 border-t-slate-700");
+
   const overlay = (
     <div
       className={`${variant === "fullscreen" ? "fixed" : "absolute"} inset-0 ${zIndexClassName} isolate flex items-center justify-center`}
@@ -49,12 +59,10 @@ export default function LoadingOverlay({
         aria-live="polite"
       >
         <div
-          className={`h-10 w-10 animate-spin rounded-full border-4 ${
-            variant === "fullscreen" ? "border-white/30 border-t-white" : "border-slate-300 border-t-slate-700"
-          }`}
+          className={`h-10 w-10 animate-spin rounded-full border-4 ${resolvedSpinnerClassName}`}
           aria-hidden
         />
-        <p className="mt-4 text-sm font-semibold">{label}</p>
+        <p className={`mt-4 text-sm font-semibold ${labelClassName ?? ""}`}>{label}</p>
       </div>
     </div>
   );

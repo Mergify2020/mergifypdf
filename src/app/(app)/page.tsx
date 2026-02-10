@@ -84,27 +84,37 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
   return (
     <>
       <FeaturesAutoScroll />
-      <section className="relative -mt-[calc(76px+env(safe-area-inset-top))] w-full overflow-x-hidden bg-gradient-to-r from-[rgba(218,236,255,0.95)] via-[rgba(224,230,255,0.7)] to-[rgba(206,210,255,0.85)] pt-[calc(76px+env(safe-area-inset-top))]">
+      <section className="relative -mt-[calc(76px+env(safe-area-inset-top))] w-full min-h-[46vh] overflow-hidden bg-white pt-[calc(76px+env(safe-area-inset-top))] lg:min-h-[50vh]">
+        <div className="pointer-events-none absolute inset-0">
+          <Image
+            src="/backgrounds/hero-background-v10.svg"
+            alt=""
+            fill
+            className="object-cover object-[50%_50%]"
+            style={{ transform: "scale(1.08)" }}
+            priority={false}
+          />
+        </div>
         <div className="relative mx-auto w-full max-w-[1400px] px-4 pt-6 pb-8 sm:px-6 sm:pt-10 sm:pb-10 lg:px-8 lg:pt-12 lg:pb-12">
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,620px)_minmax(0,760px)] lg:items-start">
-            <div className="space-y-6 text-center lg:col-start-1 lg:pt-3 lg:text-left">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,620px)_minmax(0,760px)] lg:items-stretch">
+            <div className="space-y-6 text-center lg:col-start-1 lg:flex lg:h-full lg:flex-col lg:pt-3 lg:text-left lg:self-stretch">
               <RevealOnScroll as="div">
-                <h1 className="text-balance text-[clamp(2rem,3.2vw,2.8rem)] font-bold leading-[1.08] tracking-tight">
+                <h1 className="text-balance text-[clamp(2rem,3.2vw,2.8rem)] font-bold leading-[1.08] tracking-tight text-white drop-shadow-[0_2px_10px_rgba(15,23,42,0.35)]">
                   Merge, edit, and sign documents in minutes.
                 </h1>
               </RevealOnScroll>
               <RevealOnScroll as="div">
-                <p className="text-[1.125rem] font-medium leading-relaxed text-slate-700">
+                <p className="text-[1.125rem] font-medium leading-relaxed text-white/85">
                   No installs. No clutter. Upload and finish fast.{" "}
                   <span className="whitespace-nowrap">Your work stays saved.</span>
                 </p>
               </RevealOnScroll>
-              <RevealOnScroll as="div" className="hidden space-y-5 text-left lg:block">
-                <div className="flex flex-col items-start gap-y-3 text-sm text-slate-600">
+              <RevealOnScroll as="div" className="hidden text-left lg:flex lg:flex-1 lg:flex-col lg:gap-8 lg:mt-auto">
+                <div className="flex flex-col items-start gap-y-3 text-sm text-white/80 lg:mt-3">
                   {["Upload and start instantly", "Fast, reliable, and secure", "Runs right in your browser"].map((badge) => (
-                    <div key={badge} className="flex items-center gap-3 text-[1rem] font-semibold text-slate-700">
+                    <div key={badge} className="flex items-center gap-3 text-[1rem] font-semibold text-white/90">
                       <span
-                        className="flex h-6 w-6 items-center justify-center rounded-full bg-[#6D5EF3] text-[12px] text-white shadow-[0_6px_16px_rgba(109,94,243,0.25)]"
+                        className="flex h-6 w-6 items-center justify-center rounded-full bg-white/15 text-[12px] text-white shadow-[0_6px_16px_rgba(15,23,42,0.25)] ring-1 ring-white/20"
                         aria-hidden="true"
                       >
                         ✓
@@ -113,8 +123,8 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
                     </div>
                   ))}
                 </div>
-                <div className="flex justify-start">
-                  <HeroStats />
+                <div className="flex justify-start text-white/90 lg:mt-auto lg:mb-2">
+                  <HeroStats className="hero-stats" />
                 </div>
               </RevealOnScroll>
             </div>

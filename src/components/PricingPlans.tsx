@@ -2,34 +2,21 @@
 
 import Image from "next/image";
 import { Fragment, useState } from "react";
-import { Check, X } from "lucide-react";
+import { Check, Layers, X } from "lucide-react";
 
 const tiers = [
   {
-    name: "Starter Plan",
-    price: "FREE",
-    detail: "",
-    description: "",
-    pricePanel: "bg-white/80",
-    features: [
-      "1 document edit per day",
-      "Store up to 3 projects",
-      "Full document editing",
-      "Self-sign documents",
-    ],
-  },
-  {
     name: "Essential Plus",
-    price: "$9.95 / Month",
-    secondaryPrice: "$95 / Year — Save 20% Compared to Monthly",
+    price: "$12.99 per month",
+    secondaryPrice: "$7.99 per month — Save 20% Compared to Monthly",
     detail: "Per user / month",
-    accent: "from-[#FFB480] to-[#FF8A4E]",
-    overlay: "from-orange-300/30 to-transparent",
-    button: "bg-[#FF8A4E]",
-    pricePanel: "bg-white/80",
-    description: "",
-    features: [
-      "Unlimited document uploads",
+            accent: "from-[#FFB480] to-[#FF8A4E]",
+            overlay: "from-orange-300/30 to-transparent",
+            button: "bg-[#FF8A4E]",
+            pricePanel: "bg-white",
+            description: "",
+            features: [
+              "Unlimited document uploads",
       "Unlimited project storage",
       "Full document editing",
       "Document templates",
@@ -39,18 +26,17 @@ const tiers = [
   },
   {
     name: "Signature Pro",
-    price: "$14.95 / Month",
-    secondaryPrice: "$149 / Year — Save 20% Compared to Monthly",
+    price: "$19.99 per month",
+    secondaryPrice: "$11.99 per month — Save 20% Compared to Monthly",
     detail: "Per user / month",
-    accent: "from-[#A9C7FF] via-[#7BA8F4] to-[#4D74C8]",
-    overlay: "from-sky-200/25 to-transparent",
-    button: "bg-[#4D74C8]",
-    badge: "MOST POPULAR",
+            accent: "from-[#A9C7FF] via-[#7BA8F4] to-[#4D74C8]",
+            overlay: "from-sky-200/25 to-transparent",
+            button: "bg-[#4D74C8]",
     description: "",
-    pricePanel: "bg-white/80",
-    features: [
-      "Everything in Essential Plus",
-      "Access to Mergify Sign dashboard",
+            pricePanel: "bg-white",
+            features: [
+              "Everything in Essential Plus",
+              "Access to Mergify Sign dashboard",
       "10 signature requests per month",
       "Multiple signers per document",
       "Automatic email reminders",
@@ -112,12 +98,7 @@ export default function PricingPlans() {
     },
   };
 
-  async function handleSelectPlan(tierName: string) {
-    if (tierName === "Starter Plan") {
-      window.location.href = "/pricing";
-      return;
-    }
-
+  async function handleSelectPlan(tierName: string, options?: { skipTrial?: boolean }) {
     const tierPrices = PRICE_IDS[tierName];
     const priceId = tierPrices?.[billingPeriod];
 
@@ -131,7 +112,7 @@ export default function PricingPlans() {
       const res = await fetch("/api/billing/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ priceId }),
+        body: JSON.stringify({ priceId, skipTrial: options?.skipTrial === true }),
       });
 
       if (res.status === 401) {
@@ -156,44 +137,54 @@ export default function PricingPlans() {
   }
 
   return (
-    <div className="pricing-gradient min-h-screen px-4 py-12 text-slate-900 lg:px-6">
-      <div className="mx-auto w-full max-w-7xl space-y-10 px-4 lg:px-6">
-        <div className="text-center sm:flex sm:items-center sm:justify-between sm:text-left">
-          <h1 className="text-4xl font-semibold tracking-tight">
-            <span className="bg-gradient-to-r from-sky-700 via-sky-500 to-indigo-500 bg-clip-text text-transparent">
-              Choose the workspace built for your workflow.
-            </span>
+    <div className="relative min-h-screen overflow-hidden bg-white px-4 py-12 text-slate-900 lg:px-6">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[420px]">
+        <Image
+          src="/backgrounds/login-page-background-v5.svg"
+          alt=""
+          fill
+          className="object-cover object-[50%_10%] scale-[1.08]"
+          priority={false}
+        />
+      </div>
+      <div className="relative mx-auto w-full max-w-7xl space-y-10 px-4 lg:px-6">
+        <div className="text-center">
+          <h1 className="text-4xl font-semibold tracking-tight text-white">
+            Choose the plan that fits your needs.
           </h1>
-          <div className="mt-8 flex justify-center sm:mt-0 sm:justify-end">
-            <div className="inline-flex items-center rounded-full bg-gradient-to-r from-sky-400 via-sky-600 to-indigo-500 p-[3px] text-sm font-semibold shadow-sm">
-              <div className="inline-flex items-center rounded-full bg-white px-1.5 py-1.5">
-              <button
-                type="button"
-                onClick={() => setBillingPeriod("monthly")}
-                className={`min-w-[112px] rounded-full px-5 py-2 whitespace-nowrap transition-colors ${
-                  billingPeriod === "monthly"
-                    ? "bg-black text-white shadow-sm"
-                    : "text-slate-900 hover:text-slate-700"
-                }`}
-              >
-                Monthly
-              </button>
-              <button
-                type="button"
-                onClick={() => setBillingPeriod("annual")}
-                className={`min-w-[140px] rounded-full px-5 py-2 whitespace-nowrap transition-colors ${
-                  billingPeriod === "annual"
-                    ? "bg-black text-white shadow-sm"
-                    : "text-slate-900 hover:text-slate-700"
-                }`}
-              >
+          <p className="mt-3 text-4xl font-semibold tracking-tight text-white/90">
+            Try our 3-day free trial to access all features.
+          </p>
+          <div className="mt-6 flex justify-center">
+            <div className="inline-flex items-center rounded-full border border-white/50 bg-white/15 p-[3px] text-sm font-semibold backdrop-blur">
+              <div className="inline-flex items-center rounded-full">
+                <button
+                  type="button"
+                  onClick={() => setBillingPeriod("monthly")}
+                  className={`min-w-[112px] rounded-full px-5 py-2 whitespace-nowrap transition-colors ${
+                    billingPeriod === "monthly"
+                    ? "bg-white text-slate-900 shadow-[0_6px_16px_rgba(15,23,42,0.18)]"
+                    : "text-white/80 hover:text-white"
+                  }`}
+                >
+                  Monthly
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBillingPeriod("annual")}
+                  className={`min-w-[140px] rounded-full px-5 py-2 whitespace-nowrap transition-colors ${
+                    billingPeriod === "annual"
+                    ? "bg-white text-slate-900 shadow-[0_6px_16px_rgba(15,23,42,0.18)]"
+                    : "text-white/80 hover:text-white"
+                  }`}
+                >
                 Annual ·{" "}
                 <span
                   className={`font-semibold ${
                     billingPeriod === "annual" ? "text-emerald-600" : "text-emerald-500"
                   }`}
                 >
-                  SAVE 20%
+                  SAVE UP TO 42%
                 </span>
               </button>
               </div>
@@ -201,10 +192,9 @@ export default function PricingPlans() {
           </div>
         </div>
 
-        <div className="mx-auto grid max-w-7xl gap-10 md:grid-cols-2 xl:grid-cols-3">
+        <div className="mx-auto grid max-w-4xl justify-center gap-10 md:grid-cols-2">
           {tiers.map((tier) => {
             const isPremium = Boolean(tier.badge);
-            const isFree = tier.name === "Starter Plan";
             let yearlyPrice: string | null = null;
             let savingsLabel: string | null = null;
 
@@ -217,158 +207,150 @@ export default function PricingPlans() {
                 savingsLabel = mainPart.trim().toUpperCase();
               }
             }
+            if (billingPeriod === "annual") {
+              savingsLabel = tier.name === "Essential Plus" ? "SAVE 42%" : "SAVE 37%";
+            }
 
-            const showAnnual = !isFree && billingPeriod === "annual" && yearlyPrice;
+            const showAnnual = billingPeriod === "annual" && yearlyPrice;
+            const displayedPrice = showAnnual ? yearlyPrice : tier.price;
+            const [priceAmount, priceSuffix] = displayedPrice.split(" per ");
 
             const titleClass =
-              tier.name === "Starter Plan"
-                ? "text-[2rem] md:text-[1.9rem] font-bold leading-snug text-[#6B7280]"
-                : tier.name === "Essential Plus"
-                  ? "text-[2.2rem] md:text-[2.1rem] font-bold leading-snug bg-gradient-to-r from-sky-500 to-emerald-400 bg-clip-text text-transparent"
-                  : "text-[2.2rem] md:text-[2.1rem] font-bold leading-snug bg-gradient-to-r from-purple-500 to-sky-500 bg-clip-text text-transparent";
+              tier.name === "Essential Plus"
+                ? "text-[2.2rem] md:text-[2.1rem] font-bold leading-snug bg-gradient-to-r from-sky-500 to-emerald-400 bg-clip-text text-transparent"
+                : "text-[2.2rem] md:text-[2.1rem] font-bold leading-snug bg-gradient-to-r from-purple-500 to-sky-500 bg-clip-text text-transparent";
 
             return (
-	              <div
-	                key={tier.name}
-	                className={`frosted-card flex h-full flex-col overflow-hidden rounded-[24px] px-8 py-6 transition-transform duration-150 ${
-	                  isPremium ? "ring-1 ring-purple-200/60" : ""
-	                }`}
-	              >
+              <div
+                key={tier.name}
+                className={`flex h-full flex-col overflow-hidden rounded-[12px] border-[3px] border-slate-300 bg-white px-8 pt-4 pb-8 shadow-[0_10px_24px_rgba(15,23,42,0.10)] transition-transform duration-150 ${
+                  isPremium ? "ring-1 ring-purple-200/60" : ""
+                }`}
+              >
                 <div className="relative z-10 flex h-full flex-col">
-	                  <div
-	                    className={`relative h-[220px] overflow-hidden rounded-[20px] border border-white/50 bg-white/75 px-6 py-4 text-slate-900 shadow-[0_8px_24px_rgba(0,0,0,0.12)] backdrop-blur-md ${
-	                      isPremium ? "ring-1 ring-white/60" : ""
-	                    }`}
-	                  >
-                    <div className="relative z-10">
-                      <div className="mb-3 flex h-7 items-center">
-                        {tier.badge ? (
-                          <span className="inline-flex items-center gap-2 rounded-full bg-purple-600 px-5 py-1.5 text-xs font-semibold uppercase tracking-wide text-white shadow-md">
-                            <span className="h-2 w-2 rounded-full bg-white/90" />
-                            {tier.badge}
-                          </span>
+                  <div className="relative z-10 mt-2">
+                    <div className="pt-1">
+                      <h2 className={titleClass}>
+                        {tier.name}
+                      </h2>
+                      <div className="mt-6">
+                        <div className="flex items-center gap-2">
+                          <p
+                            key={displayedPrice}
+                            className="price-swap whitespace-nowrap text-[2.8rem] md:text-[3.1rem] font-normal leading-tight tracking-tight text-slate-900"
+                          >
+                            {priceAmount}
+                          </p>
+                          {priceSuffix ? (
+                            <span key={priceSuffix} className="price-swap text-lg font-medium text-slate-500">
+                              per {priceSuffix}
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className={`mt-0.5 ${billingPeriod === "annual" ? "h-4" : "h-0"}`} />
+                        <div
+                          className={`flex items-center gap-2 transition-all duration-200 ${
+                            billingPeriod === "annual"
+                              ? "mt-0 translate-y-0 opacity-100"
+                              : "pointer-events-none mt-[-10px] translate-y-1 opacity-0"
+                          }`}
+                        >
+                          <p className="text-lg font-medium text-slate-500">Billed annually</p>
+                          {billingPeriod === "annual" && savingsLabel ? (
+                            <span className="rounded-full bg-emerald-100 px-3 py-1.5 text-[12px] font-bold uppercase tracking-wide text-emerald-700">
+                              {savingsLabel}
+                            </span>
+                          ) : null}
+                        </div>
+                        {tier.description ? (
+                          <p className="mt-3 text-sm leading-snug text-slate-700">{tier.description}</p>
                         ) : null}
                       </div>
-                      <div className="pt-1">
-                        <h2 className={titleClass}>
-                          {tier.name}
-                        </h2>
-		                          <div className="mt-6">
-	                            <div className="flex items-baseline gap-2">
-		                              <p className="whitespace-nowrap text-[2.3rem] md:text-4xl font-semibold leading-tight text-slate-900">
-	                                {showAnnual ? yearlyPrice : tier.price}
-	                              </p>
-	                            </div>
-	                            <div className="mt-1 flex h-5 items-center gap-2">
-	                              {!isFree && billingPeriod === "annual" && savingsLabel ? (
-	                                <>
-	                                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-emerald-700">
-	                                    {savingsLabel}
-	                                  </span>
-	                                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-	                                    Compared to monthly
-	                                  </span>
-	                                </>
-	                              ) : null}
-	                            </div>
-	                          {isFree && tier.detail ? (
-	                            <p className="mt-2 text-xs font-medium uppercase tracking-wide text-slate-600">
-	                              {tier.detail}
-	                            </p>
-	                          ) : null}
-	                          {tier.description ? (
-	                            <p className="mt-3 text-sm leading-snug text-slate-700">{tier.description}</p>
-	                          ) : null}
-	                        </div>
-	                      </div>
                     </div>
                   </div>
-                  <ul className="mt-4 flex-1 space-y-3 text-sm text-slate-800">
-                    {tier.features.map((feature) => {
-                      if (isPremium && feature === "Everything in Basic") return null;
-                      return (
-                        <li key={feature} className="flex items-center gap-2">
-                          <span
-                            className="inline-flex h-6 w-6 flex-none items-center justify-center rounded-full bg-white shadow-sm"
-                          >
-                            <div
-                              className={`h-1 w-3 flex-none rounded-full ${
-	                                  tier.name === "Starter Plan"
-	                                    ? "bg-[#9CA3AF]"
-	                                    : tier.name === "Essential Plus"
-	                                      ? "bg-sky-500"
-	                                      : "bg-indigo-500"
-	                                }`}
-                            />
-                          </span>
-	                          {tier.name === "Signature Pro" && feature === "Everything in Essential Plus" ? (
-	                            <span className="inline-flex items-center rounded-full bg-gradient-to-r from-sky-500 to-emerald-400 p-[1.5px]">
-	                              <span className="inline-flex items-center rounded-full bg-white px-3 py-1">
-	                                <span className="bg-gradient-to-r from-sky-500 to-emerald-400 bg-clip-text text-sm font-semibold text-transparent">
-	                                  {feature}
-	                                </span>
-	                              </span>
-	                            </span>
-		                          ) : (
-		                            <span className="font-semibold text-slate-900">{feature}</span>
-		                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
                   <button
                     type="button"
                     disabled={loadingPlan === tier.name}
                     onClick={() => void handleSelectPlan(tier.name)}
-                    className={`mt-6 w-full rounded-full border-4 border-white/90 px-4 py-2.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-all duration-150 ${
-	                      isFree
-	                        ? "border-transparent bg-[#374151]"
-	                        : isPremium
-	                          ? "bg-gradient-to-r from-purple-500 to-sky-500 hover:scale-[1.01]"
-	                          : tier.name === "Essential Plus"
-	                            ? "bg-gradient-to-r from-sky-500 to-emerald-400 hover:scale-[1.01]"
-	                            : "bg-black"
+                    className={`${
+                      billingPeriod === "monthly" ? "mt-2" : "mt-4"
+                    } w-full rounded-[12px] border-4 border-white/90 px-4 py-2.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-all duration-150 ${
+                      "bg-[#0F172A] hover:scale-[1.01] hover:bg-[#0B1220]"
                     } ${loadingPlan === tier.name ? "opacity-70 cursor-not-allowed" : ""}`}
                   >
-                    {loadingPlan === tier.name ? "Redirecting..." : "Select Plan"}
-                  </button>
-                  <div className="mt-2 flex h-6 sm:h-7 justify-center">
-                    {!isFree && (
-                      <div className="inline-flex items-center gap-2 text-[11px] font-semibold text-slate-900 opacity-80">
-                        <span className="tracking-[0.18em] uppercase">Payments secured by</span>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src="/stripe-logo.png"
-                          alt="Stripe"
-                          className="h-6 sm:h-7 w-auto rounded-md opacity-90 transition-opacity hover:opacity-100"
-                        />
-                      </div>
+                    {loadingPlan === tier.name ? "Redirecting..." : (
+                      <span className="inline-flex items-center justify-center gap-2">
+                        Start 3-day trial
+                        <span aria-hidden>→</span>
+                      </span>
                     )}
+                  </button>
+                  <div className="mt-3 flex flex-col items-center gap-2 text-xs font-semibold text-slate-900/80">
+                    <button
+                      type="button"
+                      onClick={() => void handleSelectPlan(tier.name, { skipTrial: true })}
+                      className="text-xs font-semibold text-slate-700 underline underline-offset-4 hover:text-slate-900"
+                    >
+                      Skip trial
+                    </button>
                   </div>
+                  <ul className="mt-6 flex-1 space-y-3 text-sm text-slate-800">
+                    {tier.features.map((feature) => {
+                      const isEssentialPlusRow =
+                        tier.name === "Signature Pro" && feature === "Everything in Essential Plus";
+                      return (
+                        <li key={feature} className="flex items-center gap-2">
+                          <span
+                            className={`inline-flex h-5 w-5 flex-none items-center justify-center rounded-full ${
+                              isEssentialPlusRow
+                                ? "bg-gradient-to-r from-sky-500 to-emerald-400"
+                                : tier.name === "Essential Plus"
+                                  ? "bg-sky-500"
+                                  : "bg-indigo-500"
+                            }`}
+                          >
+                            {isEssentialPlusRow ? (
+                              <Layers className="h-3 w-3 text-white" strokeWidth={3} aria-hidden="true" />
+                            ) : (
+                              <Check className="h-3 w-3 text-white" strokeWidth={3} aria-hidden="true" />
+                            )}
+                          </span>
+                          <span className="font-semibold text-slate-900">{feature}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </div>
               </div>
             );
           })}
         </div>
+        <div className="mt-6 flex h-6 sm:h-7 justify-center">
+          <div className="inline-flex items-center gap-2 text-xs font-medium text-slate-600">
+            <span>Payments powered by</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logos/Stripe-Logo-v3.png"
+              alt="Stripe"
+              className="h-5 sm:h-6 w-auto rounded-md opacity-90 transition-opacity hover:opacity-100"
+            />
+          </div>
+        </div>
 
-	        <div className="mt-16 frosted-card rounded-[40px] p-6 text-sm text-slate-900 lg:p-8">
+	        <div className="mt-16 rounded-[40px] border border-slate-200 bg-white p-6 text-sm text-slate-900 shadow-[0_18px_45px_rgba(15,23,42,0.1)] lg:p-8">
 	          <p className="mb-6 text-center text-3xl font-semibold tracking-tight text-slate-900">Compare Our Plans</p>
-          <div className="overflow-hidden rounded-3xl bg-white/75 shadow-inner">
+          <div className="overflow-hidden rounded-3xl bg-white shadow-inner">
             <table className="mx-auto w-full table-fixed text-xs sm:text-sm text-slate-800">
               <thead className="bg-black text-[10px] sm:text-sm font-semibold text-white text-center sm:text-left">
                 <tr>
                   <th className="hidden px-5 py-4 text-left text-[11px] sm:text-base font-semibold text-white sm:table-cell">
                     Features
                   </th>
-                  <th className="w-1/3 px-3 py-4 text-center text-[11px] sm:w-auto sm:text-base font-bold tracking-normal text-white">
-                    <span className="block sm:inline">Starter</span>{" "}
-                    <span className="block sm:inline">Plan</span>
-                  </th>
-                  <th className="w-1/3 px-3 py-4 text-center text-[11px] sm:w-auto sm:text-base font-bold tracking-normal text-white">
+                  <th className="w-1/2 px-3 py-4 text-center text-[11px] sm:w-auto sm:text-base font-bold tracking-normal text-white">
                     <span className="block sm:inline">Essential</span>{" "}
                     <span className="block sm:inline">Plus</span>
                   </th>
-                  <th className="w-1/3 px-3 py-4 text-center text-[11px] sm:w-auto sm:text-base font-bold tracking-normal text-white">
+                  <th className="w-1/2 px-3 py-4 text-center text-[11px] sm:w-auto sm:text-base font-bold tracking-normal text-white">
                     <span className="block sm:inline">Signature</span>{" "}
                     <span className="block sm:inline">Pro</span>
                   </th>
@@ -376,15 +358,15 @@ export default function PricingPlans() {
               </thead>
               <tbody className="text-slate-700">
                 {[
-                  { feature: "Daily Uploads", basic: "1 Per Day", pro: "Unlimited", business: "Unlimited" },
-                  { feature: "Project Storage", basic: "5 Documents", pro: "Unlimited", business: "Unlimited" },
-                  { feature: "Document Editing", basic: true, pro: true, business: true },
-                  { feature: "Self-Sign Documents", basic: true, pro: true, business: true },
-                  { feature: "Templates", basic: false, pro: true, business: true },
-                  { feature: "AI Document Tools", basic: false, pro: true, business: true },
-                  { feature: "Access to Mergify Sign", basic: false, pro: false, business: true },
-                  { feature: "Signature Tracking", basic: false, pro: false, business: true },
-                  { feature: "Outgoing Signature Requests", basic: false, pro: false, business: "10 Per Month" },
+                  { feature: "Daily Uploads", essential: "Unlimited", pro: "Unlimited" },
+                  { feature: "Project Storage", essential: "Unlimited", pro: "Unlimited" },
+                  { feature: "Document Editing", essential: true, pro: true },
+                  { feature: "Self-Sign Documents", essential: true, pro: true },
+                  { feature: "Templates", essential: true, pro: true },
+                  { feature: "AI Document Tools", essential: true, pro: true },
+                  { feature: "Access to Mergify Sign", essential: false, pro: true },
+                  { feature: "Signature Tracking", essential: false, pro: true },
+                  { feature: "Outgoing Signature Requests", essential: false, pro: "10 Per Month" },
                 ].map((row) => (
                   <Fragment key={row.feature}>
                     <tr key={`${row.feature}-label`} className="sm:hidden">
@@ -402,14 +384,11 @@ export default function PricingPlans() {
                       <td className="hidden px-5 py-5 text-xs sm:text-sm font-semibold text-slate-900 sm:table-cell">
                         {row.feature}
                       </td>
-                      <td className="w-1/3 px-3 py-3 sm:py-5 text-center text-xs sm:w-auto sm:text-sm font-semibold text-slate-900">
-                        {renderValue((row as any).basic)}
+                      <td className="w-1/2 px-3 py-3 sm:py-5 text-center text-xs sm:w-auto sm:text-sm font-semibold text-slate-900">
+                        {renderValue((row as any).essential)}
                       </td>
-                      <td className="w-1/3 px-3 py-3 sm:py-5 text-center text-xs sm:w-auto sm:text-sm font-semibold text-slate-900">
+                      <td className="w-1/2 px-3 py-3 sm:py-5 text-center text-xs sm:w-auto sm:text-sm font-semibold text-slate-900">
                         {renderValue((row as any).pro)}
-                      </td>
-                      <td className="w-1/3 px-3 py-3 sm:py-5 text-center text-xs sm:w-auto sm:text-sm font-semibold text-slate-900">
-                        {renderValue((row as any).business)}
                       </td>
                     </tr>
                   </Fragment>
@@ -419,7 +398,7 @@ export default function PricingPlans() {
           </div>
         </div>
 
-	        <div className="frosted-card rounded-[46px] p-8 text-slate-900">
+	        <div className="rounded-[46px] border border-slate-200 bg-white p-8 text-slate-900 shadow-[0_18px_45px_rgba(15,23,42,0.1)]">
 	          <p className="mb-8 text-center text-3xl font-semibold tracking-tight text-slate-900">
 	            Frequently Asked Questions
 	          </p>
@@ -427,7 +406,7 @@ export default function PricingPlans() {
             {faqs.map((faq) => (
               <div
                 key={faq.question}
-                className="rounded-3xl bg-white/75 p-6 text-slate-900 shadow-inner"
+                className="rounded-3xl bg-white p-6 text-slate-900 shadow-inner"
               >
                 <h3 className="text-base font-semibold text-slate-900">{faq.question}</h3>
                 <p className="mt-3 text-sm text-slate-700">{faq.answer}</p>

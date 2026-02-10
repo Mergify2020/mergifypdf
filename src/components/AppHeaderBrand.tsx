@@ -33,7 +33,7 @@ export default function AppHeaderBrand({
 
   const baseWidth = 168;
   const baseHeight = 42;
-  const autoScale = isPricingPage || isAccountSettings ? 1.35 : 1.12;
+  const autoScale = isAccountSettings ? 1.35 : 1.12;
   const scale = variant === "sidebarPanel" ? 1.35 : autoScale;
   const logoWidth = Math.round(baseWidth * scale);
   const logoHeight = Math.round(baseHeight * scale);
@@ -80,7 +80,7 @@ export default function AppHeaderBrand({
         height={logoHeight}
         priority
         loading="eager"
-        className="block dark:hidden"
+        className="app-brand-light block dark:hidden"
         style={{ width: logoWidth, height: logoHeight }}
       />
       <Image
@@ -90,7 +90,7 @@ export default function AppHeaderBrand({
         height={logoHeight}
         priority
         loading="eager"
-        className="hidden dark:block"
+        className="app-brand-dark hidden dark:block"
         style={{ width: logoWidth, height: logoHeight }}
       />
     </a>
@@ -108,7 +108,7 @@ export default function AppHeaderBrand({
         height={logoHeight}
         priority
         loading="eager"
-        className="block dark:hidden"
+        className="app-brand-light block dark:hidden"
         style={{ width: logoWidth, height: logoHeight }}
       />
       <Image
@@ -118,7 +118,7 @@ export default function AppHeaderBrand({
         height={logoHeight}
         priority
         loading="eager"
-        className="hidden dark:block"
+        className="app-brand-dark hidden dark:block"
         style={{ width: logoWidth, height: logoHeight }}
       />
     </Link>

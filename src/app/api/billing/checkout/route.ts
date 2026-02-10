@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const priceId = (body as { priceId?: unknown }).priceId;
+  const { priceId, skipTrial } = body as { priceId?: unknown; skipTrial?: unknown };
 
   if (!priceId || typeof priceId !== "string") {
     return NextResponse.json({ error: "Missing or invalid priceId" }, { status: 400 });
@@ -41,6 +41,12 @@ export async function POST(req: NextRequest) {
       cancel_url: cancelUrl,
       customer_email: session.user.email ?? undefined,
       allow_promotion_codes: true,
+      subscription_data:
+        skipTrial === true
+          ? undefined
+          : {
+              trial_period_days: 3,
+            },
     });
 
     if (!checkoutSession.url) {

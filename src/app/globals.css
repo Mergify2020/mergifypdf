@@ -331,6 +331,63 @@ html.theme-transition ::-webkit-scrollbar-thumb {
   border-color: transparent;
 }
 
+header[data-hero="true"] .hero-nav {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+header[data-hero="true"] .hero-nav-link {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+header[data-hero="true"] .hero-nav-link:hover {
+  color: #ffffff;
+}
+
+header[data-hero="false"] .hero-nav,
+header[data-hero="false"] .hero-nav-link {
+  color: #334155;
+}
+
+header[data-hero="false"] .hero-nav-link:hover {
+  color: #0f172a;
+}
+
+header[data-hero="true"] .hero-auth-link {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+header[data-hero="true"] .hero-auth-link:hover {
+  color: #ffffff;
+}
+
+header[data-hero="false"] .hero-auth-link {
+  color: #334155;
+}
+
+header[data-hero="false"] .hero-auth-link:hover {
+  color: #0f172a;
+}
+
+.hero-stats .hero-stat-value {
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.hero-stats .hero-stat-label {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.hero-stats .hero-stat-divider {
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+header[data-hero="true"] .app-brand-light {
+  display: none;
+}
+
+header[data-hero="true"] .app-brand-dark {
+  display: block;
+}
+
 
 @keyframes scrollbar-track-reveal-dark {
   from {
@@ -400,6 +457,21 @@ html.theme-scroll-reveal:not(.dark) ::-webkit-scrollbar-thumb {
   }
 }
 
+.price-swap {
+  animation: price-swap 180ms ease-out;
+}
+
+@keyframes price-swap {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @media (prefers-color-scheme: light) {
   body {
     background-color: #f4f6fb;
@@ -407,7 +479,12 @@ html.theme-scroll-reveal:not(.dark) ::-webkit-scrollbar-thumb {
 }
 
 .pricing-gradient {
-  background-color: #e3edf9;
+  background: linear-gradient(
+    90deg,
+    rgba(218, 236, 255, 0.95) 0%,
+    rgba(224, 230, 255, 0.7) 50%,
+    rgba(206, 210, 255, 0.85) 100%
+  );
 }
 
 .frosted-card {

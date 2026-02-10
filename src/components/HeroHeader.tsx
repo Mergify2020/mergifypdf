@@ -24,6 +24,7 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
   const revertTimeoutId = useRef<number | null>(null);
   const fadeTimeoutId = useRef<number | null>(null);
   const revertDelayMs = 1000;
+  const scrollThreshold = 12;
 
   useEffect(() => {
     if (!isAnimatedPage) {
@@ -45,7 +46,7 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
       if (rafId.current !== null) return;
       rafId.current = window.requestAnimationFrame(() => {
         rafId.current = null;
-        const scrolled = window.scrollY > 0;
+        const scrolled = window.scrollY > scrollThreshold;
         if (scrolled) {
           if (revertTimeoutId.current !== null) {
             window.clearTimeout(revertTimeoutId.current);
@@ -66,7 +67,7 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
         if (lastScrolledState.current && revertTimeoutId.current === null) {
           revertTimeoutId.current = window.setTimeout(() => {
             revertTimeoutId.current = null;
-            if (window.scrollY <= 0) {
+            if (window.scrollY <= scrollThreshold) {
               lastScrolledState.current = false;
               setFadeToGradient(true);
               setScrolledPastHero(false);
@@ -110,13 +111,15 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
     meta.setAttribute("content", color);
   }, [isHomePage, isPricingPage, scrolledPastHero]);
 
-  const gradientActive = isHomePage ? !scrolledPastHero : isAnimatedPage && !scrolledPastHero;
+  const gradientActive = isHomePage
+    ? !scrolledPastHero
+    : isAnimatedPage && !scrolledPastHero && !isPricingPage;
   let backgroundClass: string;
   if (gradientActive) {
     backgroundClass = isHomePage
       ? "bg-transparent"
       : isPricingPage
-        ? "bg-[#e3edf9]"
+        ? "bg-transparent"
         : "bg-gradient-to-r from-[#FDF2FF] via-[#EEF2FF] to-[#E0F7FF]";
   } else {
     backgroundClass = "bg-white";
@@ -138,14 +141,9 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
 
   return (
     <header
+      data-hero={gradientActive ? "true" : "false"}
       className={`fixed top-0 left-0 right-0 z-50 w-full pt-[env(safe-area-inset-top)] ${gradientActive ? "" : "border-b"} ${backgroundClass} ${shadowClass} ${borderColorClass} ${visibilityClass} ${homeHeaderOverlay} ${transitionClass}`}
     >
-      {gradientActive && isHomePage ? (
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 z-0 h-12 bg-gradient-to-b from-white/100 via-white/40 to-transparent"
-        />
-      ) : null}
       <div className="relative z-10">{children}</div>
     </header>
   );

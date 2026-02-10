@@ -40,6 +40,7 @@ export default function HeroUploadCard() {
   const dragIndexRef = useRef<number | null>(null);
   const insertIndexRef = useRef<number | null>(null);
   const dragMovedRef = useRef(false);
+  const [isDesktop, setIsDesktop] = useState(false);
   const dragStartYRef = useRef(0);
   const autoScrollRef = useRef<{ direction: -1 | 0 | 1 }>({ direction: 0 });
   const maxScrollRef = useRef(0);
@@ -400,6 +401,15 @@ export default function HeroUploadCard() {
     return () => window.clearTimeout(timer);
   }, [error]);
 
+  useEffect(() => {
+    const update = () => {
+      setIsDesktop(window.matchMedia("(min-width: 1024px)").matches);
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
   async function handleMergeFiles() {
     if (busy || selectedFiles.length === 0) return;
     setBusy(true);
@@ -442,14 +452,14 @@ export default function HeroUploadCard() {
 
   const isIdle = uiState === "idle";
   const readyCount = selectedFiles.length;
-  const minVisibleRows = readyCount > 0 ? 4 : 0;
+  const minVisibleRows = readyCount > 0 ? (isDesktop ? 5 : 4) : 0;
   const visibleRows = Math.min(Math.max(readyCount, minVisibleRows), 6);
   const rowHeight = 54;
   const listHeight =
     visibleRows > 0 ? visibleRows * rowHeight + Math.max(0, visibleRows - 1) * 8 : 0;
   const containerClassName = isIdle
-    ? `upload-card-animate flex h-[320px] flex-col justify-start overflow-hidden rounded-2xl border-[3px] ${
-        isIdle ? "border-dashed border-[#6D5EF3] pt-6 pb-3 sm:py-9" : "border-solid border-white/70 py-6"
+    ? `upload-card-animate flex h-[320px] lg:h-[402px] flex-col justify-start overflow-hidden rounded-2xl border-[3px] ${
+        isIdle ? "border-dashed border-[#6D5EF3] py-6 sm:py-9" : "border-solid border-white/70 py-6"
       } bg-gradient-to-b from-white/85 via-slate-50/90 to-white/80 px-8 shadow-[0_0_0_1px_rgba(148,163,184,0.18),0_18px_40px_rgba(15,23,42,0.08)] transition-shadow duration-200 hover:shadow-[0_0_0_1px_rgba(109,94,243,0.2),0_22px_46px_rgba(15,23,42,0.12)] active:shadow-[0_0_0_1px_rgba(109,94,243,0.2),0_16px_34px_rgba(15,23,42,0.1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6D5EF3]/40`
     : "flex min-h-[320px] max-w-full flex-col justify-start overflow-hidden text-left";
 

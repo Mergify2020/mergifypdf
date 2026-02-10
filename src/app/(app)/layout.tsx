@@ -29,26 +29,26 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               logoDarkSrc="/logos/home-expanded-sidebar-logo-dark-v6.svg"
             />
           </div>
-          <div className="hidden items-center justify-center gap-4 text-base font-semibold text-slate-700 min-[810px]:flex min-[810px]:gap-6">
+          <div className="hero-nav hidden items-center justify-center gap-4 text-base font-semibold min-[810px]:flex min-[810px]:gap-6">
             <Link
               href="/pricing"
-              className="transition hover:text-slate-900 hover:underline hover:underline-offset-8"
+              className="hero-nav-link transition hover:underline hover:underline-offset-8"
             >
               Pricing
             </Link>
-            <HeaderFeaturesLink className="transition hover:text-slate-900 hover:underline hover:underline-offset-8" />
-            <span className="cursor-default text-slate-700 hover:text-slate-900">About</span>
-            <span className="cursor-default text-slate-700 hover:text-slate-900">Contact</span>
+            <HeaderFeaturesLink className="hero-nav-link transition hover:underline hover:underline-offset-8" />
+            <span className="hero-nav-link cursor-default">About</span>
+            <span className="hero-nav-link cursor-default">Contact</span>
           </div>
-          <div className="hidden items-center justify-center gap-4 text-base font-semibold text-slate-700 min-[700px]:flex min-[810px]:hidden">
+          <div className="hero-nav hidden items-center justify-center gap-4 text-base font-semibold min-[700px]:flex min-[810px]:hidden">
             <Link
               href="/pricing"
-              className="transition hover:text-slate-900 hover:underline hover:underline-offset-8"
+              className="hero-nav-link transition hover:underline hover:underline-offset-8"
             >
               Pricing
             </Link>
-            <HeaderFeaturesLink className="transition hover:text-slate-900 hover:underline hover:underline-offset-8" />
-            <span className="cursor-default text-slate-700 hover:text-slate-900">About</span>
+            <HeaderFeaturesLink className="hero-nav-link transition hover:underline hover:underline-offset-8" />
+            <span className="hero-nav-link cursor-default">About</span>
           </div>
           <div className="justify-self-end">
             {!session?.user || lockedByTwoFactor ? (

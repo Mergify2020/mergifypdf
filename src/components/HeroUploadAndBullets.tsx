@@ -10,7 +10,7 @@ export default function HeroUploadAndBullets() {
 
   return (
     <>
-      <div className="flex justify-center pb-4 lg:col-start-2 lg:row-span-2 lg:justify-end lg:self-start lg:pb-0">
+      <div className="flex justify-center py-4 lg:col-start-2 lg:row-span-2 lg:justify-end lg:self-start lg:py-0">
         <RevealOnScroll
           as="div"
           className="w-full max-w-[600px] rounded-2xl border border-white/70 bg-white/35 p-2 shadow-[0_0_0_1px_rgba(255,255,255,0.7),0_0_18px_rgba(15,23,42,0.12)] backdrop-blur-xl lg:max-w-[760px] lg:h-full"
@@ -27,11 +27,11 @@ export default function HeroUploadAndBullets() {
         className="space-y-5 text-center lg:col-start-1 lg:hidden"
         forceVisible={heroVisible}
       >
-        <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm text-slate-600 lg:flex-col lg:items-start lg:gap-y-5">
+        <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm text-white/80 lg:flex-col lg:items-start lg:gap-y-5">
           {["Runs right in your browser", "Upload and start instantly", "Fast, reliable, and secure"].map((badge) => (
-            <div key={badge} className="flex items-center gap-3 text-[1rem] font-semibold text-slate-700">
+            <div key={badge} className="flex items-center gap-3 text-[1rem] font-semibold text-white/90">
               <span
-                className="flex h-6 w-6 items-center justify-center rounded-full bg-[#6D5EF3] text-[12px] text-white shadow-[0_6px_16px_rgba(109,94,243,0.25)]"
+                className="flex h-6 w-6 items-center justify-center rounded-full bg-white/15 text-[12px] text-white shadow-[0_6px_16px_rgba(15,23,42,0.25)] ring-1 ring-white/20"
                 aria-hidden="true"
               >
                 ✓
@@ -41,7 +41,7 @@ export default function HeroUploadAndBullets() {
           ))}
         </div>
         <div className="flex justify-center lg:justify-start">
-          <HeroStats />
+          <HeroStats className="hero-stats" />
         </div>
       </RevealOnScroll>
     </>

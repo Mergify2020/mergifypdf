@@ -27,7 +27,7 @@ export default function HeaderAuthButtons() {
           <Link
             href="/login"
             onClick={markSkipFeatureScroll}
-            className="inline-flex items-center text-base font-semibold text-slate-700 transition hover:text-slate-900"
+            className="hero-auth-link inline-flex items-center text-base font-semibold transition"
           >
             Log in
           </Link>

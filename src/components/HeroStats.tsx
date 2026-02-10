@@ -23,7 +23,7 @@ function computeCurrentCounts() {
   };
 }
 
-export default function HeroStats() {
+export default function HeroStats({ className }: { className?: string }) {
   const [edited, setEdited] = useState(EDIT_BASE);
   const [signed, setSigned] = useState(SIGN_BASE);
   const [editedTick, setEditedTick] = useState(0);
@@ -53,37 +53,37 @@ export default function HeroStats() {
   }, []);
 
   return (
-    <div className="mt-6 flex justify-center sm:justify-start">
+    <div className={`mt-6 flex justify-center sm:justify-start ${className ?? ""}`}>
       <div className="flex w-full max-w-2xl flex-row items-start gap-4 sm:gap-6">
         <div className="text-center sm:text-left">
           <div
             key={editedTick}
-            className="text-lg font-semibold leading-none text-slate-900 sm:text-xl md:text-2xl animate-numberRoll"
+            className="hero-stat-value text-lg font-semibold leading-none text-slate-900 sm:text-xl md:text-2xl animate-numberRoll"
           >
             {formatNumber(edited)}
           </div>
-          <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 sm:text-xs">
+          <p className="hero-stat-label mt-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 sm:text-xs">
             Documents edited
           </p>
         </div>
 
-        <div className="border-l-2 border-slate-400/80 pl-6 text-center sm:text-left">
+        <div className="hero-stat-divider border-l-2 border-slate-400/80 pl-6 text-center sm:text-left">
           <div
             key={signedTick}
-            className="text-lg font-semibold leading-none text-slate-900 sm:text-xl md:text-2xl animate-numberRoll"
+            className="hero-stat-value text-lg font-semibold leading-none text-slate-900 sm:text-xl md:text-2xl animate-numberRoll"
           >
             {formatNumber(signed)}
           </div>
-          <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 sm:text-xs">
+          <p className="hero-stat-label mt-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 sm:text-xs">
             Documents signed
           </p>
         </div>
 
-        <div className="border-l-2 border-slate-400/80 pl-6 text-center sm:text-left">
-          <div className="text-lg font-semibold leading-none text-slate-900 sm:text-xl md:text-2xl">
+        <div className="hero-stat-divider border-l-2 border-slate-400/80 pl-6 text-center sm:text-left">
+          <div className="hero-stat-value text-lg font-semibold leading-none text-slate-900 sm:text-xl md:text-2xl">
             16,000+
           </div>
-          <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 sm:text-xs">
+          <p className="hero-stat-label mt-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 sm:text-xs">
             Monthly users
           </p>
         </div>

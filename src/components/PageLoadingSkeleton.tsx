@@ -6,7 +6,6 @@ export default function PageLoadingSkeleton() {
           <div className="h-6 w-32 rounded-full bg-slate-100 skeleton-shimmer" />
           <div className="flex items-center gap-3">
             <div className="h-9 w-28 rounded-full bg-slate-100 skeleton-shimmer" />
-            <div className="h-9 w-9 rounded-full bg-slate-100 skeleton-shimmer" />
           </div>
         </div>
 
