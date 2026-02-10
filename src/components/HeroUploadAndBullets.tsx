@@ -29,14 +29,14 @@ export default function HeroUploadAndBullets() {
       >
         <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm lg:flex-col lg:items-start lg:gap-y-5">
           {["Runs right in your browser", "Upload and start instantly", "Fast, reliable, and secure"].map((badge) => (
-            <div key={badge} className="flex items-center gap-3 text-[1rem] font-semibold">
+            <div key={badge} className="flex items-center gap-3 text-[1rem] font-semibold lg:gap-5">
               <span
-                className="flex h-6 w-6 items-center justify-center rounded-full bg-[#6D5EF3] text-[12px] text-white shadow-[0_8px_18px_rgba(109,94,243,0.35)]"
+                className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-[#7B8BFF] to-[#A982FF] text-[12px] text-white shadow-[0_8px_18px_rgba(15,23,42,0.22),0_1px_3px_rgba(15,23,42,0.28)]"
                 aria-hidden="true"
               >
                 ✓
               </span>
-              <span className="font-bold text-[#0f172a]">{badge}</span>
+              <span className="font-bold text-white drop-shadow-[0_1px_2px_rgba(15,23,42,0.6)]">{badge}</span>
             </div>
           ))}
         </div>

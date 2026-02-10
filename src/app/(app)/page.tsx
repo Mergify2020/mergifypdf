@@ -85,17 +85,13 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
     <>
       <FeaturesAutoScroll />
       <section className="relative -mt-[calc(76px+env(safe-area-inset-top))] w-full min-h-[46vh] overflow-hidden pt-[calc(76px+env(safe-area-inset-top))] lg:min-h-[50vh]">
-        <div className="pointer-events-none absolute inset-0">
-          <Image
-            src="/backgrounds/login-page-background-v5.svg"
-            alt=""
-            fill
-            className="object-cover object-left sm:object-center"
-            style={{ transform: "scaleX(-1)" }}
-            priority={false}
-          />
-        </div>
-        <div className="pointer-events-none absolute inset-0 bg-black/20" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#2F109C] via-[#6156E6] to-[#7A9CFF]" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_18%,rgba(255,255,255,0.2),transparent_45%),radial-gradient(circle_at_85%_25%,rgba(255,255,255,0.16),transparent_42%)]" />
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(115deg,rgba(255,255,255,0.18)_0%,rgba(255,255,255,0)_40%,rgba(255,255,255,0)_100%)]" />
+        <div className="pointer-events-none absolute left-[-10%] top-[-10%] h-[260px] w-[520px] bg-[radial-gradient(ellipse_at_top_left,rgba(255,255,255,0.45),rgba(255,255,255,0)_70%)]" />
+        <div className="pointer-events-none absolute right-[-10%] top-[-10%] h-[260px] w-[520px] bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.45),rgba(255,255,255,0)_70%)]" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(0,0,0,0.22),transparent_55%)]" />
+        <div className="pointer-events-none absolute inset-0 opacity-[0.12] mix-blend-soft-light bg-[linear-gradient(rgba(255,255,255,0.35)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.35)_1px,transparent_1px)] [background-size:22px_22px]" />
           <div className="relative mx-auto w-full max-w-[1400px] px-4 pt-6 pb-8 sm:px-6 sm:pt-10 sm:pb-10 lg:px-8 lg:pt-12 lg:pb-12">
             <div className="grid gap-3 lg:grid-cols-[minmax(0,620px)_minmax(0,760px)] lg:items-stretch">
               <div className="space-y-6 text-center lg:space-y-8 lg:col-start-1 lg:flex lg:h-full lg:flex-col lg:pt-3 lg:text-left lg:self-stretch">
@@ -117,7 +113,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
                     {["Upload and start instantly", "Fast, reliable, and secure", "Runs right in your browser"].map((badge) => (
                     <div key={badge} className="flex items-center gap-3 text-[1rem] font-semibold lg:gap-5">
                       <span
-                        className="flex h-6 w-6 items-center justify-center rounded-full bg-[#6D5EF3] text-[12px] text-white shadow-[0_8px_18px_rgba(109,94,243,0.35)]"
+                        className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-[#7B8BFF] to-[#A982FF] text-[12px] text-white shadow-[0_8px_18px_rgba(15,23,42,0.22),0_1px_3px_rgba(15,23,42,0.28)]"
                         aria-hidden="true"
                       >
                         ✓
