@@ -194,7 +194,6 @@ export default function PricingPlans() {
 
         <div className="mx-auto grid max-w-4xl justify-center gap-10 md:grid-cols-2">
           {tiers.map((tier) => {
-            const isPremium = Boolean(tier.badge);
             let yearlyPrice: string | null = null;
             let savingsLabel: string | null = null;
 
@@ -223,9 +222,7 @@ export default function PricingPlans() {
             return (
               <div
                 key={tier.name}
-                className={`flex h-full flex-col overflow-hidden rounded-[12px] border-[3px] border-slate-300 bg-white px-8 pt-4 pb-8 shadow-[0_10px_24px_rgba(15,23,42,0.10)] transition-transform duration-150 ${
-                  isPremium ? "ring-1 ring-purple-200/60" : ""
-                }`}
+                className="flex h-full flex-col overflow-hidden rounded-[12px] border-[3px] border-slate-300 bg-white px-8 pt-4 pb-8 shadow-[0_10px_24px_rgba(15,23,42,0.10)] transition-transform duration-150"
               >
                 <div className="relative z-10 flex h-full flex-col">
                   <div className="relative z-10 mt-2">
