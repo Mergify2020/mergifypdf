@@ -332,15 +332,15 @@ html.theme-transition ::-webkit-scrollbar-thumb {
 }
 
 header[data-hero="true"] .hero-nav {
-  color: rgba(255, 255, 255, 0.9);
+  color: #0f172a;
 }
 
 header[data-hero="true"] .hero-nav-link {
-  color: rgba(255, 255, 255, 0.9);
+  color: #0f172a;
 }
 
 header[data-hero="true"] .hero-nav-link:hover {
-  color: #ffffff;
+  color: #0f172a;
 }
 
 header[data-hero="false"] .hero-nav,
@@ -353,11 +353,11 @@ header[data-hero="false"] .hero-nav-link:hover {
 }
 
 header[data-hero="true"] .hero-auth-link {
-  color: rgba(255, 255, 255, 0.9);
+  color: #0f172a;
 }
 
 header[data-hero="true"] .hero-auth-link:hover {
-  color: #ffffff;
+  color: #0f172a;
 }
 
 header[data-hero="false"] .hero-auth-link {
@@ -369,16 +369,17 @@ header[data-hero="false"] .hero-auth-link:hover {
 }
 
 .hero-stats .hero-stat-value {
-  color: rgba(255, 255, 255, 0.95);
+  color: #0f172a;
 }
 
 .hero-stats .hero-stat-label {
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(15, 23, 42, 0.8);
 }
 
 .hero-stats .hero-stat-divider {
-  border-color: rgba(255, 255, 255, 0.45);
+  border-color: rgba(15, 23, 42, 0.2);
 }
+
 
 header[data-hero="true"] .app-brand-light {
   display: none;

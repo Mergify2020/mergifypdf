@@ -1,0 +1,23 @@
+<svg viewBox="0 0 1440 900" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <!-- Primary vertical gradient -->
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4F46E5"></stop>
+      <stop offset="55%" stop-color="#7C73FF"></stop>
+      <stop offset="100%" stop-color="#FFFFFF"></stop>
+    </linearGradient>
+
+    <!-- Subtle top shadow for depth -->
+    <linearGradient id="shadow" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#000000" stop-opacity="0.16"></stop>
+      <stop offset="35%" stop-color="#000000" stop-opacity="0.05"></stop>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"></stop>
+    </linearGradient>
+  </defs>
+
+  <!-- Base gradient -->
+  <rect width="1440" height="900" fill="url(#bg)"></rect>
+
+  <!-- Subtle depth -->
+  <rect width="1440" height="900" fill="url(#shadow)"></rect>
+</svg>

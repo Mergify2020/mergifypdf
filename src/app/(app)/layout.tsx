@@ -26,7 +26,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <div className="flex items-center gap-3">
             <AppHeaderBrand
               logoLightSrc="/logos/home-expanded-sidebar-logo-light-v6.svg"
-              logoDarkSrc="/logos/home-expanded-sidebar-logo-dark-v6.svg"
+              logoDarkSrc="/logos/home-expanded-sidebar-logo-light-v6.svg"
             />
           </div>
           <div className="hero-nav hidden items-center justify-center gap-4 text-base font-semibold min-[810px]:flex min-[810px]:gap-6">

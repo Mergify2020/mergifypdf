@@ -58,7 +58,7 @@ export default function HeroStats({ className }: { className?: string }) {
         <div className="text-center sm:text-left">
           <div
             key={editedTick}
-            className="hero-stat-value text-lg font-semibold leading-none text-slate-900 sm:text-xl md:text-2xl animate-numberRoll"
+            className="hero-stat-value text-lg font-bold leading-none text-slate-900 sm:text-xl md:text-2xl animate-numberRoll"
           >
             {formatNumber(edited)}
           </div>
@@ -70,7 +70,7 @@ export default function HeroStats({ className }: { className?: string }) {
         <div className="hero-stat-divider border-l-2 border-slate-400/80 pl-6 text-center sm:text-left">
           <div
             key={signedTick}
-            className="hero-stat-value text-lg font-semibold leading-none text-slate-900 sm:text-xl md:text-2xl animate-numberRoll"
+            className="hero-stat-value text-lg font-bold leading-none text-slate-900 sm:text-xl md:text-2xl animate-numberRoll"
           >
             {formatNumber(signed)}
           </div>
@@ -80,7 +80,7 @@ export default function HeroStats({ className }: { className?: string }) {
         </div>
 
         <div className="hero-stat-divider border-l-2 border-slate-400/80 pl-6 text-center sm:text-left">
-          <div className="hero-stat-value text-lg font-semibold leading-none text-slate-900 sm:text-xl md:text-2xl">
+          <div className="hero-stat-value text-lg font-bold leading-none text-slate-900 sm:text-xl md:text-2xl">
             16,000+
           </div>
           <p className="hero-stat-label mt-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 sm:text-xs">

@@ -26,7 +26,7 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
           <div className="flex items-center gap-3">
             <AppHeaderBrand
               logoLightSrc="/logos/home-expanded-sidebar-logo-light-v6.svg"
-              logoDarkSrc="/logos/home-expanded-sidebar-logo-dark-v6.svg"
+              logoDarkSrc="/logos/home-expanded-sidebar-logo-light-v6.svg"
             />
           </div>
           <div className="hidden items-center justify-center gap-4 text-base font-semibold text-slate-700 min-[810px]:flex min-[810px]:gap-6">
