@@ -2189,7 +2189,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
         <div className="mx-auto flex h-[76px] w-full max-w-7xl items-center justify-between px-4 lg:px-6">
           <div className="flex items-center gap-3">
             <AppHeaderBrand
-              logoLightSrc="/logos/home-expanded-sidebar-logo-dark-v6.svg"
+              logoLightSrc="/logos/home-expanded-sidebar-logo-light-v6.svg"
               logoDarkSrc="/logos/home-expanded-sidebar-logo-dark-v6.svg"
             />
           </div>

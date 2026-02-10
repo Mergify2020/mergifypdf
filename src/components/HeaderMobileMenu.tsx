@@ -42,6 +42,7 @@ export default function HeaderMobileMenu() {
     };
   }, [menuOpen]);
 
+
   return (
     <div ref={menuRef} className="relative lg:hidden">
       <button

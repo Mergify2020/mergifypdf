@@ -10,7 +10,7 @@ export default function HeroUploadAndBullets() {
 
   return (
     <>
-      <div className="flex justify-center py-4 lg:col-start-2 lg:row-span-2 lg:justify-end lg:self-start lg:py-0">
+      <div className="flex justify-center pt-1 pb-6 lg:col-start-2 lg:row-span-2 lg:justify-end lg:self-start lg:py-0">
         <RevealOnScroll
           as="div"
           className="w-full max-w-[600px] rounded-2xl border border-white/70 bg-white/35 p-2 shadow-[0_0_0_1px_rgba(255,255,255,0.7),0_0_18px_rgba(15,23,42,0.12)] backdrop-blur-xl lg:max-w-[760px] lg:h-full"
