@@ -36,7 +36,7 @@ export default function HeaderAuthButtons() {
           <Link
             href="/register"
             onClick={markSkipFeatureScroll}
-            className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-base font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-800"
+            className="inline-flex items-center gap-2 rounded-[12px] bg-slate-900 px-4 py-2 text-base font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-800"
           >
             Start free trial
             <span aria-hidden>→</span>
@@ -50,7 +50,7 @@ export default function HeaderAuthButtons() {
           <Link
             href="/register"
             onClick={markSkipFeatureScroll}
-            className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-800 min-[715px]:gap-2"
+            className="inline-flex items-center gap-2 rounded-[12px] bg-slate-900 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-800 min-[715px]:gap-2"
           >
             <span className="min-[700px]:inline">Start free trial</span>
             <span className="hidden min-[700px]:inline" aria-hidden>

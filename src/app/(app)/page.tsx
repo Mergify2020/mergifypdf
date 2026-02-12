@@ -91,13 +91,13 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
         <div className="pointer-events-none absolute left-[-10%] top-[-10%] h-[260px] w-[520px] bg-[radial-gradient(ellipse_at_top_left,rgba(255,255,255,0.45),rgba(255,255,255,0)_70%)]" />
         <div className="pointer-events-none absolute right-[-10%] top-[-10%] h-[260px] w-[520px] bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.45),rgba(255,255,255,0)_70%)]" />
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(0,0,0,0.22),transparent_55%)]" />
-        <div className="pointer-events-none absolute inset-0 opacity-[0.12] mix-blend-soft-light bg-[linear-gradient(rgba(255,255,255,0.35)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.35)_1px,transparent_1px)] [background-size:22px_22px]" />
+        <div className="pointer-events-none absolute inset-0 opacity-[0.08] bg-[linear-gradient(rgba(255,255,255,0.35)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.35)_1px,transparent_1px)] [background-size:22px_22px]" />
           <div className="relative mx-auto w-full max-w-[1400px] px-4 pt-6 pb-8 sm:px-6 sm:pt-10 sm:pb-10 lg:px-8 lg:pt-12 lg:pb-12">
             <div className="grid gap-3 lg:grid-cols-[minmax(0,620px)_minmax(0,760px)] lg:items-stretch">
-              <div className="space-y-6 text-center lg:space-y-8 lg:col-start-1 lg:flex lg:h-full lg:flex-col lg:pt-3 lg:text-left lg:self-stretch">
+            <div className="space-y-5 text-center lg:space-y-7 lg:col-start-1 lg:flex lg:h-full lg:flex-col lg:pt-3 lg:text-left lg:self-stretch">
                 <RevealOnScroll as="div">
                 <h1 className="text-[clamp(2rem,3.2vw,2.8rem)] font-bold leading-[1.08] tracking-tight text-white drop-shadow-[0_1px_2px_rgba(15,23,42,0.6)] lg:text-balance">
-                    Merge, edit, and sign documents in minutes.
+                  Merge, edit, and sign documents in minutes.
                   </h1>
                 </RevealOnScroll>
                 <RevealOnScroll as="div">
@@ -108,12 +108,12 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
                   </span>
                   </p>
                 </RevealOnScroll>
-                <RevealOnScroll as="div" className="hidden text-left lg:flex lg:flex-1 lg:flex-col lg:gap-8 lg:mt-auto">
-                <div className="flex flex-col items-start gap-y-3 text-sm text-white/80 lg:mt-6">
+              <RevealOnScroll as="div" className="hidden text-left lg:flex lg:flex-1 lg:flex-col lg:gap-4 lg:mt-auto lg:-mt-[3px]">
+                <div className="flex flex-col items-start gap-y-3 text-sm text-white/80 lg:mt-[15px]">
                     {["Upload and start instantly", "Fast, reliable, and secure", "Runs right in your browser"].map((badge) => (
                     <div key={badge} className="flex items-center gap-3 text-[1rem] font-semibold lg:gap-5">
                       <span
-                        className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-[#7B8BFF] to-[#A982FF] text-[12px] text-white shadow-[0_8px_18px_rgba(15,23,42,0.22),0_1px_3px_rgba(15,23,42,0.28)]"
+                        className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-[12px] text-white shadow-[0_8px_18px_rgba(15,23,42,0.22),0_1px_3px_rgba(15,23,42,0.28)]"
                         aria-hidden="true"
                       >
                         ✓
@@ -124,7 +124,7 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
                     </div>
                   ))}
                   </div>
-                <div className="flex justify-start text-white/90 lg:mt-auto lg:mb-2 lg:translate-y-2">
+                <div className="flex justify-start text-white/90 lg:mt-auto lg:mb-0 lg:translate-y-2">
                   <HeroStats className="hero-stats" />
                 </div>
                 </RevealOnScroll>

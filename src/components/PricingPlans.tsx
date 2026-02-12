@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Fragment, useState } from "react";
+import { Fragment, useLayoutEffect, useRef, useState } from "react";
 import { Check, Layers, X } from "lucide-react";
 
 const tiers = [
@@ -80,6 +80,10 @@ const faqs = [
 export default function PricingPlans() {
   const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("monthly");
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+  const toggleRef = useRef<HTMLDivElement | null>(null);
+  const monthlyRef = useRef<HTMLButtonElement | null>(null);
+  const annualRef = useRef<HTMLButtonElement | null>(null);
+  const [toggleHighlight, setToggleHighlight] = useState({ left: 0, width: 0 });
 
   const PRICE_IDS: Record<
     string,
@@ -136,8 +140,26 @@ export default function PricingPlans() {
     }
   }
 
+  useLayoutEffect(() => {
+    function updateHighlight() {
+      const container = toggleRef.current;
+      const button = billingPeriod === "monthly" ? monthlyRef.current : annualRef.current;
+      if (!container || !button) return;
+      const containerRect = container.getBoundingClientRect();
+      const buttonRect = button.getBoundingClientRect();
+      setToggleHighlight({
+        left: Math.max(0, buttonRect.left - containerRect.left),
+        width: buttonRect.width,
+      });
+    }
+
+    updateHighlight();
+    window.addEventListener("resize", updateHighlight);
+    return () => window.removeEventListener("resize", updateHighlight);
+  }, [billingPeriod]);
+
   return (
-    <div className="relative min-h-screen overflow-hidden bg-white px-4 py-12 text-slate-900 lg:px-6">
+    <div className="relative min-h-screen overflow-hidden bg-[#F6F8FF] px-4 py-12 text-slate-900 lg:px-6">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[420px]">
         <Image
           src="/backgrounds/login-page-background-v5.svg"
@@ -157,14 +179,22 @@ export default function PricingPlans() {
           </p>
           <div className="mt-6 flex justify-center">
             <div className="inline-flex items-center rounded-full border border-white/50 bg-white/15 p-[3px] text-sm font-semibold backdrop-blur">
-              <div className="inline-flex items-center rounded-full">
+              <div ref={toggleRef} className="relative inline-flex items-center rounded-full">
+                <span
+                  className={`absolute inset-y-0 left-0 rounded-full bg-white shadow-[0_6px_16px_rgba(15,23,42,0.18)] transition-[transform,width] duration-200 ${
+                    toggleHighlight.width > 0 ? "opacity-100" : "opacity-0"
+                  }`}
+                  style={{
+                    width: toggleHighlight.width,
+                    transform: `translateX(${toggleHighlight.left}px)`,
+                  }}
+                />
                 <button
                   type="button"
                   onClick={() => setBillingPeriod("monthly")}
-                  className={`min-w-[112px] rounded-full px-5 py-2 whitespace-nowrap transition-colors ${
-                    billingPeriod === "monthly"
-                    ? "bg-white text-slate-900 shadow-[0_6px_16px_rgba(15,23,42,0.18)]"
-                    : "text-white/80 hover:text-white"
+                  ref={monthlyRef}
+                  className={`relative z-10 rounded-full px-5 py-2 whitespace-nowrap tracking-wide transition-colors ${
+                    billingPeriod === "monthly" ? "text-slate-900" : "text-white hover:text-slate-200"
                   }`}
                 >
                   Monthly
@@ -172,17 +202,14 @@ export default function PricingPlans() {
                 <button
                   type="button"
                   onClick={() => setBillingPeriod("annual")}
-                  className={`min-w-[140px] rounded-full px-5 py-2 whitespace-nowrap transition-colors ${
-                    billingPeriod === "annual"
-                    ? "bg-white text-slate-900 shadow-[0_6px_16px_rgba(15,23,42,0.18)]"
-                    : "text-white/80 hover:text-white"
+                  ref={annualRef}
+                  className={`relative z-10 rounded-full pl-4 pr-2 py-2 whitespace-nowrap tracking-wide transition-colors ${
+                    billingPeriod === "annual" ? "text-slate-900" : "text-white hover:text-slate-200"
                   }`}
                 >
                 Annual ·{" "}
                 <span
-                  className={`font-semibold ${
-                    billingPeriod === "annual" ? "text-emerald-600" : "text-emerald-500"
-                  }`}
+                  className="rounded-full bg-emerald-100 px-3 py-1.5 text-[12px] font-bold uppercase tracking-wide text-emerald-700"
                 >
                   SAVE UP TO 42%
                 </span>
@@ -192,7 +219,7 @@ export default function PricingPlans() {
           </div>
         </div>
 
-        <div className="mx-auto grid max-w-4xl justify-center gap-10 md:grid-cols-2">
+        <div className="mx-auto grid w-full max-w-full gap-10 md:max-w-4xl md:grid-cols-2">
           {tiers.map((tier) => {
             let yearlyPrice: string | null = null;
             let savingsLabel: string | null = null;
@@ -222,7 +249,7 @@ export default function PricingPlans() {
             return (
               <div
                 key={tier.name}
-                className="flex h-full flex-col overflow-hidden rounded-[12px] border-[3px] border-slate-300 bg-white px-8 pt-4 pb-8 shadow-[0_10px_24px_rgba(15,23,42,0.10)] transition-transform duration-150"
+                className="flex h-full w-full flex-col overflow-hidden rounded-[12px] border-[3px] border-slate-300 bg-white px-8 pt-4 pb-8 shadow-[0_10px_24px_rgba(15,23,42,0.10)] transition-transform duration-150"
               >
                 <div className="relative z-10 flex h-full flex-col">
                   <div className="relative z-10 mt-2">
@@ -271,7 +298,7 @@ export default function PricingPlans() {
                     onClick={() => void handleSelectPlan(tier.name)}
                     className={`${
                       billingPeriod === "monthly" ? "mt-2" : "mt-4"
-                    } w-full rounded-[12px] border-4 border-white/90 px-4 py-2.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-all duration-150 ${
+                    } w-full rounded-[12px] px-4 py-2.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-all duration-150 ${
                       "bg-[#0F172A] hover:scale-[1.01] hover:bg-[#0B1220]"
                     } ${loadingPlan === tier.name ? "opacity-70 cursor-not-allowed" : ""}`}
                   >
