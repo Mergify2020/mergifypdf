@@ -35,7 +35,8 @@ export async function POST(req: NextRequest) {
             typeof session.subscription === "string" ? session.subscription : null;
 
           if (email && customerId && subscriptionId) {
-            const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+            const subscriptionResponse = await stripe.subscriptions.retrieve(subscriptionId);
+            const subscription = subscriptionResponse as Stripe.Subscription;
             const priceId = subscription.items.data[0]?.price?.id ?? null;
             const status = subscription.status ?? null;
             const currentPeriodEnd = subscription.current_period_end
