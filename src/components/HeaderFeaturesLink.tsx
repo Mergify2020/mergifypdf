@@ -34,29 +34,43 @@ export default function HeaderFeaturesLink({ className, onNavigate }: HeaderFeat
       return;
     }
 
-    const section = document.getElementById("features");
-    if (!section) {
-      setIsActive(false);
-      return;
-    }
+    let cleanup: (() => void) | null = null;
+    let retryId: number | null = null;
 
-    const updateActive = () => {
-      const header = document.querySelector("header");
-      const headerHeight = header ? header.getBoundingClientRect().height : 0;
-      const rect = section.getBoundingClientRect();
-      const viewportLine = window.innerHeight * 0.35;
-      const top = rect.top - headerHeight;
-      const bottom = rect.bottom - headerHeight;
-      const inView = top <= viewportLine && bottom >= viewportLine;
-      setIsActive(inView);
+    const attach = () => {
+      const section = document.getElementById("features");
+      if (!section) {
+        retryId = window.setTimeout(attach, 120);
+        return;
+      }
+
+      const updateActive = () => {
+        const header = document.querySelector("header");
+        const headerHeight = header ? header.getBoundingClientRect().height : 0;
+        const rect = section.getBoundingClientRect();
+        const viewportLine = window.innerHeight * 0.35;
+        const top = rect.top - headerHeight;
+        const bottom = rect.bottom - headerHeight;
+        const inView = top <= viewportLine && bottom >= viewportLine;
+        setIsActive(inView);
+      };
+
+      updateActive();
+      window.addEventListener("scroll", updateActive, { passive: true });
+      window.addEventListener("resize", updateActive);
+      cleanup = () => {
+        window.removeEventListener("scroll", updateActive);
+        window.removeEventListener("resize", updateActive);
+      };
     };
 
-    updateActive();
-    window.addEventListener("scroll", updateActive, { passive: true });
-    window.addEventListener("resize", updateActive);
+    attach();
+
     return () => {
-      window.removeEventListener("scroll", updateActive);
-      window.removeEventListener("resize", updateActive);
+      if (retryId !== null) {
+        window.clearTimeout(retryId);
+      }
+      cleanup?.();
     };
   }, [pathname]);
 

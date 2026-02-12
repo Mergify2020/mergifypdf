@@ -15,6 +15,14 @@ model User {
   password      String?
   emailVerified DateTime?
   image         String?
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  stripePriceId        String?
+  stripeStatus         String?
+  stripeCurrentPeriodEnd DateTime?
+  trialUsedAt          DateTime?
+  pendingCheckoutId    String?
+  pendingCheckoutCreatedAt DateTime?
   accounts      Account[]
   sessions      Session[]
   resetTokens   ResetToken[]

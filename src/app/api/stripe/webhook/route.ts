@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getStripe } from "@/lib/stripe";
+import { prisma } from "@/lib/prisma";
+import type Stripe from "stripe";
 
 export async function POST(req: NextRequest) {
   const stripe = getStripe();
@@ -25,12 +27,84 @@ export async function POST(req: NextRequest) {
   try {
     switch (event.type) {
       case "checkout.session.completed":
-        // TODO: Link Stripe customer/subscription to your internal user here.
+        {
+          const session = event.data.object as Stripe.Checkout.Session;
+          const email = session.customer_details?.email ?? session.customer_email ?? null;
+          const customerId = typeof session.customer === "string" ? session.customer : null;
+          const subscriptionId =
+            typeof session.subscription === "string" ? session.subscription : null;
+
+          if (email && customerId && subscriptionId) {
+            const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+            const priceId = subscription.items.data[0]?.price?.id ?? null;
+            const status = subscription.status ?? null;
+            const currentPeriodEnd = subscription.current_period_end
+              ? new Date(subscription.current_period_end * 1000)
+              : null;
+
+            await prisma.user.updateMany({
+              where: { email },
+              data: {
+                stripeCustomerId: customerId,
+                stripeSubscriptionId: subscriptionId,
+                stripePriceId: priceId,
+                stripeStatus: status,
+                stripeCurrentPeriodEnd: currentPeriodEnd,
+                pendingCheckoutId: null,
+                pendingCheckoutCreatedAt: null,
+              },
+            });
+          }
+        }
         break;
       case "customer.subscription.created":
       case "customer.subscription.updated":
       case "customer.subscription.deleted":
-        // TODO: Keep your subscription state in sync here if needed.
+        {
+          const subscription = event.data.object as Stripe.Subscription;
+          const subscriptionId = subscription.id;
+          const customerId = typeof subscription.customer === "string" ? subscription.customer : null;
+          const priceId = subscription.items.data[0]?.price?.id ?? null;
+          const status = subscription.status ?? null;
+          const currentPeriodEnd = subscription.current_period_end
+            ? new Date(subscription.current_period_end * 1000)
+            : null;
+          const matchFilters = [
+            { stripeSubscriptionId: subscriptionId },
+            ...(customerId ? [{ stripeCustomerId: customerId }] : []),
+          ];
+
+          await prisma.user.updateMany({
+            where: {
+              OR: matchFilters,
+            },
+            data: {
+              stripeCustomerId: customerId ?? undefined,
+              stripeSubscriptionId: subscriptionId,
+              stripePriceId: priceId,
+              stripeStatus: status,
+              stripeCurrentPeriodEnd: currentPeriodEnd,
+              pendingCheckoutId: null,
+              pendingCheckoutCreatedAt: null,
+            },
+          });
+
+          const trialStart = subscription.trial_start ?? null;
+          const trialEnd = subscription.trial_end ?? null;
+          const isTrial = status === "trialing" || !!trialEnd;
+          if (isTrial) {
+            const trialDate = new Date(((trialStart ?? Math.floor(Date.now() / 1000)) as number) * 1000);
+            await prisma.user.updateMany({
+              where: {
+                OR: matchFilters,
+                trialUsedAt: null,
+              },
+              data: {
+                trialUsedAt: trialDate,
+              },
+            });
+          }
+        }
         break;
       default:
         break;

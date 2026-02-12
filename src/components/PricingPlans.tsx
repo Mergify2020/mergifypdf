@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Fragment, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Check, Layers, X } from "lucide-react";
 
 const tiers = [
@@ -84,6 +84,8 @@ export default function PricingPlans() {
   const monthlyRef = useRef<HTMLButtonElement | null>(null);
   const annualRef = useRef<HTMLButtonElement | null>(null);
   const [toggleHighlight, setToggleHighlight] = useState({ left: 0, width: 0 });
+  const [trialStatus, setTrialStatus] = useState<null | { eligibleForTrial: boolean }>(null);
+  const canUseTrial = trialStatus?.eligibleForTrial !== false;
 
   const PRICE_IDS: Record<
     string,
@@ -157,6 +159,26 @@ export default function PricingPlans() {
     window.addEventListener("resize", updateHighlight);
     return () => window.removeEventListener("resize", updateHighlight);
   }, [billingPeriod]);
+
+  useEffect(() => {
+    let active = true;
+    const loadTrialStatus = async () => {
+      try {
+        const res = await fetch("/api/account/trial-status");
+        if (!res.ok) return;
+        const data = (await res.json()) as { eligibleForTrial?: boolean };
+        if (active && typeof data.eligibleForTrial === "boolean") {
+          setTrialStatus({ eligibleForTrial: data.eligibleForTrial });
+        }
+      } catch {
+        // no-op
+      }
+    };
+    void loadTrialStatus();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#F6F8FF] px-4 py-12 text-slate-900 lg:px-6">
@@ -295,7 +317,9 @@ export default function PricingPlans() {
                   <button
                     type="button"
                     disabled={loadingPlan === tier.name}
-                    onClick={() => void handleSelectPlan(tier.name)}
+                    onClick={() =>
+                      void handleSelectPlan(tier.name, canUseTrial ? undefined : { skipTrial: true })
+                    }
                     className={`${
                       billingPeriod === "monthly" ? "mt-2" : "mt-4"
                     } w-full rounded-[12px] px-4 py-2.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-all duration-150 ${
@@ -304,19 +328,23 @@ export default function PricingPlans() {
                   >
                     {loadingPlan === tier.name ? "Redirecting..." : (
                       <span className="inline-flex items-center justify-center gap-2">
-                        Start 3-day trial
+                        {canUseTrial ? "Start 3-day trial" : "Subscribe now"}
                         <span aria-hidden>→</span>
                       </span>
                     )}
                   </button>
                   <div className="mt-3 flex flex-col items-center gap-2 text-xs font-semibold text-slate-900/80">
-                    <button
-                      type="button"
-                      onClick={() => void handleSelectPlan(tier.name, { skipTrial: true })}
-                      className="text-xs font-semibold text-slate-700 underline underline-offset-4 hover:text-slate-900"
-                    >
-                      Skip trial
-                    </button>
+                    {canUseTrial ? (
+                      <button
+                        type="button"
+                        onClick={() => void handleSelectPlan(tier.name, { skipTrial: true })}
+                        className="text-xs font-semibold text-slate-700 underline underline-offset-4 hover:text-slate-900"
+                      >
+                        Pay now
+                      </button>
+                    ) : (
+                      <span className="text-xs font-semibold text-slate-600">Trial already used</span>
+                    )}
                   </div>
                   <ul className="mt-6 flex-1 space-y-3 text-sm text-slate-800">
                     {tier.features.map((feature) => {
