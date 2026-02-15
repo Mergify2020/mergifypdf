@@ -82,7 +82,7 @@ export default async function Home({
 
 function MarketingLanding({ usedToday }: { usedToday: boolean }) {
   return (
-    <>
+    <div className="bg-[#F6F8FF]">
       <FeaturesAutoScroll />
       <section className="relative -mt-[calc(76px+env(safe-area-inset-top))] w-full min-h-[46vh] overflow-hidden pt-[calc(76px+env(safe-area-inset-top))] lg:min-h-[50vh]">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#2F109C] via-[#6156E6] to-[#7A9CFF]" />
@@ -135,12 +135,12 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
           </div>
       </section>
 
-      <RevealOnScroll as="div" className="w-full bg-[#F4F6FF]">
+      <RevealOnScroll as="div" className="w-full border-y border-slate-200 bg-[#fff]">
         <LogoCarousel />
       </RevealOnScroll>
 
       <HeroFeatureArea />
-    </>
+    </div>
   );
 }
 

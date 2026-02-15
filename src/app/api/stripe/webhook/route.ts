@@ -39,8 +39,10 @@ export async function POST(req: NextRequest) {
             const subscription = subscriptionResponse as Stripe.Subscription;
             const priceId = subscription.items.data[0]?.price?.id ?? null;
             const status = subscription.status ?? null;
-            const currentPeriodEnd = subscription.current_period_end
-              ? new Date(subscription.current_period_end * 1000)
+            const currentPeriodEndSeconds = (subscription as { current_period_end?: number })
+              .current_period_end;
+            const currentPeriodEnd = currentPeriodEndSeconds
+              ? new Date(currentPeriodEndSeconds * 1000)
               : null;
 
             await prisma.user.updateMany({
@@ -67,8 +69,10 @@ export async function POST(req: NextRequest) {
           const customerId = typeof subscription.customer === "string" ? subscription.customer : null;
           const priceId = subscription.items.data[0]?.price?.id ?? null;
           const status = subscription.status ?? null;
-          const currentPeriodEnd = subscription.current_period_end
-            ? new Date(subscription.current_period_end * 1000)
+          const currentPeriodEndSeconds = (subscription as { current_period_end?: number })
+            .current_period_end;
+          const currentPeriodEnd = currentPeriodEndSeconds
+            ? new Date(currentPeriodEndSeconds * 1000)
             : null;
           const matchFilters = [
             { stripeSubscriptionId: subscriptionId },

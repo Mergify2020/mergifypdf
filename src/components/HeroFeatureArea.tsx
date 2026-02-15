@@ -91,7 +91,7 @@ const FAQS = [
 
 export default function HeroFeatureArea() {
   return (
-    <section id="features" className="bg-white">
+    <section id="features" className="bg-[#F6F8FF]">
       <div className="mx-auto w-full max-w-[1400px] px-4 py-10 sm:px-6 lg:px-8">
         {/* Feature grid */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 sm:gap-5">
@@ -127,23 +127,14 @@ export default function HeroFeatureArea() {
           ))}
         </div>
 
-        <RevealOnScroll as="div" className="mt-6 mb-20 flex justify-center">
-          <a
-            href="/pricing"
-            className="inline-flex items-center justify-center rounded-full border border-white/20 bg-gradient-to-r from-[#6D5EF3] to-[#8B7CFF] px-8 py-2.5 text-base font-semibold text-white shadow-[0_12px_26px_rgba(109,94,243,0.25)] transition hover:-translate-y-0.5 hover:from-[#7567F5] hover:to-[#9486FF]"
-          >
-            Compare plans
-          </a>
-        </RevealOnScroll>
-
-        <div className="mt-10 rounded-3xl border border-slate-200 bg-slate-50 px-6 py-8 sm:px-8 sm:py-10 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+        <div className="mt-12 border-t border-slate-200/70 pt-10 pb-8 sm:pb-10">
           <RevealOnScroll as="div">
             <h2 className="text-center text-[1.65rem] font-semibold tracking-tight text-slate-900 sm:text-3xl">
               Why choose MergifyPDF
             </h2>
           </RevealOnScroll>
           <div className="mt-8 grid grid-cols-1 gap-6 text-center sm:grid-cols-2 lg:grid-cols-4 lg:text-left">
-            <RevealOnScroll className="flex h-full flex-col items-center gap-4 rounded-2xl border border-slate-200/90 bg-white/90 p-6 text-center shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(15,23,42,0.08)] sm:items-start sm:text-left" delayMs={0}>
+            <RevealOnScroll className="relative flex h-full flex-col items-center gap-4 rounded-2xl border border-slate-200 bg-white/80 p-6 text-center shadow-[0_1px_3px_rgba(15,23,42,0.08)] backdrop-blur-sm transition-shadow duration-200 hover:border-slate-300 hover:shadow-[0_0_0_1px_rgba(148,163,184,0.35)] sm:items-start sm:text-left" delayMs={0}>
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-indigo-50 via-white to-indigo-100 text-indigo-600/70 ring-1 ring-indigo-100/70">
                 <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6">
                   <path
@@ -163,12 +154,12 @@ export default function HeroFeatureArea() {
                   />
                 </svg>
               </div>
-              <p className="text-sm font-semibold text-slate-900">Free 7-day trial.</p>
+              <p className="text-sm font-semibold text-slate-900">Free 3-day trial</p>
               <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                Explore every feature free for 7 days. Cancel anytime.
+                Try every feature risk-free. No commitment.
               </p>
             </RevealOnScroll>
-            <RevealOnScroll className="flex h-full flex-col items-center gap-4 rounded-2xl border border-slate-200/90 bg-white/90 p-6 text-center shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(15,23,42,0.08)] sm:items-start sm:text-left" delayMs={80}>
+            <RevealOnScroll className="relative flex h-full flex-col items-center gap-4 rounded-2xl border border-slate-200 bg-white/80 p-6 text-center shadow-[0_1px_3px_rgba(15,23,42,0.08)] backdrop-blur-sm transition-shadow duration-200 hover:border-slate-300 hover:shadow-[0_0_0_1px_rgba(148,163,184,0.35)] sm:items-start sm:text-left" delayMs={80}>
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-indigo-50 via-white to-indigo-100 text-indigo-600/70 ring-1 ring-indigo-100/70">
                 <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6">
                   <path
@@ -189,12 +180,12 @@ export default function HeroFeatureArea() {
                   />
                 </svg>
               </div>
-              <p className="text-sm font-semibold text-slate-900">Quick to start.</p>
+              <p className="text-sm font-semibold text-slate-900">Start in seconds</p>
               <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                Start working instantly — directly in your browser.
+                No downloads. No setup. Just upload and go.
               </p>
             </RevealOnScroll>
-            <RevealOnScroll className="flex h-full flex-col items-center gap-4 rounded-2xl border border-slate-200/90 bg-white/90 p-6 text-center shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(15,23,42,0.08)] sm:items-start sm:text-left" delayMs={160}>
+            <RevealOnScroll className="relative flex h-full flex-col items-center gap-4 rounded-2xl border border-slate-200 bg-white/80 p-6 text-center shadow-[0_1px_3px_rgba(15,23,42,0.08)] backdrop-blur-sm transition-shadow duration-200 hover:border-slate-300 hover:shadow-[0_0_0_1px_rgba(148,163,184,0.35)] sm:items-start sm:text-left" delayMs={160}>
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-indigo-50 via-white to-indigo-100 text-indigo-600/70 ring-1 ring-indigo-100/70">
                 <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6">
                   <path
@@ -206,12 +197,12 @@ export default function HeroFeatureArea() {
                   />
                 </svg>
               </div>
-              <p className="text-sm font-semibold text-slate-900">Fast and reliable.</p>
+              <p className="text-sm font-semibold text-slate-900">Built for speed</p>
               <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                Designed for speed, even with large or complex documents.
+                Merge, edit, and send in seconds — even large files.
               </p>
             </RevealOnScroll>
-            <RevealOnScroll className="flex h-full flex-col items-center gap-4 rounded-2xl border border-slate-200/90 bg-white/90 p-6 text-center shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(15,23,42,0.08)] sm:items-start sm:text-left" delayMs={240}>
+            <RevealOnScroll className="relative flex h-full flex-col items-center gap-4 rounded-2xl border border-slate-200 bg-white/80 p-6 text-center shadow-[0_1px_3px_rgba(15,23,42,0.08)] backdrop-blur-sm transition-shadow duration-200 hover:border-slate-300 hover:shadow-[0_0_0_1px_rgba(148,163,184,0.35)] sm:items-start sm:text-left" delayMs={240}>
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-indigo-50 via-white to-indigo-100 text-indigo-600/70 ring-1 ring-indigo-100/70">
                 <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6">
                   <path
@@ -237,45 +228,49 @@ export default function HeroFeatureArea() {
                   />
                 </svg>
               </div>
-              <p className="text-sm font-semibold text-slate-900">One workspace for everything.</p>
+              <p className="text-sm font-semibold text-slate-900">All-in-one workspace</p>
               <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                Upload once and manage every task in one place.
+                Edit, merge, and collect signatures without switching tools.
               </p>
             </RevealOnScroll>
           </div>
         </div>
 
-        <div className="mt-10 mb-20 grid w-full items-center gap-8 text-center lg:grid-cols-[1.1fr_0.9fr] lg:text-left xl:grid-cols-[1fr_1fr]">
-          <RevealOnScroll as="div" className="flex justify-center lg:justify-start">
-            <img
-              src="/illustrations/hero-ipad-illustration.png"
-              alt=""
-              className="h-auto w-auto max-h-72 rounded-xl border border-slate-200/70 shadow-[0_10px_28px_rgba(15,23,42,0.10)] sm:max-h-80 lg:max-h-96"
-              aria-hidden="true"
-            />
-          </RevealOnScroll>
-          <div className="flex flex-col items-center gap-4 text-center lg:items-start lg:text-left">
-            <RevealOnScroll as="div">
-              <p className="text-center text-3xl font-semibold text-slate-900 sm:text-4xl lg:text-[2.75rem] xl:text-[3.25rem] lg:text-left">
-                <span className="block">Do more with your</span>
-                <span className="block whitespace-nowrap">documents — for less.</span>
-              </p>
-              <p className="text-center text-base text-slate-600 sm:text-lg lg:text-left">
-                No installs. No delays. Just the tools you need, at a fraction of the cost.
-              </p>
+        <div className="mt-12 mb-0 border-t border-slate-200/70 pt-10">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.08)] sm:p-6">
+          <div className="grid w-full items-center gap-8 text-center lg:grid-cols-[1.1fr_0.9fr] lg:text-left xl:grid-cols-[1fr_1fr]">
+            <RevealOnScroll as="div" className="flex justify-center lg:justify-start">
+              <img
+                src="/illustrations/hero-ipad-illustration.png"
+                alt=""
+                className="h-auto w-auto max-h-72 rounded-xl border border-slate-200/70 shadow-[0_10px_28px_rgba(15,23,42,0.10)] sm:max-h-80 lg:max-h-96"
+                aria-hidden="true"
+              />
             </RevealOnScroll>
-            <RevealOnScroll as="div" delayMs={120}>
-              <a
-                href="/pricing"
-                className="inline-flex items-center justify-center rounded-full border border-white/20 bg-gradient-to-r from-[#6D5EF3] to-[#8B7CFF] px-8 py-2.5 text-base font-semibold text-white shadow-[0_12px_26px_rgba(109,94,243,0.25)] transition hover:-translate-y-0.5 hover:from-[#7567F5] hover:to-[#9486FF]"
-              >
-                Start free trial
-              </a>
-            </RevealOnScroll>
+            <div className="flex flex-col items-center gap-4 text-center lg:items-start lg:text-left">
+              <RevealOnScroll as="div">
+                <p className="text-center text-3xl font-semibold text-slate-900 sm:text-4xl lg:text-[2.75rem] xl:text-[3.25rem] lg:text-left">
+                  <span className="block">Do more with your</span>
+                  <span className="block whitespace-nowrap">documents — for less.</span>
+                </p>
+                <p className="text-center text-base text-slate-600 sm:text-lg lg:text-left">
+                  No installs. No delays. Just the tools you need, at a fraction of the cost.
+                </p>
+              </RevealOnScroll>
+              <RevealOnScroll as="div" delayMs={120}>
+                <a
+                  href="/pricing"
+                  className="inline-flex items-center justify-center rounded-full border border-white/20 bg-gradient-to-r from-[#6D5EF3] to-[#8B7CFF] px-8 py-2.5 text-base font-semibold text-white shadow-[0_12px_26px_rgba(109,94,243,0.25)] transition hover:-translate-y-0.5 hover:from-[#7567F5] hover:to-[#9486FF]"
+                >
+                  Start free trial
+                </a>
+              </RevealOnScroll>
+            </div>
+          </div>
           </div>
         </div>
 
-        <div className="mt-16 mb-10">
+        <div className="mt-12 mb-10 border-t border-slate-200/70 pt-10">
           <RevealOnScroll as="div">
             <h2 className="text-center text-2xl font-semibold text-slate-900 sm:text-3xl">
               Frequently Asked Questions

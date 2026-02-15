@@ -25,6 +25,10 @@ export default function FeaturesAutoScroll() {
       const rect = section.getBoundingClientRect();
       const targetY = window.scrollY + rect.top - headerHeight - 12 + 24;
       window.scrollTo({ top: Math.max(0, targetY), behavior: "smooth" });
+      // Clear the hash after we handle the one-time jump so reload doesn't force-scroll again.
+      if (window.location.hash === "#features") {
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      }
     };
 
     const rafId = window.requestAnimationFrame(() => {

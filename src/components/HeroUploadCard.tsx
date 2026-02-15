@@ -508,7 +508,7 @@ export default function HeroUploadCard() {
           <p className="mt-7 text-[11px] text-slate-400 sm:mt-7">
             By uploading a file, you agree to our{" "}
             <a href="/terms" className="text-sky-600 underline underline-offset-2">
-              Terms of Use
+              Terms of Service
             </a>{" "}
             and{" "}
             <a href="/privacy" className="text-sky-600 underline underline-offset-2">

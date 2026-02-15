@@ -3,13 +3,24 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { CircleHelp, Info, LogIn, Shapes, Tag } from "lucide-react";
+import { siInstagram, siTiktok, siX } from "simple-icons";
 import HeaderFeaturesLink from "@/components/HeaderFeaturesLink";
 
 export default function HeaderMobileMenu() {
   const pathname = usePathname();
   const isLoginPage = pathname === "/login";
+  const isPricingPage = pathname === "/pricing";
+  const isSupportPage = pathname === "/support";
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const lockScrollYRef = useRef(0);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  function handleCloseMenu() {
+    triggerRef.current?.focus();
+    setMenuOpen(false);
+  }
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -17,7 +28,7 @@ export default function HeaderMobileMenu() {
     function handleClick(event: MouseEvent | TouchEvent) {
       if (!menuRef.current) return;
       if (!menuRef.current.contains(event.target as Node)) {
-        setMenuOpen(false);
+        handleCloseMenu();
       }
     }
 
@@ -31,14 +42,54 @@ export default function HeaderMobileMenu() {
   
   useEffect(() => {
     if (!menuOpen) return;
-    const { body } = document;
-    const prevOverflow = body.style.overflow;
-    const prevOverflowX = body.style.overflowX;
+    const { body, documentElement } = document;
+    const header = document.querySelector("header") as HTMLElement | null;
+    const prevBodyOverflow = body.style.overflow;
+    const prevBodyOverflowX = body.style.overflowX;
+    const prevBodyPosition = body.style.position;
+    const prevBodyTop = body.style.top;
+    const prevBodyWidth = body.style.width;
+    const prevHtmlOverflow = documentElement.style.overflow;
+    const prevHtmlOverflowX = documentElement.style.overflowX;
+    const prevHeaderBackground = header?.style.backgroundColor ?? "";
+    const prevHeaderBorderBottom = header?.style.borderBottom ?? "";
+    const prevHeaderBoxShadow = header?.style.boxShadow ?? "";
+
+    lockScrollYRef.current = window.scrollY;
+    documentElement.style.overflow = "hidden";
+    documentElement.style.overflowX = "hidden";
     body.style.overflow = "hidden";
     body.style.overflowX = "hidden";
+    body.style.position = "fixed";
+    body.style.top = `-${lockScrollYRef.current}px`;
+    body.style.width = "100%";
+    if (header) {
+      const isHeroState = header.dataset.hero === "true";
+      if (isHeroState) {
+        header.style.backgroundColor = "transparent";
+        header.style.borderBottom = "1px solid transparent";
+        header.style.boxShadow = "none";
+      } else {
+        header.style.backgroundColor = "#ffffff";
+        header.style.borderBottom = "1px solid rgba(226,232,240,1)";
+        header.style.boxShadow = "0 1px 0 rgba(15,23,42,0.03)";
+      }
+    }
+
     return () => {
-      body.style.overflow = prevOverflow;
-      body.style.overflowX = prevOverflowX;
+      documentElement.style.overflow = prevHtmlOverflow;
+      documentElement.style.overflowX = prevHtmlOverflowX;
+      body.style.overflow = prevBodyOverflow;
+      body.style.overflowX = prevBodyOverflowX;
+      body.style.position = prevBodyPosition;
+      body.style.top = prevBodyTop;
+      body.style.width = prevBodyWidth;
+      if (header) {
+        header.style.backgroundColor = prevHeaderBackground;
+        header.style.borderBottom = prevHeaderBorderBottom;
+        header.style.boxShadow = prevHeaderBoxShadow;
+      }
+      window.scrollTo(0, lockScrollYRef.current);
     };
   }, [menuOpen]);
 
@@ -46,6 +97,7 @@ export default function HeaderMobileMenu() {
   return (
     <div ref={menuRef} className="relative lg:hidden">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setMenuOpen((open) => !open)}
         className="flex h-10 w-10 items-center justify-center text-slate-800 transition hover:-translate-y-0.5"
@@ -73,26 +125,30 @@ export default function HeaderMobileMenu() {
       >
         <button
           type="button"
-          onClick={() => setMenuOpen(false)}
+          onClick={handleCloseMenu}
           className="absolute inset-0 bg-transparent"
           aria-label="Close menu"
         />
-        <div className="absolute left-0 right-0 bottom-0 top-[76px] bg-transparent" />
         <div
-          className={`fixed top-0 right-0 z-[61] h-screen w-[75vw] max-w-[520px] rounded-l-[18px] bg-white shadow-[0_0_0_1px_rgba(15,23,42,0.04),-18px_0_45px_rgba(15,23,42,0.12)] transition-transform duration-300 ${
+          className={`fixed top-0 right-0 z-[61] h-screen w-screen max-w-none rounded-none bg-white shadow-none transition-transform duration-300 sm:w-[75vw] sm:max-w-[520px] sm:rounded-l-[18px] sm:shadow-[0_0_0_1px_rgba(15,23,42,0.04),-18px_0_45px_rgba(15,23,42,0.12)] ${
             menuOpen ? "translate-x-0" : "translate-x-full"
           }`}
           role="dialog"
           aria-modal="true"
         >
           <div className="flex h-full flex-col">
-            <div className="flex items-center justify-between border-b border-slate-200/80 bg-white px-6 py-5">
-              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                Menu
-              </span>
+            <div className="flex h-[72px] items-center justify-between border-b border-slate-200/80 bg-white px-5 sm:h-[76px] sm:px-6">
+              <Link href="/" onClick={handleCloseMenu} className="inline-flex items-center">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/logos/home-expanded-sidebar-logo-light-v6.svg"
+                  alt="MergifyPDF"
+                  className="h-[47px] w-auto"
+                />
+              </Link>
               <button
                 type="button"
-                onClick={() => setMenuOpen(false)}
+                onClick={handleCloseMenu}
                 className="z-[62] flex h-10 w-10 items-center justify-center text-slate-800 transition hover:-translate-y-0.5"
                 aria-label="Close menu"
               >
@@ -103,49 +159,127 @@ export default function HeaderMobileMenu() {
                 </span>
               </button>
             </div>
-            <nav className="flex flex-col gap-7 px-6 py-8 text-lg font-semibold text-slate-900">
-              <Link
-                href="/pricing"
-                onClick={() => setMenuOpen(false)}
-                className="group flex items-center rounded-xl px-2 py-3 transition hover:bg-slate-50 active:bg-slate-100"
-              >
-                <span className="transition-transform duration-200 group-hover:translate-x-1 group-active:translate-x-0.5">
-                  Pricing
+            <nav className="flex flex-1 flex-col justify-between px-5 pb-4 pt-4 sm:px-6 sm:py-8">
+              <div className="flex flex-col gap-1 text-base font-semibold text-slate-900 sm:gap-2 sm:text-lg">
+                <HeaderFeaturesLink
+                  className="cursor-pointer rounded-xl px-2 py-3 text-slate-800 transition hover:bg-slate-50 active:bg-slate-100"
+                  onNavigate={handleCloseMenu}
+                  trackActiveSection
+                  activeStrategy="topBand"
+                  leadingIcon={<Shapes className="h-4 w-4 text-slate-500" aria-hidden="true" />}
+                />
+                <Link
+                  href="/pricing"
+                  onClick={handleCloseMenu}
+                  aria-current={isPricingPage ? "page" : undefined}
+                  className="group flex items-center rounded-xl px-2 py-3 transition hover:bg-slate-50 active:bg-slate-100"
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <Tag className="h-4 w-4 text-slate-500" aria-hidden="true" />
+                    <span
+                      className={`transition-transform duration-200 group-hover:translate-x-1 group-active:translate-x-0.5 ${
+                        isPricingPage ? "underline underline-offset-8" : ""
+                      }`}
+                    >
+                      Pricing
+                    </span>
+                  </span>
+                </Link>
+                <span className="inline-flex items-center gap-2 rounded-xl px-2 py-3 text-slate-800 transition hover:bg-slate-50 active:bg-slate-100">
+                  <Info className="h-4 w-4 text-slate-500" aria-hidden="true" />
+                  <span>About</span>
                 </span>
-              </Link>
-              <HeaderFeaturesLink
-                className="cursor-pointer rounded-xl px-2 py-3 text-slate-800 transition-transform duration-200 hover:translate-x-1 hover:bg-slate-50 active:translate-x-0.5 active:bg-slate-100"
-                onNavigate={() => setMenuOpen(false)}
-              />
-              <span className="cursor-pointer rounded-xl px-2 py-3 text-slate-800 transition-transform duration-200 hover:translate-x-1 hover:bg-slate-50 active:translate-x-0.5 active:bg-slate-100">
-                About
-              </span>
-              <span className="cursor-pointer rounded-xl px-2 py-3 text-slate-800 transition-transform duration-200 hover:translate-x-1 hover:bg-slate-50 active:translate-x-0.5 active:bg-slate-100">
-                Contact
-              </span>
-
-              <div className="mt-6 border-t border-slate-200/80 pt-6" />
-              {!isLoginPage ? (
-                <>
-                  <Link
-                    href="/register"
-                    onClick={() => setMenuOpen(false)}
-                    className="inline-flex items-center justify-center rounded-[12px] bg-[#6D5EF3] px-4 py-2.5 text-base font-semibold text-white shadow-[0_12px_24px_rgba(109,94,243,0.25)] transition hover:-translate-y-0.5 hover:bg-[#7567F5] active:translate-y-0.5 active:bg-[#6354E6] active:shadow-[0_8px_16px_rgba(109,94,243,0.18)]"
-                  >
-                    Start free trial
-                  </Link>
+                <Link
+                  href="/support"
+                  onClick={handleCloseMenu}
+                  aria-current={isSupportPage ? "page" : undefined}
+                  className="group flex items-center rounded-xl px-2 py-3 transition hover:bg-slate-50 active:bg-slate-100"
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <CircleHelp className="h-4 w-4 text-slate-500" aria-hidden="true" />
+                    <span
+                      className={`transition-transform duration-200 group-hover:translate-x-1 group-active:translate-x-0.5 ${
+                        isSupportPage ? "underline underline-offset-8" : ""
+                      }`}
+                    >
+                      Support
+                    </span>
+                  </span>
+                </Link>
+                {!isLoginPage ? (
                   <Link
                     href="/login"
-                    onClick={() => setMenuOpen(false)}
-                    className="mt-3 inline-flex items-center justify-center rounded-[12px] border border-slate-200 bg-white px-4 py-2.5 text-base font-semibold text-slate-900 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50 active:translate-y-0.5 active:border-slate-300 active:bg-slate-100 active:shadow-none"
+                    onClick={handleCloseMenu}
+                    className="inline-flex items-center gap-2 rounded-xl px-2 py-3 text-slate-800 transition hover:bg-slate-50 active:bg-slate-100"
                   >
-                    Log in
+                    <LogIn className="h-4 w-4 text-slate-500" aria-hidden="true" />
+                    <span>Login</span>
                   </Link>
-                </>
-              ) : null}
-              <span className="mt-8 text-xs font-medium text-slate-500/70">
-                © MergifyPDF
-              </span>
+                ) : null}
+                {!isLoginPage ? (
+                  <div className="mt-5">
+                    <Link
+                      href="/register"
+                      onClick={handleCloseMenu}
+                      className="inline-flex w-full items-center justify-center rounded-[10px] bg-[#6D5EF3] px-4 py-2.5 text-base font-semibold text-white shadow-[0_12px_24px_rgba(109,94,243,0.25)] transition hover:bg-[#7567F5] active:bg-[#6354E6]"
+                    >
+                      Start Free Trial
+                    </Link>
+                    <p className="mt-1.5 text-center text-[11px] font-medium text-slate-500">
+                      3-day trial • Cancel anytime
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+              <div className="mt-6 border-t border-slate-200/80 pt-4 text-[11px] font-medium text-slate-500">
+                <div className="flex items-center justify-center gap-5 text-slate-600">
+                  <a
+                    href="https://www.tiktok.com/@mergify.pdf"
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label="MergifyPDF on TikTok"
+                    className="inline-flex items-center gap-1.5 transition hover:text-slate-800"
+                  >
+                    <svg viewBox="0 0 24 24" width={18} height={18} aria-hidden="true">
+                      <path fill="currentColor" d={siTiktok.path} />
+                    </svg>
+                    <span>TikTok</span>
+                  </a>
+                  <a
+                    href="https://www.instagram.com/mergifypdf/"
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label="MergifyPDF on Instagram"
+                    className="inline-flex items-center gap-1.5 transition hover:text-slate-800"
+                  >
+                    <svg viewBox="0 0 24 24" width={18} height={18} aria-hidden="true">
+                      <path fill="currentColor" d={siInstagram.path} />
+                    </svg>
+                    <span>Instagram</span>
+                  </a>
+                  <a
+                    href="https://x.com/MergifyPDF"
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label="MergifyPDF on X"
+                    className="inline-flex items-center gap-1.5 transition hover:text-slate-800"
+                  >
+                    <svg viewBox="0 0 24 24" width={16} height={16} aria-hidden="true">
+                      <path fill="currentColor" d={siX.path} />
+                    </svg>
+                    <span>X</span>
+                  </a>
+                </div>
+                <div className="mt-3 flex items-center justify-center gap-4 text-[10px] font-medium text-slate-500">
+                  <a href="#" className="transition hover:text-slate-800">
+                    Privacy Policy
+                  </a>
+                  <span aria-hidden="true">•</span>
+                  <a href="#" className="transition hover:text-slate-800">
+                    Terms of Service
+                  </a>
+                </div>
+              </div>
             </nav>
           </div>
         </div>

@@ -6,7 +6,11 @@ import { prisma } from "@/lib/prisma";
 export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({
+      authenticated: false,
+      trialUsedAt: null,
+      eligibleForTrial: true,
+    });
   }
 
   const user = await prisma.user.findUnique({
@@ -15,6 +19,7 @@ export async function GET() {
   });
 
   return NextResponse.json({
+    authenticated: true,
     trialUsedAt: user?.trialUsedAt ?? null,
     eligibleForTrial: !user?.trialUsedAt,
   });

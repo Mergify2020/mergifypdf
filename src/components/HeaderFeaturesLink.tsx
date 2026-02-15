@@ -7,11 +7,23 @@ import { useEffect, useState } from "react";
 type HeaderFeaturesLinkProps = {
   className?: string;
   onNavigate?: () => void;
+  trackActiveSection?: boolean;
+  activeStrategy?: "crosshair" | "topBand";
+  leadingIcon?: React.ReactNode;
+  trailingIcon?: React.ReactNode;
 };
 
-export default function HeaderFeaturesLink({ className, onNavigate }: HeaderFeaturesLinkProps) {
+export default function HeaderFeaturesLink({
+  className,
+  onNavigate,
+  trackActiveSection = true,
+  activeStrategy = "crosshair",
+  leadingIcon,
+  trailingIcon,
+}: HeaderFeaturesLinkProps) {
   const pathname = usePathname();
   const [isActive, setIsActive] = useState(false);
+  const showActive = trackActiveSection && pathname === "/" && isActive;
 
   const handleClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
     if (pathname === "/") {
@@ -29,8 +41,7 @@ export default function HeaderFeaturesLink({ className, onNavigate }: HeaderFeat
   };
 
   useEffect(() => {
-    if (pathname !== "/") {
-      setIsActive(false);
+    if (!trackActiveSection || pathname !== "/") {
       return;
     }
 
@@ -48,10 +59,12 @@ export default function HeaderFeaturesLink({ className, onNavigate }: HeaderFeat
         const header = document.querySelector("header");
         const headerHeight = header ? header.getBoundingClientRect().height : 0;
         const rect = section.getBoundingClientRect();
-        const viewportLine = window.innerHeight * 0.35;
         const top = rect.top - headerHeight;
         const bottom = rect.bottom - headerHeight;
-        const inView = top <= viewportLine && bottom >= viewportLine;
+        const inView =
+          activeStrategy === "topBand"
+            ? top <= window.innerHeight * 0.3 && top >= -280
+            : top <= window.innerHeight * 0.35 && bottom >= window.innerHeight * 0.35;
         setIsActive(inView);
       };
 
@@ -72,15 +85,25 @@ export default function HeaderFeaturesLink({ className, onNavigate }: HeaderFeat
       }
       cleanup?.();
     };
-  }, [pathname]);
+  }, [pathname, trackActiveSection, activeStrategy]);
 
   return (
     <Link
       href="/#features"
       onClick={handleClick}
-      className={`${className ?? ""} ${isActive ? "underline underline-offset-8" : ""}`}
+      className={`${className ?? ""} ${showActive ? "underline underline-offset-8" : ""}`}
     >
-      Features
+      {leadingIcon || trailingIcon ? (
+        <span className="flex items-center justify-between gap-2">
+          <span className="inline-flex items-center gap-2">
+            {leadingIcon}
+            <span>Features</span>
+          </span>
+          {trailingIcon ? <span aria-hidden="true">{trailingIcon}</span> : null}
+        </span>
+      ) : (
+        "Features"
+      )}
     </Link>
   );
 }

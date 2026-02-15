@@ -1,8 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Check, Layers, X } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Check, CreditCard, ShieldCheck, Download, Lock } from "lucide-react";
 
 const tiers = [
   {
@@ -16,12 +16,13 @@ const tiers = [
             pricePanel: "bg-white",
             description: "",
             features: [
-              "Unlimited document uploads",
-      "Unlimited project storage",
-      "Full document editing",
-      "Document templates",
-      "Self-sign documents",
-      "AI document tools",
+      "Unlimited uploads & projects",
+      "Advanced PDF editing",
+      "Sign your own documents",
+      "Create reusable templates",
+      "Compress & optimize PDFs",
+      "Secure cloud storage",
+      "Fast, reliable processing",
     ],
   },
   {
@@ -36,44 +37,13 @@ const tiers = [
             pricePanel: "bg-white",
             features: [
               "Everything in Essential Plus",
-              "Access to Mergify Sign dashboard",
-      "10 signature requests per month",
+      "Unlimited signature requests",
+      "Dedicated signature dashboard",
       "Multiple signers per document",
-      "Automatic email reminders",
-      "Signer progress tracking",
+      "Automatic signing reminders",
+      "Real-time signing progress tracking",
+      "Complete signing activity history",
     ],
-  },
-];
-
-const faqs = [
-  {
-    question: "Can I upgrade at any time?",
-    answer:
-      "Yes. You can move between Personal, Team, or Business plans whenever you want. Your workspace updates instantly when you upgrade.",
-  },
-  {
-    question: "How does seat-based billing work?",
-    answer:
-      "The Team plan includes up to 3 users. If your team grows, the Business plan adds extra seats for $4 per user per month.",
-  },
-  {
-    question: "Do I need a credit card to get started?",
-    answer:
-      "No. Every account includes 1 free upload per day without payment. A credit card is only required if you choose to upgrade for unlimited usage.",
-  },
-  {
-    question: "Can I add or remove teammates at any time?",
-    answer: "Yes. Your seat count updates instantly, and your billing adjusts on your next cycle.",
-  },
-  {
-    question: "Can I switch back to the free plan later?",
-    answer:
-      "Yes. If you cancel, you keep your paid features until your current billing period ends. After that, your account returns to the free tier with 1 upload per day.",
-  },
-  {
-    question: "Do you offer refunds?",
-    answer:
-      "We don't provide refunds for partial billing cycles. If you cancel, you'll keep full access until the end of your paid period.",
   },
 ];
 
@@ -85,7 +55,9 @@ export default function PricingPlans() {
   const annualRef = useRef<HTMLButtonElement | null>(null);
   const [toggleHighlight, setToggleHighlight] = useState({ left: 0, width: 0 });
   const [trialStatus, setTrialStatus] = useState<null | { eligibleForTrial: boolean }>(null);
+  const [shouldAnimateToggle, setShouldAnimateToggle] = useState(false);
   const canUseTrial = trialStatus?.eligibleForTrial !== false;
+  const toggleMeasured = toggleHighlight.width > 0;
 
   const PRICE_IDS: Record<
     string,
@@ -142,6 +114,12 @@ export default function PricingPlans() {
     }
   }
 
+  function handleBillingPeriodChange(nextPeriod: "monthly" | "annual") {
+    if (nextPeriod === billingPeriod) return;
+    setShouldAnimateToggle(true);
+    setBillingPeriod(nextPeriod);
+  }
+
   useLayoutEffect(() => {
     function updateHighlight() {
       const container = toggleRef.current;
@@ -194,16 +172,18 @@ export default function PricingPlans() {
       <div className="relative mx-auto w-full max-w-7xl space-y-10 px-4 lg:px-6">
         <div className="text-center">
           <h1 className="text-4xl font-semibold tracking-tight text-white">
-            Choose the plan that fits your needs.
+            Simple pricing. Powerful document tools.
           </h1>
           <p className="mt-3 text-4xl font-semibold tracking-tight text-white/90">
-            Try our 3-day free trial to access all features.
+            Try all features free for 3 days.
           </p>
           <div className="mt-6 flex justify-center">
             <div className="inline-flex items-center rounded-full border border-white/50 bg-white/15 p-[3px] text-sm font-semibold backdrop-blur">
               <div ref={toggleRef} className="relative inline-flex items-center rounded-full">
                 <span
-                  className={`absolute inset-y-0 left-0 rounded-full bg-white shadow-[0_6px_16px_rgba(15,23,42,0.18)] transition-[transform,width] duration-200 ${
+                  className={`absolute inset-y-0 left-0 rounded-full bg-white shadow-[0_6px_16px_rgba(15,23,42,0.18)] ${
+                    shouldAnimateToggle ? "transition-[transform,width] duration-200" : ""
+                  } ${
                     toggleHighlight.width > 0 ? "opacity-100" : "opacity-0"
                   }`}
                   style={{
@@ -213,25 +193,33 @@ export default function PricingPlans() {
                 />
                 <button
                   type="button"
-                  onClick={() => setBillingPeriod("monthly")}
+                  onClick={() => handleBillingPeriodChange("monthly")}
                   ref={monthlyRef}
                   className={`relative z-10 rounded-full px-5 py-2 whitespace-nowrap tracking-wide transition-colors ${
-                    billingPeriod === "monthly" ? "text-slate-900" : "text-white hover:text-slate-200"
+                    billingPeriod === "monthly" && !toggleMeasured
+                      ? "bg-white text-slate-900 shadow-[0_6px_16px_rgba(15,23,42,0.18)]"
+                      : billingPeriod === "monthly"
+                        ? "text-slate-900"
+                        : "text-white hover:text-slate-200"
                   }`}
                 >
                   Monthly
                 </button>
                 <button
                   type="button"
-                  onClick={() => setBillingPeriod("annual")}
+                  onClick={() => handleBillingPeriodChange("annual")}
                   ref={annualRef}
                   className={`relative z-10 rounded-full pl-4 pr-2 py-2 whitespace-nowrap tracking-wide transition-colors ${
-                    billingPeriod === "annual" ? "text-slate-900" : "text-white hover:text-slate-200"
+                    billingPeriod === "annual" && !toggleMeasured
+                      ? "bg-white text-slate-900 shadow-[0_6px_16px_rgba(15,23,42,0.18)]"
+                      : billingPeriod === "annual"
+                        ? "text-slate-900"
+                        : "text-white hover:text-slate-200"
                   }`}
                 >
                 Annual ·{" "}
                 <span
-                  className="rounded-full bg-emerald-100 px-3 py-1.5 text-[12px] font-bold uppercase tracking-wide text-emerald-700"
+                  className="rounded-full bg-emerald-500 px-3 py-1.5 text-[12px] font-bold uppercase tracking-wide text-white"
                 >
                   SAVE UP TO 42%
                 </span>
@@ -271,8 +259,15 @@ export default function PricingPlans() {
             return (
               <div
                 key={tier.name}
-                className="flex h-full w-full flex-col overflow-hidden rounded-[12px] border-[3px] border-slate-300 bg-white px-8 pt-4 pb-8 shadow-[0_10px_24px_rgba(15,23,42,0.10)] transition-transform duration-150"
+                className="relative flex h-full w-full flex-col overflow-hidden rounded-[12px] border-[3px] border-slate-300 bg-white px-8 pt-4 pb-8 shadow-[0_10px_24px_rgba(15,23,42,0.10)] transition-transform duration-150"
               >
+                {tier.name === "Signature Pro" ? (
+                  <div className="pointer-events-none absolute top-0 right-0 z-20 h-40 w-40 overflow-hidden">
+                    <span className="absolute top-9 right-[-52px] inline-flex w-[238px] rotate-45 items-center justify-center bg-emerald-500 px-7 py-2 text-center text-[13px] leading-none font-bold uppercase tracking-[0.16em] text-white shadow-[0_8px_16px_rgba(16,185,129,0.35)]">
+                      <span className="translate-x-[13px]">Most Popular</span>
+                    </span>
+                  </div>
+                ) : null}
                 <div className="relative z-10 flex h-full flex-col">
                   <div className="relative z-10 mt-2">
                     <div className="pt-1">
@@ -348,151 +343,189 @@ export default function PricingPlans() {
                   </div>
                   <ul className="mt-6 flex-1 space-y-3 text-sm text-slate-800">
                     {tier.features.map((feature) => {
-                      const isEssentialPlusRow =
+                      const isEverythingInEssentialRow =
                         tier.name === "Signature Pro" && feature === "Everything in Essential Plus";
                       return (
                         <li key={feature} className="flex items-center gap-2">
                           <span
                             className={`inline-flex h-5 w-5 flex-none items-center justify-center rounded-full ${
-                              isEssentialPlusRow
-                                ? "bg-gradient-to-r from-sky-500 to-emerald-400"
+                              isEverythingInEssentialRow
+                                ? "bg-sky-500"
                                 : tier.name === "Essential Plus"
                                   ? "bg-sky-500"
                                   : "bg-indigo-500"
                             }`}
                           >
-                            {isEssentialPlusRow ? (
-                              <Layers className="h-3 w-3 text-white" strokeWidth={3} aria-hidden="true" />
-                            ) : (
-                              <Check className="h-3 w-3 text-white" strokeWidth={3} aria-hidden="true" />
-                            )}
+                            <Check className="h-3 w-3 text-white" strokeWidth={3} aria-hidden="true" />
                           </span>
                           <span className="font-semibold text-slate-900">{feature}</span>
                         </li>
                       );
                     })}
                   </ul>
+                  {tier.name === "Signature Pro" ? (
+                    <p className="mt-0 translate-y-[6px] flex w-full items-baseline justify-start gap-1 pl-7 text-xs leading-5 text-slate-500">
+                      <span className="text-rose-500/90" aria-hidden="true">
+                        *
+                      </span>
+                      <span>Signers do not need a paid plan.</span>
+                    </p>
+                  ) : null}
                 </div>
               </div>
             );
           })}
         </div>
-        <div className="mt-6 flex h-6 sm:h-7 justify-center">
-          <div className="inline-flex items-center gap-2 text-xs font-medium text-slate-600">
-            <span>Payments powered by</span>
+        <div className="mt-5 flex justify-center">
+          <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-1.5 text-xs font-semibold tracking-wide text-slate-500 shadow-[0_2px_10px_rgba(15,23,42,0.05)]">
+            <span className="uppercase">Payments powered by</span>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/logos/Stripe-Logo-v3.png"
               alt="Stripe"
-              className="h-5 sm:h-6 w-auto rounded-md opacity-90 transition-opacity hover:opacity-100"
+              className="h-5 w-auto rounded-md opacity-90 transition-opacity hover:opacity-100"
             />
           </div>
         </div>
-
-	        <div className="mt-16 rounded-[40px] border border-slate-200 bg-white p-6 text-sm text-slate-900 shadow-[0_18px_45px_rgba(15,23,42,0.1)] lg:p-8">
-	          <p className="mb-6 text-center text-3xl font-semibold tracking-tight text-slate-900">Compare Our Plans</p>
-          <div className="overflow-hidden rounded-3xl bg-white shadow-inner">
-            <table className="mx-auto w-full table-fixed text-xs sm:text-sm text-slate-800">
-              <thead className="bg-black text-[10px] sm:text-sm font-semibold text-white text-center sm:text-left">
-                <tr>
-                  <th className="hidden px-5 py-4 text-left text-[11px] sm:text-base font-semibold text-white sm:table-cell">
-                    Features
-                  </th>
-                  <th className="w-1/2 px-3 py-4 text-center text-[11px] sm:w-auto sm:text-base font-bold tracking-normal text-white">
-                    <span className="block sm:inline">Essential</span>{" "}
-                    <span className="block sm:inline">Plus</span>
-                  </th>
-                  <th className="w-1/2 px-3 py-4 text-center text-[11px] sm:w-auto sm:text-base font-bold tracking-normal text-white">
-                    <span className="block sm:inline">Signature</span>{" "}
-                    <span className="block sm:inline">Pro</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="text-slate-700">
-                {[
-                  { feature: "Daily Uploads", essential: "Unlimited", pro: "Unlimited" },
-                  { feature: "Project Storage", essential: "Unlimited", pro: "Unlimited" },
-                  { feature: "Document Editing", essential: true, pro: true },
-                  { feature: "Self-Sign Documents", essential: true, pro: true },
-                  { feature: "Templates", essential: true, pro: true },
-                  { feature: "AI Document Tools", essential: true, pro: true },
-                  { feature: "Access to Mergify Sign", essential: false, pro: true },
-                  { feature: "Signature Tracking", essential: false, pro: true },
-                  { feature: "Outgoing Signature Requests", essential: false, pro: "10 Per Month" },
-                ].map((row) => (
-                  <Fragment key={row.feature}>
-                    <tr key={`${row.feature}-label`} className="sm:hidden">
-                      <td
-                        colSpan={4}
-                        className="px-3 pt-2 pb-1 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-500"
-                      >
-                        {row.feature}
-                      </td>
-                    </tr>
-                    <tr
-                      key={`${row.feature}-values`}
-                      className="text-center sm:text-left border-b border-slate-200 sm:last:border-0"
-                    >
-                      <td className="hidden px-5 py-5 text-xs sm:text-sm font-semibold text-slate-900 sm:table-cell">
-                        {row.feature}
-                      </td>
-                      <td className="w-1/2 px-3 py-3 sm:py-5 text-center text-xs sm:w-auto sm:text-sm font-semibold text-slate-900">
-                        {renderValue((row as any).essential)}
-                      </td>
-                      <td className="w-1/2 px-3 py-3 sm:py-5 text-center text-xs sm:w-auto sm:text-sm font-semibold text-slate-900">
-                        {renderValue((row as any).pro)}
-                      </td>
-                    </tr>
-                  </Fragment>
-                ))}
-              </tbody>
-            </table>
+        <section className="mt-10 border-t border-slate-200/70 pt-10">
+          <h2 className="mb-5 text-center text-3xl font-semibold text-slate-900 sm:text-4xl">
+            Everything you need to work with confidence
+          </h2>
+          <div className="mx-auto grid max-w-6xl gap-3 md:grid-cols-2 lg:grid-cols-4">
+            <div className="flex min-h-[92px] items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-5 text-left shadow-[0_6px_16px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_10px_20px_rgba(15,23,42,0.08)]">
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                <CreditCard className="h-4 w-4" />
+              </span>
+              <p className="text-sm font-semibold text-slate-800">Secure payment processing</p>
+            </div>
+            <div className="flex min-h-[92px] items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-5 text-left shadow-[0_6px_16px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_10px_20px_rgba(15,23,42,0.08)]">
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-sky-100 text-sky-700">
+                <ShieldCheck className="h-4 w-4" />
+              </span>
+              <p className="text-sm font-semibold text-slate-800">Secure cloud storage</p>
+            </div>
+            <div className="flex min-h-[92px] items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-5 text-left shadow-[0_6px_16px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_10px_20px_rgba(15,23,42,0.08)]">
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-violet-100 text-violet-700">
+                <Download className="h-4 w-4" />
+              </span>
+              <p className="text-sm font-semibold text-slate-800">No software install required</p>
+            </div>
+            <div className="flex min-h-[92px] items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-5 text-left shadow-[0_6px_16px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_10px_20px_rgba(15,23,42,0.08)]">
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                <Lock className="h-4 w-4" />
+              </span>
+              <p className="text-sm font-semibold text-slate-800">Signature workflow controls</p>
+            </div>
           </div>
-        </div>
-
-	        <div className="rounded-[46px] border border-slate-200 bg-white p-8 text-slate-900 shadow-[0_18px_45px_rgba(15,23,42,0.1)]">
-	          <p className="mb-8 text-center text-3xl font-semibold tracking-tight text-slate-900">
-	            Frequently Asked Questions
-	          </p>
-          <div className="grid gap-6 text-left md:grid-cols-2">
-            {faqs.map((faq) => (
-              <div
-                key={faq.question}
-                className="rounded-3xl bg-white p-6 text-slate-900 shadow-inner"
-              >
-                <h3 className="text-base font-semibold text-slate-900">{faq.question}</h3>
-                <p className="mt-3 text-sm text-slate-700">{faq.answer}</p>
+        </section>
+        <section className="mt-12 border-t border-slate-200/70 pt-10">
+          <h2 className="text-center text-3xl font-semibold text-slate-900 sm:text-4xl">Who MergifyPDF Is Designed For</h2>
+          <p className="mx-auto mt-2 max-w-2xl text-center text-sm text-slate-500 sm:text-base">
+            Choose based on how you work day to day: managing your own documents or sending them for signatures.
+          </p>
+          <div className="mx-auto mt-6 grid max-w-6xl gap-4 md:grid-cols-2">
+            <article className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
+              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-sky-500 to-cyan-500" aria-hidden="true" />
+              <h3 className="text-2xl font-semibold text-slate-900">Essential Plus</h3>
+              <p className="mt-2 text-xs font-semibold tracking-[0.12em] text-sky-700 uppercase">
+                For Self-Managed Document Work
+              </p>
+              <p className="mt-3 text-sm leading-relaxed text-slate-600">
+                Best for one user editing, organizing, and signing their own documents.
+              </p>
+              <ul className="mt-5 space-y-3 text-sm text-slate-700">
+                <li className="flex items-start gap-2">
+                  <span className="mt-0.5 inline-flex h-4 w-4 flex-none items-center justify-center rounded-full bg-sky-100 text-sky-700" aria-hidden="true">
+                    <Check className="h-3 w-3" strokeWidth={3} />
+                  </span>
+                  <span>Edit and fill PDFs instantly</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-0.5 inline-flex h-4 w-4 flex-none items-center justify-center rounded-full bg-sky-100 text-sky-700" aria-hidden="true">
+                    <Check className="h-3 w-3" strokeWidth={3} />
+                  </span>
+                  <span>Merge and organize documents</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-0.5 inline-flex h-4 w-4 flex-none items-center justify-center rounded-full bg-sky-100 text-sky-700" aria-hidden="true">
+                    <Check className="h-3 w-3" strokeWidth={3} />
+                  </span>
+                  <span>Add your signature in seconds</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-0.5 inline-flex h-4 w-4 flex-none items-center justify-center rounded-full bg-sky-100 text-sky-700" aria-hidden="true">
+                    <Check className="h-3 w-3" strokeWidth={3} />
+                  </span>
+                  <span>Manage everyday paperwork with ease</span>
+                </li>
+              </ul>
+            </article>
+            <article className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
+              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-violet-500 to-indigo-500" aria-hidden="true" />
+              <h3 className="text-2xl font-semibold text-slate-900">Signature Pro</h3>
+              <p className="mt-2 text-xs font-semibold tracking-[0.12em] text-indigo-700 uppercase">
+                For Signature-Driven Work
+              </p>
+              <p className="mt-3 text-sm leading-relaxed text-slate-600">Best for one user sending documents to others for signature.</p>
+              <ul className="mt-5 space-y-3 text-sm text-slate-700">
+                <li className="flex items-start gap-2">
+                  <span className="mt-0.5 inline-flex h-4 w-4 flex-none items-center justify-center rounded-full bg-indigo-100 text-indigo-700" aria-hidden="true">
+                    <Check className="h-3 w-3" strokeWidth={3} />
+                  </span>
+                  <span>Send documents for secure online signing</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-0.5 inline-flex h-4 w-4 flex-none items-center justify-center rounded-full bg-indigo-100 text-indigo-700" aria-hidden="true">
+                    <Check className="h-3 w-3" strokeWidth={3} />
+                  </span>
+                  <span>Request one or multiple signatures</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-0.5 inline-flex h-4 w-4 flex-none items-center justify-center rounded-full bg-indigo-100 text-indigo-700" aria-hidden="true">
+                    <Check className="h-3 w-3" strokeWidth={3} />
+                  </span>
+                  <span>Monitor signing progress</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-0.5 inline-flex h-4 w-4 flex-none items-center justify-center rounded-full bg-indigo-100 text-indigo-700" aria-hidden="true">
+                    <Check className="h-3 w-3" strokeWidth={3} />
+                  </span>
+                  <span>Send reminders to avoid delays</span>
+                </li>
+              </ul>
+            </article>
+          </div>
+        </section>
+        <section className="mt-12 mb-2 border-t border-slate-200/70 pt-10">
+          <div className="mx-auto grid w-full max-w-6xl items-center gap-8 rounded-3xl border border-slate-200 bg-white p-5 text-center shadow-[0_12px_30px_rgba(15,23,42,0.08)] sm:p-6 lg:grid-cols-[1.1fr_0.9fr] lg:text-left xl:grid-cols-[1fr_1fr]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/illustrations/hero-ipad-illustration.png"
+              alt=""
+              className="mx-auto h-auto w-auto max-h-72 rounded-xl border border-slate-200/70 shadow-[0_10px_28px_rgba(15,23,42,0.10)] sm:max-h-80 lg:mx-0 lg:max-h-96"
+              aria-hidden="true"
+            />
+            <div className="flex flex-col items-center gap-4 text-center lg:items-start lg:text-left">
+              <div>
+                <p className="text-center text-3xl font-semibold text-slate-900 sm:text-4xl lg:text-[2.35rem] xl:text-[2.75rem] lg:text-left">
+                  <span className="block">Ready to simplify your</span>
+                  <span className="block whitespace-nowrap">document workflow?</span>
+                </p>
+                <p className="text-center text-base text-slate-600 sm:text-lg lg:text-left">
+                  Edit, merge, and collect signatures from one secure workspace.
+                </p>
               </div>
-            ))}
+              <a
+                href="/pricing"
+                className="inline-flex items-center justify-center rounded-full border border-white/20 bg-gradient-to-r from-[#6D5EF3] to-[#8B7CFF] px-9 py-3 text-base font-semibold text-white shadow-[0_14px_28px_rgba(109,94,243,0.28)] transition hover:-translate-y-0.5 hover:from-[#7567F5] hover:to-[#9486FF]"
+              >
+                Start free trial →
+              </a>
+            </div>
           </div>
-        </div>
+        </section>
 
       </div>
     </div>
-  );
-}
-
-function renderValue(value: boolean | string) {
-  if (typeof value === "string") {
-    if (value === "Unlimited") {
-      return (
-        <span className="block bg-gradient-to-r from-purple-600 to-blue-700 bg-clip-text text-center font-semibold text-transparent">
-          {value}
-        </span>
-      );
-    }
-    return <span className="block text-center text-slate-900">{value}</span>;
-  }
-  if (value) {
-    return (
-      <span className="flex justify-center">
-        <Check className="h-6 w-6 text-emerald-500" strokeWidth={3} />
-      </span>
-    );
-  }
-  return (
-    <span className="flex justify-center">
-      <X className="h-6 w-6 text-rose-500" strokeWidth={3} />
-    </span>
   );
 }

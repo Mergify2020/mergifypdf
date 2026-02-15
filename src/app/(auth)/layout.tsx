@@ -4,6 +4,7 @@ import AppHeaderBrand from "@/components/AppHeaderBrand";
 import HeaderAuthButtons from "@/components/HeaderAuthButtons";
 import HeroHeader from "@/components/HeroHeader";
 import HeaderFeaturesLink from "@/components/HeaderFeaturesLink";
+import HeaderSupportLink from "@/components/HeaderSupportLink";
 import { getServerSessionSafe } from "@/lib/serverSession";
 import AuthFooter from "./AuthFooter";
 
@@ -30,24 +31,27 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
             />
           </div>
           <div className="hidden items-center justify-center gap-4 text-base font-semibold text-slate-700 min-[810px]:flex min-[810px]:gap-6">
+            <HeaderFeaturesLink className="transition hover:text-slate-900 hover:underline hover:underline-offset-8" />
             <Link
               href="/pricing"
               className="transition hover:text-slate-900 hover:underline hover:underline-offset-8"
             >
               Pricing
             </Link>
-            <HeaderFeaturesLink className="transition hover:text-slate-900 hover:underline hover:underline-offset-8" />
             <span className="cursor-default text-slate-700 hover:text-slate-900">About</span>
-            <span className="cursor-default text-slate-700 hover:text-slate-900">Contact</span>
+            <HeaderSupportLink
+              className="text-slate-700 transition hover:text-slate-900 hover:underline hover:underline-offset-8"
+              activeClassName="text-slate-900 underline underline-offset-8"
+            />
           </div>
           <div className="hidden items-center justify-center gap-4 text-base font-semibold text-slate-700 min-[700px]:flex min-[810px]:hidden">
+            <HeaderFeaturesLink className="transition hover:text-slate-900 hover:underline hover:underline-offset-8" />
             <Link
               href="/pricing"
               className="transition hover:text-slate-900 hover:underline hover:underline-offset-8"
             >
               Pricing
             </Link>
-            <HeaderFeaturesLink className="transition hover:text-slate-900 hover:underline hover:underline-offset-8" />
             <span className="cursor-default text-slate-700 hover:text-slate-900">About</span>
           </div>
           <div className="justify-self-end">
