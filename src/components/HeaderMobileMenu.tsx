@@ -130,13 +130,13 @@ export default function HeaderMobileMenu() {
           aria-label="Close menu"
         />
         <div
-          className={`fixed top-0 right-0 z-[61] h-screen w-screen max-w-none rounded-none bg-white shadow-none transition-transform duration-300 sm:w-[75vw] sm:max-w-[520px] sm:rounded-l-[18px] sm:shadow-[0_0_0_1px_rgba(15,23,42,0.04),-18px_0_45px_rgba(15,23,42,0.12)] ${
+          className={`fixed top-0 right-0 z-[61] h-[100dvh] w-screen max-w-none rounded-none bg-white shadow-none transition-transform duration-300 sm:w-[75vw] sm:max-w-[520px] sm:rounded-l-[18px] sm:shadow-[0_0_0_1px_rgba(15,23,42,0.04),-18px_0_45px_rgba(15,23,42,0.12)] ${
             menuOpen ? "translate-x-0" : "translate-x-full"
           }`}
           role="dialog"
           aria-modal="true"
         >
-          <div className="flex h-full flex-col">
+          <div className="flex h-full min-h-0 flex-col">
             <div className="flex h-[72px] items-center justify-between border-b border-slate-200/80 bg-white px-5 sm:h-[76px] sm:px-6">
               <Link href="/" onClick={handleCloseMenu} className="inline-flex items-center">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -159,10 +159,10 @@ export default function HeaderMobileMenu() {
                 </span>
               </button>
             </div>
-            <nav className="flex flex-1 flex-col justify-between px-5 pb-4 pt-4 sm:px-6 sm:py-8">
-              <div className="flex flex-col gap-1 text-base font-semibold text-slate-900 sm:gap-2 sm:text-lg">
+            <nav className="flex min-h-0 flex-1 flex-col px-5 pb-4 pt-3 sm:px-6 sm:py-8">
+              <div className="flex flex-col gap-0.5 text-base font-semibold text-slate-900 sm:gap-2 sm:text-lg">
                 <HeaderFeaturesLink
-                  className="cursor-pointer rounded-xl px-2 py-3 text-slate-800 transition hover:bg-slate-50 active:bg-slate-100"
+                  className="cursor-pointer rounded-xl px-2 py-2.5 text-slate-800 transition hover:bg-slate-50 active:bg-slate-100"
                   onNavigate={handleCloseMenu}
                   trackActiveSection
                   activeStrategy="topBand"
@@ -172,7 +172,7 @@ export default function HeaderMobileMenu() {
                   href="/pricing"
                   onClick={handleCloseMenu}
                   aria-current={isPricingPage ? "page" : undefined}
-                  className="group flex items-center rounded-xl px-2 py-3 transition hover:bg-slate-50 active:bg-slate-100"
+                  className="group flex items-center rounded-xl px-2 py-2.5 transition hover:bg-slate-50 active:bg-slate-100"
                 >
                   <span className="inline-flex items-center gap-2">
                     <Tag className="h-4 w-4 text-slate-500" aria-hidden="true" />
@@ -185,7 +185,7 @@ export default function HeaderMobileMenu() {
                     </span>
                   </span>
                 </Link>
-                <span className="inline-flex items-center gap-2 rounded-xl px-2 py-3 text-slate-800 transition hover:bg-slate-50 active:bg-slate-100">
+                <span className="inline-flex items-center gap-2 rounded-xl px-2 py-2.5 text-slate-800 transition hover:bg-slate-50 active:bg-slate-100">
                   <Info className="h-4 w-4 text-slate-500" aria-hidden="true" />
                   <span>About</span>
                 </span>
@@ -193,7 +193,7 @@ export default function HeaderMobileMenu() {
                   href="/support"
                   onClick={handleCloseMenu}
                   aria-current={isSupportPage ? "page" : undefined}
-                  className="group flex items-center rounded-xl px-2 py-3 transition hover:bg-slate-50 active:bg-slate-100"
+                  className="group flex items-center rounded-xl px-2 py-2.5 transition hover:bg-slate-50 active:bg-slate-100"
                 >
                   <span className="inline-flex items-center gap-2">
                     <CircleHelp className="h-4 w-4 text-slate-500" aria-hidden="true" />
@@ -210,14 +210,14 @@ export default function HeaderMobileMenu() {
                   <Link
                     href="/login"
                     onClick={handleCloseMenu}
-                    className="inline-flex items-center gap-2 rounded-xl px-2 py-3 text-slate-800 transition hover:bg-slate-50 active:bg-slate-100"
+                    className="inline-flex items-center gap-2 rounded-xl px-2 py-2.5 text-slate-800 transition hover:bg-slate-50 active:bg-slate-100"
                   >
                     <LogIn className="h-4 w-4 text-slate-500" aria-hidden="true" />
                     <span>Login</span>
                   </Link>
                 ) : null}
                 {!isLoginPage ? (
-                  <div className="mt-5">
+                  <div className="mt-3">
                     <Link
                       href="/register"
                       onClick={handleCloseMenu}
@@ -225,13 +225,13 @@ export default function HeaderMobileMenu() {
                     >
                       Start Free Trial
                     </Link>
-                    <p className="mt-1.5 text-center text-[11px] font-medium text-slate-500">
+                    <p className="mt-1 text-center text-[11px] font-medium text-slate-500">
                       3-day trial • Cancel anytime
                     </p>
                   </div>
                 ) : null}
               </div>
-              <div className="mt-6 border-t border-slate-200/80 pt-4 text-[11px] font-medium text-slate-500">
+              <div className="mt-auto border-t border-slate-200/80 pt-3 pb-[calc(env(safe-area-inset-bottom)+6px)] text-[11px] font-medium text-slate-500">
                 <div className="flex items-center justify-center gap-5 text-slate-600">
                   <a
                     href="https://www.tiktok.com/@mergify.pdf"
