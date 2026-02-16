@@ -45,8 +45,8 @@ export default function RevealOnScroll({
         });
       },
       {
-        threshold: isMobile ? 0.18 : 0.06,
-        rootMargin: isMobile ? "0px 0px -18% 0px" : "0px 0px -5% 0px",
+        threshold: isMobile ? 0.12 : 0.06,
+        rootMargin: isMobile ? "0px 0px -12% 0px" : "0px 0px -5% 0px",
       }
     );
 
