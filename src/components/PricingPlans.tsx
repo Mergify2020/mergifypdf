@@ -158,6 +158,10 @@ export default function PricingPlans() {
     };
   }, []);
 
+  function scrollToPricingTop() {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#F6F8FF] px-4 py-12 text-slate-900 lg:px-6">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[420px]">
@@ -170,7 +174,7 @@ export default function PricingPlans() {
         />
       </div>
       <div className="relative mx-auto w-full max-w-7xl space-y-10 px-4 lg:px-6">
-        <div className="text-center">
+        <div id="pricing-page-intro" className="text-center">
           <h1 className="text-4xl font-semibold tracking-tight text-white">
             Simple pricing. Powerful document tools.
           </h1>
@@ -229,7 +233,7 @@ export default function PricingPlans() {
           </div>
         </div>
 
-        <div className="mx-auto grid w-full max-w-full gap-10 md:max-w-4xl md:grid-cols-2">
+        <div id="pricing-plan-cards" className="mx-auto grid w-full max-w-full scroll-mt-28 gap-10 md:max-w-4xl md:grid-cols-2">
           {tiers.map((tier) => {
             let yearlyPrice: string | null = null;
             let savingsLabel: string | null = null;
@@ -377,13 +381,13 @@ export default function PricingPlans() {
           })}
         </div>
         <div className="mt-5 flex justify-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-1.5 text-xs font-semibold tracking-wide text-slate-500 shadow-[0_2px_10px_rgba(15,23,42,0.05)]">
-            <span className="uppercase">Payments powered by</span>
+          <div className="inline-flex items-center gap-2 text-sm font-medium text-slate-600">
+            <span>Payments powered by</span>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/logos/Stripe-Logo-v3.png"
               alt="Stripe"
-              className="h-5 w-auto rounded-md opacity-90 transition-opacity hover:opacity-100"
+              className="h-5 sm:h-6 w-auto rounded-md opacity-90 transition-opacity hover:opacity-100"
             />
           </div>
         </div>
@@ -419,18 +423,15 @@ export default function PricingPlans() {
           </div>
         </section>
         <section className="mt-12 border-t border-slate-200/70 pt-10">
-          <h2 className="text-center text-3xl font-semibold text-slate-900 sm:text-4xl">Who MergifyPDF Is Designed For</h2>
+          <h2 className="text-center text-3xl font-semibold text-slate-900 sm:text-4xl">It All Comes Down to How You Handle Documents</h2>
           <p className="mx-auto mt-2 max-w-2xl text-center text-sm text-slate-500 sm:text-base">
-            Choose based on how you work day to day: managing your own documents or sending them for signatures.
+            Whether you handle your own documents or send them to others for signature, there&apos;s a plan built for you.
           </p>
           <div className="mx-auto mt-6 grid max-w-6xl gap-4 md:grid-cols-2">
             <article className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
               <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-sky-500 to-cyan-500" aria-hidden="true" />
               <h3 className="text-2xl font-semibold text-slate-900">Essential Plus</h3>
-              <p className="mt-2 text-xs font-semibold tracking-[0.12em] text-sky-700 uppercase">
-                For Self-Managed Document Work
-              </p>
-              <p className="mt-3 text-sm leading-relaxed text-slate-600">
+              <p className="mt-3 text-xs font-semibold tracking-[0.12em] text-sky-700 uppercase">
                 Best for one user editing, organizing, and signing their own documents.
               </p>
               <ul className="mt-5 space-y-3 text-sm text-slate-700">
@@ -438,59 +439,68 @@ export default function PricingPlans() {
                   <span className="mt-0.5 inline-flex h-4 w-4 flex-none items-center justify-center rounded-full bg-sky-100 text-sky-700" aria-hidden="true">
                     <Check className="h-3 w-3" strokeWidth={3} />
                   </span>
-                  <span>Edit and fill PDFs instantly</span>
+                  <span>Businesses editing PDFs before sending them out</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="mt-0.5 inline-flex h-4 w-4 flex-none items-center justify-center rounded-full bg-sky-100 text-sky-700" aria-hidden="true">
                     <Check className="h-3 w-3" strokeWidth={3} />
                   </span>
-                  <span>Merge and organize documents</span>
+                  <span>Freelancers preparing proposals and reports for clients</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="mt-0.5 inline-flex h-4 w-4 flex-none items-center justify-center rounded-full bg-sky-100 text-sky-700" aria-hidden="true">
                     <Check className="h-3 w-3" strokeWidth={3} />
                   </span>
-                  <span>Add your signature in seconds</span>
+                  <span>Offices organizing statements and reports into one file</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="mt-0.5 inline-flex h-4 w-4 flex-none items-center justify-center rounded-full bg-sky-100 text-sky-700" aria-hidden="true">
                     <Check className="h-3 w-3" strokeWidth={3} />
                   </span>
-                  <span>Manage everyday paperwork with ease</span>
+                  <span>Students merging essays and projects for submission</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-0.5 inline-flex h-4 w-4 flex-none items-center justify-center rounded-full bg-sky-100 text-sky-700" aria-hidden="true">
+                    <Check className="h-3 w-3" strokeWidth={3} />
+                  </span>
+                  <span>Individuals completing and signing forms digitally</span>
                 </li>
               </ul>
             </article>
             <article className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
               <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-violet-500 to-indigo-500" aria-hidden="true" />
               <h3 className="text-2xl font-semibold text-slate-900">Signature Pro</h3>
-              <p className="mt-2 text-xs font-semibold tracking-[0.12em] text-indigo-700 uppercase">
-                For Signature-Driven Work
-              </p>
-              <p className="mt-3 text-sm leading-relaxed text-slate-600">Best for one user sending documents to others for signature.</p>
+              <p className="mt-3 text-xs font-semibold tracking-[0.12em] text-indigo-700 uppercase">Best for one user sending documents to one or multiple signers.</p>
               <ul className="mt-5 space-y-3 text-sm text-slate-700">
                 <li className="flex items-start gap-2">
                   <span className="mt-0.5 inline-flex h-4 w-4 flex-none items-center justify-center rounded-full bg-indigo-100 text-indigo-700" aria-hidden="true">
                     <Check className="h-3 w-3" strokeWidth={3} />
                   </span>
-                  <span>Send documents for secure online signing</span>
+                  <span>HR sending onboarding documents for signature</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="mt-0.5 inline-flex h-4 w-4 flex-none items-center justify-center rounded-full bg-indigo-100 text-indigo-700" aria-hidden="true">
                     <Check className="h-3 w-3" strokeWidth={3} />
                   </span>
-                  <span>Request one or multiple signatures</span>
+                  <span>Businesses sending contracts to clients or vendors</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="mt-0.5 inline-flex h-4 w-4 flex-none items-center justify-center rounded-full bg-indigo-100 text-indigo-700" aria-hidden="true">
                     <Check className="h-3 w-3" strokeWidth={3} />
                   </span>
-                  <span>Monitor signing progress</span>
+                  <span>Property managers requesting lease signatures from tenants</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="mt-0.5 inline-flex h-4 w-4 flex-none items-center justify-center rounded-full bg-indigo-100 text-indigo-700" aria-hidden="true">
                     <Check className="h-3 w-3" strokeWidth={3} />
                   </span>
-                  <span>Send reminders to avoid delays</span>
+                  <span>Agencies sending service agreements before starting work</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-0.5 inline-flex h-4 w-4 flex-none items-center justify-center rounded-full bg-indigo-100 text-indigo-700" aria-hidden="true">
+                    <Check className="h-3 w-3" strokeWidth={3} />
+                  </span>
+                  <span>Organizations handling documents that require multiple signers</span>
                 </li>
               </ul>
             </article>
@@ -505,22 +515,23 @@ export default function PricingPlans() {
               className="mx-auto h-auto w-auto max-h-72 rounded-xl border border-slate-200/70 shadow-[0_10px_28px_rgba(15,23,42,0.10)] sm:max-h-80 lg:mx-0 lg:max-h-96"
               aria-hidden="true"
             />
-            <div className="flex flex-col items-center gap-4 text-center lg:items-start lg:text-left">
+            <div className="flex flex-col items-center gap-5 text-center lg:items-start lg:text-left">
               <div>
-                <p className="text-center text-3xl font-semibold text-slate-900 sm:text-4xl lg:text-[2.35rem] xl:text-[2.75rem] lg:text-left">
+                <p className="text-center text-3xl leading-tight font-semibold text-slate-900 sm:text-4xl lg:text-[2.35rem] xl:text-[2.75rem] lg:text-left">
                   <span className="block">Ready to simplify your</span>
                   <span className="block whitespace-nowrap">document workflow?</span>
                 </p>
-                <p className="text-center text-base text-slate-600 sm:text-lg lg:text-left">
+                <p className="mt-3 text-center text-base leading-relaxed text-slate-600 sm:text-lg lg:text-left">
                   Edit, merge, and collect signatures from one secure workspace.
                 </p>
               </div>
-              <a
-                href="/pricing"
+              <button
+                type="button"
+                onClick={scrollToPricingTop}
                 className="inline-flex items-center justify-center rounded-full border border-white/20 bg-gradient-to-r from-[#6D5EF3] to-[#8B7CFF] px-9 py-3 text-base font-semibold text-white shadow-[0_14px_28px_rgba(109,94,243,0.28)] transition hover:-translate-y-0.5 hover:from-[#7567F5] hover:to-[#9486FF]"
               >
                 Start free trial →
-              </a>
+              </button>
             </div>
           </div>
         </section>

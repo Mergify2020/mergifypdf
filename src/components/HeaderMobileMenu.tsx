@@ -105,15 +105,15 @@ export default function HeaderMobileMenu() {
         aria-expanded={menuOpen}
       >
         {menuOpen ? (
-          <span className="relative h-6 w-6">
-            <span className="absolute left-0 top-1/2 h-[2px] w-6 -translate-y-1/2 rotate-45 rounded bg-slate-800" />
-            <span className="absolute left-0 top-1/2 h-[2px] w-6 -translate-y-1/2 -rotate-45 rounded bg-slate-800" />
+          <span className="relative h-[26px] w-[26px]">
+            <span className="absolute left-0 top-1/2 h-[2px] w-[26px] -translate-y-1/2 rotate-45 rounded bg-slate-800" />
+            <span className="absolute left-0 top-1/2 h-[2px] w-[26px] -translate-y-1/2 -rotate-45 rounded bg-slate-800" />
           </span>
         ) : (
           <span className="flex flex-col gap-[4px]">
-            <span className="h-[2px] w-6 rounded bg-slate-800" />
-            <span className="h-[2px] w-6 rounded bg-slate-800" />
-            <span className="h-[2px] w-6 rounded bg-slate-800" />
+            <span className="h-[2px] w-[26px] rounded bg-slate-800" />
+            <span className="h-[2px] w-[26px] rounded bg-slate-800" />
+            <span className="h-[2px] w-[26px] rounded bg-slate-800" />
           </span>
         )}
       </button>

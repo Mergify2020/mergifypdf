@@ -384,6 +384,14 @@ header[data-hero="false"] .hero-auth-link:hover {
   header .app-brand-dark {
     display: none !important;
   }
+
+  header[data-hero="true"] .app-brand-light {
+    display: none !important;
+  }
+
+  header[data-hero="true"] .app-brand-dark {
+    display: block !important;
+  }
 }
 
 .hero-stats .hero-stat-value {

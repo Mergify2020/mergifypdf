@@ -133,8 +133,8 @@ export default function HeroFeatureArea() {
               Why choose MergifyPDF
             </h2>
           </RevealOnScroll>
-          <div className="mt-8 grid grid-cols-1 gap-6 text-center sm:grid-cols-2 lg:grid-cols-4 lg:text-left">
-            <RevealOnScroll className="relative flex h-full flex-col items-center gap-4 rounded-2xl border border-slate-200 bg-white/80 p-6 text-center shadow-[0_1px_3px_rgba(15,23,42,0.08)] backdrop-blur-sm transition-shadow duration-200 hover:border-slate-300 hover:shadow-[0_0_0_1px_rgba(148,163,184,0.35)] sm:items-start sm:text-left" delayMs={0}>
+          <div className="mt-8 grid grid-cols-2 gap-3 text-center sm:gap-6 lg:grid-cols-4 lg:text-left">
+            <RevealOnScroll className="relative flex h-full flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-white/80 p-4 text-center shadow-[0_1px_3px_rgba(15,23,42,0.08)] backdrop-blur-sm transition-shadow duration-200 hover:border-slate-300 hover:shadow-[0_0_0_1px_rgba(148,163,184,0.35)] sm:items-start sm:gap-4 sm:p-6 sm:text-left" delayMs={0}>
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-indigo-50 via-white to-indigo-100 text-indigo-600/70 ring-1 ring-indigo-100/70">
                 <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6">
                   <path
@@ -152,40 +152,22 @@ export default function HeroFeatureArea() {
                     strokeLinejoin="round"
                     strokeWidth="1.6"
                   />
+                  <path
+                    d="m9 17 2 2 4-4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.6"
+                  />
                 </svg>
               </div>
-              <p className="text-sm font-semibold text-slate-900">Free 3-day trial</p>
+              <p className="text-sm font-semibold text-slate-900">Free 3-Day Trial</p>
               <p className="mt-2 text-sm leading-relaxed text-slate-500">
                 Try every feature risk-free. No commitment.
               </p>
             </RevealOnScroll>
-            <RevealOnScroll className="relative flex h-full flex-col items-center gap-4 rounded-2xl border border-slate-200 bg-white/80 p-6 text-center shadow-[0_1px_3px_rgba(15,23,42,0.08)] backdrop-blur-sm transition-shadow duration-200 hover:border-slate-300 hover:shadow-[0_0_0_1px_rgba(148,163,184,0.35)] sm:items-start sm:text-left" delayMs={80}>
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-indigo-50 via-white to-indigo-100 text-indigo-600/70 ring-1 ring-indigo-100/70">
-                <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6">
-                  <path
-                    d="M5 7.5 12 12l7-4.5"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="1.6"
-                  />
-                  <path
-                    d="M5 12.5 12 17l7-4.5"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="1.6"
-                  />
-                </svg>
-              </div>
-              <p className="text-sm font-semibold text-slate-900">Start in seconds</p>
-              <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                No downloads. No setup. Just upload and go.
-              </p>
-            </RevealOnScroll>
-            <RevealOnScroll className="relative flex h-full flex-col items-center gap-4 rounded-2xl border border-slate-200 bg-white/80 p-6 text-center shadow-[0_1px_3px_rgba(15,23,42,0.08)] backdrop-blur-sm transition-shadow duration-200 hover:border-slate-300 hover:shadow-[0_0_0_1px_rgba(148,163,184,0.35)] sm:items-start sm:text-left" delayMs={160}>
+            <RevealOnScroll className="relative flex h-full flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-white/80 p-4 text-center shadow-[0_1px_3px_rgba(15,23,42,0.08)] backdrop-blur-sm transition-shadow duration-200 hover:border-slate-300 hover:shadow-[0_0_0_1px_rgba(148,163,184,0.35)] sm:items-start sm:gap-4 sm:p-6 sm:text-left" delayMs={80}>
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-indigo-50 via-white to-indigo-100 text-indigo-600/70 ring-1 ring-indigo-100/70">
                 <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6">
                   <path
@@ -197,12 +179,12 @@ export default function HeroFeatureArea() {
                   />
                 </svg>
               </div>
-              <p className="text-sm font-semibold text-slate-900">Built for speed</p>
+              <p className="text-sm font-semibold text-slate-900">No Printing. No Scanning.</p>
               <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                Merge, edit, and send in seconds — even large files.
+                Fill out and sign documents digitally - skip the paper process.
               </p>
             </RevealOnScroll>
-            <RevealOnScroll className="relative flex h-full flex-col items-center gap-4 rounded-2xl border border-slate-200 bg-white/80 p-6 text-center shadow-[0_1px_3px_rgba(15,23,42,0.08)] backdrop-blur-sm transition-shadow duration-200 hover:border-slate-300 hover:shadow-[0_0_0_1px_rgba(148,163,184,0.35)] sm:items-start sm:text-left" delayMs={240}>
+            <RevealOnScroll className="relative flex h-full flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-white/80 p-4 text-center shadow-[0_1px_3px_rgba(15,23,42,0.08)] backdrop-blur-sm transition-shadow duration-200 hover:border-slate-300 hover:shadow-[0_0_0_1px_rgba(148,163,184,0.35)] sm:items-start sm:gap-4 sm:p-6 sm:text-left" delayMs={160}>
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-indigo-50 via-white to-indigo-100 text-indigo-600/70 ring-1 ring-indigo-100/70">
                 <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6">
                   <path
@@ -213,14 +195,7 @@ export default function HeroFeatureArea() {
                     strokeWidth="1.6"
                   />
                   <path
-                    d="M4 12l8 4 8-4"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeLinejoin="round"
-                    strokeWidth="1.6"
-                  />
-                  <path
-                    d="M4 16l8 4 8-4"
+                    d="M4 12l8 4 8-4M4 16l8 4 8-4"
                     fill="none"
                     stroke="currentColor"
                     strokeLinejoin="round"
@@ -228,9 +203,34 @@ export default function HeroFeatureArea() {
                   />
                 </svg>
               </div>
-              <p className="text-sm font-semibold text-slate-900">All-in-one workspace</p>
+              <p className="text-sm font-semibold text-slate-900">Everything in One Workspace</p>
               <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                Edit, merge, and collect signatures without switching tools.
+                Edit, merge, and send documents without switching between tools.
+              </p>
+            </RevealOnScroll>
+            <RevealOnScroll className="relative flex h-full flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-white/80 p-4 text-center shadow-[0_1px_3px_rgba(15,23,42,0.08)] backdrop-blur-sm transition-shadow duration-200 hover:border-slate-300 hover:shadow-[0_0_0_1px_rgba(148,163,184,0.35)] sm:items-start sm:gap-4 sm:p-6 sm:text-left" delayMs={240}>
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-indigo-50 via-white to-indigo-100 text-indigo-600/70 ring-1 ring-indigo-100/70">
+                <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6">
+                  <path
+                    d="M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18Z"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinejoin="round"
+                    strokeWidth="1.6"
+                  />
+                  <path
+                    d="M3.5 12h17M12 3c2.2 2.2 3.3 5.2 3.3 9S14.2 18.8 12 21M12 3C9.8 5.2 8.7 8.2 8.7 12S9.8 18.8 12 21"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.6"
+                  />
+                </svg>
+              </div>
+              <p className="text-sm font-semibold text-slate-900">Built for Real-World Workflows</p>
+              <p className="mt-2 text-sm leading-relaxed text-slate-500">
+                From self-signing forms to sending documents to multiple signers.
               </p>
             </RevealOnScroll>
           </div>
@@ -247,13 +247,13 @@ export default function HeroFeatureArea() {
                 aria-hidden="true"
               />
             </RevealOnScroll>
-            <div className="flex flex-col items-center gap-4 text-center lg:items-start lg:text-left">
+            <div className="flex flex-col items-center gap-5 text-center lg:items-start lg:text-left">
               <RevealOnScroll as="div">
-                <p className="text-center text-3xl font-semibold text-slate-900 sm:text-4xl lg:text-[2.75rem] xl:text-[3.25rem] lg:text-left">
+                <p className="text-center text-3xl leading-tight font-semibold text-slate-900 sm:text-4xl lg:text-[2.75rem] xl:text-[3.25rem] lg:text-left">
                   <span className="block">Do more with your</span>
                   <span className="block whitespace-nowrap">documents — for less.</span>
                 </p>
-                <p className="text-center text-base text-slate-600 sm:text-lg lg:text-left">
+                <p className="mt-3 text-center text-base leading-relaxed text-slate-600 sm:text-lg lg:text-left">
                   No installs. No delays. Just the tools you need, at a fraction of the cost.
                 </p>
               </RevealOnScroll>
