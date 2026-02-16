@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Check, CreditCard, ShieldCheck, Download, Lock } from "lucide-react";
+import RevealOnScroll from "@/components/RevealOnScroll";
 
 const tiers = [
   {
@@ -233,7 +234,11 @@ export default function PricingPlans() {
           </div>
         </div>
 
-        <div id="pricing-plan-cards" className="mx-auto grid w-full max-w-full scroll-mt-28 gap-10 md:max-w-4xl md:grid-cols-2">
+        <RevealOnScroll
+          as="div"
+          className="mx-auto w-full max-w-full md:max-w-4xl"
+        >
+          <div id="pricing-plan-cards" className="grid w-full scroll-mt-28 gap-10 md:grid-cols-2">
           {tiers.map((tier) => {
             let yearlyPrice: string | null = null;
             let savingsLabel: string | null = null;
@@ -379,7 +384,8 @@ export default function PricingPlans() {
               </div>
             );
           })}
-        </div>
+          </div>
+        </RevealOnScroll>
         <div className="mt-5 flex justify-center">
           <div className="inline-flex items-center gap-2 text-sm font-medium text-slate-600">
             <span>Payments powered by</span>
@@ -392,10 +398,12 @@ export default function PricingPlans() {
           </div>
         </div>
         <section className="mt-10 border-t border-slate-200/70 pt-10">
-          <h2 className="mb-5 text-center text-3xl font-semibold text-slate-900 sm:text-4xl">
-            Everything you need to work with confidence
-          </h2>
-          <div className="mx-auto grid max-w-6xl gap-3 md:grid-cols-2 lg:grid-cols-4">
+          <RevealOnScroll as="div">
+            <h2 className="mb-5 text-center text-3xl font-semibold text-slate-900 sm:text-4xl">
+              Everything you need to work with confidence
+            </h2>
+          </RevealOnScroll>
+          <RevealOnScroll as="div" delayMs={80} className="mx-auto grid max-w-6xl gap-3 md:grid-cols-2 lg:grid-cols-4">
             <div className="flex min-h-[92px] items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-5 text-left shadow-[0_6px_16px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_10px_20px_rgba(15,23,42,0.08)]">
               <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
                 <CreditCard className="h-4 w-4" />
@@ -420,14 +428,16 @@ export default function PricingPlans() {
               </span>
               <p className="text-sm font-semibold text-slate-800">Signature workflow controls</p>
             </div>
-          </div>
+          </RevealOnScroll>
         </section>
         <section className="mt-12 border-t border-slate-200/70 pt-10">
-          <h2 className="text-center text-3xl font-semibold text-slate-900 sm:text-4xl">It All Comes Down to How You Handle Documents</h2>
-          <p className="mx-auto mt-2 max-w-2xl text-center text-sm text-slate-500 sm:text-base">
-            Whether you handle your own documents or send them to others for signature, there&apos;s a plan built for you.
-          </p>
-          <div className="mx-auto mt-6 grid max-w-6xl gap-4 md:grid-cols-2">
+          <RevealOnScroll as="div">
+            <h2 className="text-center text-3xl font-semibold text-slate-900 sm:text-4xl">It All Comes Down to How You Handle Documents</h2>
+            <p className="mx-auto mt-2 max-w-2xl text-center text-sm text-slate-500 sm:text-base">
+              Whether you handle your own documents or send them to others for signature, there&apos;s a plan built for you.
+            </p>
+          </RevealOnScroll>
+          <RevealOnScroll as="div" delayMs={80} className="mx-auto mt-6 grid max-w-6xl gap-4 md:grid-cols-2">
             <article className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
               <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-sky-500 to-cyan-500" aria-hidden="true" />
               <h3 className="text-2xl font-semibold text-slate-900">Essential Plus</h3>
@@ -504,10 +514,13 @@ export default function PricingPlans() {
                 </li>
               </ul>
             </article>
-          </div>
+          </RevealOnScroll>
         </section>
         <section className="mt-12 mb-2 border-t border-slate-200/70 pt-10">
-          <div className="mx-auto grid w-full max-w-6xl items-center gap-8 rounded-3xl border border-slate-200 bg-white p-5 text-center shadow-[0_12px_30px_rgba(15,23,42,0.08)] sm:p-6 lg:grid-cols-[1.1fr_0.9fr] lg:text-left xl:grid-cols-[1fr_1fr]">
+          <RevealOnScroll
+            as="div"
+            className="mx-auto grid w-full max-w-6xl items-center gap-8 rounded-3xl border border-slate-200 bg-white p-5 text-center shadow-[0_12px_30px_rgba(15,23,42,0.08)] sm:p-6 lg:grid-cols-[1.1fr_0.9fr] lg:text-left xl:grid-cols-[1fr_1fr]"
+          >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/illustrations/hero-ipad-illustration.png"
@@ -533,7 +546,7 @@ export default function PricingPlans() {
                 Start free trial →
               </button>
             </div>
-          </div>
+          </RevealOnScroll>
         </section>
 
       </div>
