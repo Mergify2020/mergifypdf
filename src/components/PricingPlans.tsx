@@ -134,7 +134,7 @@ export default function PricingPlans() {
     setBillingPreferenceReady(true);
   }, []);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     function updateHighlight() {
       const container = toggleRef.current;
       const button = billingPeriod === "monthly" ? monthlyRef.current : annualRef.current;
@@ -147,9 +147,12 @@ export default function PricingPlans() {
       });
     }
 
-    updateHighlight();
+    const rafId = window.requestAnimationFrame(updateHighlight);
     window.addEventListener("resize", updateHighlight);
-    return () => window.removeEventListener("resize", updateHighlight);
+    return () => {
+      window.removeEventListener("resize", updateHighlight);
+      window.cancelAnimationFrame(rafId);
+    };
   }, [billingPeriod]);
 
   useEffect(() => {
@@ -212,14 +215,15 @@ export default function PricingPlans() {
             <div className="inline-flex items-center rounded-full border border-white/50 bg-white/15 p-[3px] text-sm font-semibold backdrop-blur">
               <div ref={toggleRef} className="relative inline-flex items-center rounded-full">
                 <span
-                  className={`absolute inset-y-0 left-0 rounded-full bg-white shadow-[0_6px_16px_rgba(15,23,42,0.18)] transition-opacity duration-200 ${
-                    shouldAnimateToggle ? "transition-[transform,width,opacity] duration-200" : ""
-                  } ${
+                  className={`absolute inset-y-0 left-0 rounded-full bg-white shadow-[0_6px_16px_rgba(15,23,42,0.18)] ${
                     billingPreferenceReady && toggleHighlight.width > 0 ? "opacity-100" : "opacity-0"
                   }`}
                   style={{
                     width: toggleHighlight.width,
                     transform: `translateX(${toggleHighlight.left}px)`,
+                    transition: shouldAnimateToggle
+                      ? "transform 220ms ease, width 220ms ease, opacity 200ms ease"
+                      : "opacity 200ms ease",
                   }}
                 />
                 <button
@@ -229,9 +233,7 @@ export default function PricingPlans() {
                   className={`relative z-10 rounded-full px-5 py-2 whitespace-nowrap tracking-wide transition-colors ${
                     !billingPreferenceReady
                       ? "text-white"
-                      : billingPeriod === "monthly" && !toggleMeasured
-                        ? "bg-white text-slate-900 shadow-[0_6px_16px_rgba(15,23,42,0.18)]"
-                        : billingPeriod === "monthly"
+                      : billingPeriod === "monthly" && toggleMeasured
                           ? "text-slate-900"
                           : "text-white hover:text-slate-200"
                   }`}
@@ -245,9 +247,7 @@ export default function PricingPlans() {
                   className={`relative z-10 rounded-full pl-4 pr-2 py-2 whitespace-nowrap tracking-wide transition-colors ${
                     !billingPreferenceReady
                       ? "text-white"
-                      : billingPeriod === "annual" && !toggleMeasured
-                        ? "bg-white text-slate-900 shadow-[0_6px_16px_rgba(15,23,42,0.18)]"
-                        : billingPeriod === "annual"
+                      : billingPeriod === "annual" && toggleMeasured
                           ? "text-slate-900"
                           : "text-white hover:text-slate-200"
                   }`}
