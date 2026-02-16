@@ -50,6 +50,7 @@ const tiers = [
 
 export default function PricingPlans() {
   const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("monthly");
+  const [billingPreferenceReady, setBillingPreferenceReady] = useState(false);
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const toggleRef = useRef<HTMLDivElement | null>(null);
   const monthlyRef = useRef<HTMLButtonElement | null>(null);
@@ -122,6 +123,18 @@ export default function PricingPlans() {
   }
 
   useLayoutEffect(() => {
+    try {
+      const stored = window.localStorage.getItem("pricing:billing-period");
+      if (stored === "monthly" || stored === "annual") {
+        setBillingPeriod(stored);
+      }
+    } catch {
+      // ignore storage access errors
+    }
+    setBillingPreferenceReady(true);
+  }, []);
+
+  useLayoutEffect(() => {
     function updateHighlight() {
       const container = toggleRef.current;
       const button = billingPeriod === "monthly" ? monthlyRef.current : annualRef.current;
@@ -138,6 +151,15 @@ export default function PricingPlans() {
     window.addEventListener("resize", updateHighlight);
     return () => window.removeEventListener("resize", updateHighlight);
   }, [billingPeriod]);
+
+  useEffect(() => {
+    if (!billingPreferenceReady) return;
+    try {
+      window.localStorage.setItem("pricing:billing-period", billingPeriod);
+    } catch {
+      // ignore storage access errors
+    }
+  }, [billingPeriod, billingPreferenceReady]);
 
   useEffect(() => {
     let active = true;
@@ -176,20 +198,24 @@ export default function PricingPlans() {
       </div>
       <div className="relative mx-auto w-full max-w-7xl space-y-10 px-4 lg:px-6">
         <div id="pricing-page-intro" className="text-center">
-          <h1 className="text-4xl font-semibold tracking-tight text-white">
-            Simple pricing. Smart workflows.
-          </h1>
-          <p className="mt-3 text-4xl font-semibold tracking-tight text-white/90">
-            Try all features free for 3 days.
-          </p>
-          <div className="mt-6 flex justify-center">
+          <RevealOnScroll as="div">
+            <h1 className="text-4xl font-semibold tracking-tight text-white">
+              Simple pricing. Smart workflows.
+            </h1>
+          </RevealOnScroll>
+          <RevealOnScroll as="div" delayMs={70}>
+            <p className="mt-3 text-4xl font-semibold tracking-tight text-white/90">
+              Try all features free for 3 days.
+            </p>
+          </RevealOnScroll>
+          <RevealOnScroll as="div" delayMs={130} className="mt-6 flex justify-center">
             <div className="inline-flex items-center rounded-full border border-white/50 bg-white/15 p-[3px] text-sm font-semibold backdrop-blur">
               <div ref={toggleRef} className="relative inline-flex items-center rounded-full">
                 <span
-                  className={`absolute inset-y-0 left-0 rounded-full bg-white shadow-[0_6px_16px_rgba(15,23,42,0.18)] ${
-                    shouldAnimateToggle ? "transition-[transform,width] duration-200" : ""
+                  className={`absolute inset-y-0 left-0 rounded-full bg-white shadow-[0_6px_16px_rgba(15,23,42,0.18)] transition-opacity duration-200 ${
+                    shouldAnimateToggle ? "transition-[transform,width,opacity] duration-200" : ""
                   } ${
-                    toggleHighlight.width > 0 ? "opacity-100" : "opacity-0"
+                    billingPreferenceReady && toggleHighlight.width > 0 ? "opacity-100" : "opacity-0"
                   }`}
                   style={{
                     width: toggleHighlight.width,
@@ -201,11 +227,13 @@ export default function PricingPlans() {
                   onClick={() => handleBillingPeriodChange("monthly")}
                   ref={monthlyRef}
                   className={`relative z-10 rounded-full px-5 py-2 whitespace-nowrap tracking-wide transition-colors ${
-                    billingPeriod === "monthly" && !toggleMeasured
-                      ? "bg-white text-slate-900 shadow-[0_6px_16px_rgba(15,23,42,0.18)]"
-                      : billingPeriod === "monthly"
-                        ? "text-slate-900"
-                        : "text-white hover:text-slate-200"
+                    !billingPreferenceReady
+                      ? "text-white"
+                      : billingPeriod === "monthly" && !toggleMeasured
+                        ? "bg-white text-slate-900 shadow-[0_6px_16px_rgba(15,23,42,0.18)]"
+                        : billingPeriod === "monthly"
+                          ? "text-slate-900"
+                          : "text-white hover:text-slate-200"
                   }`}
                 >
                   Monthly
@@ -215,11 +243,13 @@ export default function PricingPlans() {
                   onClick={() => handleBillingPeriodChange("annual")}
                   ref={annualRef}
                   className={`relative z-10 rounded-full pl-4 pr-2 py-2 whitespace-nowrap tracking-wide transition-colors ${
-                    billingPeriod === "annual" && !toggleMeasured
-                      ? "bg-white text-slate-900 shadow-[0_6px_16px_rgba(15,23,42,0.18)]"
-                      : billingPeriod === "annual"
-                        ? "text-slate-900"
-                        : "text-white hover:text-slate-200"
+                    !billingPreferenceReady
+                      ? "text-white"
+                      : billingPeriod === "annual" && !toggleMeasured
+                        ? "bg-white text-slate-900 shadow-[0_6px_16px_rgba(15,23,42,0.18)]"
+                        : billingPeriod === "annual"
+                          ? "text-slate-900"
+                          : "text-white hover:text-slate-200"
                   }`}
                 >
                 Annual ·{" "}
@@ -231,7 +261,7 @@ export default function PricingPlans() {
               </button>
               </div>
             </div>
-          </div>
+          </RevealOnScroll>
         </div>
 
         <div className="mx-auto w-full max-w-full md:max-w-4xl">
@@ -382,7 +412,7 @@ export default function PricingPlans() {
           })}
           </div>
         </div>
-        <div className="mt-5 flex justify-center">
+        <RevealOnScroll as="div" variant="fade" className="mt-5 flex justify-center">
           <div className="inline-flex items-center gap-2 text-sm font-medium text-slate-600">
             <span>Payments powered by</span>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -392,9 +422,9 @@ export default function PricingPlans() {
               className="h-5 sm:h-6 w-auto rounded-md opacity-90 transition-opacity hover:opacity-100"
             />
           </div>
-        </div>
-        <section className="mt-10 border-t border-slate-200/70 pt-10">
-          <RevealOnScroll as="div">
+        </RevealOnScroll>
+        <section className="mt-10">
+          <RevealOnScroll as="div" variant="fade" className="border-t border-slate-200/70 pt-10">
             <h2 className="mb-5 text-center text-3xl font-semibold text-slate-900 sm:text-4xl">
               Everything you need to work with confidence
             </h2>
