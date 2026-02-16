@@ -177,7 +177,7 @@ export default function PricingPlans() {
       <div className="relative mx-auto w-full max-w-7xl space-y-10 px-4 lg:px-6">
         <div id="pricing-page-intro" className="text-center">
           <h1 className="text-4xl font-semibold tracking-tight text-white">
-            Simple pricing. Powerful document tools.
+            Simple pricing. Smart workflows.
           </h1>
           <p className="mt-3 text-4xl font-semibold tracking-tight text-white/90">
             Try all features free for 3 days.
@@ -234,12 +234,9 @@ export default function PricingPlans() {
           </div>
         </div>
 
-        <RevealOnScroll
-          as="div"
-          className="mx-auto w-full max-w-full md:max-w-4xl"
-        >
+        <div className="mx-auto w-full max-w-full md:max-w-4xl">
           <div id="pricing-plan-cards" className="grid w-full scroll-mt-28 gap-10 md:grid-cols-2">
-          {tiers.map((tier) => {
+          {tiers.map((tier, index) => {
             let yearlyPrice: string | null = null;
             let savingsLabel: string | null = null;
 
@@ -266,10 +263,8 @@ export default function PricingPlans() {
                 : "text-[2.2rem] md:text-[2.1rem] font-bold leading-snug bg-gradient-to-r from-purple-500 to-sky-500 bg-clip-text text-transparent";
 
             return (
-              <div
-                key={tier.name}
-                className="relative flex h-full w-full flex-col overflow-hidden rounded-[12px] border-[3px] border-slate-300 bg-white px-8 pt-4 pb-8 shadow-[0_10px_24px_rgba(15,23,42,0.10)] transition-transform duration-150"
-              >
+              <RevealOnScroll key={tier.name} as="div" delayMs={index * 80} className="h-full">
+                <div className="relative flex h-full w-full flex-col overflow-hidden rounded-[12px] border-[3px] border-slate-300 bg-white px-8 pt-4 pb-8 shadow-[0_10px_24px_rgba(15,23,42,0.10)] transition-transform duration-150">
                 {tier.name === "Signature Pro" ? (
                   <div className="pointer-events-none absolute top-0 right-0 z-20 h-40 w-40 overflow-hidden">
                     <span className="absolute top-9 right-[-52px] inline-flex w-[238px] rotate-45 items-center justify-center bg-emerald-500 px-7 py-2 text-center text-[13px] leading-none font-bold uppercase tracking-[0.16em] text-white shadow-[0_8px_16px_rgba(16,185,129,0.35)]">
@@ -381,11 +376,12 @@ export default function PricingPlans() {
                     </p>
                   ) : null}
                 </div>
-              </div>
+                </div>
+              </RevealOnScroll>
             );
           })}
           </div>
-        </RevealOnScroll>
+        </div>
         <div className="mt-5 flex justify-center">
           <div className="inline-flex items-center gap-2 text-sm font-medium text-slate-600">
             <span>Payments powered by</span>
@@ -403,32 +399,40 @@ export default function PricingPlans() {
               Everything you need to work with confidence
             </h2>
           </RevealOnScroll>
-          <RevealOnScroll as="div" delayMs={80} className="mx-auto grid max-w-6xl gap-3 md:grid-cols-2 lg:grid-cols-4">
-            <div className="flex min-h-[92px] items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-5 text-left shadow-[0_6px_16px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_10px_20px_rgba(15,23,42,0.08)]">
+          <div className="mx-auto grid max-w-6xl gap-3 md:grid-cols-2 lg:grid-cols-4">
+            <RevealOnScroll as="div" delayMs={60}>
+              <div className="flex min-h-[92px] items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-5 text-left shadow-[0_6px_16px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_10px_20px_rgba(15,23,42,0.08)]">
               <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
                 <CreditCard className="h-4 w-4" />
               </span>
               <p className="text-sm font-semibold text-slate-800">Secure payment processing</p>
-            </div>
-            <div className="flex min-h-[92px] items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-5 text-left shadow-[0_6px_16px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_10px_20px_rgba(15,23,42,0.08)]">
+              </div>
+            </RevealOnScroll>
+            <RevealOnScroll as="div" delayMs={120}>
+              <div className="flex min-h-[92px] items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-5 text-left shadow-[0_6px_16px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_10px_20px_rgba(15,23,42,0.08)]">
               <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-sky-100 text-sky-700">
                 <ShieldCheck className="h-4 w-4" />
               </span>
               <p className="text-sm font-semibold text-slate-800">Secure cloud storage</p>
-            </div>
-            <div className="flex min-h-[92px] items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-5 text-left shadow-[0_6px_16px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_10px_20px_rgba(15,23,42,0.08)]">
+              </div>
+            </RevealOnScroll>
+            <RevealOnScroll as="div" delayMs={180}>
+              <div className="flex min-h-[92px] items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-5 text-left shadow-[0_6px_16px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_10px_20px_rgba(15,23,42,0.08)]">
               <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-violet-100 text-violet-700">
                 <Download className="h-4 w-4" />
               </span>
               <p className="text-sm font-semibold text-slate-800">No software install required</p>
-            </div>
-            <div className="flex min-h-[92px] items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-5 text-left shadow-[0_6px_16px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_10px_20px_rgba(15,23,42,0.08)]">
+              </div>
+            </RevealOnScroll>
+            <RevealOnScroll as="div" delayMs={240}>
+              <div className="flex min-h-[92px] items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-5 text-left shadow-[0_6px_16px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_10px_20px_rgba(15,23,42,0.08)]">
               <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-amber-700">
                 <Lock className="h-4 w-4" />
               </span>
               <p className="text-sm font-semibold text-slate-800">Signature workflow controls</p>
-            </div>
-          </RevealOnScroll>
+              </div>
+            </RevealOnScroll>
+          </div>
         </section>
         <section className="mt-12 border-t border-slate-200/70 pt-10">
           <RevealOnScroll as="div">
@@ -437,8 +441,8 @@ export default function PricingPlans() {
               Whether you handle your own documents or send them to others for signature, there&apos;s a plan built for you.
             </p>
           </RevealOnScroll>
-          <RevealOnScroll as="div" delayMs={80} className="mx-auto mt-6 grid max-w-6xl gap-4 md:grid-cols-2">
-            <article className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
+          <div className="mx-auto mt-6 grid max-w-6xl gap-4 md:grid-cols-2">
+            <RevealOnScroll as="article" delayMs={80} className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
               <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-sky-500 to-cyan-500" aria-hidden="true" />
               <h3 className="text-2xl font-semibold text-slate-900">Essential Plus</h3>
               <p className="mt-3 text-xs font-semibold tracking-[0.12em] text-sky-700 uppercase">
@@ -476,8 +480,8 @@ export default function PricingPlans() {
                   <span>Individuals completing and signing forms digitally</span>
                 </li>
               </ul>
-            </article>
-            <article className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
+            </RevealOnScroll>
+            <RevealOnScroll as="article" delayMs={160} className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
               <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-violet-500 to-indigo-500" aria-hidden="true" />
               <h3 className="text-2xl font-semibold text-slate-900">Signature Pro</h3>
               <p className="mt-3 text-xs font-semibold tracking-[0.12em] text-indigo-700 uppercase">Best for one user sending documents to one or multiple signers.</p>
@@ -513,8 +517,8 @@ export default function PricingPlans() {
                   <span>Organizations handling documents that require multiple signers</span>
                 </li>
               </ul>
-            </article>
-          </RevealOnScroll>
+            </RevealOnScroll>
+          </div>
         </section>
         <section className="mt-12 mb-2 border-t border-slate-200/70 pt-10">
           <RevealOnScroll
