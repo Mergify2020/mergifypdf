@@ -100,12 +100,6 @@ export default function Footer() {
               <a href="#" className="block text-[13px] text-slate-300 transition hover:text-white">
                 Help Center
               </a>
-              <a href="#" className="block text-[13px] text-slate-300 transition hover:text-white">
-                FAQ
-              </a>
-              <a href="#" className="block text-[13px] text-slate-300 transition hover:text-white">
-                Contact Support
-              </a>
             </div>
           </div>
 

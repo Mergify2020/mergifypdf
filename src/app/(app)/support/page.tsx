@@ -1,45 +1,58 @@
 import Image from "next/image";
-import { CircleDollarSign, FileText, Rocket, Search, Settings, ShieldCheck } from "lucide-react";
+import {
+  CircleDollarSign,
+  FileText,
+  LifeBuoy,
+  Mail,
+  PenSquare,
+  Rocket,
+  Search,
+  Send,
+  ShieldCheck,
+  User,
+} from "lucide-react";
 
 const topics = [
   {
     title: "Getting Started",
-    description: "Setup, onboarding, and first-time workflows.",
+    description: "Setup, uploading files, and your first document workflow.",
     icon: Rocket,
   },
   {
-    title: "My Account",
-    description: "Profile updates, login, and account settings.",
-    icon: Settings,
+    title: "Document Editing",
+    description: "Merging, splitting, reordering, and organizing PDFs.",
+    icon: FileText,
   },
   {
-    title: "Billing & Payments",
-    description: "Plans, renewals, invoices, and payment details.",
+    title: "Signing Documents",
+    description: "How to sign documents yourself and prepare them for others.",
+    icon: PenSquare,
+  },
+  {
+    title: "Sending for Signature",
+    description: "Requesting signatures, adding multiple signers, and tracking status.",
+    icon: Send,
+  },
+  {
+    title: "Account & Login",
+    description: "Profile updates, password resets, and account access.",
+    icon: User,
+  },
+  {
+    title: "Billing & Subscriptions",
+    description: "Trial details, renewals, cancellations, and invoices.",
     icon: CircleDollarSign,
   },
   {
-    title: "Document Tools",
-    description: "Merge, sign, annotate, and file management help.",
-    icon: FileText,
-  },
-  {
-    title: "Terms of Service",
-    description: "Rules, usage terms, and account responsibilities.",
-    icon: FileText,
-  },
-  {
-    title: "Privacy Policy",
-    description: "How we collect, use, and protect your data.",
+    title: "Security & Data",
+    description: "How files are stored, protected, and deleted.",
     icon: ShieldCheck,
   },
-];
-
-const popularArticles = [
-  "How to create an account",
-  "How the 3-day trial works",
-  "How annual and monthly billing work",
-  "How to cancel subscription",
-  "How to download invoices",
+  {
+    title: "Troubleshooting",
+    description: "Upload issues, file errors, or common technical problems.",
+    icon: LifeBuoy,
+  },
 ];
 
 export default function SupportPage() {
@@ -72,68 +85,112 @@ export default function SupportPage() {
           </div>
         </section>
 
-        <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_45px_rgba(15,23,42,0.08)] sm:p-8">
-          <div className="grid gap-6 lg:grid-cols-[1fr_290px]">
-            <div>
-              <h2 className="text-3xl font-semibold tracking-tight text-slate-900">Help Topics</h2>
-              <div className="mt-6 grid gap-2 border-t border-slate-200 sm:grid-cols-2">
-                {topics.map(({ title, description, icon: Icon }) => (
-                  <article
-                    key={title}
-                    className="flex gap-3 border-b border-slate-200 px-1 py-5 transition-colors hover:bg-slate-50/70 sm:px-2"
-                  >
+        <section className="mt-6">
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_45px_rgba(15,23,42,0.08)] sm:p-8">
+            <h2 className="text-3xl font-semibold tracking-tight text-slate-900">Popular Help Topics</h2>
+            <div className="mt-6 grid gap-2 border-t border-slate-200 sm:grid-cols-2">
+              {topics.map(({ title, description, icon: Icon }) => (
+                <article
+                  key={title}
+                  className="flex gap-3 border-b border-slate-200 px-1 py-5 transition-colors hover:bg-slate-50/70 sm:px-2"
+                >
+                  <span className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-violet-50 text-violet-600">
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <h3 className="text-xl font-semibold text-slate-900">{title}</h3>
+                    <p className="mt-1 text-sm leading-relaxed text-slate-600">{description}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-6 grid gap-4 lg:grid-cols-[320px_1fr]">
+          <aside className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.08)] sm:p-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between lg:flex-col">
+              <div className="order-2 sm:order-2 sm:self-center lg:order-2 lg:w-full">
+                <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Contact Support</h2>
+                <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                  Get help with your account, billing, or document workflows.
+                </p>
+
+                <div className="mt-5 space-y-4">
+                  <div className="flex items-start gap-3">
                     <span className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-violet-50 text-violet-600">
-                      <Icon className="h-5 w-5" />
+                      <Mail className="h-5 w-5" />
                     </span>
                     <div>
-                      <h3 className="text-xl font-semibold text-slate-900">{title}</h3>
-                      <p className="mt-1 text-sm leading-relaxed text-slate-600">{description}</p>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </div>
-
-            <aside className="space-y-4">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                <h3 className="text-lg font-semibold text-slate-900">Popular Articles</h3>
-                <ul className="mt-4 space-y-2 text-sm text-slate-700">
-                  {popularArticles.map((item) => (
-                    <li key={item}>
-                      <a href="#" className="transition hover:text-slate-900 hover:underline">
-                        {item}
+                      <p className="text-sm font-semibold text-slate-900">Email</p>
+                      <a href="mailto:support@mergifypdf.com" className="text-sm text-slate-600 hover:text-violet-600">
+                        support@mergifypdf.com
                       </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                <h3 className="text-lg font-semibold text-slate-900">Need Support?</h3>
-                <p className="mt-2 text-sm text-slate-600">
-                  Can&rsquo;t find what you need? Contact us and include your account email for faster help.
-                </p>
-                <details className="group mt-4 overflow-hidden rounded-2xl border border-transparent transition group-open:border-cyan-500 group-open:bg-white">
-                  <summary className="flex w-full cursor-pointer list-none items-center justify-center rounded-full bg-violet-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-600 group-open:rounded-none group-open:rounded-t-2xl">
-                    Contact Support
-                  </summary>
-                  <div className="grid grid-rows-[0fr] opacity-0 transition-[grid-template-rows,opacity] duration-300 ease-out group-open:grid-rows-[1fr] group-open:opacity-100">
-                    <div className="overflow-hidden">
-                      <div className="border-t border-violet-200 bg-white p-3 text-sm text-slate-700">
-                        <p>
-                          Email us at{" "}
-                          <a className="font-semibold text-slate-900 underline" href="mailto:support@mergifypdf.com">
-                            Support@mergifypdf.com
-                          </a>
-                          .
-                        </p>
-                        <p className="mt-1">We will get back to you within 24 hours.</p>
-                      </div>
                     </div>
                   </div>
-                </details>
+                </div>
               </div>
-            </aside>
+
+              <div className="order-1 flex justify-center sm:order-1 sm:justify-start lg:order-1 lg:justify-center">
+                <Image
+                  src="/illustrations/support-type-illustration.svg"
+                  alt="Support illustration"
+                  width={242}
+                  height={161}
+                  className="h-auto w-[242px] -scale-x-100"
+                />
+              </div>
+            </div>
+          </aside>
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_45px_rgba(15,23,42,0.08)] sm:p-7">
+            <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Get help from our support team</h2>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+              Share what you need, and we&apos;ll guide you to the fastest solution.
+            </p>
+
+            <form className="mt-6 space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-slate-700">Name</span>
+                  <input
+                    type="text"
+                    placeholder="Name"
+                    className="w-full rounded-xl border-2 border-slate-400 bg-white px-4 py-3 text-base text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-violet-500"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-slate-700">
+                    Email <span className="text-rose-500">*</span>
+                  </span>
+                  <input
+                    type="email"
+                    placeholder="Email"
+                    className="w-full rounded-xl border-2 border-slate-400 bg-white px-4 py-3 text-base text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-violet-500"
+                  />
+                </label>
+              </div>
+
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-slate-700">
+                  Message <span className="text-rose-500">*</span>
+                </span>
+                <div className="overflow-hidden rounded-xl border-2 border-slate-400 bg-white transition-colors focus-within:border-violet-500">
+                  <textarea
+                    rows={6}
+                    placeholder="Message"
+                    className="w-full resize-none border-0 bg-transparent px-4 py-3 text-base text-slate-900 outline-none placeholder:text-slate-400"
+                  />
+                </div>
+              </label>
+
+              <button
+                type="button"
+                className="mt-2 inline-flex min-w-44 items-center justify-center rounded-xl bg-violet-500 px-5 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(109,89,255,0.32)] transition-colors hover:bg-violet-600"
+              >
+                Send Message
+              </button>
+            </form>
           </div>
         </section>
       </div>
