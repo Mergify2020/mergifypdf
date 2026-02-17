@@ -18,6 +18,12 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [codeDigits, setCodeDigits] = useState<string[]>(() => Array(6).fill(""));
   const [pendingEmail, setPendingEmail] = useState("");
+  const [requiredErrors, setRequiredErrors] = useState({
+    firstName: false,
+    lastName: false,
+    email: false,
+    password: false,
+  });
   const codeValue = useMemo(() => codeDigits.join(""), [codeDigits]);
   const codeRefs = useRef<Array<HTMLInputElement | null>>([]);
 
@@ -32,8 +38,15 @@ export default function RegisterPage() {
     setErr(null);
     setInfo(null);
 
-    if (!firstName.trim() || !lastName.trim() || !email.trim() || !password.trim()) {
-      setErr("First name, last name, email, and password are required.");
+    const nextRequiredErrors = {
+      firstName: firstName.trim().length === 0,
+      lastName: lastName.trim().length === 0,
+      email: email.trim().length === 0,
+      password: password.trim().length === 0,
+    };
+    setRequiredErrors(nextRequiredErrors);
+
+    if (Object.values(nextRequiredErrors).some(Boolean)) {
       return;
     }
 
@@ -102,6 +115,7 @@ export default function RegisterPage() {
     setResendBusy(false);
     setFirstName("");
     setLastName("");
+    setRequiredErrors({ firstName: false, lastName: false, email: false, password: false });
   }
 
   async function onVerify(e: React.FormEvent) {
@@ -175,13 +189,10 @@ export default function RegisterPage() {
   return (
     <main
       data-login-page
-      className="relative flex w-full justify-center overflow-y-auto bg-white px-0 py-8 pb-[78px] sm:py-8 sm:pb-[78px] md:items-center"
-      style={{
-        minHeight: "calc(100svh - 76px)",
-      }}
+      className="relative box-border flex min-h-[100svh] w-full justify-center overflow-y-auto bg-[#4B46C8] px-0 py-8 pb-[78px] sm:min-h-screen sm:py-8 sm:pb-0 md:items-center"
     >
       {/* Darkened hero team background, behind card but above base color */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 bottom-[46px] z-0 overflow-hidden">
+      <div className="pointer-events-none absolute inset-x-0 top-0 bottom-[46px] z-0 overflow-hidden sm:bottom-0">
         <Image
           src="/backgrounds/login-page-background-v5.svg"
           alt="MergifyPDF login background"
@@ -227,17 +238,26 @@ export default function RegisterPage() {
             {step === "form" ? (
               <>
                 <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-6">
-                  <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
                     <div>
                       <label className="mb-1 block text-xs font-medium text-slate-700">
                         First name
                       </label>
                       <input
-                        className="w-full rounded-md border-2 bg-white py-2.5 pl-[18px] pr-4 text-sm text-slate-900 outline-none transition focus-visible:border-[#6D6AF4] focus-visible:ring-0 border-slate-300 hover:border-slate-400"
+                        className={`w-full rounded-md border-2 bg-white py-2.5 pl-[18px] pr-4 text-sm text-slate-900 outline-none transition focus-visible:ring-0 ${
+                          requiredErrors.firstName
+                            ? "border-rose-500 hover:border-rose-500 focus-visible:border-rose-500"
+                            : "border-slate-300 hover:border-slate-400 focus-visible:border-[#6D6AF4]"
+                        }`}
                         type="text"
                         placeholder="First name"
                         value={firstName}
-                        onChange={(e) => setFirstName(e.target.value)}
+                        onChange={(e) => {
+                          setFirstName(e.target.value);
+                          if (requiredErrors.firstName && e.target.value.trim().length > 0) {
+                            setRequiredErrors((current) => ({ ...current, firstName: false }));
+                          }
+                        }}
                         autoComplete="given-name"
                       />
                     </div>
@@ -246,11 +266,20 @@ export default function RegisterPage() {
                         Last name
                       </label>
                       <input
-                        className="w-full rounded-md border-2 bg-white py-2.5 pl-[18px] pr-4 text-sm text-slate-900 outline-none transition focus-visible:border-[#6D6AF4] focus-visible:ring-0 border-slate-300 hover:border-slate-400"
+                        className={`w-full rounded-md border-2 bg-white py-2.5 pl-[18px] pr-4 text-sm text-slate-900 outline-none transition focus-visible:ring-0 ${
+                          requiredErrors.lastName
+                            ? "border-rose-500 hover:border-rose-500 focus-visible:border-rose-500"
+                            : "border-slate-300 hover:border-slate-400 focus-visible:border-[#6D6AF4]"
+                        }`}
                         type="text"
                         placeholder="Last name"
                         value={lastName}
-                        onChange={(e) => setLastName(e.target.value)}
+                        onChange={(e) => {
+                          setLastName(e.target.value);
+                          if (requiredErrors.lastName && e.target.value.trim().length > 0) {
+                            setRequiredErrors((current) => ({ ...current, lastName: false }));
+                          }
+                        }}
                         autoComplete="family-name"
                       />
                     </div>
@@ -261,11 +290,20 @@ export default function RegisterPage() {
                       Email
                     </label>
                     <input
-                      className="w-full rounded-md border-2 bg-white py-2.5 pl-[18px] pr-4 text-sm text-slate-900 outline-none transition focus-visible:border-[#6D6AF4] focus-visible:ring-0 border-slate-300 hover:border-slate-400"
+                      className={`w-full rounded-md border-2 bg-white py-2.5 pl-[18px] pr-4 text-sm text-slate-900 outline-none transition focus-visible:ring-0 ${
+                        requiredErrors.email
+                          ? "border-rose-500 hover:border-rose-500 focus-visible:border-rose-500"
+                          : "border-slate-300 hover:border-slate-400 focus-visible:border-[#6D6AF4]"
+                      }`}
                       type="email"
                       placeholder="you@example.com"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        if (requiredErrors.email && e.target.value.trim().length > 0) {
+                          setRequiredErrors((current) => ({ ...current, email: false }));
+                        }
+                      }}
                     />
                   </div>
 
@@ -275,11 +313,20 @@ export default function RegisterPage() {
                     </label>
                     <div className="relative">
                       <input
-                        className="w-full rounded-md border-2 bg-white py-2.5 pl-[18px] pr-10 text-[15px] text-slate-900 outline-none transition focus-visible:border-[#6D6AF4] focus-visible:ring-0 border-slate-300 hover:border-slate-400"
+                        className={`w-full rounded-md border-2 bg-white py-2.5 pl-[18px] pr-10 text-[15px] text-slate-900 outline-none transition focus-visible:ring-0 ${
+                          requiredErrors.password
+                            ? "border-rose-500 hover:border-rose-500 focus-visible:border-rose-500"
+                            : "border-slate-300 hover:border-slate-400 focus-visible:border-[#6D6AF4]"
+                        }`}
                         type={showPassword ? "text" : "password"}
                         placeholder="Create a password"
                         value={password}
-                        onChange={(e) => setPassword(e.target.value)}
+                        onChange={(e) => {
+                          setPassword(e.target.value);
+                          if (requiredErrors.password && e.target.value.trim().length > 0) {
+                            setRequiredErrors((current) => ({ ...current, password: false }));
+                          }
+                        }}
                         minLength={8}
                         autoComplete="new-password"
                       />
