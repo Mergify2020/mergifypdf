@@ -175,9 +175,9 @@ export default function RegisterPage() {
   return (
     <main
       data-login-page
-      className="relative flex w-full justify-center overflow-y-auto bg-white px-0 py-6 sm:py-8 md:items-center"
+      className="relative flex w-full justify-center overflow-y-auto bg-white px-0 py-6 pb-[46px] sm:py-8 sm:pb-[46px] md:items-center"
       style={{
-        minHeight: "calc(100svh - 46px)",
+        minHeight: "calc(100svh - 76px)",
       }}
     >
       {/* Darkened hero team background, behind card but above base color */}
