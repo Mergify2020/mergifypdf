@@ -175,9 +175,8 @@ export default function RegisterPage() {
   return (
     <main
       data-login-page
-      className="relative flex w-full items-center justify-center overflow-hidden bg-white px-0 py-4 sm:py-6"
+      className="relative flex w-full justify-center overflow-y-auto bg-white px-0 py-6 sm:py-8 md:items-center"
       style={{
-        height: "calc(100svh - 46px)",
         minHeight: "calc(100svh - 46px)",
       }}
     >
@@ -196,7 +195,7 @@ export default function RegisterPage() {
       <div className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-center px-4 lg:px-6">
         {/* Create-account card centered */}
         <div className="flex w-full justify-center">
-          <div className="auth-card-animate w-full max-w-lg min-h-[620px] rounded-[5px] border border-white/25 bg-white px-7 py-12 shadow-[0_30px_90px_rgba(15,23,42,0.22)] sm:px-9 sm:py-14">
+          <div className="auth-card-animate w-full max-w-lg rounded-[5px] border border-white/25 bg-white px-7 py-12 shadow-[0_30px_90px_rgba(15,23,42,0.22)] sm:min-h-[620px] sm:px-9 sm:py-14">
             <div className="mb-4 flex items-center">
               <Image
                 src="/logos/home-expanded-sidebar-logo-light-v6.svg"
