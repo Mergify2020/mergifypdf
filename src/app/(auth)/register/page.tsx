@@ -189,7 +189,7 @@ export default function RegisterPage() {
   return (
     <main
       data-login-page
-      className="relative box-border flex min-h-[calc(100svh-46px)] w-full justify-center overflow-y-auto bg-[#4B46C8] px-0 py-8 sm:min-h-screen sm:py-8 sm:pb-0 md:items-center"
+      className="relative box-border flex h-[calc(100svh-46px)] w-full justify-center overflow-hidden bg-[#4B46C8] px-0 py-8 sm:min-h-screen sm:h-auto sm:overflow-y-auto sm:py-8 sm:pb-0 md:items-center"
     >
       {/* Darkened hero team background, behind card but above base color */}
       <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
