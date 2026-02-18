@@ -270,7 +270,7 @@ export default function ForgotPasswordPage() {
                       Email address
                     </label>
                     <input
-                      className="w-full rounded-md border-2 bg-white py-2.5 pl-[18px] pr-4 text-sm text-slate-900 outline-none transition focus-visible:border-[#6D6AF4] focus-visible:ring-0 border-slate-300 hover:border-slate-400"
+                      className="w-full rounded-md border-2 bg-white py-2.5 pl-[18px] pr-4 text-base text-slate-900 outline-none transition focus-visible:border-[#6D6AF4] focus-visible:ring-0 border-slate-300 hover:border-slate-400 sm:text-sm"
                       type="email"
                       required
                       placeholder="you@example.com"

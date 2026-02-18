@@ -174,7 +174,7 @@ export default function LoginPage() {
                       Email address
                     </label>
                     <input
-                      className={`w-full rounded-md border-2 bg-white py-2.5 pl-[18px] pr-4 text-sm text-slate-900 outline-none transition focus-visible:border-[#6D6AF4] focus-visible:ring-0 ${
+                      className={`w-full rounded-md border-2 bg-white py-2.5 pl-[18px] pr-4 text-base text-slate-900 outline-none transition focus-visible:border-[#6D6AF4] focus-visible:ring-0 sm:text-sm ${
                         fieldErrors.email ? "border-red-500" : "border-slate-300 hover:border-slate-400"
                       }`}
                       type="email"
@@ -202,7 +202,7 @@ export default function LoginPage() {
                     <div className="relative">
                       <input
                         ref={passwordInputRef}
-                        className={`w-full rounded-md border-2 bg-white py-2.5 pl-[18px] pr-10 text-[15px] text-slate-900 outline-none transition focus-visible:border-[#6D6AF4] focus-visible:ring-0 ${
+                        className={`w-full rounded-md border-2 bg-white py-2.5 pl-[18px] pr-10 text-base text-slate-900 outline-none transition focus-visible:border-[#6D6AF4] focus-visible:ring-0 sm:text-[15px] ${
                           fieldErrors.password ? "border-red-500" : "border-slate-300 hover:border-slate-400"
                         }`}
                         type={showPassword ? "text" : "password"}

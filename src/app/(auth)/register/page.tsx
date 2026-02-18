@@ -247,7 +247,7 @@ export default function RegisterPage() {
                         First name
                       </label>
                       <input
-                        className={`w-full rounded-md border-2 bg-white py-2.5 pl-[18px] pr-4 text-sm text-slate-900 outline-none transition focus-visible:ring-0 ${
+                        className={`w-full rounded-md border-2 bg-white py-2.5 pl-[18px] pr-4 text-base text-slate-900 outline-none transition focus-visible:ring-0 sm:text-sm ${
                           requiredErrors.firstName
                             ? "border-rose-500 hover:border-rose-500 focus-visible:border-rose-500"
                             : "border-slate-300 hover:border-slate-400 focus-visible:border-[#6D6AF4]"
@@ -269,7 +269,7 @@ export default function RegisterPage() {
                         Last name
                       </label>
                       <input
-                        className={`w-full rounded-md border-2 bg-white py-2.5 pl-[18px] pr-4 text-sm text-slate-900 outline-none transition focus-visible:ring-0 ${
+                        className={`w-full rounded-md border-2 bg-white py-2.5 pl-[18px] pr-4 text-base text-slate-900 outline-none transition focus-visible:ring-0 sm:text-sm ${
                           requiredErrors.lastName
                             ? "border-rose-500 hover:border-rose-500 focus-visible:border-rose-500"
                             : "border-slate-300 hover:border-slate-400 focus-visible:border-[#6D6AF4]"
@@ -293,7 +293,7 @@ export default function RegisterPage() {
                       Email
                     </label>
                     <input
-                      className={`w-full rounded-md border-2 bg-white py-2.5 pl-[18px] pr-4 text-sm text-slate-900 outline-none transition focus-visible:ring-0 ${
+                      className={`w-full rounded-md border-2 bg-white py-2.5 pl-[18px] pr-4 text-base text-slate-900 outline-none transition focus-visible:ring-0 sm:text-sm ${
                         requiredErrors.email
                           ? "border-rose-500 hover:border-rose-500 focus-visible:border-rose-500"
                           : "border-slate-300 hover:border-slate-400 focus-visible:border-[#6D6AF4]"
@@ -316,7 +316,7 @@ export default function RegisterPage() {
                     </label>
                     <div className="relative">
                       <input
-                        className={`w-full rounded-md border-2 bg-white py-2.5 pl-[18px] pr-10 text-[15px] text-slate-900 outline-none transition focus-visible:ring-0 ${
+                        className={`w-full rounded-md border-2 bg-white py-2.5 pl-[18px] pr-10 text-base text-slate-900 outline-none transition focus-visible:ring-0 sm:text-[15px] ${
                           requiredErrors.password
                             ? "border-rose-500 hover:border-rose-500 focus-visible:border-rose-500"
                             : hasPasswordStrengthError
