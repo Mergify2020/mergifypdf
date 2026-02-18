@@ -115,14 +115,10 @@ export default function LoginPage() {
     <>
       <main
         data-login-page
-        className="relative flex w-full items-center justify-center overflow-hidden bg-white px-0 py-4 sm:py-6"
-        style={{
-          height: "calc(100svh - 46px)",
-          minHeight: "calc(100svh - 46px)",
-        }}
+        className="relative box-border flex h-full min-h-0 w-full justify-center overflow-hidden bg-white px-0 py-0 sm:py-6 md:items-center"
       >
         {/* Darkened hero team background, behind card but above base color */}
-        <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+        <div className="pointer-events-none fixed inset-x-0 top-0 bottom-[46px] z-0 overflow-hidden sm:bottom-10">
           <Image
             src="/backgrounds/login-page-background-v5.svg"
             alt="MergifyPDF login background"
@@ -133,10 +129,10 @@ export default function LoginPage() {
         </div>
 
         {/* Layout container to keep card centered */}
-        <div className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-center px-4 lg:px-6">
+        <div className="relative z-10 mx-auto flex h-full w-full max-w-7xl items-stretch justify-center px-4 pb-[46px] sm:items-center sm:pb-0 lg:px-6">
           {/* Login card centered */}
-          <div className="flex w-full justify-center">
-            <div className="auth-card-animate relative w-full max-w-lg min-h-[620px] rounded-[5px] border border-white/25 bg-white px-7 py-12 shadow-[0_30px_90px_rgba(15,23,42,0.22)] sm:px-9 sm:py-14">
+          <div className="flex h-full w-full items-stretch justify-center sm:items-center">
+            <div className="auth-card-animate relative mt-4 h-[calc(100%-1rem)] w-full max-w-lg overflow-y-auto overscroll-contain rounded-[5px] border border-white/25 bg-white px-7 py-12 shadow-[0_1px_4px_rgba(15,23,42,0.16)] [scrollbar-gutter:stable] [-webkit-overflow-scrolling:touch] sm:mt-0 sm:h-auto sm:min-h-[620px] sm:px-9 sm:py-14 sm:shadow-[0_30px_90px_rgba(15,23,42,0.22)]">
               <div className="mb-4 flex items-center">
                 <Image
                   src="/logos/home-expanded-sidebar-logo-light-v6.svg"

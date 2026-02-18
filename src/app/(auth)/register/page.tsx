@@ -32,6 +32,9 @@ export default function RegisterPage() {
   const [busy, setBusy] = useState(false);
   const [resendBusy, setResendBusy] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(25);
+  const hasPasswordStrengthError =
+    typeof err === "string" &&
+    err.startsWith("Password must be at least 8 characters");
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -316,7 +319,9 @@ export default function RegisterPage() {
                         className={`w-full rounded-md border-2 bg-white py-2.5 pl-[18px] pr-10 text-[15px] text-slate-900 outline-none transition focus-visible:ring-0 ${
                           requiredErrors.password
                             ? "border-rose-500 hover:border-rose-500 focus-visible:border-rose-500"
-                            : "border-slate-300 hover:border-slate-400 focus-visible:border-[#6D6AF4]"
+                            : hasPasswordStrengthError
+                              ? "border-slate-300 hover:border-slate-400 focus-visible:border-[#6D6AF4] max-sm:border-rose-500 max-sm:hover:border-rose-500 max-sm:focus-visible:border-rose-500"
+                              : "border-slate-300 hover:border-slate-400 focus-visible:border-[#6D6AF4]"
                         }`}
                         type={showPassword ? "text" : "password"}
                         placeholder="Create a password"
