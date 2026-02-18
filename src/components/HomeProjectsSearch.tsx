@@ -10,13 +10,15 @@ import {
   Clock,
   Moon,
   Search,
-  Sparkles,
   Sun,
   UserRound,
   UsersRound,
 } from "lucide-react";
+import { useSession } from "next-auth/react";
 import RecentProjectsRow from "@/components/RecentProjectsRow";
 import SettingsMenu from "@/components/SettingsMenu";
+import { useAvatarPreference } from "@/lib/useAvatarPreference";
+import { getAvatarFallback } from "@/lib/avatarFallback";
 import {
   getProjectsSummaryCache,
   subscribeProjectsSummary,
@@ -112,6 +114,7 @@ export default function HomeProjectsSearch({
   const [recentScrollbarWidth, setRecentScrollbarWidth] = useState(0);
   const [forceStableScrollbar, setForceStableScrollbar] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
+  const { data: session } = useSession();
 
   useEffect(() => {
     setProjectsState(projects);
@@ -144,6 +147,12 @@ export default function HomeProjectsSearch({
     const initials = `${first}${second}`.toUpperCase();
     return initials.length ? initials : "Y";
   }, [accountName]);
+  const avatarKey = session?.user?.email ?? session?.user?.id ?? accountEmail ?? accountName;
+  const { avatar } = useAvatarPreference(avatarKey);
+  const fallbackAvatar = useMemo(
+    () => getAvatarFallback(avatarKey, accountName || accountEmail || "User"),
+    [accountEmail, accountName, avatarKey]
+  );
 
   useEffect(() => {
     if (!sortMenuOpen) return;
@@ -471,22 +480,39 @@ export default function HomeProjectsSearch({
               >
                 {theme === "dark" ? <Sun className="h-4 w-4" aria-hidden /> : <Moon className="h-4 w-4" aria-hidden />}
               </button>
-              <div className="flex h-11 items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white py-1.5 pl-1 pr-1.5 shadow-[12px_0_36px_rgba(15,23,42,0.10)] dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[12px_0_36px_rgba(0,0,0,0.45)]">
-                <div className="shrink-0">
-                  <SettingsMenu />
-                </div>
-                <span className="flex min-w-0 flex-col leading-tight">
-                  <span className="max-w-[220px] truncate text-[13px] font-semibold text-[#1F2A37] dark:text-zinc-100">
-                    {accountName}
-                  </span>
-                  {accountEmail ? (
-                    <span className="max-w-[220px] truncate text-[11px] font-medium text-[#64748B] dark:text-zinc-400">
-                      {accountEmail}
+              <SettingsMenu
+                trigger="custom"
+                triggerLabel="Open profile menu"
+                triggerClassName="flex h-11 items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white py-1.5 pl-1 pr-1.5 shadow-[12px_0_36px_rgba(15,23,42,0.10)] transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F1F4F9] dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[12px_0_36px_rgba(0,0,0,0.45)] dark:hover:bg-zinc-800 dark:focus-visible:ring-offset-[#222224]"
+                triggerContent={
+                  <>
+                    <span className="shrink-0 pointer-events-none">
+                      {avatar ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={avatar} alt="Your avatar" className="h-8 w-8 rounded-full object-cover" />
+                      ) : (
+                        <span
+                          className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold uppercase text-white"
+                          style={{ backgroundColor: fallbackAvatar.color }}
+                        >
+                          {fallbackAvatar.initials}
+                        </span>
+                      )}
                     </span>
-                  ) : null}
-                </span>
-                <ChevronDown className="h-4 w-4 text-[#94A3B8] dark:text-zinc-400" aria-hidden="true" />
-              </div>
+                    <span className="flex min-w-0 flex-col leading-tight text-left">
+                      <span className="max-w-[220px] truncate text-[13px] font-semibold text-[#1F2A37] dark:text-zinc-100">
+                        {accountName}
+                      </span>
+                      {accountEmail ? (
+                        <span className="max-w-[220px] truncate text-[11px] font-medium text-[#64748B] dark:text-zinc-400">
+                          {accountEmail}
+                        </span>
+                      ) : null}
+                    </span>
+                    <ChevronDown className="h-4 w-4 text-[#94A3B8] dark:text-zinc-400" aria-hidden="true" />
+                  </>
+                }
+              />
             </div>
           </div>
         </div>

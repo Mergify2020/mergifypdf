@@ -217,6 +217,8 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
   const avatarKey = session?.user?.email ?? session?.user?.id ?? null;
   const { avatar } = useAvatarPreference(avatarKey);
   const [signingOut, setSigningOut] = useState(false);
+  const [logoutConfirmArmed, setLogoutConfirmArmed] = useState(false);
+  const logoutConfirmTimeoutRef = useRef<number | null>(null);
   const [sidebarTooltip, setSidebarTooltip] = useState<{
     label: string;
     top: number;
@@ -227,6 +229,61 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
     avatarKey,
     session?.user?.name ?? session?.user?.email ?? "Account"
   );
+
+  const clearLogoutConfirmTimer = () => {
+    if (logoutConfirmTimeoutRef.current !== null && typeof window !== "undefined") {
+      window.clearTimeout(logoutConfirmTimeoutRef.current);
+      logoutConfirmTimeoutRef.current = null;
+    }
+  };
+
+  const resetLogoutConfirm = () => {
+    clearLogoutConfirmTimer();
+    setLogoutConfirmArmed(false);
+  };
+
+  const armLogoutConfirm = () => {
+    clearLogoutConfirmTimer();
+    setLogoutConfirmArmed(true);
+    if (typeof window !== "undefined") {
+      logoutConfirmTimeoutRef.current = window.setTimeout(() => {
+        setLogoutConfirmArmed(false);
+        logoutConfirmTimeoutRef.current = null;
+      }, 4000);
+    }
+  };
+
+  const handleLogoutRequest = async ({
+    closeProfile = false,
+    closeMobile = false,
+    closeExpanded = false,
+  }: {
+    closeProfile?: boolean;
+    closeMobile?: boolean;
+    closeExpanded?: boolean;
+  } = {}) => {
+    if (signingOut) return;
+
+    if (!logoutConfirmArmed) {
+      armLogoutConfirm();
+      return;
+    }
+
+    resetLogoutConfirm();
+    if (closeProfile) setProfileOpen(false);
+    if (closeMobile) setMobileOpen(false);
+    if (closeExpanded) {
+      setExpanded(false);
+      setProfileOpen(false);
+    }
+
+    try {
+      setSigningOut(true);
+      await signOut({ callbackUrl: "/login" });
+    } finally {
+      setSigningOut(false);
+    }
+  };
 
 
   useEffect(() => {
@@ -266,6 +323,12 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
       window.scrollTo(0, scrollY);
     };
   }, [createOpen]);
+
+  useEffect(() => {
+    return () => {
+      clearLogoutConfirmTimer();
+    };
+  }, []);
 
   const createId = () =>
     typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -817,6 +880,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
     items.map(({ label, icon: Icon, href, disabled, onClick }) => {
       const isExpanded = forceExpanded ?? navExpanded;
       const isLogout = label === "Log out";
+      const logoutArmedA11yLabel = isLogout && logoutConfirmArmed ? "Tap again to log out" : label;
       const isActive =
         !disabled &&
         (label === "Trash"
@@ -858,14 +922,18 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
               : isActive
                 ? "text-[#2563EB] dark:text-zinc-100"
                 : "cursor-pointer text-[#4B5563] hover:text-[#374151] dark:text-zinc-400 dark:hover:text-zinc-200"
-          } ${isExpanded ? expandedLayoutClasses : collapsedLayoutClasses}`
+          } ${isExpanded ? expandedLayoutClasses : collapsedLayoutClasses} ${
+            isLogout && logoutConfirmArmed ? "bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-300" : ""
+          }`
         : `group relative flex w-full overflow-visible rounded-xl text-sm font-medium transition-[background-color,color] duration-[120ms] ease-out ${
             disabled
               ? "cursor-not-allowed text-[#4B5563] dark:text-zinc-500"
               : isActive
                 ? "text-[#2563EB] dark:text-zinc-100"
                 : "cursor-pointer text-[#4B5563] hover:text-[#374151] dark:text-zinc-400 dark:hover:text-zinc-200"
-          } ${isExpanded ? expandedLayoutClasses : collapsedLayoutClasses}`;
+          } ${isExpanded ? expandedLayoutClasses : collapsedLayoutClasses} ${
+            isLogout && logoutConfirmArmed ? "bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-300" : ""
+          }`;
 
       const basePadding = isExpanded ? "px-3 py-2.5" : "px-3 py-[5.5px]";
       const activeRoundedClass = "rounded-r-xl";
@@ -925,7 +993,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
         if (isExpanded) return;
         const rect = event.currentTarget.getBoundingClientRect();
         setSidebarTooltip({
-          label,
+          label: logoutArmedA11yLabel,
           top: rect.top + rect.height / 2,
           left: rect.right + 12,
         });
@@ -941,7 +1009,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
           <button
             key={label}
             type="button"
-            aria-label={label}
+            aria-label={logoutArmedA11yLabel}
             disabled
             className={itemClasses}
             onMouseEnter={handleTooltipEnter}
@@ -959,9 +1027,14 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
           <button
             key={label}
             type="button"
-            aria-label={label}
+            aria-label={logoutArmedA11yLabel}
             className={itemClasses}
             onClick={() => {
+              if (isLogout) {
+                void handleLogoutRequest();
+                return;
+              }
+              resetLogoutConfirm();
               onClick();
             }}
             onMouseEnter={handleTooltipEnter}
@@ -981,8 +1054,9 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
           prefetch
           onClick={() => {
             setMobileOpen(false);
+            resetLogoutConfirm();
           }}
-          aria-label={label}
+          aria-label={logoutArmedA11yLabel}
           className={itemClasses}
           onMouseEnter={handleTooltipEnter}
           onMouseLeave={handleTooltipLeave}
@@ -996,6 +1070,8 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
 
   const renderMobileNavItems = (items: SidebarItem[]) =>
     items.map(({ label, icon: Icon, href, disabled, onClick }) => {
+      const isLogout = label === "Log out";
+      const logoutArmedA11yLabel = isLogout && logoutConfirmArmed ? "Tap again to log out" : label;
       const isActive =
         !disabled &&
         (label === "Trash"
@@ -1013,17 +1089,23 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
         : isActive
           ? "bg-sky-100 text-sky-900"
           : "cursor-pointer text-[#4B5563] hover:bg-[rgba(0,0,0,0.04)] hover:text-[#374151]";
+      const confirmClasses = isLogout && logoutConfirmArmed ? "bg-red-50 text-red-700" : "";
 
       const content = (
         <>
           <Icon className="h-6 w-6 shrink-0" aria-hidden weight={isActive ? "fill" : "regular"} />
           <span className="truncate whitespace-nowrap">{label}</span>
+          {isLogout && logoutConfirmArmed ? (
+            <span className="ml-auto rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700">
+              Tap again
+            </span>
+          ) : null}
         </>
       );
 
       if (disabled) {
         return (
-          <button key={label} type="button" aria-label={label} disabled className={`${baseClasses} ${stateClasses}`}>
+          <button key={label} type="button" aria-label={logoutArmedA11yLabel} disabled className={`${baseClasses} ${stateClasses} ${confirmClasses}`}>
             {content}
           </button>
         );
@@ -1034,9 +1116,14 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
           <button
             key={label}
             type="button"
-            aria-label={label}
-            className={`${baseClasses} ${stateClasses}`}
+            aria-label={logoutArmedA11yLabel}
+            className={`${baseClasses} ${stateClasses} ${confirmClasses}`}
             onClick={() => {
+              if (isLogout) {
+                void handleLogoutRequest({ closeMobile: true });
+                return;
+              }
+              resetLogoutConfirm();
               setMobileOpen(false);
               onClick();
             }}
@@ -1051,9 +1138,12 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
           key={label}
           href={targetHref}
           prefetch
-          onClick={() => setMobileOpen(false)}
-          aria-label={label}
-          className={`${baseClasses} ${stateClasses}`}
+          onClick={() => {
+            resetLogoutConfirm();
+            setMobileOpen(false);
+          }}
+          aria-label={logoutArmedA11yLabel}
+          className={`${baseClasses} ${stateClasses} ${confirmClasses}`}
         >
           {content}
         </Link>
@@ -1355,19 +1445,17 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                             type="button"
                             disabled={signingOut}
                             onClick={async () => {
-                              if (signingOut) return;
-                              setProfileOpen(false);
-                              try {
-                                setSigningOut(true);
-                                await signOut({ callbackUrl: "/login" });
-                              } finally {
-                                setSigningOut(false);
-                              }
+                              await handleLogoutRequest({ closeProfile: true });
                             }}
                             className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-left text-2xl font-semibold text-red-600 transition hover:bg-red-50"
                           >
                             <LogOut className="h-6 w-6" aria-hidden />
                             <span>Log out</span>
+                            {logoutConfirmArmed ? (
+                              <span className="ml-auto rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-red-700">
+                                Tap again
+                              </span>
+                            ) : null}
                           </button>
                         </>
                       ) : (
@@ -1430,19 +1518,17 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                             type="button"
                             disabled={signingOut}
                             onClick={async () => {
-                              if (signingOut) return;
-                              setProfileOpen(false);
-                              try {
-                                setSigningOut(true);
-                                await signOut({ callbackUrl: "/login" });
-                              } finally {
-                                setSigningOut(false);
-                              }
+                              await handleLogoutRequest({ closeProfile: true });
                             }}
                             className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-2xl font-semibold text-red-600 transition hover:bg-red-50"
                           >
                             <LogOut className="h-6 w-6" aria-hidden />
                             <span>Log out</span>
+                            {logoutConfirmArmed ? (
+                              <span className="ml-auto rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-red-700">
+                                Tap again
+                              </span>
+                            ) : null}
                           </button>
                         </>
                       )}
@@ -1517,20 +1603,17 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                       type="button"
                       disabled={signingOut}
                       onClick={async () => {
-                        if (signingOut) return;
-                        setExpanded(false);
-                        setProfileOpen(false);
-                        try {
-                          setSigningOut(true);
-                          await signOut({ callbackUrl: "/login" });
-                        } finally {
-                          setSigningOut(false);
-                        }
+                        await handleLogoutRequest({ closeExpanded: true });
                       }}
                       className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-left text-2xl font-semibold text-red-600 transition hover:bg-red-50"
                     >
                       <LogOut className="h-6 w-6" aria-hidden />
                       <span>Log out</span>
+                      {logoutConfirmArmed ? (
+                        <span className="ml-auto rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-red-700">
+                          Tap again
+                        </span>
+                      ) : null}
                     </button>
                   </div>
                 ) : (
@@ -1889,19 +1972,17 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                   type="button"
                   disabled={signingOut}
                   onClick={async () => {
-                    if (signingOut) return;
-                    setMobileOpen(false);
-                    try {
-                      setSigningOut(true);
-                      await signOut({ callbackUrl: "/login" });
-                    } finally {
-                      setSigningOut(false);
-                    }
+                    await handleLogoutRequest({ closeMobile: true });
                   }}
                   className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-red-600 transition hover:bg-red-50"
                 >
                   <LogOut className="h-6 w-6" aria-hidden />
-                  <span>Logout</span>
+                  <span>Log out</span>
+                  {logoutConfirmArmed ? (
+                    <span className="ml-auto rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700">
+                      Tap again
+                    </span>
+                  ) : null}
                 </button>
               </div>
             </div>
