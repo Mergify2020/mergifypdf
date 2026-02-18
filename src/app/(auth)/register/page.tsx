@@ -189,10 +189,10 @@ export default function RegisterPage() {
   return (
     <main
       data-login-page
-      className="relative box-border flex h-[calc(100svh-46px)] w-full justify-center overflow-hidden bg-[#4B46C8] px-0 py-[58px] sm:h-screen sm:py-[58px] md:items-center"
+      className="relative box-border flex h-full min-h-0 w-full justify-center overflow-hidden bg-[#4B46C8] px-0 py-0 sm:py-[58px] md:items-center"
     >
       {/* Darkened hero team background, behind card but above base color */}
-      <div className="pointer-events-none fixed inset-x-0 top-0 bottom-[46px] z-0 overflow-hidden sm:bottom-0">
+      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
         <Image
           src="/backgrounds/login-page-background-v5.svg"
           alt="MergifyPDF login background"
@@ -203,10 +203,10 @@ export default function RegisterPage() {
       </div>
 
       {/* Layout container to keep card centered */}
-      <div className="relative z-10 mx-auto flex h-full w-full max-w-7xl items-center justify-center px-4 lg:px-6">
+      <div className="relative z-10 mx-auto flex h-full w-full max-w-7xl items-stretch justify-center px-4 pb-[46px] sm:items-center sm:pb-0 lg:px-6">
         {/* Create-account card centered */}
-        <div className="flex h-full w-full items-center justify-center">
-          <div className="auth-card-animate max-h-full w-full max-w-lg overflow-y-auto rounded-[5px] border border-white/25 bg-white px-7 py-9 shadow-[0_30px_90px_rgba(15,23,42,0.22)] sm:min-h-[620px] sm:px-9 sm:py-10">
+        <div className="flex h-full w-full items-stretch justify-center sm:items-center">
+          <div className="auth-card-animate h-full w-full max-w-lg overflow-y-auto overscroll-contain rounded-[5px] border border-white/25 bg-white px-7 py-9 shadow-[0_30px_90px_rgba(15,23,42,0.22)] [scrollbar-gutter:stable] [-webkit-overflow-scrolling:touch] sm:h-auto sm:min-h-[620px] sm:px-9 sm:py-10">
             <div className="mb-4 flex items-center">
               <Image
                 src="/logos/home-expanded-sidebar-logo-light-v6.svg"
