@@ -192,7 +192,7 @@ export default function RegisterPage() {
   return (
     <main
       data-login-page
-      className="relative box-border flex h-[calc(100svh-46px)] min-h-[calc(100svh-46px)] w-full justify-center overflow-hidden bg-[#4B46C8] px-0 py-0 sm:h-[calc(100svh-40px)] sm:min-h-[calc(100svh-40px)] sm:py-[58px] md:items-center"
+      className="relative box-border flex h-[calc(100svh-46px)] min-h-[calc(100svh-46px)] w-full justify-center overflow-x-hidden overflow-y-auto bg-[#4B46C8] px-0 py-0 sm:h-[calc(100svh-40px)] sm:min-h-[calc(100svh-40px)] sm:py-[58px] md:items-center"
     >
       {/* Darkened hero team background, behind card but above base color */}
       <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
@@ -206,10 +206,10 @@ export default function RegisterPage() {
       </div>
 
       {/* Layout container to keep card centered */}
-      <div className="relative z-10 mx-auto flex h-full w-full max-w-7xl items-center justify-center px-4 py-3 sm:py-0 lg:px-6">
+      <div className="relative z-10 mx-auto flex min-h-full w-full max-w-7xl items-start justify-center px-4 py-6 sm:items-center sm:py-0 lg:px-6">
         {/* Create-account card centered */}
-        <div className="flex h-full w-full items-center justify-center">
-          <div className="auth-card-animate h-full max-h-full w-full max-w-lg overflow-y-auto overscroll-contain rounded-[5px] border border-white/25 bg-white px-6 py-8 shadow-[0_1px_4px_rgba(15,23,42,0.16)] [scrollbar-gutter:stable] [-webkit-overflow-scrolling:touch] sm:h-auto sm:max-h-none sm:min-h-[620px] sm:px-9 sm:py-10 sm:shadow-[0_30px_90px_rgba(15,23,42,0.22)]">
+        <div className="flex min-h-full w-full items-start justify-center sm:items-center">
+          <div className="auth-card-animate min-h-full w-full max-w-lg rounded-[5px] border border-white/25 bg-white px-6 py-8 shadow-[0_1px_4px_rgba(15,23,42,0.16)] sm:h-auto sm:min-h-[620px] sm:px-9 sm:py-10 sm:shadow-[0_30px_90px_rgba(15,23,42,0.22)]">
             <div className="mb-4 flex items-center">
               <Image
                 src="/logos/home-expanded-sidebar-logo-light-v6.svg"
