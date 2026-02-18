@@ -16,9 +16,11 @@ export default function ForgotPasswordPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
   const [resendBusy, setResendBusy] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(25);
   const [requestCooldown, setRequestCooldown] = useState(0);
+  const actionBusy = busy || googleBusy;
   const codeValue = useMemo(() => codeDigits.join(""), [codeDigits]);
   const codeRefs = useRef<Array<HTMLInputElement | null>>([]);
 
@@ -68,6 +70,7 @@ export default function ForgotPasswordPage() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (actionBusy) return;
     if (!email.trim().includes("@")) {
       setIsError(true);
       setMessage("Please enter a valid email address.");
@@ -107,6 +110,7 @@ export default function ForgotPasswordPage() {
 
   async function onVerify(e: React.FormEvent) {
     e.preventDefault();
+    if (actionBusy) return;
     if (codeValue.length !== 6) {
       setIsError(true);
       setMessage("Please enter the 6-digit code.");
@@ -179,6 +183,7 @@ export default function ForgotPasswordPage() {
     setMessage(null);
     setIsError(false);
     setBusy(false);
+    setGoogleBusy(false);
     setResendBusy(false);
     setCodeDigits(Array(6).fill(""));
   }
@@ -288,7 +293,7 @@ export default function ForgotPasswordPage() {
                   <button
                     className="w-full rounded-md bg-[#1F2937] py-2.5 text-sm font-semibold text-white transition hover:-translate-y-[1px] hover:bg-[#111827] active:scale-[0.985] active:bg-[#0B1220] active:brightness-95 active:transition active:duration-100 disabled:opacity-60 disabled:hover:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F2937]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
                     type="submit"
-                    disabled={busy || requestCooldown > 0}
+                    disabled={actionBusy || requestCooldown > 0}
                   >
                     {busy
                       ? "Sending\u2026"
@@ -307,18 +312,41 @@ export default function ForgotPasswordPage() {
                 <button
                   type="button"
                   onClick={async () => {
+                    if (actionBusy) return;
                     try {
+                      setGoogleBusy(true);
+                      setMessage(null);
+                      setIsError(false);
                       await signIn("google", { callbackUrl: "/" });
                     } catch {
+                      setGoogleBusy(false);
                       // no-op; this button is secondary to the reset flow
+                      setMessage("Google sign-in failed. Please try again.");
+                      setIsError(true);
                     }
                   }}
-                  disabled={busy}
-                  aria-disabled={busy}
+                  disabled={actionBusy}
+                  aria-disabled={actionBusy}
                   className="flex w-full items-center justify-center gap-3 rounded-md border-2 border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 transition hover:-translate-y-[1px] hover:border-slate-400 hover:shadow-md active:scale-[0.985] active:brightness-95 active:transition active:duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent disabled:opacity-60"
                 >
                   <img src="/google.svg" alt="Google logo" className="h-5 w-5" />
-                  <span>Continue with Google</span>
+                  <span>{googleBusy ? "Signing in with Google…" : "Continue with Google"}</span>
+                  {googleBusy && (
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      className="h-4 w-4 animate-spin text-slate-700"
+                      fill="none"
+                    >
+                      <circle cx="12" cy="12" r="9" className="stroke-slate-400" strokeWidth="2.5" />
+                      <path
+                        d="M21 12a9 9 0 0 0-9-9"
+                        className="stroke-current"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  )}
                 </button>
               </>
             ) : (

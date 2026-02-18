@@ -30,14 +30,17 @@ export default function RegisterPage() {
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
   const [resendBusy, setResendBusy] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(25);
+  const actionBusy = busy || googleBusy;
   const hasPasswordStrengthError =
     typeof err === "string" &&
     err.startsWith("Password must be at least 8 characters");
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (actionBusy) return;
     setErr(null);
     setInfo(null);
 
@@ -115,6 +118,7 @@ export default function RegisterPage() {
     setErr(null);
     setInfo(null);
     setBusy(false);
+    setGoogleBusy(false);
     setResendBusy(false);
     setFirstName("");
     setLastName("");
@@ -123,6 +127,7 @@ export default function RegisterPage() {
 
   async function onVerify(e: React.FormEvent) {
     e.preventDefault();
+    if (actionBusy) return;
     setBusy(true);
     setErr(null);
     setInfo(null);
@@ -385,7 +390,7 @@ export default function RegisterPage() {
                   <button
                     className="w-full rounded-md bg-[#1F2937] py-2.5 text-sm font-semibold text-white transition hover:-translate-y-[1px] hover:bg-[#111827] active:scale-[0.985] active:bg-[#0B1220] active:brightness-95 active:transition active:duration-100 disabled:opacity-60 disabled:hover:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F2937]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
                     type="submit"
-                    disabled={busy}
+                    disabled={actionBusy}
                   >
                     {busy ? "Creating Account..." : "Create account"}
                   </button>
@@ -400,20 +405,39 @@ export default function RegisterPage() {
                 <button
                   type="button"
                   onClick={async () => {
+                    if (actionBusy) return;
                     try {
-                      setBusy(true);
+                      setGoogleBusy(true);
+                      setErr(null);
+                      setInfo(null);
                       await signIn("google", { callbackUrl: "/" });
                     } catch {
-                      setBusy(false);
+                      setGoogleBusy(false);
                       setErr("Google login failed. Please try again.");
                     }
                   }}
-                  disabled={busy}
-                  aria-disabled={busy}
+                  disabled={actionBusy}
+                  aria-disabled={actionBusy}
                   className="flex w-full items-center justify-center gap-3 rounded-md border-2 border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 transition hover:-translate-y-[1px] hover:border-slate-400 hover:shadow-md active:scale-[0.985] active:brightness-95 active:transition active:duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent disabled:opacity-60"
                 >
                   <img src="/google.svg" alt="Google logo" className="h-5 w-5" />
-                  <span>Continue with Google</span>
+                  <span>{googleBusy ? "Signing in with Google…" : "Continue with Google"}</span>
+                  {googleBusy && (
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      className="h-4 w-4 animate-spin text-slate-700"
+                      fill="none"
+                    >
+                      <circle cx="12" cy="12" r="9" className="stroke-slate-400" strokeWidth="2.5" />
+                      <path
+                        d="M21 12a9 9 0 0 0-9-9"
+                        className="stroke-current"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  )}
                 </button>
               </>
             ) : (

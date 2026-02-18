@@ -6,7 +6,6 @@ import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import LoadingOverlay from "@/components/LoadingOverlay";
 
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
   CredentialsSignin: "Invalid email or password.",
@@ -34,10 +33,12 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState<string | null>(() => getAuthError(queryError));
-  const [busy, setBusy] = useState(false);
+  const [credentialBusy, setCredentialBusy] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({ email: false, password: false });
   const [showPassword, setShowPassword] = useState(false);
   const passwordInputRef = useRef<HTMLInputElement | null>(null);
+  const actionBusy = credentialBusy || googleBusy;
 
   useEffect(() => {
     if (!queryError) return;
@@ -46,7 +47,8 @@ export default function LoginPage() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setBusy(true);
+    if (actionBusy) return;
+    setCredentialBusy(true);
     setErr(null);
 
     const normalizedEmail = email.trim().toLowerCase();
@@ -55,7 +57,7 @@ export default function LoginPage() {
 
     if (emailEmpty || passwordEmpty) {
       setFieldErrors({ email: emailEmpty, password: passwordEmpty });
-      setBusy(false);
+      setCredentialBusy(false);
       return;
     }
 
@@ -69,7 +71,7 @@ export default function LoginPage() {
 
       if (res?.error) {
         setErr(getAuthError(res.error));
-        setBusy(false);
+        setCredentialBusy(false);
         return;
       }
 
@@ -82,17 +84,18 @@ export default function LoginPage() {
     } catch (error) {
       console.error(error);
       setErr("Unable to log in. Please try again.");
-      setBusy(false);
+      setCredentialBusy(false);
     }
   }
 
   async function handleGoogleLogin() {
+    if (actionBusy) return;
     try {
-      setBusy(true);
+      setGoogleBusy(true);
       await signIn("google", { callbackUrl });
-      // No setBusy(false) here; page will unmount on redirect
+      // No setGoogleBusy(false) here; page will unmount on redirect
     } catch {
-      setBusy(false);
+      setGoogleBusy(false);
       setErr("Google sign-in failed. Please try again.");
     }
   }
@@ -264,11 +267,31 @@ export default function LoginPage() {
                 <div className="space-y-4">
                   <button
                     type="submit"
-                    disabled={busy}
-                    aria-disabled={busy}
+                    disabled={actionBusy}
+                    aria-disabled={actionBusy}
                     className="w-full rounded-md bg-[#1F2937] py-2.5 text-sm font-semibold text-white transition hover:-translate-y-[1px] hover:bg-[#111827] active:scale-[0.985] active:bg-[#0B1220] active:brightness-95 active:transition active:duration-100 disabled:opacity-60 disabled:hover:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F2937]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
                   >
-                    {busy ? "Signing in…" : "Continue"}
+                    {credentialBusy ? (
+                      <span className="inline-flex items-center justify-center gap-2">
+                        <svg
+                          aria-hidden="true"
+                          viewBox="0 0 24 24"
+                          className="h-4 w-4 animate-spin"
+                          fill="none"
+                        >
+                          <circle cx="12" cy="12" r="9" className="stroke-white/30" strokeWidth="2.5" />
+                          <path
+                            d="M21 12a9 9 0 0 0-9-9"
+                            className="stroke-white"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                        Signing in...
+                      </span>
+                    ) : (
+                      "Continue"
+                    )}
                   </button>
 
                   <div className="my-6 flex items-center gap-2 text-gray-700">
@@ -280,13 +303,29 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={handleGoogleLogin}
-                    disabled={busy}
-                    aria-disabled={busy}
+                    disabled={actionBusy}
+                    aria-disabled={actionBusy}
                     className="flex w-full items-center justify-center gap-3 rounded-md border-2 border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 transition hover:-translate-y-[1px] hover:border-slate-400 hover:shadow-md active:scale-[0.985] active:brightness-95 active:transition active:duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
                     aria-label="Continue with Google"
                   >
                     <img src="/google.svg" alt="Google logo" className="h-5 w-5" />
-                    <span>Continue with Google</span>
+                    <span>{googleBusy ? "Signing in with Google…" : "Continue with Google"}</span>
+                    {googleBusy && (
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 24 24"
+                        className="h-4 w-4 animate-spin text-slate-700"
+                        fill="none"
+                      >
+                        <circle cx="12" cy="12" r="9" className="stroke-slate-400" strokeWidth="2.5" />
+                        <path
+                          d="M21 12a9 9 0 0 0-9-9"
+                          className="stroke-current"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                    )}
                   </button>
 
                   <div className="text-center text-sm text-slate-800">
@@ -300,16 +339,6 @@ export default function LoginPage() {
                 </div>
               </form>
 
-              <LoadingOverlay
-                open={busy}
-                label={err ? "Please try again…" : "Signing you in…"}
-                variant="container"
-                zIndexClassName="z-20"
-                backdropClassName="bg-white/85 backdrop-blur-[2px]"
-                panelClassName="border-0 bg-transparent px-0 py-0 shadow-none"
-                spinnerClassName="h-16 w-16 border-[6px] border-[#6D6AF4]/25 border-t-[#6D6AF4]"
-                labelClassName="text-lg font-semibold text-[#4c4ad9]"
-              />
             </div>
           </div>
         </div>
