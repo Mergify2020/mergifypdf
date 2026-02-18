@@ -324,15 +324,15 @@ export default function ForgotPasswordPage() {
             ) : (
               <>
                 <form onSubmit={onVerify} className="mt-6 space-y-4">
-                  <div className="mx-auto flex w-fit items-center gap-4">
-                    {codeDigits.map((digit, index) => (
-                      <input
+                <div className="mx-auto flex w-full max-w-[320px] items-center justify-between gap-2 sm:w-fit sm:max-w-none sm:gap-4">
+                  {codeDigits.map((digit, index) => (
+                    <input
                         key={`code-${index}`}
                         ref={(el) => {
                           codeRefs.current[index] = el;
                         }}
                         autoFocus={index === 0}
-                        className="h-16 w-[60px] rounded-lg border-2 border-slate-300 bg-white text-center text-[1.375rem] text-slate-900 outline-none transition focus-visible:border-[#6D6AF4] focus-visible:ring-0 hover:border-slate-400"
+                        className="h-12 w-10 rounded-lg border-2 border-slate-300 bg-white text-center text-xl text-slate-900 outline-none transition focus-visible:border-[#6D6AF4] focus-visible:ring-0 hover:border-slate-400 sm:h-16 sm:w-[60px] sm:text-[1.375rem]"
                         type="text"
                         inputMode="numeric"
                         pattern="\d*"
