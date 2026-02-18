@@ -192,7 +192,7 @@ export default function RegisterPage() {
       className="relative box-border flex h-full min-h-0 w-full justify-center overflow-hidden bg-[#4B46C8] px-0 py-0 sm:py-[58px] md:items-center"
     >
       {/* Darkened hero team background, behind card but above base color */}
-      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+      <div className="pointer-events-none fixed inset-x-0 top-0 bottom-[46px] z-0 overflow-hidden sm:bottom-10">
         <Image
           src="/backgrounds/login-page-background-v5.svg"
           alt="MergifyPDF login background"
