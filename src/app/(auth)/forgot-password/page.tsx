@@ -206,7 +206,7 @@ export default function ForgotPasswordPage() {
   return (
     <main
       data-login-page
-      className="relative box-border flex h-[calc(100svh-46px)] min-h-[calc(100svh-46px)] w-full justify-center overflow-hidden bg-[#4B46C8] px-0 py-0 sm:h-[calc(100svh-40px)] sm:min-h-[calc(100svh-40px)] sm:py-6 md:items-center"
+      className="relative box-border flex h-[calc(100svh-46px)] min-h-[calc(100svh-46px)] w-full justify-center overflow-hidden bg-[#4B46C8] px-0 py-0 sm:h-[calc(100svh-40px)] sm:min-h-[calc(100svh-40px)] sm:py-0 md:items-center"
     >
       {/* Darkened hero team background, behind card but above base color */}
       <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">

@@ -72,7 +72,7 @@ function ResetPasswordInner() {
   return (
     <main
       data-login-page
-      className="relative box-border flex min-h-[calc(100svh-46px)] w-full justify-center overflow-x-hidden bg-transparent px-0 py-0 sm:min-h-[calc(100svh-40px)] sm:py-6 md:items-center"
+      className="relative box-border flex min-h-[calc(100svh-46px)] w-full justify-center overflow-x-hidden bg-transparent px-0 py-0 sm:min-h-[calc(100svh-40px)] sm:py-0 md:items-center"
     >
       <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
         <Image
