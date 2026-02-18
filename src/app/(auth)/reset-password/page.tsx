@@ -72,9 +72,9 @@ function ResetPasswordInner() {
   return (
     <main
       data-login-page
-      className="relative box-border flex h-full min-h-0 w-full justify-center overflow-hidden bg-[#4B46C8] px-0 py-0 sm:py-6 md:items-center"
+      className="relative box-border flex min-h-[calc(100svh-46px)] w-full justify-center overflow-x-hidden bg-transparent px-0 py-0 sm:min-h-[calc(100svh-40px)] sm:py-6 md:items-center"
     >
-      <div className="pointer-events-none fixed inset-x-0 top-0 bottom-[46px] z-0 overflow-hidden sm:bottom-10">
+      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
         <Image
           src="/backgrounds/login-page-background-v5.svg"
           alt="MergifyPDF login background"
@@ -84,9 +84,9 @@ function ResetPasswordInner() {
         />
       </div>
 
-      <div className="relative z-10 mx-auto flex h-full w-full max-w-7xl items-stretch justify-center px-4 pb-[46px] sm:items-center sm:pb-0 lg:px-6">
-        <div className="flex h-full w-full items-stretch justify-center sm:items-center">
-          <div className="auth-card-animate mt-4 h-[calc(100%-1rem)] w-full max-w-lg overflow-y-auto overscroll-contain rounded-[5px] border border-white/25 bg-white px-7 py-12 shadow-[0_1px_4px_rgba(15,23,42,0.16)] [scrollbar-gutter:stable] [-webkit-overflow-scrolling:touch] sm:mt-0 sm:h-auto sm:min-h-[620px] sm:px-9 sm:py-14 sm:shadow-[0_30px_90px_rgba(15,23,42,0.22)]">
+      <div className="relative z-10 mx-auto flex min-h-[calc(100svh-46px)] w-full max-w-7xl items-start justify-center px-4 py-6 sm:min-h-[calc(100svh-40px)] sm:items-center sm:py-0 lg:px-6">
+        <div className="flex min-h-full w-full items-start justify-center sm:items-center">
+          <div className="auth-card-animate min-h-full w-full max-w-lg rounded-[5px] border border-white/25 bg-white px-7 py-12 shadow-[0_1px_4px_rgba(15,23,42,0.16)] sm:h-auto sm:min-h-[620px] sm:px-9 sm:py-14 sm:shadow-[0_30px_90px_rgba(15,23,42,0.22)]">
             <div className="mb-4 flex items-center">
               <Image
                 src="/logos/home-expanded-sidebar-logo-light-v6.svg"
