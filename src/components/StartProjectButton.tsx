@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
-import { FileText, FileUp, Plus, X } from "lucide-react";
+import { FileText, FileUp, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import { PROJECT_NAME_STORAGE_KEY, sanitizeProjectName } from "@/lib/projectName";
 import { useWorkspaceFilePreloader, type PendingWorkspaceFile } from "@/components/useWorkspaceFilePreloader";
@@ -200,7 +200,7 @@ export default function StartProjectButton({ className, variant = "default", ico
         onClick={launchModal}
         className={`${variant === "custom" ? "" : "btn-primary px-8 text-base"} ${className ?? ""}`}
       >
-        <Plus className={`${iconOnly ? "h-7 w-7" : "mr-2 h-7 w-7"}`} aria-hidden />
+        <FileUp className={`${iconOnly ? "h-7 w-7" : "mr-2 h-7 w-7"}`} aria-hidden />
         <span
           className={`overflow-hidden whitespace-nowrap text-sm transition-[max-width,opacity,transform] duration-200 ease-out ${
             iconOnly

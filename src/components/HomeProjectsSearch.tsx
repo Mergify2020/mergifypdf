@@ -114,6 +114,7 @@ export default function HomeProjectsSearch({
   const [recentScrollbarWidth, setRecentScrollbarWidth] = useState(0);
   const [forceStableScrollbar, setForceStableScrollbar] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const { data: session } = useSession();
 
   useEffect(() => {
@@ -147,12 +148,16 @@ export default function HomeProjectsSearch({
     const initials = `${first}${second}`.toUpperCase();
     return initials.length ? initials : "Y";
   }, [accountName]);
-  const avatarKey = session?.user?.email ?? session?.user?.id ?? accountEmail ?? accountName;
+  const avatarKey = session?.user?.id ?? session?.user?.email ?? null;
   const { avatar } = useAvatarPreference(avatarKey);
   const fallbackAvatar = useMemo(
     () => getAvatarFallback(avatarKey, accountName || accountEmail || "User"),
     [accountEmail, accountName, avatarKey]
   );
+
+  useEffect(() => {
+    setAvatarLoadFailed(false);
+  }, [avatar]);
 
   useEffect(() => {
     if (!sortMenuOpen) return;
@@ -470,11 +475,11 @@ export default function HomeProjectsSearch({
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex h-11 w-[276px] min-w-[276px] max-w-[276px] flex-nowrap items-center gap-2 shrink-0">
               <button
                 type="button"
                 onClick={toggleTheme}
-                className="flex h-11 w-11 items-center justify-center rounded-full border border-[#E5E7EB] bg-white text-[#1F2A37] shadow-[12px_0_36px_rgba(15,23,42,0.10)] transition hover:bg-slate-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:shadow-[12px_0_36px_rgba(0,0,0,0.45)] dark:hover:bg-zinc-800"
+                className="shrink-0 flex h-11 w-11 items-center justify-center rounded-full border border-[#E5E7EB] bg-white text-[#1F2A37] shadow-[12px_0_36px_rgba(15,23,42,0.10)] transition hover:bg-slate-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:shadow-[12px_0_36px_rgba(0,0,0,0.45)] dark:hover:bg-zinc-800"
                 aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
                 aria-pressed={theme === "dark"}
               >
@@ -483,13 +488,18 @@ export default function HomeProjectsSearch({
               <SettingsMenu
                 trigger="custom"
                 triggerLabel="Open profile menu"
-                triggerClassName="flex h-11 items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white py-1.5 pl-1 pr-1.5 shadow-[12px_0_36px_rgba(15,23,42,0.10)] transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F1F4F9] dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[12px_0_36px_rgba(0,0,0,0.45)] dark:hover:bg-zinc-800 dark:focus-visible:ring-offset-[#222224]"
+                triggerClassName="w-full min-w-0 max-w-full overflow-hidden flex h-11 items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white py-1.5 pl-1 pr-1.5 shadow-[12px_0_36px_rgba(15,23,42,0.10)] transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F1F4F9] dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[12px_0_36px_rgba(0,0,0,0.45)] dark:hover:bg-zinc-800 dark:focus-visible:ring-offset-[#222224]"
                 triggerContent={
                   <>
                     <span className="shrink-0 pointer-events-none">
-                      {avatar ? (
+                      {avatar && !avatarLoadFailed ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={avatar} alt="Your avatar" className="h-8 w-8 rounded-full object-cover" />
+                        <img
+                          src={avatar}
+                          alt="Your avatar"
+                          className="h-8 w-8 rounded-full object-cover"
+                          onError={() => setAvatarLoadFailed(true)}
+                        />
                       ) : (
                         <span
                           className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold uppercase text-white"
@@ -499,17 +509,17 @@ export default function HomeProjectsSearch({
                         </span>
                       )}
                     </span>
-                    <span className="flex min-w-0 flex-col leading-tight text-left">
-                      <span className="max-w-[220px] truncate text-[13px] font-semibold text-[#1F2A37] dark:text-zinc-100">
+                    <span className="flex min-w-0 flex-1 flex-col leading-tight text-left">
+                      <span className="truncate text-[13px] font-semibold text-[#1F2A37] dark:text-zinc-100">
                         {accountName}
                       </span>
                       {accountEmail ? (
-                        <span className="max-w-[220px] truncate text-[11px] font-medium text-[#64748B] dark:text-zinc-400">
+                        <span className="truncate text-[11px] font-medium text-[#64748B] dark:text-zinc-400">
                           {accountEmail}
                         </span>
                       ) : null}
                     </span>
-                    <ChevronDown className="h-4 w-4 text-[#94A3B8] dark:text-zinc-400" aria-hidden="true" />
+                    <ChevronDown className="h-4 w-4 shrink-0 text-[#94A3B8] dark:text-zinc-400" aria-hidden="true" />
                   </>
                 }
               />

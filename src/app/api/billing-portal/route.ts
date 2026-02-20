@@ -22,8 +22,9 @@ export async function POST(req: NextRequest) {
   const stripe = getStripe();
   const session = await getServerSession(authOptions);
   const email = session?.user?.email ?? null;
+  const userId = session?.user?.id ?? null;
 
-  if (!email) {
+  if (!email || !userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -38,16 +39,31 @@ export async function POST(req: NextRequest) {
   const returnUrl = safeReturnUrl(origin, (body as { returnUrl?: unknown } | null)?.returnUrl);
 
   try {
-    const existing = await stripe.customers.list({ email, limit: 1 });
-    const customer =
-      existing.data[0] ??
-      (await stripe.customers.create({
-        email,
-        name: session?.user?.name ?? undefined,
-      }));
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { stripeCustomerId: true, email: true, name: true },
+    });
+
+    let customerId = user?.stripeCustomerId ?? null;
+
+    if (!customerId) {
+      const existing = await stripe.customers.list({ email, limit: 1 });
+      const customer =
+        existing.data[0] ??
+        (await stripe.customers.create({
+          email: user?.email ?? email,
+          name: user?.name ?? session?.user?.name ?? undefined,
+        }));
+      customerId = customer.id;
+
+      await prisma.user.update({
+        where: { id: userId },
+        data: { stripeCustomerId: customerId },
+      });
+    }
 
     const portalSession = await stripe.billingPortal.sessions.create({
-      customer: customer.id,
+      customer: customerId,
       return_url: returnUrl,
     });
 

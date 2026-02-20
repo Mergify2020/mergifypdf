@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { CircleHelp, CreditCard, LogOut, Settings, User } from "lucide-react";
+import { CircleHelp, CreditCard, ExternalLink, LogOut, Settings, User } from "lucide-react";
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
 import { getAvatarFallback } from "@/lib/avatarFallback";
 
@@ -27,7 +27,8 @@ export default function SettingsMenu({
   const { data: session } = useSession();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const avatarKey = session?.user?.email ?? session?.user?.id ?? null;
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
+  const avatarKey = session?.user?.id ?? session?.user?.email ?? null;
   const { avatar } = useAvatarPreference(avatarKey);
   const fallback = getAvatarFallback(
     avatarKey,
@@ -36,6 +37,11 @@ export default function SettingsMenu({
 
   const outerSizeClass = variant === "pricing" ? "h-12 w-12" : "h-9 w-9";
   const innerSizeClass = variant === "pricing" ? "h-11 w-11" : "h-8 w-8";
+  const showAvatarImage = Boolean(avatar) && !avatarLoadFailed;
+
+  useEffect(() => {
+    setAvatarLoadFailed(false);
+  }, [avatar]);
 
   useEffect(() => {
     if (!open) return;
@@ -91,7 +97,10 @@ export default function SettingsMenu({
   }
 
   return (
-    <div ref={containerRef} className="relative">
+    <div
+      ref={containerRef}
+      className={`relative ${trigger === "custom" ? "w-full min-w-0" : ""}`}
+    >
       <button
         type="button"
         onClick={handleToggle}
@@ -112,9 +121,14 @@ export default function SettingsMenu({
         )}
         {trigger === "icon" ? (
           <User className="h-5 w-5 text-slate-700" aria-hidden />
-        ) : trigger === "avatar" && avatar ? (
+        ) : trigger === "avatar" && showAvatarImage ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={avatar} alt="Your avatar" className={`${innerSizeClass} rounded-full object-cover`} />
+          <img
+            src={avatar!}
+            alt="Your avatar"
+            className={`${innerSizeClass} rounded-full object-cover`}
+            onError={() => setAvatarLoadFailed(true)}
+          />
         ) : trigger === "avatar" ? (
           <span
             className={`flex items-center justify-center rounded-full text-xs font-semibold uppercase text-white ${innerSizeClass}`}
@@ -134,10 +148,15 @@ export default function SettingsMenu({
         }
       >
         <div className="space-y-3 text-sm text-slate-700 dark:text-zinc-200">
-            <div className="flex items-center gap-3 rounded-md bg-[#F8FAFC] px-3 py-2.5 dark:bg-zinc-800/70">
-              {avatar ? (
+            <div className="flex items-center gap-3 px-3 py-2.5">
+              {showAvatarImage ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={avatar} alt="Your avatar" className="h-11 w-11 rounded-md object-cover" />
+                <img
+                  src={avatar!}
+                  alt="Your avatar"
+                  className="h-11 w-11 rounded-md object-cover"
+                  onError={() => setAvatarLoadFailed(true)}
+                />
               ) : (
                 <span
                   className="flex h-11 w-11 items-center justify-center rounded-md text-base font-semibold uppercase text-white"
@@ -146,17 +165,26 @@ export default function SettingsMenu({
                   {fallback.initials}
                 </span>
               )}
-              <div>
-                <p className="text-base font-semibold text-[#0F172A] dark:text-zinc-100">
+              <div className="min-w-0">
+                <p className="max-w-[190px] truncate text-base font-semibold text-[#0F172A] dark:text-zinc-100">
                   {session?.user?.name ?? "Mergify user"}
                 </p>
                 {session?.user?.email && (
-                  <p className="text-sm text-[#64748B] dark:text-zinc-400">{session.user.email}</p>
+                  <p className="max-w-[190px] truncate text-sm text-[#64748B] dark:text-zinc-400">
+                    {session.user.email}
+                  </p>
                 )}
               </div>
             </div>
 
             <div className="border-t border-[#E6EBF2] pt-2 dark:border-zinc-700">
+              <button
+                type="button"
+                onClick={handlePricing}
+                className="mb-2 flex w-full items-center justify-center rounded-md bg-[#6C47FF] px-3 py-2.5 text-[15px] font-semibold text-white transition hover:bg-[#5B38E6] focus:outline-none focus:ring-2 focus:ring-[#6C47FF]/40 focus:ring-offset-2 focus:ring-offset-white dark:bg-[#6C47FF] dark:hover:bg-[#5B38E6] dark:focus:ring-offset-zinc-900"
+              >
+                Upgrade plan
+              </button>
               <button
                 type="button"
                 onClick={handleAccountSettings}
@@ -176,10 +204,16 @@ export default function SettingsMenu({
               <button
                 type="button"
                 onClick={handleHelpCenter}
-                className="group flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-[15px] font-medium text-[#1E293B] transition hover:bg-[#F8FAFC] hover:text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/35 focus:ring-offset-2 focus:ring-offset-white dark:text-zinc-100 dark:hover:bg-zinc-800/80 dark:hover:text-zinc-50 dark:focus:ring-offset-zinc-900"
+                className="group flex w-full items-center justify-between rounded-md px-3 py-2.5 text-left text-[15px] font-medium text-[#1E293B] transition hover:bg-[#F8FAFC] hover:text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/35 focus:ring-offset-2 focus:ring-offset-white dark:text-zinc-100 dark:hover:bg-zinc-800/80 dark:hover:text-zinc-50 dark:focus:ring-offset-zinc-900"
               >
-                <CircleHelp className="h-4 w-4 text-[#64748B] dark:text-zinc-400" aria-hidden />
-                <span>Help Center</span>
+                <span className="flex items-center gap-3">
+                  <CircleHelp className="h-4 w-4 text-[#64748B] dark:text-zinc-400" aria-hidden />
+                  <span>Help Center</span>
+                </span>
+                <ExternalLink
+                  className="h-4 w-4 text-[#94A3B8] transition group-hover:text-[#64748B] dark:text-zinc-500 dark:group-hover:text-zinc-300"
+                  aria-hidden
+                />
               </button>
             </div>
 
@@ -189,10 +223,10 @@ export default function SettingsMenu({
                 onClick={handleSignOut}
                 disabled={busy}
                 aria-disabled={busy}
-                className="flex w-full items-center justify-center gap-2 rounded-md bg-[#1E293B] px-3 py-2.5 text-[15px] font-medium text-white transition hover:bg-[#0F172A] active:scale-[0.99] disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-[#1E293B]/35 focus:ring-offset-2 focus:ring-offset-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 dark:focus:ring-offset-zinc-900"
+                className="group flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-[15px] font-medium text-[#B91C1C] transition hover:bg-red-50 hover:text-[#991B1B] active:scale-[0.99] disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-[#DC2626]/30 focus:ring-offset-2 focus:ring-offset-white dark:text-red-400 dark:hover:bg-red-950/30 dark:hover:text-red-300 dark:focus:ring-offset-zinc-900"
               >
-                <LogOut className="h-4 w-4" aria-hidden />
-                <span>Log out</span>
+                <LogOut className="h-4 w-4 text-current" aria-hidden />
+                <span>{busy ? "Logging out..." : "Log out"}</span>
               </button>
             </div>
         </div>

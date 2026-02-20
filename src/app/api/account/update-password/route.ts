@@ -23,7 +23,10 @@ export async function POST(req: Request) {
     );
   }
 
-  const { newPassword } = await req.json();
+  const { currentPassword, newPassword } = await req.json();
+  if (!currentPassword || typeof currentPassword !== "string") {
+    return NextResponse.json({ error: "Current password is required." }, { status: 400 });
+  }
   if (!newPassword || typeof newPassword !== "string" || newPassword.length < 8) {
     return NextResponse.json(
       { error: "Password must be at least 8 characters long." },
@@ -34,6 +37,19 @@ export async function POST(req: Request) {
   const user = await prisma.user.findUnique({ where: { id: session.user.id } });
   if (!user?.password) {
     return NextResponse.json({ error: "Unable to update password." }, { status: 400 });
+  }
+
+  const matches = await bcrypt.compare(currentPassword, user.password);
+  if (!matches) {
+    return NextResponse.json({ error: "Current password is incorrect." }, { status: 400 });
+  }
+
+  const sameAsCurrent = await bcrypt.compare(newPassword, user.password);
+  if (sameAsCurrent) {
+    return NextResponse.json(
+      { error: "New password must be different from your current password." },
+      { status: 400 }
+    );
   }
 
   const hashed = await bcrypt.hash(newPassword, 10);

@@ -61,9 +61,18 @@ export const authOptions: NextAuthOptions = {
   ],
 
   callbacks: {
-    async jwt({ token, account, user, profile }) {
+    async jwt({ token, account, user, profile, trigger, session }) {
       const userId = token.sub ?? user?.id;
       if (!userId) return token;
+
+      if (trigger === "update" && session) {
+        if (typeof session.email === "string") {
+          token.email = session.email;
+        }
+        if (typeof session.name === "string") {
+          token.name = session.name;
+        }
+      }
 
       if (account || !token.providers) {
         const linkedAccounts = await prisma.account.findMany({

@@ -33,11 +33,8 @@ import {
 import {
   FileText as PhFileText,
   Folders as PhFolders,
-  GearSix as PhGearSix,
   House as PhHouse,
-  Question as PhQuestion,
   Signature as PhSignature,
-  SignOut as PhSignOut,
   Trash as PhTrash,
 } from "@phosphor-icons/react";
 import { useSession, signOut } from "next-auth/react";
@@ -102,6 +99,9 @@ const navigationItems: SidebarItem[] = [
   { label: "Projects", icon: PhFolders, href: "/projects" },
   { label: "Signatures", icon: PhSignature, href: "/signature-center" },
   { label: "Templates", icon: PhFileText, href: "/templates" },
+];
+
+const bottomSidebarItems: SidebarItem[] = [
   { label: "Trash", icon: PhTrash, href: "/projects/trash" },
 ];
 
@@ -158,19 +158,6 @@ const sidebarPanels: Record<string, SidebarPanel> = {
   },
 };
 
-const otherItems: SidebarItem[] = [
-  { label: "Help & Center", icon: PhQuestion, href: "/help", disabled: true },
-  { label: "Settings", icon: PhGearSix, href: "/settings", disabled: true },
-  {
-    label: "Log out",
-    icon: PhSignOut,
-    href: "/logout",
-    onClick: () => {
-      void signOut({ callbackUrl: "/login" });
-    },
-  },
-];
-
 interface WorkspaceShellProps {
   children: React.ReactNode;
 }
@@ -205,6 +192,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
   const [createShowValidation, setCreateShowValidation] = useState(false);
   const [createRemoveConfirmId, setCreateRemoveConfirmId] = useState<string | null>(null);
   const [billingPortalLoading, setBillingPortalLoading] = useState(false);
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const [compactSidebar, setCompactSidebar] = useState(false);
   const [narrowSidebar, setNarrowSidebar] = useState(false);
   const [overlaySidebar, setOverlaySidebar] = useState(false);
@@ -214,7 +202,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const createRef = useRef<HTMLDivElement>(null);
   const createFileInputRef = useRef<HTMLInputElement | null>(null);
-  const avatarKey = session?.user?.email ?? session?.user?.id ?? null;
+  const avatarKey = session?.user?.id ?? session?.user?.email ?? null;
   const { avatar } = useAvatarPreference(avatarKey);
   const [signingOut, setSigningOut] = useState(false);
   const [logoutConfirmArmed, setLogoutConfirmArmed] = useState(false);
@@ -229,6 +217,11 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
     avatarKey,
     session?.user?.name ?? session?.user?.email ?? "Account"
   );
+  const showAvatarImage = Boolean(avatar) && !avatarLoadFailed;
+
+  useEffect(() => {
+    setAvatarLoadFailed(false);
+  }, [avatar]);
 
   const clearLogoutConfirmTimer = () => {
     if (logoutConfirmTimeoutRef.current !== null && typeof window !== "undefined") {
@@ -242,17 +235,6 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
     setLogoutConfirmArmed(false);
   };
 
-  const armLogoutConfirm = () => {
-    clearLogoutConfirmTimer();
-    setLogoutConfirmArmed(true);
-    if (typeof window !== "undefined") {
-      logoutConfirmTimeoutRef.current = window.setTimeout(() => {
-        setLogoutConfirmArmed(false);
-        logoutConfirmTimeoutRef.current = null;
-      }, 4000);
-    }
-  };
-
   const handleLogoutRequest = async ({
     closeProfile = false,
     closeMobile = false,
@@ -263,13 +245,6 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
     closeExpanded?: boolean;
   } = {}) => {
     if (signingOut) return;
-
-    if (!logoutConfirmArmed) {
-      armLogoutConfirm();
-      return;
-    }
-
-    resetLogoutConfirm();
     if (closeProfile) setProfileOpen(false);
     if (closeMobile) setMobileOpen(false);
     if (closeExpanded) {
@@ -456,6 +431,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
 
   const isPricingRoute = pathname === "/pricing";
   const isAccountRoute = pathname?.startsWith("/account");
+  const hideWorkspaceSidebar = isAccountRoute;
   const isStudioRoute = pathname?.startsWith("/studio");
   const isProjectsPanel = panelKey === "projects";
   const isHomePanel = panelKey === "home";
@@ -484,6 +460,12 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
     const timer = setTimeout(prefetch, 200);
     return () => clearTimeout(timer);
   }, [router]);
+
+  useEffect(() => {
+    if (hideWorkspaceSidebar) {
+      setMobileOpen(false);
+    }
+  }, [hideWorkspaceSidebar]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -770,7 +752,9 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
         : "md:pl-[calc(var(--shell-left)+80px+24px+240px)]"
       : "";
   const sidebarExpandedClass = panelExpanded && !shouldOverlay ? "with-sidebar-panel" : "";
-  const contentOffsetClass = `${baseContentOffsetClass} ${expandedContentOffsetClass} ${sidebarExpandedClass}`.trim();
+  const contentOffsetClass = hideWorkspaceSidebar
+    ? ""
+    : `${baseContentOffsetClass} ${expandedContentOffsetClass} ${sidebarExpandedClass}`.trim();
   const setSidebarTooltipFromEvent = (
     event: React.MouseEvent<HTMLElement> | React.FocusEvent<HTMLElement>,
     label: string,
@@ -895,10 +879,10 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
         : "flex h-8 w-full items-center justify-center rounded-2xl transition";
       const iconWrapperState = homeSidebarLocked
         ? isActive
-          ? "text-[#2563EB] dark:text-zinc-100"
+          ? "text-[#6C47FF] dark:text-zinc-100"
           : "text-[#6B7280] dark:text-zinc-400"
         : isActive
-          ? "text-[#2563EB] dark:text-zinc-100"
+          ? "text-[#6C47FF] dark:text-zinc-100"
           : "text-[#6B7280] dark:text-zinc-400";
       const iconWrapperHover = !isActive && !disabled
         ? isLogout
@@ -920,7 +904,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
             disabled
               ? "cursor-not-allowed text-[#4B5563] dark:text-zinc-500"
               : isActive
-                ? "text-[#2563EB] dark:text-zinc-100"
+                ? "text-[#6C47FF] dark:text-zinc-100"
                 : "cursor-pointer text-[#4B5563] hover:text-[#374151] dark:text-zinc-400 dark:hover:text-zinc-200"
           } ${isExpanded ? expandedLayoutClasses : collapsedLayoutClasses} ${
             isLogout && logoutConfirmArmed ? "bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-300" : ""
@@ -929,7 +913,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
             disabled
               ? "cursor-not-allowed text-[#4B5563] dark:text-zinc-500"
               : isActive
-                ? "text-[#2563EB] dark:text-zinc-100"
+                ? "text-[#6C47FF] dark:text-zinc-100"
                 : "cursor-pointer text-[#4B5563] hover:text-[#374151] dark:text-zinc-400 dark:hover:text-zinc-200"
           } ${isExpanded ? expandedLayoutClasses : collapsedLayoutClasses} ${
             isLogout && logoutConfirmArmed ? "bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-300" : ""
@@ -941,14 +925,14 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
         <span className="relative flex w-full items-center pl-0">
           {isActive ? (
             isExpanded ? (
-              <span
-                className="absolute left-0 inset-y-0 w-[3px] rounded-full bg-[#2563EB] dark:bg-zinc-200"
+                <span
+                className="absolute left-0 inset-y-0 w-[3px] rounded-full bg-[#6C47FF] dark:bg-zinc-200"
                 style={{ top: 3, bottom: 3 }}
                 aria-hidden
               />
             ) : (
-              <span
-                className="absolute left-0 inset-y-0 w-[3px] rounded-full bg-[#2563EB] dark:bg-zinc-200"
+                <span
+                className="absolute left-0 inset-y-0 w-[3px] rounded-full bg-[#6C47FF] dark:bg-zinc-200"
                 style={{ top: 3, bottom: 3 }}
                 aria-hidden
               />
@@ -957,7 +941,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
           <span
             className={`flex items-center ${basePadding} transition-[width] duration-[140ms] ease-out ${
               isActive
-                ? `w-full ${activeRoundedClass} bg-[rgba(59,130,246,0.08)] shadow-inner dark:shadow-none dark:bg-zinc-800/60`
+                ? `w-full ${activeRoundedClass} bg-[rgba(108,71,255,0.06)] shadow-inner dark:shadow-none dark:bg-zinc-800/60`
                 : "group-hover:w-full group-hover:rounded-xl group-hover:bg-[rgba(0,0,0,0.04)] dark:group-hover:bg-white/5"
             } ${isExpanded ? "" : "w-full justify-center"}`}
           >
@@ -979,7 +963,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
             ) : hideCollapsedLabel ? null : (
               <span
                 className={`text-[11px] sm:text-xs lg:text-sm font-medium tracking-wide ${logoutHoverClass} ${
-                  isActive ? "text-sky-700 dark:text-zinc-100" : "text-slate-500 dark:text-zinc-400"
+                  isActive ? "text-[#5B38E6] dark:text-zinc-100" : "text-slate-500 dark:text-zinc-400"
                 }`}
               >
                 {label}
@@ -1087,7 +1071,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
       const stateClasses = disabled
         ? "cursor-not-allowed text-[#4B5563]"
         : isActive
-          ? "bg-sky-100 text-sky-900"
+          ? "bg-[rgba(108,71,255,0.08)] text-[#4C34C9]"
           : "cursor-pointer text-[#4B5563] hover:bg-[rgba(0,0,0,0.04)] hover:text-[#374151]";
       const confirmClasses = isLogout && logoutConfirmArmed ? "bg-red-50 text-red-700" : "";
 
@@ -1163,6 +1147,8 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
         } as React.CSSProperties
       }
     >
+      {!hideWorkspaceSidebar ? (
+      <>
       {/* Desktop sidebar */}
       <aside className="fixed left-[var(--shell-left)] top-6 bottom-6 z-50 hidden w-[var(--shell-sidebar-width)] text-slate-800 transition-[width] duration-300 ease-in-out dark:text-zinc-100 md:flex">
         <div className="relative flex h-full w-full">
@@ -1282,16 +1268,16 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                       iconOnly={!navExpanded}
                       className={
                         navExpanded
-                          ? "flex h-12 w-[220px] items-center justify-center rounded-full border border-transparent bg-[#2563EB] px-5 text-sm font-semibold tracking-wide text-white shadow-[0_10px_22px_rgba(15,23,42,0.22)] transition-[width,transform,opacity,background-color,box-shadow] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] origin-left transform-gpu opacity-100 scale-100 hover:bg-[#1D4ED8] hover:shadow-[0_12px_26px_rgba(15,23,42,0.28)] dark:border-zinc-700/40 dark:bg-zinc-800 dark:text-zinc-100 dark:shadow-[0_12px_26px_rgba(0,0,0,0.45)] dark:hover:bg-zinc-700 dark:hover:border-zinc-600/60 dark:hover:shadow-[0_14px_30px_rgba(0,0,0,0.55)] dark:active:bg-zinc-900"
-                          : "flex h-12 w-12 items-center justify-center rounded-xl border border-transparent bg-[#2563EB] text-white shadow-[0_10px_22px_rgba(15,23,42,0.22)] transition-[width,transform,opacity,background-color,box-shadow] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] origin-left transform-gpu opacity-100 scale-95 hover:bg-[#1D4ED8] hover:shadow-[0_12px_26px_rgba(15,23,42,0.28)] dark:border-zinc-700/40 dark:bg-zinc-800 dark:text-zinc-100 dark:shadow-[0_12px_26px_rgba(0,0,0,0.45)] dark:hover:bg-zinc-700 dark:hover:border-zinc-600/60 dark:hover:shadow-[0_14px_30px_rgba(0,0,0,0.55)] dark:active:bg-zinc-900"
+                          ? "flex h-12 w-[220px] items-center justify-center rounded-xl border border-transparent bg-[#6C47FF] px-5 text-sm font-semibold tracking-wide text-white shadow-[0_8px_18px_rgba(15,23,42,0.14)] transition-[width,transform,opacity,background-color,box-shadow] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] origin-left transform-gpu opacity-100 scale-100 hover:bg-[#5B38E6] hover:shadow-[0_10px_22px_rgba(15,23,42,0.18)] dark:border-zinc-700/40 dark:bg-[#6C47FF] dark:text-zinc-100 dark:shadow-[0_10px_22px_rgba(0,0,0,0.35)] dark:hover:bg-[#5B38E6] dark:hover:border-zinc-600/60 dark:hover:shadow-[0_12px_26px_rgba(0,0,0,0.42)] dark:active:bg-[#4E2FD1]"
+                          : "flex h-12 w-12 items-center justify-center rounded-lg border border-transparent bg-[#6C47FF] text-white shadow-[0_8px_18px_rgba(15,23,42,0.14)] transition-[width,transform,opacity,background-color,box-shadow] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] origin-left transform-gpu opacity-100 scale-95 hover:bg-[#5B38E6] hover:shadow-[0_10px_22px_rgba(15,23,42,0.18)] dark:border-zinc-700/40 dark:bg-[#6C47FF] dark:text-zinc-100 dark:shadow-[0_10px_22px_rgba(0,0,0,0.35)] dark:hover:bg-[#5B38E6] dark:hover:border-zinc-600/60 dark:hover:shadow-[0_12px_26px_rgba(0,0,0,0.42)] dark:active:bg-[#4E2FD1]"
                       }
                     />
                   </div>
                 </nav>
 
-              {otherItems.length > 0 ? (
+              {bottomSidebarItems.length > 0 ? (
                   <div className="mt-auto flex flex-col items-center gap-3 pt-6">
-                    {renderItems(otherItems, {
+                    {renderItems(bottomSidebarItems, {
                       labelClassName: itemLabelClasses,
                       forceExpanded: navExpanded,
                       hideCollapsedLabel: true,
@@ -1322,14 +1308,15 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                       profileOpen ? "border-sky-300" : "border-transparent"
                     }`}
                   >
-                    {avatar ? (
+                    {showAvatarImage ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
-                        src={avatar}
+                        src={avatar!}
                         alt="Your avatar"
                         className={`${
                           sidebarCompact ? "h-[58px] w-[58px]" : "h-16 w-16"
                         } shrink-0 rounded-full object-cover`}
+                        onError={() => setAvatarLoadFailed(true)}
                       />
                     ) : (
                       <span
@@ -1364,9 +1351,14 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                   >
                     <div className="flex items-center gap-3 rounded-2xl border-[3px] border-slate-300 px-3 py-3">
                       <span className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-50 text-slate-600">
-                        {avatar ? (
+                        {showAvatarImage ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={avatar} alt="Your avatar" className="h-10 w-10 rounded-full object-cover" />
+                          <img
+                            src={avatar!}
+                            alt="Your avatar"
+                            className="h-10 w-10 rounded-full object-cover"
+                            onError={() => setAvatarLoadFailed(true)}
+                          />
                         ) : (
                           <span
                             className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold uppercase text-white"
@@ -1450,12 +1442,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                             className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-left text-2xl font-semibold text-red-600 transition hover:bg-red-50"
                           >
                             <LogOut className="h-6 w-6" aria-hidden />
-                            <span>Log out</span>
-                            {logoutConfirmArmed ? (
-                              <span className="ml-auto rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-red-700">
-                                Tap again
-                              </span>
-                            ) : null}
+                            <span>{signingOut ? "Logging out..." : "Log out"}</span>
                           </button>
                         </>
                       ) : (
@@ -1523,12 +1510,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                             className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-2xl font-semibold text-red-600 transition hover:bg-red-50"
                           >
                             <LogOut className="h-6 w-6" aria-hidden />
-                            <span>Log out</span>
-                            {logoutConfirmArmed ? (
-                              <span className="ml-auto rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-red-700">
-                                Tap again
-                              </span>
-                            ) : null}
+                            <span>{signingOut ? "Logging out..." : "Log out"}</span>
                           </button>
                         </>
                       )}
@@ -1608,12 +1590,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                       className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-left text-2xl font-semibold text-red-600 transition hover:bg-red-50"
                     >
                       <LogOut className="h-6 w-6" aria-hidden />
-                      <span>Log out</span>
-                      {logoutConfirmArmed ? (
-                        <span className="ml-auto rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-red-700">
-                          Tap again
-                        </span>
-                      ) : null}
+                      <span>{signingOut ? "Logging out..." : "Log out"}</span>
                     </button>
                   </div>
                 ) : (
@@ -1774,9 +1751,11 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
           ) : null}
         </div>
       </aside>
+      </>
+      ) : null}
 
       {/* Mobile drawer */}
-      {mobileOpen ? (
+      {!hideWorkspaceSidebar && mobileOpen ? (
         <>
           <div className="fixed inset-0 z-40 bg-black/40 dark:bg-zinc-950/60 md:hidden" onClick={() => setMobileOpen(false)} />
           <aside className="fixed inset-y-0 left-0 z-50 w-72 overflow-y-auto border-r border-slate-200 bg-white p-6 shadow-2xl dark:shadow-[0_22px_60px_rgba(0,0,0,0.45)] transition-transform duration-300 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 md:hidden">
@@ -1913,13 +1892,10 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                 ) : null}
               </div>
 
-              {otherItems.length > 0 ? (
+              {bottomSidebarItems.length > 0 ? (
                 <div className="border-t border-slate-200 pt-4">
-                  <p className="pb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                    Other
-                  </p>
                   <div className="flex flex-col gap-1">
-                    {renderMobileNavItems(otherItems)}
+                    {renderMobileNavItems(bottomSidebarItems)}
                   </div>
                 </div>
               ) : null}
@@ -1977,12 +1953,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
                   className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-red-600 transition hover:bg-red-50"
                 >
                   <LogOut className="h-6 w-6" aria-hidden />
-                  <span>Log out</span>
-                  {logoutConfirmArmed ? (
-                    <span className="ml-auto rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700">
-                      Tap again
-                    </span>
-                  ) : null}
+                  <span>{signingOut ? "Logging out..." : "Log out"}</span>
                 </button>
               </div>
             </div>
@@ -1996,16 +1967,18 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
         <header className="sticky top-0 z-20 w-full border-b border-slate-200 bg-white/90 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/90 md:hidden">
           <div className="mx-auto flex h-[76px] w-full max-w-7xl items-center justify-between px-3 lg:px-6">
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileOpen(true);
-                }}
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-transparent text-slate-900 shadow-none transition hover:bg-slate-100 active:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-800 focus:ring-offset-2 md:hidden"
-              >
-                <Menu className="h-7 w-7" />
-                <span className="sr-only">Open workspace menu</span>
-              </button>
+              {!hideWorkspaceSidebar ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileOpen(true);
+                  }}
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-transparent text-slate-900 shadow-none transition hover:bg-slate-100 active:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-800 focus:ring-offset-2 md:hidden"
+                >
+                  <Menu className="h-7 w-7" />
+                  <span className="sr-only">Open workspace menu</span>
+                </button>
+              ) : null}
               <AppHeaderBrand />
             </div>
             <div className="relative flex items-center" />

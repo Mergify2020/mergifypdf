@@ -1,12 +1,13 @@
 "use client";
 
-import { User, Mail, Lock, Shield, Trash2 } from "lucide-react";
+import { ChevronDown, MoveLeft, PencilLine, User, Mail, Lock, Shield, Trash2, CreditCard, Loader2 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { useEffect, useRef, useState } from "react";
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
 import { getAvatarFallback } from "@/lib/avatarFallback";
 import PricingPlans from "@/components/PricingPlans";
+import SettingsMenu from "@/components/SettingsMenu";
 
 const PREVIEW_STAGE_SIZE = 256; // matches Tailwind h-64
 const MIN_CROP_SIZE = 56;
@@ -102,31 +103,50 @@ function resizeRectByHandle(
 
 function AccountSettingsPage() {
   const router = useRouter();
-  const { data: session } = useSession();
+  const { data: session, update: updateSession } = useSession();
   const providers = session?.user?.providers ?? [];
   const hasCredentialsAccess = providers.length === 0 || providers.includes("credentials");
   const managedByGoogle = !hasCredentialsAccess && providers.includes("google");
   const canManageEmail = hasCredentialsAccess;
   const canChangePassword = hasCredentialsAccess;
-  const displayName = session?.user?.name ?? "";
 
   const [email, setEmail] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [emailCodeDigits, setEmailCodeDigits] = useState<string[]>(Array(6).fill(""));
+  const [emailStep, setEmailStep] = useState<"request" | "verify">("request");
   const [emailBusy, setEmailBusy] = useState(false);
   const [emailMessage, setEmailMessage] = useState<string | null>(null);
+  const [emailResendCooldown, setEmailResendCooldown] = useState(0);
+  const [billingPortalLoading, setBillingPortalLoading] = useState(false);
+  const [billingPortalError, setBillingPortalError] = useState<string | null>(null);
+  const [warmedBillingPortalUrl, setWarmedBillingPortalUrl] = useState<string | null>(null);
+  const [warmedBillingPortalAt, setWarmedBillingPortalAt] = useState<number>(0);
+  const [firstNameValue, setFirstNameValue] = useState("");
+  const [lastNameValue, setLastNameValue] = useState("");
+  const [editingNameField, setEditingNameField] = useState<"first" | "last" | null>(null);
+  const [nameBusy, setNameBusy] = useState(false);
+  const [nameMessage, setNameMessage] = useState<string | null>(null);
 
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
   const [passwordBusy, setPasswordBusy] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
-  const avatarKey = session?.user?.email ?? session?.user?.id ?? null;
+  const accountEmail = email || session?.user?.email || null;
+  const avatarKey = session?.user?.id ?? session?.user?.email ?? null;
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
+  const accountName = [firstNameValue.trim(), lastNameValue.trim()].filter(Boolean).join(" ")
+    || session?.user?.email
+    || "Account";
   const fallbackAvatar = getAvatarFallback(
     avatarKey,
-    displayName || session?.user?.email || "User"
+    accountName || session?.user?.email || "User"
   );
   const { avatar, setAvatar, clearAvatar } = useAvatarPreference(avatarKey);
   const [avatarMessage, setAvatarMessage] = useState<string | null>(null);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const emailCodeRefs = useRef<Array<HTMLInputElement | null>>([]);
   const [showCropper, setShowCropper] = useState(false);
   const [pendingAvatar, setPendingAvatar] = useState<string | null>(null);
   const [displayMeta, setDisplayMeta] = useState<DisplayMeta | null>(null);
@@ -149,12 +169,25 @@ function AccountSettingsPage() {
   const [disconnectPassword, setDisconnectPassword] = useState("");
   const [disconnectBusy, setDisconnectBusy] = useState(false);
   const [disconnectError, setDisconnectError] = useState<string | null>(null);
+  const showAvatarImage = Boolean(avatar) && !avatarLoadFailed;
 
   useEffect(() => {
     if (session?.user?.email) {
       setEmail(session.user.email);
+      setNewEmail(session.user.email);
     }
   }, [session?.user?.email]);
+
+  useEffect(() => {
+    setAvatarLoadFailed(false);
+  }, [avatar]);
+
+  useEffect(() => {
+    const fullName = (session?.user?.name ?? "").trim();
+    const parts = fullName.split(/\s+/).filter(Boolean);
+    setFirstNameValue(parts[0] ?? "");
+    setLastNameValue(parts.length > 1 ? parts.slice(1).join(" ") : "");
+  }, [session?.user?.name]);
 
   useEffect(() => {
     let cancelled = false;
@@ -180,8 +213,7 @@ function AccountSettingsPage() {
     };
   }, [session?.user?.id]);
 
-  async function handleEmailSubmit(event: React.FormEvent) {
-    event.preventDefault();
+  async function requestEmailCode() {
     if (!canManageEmail) {
       setEmailMessage(managedByGoogle ? "Your email is handled by Google." : "Email changes are disabled for your sign-in method.");
       return;
@@ -193,19 +225,196 @@ function AccountSettingsPage() {
       const response = await fetch("/api/account/update-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ action: "request-code", newEmail }),
       });
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(data.error ?? "Unable to update email.");
+        throw new Error(data.error ?? "Unable to send verification code.");
       }
-      setEmailMessage("Email updated.");
+      setEmailStep("verify");
+      setEmailCodeDigits(Array(6).fill(""));
+      setEmailMessage(data.message ?? "We sent a 6-digit code to your new email.");
+      setEmailResendCooldown(25);
+      setTimeout(() => {
+        emailCodeRefs.current[0]?.focus();
+      }, 0);
     } catch (error) {
       setEmailMessage(
         error instanceof Error ? error.message : "Something went wrong. Please try again."
       );
     } finally {
       setEmailBusy(false);
+    }
+  }
+
+  async function handleEmailRequest(event: React.FormEvent) {
+    event.preventDefault();
+    await requestEmailCode();
+  }
+
+  async function handleEmailVerify(event: React.FormEvent) {
+    event.preventDefault();
+    if (!canManageEmail) {
+      setEmailMessage(managedByGoogle ? "Your email is handled by Google." : "Email changes are disabled for your sign-in method.");
+      return;
+    }
+    const code = emailCodeDigits.join("").trim();
+    if (!/^\d{6}$/.test(code)) {
+      setEmailMessage("Enter the 6-digit code.");
+      return;
+    }
+    setEmailBusy(true);
+    setEmailMessage(null);
+
+    try {
+      const response = await fetch("/api/account/update-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "verify-code", newEmail, code }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error ?? "Unable to verify code.");
+      }
+      const updatedEmail =
+        typeof data.email === "string" && data.email.includes("@")
+          ? data.email
+          : newEmail.trim().toLowerCase();
+      setEmail(updatedEmail);
+      setNewEmail(updatedEmail);
+      setEmailCodeDigits(Array(6).fill(""));
+      setEmailStep("request");
+      try {
+        await updateSession({ email: updatedEmail });
+      } catch {
+        // ignore; we'll force-refresh below
+      }
+      router.refresh();
+      setEmailMessage(data.message ?? "Email updated.");
+    } catch (error) {
+      setEmailMessage(
+        error instanceof Error ? error.message : "Something went wrong. Please try again."
+      );
+    } finally {
+      setEmailBusy(false);
+    }
+  }
+
+  function focusEmailCodeIndex(index: number) {
+    emailCodeRefs.current[index]?.focus();
+  }
+
+  function updateEmailCodeDigit(index: number, value: string) {
+    setEmailCodeDigits((prev) => {
+      const next = [...prev];
+      next[index] = value;
+      return next;
+    });
+  }
+
+  useEffect(() => {
+    if (emailResendCooldown <= 0) return;
+    const timer = window.setInterval(() => {
+      setEmailResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [emailResendCooldown]);
+
+  async function openBillingPortal() {
+    if (billingPortalLoading) return;
+    try {
+      setBillingPortalLoading(true);
+      setBillingPortalError(null);
+      const now = Date.now();
+      if (
+        warmedBillingPortalUrl &&
+        warmedBillingPortalAt > 0 &&
+        now - warmedBillingPortalAt < 25_000
+      ) {
+        window.location.href = warmedBillingPortalUrl;
+        return;
+      }
+      const returnUrl =
+        typeof window === "undefined"
+          ? undefined
+          : `${window.location.origin}/account#account-information`;
+      const response = await fetch("/api/billing-portal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ returnUrl }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || typeof data?.url !== "string") {
+        throw new Error(data?.error ?? "Unable to open billing portal.");
+      }
+      window.location.href = data.url;
+    } catch {
+      setBillingPortalError("Unable to open billing portal right now.");
+    } finally {
+      setBillingPortalLoading(false);
+    }
+  }
+
+  async function warmBillingPortal() {
+    if (billingPortalLoading) return;
+    const now = Date.now();
+    if (
+      warmedBillingPortalUrl &&
+      warmedBillingPortalAt > 0 &&
+      now - warmedBillingPortalAt < 25_000
+    ) {
+      return;
+    }
+    try {
+      const returnUrl =
+        typeof window === "undefined"
+          ? undefined
+          : `${window.location.origin}/account#account-information`;
+      const response = await fetch("/api/billing-portal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ returnUrl }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || typeof data?.url !== "string") return;
+      setWarmedBillingPortalUrl(data.url);
+      setWarmedBillingPortalAt(now);
+    } catch {
+      // best-effort warmup; ignore failures
+    }
+  }
+
+  async function handleNameSubmit() {
+    if (nameBusy) return;
+    setNameBusy(true);
+    setNameMessage(null);
+    try {
+      const response = await fetch("/api/account/update-name", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          firstName: firstNameValue,
+          lastName: lastNameValue,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.error ?? "Unable to update name.");
+      }
+      const mergedName = [firstNameValue.trim(), lastNameValue.trim()].filter(Boolean).join(" ");
+      try {
+        await updateSession({ name: mergedName || null });
+      } catch {
+        router.refresh();
+      }
+      setEditingNameField(null);
+      setNameMessage("Name updated.");
+    } catch (error) {
+      setNameMessage(error instanceof Error ? error.message : "Unable to update name.");
+    } finally {
+      setNameBusy(false);
     }
   }
 
@@ -408,6 +617,10 @@ function AccountSettingsPage() {
     event.preventDefault();
     setPasswordMessage(null);
 
+    if (currentPassword.length < 8) {
+      setPasswordMessage("Enter your current password.");
+      return;
+    }
     if (newPassword !== confirmPassword) {
       setPasswordMessage("Passwords do not match.");
       return;
@@ -418,13 +631,14 @@ function AccountSettingsPage() {
       const response = await fetch("/api/account/update-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ newPassword }),
+        body: JSON.stringify({ currentPassword, newPassword }),
       });
       const data = await response.json();
       if (!response.ok) {
         throw new Error(data.error ?? "Unable to update password.");
       }
       setPasswordMessage("Password updated.");
+      setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
     } catch (error) {
@@ -634,130 +848,403 @@ function AccountSettingsPage() {
   }
 
   return (
-    <main className="w-full bg-slate-50 px-10 py-12">
-      <div className="rounded-3xl border border-gray-200 bg-white/95 p-6 shadow-md sm:p-8 lg:p-10">
-        <div className="mx-auto max-w-3xl">
-          <div className="text-center">
-            <h1 className="text-3xl font-semibold tracking-tight text-gray-900">Account settings</h1>
-            <p className="mt-2 text-sm text-gray-600">
-              Manage your profile, security, and preferences.
-            </p>
-          </div>
-
-          <section className="mt-8">
-          <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600">
-              <User className="h-4 w-4" aria-hidden />
-            </span>
-            <h2 className="text-lg font-semibold">Profile</h2>
-          </div>
-        <dl className="mt-4 space-y-3">
-          <div>
-            <dt className="text-sm font-medium text-gray-700">Name</dt>
-            <dd className="text-sm text-gray-800">{displayName || "Not provided"}</dd>
-          </div>
-          <div>
-            <dt className="text-sm font-medium text-gray-700">Email</dt>
-            <dd className="text-sm text-gray-800">{email || "Unknown"}</dd>
-          </div>
-        </dl>
-        <div className="mt-4 flex flex-col gap-3 rounded-xl border border-dashed border-gray-200 bg-gray-50/80 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            {avatar ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={avatar} alt="Profile preview" className="h-16 w-16 rounded-full object-cover" />
-            ) : (
-              <span
-                className="flex h-16 w-16 items-center justify-center rounded-full text-lg font-semibold uppercase text-white"
-                style={{ backgroundColor: fallbackAvatar.color }}
-              >
-                {fallbackAvatar.initials}
-              </span>
-            )}
-            <div>
-              <p className="text-sm font-semibold text-gray-800">Profile photo</p>
-            </div>
-          </div>
-          <div className="flex gap-3">
+    <main className="w-full bg-slate-100 px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <div className="min-w-0 flex items-center gap-3">
             <button
               type="button"
-              onClick={handleAvatarClick}
-              disabled={avatarBusy}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800 transition hover:bg-white disabled:opacity-50"
+              onClick={() => {
+                router.push("/");
+              }}
+              className="inline-flex h-9 w-9 items-center justify-center text-gray-700 transition hover:text-gray-900"
+              aria-label="Back to home"
             >
-              {avatarBusy ? "Uploading…" : "Upload photo"}
+              <MoveLeft className="h-6 w-6 stroke-[2.75]" aria-hidden />
             </button>
+            <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Account settings</h1>
+          </div>
+          <div className="ml-auto flex shrink-0 items-center gap-3">
             <button
               type="button"
-              onClick={handleAvatarReset}
-              className="rounded-lg border border-transparent px-3 py-2 text-sm text-gray-600 hover:text-gray-900"
+              onClick={() => {
+                router.push("/support");
+              }}
+              className="whitespace-nowrap text-base font-medium text-gray-700 transition hover:text-gray-900"
             >
-              Remove
+              Contact us
             </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleAvatarChange}
+            <span className="h-7 w-[1.5px] bg-gray-300" aria-hidden />
+            <SettingsMenu
+              trigger="custom"
+              triggerLabel="Open profile menu"
+              triggerClassName="w-[224px] min-w-[224px] max-w-[224px] overflow-hidden flex h-11 items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white py-1.5 pl-1 pr-1.5 shadow-[12px_0_36px_rgba(15,23,42,0.10)] transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/30 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-100 dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[12px_0_36px_rgba(0,0,0,0.45)] dark:hover:bg-zinc-800 dark:focus-visible:ring-offset-[#222224]"
+              triggerContent={
+                <>
+                  <span className="shrink-0 pointer-events-none">
+                    {showAvatarImage ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={avatar!}
+                        alt="Your avatar"
+                        className="h-8 w-8 rounded-full object-cover"
+                        onError={() => setAvatarLoadFailed(true)}
+                      />
+                    ) : (
+                      <span
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold uppercase text-white"
+                        style={{ backgroundColor: fallbackAvatar.color }}
+                      >
+                        {fallbackAvatar.initials}
+                      </span>
+                    )}
+                  </span>
+                  <span className="flex min-w-0 flex-1 flex-col leading-tight text-left">
+                    <span className="truncate text-[13px] font-semibold text-[#1F2A37]">
+                      {accountName}
+                    </span>
+                    {accountEmail ? (
+                      <span className="truncate text-[11px] font-medium text-[#64748B]">
+                        {accountEmail}
+                      </span>
+                    ) : null}
+                  </span>
+                  <ChevronDown className="h-4 w-4 shrink-0 text-[#94A3B8]" aria-hidden="true" />
+                </>
+              }
             />
           </div>
         </div>
-        {avatarMessage && <p className="mt-2 text-sm text-gray-600">{avatarMessage}</p>}
+
+        <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start">
+          <aside className="self-start rounded-2xl border border-gray-200 bg-white p-4 shadow-sm lg:sticky lg:top-6">
+            <p className="px-2 text-xs font-bold uppercase tracking-[0.14em] text-gray-600">Settings</p>
+            <nav className="mt-3 space-y-1">
+              <a
+                href="#account-information"
+                className="flex items-center gap-2 rounded-xl bg-[rgba(108,71,255,0.10)] px-3 py-2.5 text-sm font-semibold text-[#5B38E6]"
+              >
+                <User className="h-4 w-4" aria-hidden />
+                <span>Account information</span>
+              </a>
+              <button
+                type="button"
+                onClick={() => {
+                  router.push("/account?view=pricing");
+                }}
+                className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-gray-800 transition hover:bg-gray-50 hover:text-gray-900"
+              >
+                <Mail className="h-4 w-4 text-gray-600 stroke-[2.2]" aria-hidden />
+                <span>Plan &amp; usage</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void openBillingPortal();
+                }}
+                onMouseEnter={() => {
+                  void warmBillingPortal();
+                }}
+                onFocus={() => {
+                  void warmBillingPortal();
+                }}
+                disabled={billingPortalLoading}
+                className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-gray-800 transition hover:bg-gray-50 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <CreditCard className="h-4 w-4 text-gray-600 stroke-[2.2]" aria-hidden />
+                <span className="inline-flex items-center gap-1.5">
+                  {billingPortalLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : null}
+                  <span>{billingPortalLoading ? "Opening portal..." : "Billing portal"}</span>
+                </span>
+              </button>
+              {billingPortalError ? (
+                <p className="px-3 text-xs font-medium text-rose-600">{billingPortalError}</p>
+              ) : null}
+            </nav>
+          </aside>
+
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-7">
+            <h2 className="text-3xl font-semibold tracking-tight text-gray-900">Personal details</h2>
+
+          <section id="account-information" className="mt-6">
+          <div className="flex items-center gap-2">
+            <User className="h-4 w-4 text-slate-600" aria-hidden />
+            <h2 className="text-lg font-semibold">Profile</h2>
+          </div>
+        <dl className="mt-4 grid gap-x-6 gap-y-4 md:grid-cols-2">
+          <div className="min-w-0">
+            <div className="flex items-center justify-between gap-2">
+              <dt className="text-sm font-medium text-gray-700">First name</dt>
+              <button
+                type="button"
+                onClick={() => setEditingNameField("first")}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 px-2.5 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
+                aria-label="Edit first name"
+              >
+                <PencilLine className="h-3.5 w-3.5" aria-hidden />
+                <span>Edit</span>
+              </button>
+            </div>
+            {editingNameField === "first" ? (
+              <div className="mt-2">
+                <input
+                  value={firstNameValue}
+                  onChange={(event) => setFirstNameValue(event.target.value)}
+                  className="w-full rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35"
+                />
+                <div className="mt-2 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void handleNameSubmit();
+                    }}
+                    disabled={nameBusy}
+                    className="rounded-md bg-[#6C47FF] px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-[#5B38E6] disabled:opacity-60"
+                  >
+                    {nameBusy ? "Saving..." : "Save"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingNameField(null)}
+                    className="rounded-md px-2 py-1 text-xs font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-800"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <dd className="mt-1 text-base text-gray-900">{firstNameValue || "Not provided"}</dd>
+            )}
+          </div>
+
+          <div className="min-w-0">
+            <div className="flex items-center justify-between gap-2">
+              <dt className="text-sm font-medium text-gray-700">Last name</dt>
+              <button
+                type="button"
+                onClick={() => setEditingNameField("last")}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 px-2.5 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
+                aria-label="Edit last name"
+              >
+                <PencilLine className="h-3.5 w-3.5" aria-hidden />
+                <span>Edit</span>
+              </button>
+            </div>
+            {editingNameField === "last" ? (
+              <div className="mt-2">
+                <input
+                  value={lastNameValue}
+                  onChange={(event) => setLastNameValue(event.target.value)}
+                  className="w-full rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35"
+                />
+                <div className="mt-2 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void handleNameSubmit();
+                    }}
+                    disabled={nameBusy}
+                    className="rounded-md bg-[#6C47FF] px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-[#5B38E6] disabled:opacity-60"
+                  >
+                    {nameBusy ? "Saving..." : "Save"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingNameField(null)}
+                    className="rounded-md px-2 py-1 text-xs font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-800"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <dd className="mt-1 text-base text-gray-900">{lastNameValue || "Not provided"}</dd>
+            )}
+          </div>
+
+          <div className="col-span-full border-t border-gray-200 pt-4" />
+
+          <div className="min-w-0">
+            <dt className="text-sm font-medium text-gray-700">Email</dt>
+            <dd className="mt-1 text-sm text-gray-800">{email || "Unknown"}</dd>
+          </div>
+
+        </dl>
+        {nameMessage ? <p className="mt-2 text-sm text-gray-600">{nameMessage}</p> : null}
         </section>
 
         {canManageEmail && (
-        <section className="mt-10 border-t border-gray-200 pt-8">
+        <section className="mt-8 border-t border-gray-200 pt-6">
           <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-500/10 text-orange-500">
-              <Mail className="h-4 w-4" aria-hidden />
-            </span>
+            <Mail className="h-4 w-4 text-slate-600" aria-hidden />
             <h2 className="text-lg font-semibold">Change email</h2>
           </div>
           <>
             <p className="mt-1 text-sm text-gray-600">
               We will send confirmations to this email address.
             </p>
-            <form onSubmit={handleEmailSubmit} className="mt-4 space-y-4">
+            <form onSubmit={emailStep === "request" ? handleEmailRequest : handleEmailVerify} className="mt-4 space-y-4">
               <label className="block text-sm font-medium text-gray-700" htmlFor="account-email">
-                Email address
+                New email address
               </label>
               <input
                 id="account-email"
                 type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
+                value={newEmail}
+                onChange={(event) => setNewEmail(event.target.value)}
                 required
-                className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c] focus-visible:ring-offset-0"
+                readOnly={emailStep === "verify"}
+                aria-readonly={emailStep === "verify"}
+                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 focus-visible:ring-offset-0 read-only:cursor-not-allowed read-only:bg-gray-50 read-only:text-gray-500"
               />
-              <button
-                type="submit"
-                disabled={emailBusy}
-                aria-disabled={emailBusy}
-                className="rounded-md bg-[#024d7c] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#013a60] disabled:opacity-60"
-              >
-                {emailBusy ? "Saving..." : "Save email"}
-              </button>
-              {emailMessage && <p className="text-sm text-gray-600">{emailMessage}</p>}
+              {emailStep === "verify" ? (
+                <div className="space-y-2">
+                  <div className="flex w-full max-w-[320px] items-center justify-between gap-2 sm:w-fit sm:max-w-none sm:gap-3">
+                    {emailCodeDigits.map((digit, index) => (
+                      <input
+                        key={`email-code-${index}`}
+                        ref={(el) => {
+                          emailCodeRefs.current[index] = el;
+                        }}
+                        id={index === 0 ? "account-email-code" : undefined}
+                        autoFocus={index === 0}
+                        className="h-11 w-9 rounded-lg border-2 border-slate-300 bg-white text-center text-lg text-slate-900 outline-none transition hover:border-slate-400 focus-visible:border-[#6D6AF4] focus-visible:ring-0 sm:h-12 sm:w-11"
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={1}
+                        value={digit}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, "");
+                          if (!value) {
+                            updateEmailCodeDigit(index, "");
+                            return;
+                          }
+                          updateEmailCodeDigit(index, value[0]);
+                          if (index < 5) {
+                            focusEmailCodeIndex(index + 1);
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Backspace" && !digit && index > 0) {
+                            updateEmailCodeDigit(index - 1, "");
+                            focusEmailCodeIndex(index - 1);
+                          }
+                          if (e.key === "ArrowLeft" && index > 0) {
+                            focusEmailCodeIndex(index - 1);
+                          }
+                          if (e.key === "ArrowRight" && index < 5) {
+                            focusEmailCodeIndex(index + 1);
+                          }
+                        }}
+                        onPaste={(e) => {
+                          const pasted = e.clipboardData.getData("text").replace(/\D/g, "");
+                          if (!pasted) return;
+                          e.preventDefault();
+                          const next = [...emailCodeDigits];
+                          for (let i = 0; i < 6; i += 1) {
+                            const targetIndex = index + i;
+                            if (targetIndex > 5) break;
+                            next[targetIndex] = pasted[i] ?? "";
+                          }
+                          setEmailCodeDigits(next);
+                          const lastIndex = Math.min(index + pasted.length - 1, 5);
+                          focusEmailCodeIndex(Math.max(lastIndex, 0));
+                        }}
+                        aria-label={`Digit ${index + 1}`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              {emailStep === "verify" && emailMessage ? (
+                <p className="text-sm text-gray-600">{emailMessage}</p>
+              ) : null}
+              {emailStep === "verify" ? (
+                <div className="flex items-center gap-3">
+                  <button
+                    type="submit"
+                    disabled={emailBusy}
+                    aria-disabled={emailBusy}
+                    className="rounded-md bg-[#6C47FF] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#5B38E6] disabled:opacity-60"
+                  >
+                    {emailBusy ? "Verifying..." : "Confirm email change"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={emailBusy || emailResendCooldown > 0}
+                    onClick={() => {
+                      if (emailBusy || emailResendCooldown > 0) return;
+                      void requestEmailCode();
+                    }}
+                    className="rounded-md border-2 border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 transition hover:-translate-y-[1px] hover:border-slate-400 hover:shadow-sm disabled:opacity-60"
+                  >
+                    {emailBusy
+                      ? "Sending..."
+                      : emailResendCooldown > 0
+                        ? `Resend code in ${emailResendCooldown}s`
+                        : "Resend code"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (emailBusy) return;
+                      setEmailStep("request");
+                      setNewEmail(email);
+                      setEmailCodeDigits(Array(6).fill(""));
+                      setEmailMessage(null);
+                    }}
+                    className="rounded-md px-2 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 hover:text-gray-900"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={emailBusy || emailResendCooldown > 0}
+                  aria-disabled={emailBusy || emailResendCooldown > 0}
+                  className="rounded-md bg-[#6C47FF] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#5B38E6] disabled:opacity-60"
+                >
+                  {emailResendCooldown > 0
+                    ? `Send code in ${emailResendCooldown}s`
+                    : emailBusy
+                      ? "Sending..."
+                      : "Send code"}
+                </button>
+              )}
+              {emailStep === "request" && emailMessage ? (
+                <p className="text-sm text-gray-600">{emailMessage}</p>
+              ) : null}
             </form>
           </>
         </section>
         )}
 
         {canChangePassword && (
-        <section className="mt-10 border-t border-gray-200 pt-8">
+        <section className="mt-8 border-t border-gray-200 pt-6">
           <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-yellow-400/15 text-yellow-500">
-              <Lock className="h-4 w-4" aria-hidden />
-            </span>
+            <Lock className="h-4 w-4 text-slate-600" aria-hidden />
             <h2 className="text-lg font-semibold">Change password</h2>
           </div>
           <>
-            <p className="mt-1 text-sm text-gray-600">
-              Choose a new password that you have not used elsewhere.
-            </p>
-            <form onSubmit={handlePasswordSubmit} className="mt-4 space-y-4">
+            <form onSubmit={handlePasswordSubmit} className="mt-4 space-y-5">
               <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700" htmlFor="account-password-current">
+                  Enter your current password
+                </label>
+                <input
+                  id="account-password-current"
+                  type="password"
+                  value={currentPassword}
+                  onChange={(event) => setCurrentPassword(event.target.value)}
+                  required
+                  minLength={8}
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 focus-visible:ring-offset-0"
+                  placeholder="Enter your current password"
+                />
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700" htmlFor="account-password-new">
                   New password
                 </label>
@@ -768,7 +1255,8 @@ function AccountSettingsPage() {
                   onChange={(event) => setNewPassword(event.target.value)}
                   required
                   minLength={8}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c] focus-visible:ring-offset-0"
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 focus-visible:ring-offset-0"
+                  placeholder="Create new password"
                 />
               </div>
               <div className="space-y-2">
@@ -782,16 +1270,24 @@ function AccountSettingsPage() {
                   onChange={(event) => setConfirmPassword(event.target.value)}
                   required
                   minLength={8}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c] focus-visible:ring-offset-0"
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 focus-visible:ring-offset-0"
+                  placeholder="Re-enter your new password"
                 />
+              </div>
               </div>
               <button
                 type="submit"
-                disabled={passwordBusy}
+                disabled={
+                  passwordBusy ||
+                  currentPassword.length < 8 ||
+                  newPassword.length < 8 ||
+                  confirmPassword.length < 8 ||
+                  newPassword !== confirmPassword
+                }
                 aria-disabled={passwordBusy}
-                className="rounded-md bg-[#024d7c] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#013a60] disabled:opacity-60"
+                className="rounded-md bg-[#6C47FF] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#5B38E6] disabled:opacity-60"
               >
-                {passwordBusy ? "Saving..." : "Save password"}
+                {passwordBusy ? "Saving..." : "Save changes"}
               </button>
               {passwordMessage && <p className="text-sm text-gray-600">{passwordMessage}</p>}
             </form>
@@ -799,15 +1295,13 @@ function AccountSettingsPage() {
         </section>
         )}
 
-        <section className="mt-10 border-t border-gray-200 pt-8">
+        <section id="security" className="mt-8 border-t border-gray-200 pt-6">
           <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-600">
-              <Shield className="h-4 w-4" aria-hidden />
-            </span>
+            <Shield className="h-4 w-4 text-slate-600" aria-hidden />
             <h2 className="text-lg font-semibold">Security</h2>
           </div>
         <p className="mt-1 text-sm text-gray-600">Keep your MergifyPDF account secure.</p>
-        <div className="mt-4 flex flex-col gap-3 rounded-lg border border-gray-200 bg-gray-50/80 p-4">
+        <div className="mt-4 flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-4">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-medium text-gray-800">Two-factor authentication</p>
@@ -833,7 +1327,7 @@ function AccountSettingsPage() {
                 <button
                   type="button"
                   onClick={openEnableTwoFactor}
-                  className="rounded-md bg-[#024d7c] px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-[#013a60]"
+                  className="rounded-md bg-[#6C47FF] px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-[#5B38E6]"
                 >
                   Enable 2FA
                 </button>
@@ -843,18 +1337,16 @@ function AccountSettingsPage() {
         </div>
         </section>
 
-        <section className="mt-10 border-t border-gray-200 pt-8">
+        <section id="data-privacy" className="mt-8 border-t border-gray-200 pt-6">
           <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500/10 text-rose-500">
-              <Trash2 className="h-4 w-4" aria-hidden />
-            </span>
+            <Trash2 className="h-4 w-4 text-slate-600" aria-hidden />
             <h2 className="text-lg font-semibold">Data &amp; Privacy</h2>
           </div>
         <p className="mt-1 text-sm text-gray-600">
           Control how your data and account are handled.
         </p>
         <div className="mt-4 space-y-6">
-          <div className="rounded-lg border border-gray-200 bg-gray-50/80 p-4">
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
             <p className="text-sm font-medium text-gray-800">Delete account</p>
             <p className="mt-1 text-xs text-gray-600">
               Permanently delete your MergifyPDF account and all associated data. This action cannot be
@@ -870,7 +1362,7 @@ function AccountSettingsPage() {
           </div>
 
           {managedByGoogle && (
-            <div className="rounded-lg border border-gray-200 bg-gray-50/80 p-4">
+            <div className="rounded-lg border border-gray-200 bg-white p-4">
               <p className="text-sm font-medium text-gray-800">Connected account</p>
               <p className="mt-1 text-xs text-gray-600">
                 Your MergifyPDF account is connected to Google for sign-in.
@@ -887,6 +1379,7 @@ function AccountSettingsPage() {
         </div>
         </section>
         </div>
+      </div>
       </div>
 
       {twoFactorModalMode && (
