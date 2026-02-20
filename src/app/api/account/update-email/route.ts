@@ -63,6 +63,7 @@ export async function POST(req: Request) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const userId = session.user.id;
 
   const body = await req.json().catch(() => ({} as Record<string, unknown>));
 
@@ -70,7 +71,7 @@ export async function POST(req: Request) {
     const raw = typeof body.image === "string" ? body.image.trim() : "";
     if (!raw) {
       await prisma.user.update({
-        where: { id: session.user.id },
+        where: { id: userId },
         data: { image: null },
       });
       return NextResponse.json({ success: true });
@@ -79,7 +80,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Image is too large." }, { status: 400 });
     }
     await prisma.user.update({
-      where: { id: session.user.id },
+      where: { id: userId },
       data: { image: raw },
     });
     return NextResponse.json({ success: true });
@@ -116,7 +117,7 @@ export async function POST(req: Request) {
   }
 
   const currentUser = await prisma.user.findUnique({
-    where: { id: session.user.id },
+    where: { id: userId },
     select: { email: true, stripeCustomerId: true },
   });
   const currentEmail = (currentUser?.email ?? "").trim().toLowerCase();
@@ -125,7 +126,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Enter a different email address." }, { status: 400 });
   }
 
-  const ownerState = await getEmailOwnerState(normalized, session.user.id);
+  const ownerState = await getEmailOwnerState(normalized, userId);
   if (ownerState.status === "blocking") {
     return NextResponse.json(
       { error: "This email is already linked to an account." },
@@ -145,10 +146,10 @@ export async function POST(req: Request) {
 
     const code = generateSixDigitCode();
     const token = hashVerificationCode(code);
-    const identifier = emailChangeIdentifier(session.user.id, normalized);
+    const identifier = emailChangeIdentifier(userId, normalized);
 
     await prisma.verificationToken.deleteMany({
-      where: { identifier: { startsWith: `${EMAIL_CHANGE_PREFIX}${session.user.id}:` } },
+      where: { identifier: { startsWith: `${EMAIL_CHANGE_PREFIX}${userId}:` } },
     });
 
     await prisma.verificationToken.create({
@@ -187,7 +188,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Enter the 6-digit code." }, { status: 400 });
   }
 
-  const identifier = emailChangeIdentifier(session.user.id, normalized);
+  const identifier = emailChangeIdentifier(userId, normalized);
   const hashedCode = hashVerificationCode(rawCode);
 
   const verification = await prisma.verificationToken.findFirst({
@@ -212,7 +213,7 @@ export async function POST(req: Request) {
       },
     });
 
-    if (duplicate && duplicate.id !== session.user.id) {
+    if (duplicate && duplicate.id !== userId) {
       const linkedOauthCount = await tx.account.count({
         where: { userId: duplicate.id, provider: { not: "credentials" } },
       });
@@ -233,13 +234,13 @@ export async function POST(req: Request) {
     }
 
     const updated = await tx.user.update({
-      where: { id: session.user.id },
+      where: { id: userId },
       data: { email: normalized },
       select: { stripeCustomerId: true },
     });
 
     await tx.verificationToken.deleteMany({
-      where: { identifier: { startsWith: `${EMAIL_CHANGE_PREFIX}${session.user.id}:` } },
+      where: { identifier: { startsWith: `${EMAIL_CHANGE_PREFIX}${userId}:` } },
     });
 
     return { conflict: false as const, stripeCustomerId: updated.stripeCustomerId ?? null };
@@ -269,9 +270,10 @@ export async function GET() {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const userId = session.user.id;
 
   const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
+    where: { id: userId },
     select: { image: true },
   });
   return NextResponse.json({ success: true, image: user?.image ?? null });
