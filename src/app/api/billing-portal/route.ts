@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { getStripe } from "@/lib/stripe";
+import { prisma } from "@/lib/prisma";
 import { isSameOrigin } from "@/lib/requestGuards";
 
 function safeReturnUrl(origin: string, candidate: unknown) {
