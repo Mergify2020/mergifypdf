@@ -8,7 +8,6 @@ import { useAvatarPreference } from "@/lib/useAvatarPreference";
 import { getAvatarFallback } from "@/lib/avatarFallback";
 import PricingPlans from "@/components/PricingPlans";
 import SettingsMenu from "@/components/SettingsMenu";
-import LoadingOverlay from "@/components/LoadingOverlay";
 
 const PREVIEW_STAGE_SIZE = 256; // matches Tailwind h-64
 const MIN_CROP_SIZE = 56;
@@ -177,7 +176,6 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
   const [disconnectPassword, setDisconnectPassword] = useState("");
   const [disconnectBusy, setDisconnectBusy] = useState(false);
   const [disconnectError, setDisconnectError] = useState<string | null>(null);
-  const [navigatingHome, setNavigatingHome] = useState(false);
   const [activeSettingsTab, setActiveSettingsTab] = useState<SettingsTab>(initialSettingsTab);
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const showAvatarImage = Boolean(avatar) && !avatarLoadFailed;
@@ -969,7 +967,6 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
             <button
               type="button"
               onClick={() => {
-                setNavigatingHome(true);
                 router.push("/");
               }}
               className="inline-flex h-9 w-9 items-center justify-center text-gray-700 transition hover:text-gray-900 dark:text-zinc-100 dark:hover:text-white"
@@ -1993,8 +1990,6 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
           </div>
         </div>
       ) : null}
-
-      <LoadingOverlay open={navigatingHome} label="Opening home…" />
     </main>
   );
 }

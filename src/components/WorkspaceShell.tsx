@@ -1137,7 +1137,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
   const workspaceShell = (
     <>
     <div
-      className={`flex min-h-screen ${isHomePanel ? "bg-[#F1F4F9]" : "bg-slate-100"} ${sidebarCompact ? "sidebar-collapsed" : ""} ${expanded ? "" : "sidebar-minimized"} dark:bg-[#222224]`}
+      className={`relative flex min-h-screen ${isHomePanel ? "bg-[#F1F4F9]" : "bg-slate-100"} ${sidebarCompact ? "sidebar-collapsed" : ""} ${expanded ? "" : "sidebar-minimized"} dark:bg-[#222224]`}
       style={
         {
           "--shell-content-width": expanded ? "1680px" : "1960px",
@@ -1150,7 +1150,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
       {!hideWorkspaceSidebar ? (
       <>
       {/* Desktop sidebar */}
-      <aside className="page-fade-in fixed left-[var(--shell-left)] top-6 bottom-6 z-50 hidden w-[var(--shell-sidebar-width)] text-slate-800 transition-[width] duration-300 ease-in-out dark:text-zinc-100 md:flex">
+      <aside className="page-fade-in absolute left-[var(--shell-left)] top-6 z-50 hidden h-[calc(100vh-48px)] w-[var(--shell-sidebar-width)] text-slate-800 transition-[width] duration-300 ease-in-out dark:text-zinc-100 md:flex">
         <div className="relative flex h-full w-full">
           <div
             ref={sidebarRef}
