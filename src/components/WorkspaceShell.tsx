@@ -164,8 +164,12 @@ interface WorkspaceShellProps {
   initialSidebarExpanded?: boolean;
 }
 
-function shouldShowBootLoader(pathname?: string | null) {
-  return pathname === "/" || pathname?.startsWith("/account") || pathname?.startsWith("/settings");
+function shouldShowBootLoader(pathname?: string | null): boolean {
+  return (
+    pathname === "/" ||
+    pathname?.startsWith("/account") === true ||
+    pathname?.startsWith("/settings") === true
+  );
 }
 
 export default function WorkspaceShell({
