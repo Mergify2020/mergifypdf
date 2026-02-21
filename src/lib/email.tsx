@@ -9,6 +9,12 @@ import { TwoFactorCodeEmail } from "@/emails/TwoFactorCodeEmail";
 import { TwoFactorSignInEmail } from "@/emails/TwoFactorSignInEmail";
 
 type SendArgs = { to: string; code: string };
+const EMAIL_APP_BASE_URL = (
+  process.env.NEXT_PUBLIC_APP_URL
+  || process.env.NEXTAUTH_URL
+  || "https://mergifypdf.com"
+).replace(/\/+$/, "");
+const LOGIN_URL = `${EMAIL_APP_BASE_URL}/login`;
 
 type ResetEmailSuccess = { ok: true; id?: string | null; fallback?: boolean };
 type ResetEmailFailure = { ok: false; error: string };
@@ -29,7 +35,7 @@ export async function sendResetEmail({ to, code }: SendArgs): Promise<ResetEmail
       from,
       to,
       subject: "Reset your MergifyPDF password",
-      react: <ResetPasswordCodeEmail code={code} />,
+      react: <ResetPasswordCodeEmail code={code} manageAccountUrl={LOGIN_URL} />,
     });
 
     if (error) {
@@ -68,7 +74,7 @@ export async function sendResetEmail({ to, code }: SendArgs): Promise<ResetEmail
                       </tr>
                       <tr>
                         <td style="border-top:1px solid #e5e7eb;padding:16px 30px 22px;background-color:#f4f5f7;border-bottom-left-radius:8px;border-bottom-right-radius:8px;">
-                          <div style="color:#6b7280;font-size:13px;margin-bottom:8px;">Manage Account</div>
+                          <a href="${LOGIN_URL}" style="display:inline-block;color:#6b7280;font-size:13px;margin-bottom:8px;text-decoration:underline;">Manage Account</a>
                           <div style="color:#6b7280;font-size:13px;margin-bottom:8px;">Support</div>
                           <div style="color:#6b7280;font-size:13px;margin-bottom:8px;">Privacy Policy</div>
                           <div style="color:#6b7280;font-size:13px;margin-bottom:10px;">Terms of Service</div>
@@ -118,7 +124,7 @@ export async function sendEmailChangeCodeEmail({ to, code }: SendArgs): Promise<
       from,
       to,
       subject: "Confirm your new MergifyPDF email",
-      react: <EmailChangeCodeEmail code={code} />,
+      react: <EmailChangeCodeEmail code={code} manageAccountUrl={LOGIN_URL} />,
     });
 
     if (error) {
@@ -145,6 +151,9 @@ export async function sendEmailChangeCodeEmail({ to, code }: SendArgs): Promise<
                           <p style="margin:0 0 10px;color:#1f2937;font-size:16px;">Use this code to confirm your new email address:</p>
                           <p style="font-size:28px;letter-spacing:6px;font-weight:700;margin:0 0 18px;color:#111827;font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;">${code}</p>
                           <p style="margin:0 0 16px;color:#4b5563;font-size:14px;">This code expires in 10 minutes. Don’t share it with anyone.</p>
+                          <p style="margin:0 0 18px;color:#374151;font-size:15px;">
+                            To protect your account, we recommend enabling two-factor authentication. This adds an additional layer of security to help prevent unauthorized access.
+                          </p>
                           <div style="height:1px;background-color:#e5e7eb;margin:18px 0;"></div>
                           <p style="margin:0 0 6px;color:#1f2937;font-weight:600;">Didn’t request this?</p>
                           <p style="margin:0;color:#6b7280;font-size:14px;">
@@ -154,6 +163,7 @@ export async function sendEmailChangeCodeEmail({ to, code }: SendArgs): Promise<
                       </tr>
                       <tr>
                         <td style="border-top:1px solid #e5e7eb;padding:16px 30px 22px;background-color:#f4f5f7;border-bottom-left-radius:8px;border-bottom-right-radius:8px;">
+                          <a href="${LOGIN_URL}" style="display:inline-block;color:#6b7280;font-size:13px;margin-bottom:8px;text-decoration:underline;">Manage Account</a>
                           <div style="color:#6b7280;font-size:13px;margin-bottom:8px;">Support</div>
                           <div style="color:#6b7280;font-size:13px;margin-bottom:8px;">Privacy Policy</div>
                           <div style="color:#6b7280;font-size:13px;margin-bottom:10px;">Terms of Service</div>
@@ -202,7 +212,7 @@ export async function sendSignupCodeEmail({ to, code }: SignupArgs) {
       from,
       to,
       subject: "Verify your MergifyPDF account",
-      react: <SignupCodeEmail code={code} />,
+      react: <SignupCodeEmail code={code} manageAccountUrl={LOGIN_URL} />,
     });
 
     if (error) {
@@ -245,7 +255,7 @@ export async function sendSignupCodeEmail({ to, code }: SignupArgs) {
                       </tr>
                       <tr>
                         <td style="border-top:1px solid #e5e7eb;padding:16px 30px 22px;background-color:#f4f5f7;border-bottom-left-radius:8px;border-bottom-right-radius:8px;">
-                          <div style="color:#6b7280;font-size:13px;margin-bottom:8px;">Manage Account</div>
+                          <a href="${LOGIN_URL}" style="display:inline-block;color:#6b7280;font-size:13px;margin-bottom:8px;text-decoration:underline;">Manage Account</a>
                           <div style="color:#6b7280;font-size:13px;margin-bottom:8px;">Support</div>
                           <div style="color:#6b7280;font-size:13px;margin-bottom:8px;">Privacy Policy</div>
                           <div style="color:#6b7280;font-size:13px;margin-bottom:10px;">Terms of Service</div>
@@ -352,7 +362,7 @@ export async function sendTwoFactorSetupEmail({
       from,
       to,
       subject: "Confirm two-factor authentication for your MergifyPDF account",
-      react: <TwoFactorCodeEmail code={code} />,
+      react: <TwoFactorCodeEmail code={code} manageAccountUrl={LOGIN_URL} />,
     });
 
     if (error) {
@@ -375,6 +385,9 @@ export async function sendTwoFactorSetupEmail({
             </p>
             <p style="margin-top:18px;color:#4B5563;">
               This code expires in 10 minutes. If you didn't request it, you can safely ignore this email.
+            </p>
+            <p style="margin-top:10px;">
+              <a href="${LOGIN_URL}" style="color:#4B5563;font-size:13px;text-decoration:underline;">Manage Account</a>
             </p>
           </div>
         `,
@@ -417,7 +430,7 @@ export async function sendTwoFactorLoginEmail({
       from,
       to,
       subject: "Your MergifyPDF sign-in code",
-      react: <TwoFactorSignInEmail code={code} />,
+      react: <TwoFactorSignInEmail code={code} manageAccountUrl={LOGIN_URL} />,
     });
 
     if (error) {
@@ -440,6 +453,9 @@ export async function sendTwoFactorLoginEmail({
             </p>
             <p style="margin-top:18px;color:#4B5563;">
               This code expires in 10 minutes. If you didn't try to sign in, you can safely ignore this email.
+            </p>
+            <p style="margin-top:10px;">
+              <a href="${LOGIN_URL}" style="color:#4B5563;font-size:13px;text-decoration:underline;">Manage Account</a>
             </p>
           </div>
         `,

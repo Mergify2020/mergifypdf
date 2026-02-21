@@ -4,9 +4,10 @@ import React from "react";
 
 type Props = {
   code: string;
+  manageAccountUrl: string;
 };
 
-export function EmailChangeCodeEmail({ code }: Props) {
+export function EmailChangeCodeEmail({ code, manageAccountUrl }: Props) {
   return (
     <table
       role="presentation"
@@ -64,6 +65,10 @@ export function EmailChangeCodeEmail({ code }: Props) {
                     <p style={{ margin: "0 0 16px", color: "#4b5563", fontSize: "14px" }}>
                       This code expires in 10 minutes. Don&apos;t share it with anyone.
                     </p>
+                    <p style={{ margin: "0 0 18px", color: "#374151", fontSize: "15px" }}>
+                      To protect your account, we recommend enabling two-factor authentication.
+                      This adds an additional layer of security to help prevent unauthorized access.
+                    </p>
                     <div style={{ height: 1, backgroundColor: "#e5e7eb", margin: "18px 0" }} />
                     <p style={{ margin: "0 0 6px", color: "#1f2937", fontWeight: 600 }}>
                       Didn&apos;t request this?
@@ -83,6 +88,18 @@ export function EmailChangeCodeEmail({ code }: Props) {
                       borderBottomRightRadius: "8px",
                     }}
                   >
+                    <a
+                      href={manageAccountUrl}
+                      style={{
+                        display: "inline-block",
+                        marginBottom: "8px",
+                        color: "#6b7280",
+                        fontSize: "13px",
+                        textDecoration: "underline",
+                      }}
+                    >
+                      Manage Account
+                    </a>
                     <div style={{ color: "#6b7280", fontSize: "13px", marginBottom: "8px" }}>
                       Support
                     </div>

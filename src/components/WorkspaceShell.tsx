@@ -1150,7 +1150,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
       {!hideWorkspaceSidebar ? (
       <>
       {/* Desktop sidebar */}
-      <aside className="fixed left-[var(--shell-left)] top-6 bottom-6 z-50 hidden w-[var(--shell-sidebar-width)] text-slate-800 transition-[width] duration-300 ease-in-out dark:text-zinc-100 md:flex">
+      <aside className="page-fade-in fixed left-[var(--shell-left)] top-6 bottom-6 z-50 hidden w-[var(--shell-sidebar-width)] text-slate-800 transition-[width] duration-300 ease-in-out dark:text-zinc-100 md:flex">
         <div className="relative flex h-full w-full">
           <div
             ref={sidebarRef}
@@ -1758,7 +1758,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
       {!hideWorkspaceSidebar && mobileOpen ? (
         <>
           <div className="fixed inset-0 z-40 bg-black/40 dark:bg-zinc-950/60 md:hidden" onClick={() => setMobileOpen(false)} />
-          <aside className="fixed inset-y-0 left-0 z-50 w-72 overflow-y-auto border-r border-slate-200 bg-white p-6 shadow-2xl dark:shadow-[0_22px_60px_rgba(0,0,0,0.45)] transition-transform duration-300 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 md:hidden">
+          <aside className="page-fade-in fixed inset-y-0 left-0 z-50 w-72 overflow-y-auto border-r border-slate-200 bg-white p-6 shadow-2xl dark:shadow-[0_22px_60px_rgba(0,0,0,0.45)] transition-transform duration-300 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 md:hidden">
             <div className="mb-6 flex items-center justify-end">
               <button
                 type="button"
@@ -1986,7 +1986,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
         </header>
 
         <Suspense fallback={<PageLoadingSkeleton />}>
-          <main className="page-fade-in relative z-0 flex-1 lg:z-40">
+          <main className="relative z-0 flex-1 lg:z-40">
             <div className="flex w-full justify-start pr-6">
               <div
                 className="workspace-content-shell w-full"
@@ -2252,14 +2252,14 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
           </div>
         </div>
       </HeroHeader>
-      <main className="page-fade-in relative z-0 lg:z-40">{children}</main>
+      <main className="relative z-0 lg:z-40">{children}</main>
     </div>
   );
 
   if (isStudioRoute) {
     return (
       <Suspense fallback={<PageLoadingSkeleton />}>
-        <main className="page-fade-in">{children}</main>
+        <main>{children}</main>
       </Suspense>
     );
   }

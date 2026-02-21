@@ -262,7 +262,7 @@ export async function POST(req: Request) {
     }
   }
 
-  return NextResponse.json({ success: true, email: normalized, message: "Email updated." });
+  return NextResponse.json({ success: true, email: normalized, message: "Email updated successfully." });
 }
 
 export async function GET() {

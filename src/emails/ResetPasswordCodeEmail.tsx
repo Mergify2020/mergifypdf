@@ -4,9 +4,10 @@ import React from "react";
 
 type Props = {
   code: string;
+  manageAccountUrl: string;
 };
 
-export function ResetPasswordCodeEmail({ code }: Props) {
+export function ResetPasswordCodeEmail({ code, manageAccountUrl }: Props) {
   return (
     <table
       role="presentation"
@@ -88,9 +89,18 @@ export function ResetPasswordCodeEmail({ code }: Props) {
                       borderBottomRightRadius: "8px",
                     }}
                   >
-                    <div style={{ color: "#6b7280", fontSize: "13px", marginBottom: "8px" }}>
+                    <a
+                      href={manageAccountUrl}
+                      style={{
+                        display: "inline-block",
+                        marginBottom: "8px",
+                        color: "#6b7280",
+                        fontSize: "13px",
+                        textDecoration: "underline",
+                      }}
+                    >
                       Manage Account
-                    </div>
+                    </a>
                     <div style={{ color: "#6b7280", fontSize: "13px", marginBottom: "8px" }}>
                       Support
                     </div>

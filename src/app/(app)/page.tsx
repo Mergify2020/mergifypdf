@@ -157,14 +157,13 @@ async function ProjectsDashboard({
   const shapedProjects = await prisma.project.findMany({
     where: { userId, trashedAt: null },
     orderBy: { updatedAt: "desc" },
-    take: 60,
+    take: 40,
     select: {
       id: true,
       name: true,
       updatedAt: true,
       pagesCount: true,
       previewKey: true,
-      pdfKey: true,
       data: true,
     },
   });

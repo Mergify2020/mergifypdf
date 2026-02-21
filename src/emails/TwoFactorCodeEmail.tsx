@@ -1,6 +1,6 @@
 import * as React from "react";
 
-export function TwoFactorCodeEmail({ code }: { code: string }) {
+export function TwoFactorCodeEmail({ code, manageAccountUrl }: { code: string; manageAccountUrl: string }) {
   return (
     <div
       style={{
@@ -32,7 +32,11 @@ export function TwoFactorCodeEmail({ code }: { code: string }) {
         This code expires in 10 minutes. If you didn&apos;t request it, you can safely ignore this
         email.
       </p>
+      <p style={{ marginTop: "10px" }}>
+        <a href={manageAccountUrl} style={{ color: "#4B5563", fontSize: "13px", textDecoration: "underline" }}>
+          Manage Account
+        </a>
+      </p>
     </div>
   );
 }
-

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowDown,
@@ -109,7 +109,7 @@ export default function HomeProjectsSearch({
   const heroBlockRef = useRef<HTMLDivElement | null>(null);
   const recentCardRef = useRef<HTMLDivElement | null>(null);
   const recentListRef = useRef<HTMLDivElement | null>(null);
-  const syncRecentHeightRef = useRef<(() => void) | null>(null);
+  const [recentCardHeight, setRecentCardHeight] = useState<number | null>(null);
   const [recentHasOverflow, setRecentHasOverflow] = useState(false);
   const [recentScrollbarWidth, setRecentScrollbarWidth] = useState(0);
   const [forceStableScrollbar, setForceStableScrollbar] = useState(false);
@@ -201,7 +201,7 @@ export default function HomeProjectsSearch({
     };
   }, [ownerMenuOpen]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (typeof window === "undefined") return;
     const root = document.documentElement;
     const updateOffset = () => {
@@ -211,7 +211,6 @@ export default function HomeProjectsSearch({
       const gap = 24;
       root.style.setProperty("--home-section-gap", `${gap}px`);
       root.style.setProperty("--home-right-column-offset", `${height + gap}px`);
-      syncRecentHeightRef.current?.();
     };
 
     updateOffset();
@@ -227,38 +226,37 @@ export default function HomeProjectsSearch({
     };
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (typeof window === "undefined") return;
-    const card = recentCardRef.current;
-    if (!card) return;
 
-    const updateHeight = () => {
+    const measure = () => {
+      const card = recentCardRef.current;
+      if (!card) return;
       const cardRect = card.getBoundingClientRect();
       const sidebar = document.getElementById("home-sidebar");
       const sidebarBottom = sidebar?.getBoundingClientRect().bottom;
       const viewportBottom = window.innerHeight - 24;
       const targetBottom = typeof sidebarBottom === "number" ? sidebarBottom : viewportBottom;
       const nextHeight = Math.max(0, Math.round(targetBottom - cardRect.top));
-      card.style.height = `${nextHeight}px`;
+      setRecentCardHeight((prev) => (prev === nextHeight ? prev : nextHeight));
     };
 
-    const updateWithRaf = () => {
-      window.requestAnimationFrame(updateHeight);
+    const measureWithRaf = () => {
+      window.requestAnimationFrame(measure);
     };
 
-    syncRecentHeightRef.current = updateWithRaf;
-    updateWithRaf();
-    window.addEventListener("resize", updateWithRaf);
-    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(updateWithRaf) : null;
+    measure();
+    window.addEventListener("resize", measureWithRaf);
+    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measureWithRaf) : null;
     if (observer) {
-      observer.observe(card);
+      if (heroBlockRef.current) observer.observe(heroBlockRef.current);
+      if (recentCardRef.current) observer.observe(recentCardRef.current);
       const sidebar = document.getElementById("home-sidebar");
       if (sidebar) observer.observe(sidebar);
     }
 
     return () => {
-      syncRecentHeightRef.current = null;
-      window.removeEventListener("resize", updateWithRaf);
+      window.removeEventListener("resize", measureWithRaf);
       if (observer) observer.disconnect();
     };
   }, []);
@@ -532,6 +530,10 @@ export default function HomeProjectsSearch({
         <div
           ref={recentCardRef}
           className="flex min-h-0 flex-col rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-[0_12px_36px_rgba(15,23,42,0.10)] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_12px_30px_rgba(0,0,0,0.35)] sm:p-5"
+          style={{
+            height: recentCardHeight ? `${recentCardHeight}px` : "calc(100dvh - 136px)",
+            visibility: recentCardHeight ? "visible" : "hidden",
+          }}
         >
           <div className="flex flex-wrap items-center justify-between gap-4">
             <h2 className="text-base font-semibold text-[#1F2A37] dark:text-zinc-100 sm:text-lg">

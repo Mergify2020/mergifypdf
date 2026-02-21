@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, MoveLeft, PencilLine, User, Mail, Lock, Shield, Trash2, CreditCard, Loader2 } from "lucide-react";
+import { Check, ChevronDown, MoveLeft, PencilLine, User, Mail, Lock, Shield, CreditCard, Loader2, Star, Smile, Moon, Sun } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { useEffect, useRef, useState } from "react";
@@ -8,6 +8,7 @@ import { useAvatarPreference } from "@/lib/useAvatarPreference";
 import { getAvatarFallback } from "@/lib/avatarFallback";
 import PricingPlans from "@/components/PricingPlans";
 import SettingsMenu from "@/components/SettingsMenu";
+import LoadingOverlay from "@/components/LoadingOverlay";
 
 const PREVIEW_STAGE_SIZE = 256; // matches Tailwind h-64
 const MIN_CROP_SIZE = 56;
@@ -23,6 +24,7 @@ type DisplayMeta = {
 type CropRect = { x: number; y: number; size: number };
 type Bounds = { left: number; top: number; right: number; bottom: number };
 type CropHandle = "nw" | "ne" | "sw" | "se";
+type SettingsTab = "account" | "security";
 const HANDLE_POSITIONS: Record<CropHandle, string> = {
   nw: "-top-2 -left-2",
   ne: "-top-2 -right-2",
@@ -101,7 +103,7 @@ function resizeRectByHandle(
   return clampRectToBounds(nextRect, bounds);
 }
 
-function AccountSettingsPage() {
+function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { activeSettingsTab: SettingsTab }) {
   const router = useRouter();
   const { data: session, update: updateSession } = useSession();
   const providers = session?.user?.providers ?? [];
@@ -112,9 +114,12 @@ function AccountSettingsPage() {
 
   const [email, setEmail] = useState("");
   const [newEmail, setNewEmail] = useState("");
+  const [confirmNewEmail, setConfirmNewEmail] = useState("");
   const [emailCodeDigits, setEmailCodeDigits] = useState<string[]>(Array(6).fill(""));
   const [emailStep, setEmailStep] = useState<"request" | "verify">("request");
-  const [emailBusy, setEmailBusy] = useState(false);
+  const [emailRequestBusy, setEmailRequestBusy] = useState(false);
+  const [emailVerifyBusy, setEmailVerifyBusy] = useState(false);
+  const [emailRequestSubmitAttempted, setEmailRequestSubmitAttempted] = useState(false);
   const [emailMessage, setEmailMessage] = useState<string | null>(null);
   const [emailResendCooldown, setEmailResendCooldown] = useState(0);
   const [billingPortalLoading, setBillingPortalLoading] = useState(false);
@@ -123,6 +128,8 @@ function AccountSettingsPage() {
   const [warmedBillingPortalAt, setWarmedBillingPortalAt] = useState<number>(0);
   const [firstNameValue, setFirstNameValue] = useState("");
   const [lastNameValue, setLastNameValue] = useState("");
+  const [savedFirstName, setSavedFirstName] = useState("");
+  const [savedLastName, setSavedLastName] = useState("");
   const [editingNameField, setEditingNameField] = useState<"first" | "last" | null>(null);
   const [nameBusy, setNameBusy] = useState(false);
   const [nameMessage, setNameMessage] = useState<string | null>(null);
@@ -132,6 +139,7 @@ function AccountSettingsPage() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [passwordBusy, setPasswordBusy] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
+  const [passwordSubmitAttempted, setPasswordSubmitAttempted] = useState(false);
   const accountEmail = email || session?.user?.email || null;
   const avatarKey = session?.user?.id ?? session?.user?.email ?? null;
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
@@ -169,14 +177,63 @@ function AccountSettingsPage() {
   const [disconnectPassword, setDisconnectPassword] = useState("");
   const [disconnectBusy, setDisconnectBusy] = useState(false);
   const [disconnectError, setDisconnectError] = useState<string | null>(null);
+  const [navigatingHome, setNavigatingHome] = useState(false);
+  const [activeSettingsTab, setActiveSettingsTab] = useState<SettingsTab>(initialSettingsTab);
+  const [theme, setTheme] = useState<"light" | "dark">("light");
   const showAvatarImage = Boolean(avatar) && !avatarLoadFailed;
+  const isEmailConfirmationMismatch =
+    emailStep === "request"
+    && confirmNewEmail.trim().length > 0
+    && newEmail.trim().toLowerCase() !== confirmNewEmail.trim().toLowerCase();
+
+  useEffect(() => {
+    setActiveSettingsTab(initialSettingsTab);
+  }, [initialSettingsTab]);
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem("theme");
+    const initialTheme = stored === "dark" ? "dark" : "light";
+    document.documentElement.classList.toggle("dark", initialTheme === "dark");
+    if (initialTheme === "light") {
+      document.body.classList.remove("dark");
+    }
+    setTheme(initialTheme);
+  }, []);
+
+  useEffect(() => {
+    router.prefetch("/");
+  }, [router]);
+
+  function switchSettingsTab(nextTab: SettingsTab) {
+    if (nextTab === activeSettingsTab) return;
+    setActiveSettingsTab(nextTab);
+    if (typeof window !== "undefined") {
+      const nextUrl = nextTab === "security" ? "/account?view=security" : "/account";
+      window.history.pushState(window.history.state, "", nextUrl);
+    }
+  }
 
   useEffect(() => {
     if (session?.user?.email) {
       setEmail(session.user.email);
-      setNewEmail(session.user.email);
+      setNewEmail("");
+      setConfirmNewEmail("");
     }
   }, [session?.user?.email]);
+
+  function applyTheme(nextTheme: "light" | "dark") {
+    document.documentElement.classList.add("theme-transition");
+    document.documentElement.classList.toggle("dark", nextTheme === "dark");
+    if (nextTheme === "light") {
+      document.body.classList.remove("dark");
+    }
+    window.localStorage.setItem("theme", nextTheme);
+    document.cookie = `theme=${nextTheme}; path=/; max-age=31536000`;
+    setTheme(nextTheme);
+    window.setTimeout(() => {
+      document.documentElement.classList.remove("theme-transition");
+    }, 200);
+  }
 
   useEffect(() => {
     setAvatarLoadFailed(false);
@@ -185,9 +242,32 @@ function AccountSettingsPage() {
   useEffect(() => {
     const fullName = (session?.user?.name ?? "").trim();
     const parts = fullName.split(/\s+/).filter(Boolean);
-    setFirstNameValue(parts[0] ?? "");
-    setLastNameValue(parts.length > 1 ? parts.slice(1).join(" ") : "");
+    const parsedFirstName = parts[0] ?? "";
+    const parsedLastName = parts.length > 1 ? parts.slice(1).join(" ") : "";
+    setSavedFirstName(parsedFirstName);
+    setSavedLastName(parsedLastName);
+    setFirstNameValue(parsedFirstName);
+    setLastNameValue(parsedLastName);
   }, [session?.user?.name]);
+
+  function openNameEditor(field: "first" | "last") {
+    if (editingNameField === field) return;
+    if (editingNameField === "first") {
+      setFirstNameValue(savedFirstName);
+    } else if (editingNameField === "last") {
+      setLastNameValue(savedLastName);
+    }
+    setEditingNameField(field);
+  }
+
+  function cancelNameEditor(field: "first" | "last") {
+    if (field === "first") {
+      setFirstNameValue(savedFirstName);
+    } else {
+      setLastNameValue(savedLastName);
+    }
+    setEditingNameField(null);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -218,7 +298,7 @@ function AccountSettingsPage() {
       setEmailMessage(managedByGoogle ? "Your email is handled by Google." : "Email changes are disabled for your sign-in method.");
       return;
     }
-    setEmailBusy(true);
+    setEmailRequestBusy(true);
     setEmailMessage(null);
 
     try {
@@ -232,8 +312,8 @@ function AccountSettingsPage() {
         throw new Error(data.error ?? "Unable to send verification code.");
       }
       setEmailStep("verify");
+      setEmailRequestSubmitAttempted(false);
       setEmailCodeDigits(Array(6).fill(""));
-      setEmailMessage(data.message ?? "We sent a 6-digit code to your new email.");
       setEmailResendCooldown(25);
       setTimeout(() => {
         emailCodeRefs.current[0]?.focus();
@@ -243,12 +323,22 @@ function AccountSettingsPage() {
         error instanceof Error ? error.message : "Something went wrong. Please try again."
       );
     } finally {
-      setEmailBusy(false);
+      setEmailRequestBusy(false);
     }
   }
 
   async function handleEmailRequest(event: React.FormEvent) {
     event.preventDefault();
+    setEmailMessage(null);
+    setEmailRequestSubmitAttempted(true);
+    if (!newEmail.trim() || !confirmNewEmail.trim()) {
+      setEmailMessage("Please fill in all email fields.");
+      return;
+    }
+    if (newEmail.trim().toLowerCase() !== confirmNewEmail.trim().toLowerCase()) {
+      setEmailMessage("Email addresses do not match.");
+      return;
+    }
     await requestEmailCode();
   }
 
@@ -263,7 +353,7 @@ function AccountSettingsPage() {
       setEmailMessage("Enter the 6-digit code.");
       return;
     }
-    setEmailBusy(true);
+    setEmailVerifyBusy(true);
     setEmailMessage(null);
 
     try {
@@ -281,7 +371,8 @@ function AccountSettingsPage() {
           ? data.email
           : newEmail.trim().toLowerCase();
       setEmail(updatedEmail);
-      setNewEmail(updatedEmail);
+      setNewEmail("");
+      setConfirmNewEmail("");
       setEmailCodeDigits(Array(6).fill(""));
       setEmailStep("request");
       try {
@@ -296,7 +387,7 @@ function AccountSettingsPage() {
         error instanceof Error ? error.message : "Something went wrong. Please try again."
       );
     } finally {
-      setEmailBusy(false);
+      setEmailVerifyBusy(false);
     }
   }
 
@@ -322,6 +413,16 @@ function AccountSettingsPage() {
     };
   }, [emailResendCooldown]);
 
+  useEffect(() => {
+    if (emailMessage !== "Email updated successfully.") return;
+    const timer = window.setTimeout(() => {
+      setEmailMessage((current) => (current === "Email updated successfully." ? null : current));
+    }, 6000);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [emailMessage]);
+
   async function openBillingPortal() {
     if (billingPortalLoading) return;
     try {
@@ -339,7 +440,7 @@ function AccountSettingsPage() {
       const returnUrl =
         typeof window === "undefined"
           ? undefined
-          : `${window.location.origin}/account#account-information`;
+          : `${window.location.origin}/account${activeSettingsTab === "security" ? "?view=security" : ""}`;
       const response = await fetch("/api/billing-portal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -371,7 +472,7 @@ function AccountSettingsPage() {
       const returnUrl =
         typeof window === "undefined"
           ? undefined
-          : `${window.location.origin}/account#account-information`;
+          : `${window.location.origin}/account${activeSettingsTab === "security" ? "?view=security" : ""}`;
       const response = await fetch("/api/billing-portal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -404,6 +505,8 @@ function AccountSettingsPage() {
         throw new Error(data?.error ?? "Unable to update name.");
       }
       const mergedName = [firstNameValue.trim(), lastNameValue.trim()].filter(Boolean).join(" ");
+      setSavedFirstName(firstNameValue.trim());
+      setSavedLastName(lastNameValue.trim());
       try {
         await updateSession({ name: mergedName || null });
       } catch {
@@ -616,9 +719,19 @@ function AccountSettingsPage() {
   async function handlePasswordSubmit(event: React.FormEvent) {
     event.preventDefault();
     setPasswordMessage(null);
+    setPasswordSubmitAttempted(true);
+
+    if (!currentPassword.trim() || !newPassword.trim() || !confirmPassword.trim()) {
+      setPasswordMessage("Please fill in all password fields.");
+      return;
+    }
 
     if (currentPassword.length < 8) {
       setPasswordMessage("Enter your current password.");
+      return;
+    }
+    if (newPassword.length < 8 || confirmPassword.length < 8) {
+      setPasswordMessage("New password must be at least 8 characters.");
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -641,6 +754,7 @@ function AccountSettingsPage() {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
+      setPasswordSubmitAttempted(false);
     } catch (error) {
       setPasswordMessage(
         error instanceof Error ? error.message : "Unable to update password. Please try again."
@@ -848,21 +962,22 @@ function AccountSettingsPage() {
   }
 
   return (
-    <main className="w-full bg-slate-100 px-4 py-6 sm:px-6 lg:px-8">
+    <main className="w-full bg-slate-100 px-4 py-6 text-slate-900 sm:px-6 lg:px-8 dark:bg-[#222224] dark:text-zinc-100">
       <div className="mx-auto max-w-7xl">
         <div className="mb-5 flex items-center justify-between gap-3">
           <div className="min-w-0 flex items-center gap-3">
             <button
               type="button"
               onClick={() => {
+                setNavigatingHome(true);
                 router.push("/");
               }}
-              className="inline-flex h-9 w-9 items-center justify-center text-gray-700 transition hover:text-gray-900"
+              className="inline-flex h-9 w-9 items-center justify-center text-gray-700 transition hover:text-gray-900 dark:text-zinc-100 dark:hover:text-white"
               aria-label="Back to home"
             >
               <MoveLeft className="h-6 w-6 stroke-[2.75]" aria-hidden />
             </button>
-            <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Account settings</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-zinc-100">Account settings</h1>
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-3">
             <button
@@ -870,11 +985,11 @@ function AccountSettingsPage() {
               onClick={() => {
                 router.push("/support");
               }}
-              className="whitespace-nowrap text-base font-medium text-gray-700 transition hover:text-gray-900"
+              className="whitespace-nowrap text-base font-medium text-gray-900 transition hover:text-black dark:text-zinc-100 dark:hover:text-white"
             >
               Contact us
             </button>
-            <span className="h-7 w-[1.5px] bg-gray-300" aria-hidden />
+            <span className="h-7 w-[1.5px] bg-gray-300 dark:bg-white/30" aria-hidden />
             <SettingsMenu
               trigger="custom"
               triggerLabel="Open profile menu"
@@ -900,41 +1015,68 @@ function AccountSettingsPage() {
                     )}
                   </span>
                   <span className="flex min-w-0 flex-1 flex-col leading-tight text-left">
-                    <span className="truncate text-[13px] font-semibold text-[#1F2A37]">
+                    <span className="truncate text-[13px] font-semibold text-[#1F2A37] dark:text-zinc-100">
                       {accountName}
                     </span>
                     {accountEmail ? (
-                      <span className="truncate text-[11px] font-medium text-[#64748B]">
+                      <span className="truncate text-[11px] font-medium text-[#64748B] dark:text-zinc-400">
                         {accountEmail}
                       </span>
                     ) : null}
                   </span>
-                  <ChevronDown className="h-4 w-4 shrink-0 text-[#94A3B8]" aria-hidden="true" />
+                  <ChevronDown className="h-4 w-4 shrink-0 text-[#94A3B8] dark:text-zinc-400" aria-hidden="true" />
                 </>
               }
             />
           </div>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start">
-          <aside className="self-start rounded-2xl border border-gray-200 bg-white p-4 shadow-sm lg:sticky lg:top-6">
-            <p className="px-2 text-xs font-bold uppercase tracking-[0.14em] text-gray-600">Settings</p>
+        <div className="grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start">
+          <aside className="self-start rounded-2xl border border-gray-200 bg-white p-4 shadow-sm lg:sticky lg:top-6 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_12px_30px_rgba(0,0,0,0.35)]">
+            <p className="px-2 text-xs font-bold uppercase tracking-[0.14em] text-gray-600 dark:text-zinc-400">Settings</p>
             <nav className="mt-3 space-y-1">
-              <a
-                href="#account-information"
-                className="flex items-center gap-2 rounded-xl bg-[rgba(108,71,255,0.10)] px-3 py-2.5 text-sm font-semibold text-[#5B38E6]"
+              <button
+                type="button"
+                onClick={() => {
+                  switchSettingsTab("account");
+                }}
+                className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${
+                  activeSettingsTab === "account"
+                    ? "bg-[rgba(108,71,255,0.10)] text-[#5B38E6] dark:bg-zinc-800/60 dark:text-zinc-100"
+                    : "text-gray-800 hover:bg-gray-50 hover:text-gray-900 dark:text-zinc-200 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                }`}
               >
-                <User className="h-4 w-4" aria-hidden />
-                <span>Account information</span>
-              </a>
+                <User className="h-5 w-5" aria-hidden />
+                <span>Personal details</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  switchSettingsTab("security");
+                }}
+                className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${
+                  activeSettingsTab === "security"
+                    ? "bg-[rgba(108,71,255,0.10)] text-[#5B38E6] dark:bg-zinc-800/60 dark:text-zinc-100"
+                    : "text-gray-800 hover:bg-gray-50 hover:text-gray-900 dark:text-zinc-200 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                }`}
+              >
+                <Lock
+                  className={`h-5 w-5 stroke-[2.2] ${activeSettingsTab === "security" ? "text-[#5B38E6]" : "text-gray-600 dark:text-zinc-400"}`}
+                  aria-hidden
+                />
+                <span>Security</span>
+              </button>
               <button
                 type="button"
                 onClick={() => {
                   router.push("/account?view=pricing");
                 }}
-                className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-gray-800 transition hover:bg-gray-50 hover:text-gray-900"
+                className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-gray-800 transition hover:bg-gray-50 hover:text-gray-900 dark:text-zinc-200 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
               >
-                <Mail className="h-4 w-4 text-gray-600 stroke-[2.2]" aria-hidden />
+                <span className="relative h-5 w-5 text-gray-600 dark:text-zinc-400" aria-hidden>
+                  <Star className="h-5 w-5 stroke-[2.2]" />
+                  <Smile className="absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 stroke-[2.4]" />
+                </span>
                 <span>Plan &amp; usage</span>
               </button>
               <button
@@ -949,48 +1091,38 @@ function AccountSettingsPage() {
                   void warmBillingPortal();
                 }}
                 disabled={billingPortalLoading}
-                className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-gray-800 transition hover:bg-gray-50 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-gray-800 transition hover:bg-gray-50 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-60 dark:text-zinc-200 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
               >
-                <CreditCard className="h-4 w-4 text-gray-600 stroke-[2.2]" aria-hidden />
+                <CreditCard className="h-5 w-5 text-gray-600 stroke-[2.2] dark:text-zinc-400" aria-hidden />
                 <span className="inline-flex items-center gap-1.5">
                   {billingPortalLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : null}
                   <span>{billingPortalLoading ? "Opening portal..." : "Billing portal"}</span>
                 </span>
               </button>
               {billingPortalError ? (
-                <p className="px-3 text-xs font-medium text-rose-600">{billingPortalError}</p>
+                <p className="px-3 text-xs font-medium text-rose-600 dark:text-rose-400">{billingPortalError}</p>
               ) : null}
             </nav>
           </aside>
 
-          <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-7">
-            <h2 className="text-3xl font-semibold tracking-tight text-gray-900">Personal details</h2>
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-7 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_12px_30px_rgba(0,0,0,0.35)]">
+            <h2 className="text-3xl font-semibold tracking-tight text-gray-900 dark:text-zinc-100">
+              {activeSettingsTab === "security" ? "Security" : "Personal details"}
+            </h2>
 
-          <section id="account-information" className="mt-6">
-          <div className="flex items-center gap-2">
-            <User className="h-4 w-4 text-slate-600" aria-hidden />
-            <h2 className="text-lg font-semibold">Profile</h2>
-          </div>
+          {activeSettingsTab === "account" ? (
+          <>
+          <div className="mt-6 border-t border-gray-200 dark:border-zinc-800" />
+          <section className="mt-6">
         <dl className="mt-4 grid gap-x-6 gap-y-4 md:grid-cols-2">
           <div className="min-w-0">
-            <div className="flex items-center justify-between gap-2">
-              <dt className="text-sm font-medium text-gray-700">First name</dt>
-              <button
-                type="button"
-                onClick={() => setEditingNameField("first")}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 px-2.5 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
-                aria-label="Edit first name"
-              >
-                <PencilLine className="h-3.5 w-3.5" aria-hidden />
-                <span>Edit</span>
-              </button>
-            </div>
+            <dt className="text-sm font-medium text-gray-700 dark:text-zinc-300">First name</dt>
             {editingNameField === "first" ? (
-              <div className="mt-2">
+              <div className="inline-fade-in-soft mt-2">
                 <input
                   value={firstNameValue}
                   onChange={(event) => setFirstNameValue(event.target.value)}
-                  className="w-full rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35"
+                  className="w-full rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                 />
                 <div className="mt-2 flex items-center gap-2">
                   <button
@@ -999,43 +1131,43 @@ function AccountSettingsPage() {
                       void handleNameSubmit();
                     }}
                     disabled={nameBusy}
-                    className="rounded-md bg-[#6C47FF] px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-[#5B38E6] disabled:opacity-60"
+                    className="rounded-md bg-[#6C47FF] px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-[#5B38E6] disabled:opacity-60"
                   >
                     {nameBusy ? "Saving..." : "Save"}
                   </button>
                   <button
                     type="button"
-                    onClick={() => setEditingNameField(null)}
-                    className="rounded-md px-2 py-1 text-xs font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-800"
+                    onClick={() => cancelNameEditor("first")}
+                    className="rounded-md px-2.5 py-1.5 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 hover:text-gray-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
                   >
                     Cancel
                   </button>
                 </div>
               </div>
             ) : (
-              <dd className="mt-1 text-base text-gray-900">{firstNameValue || "Not provided"}</dd>
+              <div className="mt-1 flex items-center justify-between gap-2">
+                <dd className="text-base text-gray-900 dark:text-zinc-100">{firstNameValue || "Not provided"}</dd>
+                <button
+                  type="button"
+                  onClick={() => openNameEditor("first")}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 px-2.5 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+                  aria-label="Edit first name"
+                >
+                  <PencilLine className="h-3.5 w-3.5" aria-hidden />
+                  <span>Edit</span>
+                </button>
+              </div>
             )}
           </div>
 
           <div className="min-w-0">
-            <div className="flex items-center justify-between gap-2">
-              <dt className="text-sm font-medium text-gray-700">Last name</dt>
-              <button
-                type="button"
-                onClick={() => setEditingNameField("last")}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 px-2.5 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
-                aria-label="Edit last name"
-              >
-                <PencilLine className="h-3.5 w-3.5" aria-hidden />
-                <span>Edit</span>
-              </button>
-            </div>
+            <dt className="text-sm font-medium text-gray-700 dark:text-zinc-300">Last name</dt>
             {editingNameField === "last" ? (
-              <div className="mt-2">
+              <div className="inline-fade-in-soft mt-2">
                 <input
                   value={lastNameValue}
                   onChange={(event) => setLastNameValue(event.target.value)}
-                  className="w-full rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35"
+                  className="w-full rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                 />
                 <div className="mt-2 flex items-center gap-2">
                   <button
@@ -1044,47 +1176,55 @@ function AccountSettingsPage() {
                       void handleNameSubmit();
                     }}
                     disabled={nameBusy}
-                    className="rounded-md bg-[#6C47FF] px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-[#5B38E6] disabled:opacity-60"
+                    className="rounded-md bg-[#6C47FF] px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-[#5B38E6] disabled:opacity-60"
                   >
                     {nameBusy ? "Saving..." : "Save"}
                   </button>
                   <button
                     type="button"
-                    onClick={() => setEditingNameField(null)}
-                    className="rounded-md px-2 py-1 text-xs font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-800"
+                    onClick={() => cancelNameEditor("last")}
+                    className="rounded-md px-2.5 py-1.5 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 hover:text-gray-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
                   >
                     Cancel
                   </button>
                 </div>
               </div>
             ) : (
-              <dd className="mt-1 text-base text-gray-900">{lastNameValue || "Not provided"}</dd>
+              <div className="mt-1 flex items-center justify-between gap-2">
+                <dd className="text-base text-gray-900 dark:text-zinc-100">{lastNameValue || "Not provided"}</dd>
+                <button
+                  type="button"
+                  onClick={() => openNameEditor("last")}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 px-2.5 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+                  aria-label="Edit last name"
+                >
+                  <PencilLine className="h-3.5 w-3.5" aria-hidden />
+                  <span>Edit</span>
+                </button>
+              </div>
             )}
           </div>
 
-          <div className="col-span-full border-t border-gray-200 pt-4" />
+          <div className="col-span-full border-t border-gray-200 pt-4 dark:border-zinc-800" />
 
           <div className="min-w-0">
-            <dt className="text-sm font-medium text-gray-700">Email</dt>
-            <dd className="mt-1 text-sm text-gray-800">{email || "Unknown"}</dd>
+            <dt className="text-sm font-medium text-gray-700 dark:text-zinc-300">Email</dt>
+            <dd className="mt-1 text-sm text-gray-800 dark:text-zinc-200">{email || "Unknown"}</dd>
           </div>
 
         </dl>
-        {nameMessage ? <p className="mt-2 text-sm text-gray-600">{nameMessage}</p> : null}
+        {nameMessage ? <p className="mt-2 text-sm text-gray-600 dark:text-zinc-400">{nameMessage}</p> : null}
         </section>
 
-        {canManageEmail && (
-        <section className="mt-8 border-t border-gray-200 pt-6">
+        <section className="mt-8 border-t border-gray-200 pt-6 dark:border-zinc-800">
           <div className="flex items-center gap-2">
-            <Mail className="h-4 w-4 text-slate-600" aria-hidden />
-            <h2 className="text-lg font-semibold">Change email</h2>
+            <Mail className="h-4 w-4 text-slate-600 dark:text-zinc-400" aria-hidden />
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">Change email</h2>
           </div>
+          {canManageEmail ? (
           <>
-            <p className="mt-1 text-sm text-gray-600">
-              We will send confirmations to this email address.
-            </p>
-            <form onSubmit={emailStep === "request" ? handleEmailRequest : handleEmailVerify} className="mt-4 space-y-4">
-              <label className="block text-sm font-medium text-gray-700" htmlFor="account-email">
+            <form onSubmit={emailStep === "request" ? handleEmailRequest : handleEmailVerify} noValidate className="mt-4 space-y-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-zinc-300" htmlFor="account-email">
                 New email address
               </label>
               <input
@@ -1093,12 +1233,48 @@ function AccountSettingsPage() {
                 value={newEmail}
                 onChange={(event) => setNewEmail(event.target.value)}
                 required
+                placeholder="name@example.com"
                 readOnly={emailStep === "verify"}
                 aria-readonly={emailStep === "verify"}
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 focus-visible:ring-offset-0 read-only:cursor-not-allowed read-only:bg-gray-50 read-only:text-gray-500"
+                className={`w-full rounded-md border bg-white px-3 py-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 focus-visible:ring-offset-0 read-only:cursor-not-allowed read-only:bg-gray-50 read-only:text-gray-500 dark:bg-zinc-800 dark:text-zinc-100 dark:read-only:bg-zinc-800/60 dark:read-only:text-zinc-500 ${
+                  emailStep === "request" && emailRequestSubmitAttempted && !newEmail.trim()
+                    ? "border-rose-500 dark:border-rose-500"
+                    : "border-gray-300 dark:border-zinc-700"
+                }`}
               />
+              {emailStep === "request" ? (
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-zinc-300" htmlFor="account-email-confirm">
+                    Confirm email address
+                  </label>
+                  <input
+                    id="account-email-confirm"
+                    type="email"
+                    value={confirmNewEmail}
+                    onChange={(event) => setConfirmNewEmail(event.target.value)}
+                    required
+                    placeholder="Re-enter new email address"
+                    className={`w-full rounded-md border bg-white px-3 py-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 focus-visible:ring-offset-0 dark:bg-zinc-800 dark:text-zinc-100 ${
+                      emailRequestSubmitAttempted && !confirmNewEmail.trim()
+                        ? "border-rose-500 dark:border-rose-500"
+                        : isEmailConfirmationMismatch
+                          ? "border-rose-300 dark:border-rose-500"
+                          : "border-gray-300 dark:border-zinc-700"
+                    }`}
+                  />
+                  {isEmailConfirmationMismatch ? (
+                    <p className="text-sm text-rose-600">Email addresses do not match.</p>
+                  ) : null}
+                </div>
+              ) : null}
               {emailStep === "verify" ? (
                 <div className="space-y-2">
+                  <p className="text-sm font-semibold text-gray-800 dark:text-zinc-200">
+                    Verify your identity
+                  </p>
+                  <p className="text-sm text-gray-600 dark:text-zinc-400">
+                    Enter the 6-digit code we sent to your new email to confirm this change.
+                  </p>
                   <div className="flex w-full max-w-[320px] items-center justify-between gap-2 sm:w-fit sm:max-w-none sm:gap-3">
                     {emailCodeDigits.map((digit, index) => (
                       <input
@@ -1108,7 +1284,7 @@ function AccountSettingsPage() {
                         }}
                         id={index === 0 ? "account-email-code" : undefined}
                         autoFocus={index === 0}
-                        className="h-11 w-9 rounded-lg border-2 border-slate-300 bg-white text-center text-lg text-slate-900 outline-none transition hover:border-slate-400 focus-visible:border-[#6D6AF4] focus-visible:ring-0 sm:h-12 sm:w-11"
+                        className="h-11 w-9 rounded-lg border-2 border-slate-300 bg-white text-center text-lg text-slate-900 outline-none transition hover:border-slate-400 focus-visible:border-[#6D6AF4] focus-visible:ring-0 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:border-zinc-500 sm:h-12 sm:w-11"
                         type="text"
                         inputMode="numeric"
                         maxLength={1}
@@ -1156,29 +1332,29 @@ function AccountSettingsPage() {
                   </div>
                 </div>
               ) : null}
-              {emailStep === "verify" && emailMessage ? (
-                <p className="text-sm text-gray-600">{emailMessage}</p>
+              {emailStep === "verify" && emailMessage && !emailMessage.startsWith("We sent a 6-digit code") ? (
+                <p className="text-sm text-gray-600 dark:text-zinc-400">{emailMessage}</p>
               ) : null}
               {emailStep === "verify" ? (
                 <div className="flex items-center gap-3">
                   <button
                     type="submit"
-                    disabled={emailBusy}
-                    aria-disabled={emailBusy}
+                    disabled={emailVerifyBusy}
+                    aria-disabled={emailVerifyBusy}
                     className="rounded-md bg-[#6C47FF] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#5B38E6] disabled:opacity-60"
                   >
-                    {emailBusy ? "Verifying..." : "Confirm email change"}
+                    {emailVerifyBusy ? "Verifying..." : "Confirm email change"}
                   </button>
                   <button
                     type="button"
-                    disabled={emailBusy || emailResendCooldown > 0}
+                    disabled={emailRequestBusy || emailVerifyBusy || emailResendCooldown > 0}
                     onClick={() => {
-                      if (emailBusy || emailResendCooldown > 0) return;
+                      if (emailRequestBusy || emailVerifyBusy || emailResendCooldown > 0) return;
                       void requestEmailCode();
                     }}
-                    className="rounded-md border-2 border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 transition hover:-translate-y-[1px] hover:border-slate-400 hover:shadow-sm disabled:opacity-60"
+                    className="rounded-md border-2 border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 transition hover:-translate-y-[1px] hover:border-slate-400 hover:shadow-sm disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:border-zinc-500"
                   >
-                    {emailBusy
+                    {emailRequestBusy
                       ? "Sending..."
                       : emailResendCooldown > 0
                         ? `Resend code in ${emailResendCooldown}s`
@@ -1187,13 +1363,15 @@ function AccountSettingsPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      if (emailBusy) return;
+                      if (emailRequestBusy || emailVerifyBusy) return;
                       setEmailStep("request");
-                      setNewEmail(email);
+                      setNewEmail("");
+                      setConfirmNewEmail("");
+                      setEmailRequestSubmitAttempted(false);
                       setEmailCodeDigits(Array(6).fill(""));
                       setEmailMessage(null);
                     }}
-                    className="rounded-md px-2 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 hover:text-gray-900"
+                    className="rounded-md px-2 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 hover:text-gray-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
                   >
                     Cancel
                   </button>
@@ -1201,35 +1379,127 @@ function AccountSettingsPage() {
               ) : (
                 <button
                   type="submit"
-                  disabled={emailBusy || emailResendCooldown > 0}
-                  aria-disabled={emailBusy || emailResendCooldown > 0}
+                  disabled={emailRequestBusy || emailResendCooldown > 0 || isEmailConfirmationMismatch}
+                  aria-disabled={emailRequestBusy || emailResendCooldown > 0 || isEmailConfirmationMismatch}
                   className="rounded-md bg-[#6C47FF] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#5B38E6] disabled:opacity-60"
                 >
                   {emailResendCooldown > 0
-                    ? `Send code in ${emailResendCooldown}s`
-                    : emailBusy
-                      ? "Sending..."
-                      : "Send code"}
+                    ? `Send verification code in ${emailResendCooldown}s`
+                    : emailRequestBusy
+                      ? "Sending code..."
+                      : "Send verification code"}
                 </button>
               )}
               {emailStep === "request" && emailMessage ? (
-                <p className="text-sm text-gray-600">{emailMessage}</p>
+                <p
+                  className={`text-sm ${
+                    emailMessage.toLowerCase().includes("updated")
+                      ? "text-green-700"
+                      : "text-gray-600 dark:text-zinc-400"
+                  }`}
+                >
+                  {emailMessage}
+                </p>
               ) : null}
             </form>
           </>
+          ) : (
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+              <p className="text-sm font-semibold text-amber-900 dark:text-amber-300">
+                {managedByGoogle ? "Email managed by Google" : "Email changes unavailable"}
+              </p>
+              {managedByGoogle ? (
+                <p className="mt-1 text-sm text-amber-800 dark:text-amber-200">
+                  Your email is managed by Google and can&apos;t be changed here.
+                </p>
+              ) : (
+                <p className="mt-1 text-sm text-amber-800 dark:text-amber-200">
+                  Your sign-in method manages your email address. Email changes are not available from this page.
+                </p>
+              )}
+            </div>
+          )}
         </section>
-        )}
 
-        {canChangePassword && (
-        <section className="mt-8 border-t border-gray-200 pt-6">
+        <section className="mt-8 border-t border-gray-200 pt-6 dark:border-zinc-800">
           <div className="flex items-center gap-2">
-            <Lock className="h-4 w-4 text-slate-600" aria-hidden />
-            <h2 className="text-lg font-semibold">Change password</h2>
+            <Sun className="h-4 w-4 text-slate-600 dark:text-zinc-400" aria-hidden />
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">Appearance</h2>
+          </div>
+          <p className="mt-1 text-sm text-gray-600 dark:text-zinc-400">Choose how MergifyPDF looks for your account.</p>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => applyTheme("light")}
+              aria-pressed={theme === "light"}
+              className={`group rounded-xl border p-3 text-left transition ${
+                theme === "light"
+                  ? "border-[3px] border-[#6C47FF] bg-gradient-to-b from-[#F8F5FF] to-white"
+                  : "border-[#DFE4EC] bg-white hover:border-[#c8b8ff] hover:bg-[#faf8ff]"
+              }`}
+            >
+              <div className="mb-3 h-14 rounded-lg border border-[#DFE4EC] bg-[#F6F8FC] p-2">
+                <div className="h-2 w-10 rounded-full bg-[#D6DDEA]" />
+                <div className="mt-2 h-2 w-full rounded-full bg-[#E6EBF4]" />
+                <div className="mt-1 h-2 w-2/3 rounded-full bg-[#E6EBF4]" />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
+                  <Sun className="h-4 w-4" aria-hidden />
+                  Light mode
+                </span>
+                {theme === "light" ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[#6C47FF] px-2 py-1 text-xs font-semibold text-white">
+                    <Check className="h-3.5 w-3.5" aria-hidden />
+                    Active
+                  </span>
+                ) : null}
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => applyTheme("dark")}
+              aria-pressed={theme === "dark"}
+              className={`group rounded-xl border p-3 text-left transition ${
+                theme === "dark"
+                  ? "border-[3px] border-[#8B6DFF] bg-gradient-to-b from-[rgba(139,109,255,0.22)] to-[rgba(139,109,255,0.08)]"
+                  : "border-zinc-700 bg-zinc-800 hover:border-zinc-500 hover:bg-zinc-700"
+              }`}
+            >
+              <div className="mb-3 h-14 rounded-lg border border-zinc-700 bg-zinc-900 p-2">
+                <div className="h-2 w-10 rounded-full bg-zinc-600" />
+                <div className="mt-2 h-2 w-full rounded-full bg-zinc-700" />
+                <div className="mt-1 h-2 w-2/3 rounded-full bg-zinc-700" />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="inline-flex items-center gap-2 text-sm font-semibold text-zinc-100">
+                  <Moon className="h-4 w-4" aria-hidden />
+                  Dark mode
+                </span>
+                {theme === "dark" ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[#6C47FF] px-2 py-1 text-xs font-semibold text-white">
+                    <Check className="h-3.5 w-3.5" aria-hidden />
+                    Active
+                  </span>
+                ) : null}
+              </div>
+            </button>
+          </div>
+        </section>
+
+        </>
+          ) : null}
+
+        {activeSettingsTab === "security" && canChangePassword && (
+        <section className="mt-8 border-t border-gray-200 pt-6 dark:border-zinc-800">
+          <div className="flex items-center gap-2">
+            <Lock className="h-4 w-4 text-slate-600 dark:text-zinc-400" aria-hidden />
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">Change password</h2>
           </div>
           <>
-            <form onSubmit={handlePasswordSubmit} className="mt-4 space-y-5">
+            <form onSubmit={handlePasswordSubmit} noValidate className="mt-4 space-y-5">
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700" htmlFor="account-password-current">
+                <label className="block text-sm font-medium text-gray-700 dark:text-zinc-300" htmlFor="account-password-current">
                   Enter your current password
                 </label>
                 <input
@@ -1239,13 +1509,17 @@ function AccountSettingsPage() {
                   onChange={(event) => setCurrentPassword(event.target.value)}
                   required
                   minLength={8}
-                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 focus-visible:ring-offset-0"
+                  className={`w-full rounded-md border bg-white px-3 py-2 text-gray-900 shadow-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 focus-visible:ring-offset-0 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500 ${
+                    passwordSubmitAttempted && !currentPassword.trim()
+                      ? "border-rose-500 dark:border-rose-500"
+                      : "border-gray-300 dark:border-zinc-700"
+                  }`}
                   placeholder="Enter your current password"
                 />
               </div>
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700" htmlFor="account-password-new">
+                <label className="block text-sm font-medium text-gray-700 dark:text-zinc-300" htmlFor="account-password-new">
                   New password
                 </label>
                 <input
@@ -1255,12 +1529,16 @@ function AccountSettingsPage() {
                   onChange={(event) => setNewPassword(event.target.value)}
                   required
                   minLength={8}
-                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 focus-visible:ring-offset-0"
+                  className={`w-full rounded-md border bg-white px-3 py-2 text-gray-900 shadow-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 focus-visible:ring-offset-0 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500 ${
+                    passwordSubmitAttempted && !newPassword.trim()
+                      ? "border-rose-500 dark:border-rose-500"
+                      : "border-gray-300 dark:border-zinc-700"
+                  }`}
                   placeholder="Create new password"
                 />
               </div>
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700" htmlFor="account-password-confirm">
+                <label className="block text-sm font-medium text-gray-700 dark:text-zinc-300" htmlFor="account-password-confirm">
                   Confirm new password
                 </label>
                 <input
@@ -1270,85 +1548,75 @@ function AccountSettingsPage() {
                   onChange={(event) => setConfirmPassword(event.target.value)}
                   required
                   minLength={8}
-                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 focus-visible:ring-offset-0"
+                  className={`w-full rounded-md border bg-white px-3 py-2 text-gray-900 shadow-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 focus-visible:ring-offset-0 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500 ${
+                    passwordSubmitAttempted && !confirmPassword.trim()
+                      ? "border-rose-500 dark:border-rose-500"
+                      : "border-gray-300 dark:border-zinc-700"
+                  }`}
                   placeholder="Re-enter your new password"
                 />
               </div>
               </div>
               <button
                 type="submit"
-                disabled={
-                  passwordBusy ||
-                  currentPassword.length < 8 ||
-                  newPassword.length < 8 ||
-                  confirmPassword.length < 8 ||
-                  newPassword !== confirmPassword
-                }
+                disabled={passwordBusy}
                 aria-disabled={passwordBusy}
                 className="rounded-md bg-[#6C47FF] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#5B38E6] disabled:opacity-60"
               >
                 {passwordBusy ? "Saving..." : "Save changes"}
               </button>
-              {passwordMessage && <p className="text-sm text-gray-600">{passwordMessage}</p>}
+              {passwordMessage && <p className="text-sm text-gray-600 dark:text-zinc-400">{passwordMessage}</p>}
             </form>
           </>
         </section>
         )}
 
-        <section id="security" className="mt-8 border-t border-gray-200 pt-6">
+        {activeSettingsTab === "security" ? (
+        <section className="mt-8 border-t border-gray-200 pt-6 dark:border-zinc-800">
           <div className="flex items-center gap-2">
-            <Shield className="h-4 w-4 text-slate-600" aria-hidden />
-            <h2 className="text-lg font-semibold">Security</h2>
+            <Shield className="h-4 w-4 text-slate-600 dark:text-zinc-400" aria-hidden />
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">Security</h2>
           </div>
-        <p className="mt-1 text-sm text-gray-600">Keep your MergifyPDF account secure.</p>
-        <div className="mt-4 flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-4">
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-800">Two-factor authentication</p>
-              <p className="text-xs text-gray-600">
-                Add an extra layer of protection to your account.
-              </p>
-              {twoFactorMethod && (
-                <p className="mt-1 text-xs font-medium text-green-700">
-                  2FA enabled · Email verification
-                </p>
-              )}
+          <p className="mt-1 text-sm text-gray-600 dark:text-zinc-400">Keep your MergifyPDF account secure.</p>
+          <div className="mt-4 space-y-6">
+            <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-800/60">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-800 dark:text-zinc-100">Two-factor authentication</p>
+                  <p className="text-xs text-gray-600 dark:text-zinc-400">
+                    Add an extra layer of protection to your account.
+                  </p>
+                  {twoFactorMethod && (
+                    <p className="mt-1 text-xs font-medium text-green-700 dark:text-emerald-400">
+                      2FA enabled · Email verification
+                    </p>
+                  )}
+                </div>
+                <div className="mt-2 sm:mt-0">
+                  {twoFactorMethod ? (
+                    <button
+                      type="button"
+                      onClick={openManageTwoFactor}
+                      className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-800 transition hover:bg-white dark:border-zinc-600 dark:text-zinc-100 dark:hover:bg-zinc-700"
+                    >
+                      Manage
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={openEnableTwoFactor}
+                      className="rounded-md bg-[#6C47FF] px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-[#5B38E6]"
+                    >
+                      Enable 2FA
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
-            <div className="mt-2 sm:mt-0">
-              {twoFactorMethod ? (
-                <button
-                  type="button"
-                  onClick={openManageTwoFactor}
-                  className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-800 transition hover:bg-white"
-                >
-                  Manage
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={openEnableTwoFactor}
-                  className="rounded-md bg-[#6C47FF] px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-[#5B38E6]"
-                >
-                  Enable 2FA
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-        </section>
 
-        <section id="data-privacy" className="mt-8 border-t border-gray-200 pt-6">
-          <div className="flex items-center gap-2">
-            <Trash2 className="h-4 w-4 text-slate-600" aria-hidden />
-            <h2 className="text-lg font-semibold">Data &amp; Privacy</h2>
-          </div>
-        <p className="mt-1 text-sm text-gray-600">
-          Control how your data and account are handled.
-        </p>
-        <div className="mt-4 space-y-6">
-          <div className="rounded-lg border border-gray-200 bg-white p-4">
-            <p className="text-sm font-medium text-gray-800">Delete account</p>
-            <p className="mt-1 text-xs text-gray-600">
+          <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-800/60">
+            <p className="text-sm font-medium text-gray-800 dark:text-zinc-100">Delete account</p>
+            <p className="mt-1 text-xs text-gray-600 dark:text-zinc-400">
               Permanently delete your MergifyPDF account and all associated data. This action cannot be
               undone.
             </p>
@@ -1362,22 +1630,23 @@ function AccountSettingsPage() {
           </div>
 
           {managedByGoogle && (
-            <div className="rounded-lg border border-gray-200 bg-white p-4">
-              <p className="text-sm font-medium text-gray-800">Connected account</p>
-              <p className="mt-1 text-xs text-gray-600">
+            <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-800/60">
+              <p className="text-sm font-medium text-gray-800 dark:text-zinc-100">Connected account</p>
+              <p className="mt-1 text-xs text-gray-600 dark:text-zinc-400">
                 Your MergifyPDF account is connected to Google for sign-in.
               </p>
               <button
                 type="button"
                 onClick={() => setDisconnectModalOpen(true)}
-                className="mt-3 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-800 transition hover:bg-white"
+                className="mt-3 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-800 transition hover:bg-white dark:border-zinc-600 dark:text-zinc-100 dark:hover:bg-zinc-700"
               >
                 Disconnect Google
               </button>
             </div>
           )}
-        </div>
+          </div>
         </section>
+        ) : null}
         </div>
       </div>
       </div>
@@ -1724,6 +1993,8 @@ function AccountSettingsPage() {
           </div>
         </div>
       ) : null}
+
+      <LoadingOverlay open={navigatingHome} label="Opening home…" />
     </main>
   );
 }
@@ -1731,10 +2002,11 @@ function AccountSettingsPage() {
 export default function AccountPage() {
   const searchParams = useSearchParams();
   const view = searchParams.get("view");
+  const activeSettingsTab: SettingsTab = view === "security" ? "security" : "account";
 
   if (view === "pricing") {
     return <PricingPlans />;
   }
 
-  return <AccountSettingsPage />;
+  return <AccountSettingsPage activeSettingsTab={activeSettingsTab} />;
 }
