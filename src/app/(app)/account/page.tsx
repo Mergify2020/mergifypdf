@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronDown, MoveLeft, PencilLine, User, Mail, Lock, Shield, CreditCard, Loader2, Star, Smile, Moon, Sun } from "lucide-react";
+import { ChevronDown, MoveLeft, PencilLine, User, Mail, Lock, Shield, CreditCard, Star, Smile, Sun } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { useEffect, useRef, useState } from "react";
@@ -8,6 +8,7 @@ import { useAvatarPreference } from "@/lib/useAvatarPreference";
 import { getAvatarFallback } from "@/lib/avatarFallback";
 import PricingPlans from "@/components/PricingPlans";
 import SettingsMenu from "@/components/SettingsMenu";
+import LoadingOverlay from "@/components/LoadingOverlay";
 
 const PREVIEW_STAGE_SIZE = 256; // matches Tailwind h-64
 const MIN_CROP_SIZE = 56;
@@ -201,6 +202,15 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
   useEffect(() => {
     router.prefetch("/");
   }, [router]);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      window.dispatchEvent(new Event("workspace-content-ready"));
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, []);
 
   function switchSettingsTab(nextTab: SettingsTab) {
     if (nextTab === activeSettingsTab) return;
@@ -451,7 +461,6 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
       window.location.href = data.url;
     } catch {
       setBillingPortalError("Unable to open billing portal right now.");
-    } finally {
       setBillingPortalLoading(false);
     }
   }
@@ -961,12 +970,13 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
 
   return (
     <main className="w-full bg-slate-100 px-4 py-6 text-slate-900 sm:px-6 lg:px-8 dark:bg-[#222224] dark:text-zinc-100">
-      <div className="mx-auto max-w-7xl">
+      <div className="mx-auto max-w-[1400px]">
         <div className="mb-5 flex items-center justify-between gap-3">
           <div className="min-w-0 flex items-center gap-3">
             <button
               type="button"
               onClick={() => {
+                window.dispatchEvent(new Event("workspace-loading-start"));
                 router.push("/");
               }}
               className="inline-flex h-9 w-9 items-center justify-center text-gray-700 transition hover:text-gray-900 dark:text-zinc-100 dark:hover:text-white"
@@ -990,7 +1000,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
             <SettingsMenu
               trigger="custom"
               triggerLabel="Open profile menu"
-              triggerClassName="w-[224px] min-w-[224px] max-w-[224px] overflow-hidden flex h-11 items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white py-1.5 pl-1 pr-1.5 shadow-[12px_0_36px_rgba(15,23,42,0.10)] transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/30 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-100 dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[12px_0_36px_rgba(0,0,0,0.45)] dark:hover:bg-zinc-800 dark:focus-visible:ring-offset-[#222224]"
+              triggerClassName="w-[224px] min-w-[224px] max-w-[224px] overflow-hidden flex h-11 items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white py-1.5 pl-1 pr-1.5 shadow-[12px_0_36px_rgba(15,23,42,0.10)] transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/30 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-100 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_8px_22px_rgba(0,0,0,0.28),0_24px_52px_rgba(0,0,0,0.24)] dark:hover:bg-zinc-800 dark:focus-visible:ring-offset-[#222224]"
               triggerContent={
                 <>
                   <span className="shrink-0 pointer-events-none">
@@ -1028,8 +1038,8 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
           </div>
         </div>
 
-        <div className="grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start">
-          <aside className="self-start rounded-2xl border border-gray-200 bg-white p-4 shadow-sm lg:sticky lg:top-6 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_12px_30px_rgba(0,0,0,0.35)]">
+        <div className="grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start">
+          <aside className="self-start rounded-2xl border-[1.5px] border-gray-200 bg-white p-4 shadow-sm lg:sticky lg:top-6 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_8px_22px_rgba(0,0,0,0.28),0_24px_52px_rgba(0,0,0,0.24)]">
             <p className="px-2 text-xs font-bold uppercase tracking-[0.14em] text-gray-600 dark:text-zinc-400">Settings</p>
             <nav className="mt-3 space-y-1">
               <button
@@ -1039,11 +1049,14 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                 }}
                 className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${
                   activeSettingsTab === "account"
-                    ? "bg-[rgba(108,71,255,0.10)] text-[#5B38E6] dark:bg-zinc-800/60 dark:text-zinc-100"
-                    : "text-gray-800 hover:bg-gray-50 hover:text-gray-900 dark:text-zinc-200 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                    ? "bg-[rgba(108,71,255,0.10)] text-[#5B38E6] dark:bg-zinc-800/60 dark:text-white"
+                    : "text-gray-800 hover:bg-gray-50 hover:text-gray-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
                 }`}
               >
-                <User className="h-5 w-5" aria-hidden />
+                <User
+                  className={`h-5 w-5 ${activeSettingsTab === "account" ? "text-[#5B38E6] dark:text-white" : "text-gray-600 dark:text-zinc-400"}`}
+                  aria-hidden
+                />
                 <span>Personal details</span>
               </button>
               <button
@@ -1053,12 +1066,12 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                 }}
                 className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${
                   activeSettingsTab === "security"
-                    ? "bg-[rgba(108,71,255,0.10)] text-[#5B38E6] dark:bg-zinc-800/60 dark:text-zinc-100"
-                    : "text-gray-800 hover:bg-gray-50 hover:text-gray-900 dark:text-zinc-200 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                    ? "bg-[rgba(108,71,255,0.10)] text-[#5B38E6] dark:bg-zinc-800/60 dark:text-white"
+                    : "text-gray-800 hover:bg-gray-50 hover:text-gray-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
                 }`}
               >
                 <Lock
-                  className={`h-5 w-5 stroke-[2.2] ${activeSettingsTab === "security" ? "text-[#5B38E6]" : "text-gray-600 dark:text-zinc-400"}`}
+                  className={`h-5 w-5 stroke-[2.2] ${activeSettingsTab === "security" ? "text-[#5B38E6] dark:text-white" : "text-gray-600 dark:text-zinc-400"}`}
                   aria-hidden
                 />
                 <span>Security</span>
@@ -1068,7 +1081,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                 onClick={() => {
                   router.push("/account?view=pricing");
                 }}
-                className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-gray-800 transition hover:bg-gray-50 hover:text-gray-900 dark:text-zinc-200 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-gray-800 transition hover:bg-gray-50 hover:text-gray-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
               >
                 <span className="relative h-5 w-5 text-gray-600 dark:text-zinc-400" aria-hidden>
                   <Star className="h-5 w-5 stroke-[2.2]" />
@@ -1088,13 +1101,10 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                   void warmBillingPortal();
                 }}
                 disabled={billingPortalLoading}
-                className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-gray-800 transition hover:bg-gray-50 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-60 dark:text-zinc-200 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-gray-800 transition hover:bg-gray-50 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-60 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
               >
                 <CreditCard className="h-5 w-5 text-gray-600 stroke-[2.2] dark:text-zinc-400" aria-hidden />
-                <span className="inline-flex items-center gap-1.5">
-                  {billingPortalLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : null}
-                  <span>{billingPortalLoading ? "Opening portal..." : "Billing portal"}</span>
-                </span>
+                <span>Billing portal</span>
               </button>
               {billingPortalError ? (
                 <p className="px-3 text-xs font-medium text-rose-600 dark:text-rose-400">{billingPortalError}</p>
@@ -1102,7 +1112,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
             </nav>
           </aside>
 
-          <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-7 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_12px_30px_rgba(0,0,0,0.35)]">
+          <div className="rounded-2xl border-[1.5px] border-gray-200 bg-white p-6 shadow-sm sm:p-7 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_8px_22px_rgba(0,0,0,0.28),0_24px_52px_rgba(0,0,0,0.24)]">
             <h2 className="text-3xl font-semibold tracking-tight text-gray-900 dark:text-zinc-100">
               {activeSettingsTab === "security" ? "Security" : "Personal details"}
             </h2>
@@ -1423,64 +1433,40 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
             <Sun className="h-4 w-4 text-slate-600 dark:text-zinc-400" aria-hidden />
             <h2 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">Appearance</h2>
           </div>
-          <p className="mt-1 text-sm text-gray-600 dark:text-zinc-400">Choose how MergifyPDF looks for your account.</p>
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
-            <button
-              type="button"
-              onClick={() => applyTheme("light")}
-              aria-pressed={theme === "light"}
-              className={`group rounded-xl border p-3 text-left transition ${
-                theme === "light"
-                  ? "border-[3px] border-[#6C47FF] bg-gradient-to-b from-[#F8F5FF] to-white"
-                  : "border-[#DFE4EC] bg-white hover:border-[#c8b8ff] hover:bg-[#faf8ff]"
-              }`}
-            >
-              <div className="mb-3 h-14 rounded-lg border border-[#DFE4EC] bg-[#F6F8FC] p-2">
-                <div className="h-2 w-10 rounded-full bg-[#D6DDEA]" />
-                <div className="mt-2 h-2 w-full rounded-full bg-[#E6EBF4]" />
-                <div className="mt-1 h-2 w-2/3 rounded-full bg-[#E6EBF4]" />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
-                  <Sun className="h-4 w-4" aria-hidden />
-                  Light mode
-                </span>
-                {theme === "light" ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-[#6C47FF] px-2 py-1 text-xs font-semibold text-white">
-                    <Check className="h-3.5 w-3.5" aria-hidden />
-                    Active
-                  </span>
-                ) : null}
-              </div>
-            </button>
-            <button
-              type="button"
-              onClick={() => applyTheme("dark")}
-              aria-pressed={theme === "dark"}
-              className={`group rounded-xl border p-3 text-left transition ${
-                theme === "dark"
-                  ? "border-[3px] border-[#8B6DFF] bg-gradient-to-b from-[rgba(139,109,255,0.22)] to-[rgba(139,109,255,0.08)]"
-                  : "border-zinc-700 bg-zinc-800 hover:border-zinc-500 hover:bg-zinc-700"
-              }`}
-            >
-              <div className="mb-3 h-14 rounded-lg border border-zinc-700 bg-zinc-900 p-2">
-                <div className="h-2 w-10 rounded-full bg-zinc-600" />
-                <div className="mt-2 h-2 w-full rounded-full bg-zinc-700" />
-                <div className="mt-1 h-2 w-2/3 rounded-full bg-zinc-700" />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="inline-flex items-center gap-2 text-sm font-semibold text-zinc-100">
-                  <Moon className="h-4 w-4" aria-hidden />
-                  Dark mode
-                </span>
-                {theme === "dark" ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-[#6C47FF] px-2 py-1 text-xs font-semibold text-white">
-                    <Check className="h-3.5 w-3.5" aria-hidden />
-                    Active
-                  </span>
-                ) : null}
-              </div>
-            </button>
+          <p className="mt-1 text-sm text-gray-600 dark:text-zinc-400">Choose light or dark mode.</p>
+          <div className="mt-4 max-w-xs">
+            <div className="relative inline-flex h-11 w-[150px] items-center rounded-lg border border-gray-300 bg-white p-1 dark:border-zinc-700 dark:bg-zinc-900">
+              <span
+                aria-hidden
+                className={`absolute top-1 h-[34px] w-[70px] rounded-md bg-[#6C47FF] transition-transform duration-300 ease-out ${
+                  theme === "dark" ? "translate-x-[72px]" : "translate-x-0"
+                }`}
+              />
+              <button
+                type="button"
+                onClick={() => applyTheme("light")}
+                className={`relative z-10 w-[70px] rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                  theme === "light"
+                    ? "text-white"
+                    : "text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                }`}
+                aria-pressed={theme === "light"}
+              >
+                Light
+              </button>
+              <button
+                type="button"
+                onClick={() => applyTheme("dark")}
+                className={`relative z-10 w-[70px] rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                  theme === "dark"
+                    ? "text-white"
+                    : "text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                }`}
+                aria-pressed={theme === "dark"}
+              >
+                Dark
+              </button>
+            </div>
           </div>
         </section>
 
@@ -1990,6 +1976,12 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
           </div>
         </div>
       ) : null}
+
+      <LoadingOverlay
+        open={billingPortalLoading}
+        label="Opening Billing Portal..."
+        zIndexClassName="z-[1200]"
+      />
     </main>
   );
 }

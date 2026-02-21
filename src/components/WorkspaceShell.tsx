@@ -60,6 +60,7 @@ const WORKSPACE_META_KEY = "mpdf:files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
 const STARTUP_OVERLAY_KEY = "mpdf:startup-overlay";
 const STARTUP_OVERLAY_CONTEXT_KEY = "mpdf:startup-overlay-context";
+const SIDEBAR_EXPANDED_KEY = "mpdf:sidebar-expanded";
 
 async function resetWorkspaceStorage() {
   try {
@@ -160,9 +161,17 @@ const sidebarPanels: Record<string, SidebarPanel> = {
 
 interface WorkspaceShellProps {
   children: React.ReactNode;
+  initialSidebarExpanded?: boolean;
 }
 
-export default function WorkspaceShell({ children }: WorkspaceShellProps) {
+function shouldShowBootLoader(pathname?: string | null) {
+  return pathname === "/" || pathname?.startsWith("/account") || pathname?.startsWith("/settings");
+}
+
+export default function WorkspaceShell({
+  children,
+  initialSidebarExpanded = true,
+}: WorkspaceShellProps) {
   const router = useRouter();
   const { data: session } = useSession();
   const firstName = useMemo(() => {
@@ -178,7 +187,7 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
   const [homeRecentProjects, setHomeRecentProjects] = useState<
     { id?: string; title: string; updatedAt?: number; previewUrl?: string | null; hasPreview?: boolean }[]
   >([]);
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(initialSidebarExpanded);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileMenuPosition, setProfileMenuPosition] = useState<{ left: number; bottom: number } | null>(
@@ -213,6 +222,10 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
     left: number;
   } | null>(null);
   const [createDragActive, setCreateDragActive] = useState(false);
+  const [homeBootLoading, setHomeBootLoading] = useState(() => shouldShowBootLoader(pathname));
+  const homeBootStartedAtRef = useRef(0);
+  const homeBootShownAtRef = useRef(0);
+  const homeBootVisibleRef = useRef(shouldShowBootLoader(pathname));
   const fallbackAvatar = getAvatarFallback(
     avatarKey,
     session?.user?.name ?? session?.user?.email ?? "Account"
@@ -222,6 +235,80 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
   useEffect(() => {
     setAvatarLoadFailed(false);
   }, [avatar]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage?.setItem(SIDEBAR_EXPANDED_KEY, expanded ? "1" : "0");
+      document.cookie = `mpdf_sidebar_expanded=${expanded ? "1" : "0"}; path=/; max-age=31536000; samesite=lax`;
+    } catch {
+      // ignore storage write errors
+    }
+  }, [expanded]);
+
+  useEffect(() => {
+    homeBootVisibleRef.current = homeBootLoading;
+  }, [homeBootLoading]);
+
+  useEffect(() => {
+    const handleLoadingStart = () => {
+      homeBootShownAtRef.current = performance.now();
+      setHomeBootLoading(true);
+    };
+    window.addEventListener("workspace-loading-start", handleLoadingStart);
+    return () => {
+      window.removeEventListener("workspace-loading-start", handleLoadingStart);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!shouldShowBootLoader(pathname)) {
+      setHomeBootLoading(false);
+      return;
+    }
+    homeBootStartedAtRef.current = performance.now();
+
+    let readyReceived = false;
+    const showDelayMs = 240;
+    const minVisibleMs = 450;
+    const showTimer = !homeBootVisibleRef.current
+      ? window.setTimeout(() => {
+          if (readyReceived) return;
+          homeBootShownAtRef.current = performance.now();
+          setHomeBootLoading(true);
+        }, showDelayMs)
+      : null;
+    if (homeBootVisibleRef.current && homeBootShownAtRef.current <= 0) {
+      homeBootShownAtRef.current = performance.now();
+    }
+    const safetyTimeout = window.setTimeout(() => {
+      setHomeBootLoading(false);
+    }, 8000);
+
+    const handleReady = () => {
+      readyReceived = true;
+      if (showTimer !== null) window.clearTimeout(showTimer);
+      const shownAt = homeBootShownAtRef.current;
+      if (!homeBootVisibleRef.current || shownAt <= 0) {
+        setHomeBootLoading(false);
+        window.clearTimeout(safetyTimeout);
+        return;
+      }
+      const elapsedVisible = performance.now() - shownAt;
+      const remaining = Math.max(0, minVisibleMs - elapsedVisible);
+      window.setTimeout(() => {
+        setHomeBootLoading(false);
+      }, remaining);
+      window.clearTimeout(safetyTimeout);
+    };
+
+    window.addEventListener("workspace-content-ready", handleReady);
+    return () => {
+      window.removeEventListener("workspace-content-ready", handleReady);
+      if (showTimer !== null) window.clearTimeout(showTimer);
+      window.clearTimeout(safetyTimeout);
+    };
+  }, [pathname]);
 
   const clearLogoutConfirmTimer = () => {
     if (logoutConfirmTimeoutRef.current !== null && typeof window !== "undefined") {
@@ -1156,8 +1243,8 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
             ref={sidebarRef}
             className={`flex h-full ${railWidthClass} flex-col ${
               homeSidebarLocked
-                ? "rounded-xl border border-[#E5E7EB] bg-white shadow-[0_10px_30px_rgba(0,0,0,0.08)] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_12px_30px_rgba(0,0,0,0.35)]"
-                : "rounded-xl border border-[#E5E7EB] bg-white shadow-[0_10px_30px_rgba(0,0,0,0.08)] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_12px_30px_rgba(0,0,0,0.35)]"
+                ? "rounded-xl border-[1.5px] border-[#E5E7EB] bg-white shadow-[0_10px_30px_rgba(0,0,0,0.08)] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_12px_30px_rgba(0,0,0,0.35)]"
+                : "rounded-xl border-[1.5px] border-[#E5E7EB] bg-white shadow-[0_10px_30px_rgba(0,0,0,0.08)] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_12px_30px_rgba(0,0,0,0.35)]"
             } w-full ${sidebarCompact ? "z-10" : "z-20"}`}
           >
             <div className="flex flex-1 flex-col gap-4 overflow-y-auto overflow-x-hidden px-1 py-5 lg:px-2">
@@ -2220,6 +2307,11 @@ export default function WorkspaceShell({ children }: WorkspaceShellProps) {
         : null}
 
       <LoadingOverlay open={billingPortalLoading} label="Opening billing portal…" />
+      <LoadingOverlay
+        open={homeBootLoading}
+        label="Loading..."
+        zIndexClassName="z-[1200]"
+      />
       {sidebarTooltip
         ? createPortal(
           <div

@@ -1,8 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
-
 type Props = {
   open: boolean;
   label?: string;
@@ -24,29 +21,27 @@ export default function LoadingOverlay({
   spinnerClassName,
   labelClassName,
 }: Props) {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   if (!open) return null;
-  if (variant === "fullscreen" && !mounted) return null;
+  const spinnerSizeClass = "h-10 w-10 border-4";
+  const labelSizeClass = "mt-4 text-sm font-semibold";
 
   const resolvedBackdropClassName =
-    backdropClassName ?? (variant === "fullscreen" ? "bg-slate-950/70 backdrop-blur-sm" : "bg-slate-50/85");
+    backdropClassName ??
+    (variant === "fullscreen"
+      ? "bg-white dark:bg-[#222224]"
+      : "bg-slate-50/85 dark:bg-slate-950/70");
 
   const resolvedPanelClassName =
     panelClassName ??
     (variant === "fullscreen"
-      ? "rounded-2xl border border-white/15 bg-white/10 px-8 py-6 text-white shadow-[0_22px_60px_rgba(15,23,42,0.35)]"
-      : "rounded-2xl border border-slate-200 bg-white px-8 py-6 text-slate-900 shadow-[0_22px_60px_rgba(15,23,42,0.12)]");
+      ? "bg-transparent border-0 shadow-none px-0 py-0 text-slate-900 dark:text-white"
+      : "rounded-2xl border border-slate-200 bg-white px-8 py-6 text-slate-900 shadow-[0_22px_60px_rgba(15,23,42,0.12)] dark:border-zinc-700/80 dark:bg-zinc-900 dark:text-white dark:shadow-[0_22px_60px_rgba(15,23,42,0.35)]");
 
   const resolvedSpinnerClassName =
     spinnerClassName ??
     (variant === "fullscreen"
-      ? "border-white/30 border-t-white"
-      : "border-slate-300 border-t-slate-700");
+      ? "border-zinc-400 border-t-zinc-900 dark:border-zinc-500 dark:border-t-white"
+      : "border-slate-300 border-t-slate-700 dark:border-zinc-500 dark:border-t-zinc-100");
 
   const overlay = (
     <div
@@ -59,14 +54,14 @@ export default function LoadingOverlay({
         aria-live="polite"
       >
         <div
-          className={`h-10 w-10 animate-spin rounded-full border-4 ${resolvedSpinnerClassName}`}
+          className={`${spinnerSizeClass} animate-spin rounded-full ${resolvedSpinnerClassName}`}
           aria-hidden
         />
-        <p className={`mt-4 text-sm font-semibold ${labelClassName ?? ""}`}>{label}</p>
+        <p className={`${labelSizeClass} ${labelClassName ?? ""}`}>{label}</p>
       </div>
     </div>
   );
 
   if (variant === "container") return overlay;
-  return createPortal(overlay, document.body);
+  return overlay;
 }

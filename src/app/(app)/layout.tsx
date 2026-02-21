@@ -8,18 +8,22 @@ import HeroHeader from "@/components/HeroHeader";
 import WorkspaceSettingsMenu from "@/components/WorkspaceSettingsMenu";
 import WorkspaceShell from "@/components/WorkspaceShell";
 import { getServerSessionSafe } from "@/lib/serverSession";
+import { cookies } from "next/headers";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSessionSafe();
+  const cookieStore = await cookies();
+  const sidebarExpandedCookie = cookieStore.get("mpdf_sidebar_expanded")?.value;
+  const initialSidebarExpanded = sidebarExpandedCookie === "0" ? false : true;
   const lockedByTwoFactor =
     !!session?.user?.twoFactorEnabled && session.user.twoFactorPassed !== true;
   const authedWorkspace = session?.user && !lockedByTwoFactor;
 
   return authedWorkspace ? (
-    <WorkspaceShell>{children}</WorkspaceShell>
+    <WorkspaceShell initialSidebarExpanded={initialSidebarExpanded}>{children}</WorkspaceShell>
   ) : (
     <>
       <HeroHeader>

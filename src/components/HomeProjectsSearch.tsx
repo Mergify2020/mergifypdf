@@ -226,6 +226,17 @@ export default function HomeProjectsSearch({
     };
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!recentCardHeight || recentCardHeight <= 0) return;
+    const frame = window.requestAnimationFrame(() => {
+      window.dispatchEvent(new Event("workspace-content-ready"));
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, [recentCardHeight]);
+
   useLayoutEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -435,7 +446,7 @@ export default function HomeProjectsSearch({
               <div className={`flex w-full items-center ${hideHeadline ? "gap-3" : "gap-6"}`}>
                 <div className={`flex w-full ${hideHeadline ? "max-w-xl" : "max-w-sm"}`}>
                   <div
-                    className="flex h-11 w-full cursor-text rounded-full border-2 border-[#E5E7EB] bg-transparent p-[1px] shadow-[12px_0_36px_rgba(15,23,42,0.10)] focus-within:border-[#2563EB] dark:border-zinc-700 dark:bg-zinc-900/60 dark:shadow-[12px_0_36px_rgba(0,0,0,0.45)] dark:focus-within:border-[#2563EB]"
+                    className="flex h-11 w-full cursor-text rounded-full border border-[#E5E7EB] bg-transparent p-[1px] shadow-[12px_0_36px_rgba(15,23,42,0.10)] focus-within:border-[#2563EB] dark:border-zinc-800 dark:bg-zinc-900/60 dark:shadow-[0_8px_22px_rgba(0,0,0,0.28),0_24px_52px_rgba(0,0,0,0.24)] dark:focus-within:border-[#2563EB]"
                     onMouseDown={(event) => {
                       const target = event.target;
                       if (target instanceof HTMLInputElement) return;
@@ -477,7 +488,7 @@ export default function HomeProjectsSearch({
               <button
                 type="button"
                 onClick={toggleTheme}
-                className="shrink-0 flex h-11 w-11 items-center justify-center rounded-full border border-[#E5E7EB] bg-white text-[#1F2A37] shadow-[12px_0_36px_rgba(15,23,42,0.10)] transition hover:bg-slate-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:shadow-[12px_0_36px_rgba(0,0,0,0.45)] dark:hover:bg-zinc-800"
+                className="shrink-0 flex h-11 w-11 items-center justify-center rounded-full border border-[#E5E7EB] bg-white text-[#1F2A37] shadow-[12px_0_36px_rgba(15,23,42,0.10)] transition hover:bg-slate-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:shadow-[0_8px_22px_rgba(0,0,0,0.28),0_24px_52px_rgba(0,0,0,0.24)] dark:hover:bg-zinc-800"
                 aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
                 aria-pressed={theme === "dark"}
               >
@@ -486,7 +497,7 @@ export default function HomeProjectsSearch({
               <SettingsMenu
                 trigger="custom"
                 triggerLabel="Open profile menu"
-                triggerClassName="w-full min-w-0 max-w-full overflow-hidden flex h-11 items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white py-1.5 pl-1 pr-1.5 shadow-[12px_0_36px_rgba(15,23,42,0.10)] transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F1F4F9] dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[12px_0_36px_rgba(0,0,0,0.45)] dark:hover:bg-zinc-800 dark:focus-visible:ring-offset-[#222224]"
+                triggerClassName="w-full min-w-0 max-w-full overflow-hidden flex h-11 items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white py-1.5 pl-1 pr-1.5 shadow-[12px_0_36px_rgba(15,23,42,0.10)] transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F1F4F9] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_8px_22px_rgba(0,0,0,0.28),0_24px_52px_rgba(0,0,0,0.24)] dark:hover:bg-zinc-800 dark:focus-visible:ring-offset-[#222224]"
                 triggerContent={
                   <>
                     <span className="shrink-0 pointer-events-none">
@@ -529,7 +540,7 @@ export default function HomeProjectsSearch({
       <section className="mt-6 w-full">
         <div
           ref={recentCardRef}
-          className="flex min-h-0 flex-col rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-[0_12px_36px_rgba(15,23,42,0.10)] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_12px_30px_rgba(0,0,0,0.35)] sm:p-5"
+          className="flex min-h-0 flex-col rounded-xl border-[1.5px] border-[#E5E7EB] bg-white p-4 shadow-[0_12px_36px_rgba(15,23,42,0.10)] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_8px_22px_rgba(0,0,0,0.28),0_24px_52px_rgba(0,0,0,0.24)] sm:p-5"
           style={{
             height: recentCardHeight ? `${recentCardHeight}px` : "calc(100dvh - 136px)",
             visibility: recentCardHeight ? "visible" : "hidden",
