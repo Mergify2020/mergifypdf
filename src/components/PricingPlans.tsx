@@ -69,12 +69,12 @@ export default function PricingPlans() {
     }
   > = {
     "Essential Plus": {
-      monthly: "price_1Sa3MPJCQrZL3P2hvT5zgJxa",
-      annual: "price_1Sa3NOJCQrZL3P2h4qkploLe",
+      monthly: "price_1T3SEvJCQrZL3P2hfpX6i8qx",
+      annual: "price_1T3SGJJCQrZL3P2h1rkd9yRY",
     },
     "Signature Pro": {
-      monthly: "price_1Sa3L6JCQrZL3P2hcbGBWN7P",
-      annual: "price_1Sa3OSJCQrZL3P2hqw2zxi9w",
+      monthly: "price_1T3SH0JCQrZL3P2hoyT8N2yN",
+      annual: "price_1T3SI2JCQrZL3P2hchDkvXBd",
     },
   };
 
@@ -357,7 +357,7 @@ export default function PricingPlans() {
                   >
                     {loadingPlan === tier.name ? "Redirecting..." : (
                       <span className="inline-flex items-center justify-center gap-2">
-                        {canUseTrial ? "Start 3-day trial" : "Subscribe now"}
+                        {canUseTrial ? "Start 7-day trial" : "Subscribe now"}
                         <span aria-hidden>→</span>
                       </span>
                     )}

@@ -44,6 +44,8 @@ export async function POST(req: NextRequest) {
       where: { id: userId },
       select: { stripeCustomerId: true, email: true, name: true },
     });
+    const targetEmail = (user?.email ?? email).trim().toLowerCase();
+    const targetName = user?.name ?? session?.user?.name ?? undefined;
 
     let customerId = user?.stripeCustomerId ?? null;
 
@@ -52,8 +54,8 @@ export async function POST(req: NextRequest) {
       const customer =
         existing.data[0] ??
         (await stripe.customers.create({
-          email: user?.email ?? email,
-          name: user?.name ?? session?.user?.name ?? undefined,
+          email: targetEmail,
+          name: targetName,
         }));
       customerId = customer.id;
 
@@ -62,6 +64,12 @@ export async function POST(req: NextRequest) {
         data: { stripeCustomerId: customerId },
       });
     }
+
+    // Keep identity source-of-truth in app auth profile, not Stripe portal edits.
+    await stripe.customers.update(customerId, {
+      email: targetEmail,
+      name: targetName,
+    });
 
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: customerId,

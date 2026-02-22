@@ -7,10 +7,10 @@ import { prisma } from "@/lib/prisma";
 import { randomUUID } from "crypto";
 
 const ALLOWED_PRICE_IDS = new Set([
-  "price_1Sa3MPJCQrZL3P2hvT5zgJxa",
-  "price_1Sa3NOJCQrZL3P2h4qkploLe",
-  "price_1Sa3L6JCQrZL3P2hcbGBWN7P",
-  "price_1Sa3OSJCQrZL3P2hqw2zxi9w",
+  "price_1T3SEvJCQrZL3P2hfpX6i8qx",
+  "price_1T3SGJJCQrZL3P2h1rkd9yRY",
+  "price_1T3SH0JCQrZL3P2hoyT8N2yN",
+  "price_1T3SI2JCQrZL3P2hchDkvXBd",
 ]);
 
 export async function POST(req: NextRequest) {
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
       cancel_url: cancelUrl,
       customer_email: session.user.email ?? undefined,
       allow_promotion_codes: true,
-      subscription_data: trialAllowed ? { trial_period_days: 3 } : undefined,
+      subscription_data: trialAllowed ? { trial_period_days: 7 } : undefined,
       },
       {
         idempotencyKey: `checkout-${user?.id ?? "unknown"}-${pendingCheckoutId}`,

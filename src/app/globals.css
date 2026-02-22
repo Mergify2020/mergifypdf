@@ -236,6 +236,36 @@ html.theme-transition body {
   transition: background-color 200ms ease, color 200ms ease;
 }
 
+/* Keep browser autofill from forcing light blue fields, especially in dark mode. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus {
+  -webkit-text-fill-color: #111827;
+  -webkit-box-shadow: 0 0 0px 1000px #ffffff inset;
+  box-shadow: 0 0 0px 1000px #ffffff inset;
+  transition: background-color 9999s ease-in-out 0s;
+}
+
+.dark input:-webkit-autofill,
+.dark input:-webkit-autofill:hover,
+.dark input:-webkit-autofill:focus,
+.dark textarea:-webkit-autofill,
+.dark textarea:-webkit-autofill:hover,
+.dark textarea:-webkit-autofill:focus,
+.dark select:-webkit-autofill,
+.dark select:-webkit-autofill:hover,
+.dark select:-webkit-autofill:focus {
+  -webkit-text-fill-color: #f4f4f5;
+  -webkit-box-shadow: 0 0 0px 1000px #27272a inset;
+  box-shadow: 0 0 0px 1000px #27272a inset;
+}
+
 @media (min-width: 768px) and (max-width: 1024px) {
   html:has(main[data-login-page]),
   body:has(main[data-login-page]) {

@@ -4,10 +4,23 @@ import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { isSameOrigin } from "@/lib/requestGuards";
+import { meetsPasswordPolicy, NEW_PASSWORD_REQUIREMENTS_ERROR } from "@/lib/passwordPolicy";
+import { rateLimit } from "@/lib/rateLimit";
 
 export async function POST(req: Request) {
   if (!isSameOrigin(req)) {
     return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
+  }
+  const limit = await rateLimit(req, { keyPrefix: "account-update-password", windowMs: 600_000, max: 5 });
+  if (!limit.ok) {
+    const retryAfterSeconds = Math.max(1, Math.ceil((limit.resetAt - Date.now()) / 1000));
+    const retryAfterMinutes = Math.max(1, Math.ceil(retryAfterSeconds / 60));
+    return NextResponse.json(
+      {
+        error: `Too many requests. Try again in ${retryAfterMinutes} minute${retryAfterMinutes === 1 ? "" : "s"}.`,
+      },
+      { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } }
+    );
   }
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
@@ -27,9 +40,9 @@ export async function POST(req: Request) {
   if (!currentPassword || typeof currentPassword !== "string") {
     return NextResponse.json({ error: "Current password is required." }, { status: 400 });
   }
-  if (!newPassword || typeof newPassword !== "string" || newPassword.length < 8) {
+  if (!newPassword || typeof newPassword !== "string" || !meetsPasswordPolicy(newPassword)) {
     return NextResponse.json(
-      { error: "Password must be at least 8 characters long." },
+      { error: NEW_PASSWORD_REQUIREMENTS_ERROR },
       { status: 400 }
     );
   }
@@ -41,7 +54,7 @@ export async function POST(req: Request) {
 
   const matches = await bcrypt.compare(currentPassword, user.password);
   if (!matches) {
-    return NextResponse.json({ error: "Current password is incorrect." }, { status: 400 });
+    return NextResponse.json({ error: "The current password you entered is incorrect." }, { status: 400 });
   }
 
   const sameAsCurrent = await bcrypt.compare(newPassword, user.password);

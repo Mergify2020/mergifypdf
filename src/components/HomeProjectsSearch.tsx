@@ -107,9 +107,7 @@ export default function HomeProjectsSearch({
   const ownerMenuRef = useRef<HTMLDivElement | null>(null);
   const [ownerSearch, setOwnerSearch] = useState("");
   const heroBlockRef = useRef<HTMLDivElement | null>(null);
-  const recentCardRef = useRef<HTMLDivElement | null>(null);
   const recentListRef = useRef<HTMLDivElement | null>(null);
-  const [recentCardHeight, setRecentCardHeight] = useState<number | null>(null);
   const [recentHasOverflow, setRecentHasOverflow] = useState(false);
   const [recentScrollbarWidth, setRecentScrollbarWidth] = useState(0);
   const [forceStableScrollbar, setForceStableScrollbar] = useState(false);
@@ -228,47 +226,11 @@ export default function HomeProjectsSearch({
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (!recentCardHeight || recentCardHeight <= 0) return;
     const frame = window.requestAnimationFrame(() => {
       window.dispatchEvent(new Event("workspace-content-ready"));
     });
     return () => {
       window.cancelAnimationFrame(frame);
-    };
-  }, [recentCardHeight]);
-
-  useLayoutEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const measure = () => {
-      const card = recentCardRef.current;
-      if (!card) return;
-      const cardRect = card.getBoundingClientRect();
-      const sidebar = document.getElementById("home-sidebar");
-      const sidebarBottom = sidebar?.getBoundingClientRect().bottom;
-      const viewportBottom = window.innerHeight - 24;
-      const targetBottom = typeof sidebarBottom === "number" ? sidebarBottom : viewportBottom;
-      const nextHeight = Math.max(0, Math.round(targetBottom - cardRect.top));
-      setRecentCardHeight((prev) => (prev === nextHeight ? prev : nextHeight));
-    };
-
-    const measureWithRaf = () => {
-      window.requestAnimationFrame(measure);
-    };
-
-    measure();
-    window.addEventListener("resize", measureWithRaf);
-    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measureWithRaf) : null;
-    if (observer) {
-      if (heroBlockRef.current) observer.observe(heroBlockRef.current);
-      if (recentCardRef.current) observer.observe(recentCardRef.current);
-      const sidebar = document.getElementById("home-sidebar");
-      if (sidebar) observer.observe(sidebar);
-    }
-
-    return () => {
-      window.removeEventListener("resize", measureWithRaf);
-      if (observer) observer.disconnect();
     };
   }, []);
 
@@ -539,11 +501,10 @@ export default function HomeProjectsSearch({
 
       <section className="mt-6 w-full">
         <div
-          ref={recentCardRef}
-          className="flex min-h-0 flex-col rounded-xl border-[1.5px] border-[#E5E7EB] bg-white p-4 shadow-[0_12px_36px_rgba(15,23,42,0.10)] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_8px_22px_rgba(0,0,0,0.28),0_24px_52px_rgba(0,0,0,0.24)] sm:p-5"
+          className="flex min-h-0 flex-col rounded-xl border-[1.5px] border-[#E5E7EB] bg-white p-4 transition-[height] duration-300 ease-out shadow-[0_12px_36px_rgba(15,23,42,0.10)] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_8px_22px_rgba(0,0,0,0.28),0_24px_52px_rgba(0,0,0,0.24)] sm:p-5"
           style={{
-            height: recentCardHeight ? `${recentCardHeight}px` : "calc(100dvh - 136px)",
-            visibility: recentCardHeight ? "visible" : "hidden",
+            height:
+              "calc(100dvh - 48px - var(--home-banner-offset, 0px) - var(--home-right-column-offset, 0px))",
           }}
         >
           <div className="flex flex-wrap items-center justify-between gap-4">

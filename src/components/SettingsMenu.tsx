@@ -28,6 +28,8 @@ export default function SettingsMenu({
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
+  const [hasActivePlan, setHasActivePlan] = useState<boolean | null>(null);
+  const [stripeStatus, setStripeStatus] = useState<string | null>(null);
   const avatarKey = session?.user?.id ?? session?.user?.email ?? null;
   const { avatar } = useAvatarPreference(avatarKey);
   const fallback = getAvatarFallback(
@@ -42,6 +44,40 @@ export default function SettingsMenu({
   useEffect(() => {
     setAvatarLoadFailed(false);
   }, [avatar]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadPlanStatus() {
+      if (!session?.user?.email) {
+        if (active) setHasActivePlan(false);
+        return;
+      }
+      try {
+        const response = await fetch("/api/account/trial-status");
+        if (!response.ok) {
+          if (active) {
+            setHasActivePlan(false);
+            setStripeStatus(null);
+          }
+          return;
+        }
+        const data = (await response.json()) as { hasActivePlan?: boolean; stripeStatus?: string | null };
+        if (active) {
+          setHasActivePlan(data.hasActivePlan === true);
+          setStripeStatus(typeof data.stripeStatus === "string" ? data.stripeStatus : null);
+        }
+      } catch {
+        if (active) {
+          setHasActivePlan(false);
+          setStripeStatus(null);
+        }
+      }
+    }
+    void loadPlanStatus();
+    return () => {
+      active = false;
+    };
+  }, [session?.user?.email]);
 
   useEffect(() => {
     if (!open) return;
@@ -75,6 +111,27 @@ export default function SettingsMenu({
     router.push("/pricing");
   }
 
+  async function handleBillingPortal() {
+    setOpen(false);
+    try {
+      const response = await fetch("/api/billing-portal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          returnUrl: typeof window !== "undefined" ? window.location.href : "/account",
+        }),
+      });
+      const data = await response.json().catch(() => ({} as { url?: string }));
+      if (response.ok && typeof data.url === "string" && data.url.length > 0) {
+        window.location.href = data.url;
+        return;
+      }
+    } catch {
+      // fall through to account page
+    }
+    router.push("/account?view=security");
+  }
+
   function handleAccountSettings() {
     setOpen(false);
     router.push("/account");
@@ -95,6 +152,8 @@ export default function SettingsMenu({
       setBusy(false);
     }
   }
+
+  const shouldShowUpdatePaymentCta = stripeStatus === "past_due" || stripeStatus === "unpaid";
 
   return (
     <div
@@ -178,13 +237,25 @@ export default function SettingsMenu({
             </div>
 
             <div className="border-t border-[#E6EBF2] pt-2 dark:border-zinc-700">
-              <button
-                type="button"
-                onClick={handlePricing}
-                className="mb-2 flex w-full items-center justify-center rounded-md bg-[#6C47FF] px-3 py-2.5 text-[15px] font-semibold text-white transition hover:bg-[#5B38E6] focus:outline-none focus:ring-2 focus:ring-[#6C47FF]/40 focus:ring-offset-2 focus:ring-offset-white dark:bg-[#6C47FF] dark:hover:bg-[#5B38E6] dark:focus:ring-offset-zinc-900"
-              >
-                Upgrade plan
-              </button>
+              {shouldShowUpdatePaymentCta ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleBillingPortal();
+                  }}
+                  className="mb-2 flex w-full items-center justify-center rounded-md bg-[#6C47FF] px-3 py-2.5 text-[15px] font-semibold text-white transition hover:bg-[#5B38E6] focus:outline-none focus:ring-2 focus:ring-[#6C47FF]/40 focus:ring-offset-2 focus:ring-offset-white dark:bg-[#6C47FF] dark:hover:bg-[#5B38E6] dark:focus:ring-offset-zinc-900"
+                >
+                  Update payment method
+                </button>
+              ) : hasActivePlan === false ? (
+                <button
+                  type="button"
+                  onClick={handlePricing}
+                  className="mb-2 flex w-full items-center justify-center rounded-md bg-[#6C47FF] px-3 py-2.5 text-[15px] font-semibold text-white transition hover:bg-[#5B38E6] focus:outline-none focus:ring-2 focus:ring-[#6C47FF]/40 focus:ring-offset-2 focus:ring-offset-white dark:bg-[#6C47FF] dark:hover:bg-[#5B38E6] dark:focus:ring-offset-zinc-900"
+                >
+                  Upgrade plan
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={handleAccountSettings}

@@ -10,17 +10,22 @@ export async function GET() {
       authenticated: false,
       trialUsedAt: null,
       eligibleForTrial: true,
+      hasActivePlan: false,
+      stripeStatus: null,
     });
   }
 
   const user = await prisma.user.findUnique({
     where: { email: session.user.email },
-    select: { trialUsedAt: true },
+    select: { trialUsedAt: true, stripeStatus: true },
   });
+  const hasActivePlan = user?.stripeStatus === "active" || user?.stripeStatus === "trialing";
 
   return NextResponse.json({
     authenticated: true,
     trialUsedAt: user?.trialUsedAt ?? null,
     eligibleForTrial: !user?.trialUsedAt,
+    hasActivePlan,
+    stripeStatus: user?.stripeStatus ?? null,
   });
 }

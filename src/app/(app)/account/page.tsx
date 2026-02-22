@@ -6,6 +6,11 @@ import { signOut, useSession } from "next-auth/react";
 import { useEffect, useRef, useState } from "react";
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
 import { getAvatarFallback } from "@/lib/avatarFallback";
+import {
+  meetsPasswordPolicy,
+  NEW_PASSWORD_REQUIREMENTS_ERROR,
+  NEW_PASSWORD_REQUIREMENTS_HINT,
+} from "@/lib/passwordPolicy";
 import PricingPlans from "@/components/PricingPlans";
 import SettingsMenu from "@/components/SettingsMenu";
 import LoadingOverlay from "@/components/LoadingOverlay";
@@ -184,6 +189,25 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
     emailStep === "request"
     && confirmNewEmail.trim().length > 0
     && newEmail.trim().toLowerCase() !== confirmNewEmail.trim().toLowerCase();
+  const isCurrentPasswordIncorrect =
+    Boolean(passwordMessage)
+    && /current password/i.test(passwordMessage)
+    && /incorrect/i.test(passwordMessage);
+  const isNewPasswordRequirementsError = passwordMessage === NEW_PASSWORD_REQUIREMENTS_ERROR;
+  const isPasswordRateLimited =
+    Boolean(passwordMessage) && /^too many requests/i.test(passwordMessage);
+  const isNewPasswordMismatch =
+    Boolean(passwordMessage) && /do not match/i.test(passwordMessage);
+  const currentPasswordHasError =
+    (passwordSubmitAttempted && !currentPassword.trim()) || isCurrentPasswordIncorrect;
+  const newPasswordHasError =
+    (passwordSubmitAttempted && !newPassword.trim())
+    || isNewPasswordMismatch
+    || isNewPasswordRequirementsError;
+  const confirmPasswordHasError =
+    (passwordSubmitAttempted && !confirmPassword.trim())
+    || isNewPasswordMismatch
+    || isNewPasswordRequirementsError;
 
   useEffect(() => {
     setActiveSettingsTab(initialSettingsTab);
@@ -737,12 +761,12 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
       setPasswordMessage("Enter your current password.");
       return;
     }
-    if (newPassword.length < 8 || confirmPassword.length < 8) {
-      setPasswordMessage("New password must be at least 8 characters.");
+    if (newPassword !== confirmPassword) {
+      setPasswordMessage("The new passwords you entered do not match.");
       return;
     }
-    if (newPassword !== confirmPassword) {
-      setPasswordMessage("Passwords do not match.");
+    if (!meetsPasswordPolicy(newPassword)) {
+      setPasswordMessage(NEW_PASSWORD_REQUIREMENTS_ERROR);
       return;
     }
 
@@ -1129,6 +1153,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                 <input
                   value={firstNameValue}
                   onChange={(event) => setFirstNameValue(event.target.value)}
+                  autoComplete="given-name"
                   className="w-full rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                 />
                 <div className="mt-2 flex items-center gap-2">
@@ -1174,6 +1199,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                 <input
                   value={lastNameValue}
                   onChange={(event) => setLastNameValue(event.target.value)}
+                  autoComplete="family-name"
                   className="w-full rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                 />
                 <div className="mt-2 flex items-center gap-2">
@@ -1263,9 +1289,9 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                     placeholder="Re-enter new email address"
                     className={`w-full rounded-md border bg-white px-3 py-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 focus-visible:ring-offset-0 dark:bg-zinc-800 dark:text-zinc-100 ${
                       emailRequestSubmitAttempted && !confirmNewEmail.trim()
-                        ? "border-rose-500 dark:border-rose-500"
+                        ? "border-transparent ring-2 ring-rose-600/60 dark:ring-rose-500/50"
                         : isEmailConfirmationMismatch
-                          ? "border-rose-300 dark:border-rose-500"
+                          ? "border-transparent ring-2 ring-rose-600/60 dark:ring-rose-500/50"
                           : "border-gray-300 dark:border-zinc-700"
                     }`}
                   />
@@ -1489,12 +1515,20 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                   id="account-password-current"
                   type="password"
                   value={currentPassword}
-                  onChange={(event) => setCurrentPassword(event.target.value)}
+                  onChange={(event) => {
+                    setCurrentPassword(event.target.value);
+                    if (passwordSubmitAttempted) {
+                      setPasswordSubmitAttempted(false);
+                    }
+                    if (isCurrentPasswordIncorrect) {
+                      setPasswordMessage(null);
+                    }
+                  }}
                   required
                   minLength={8}
                   className={`w-full rounded-md border bg-white px-3 py-2 text-gray-900 shadow-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 focus-visible:ring-offset-0 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500 ${
-                    passwordSubmitAttempted && !currentPassword.trim()
-                      ? "border-rose-500 dark:border-rose-500"
+                    currentPasswordHasError
+                      ? "border-transparent ring-2 ring-rose-600/60 dark:ring-rose-500/50"
                       : "border-gray-300 dark:border-zinc-700"
                   }`}
                   placeholder="Enter your current password"
@@ -1509,16 +1543,27 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                   id="account-password-new"
                   type="password"
                   value={newPassword}
-                  onChange={(event) => setNewPassword(event.target.value)}
+                  onChange={(event) => {
+                    setNewPassword(event.target.value);
+                    if (passwordSubmitAttempted) {
+                      setPasswordSubmitAttempted(false);
+                    }
+                    if (isNewPasswordMismatch || isNewPasswordRequirementsError) {
+                      setPasswordMessage(null);
+                    }
+                  }}
                   required
                   minLength={8}
                   className={`w-full rounded-md border bg-white px-3 py-2 text-gray-900 shadow-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 focus-visible:ring-offset-0 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500 ${
-                    passwordSubmitAttempted && !newPassword.trim()
-                      ? "border-rose-500 dark:border-rose-500"
-                      : "border-gray-300 dark:border-zinc-700"
+                    isNewPasswordMismatch || isNewPasswordRequirementsError
+                      ? "border-transparent ring-2 ring-rose-600/60 dark:ring-rose-500/50"
+                      : newPasswordHasError
+                        ? "border-transparent ring-2 ring-rose-600/60 dark:ring-rose-500/50"
+                        : "border-gray-300 dark:border-zinc-700"
                   }`}
                   placeholder="Create new password"
                 />
+                <p className="text-xs text-gray-500 dark:text-zinc-400">{NEW_PASSWORD_REQUIREMENTS_HINT}</p>
               </div>
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700 dark:text-zinc-300" htmlFor="account-password-confirm">
@@ -1528,13 +1573,23 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                   id="account-password-confirm"
                   type="password"
                   value={confirmPassword}
-                  onChange={(event) => setConfirmPassword(event.target.value)}
+                  onChange={(event) => {
+                    setConfirmPassword(event.target.value);
+                    if (passwordSubmitAttempted) {
+                      setPasswordSubmitAttempted(false);
+                    }
+                    if (isNewPasswordMismatch || isNewPasswordRequirementsError) {
+                      setPasswordMessage(null);
+                    }
+                  }}
                   required
                   minLength={8}
                   className={`w-full rounded-md border bg-white px-3 py-2 text-gray-900 shadow-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 focus-visible:ring-offset-0 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500 ${
-                    passwordSubmitAttempted && !confirmPassword.trim()
-                      ? "border-rose-500 dark:border-rose-500"
-                      : "border-gray-300 dark:border-zinc-700"
+                    isNewPasswordMismatch || isNewPasswordRequirementsError
+                      ? "border-transparent ring-2 ring-rose-600/60 dark:ring-rose-500/50"
+                      : confirmPasswordHasError
+                        ? "border-transparent ring-2 ring-rose-600/60 dark:ring-rose-500/50"
+                        : "border-gray-300 dark:border-zinc-700"
                   }`}
                   placeholder="Re-enter your new password"
                 />
@@ -1548,7 +1603,20 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
               >
                 {passwordBusy ? "Saving..." : "Save changes"}
               </button>
-              {passwordMessage && <p className="text-sm text-gray-600 dark:text-zinc-400">{passwordMessage}</p>}
+              {passwordMessage && (
+                <p
+                  className={`text-sm ${
+                    isCurrentPasswordIncorrect
+                    || isNewPasswordRequirementsError
+                    || isNewPasswordMismatch
+                    || isPasswordRateLimited
+                      ? "text-rose-600 dark:text-rose-400"
+                      : "text-gray-600 dark:text-zinc-400"
+                  }`}
+                >
+                  {passwordMessage}
+                </p>
+              )}
             </form>
           </>
         </section>

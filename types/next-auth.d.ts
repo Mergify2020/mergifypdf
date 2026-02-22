@@ -7,6 +7,7 @@ declare module "next-auth" {
       providers?: string[];
       id?: string;
       image?: string | null;
+      stripeStatus?: string | null;
       twoFactorEnabled?: boolean;
       twoFactorPassed?: boolean;
     };
@@ -17,6 +18,7 @@ declare module "next-auth/jwt" {
   interface JWT {
     authType?: "oauth" | "credentials";
     providers?: string[];
+    stripeStatus?: string | null;
     twoFactorEnabled?: boolean;
     twoFactorPassed?: boolean;
     twoFactorMethod?: string | null;

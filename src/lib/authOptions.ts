@@ -92,23 +92,22 @@ export const authOptions: NextAuthOptions = {
           : "credentials";
       }
 
-      if (account || user) {
-        const dbUser = await prisma.user.findUnique({
-          where: { id: userId },
-          select: { twoFactorEnabled: true, twoFactorMethod: true },
-        });
+      const dbUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { twoFactorEnabled: true, twoFactorMethod: true, stripeStatus: true },
+      });
 
-        const twoFactorEnabled = !!dbUser?.twoFactorEnabled;
-        token.twoFactorEnabled = twoFactorEnabled;
-        token.twoFactorMethod = dbUser?.twoFactorMethod ?? null;
+      const twoFactorEnabled = !!dbUser?.twoFactorEnabled;
+      token.twoFactorEnabled = twoFactorEnabled;
+      token.twoFactorMethod = dbUser?.twoFactorMethod ?? null;
+      token.stripeStatus = dbUser?.stripeStatus ?? null;
 
-        if (account) {
-          // Fresh sign-in: always reset 2FA pass flag based on whether 2FA is enabled
-          token.twoFactorPassed = !twoFactorEnabled;
-        } else if (typeof token.twoFactorPassed !== "boolean") {
-          // Default for existing tokens without this flag yet
-          token.twoFactorPassed = !twoFactorEnabled;
-        }
+      if (account) {
+        // Fresh sign-in: always reset 2FA pass flag based on whether 2FA is enabled
+        token.twoFactorPassed = !twoFactorEnabled;
+      } else if (typeof token.twoFactorPassed !== "boolean") {
+        // Default for existing tokens without this flag yet
+        token.twoFactorPassed = !twoFactorEnabled;
       }
 
       const nextEmail = profile?.email ?? user?.email ?? (token.email as string | undefined);
@@ -140,6 +139,8 @@ export const authOptions: NextAuthOptions = {
 
         session.user.twoFactorEnabled = twoFactorEnabled;
         session.user.twoFactorPassed = twoFactorPassed;
+        session.user.stripeStatus =
+          typeof token.stripeStatus === "string" ? token.stripeStatus : null;
       }
       return session;
     },

@@ -188,7 +188,10 @@ async function ProjectsDashboard({
     })(),
   }));
   return (
-    <main className="h-screen w-full bg-[#F1F4F9] py-6 dark:bg-[#222224]">
+    <main
+      className="w-full bg-[#F1F4F9] py-6 transition-[height] duration-300 ease-out dark:bg-[#222224]"
+      style={{ height: "calc(100vh - var(--home-banner-offset, 0px))" }}
+    >
       <div className="w-full">
         <div className="home-content-grid grid h-full w-full max-w-[1680px] min-h-0 gap-[24px] lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start">
           <div

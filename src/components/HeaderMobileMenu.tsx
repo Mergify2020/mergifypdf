@@ -226,7 +226,7 @@ export default function HeaderMobileMenu() {
                       Start Free Trial
                     </Link>
                     <p className="mt-1 text-center text-[11px] font-medium text-slate-500">
-                      3-day trial • Cancel anytime
+                      7-day trial • Cancel anytime
                     </p>
                   </div>
                 ) : null}

@@ -45,6 +45,7 @@ import SettingsMenu from "./SettingsMenu";
 import HeroHeader from "./HeroHeader";
 import PageLoadingSkeleton from "./PageLoadingSkeleton";
 import LoadingOverlay from "./LoadingOverlay";
+import BillingStatusBanner from "@/components/BillingStatusBanner";
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
 import { getAvatarFallback } from "@/lib/avatarFallback";
 import { useWorkspaceFilePreloader, type PendingWorkspaceFile } from "@/components/useWorkspaceFilePreloader";
@@ -205,6 +206,12 @@ export default function WorkspaceShell({
   const [createShowValidation, setCreateShowValidation] = useState(false);
   const [createRemoveConfirmId, setCreateRemoveConfirmId] = useState<string | null>(null);
   const [billingPortalLoading, setBillingPortalLoading] = useState(false);
+  const [homeStripeStatusOverride, setHomeStripeStatusOverride] = useState<string | null | undefined>(
+    undefined
+  );
+  const [homeBillingBannerDismissed, setHomeBillingBannerDismissed] = useState(false);
+  const [homeBillingBannerMounted, setHomeBillingBannerMounted] = useState(false);
+  const [homeBillingBannerVisible, setHomeBillingBannerVisible] = useState(false);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const [compactSidebar, setCompactSidebar] = useState(false);
   const [narrowSidebar, setNarrowSidebar] = useState(false);
@@ -527,6 +534,10 @@ export default function WorkspaceShell({
   const isProjectsPanel = panelKey === "projects";
   const isHomePanel = panelKey === "home";
   const isTemplatesPanel = panelKey === "templates";
+  const homeStripeStatus = homeStripeStatusOverride ?? (session?.user?.stripeStatus ?? null);
+  const homeBillingIsDelinquent = homeStripeStatus === "past_due" || homeStripeStatus === "unpaid";
+  const showHomeBillingBanner = isHomePanel && homeBillingIsDelinquent && !homeBillingBannerDismissed;
+  const renderHomeBillingBanner = homeBillingBannerMounted;
   const PanelTitleIcon: LucideIcon =
     panelKey === "home"
       ? FolderKanban
@@ -551,6 +562,72 @@ export default function WorkspaceShell({
     const timer = setTimeout(prefetch, 200);
     return () => clearTimeout(timer);
   }, [router]);
+
+  useEffect(() => {
+    if (!isHomePanel || !session?.user?.email) {
+      setHomeStripeStatusOverride(undefined);
+      return;
+    }
+    let cancelled = false;
+    async function reconcileHomeStripeStatus() {
+      try {
+        const response = await fetch("/api/account/trial-status", { cache: "no-store" });
+        if (!response.ok) {
+          if (!cancelled) setHomeStripeStatusOverride(undefined);
+          return;
+        }
+        const data = (await response.json()) as { stripeStatus?: string | null };
+        if (!cancelled) {
+          setHomeStripeStatusOverride(typeof data.stripeStatus === "string" ? data.stripeStatus : null);
+        }
+      } catch {
+        if (!cancelled) setHomeStripeStatusOverride(undefined);
+      }
+    }
+    void reconcileHomeStripeStatus();
+    return () => {
+      cancelled = true;
+    };
+  }, [isHomePanel, session?.user?.email]);
+
+  useEffect(() => {
+    // Dismiss is page-local only; banner should return on refresh while delinquent.
+    setHomeBillingBannerDismissed(false);
+  }, [homeStripeStatus, isHomePanel]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let firstFrame = 0;
+    let showTimer = 0;
+    let hideTimer = 0;
+
+    if (showHomeBillingBanner) {
+      setHomeBillingBannerMounted(true);
+      setHomeBillingBannerVisible(false);
+      // Ensure hidden state paints first, then run a noticeable entrance.
+      firstFrame = window.requestAnimationFrame(() => {
+        showTimer = window.setTimeout(() => {
+          if (!cancelled) {
+            setHomeBillingBannerVisible(true);
+          }
+        }, 2200);
+      });
+    } else {
+      setHomeBillingBannerVisible(false);
+      hideTimer = window.setTimeout(() => {
+        if (!cancelled) {
+          setHomeBillingBannerMounted(false);
+        }
+      }, 300);
+    }
+
+    return () => {
+      cancelled = true;
+      if (firstFrame) window.cancelAnimationFrame(firstFrame);
+      if (showTimer) window.clearTimeout(showTimer);
+      if (hideTimer) window.clearTimeout(hideTimer);
+    };
+  }, [showHomeBillingBanner]);
 
   useEffect(() => {
     if (hideWorkspaceSidebar) {
@@ -911,7 +988,11 @@ export default function WorkspaceShell({
     }
   }, [isAccountRoute]);
 
-  const openBillingPortal = async () => {
+  const dismissHomeBillingBanner = () => {
+    setHomeBillingBannerDismissed(true);
+  };
+
+  const openBillingPortal = async ({ collapseSidebarAfter = true }: { collapseSidebarAfter?: boolean } = {}) => {
     try {
       setBillingPortalLoading(true);
       const returnUrl = typeof window === "undefined" ? undefined : window.location.href;
@@ -940,7 +1021,9 @@ export default function WorkspaceShell({
       console.error("Unexpected error loading billing portal");
     } finally {
       setProfileOpen(false);
-      setExpanded(false);
+      if (collapseSidebarAfter) {
+        setExpanded(false);
+      }
     }
   };
 
@@ -1227,21 +1310,43 @@ export default function WorkspaceShell({
 
   const workspaceShell = (
     <>
+    {isHomePanel ? <div aria-hidden className="fixed inset-0 z-0 bg-[#F1F4F9] dark:bg-[#222224]" /> : null}
     <div
-      className={`relative flex min-h-screen ${isHomePanel ? "bg-[#F1F4F9]" : "bg-slate-100"} ${sidebarCompact ? "sidebar-collapsed" : ""} ${expanded ? "" : "sidebar-minimized"} dark:bg-[#222224]`}
+      className={`relative z-10 flex pt-0 transition-[padding-top,min-height] duration-300 ease-out md:pt-[var(--home-banner-offset)] ${isHomePanel ? "bg-[#F1F4F9]" : "bg-slate-100"} ${sidebarCompact ? "sidebar-collapsed" : ""} ${expanded ? "" : "sidebar-minimized"} dark:bg-[#222224]`}
       style={
         {
+          minHeight: "calc(100vh - var(--home-banner-offset))",
           "--shell-content-width": expanded ? "1680px" : "1960px",
           "--shell-left":
             "max(24px, calc((100vw - (var(--shell-content-width) + var(--shell-sidebar-width) + 24px)) / 2))",
           "--shell-sidebar-width": expanded ? "256px" : "80px",
+          "--home-banner-offset": homeBillingBannerVisible ? "56px" : "0px",
         } as React.CSSProperties
       }
     >
+      {renderHomeBillingBanner ? (
+        <div className="pointer-events-none absolute left-0 right-0 top-0 z-[70] hidden md:block">
+          <div
+            className={`pointer-events-auto transition-all duration-300 ease-out ${
+              homeBillingBannerVisible ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0"
+            }`}
+          >
+            <BillingStatusBanner
+              onUpdatePaymentMethod={() => {
+                void openBillingPortal({ collapseSidebarAfter: false });
+              }}
+              onDismiss={dismissHomeBillingBanner}
+            />
+          </div>
+        </div>
+      ) : null}
       {!hideWorkspaceSidebar ? (
       <>
       {/* Desktop sidebar */}
-      <aside className="page-fade-in absolute left-[var(--shell-left)] top-6 z-50 hidden h-[calc(100vh-48px)] w-[var(--shell-sidebar-width)] text-slate-800 transition-[width] duration-300 ease-in-out dark:text-zinc-100 md:flex">
+      <aside
+        id={isHomePanel ? "home-sidebar" : undefined}
+        className="page-fade-in absolute left-[var(--shell-left)] top-[calc(24px+var(--home-banner-offset))] z-50 hidden h-[calc(100vh-48px-var(--home-banner-offset))] w-[var(--shell-sidebar-width)] text-slate-800 transition-[width,top,height] duration-300 ease-out dark:text-zinc-100 md:flex"
+      >
         <div className="relative flex h-full w-full">
           <div
             ref={sidebarRef}
@@ -2053,7 +2158,7 @@ export default function WorkspaceShell({
       ) : null}
 
       <div
-        className={`flex min-h-screen w-full flex-col bg-transparent transition-all duration-300 ease-in-out ${contentOffsetClass}`}
+        className={`flex min-h-0 w-full flex-1 flex-col bg-transparent transition-all duration-300 ease-in-out ${contentOffsetClass}`}
       >
         <header className="sticky top-0 z-20 w-full border-b border-slate-200 bg-white/90 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/90 md:hidden">
           <div className="mx-auto flex h-[76px] w-full max-w-7xl items-center justify-between px-3 lg:px-6">

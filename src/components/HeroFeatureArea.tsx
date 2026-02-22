@@ -162,7 +162,7 @@ export default function HeroFeatureArea() {
                   />
                 </svg>
               </div>
-              <p className="text-sm font-semibold text-slate-900">Free 3-Day Trial</p>
+              <p className="text-sm font-semibold text-slate-900">Free 7-Day Trial</p>
               <p className="mt-2 text-sm leading-relaxed text-slate-500">
                 Try every feature risk-free. No commitment.
               </p>
