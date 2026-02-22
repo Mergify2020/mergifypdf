@@ -185,19 +185,20 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
   const [activeSettingsTab, setActiveSettingsTab] = useState<SettingsTab>(initialSettingsTab);
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const showAvatarImage = Boolean(avatar) && !avatarLoadFailed;
+  const passwordMessageText = passwordMessage ?? "";
   const isEmailConfirmationMismatch =
     emailStep === "request"
     && confirmNewEmail.trim().length > 0
     && newEmail.trim().toLowerCase() !== confirmNewEmail.trim().toLowerCase();
   const isCurrentPasswordIncorrect =
     Boolean(passwordMessage)
-    && /current password/i.test(passwordMessage)
-    && /incorrect/i.test(passwordMessage);
+    && /current password/i.test(passwordMessageText)
+    && /incorrect/i.test(passwordMessageText);
   const isNewPasswordRequirementsError = passwordMessage === NEW_PASSWORD_REQUIREMENTS_ERROR;
   const isPasswordRateLimited =
-    Boolean(passwordMessage) && /^too many requests/i.test(passwordMessage);
+    Boolean(passwordMessage) && /^too many requests/i.test(passwordMessageText);
   const isNewPasswordMismatch =
-    Boolean(passwordMessage) && /do not match/i.test(passwordMessage);
+    Boolean(passwordMessage) && /do not match/i.test(passwordMessageText);
   const currentPasswordHasError =
     (passwordSubmitAttempted && !currentPassword.trim()) || isCurrentPasswordIncorrect;
   const newPasswordHasError =
