@@ -15,7 +15,7 @@
   --color-border-subtle: #e1e5f0;
   --color-text-main: #0f172a;
   --color-text-muted: #6b7280;
-  --scrollbar-track: #ffffff;
+  --scrollbar-track: #f1f5f9;
   --scrollbar-thumb: #cbd5e1;
   --scrollbar-thumb-hover: #94a3b8;
 }
@@ -207,7 +207,7 @@ body {
 
 html {
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
-  scrollbar-gutter: stable;
+  background-color: var(--background);
 }
 
 ::-webkit-scrollbar {
@@ -218,6 +218,11 @@ html {
 ::-webkit-scrollbar-track {
   background: var(--scrollbar-track);
   transition: background-color 320ms ease;
+}
+
+html::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
 }
 
 ::-webkit-scrollbar-thumb {
@@ -366,15 +371,7 @@ html.theme-transition .no-theme-transition * {
 }
 
 html.theme-transition {
-  scrollbar-color: var(--scrollbar-thumb) transparent;
-}
-
-html.theme-transition ::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-html.theme-transition ::-webkit-scrollbar-thumb {
-  border-color: transparent;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
 header[data-hero="true"] .hero-nav {
@@ -886,6 +883,36 @@ html.theme-scroll-reveal:not(.dark) ::-webkit-scrollbar-thumb {
 .sidebar-collapsed .workspace-content-shell {
   max-width: 1960px;
 }
+
+.workspace-content-swap-out {
+  opacity: 0.93;
+  transition: opacity 70ms ease-out;
+}
+
+.workspace-content-swap-in {
+  animation: workspace-content-swap-in 120ms ease-out;
+}
+
+@keyframes workspace-content-swap-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-content-swap-out {
+    opacity: 1;
+    transition: none;
+  }
+
+  .workspace-content-swap-in {
+    animation: none;
+  }
+}
+
 header[data-hero="true"] .app-brand-dark {
   filter: drop-shadow(0 1px 2px rgba(15, 23, 42, 0.6));
 }

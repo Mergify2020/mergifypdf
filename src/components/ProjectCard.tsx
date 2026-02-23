@@ -54,6 +54,7 @@ export default function ProjectCard({
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const cardRef = useRef<HTMLDivElement | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(Boolean(project.hasPreview));
   const previewRefreshInFlight = useRef(false);
   const lastFailedPreviewRef = useRef<string | null>(null);
   const [renaming, setRenaming] = useState(false);
@@ -94,8 +95,10 @@ export default function ProjectCard({
   useEffect(() => {
     if (!project.hasPreview) {
       setPreviewUrl(null);
+      setPreviewLoading(false);
       return;
     }
+    setPreviewLoading(true);
     let cancelled = false;
     const controller = new AbortController();
     const load = async () => {
@@ -105,6 +108,7 @@ export default function ProjectCard({
         lastFailedPreviewRef.current = null;
         setPreviewUrl(url);
       } catch {
+        if (!cancelled) setPreviewLoading(false);
         // fail silently
       }
     };
@@ -117,6 +121,7 @@ export default function ProjectCard({
 
   const refreshPreviewUrl = async () => {
     if (!project.hasPreview || previewRefreshInFlight.current) return;
+    setPreviewLoading(true);
     previewRefreshInFlight.current = true;
     try {
       const url = await fetchPreviewUrl();
@@ -124,6 +129,7 @@ export default function ProjectCard({
       setPreviewUrl(url);
     } catch {
       setPreviewUrl(null);
+      setPreviewLoading(false);
     } finally {
       previewRefreshInFlight.current = false;
     }
@@ -486,8 +492,14 @@ export default function ProjectCard({
               <img
                 src={previewUrl}
                 alt=""
-                className="max-h-full max-w-full object-contain"
+                className={`max-h-full max-w-full object-contain transition-opacity duration-200 ${
+                  previewLoading ? "opacity-0" : "opacity-100"
+                }`}
+                onLoad={() => {
+                  setPreviewLoading(false);
+                }}
                 onError={() => {
+                  setPreviewLoading(false);
                   if (previewUrl && lastFailedPreviewRef.current !== previewUrl) {
                     lastFailedPreviewRef.current = previewUrl;
                     void refreshPreviewUrl();
@@ -497,32 +509,39 @@ export default function ProjectCard({
                 }}
               />
             ) : (
-              <div className="flex h-full w-full items-center justify-center text-slate-300 dark:text-zinc-600">
-                <svg viewBox="0 0 64 64" className="h-10 w-10" aria-hidden="true">
-                  <path
-                    d="M18 8h20l10 10v34a4 4 0 0 1-4 4H18a4 4 0 0 1-4-4V12a4 4 0 0 1 4-4z"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="3"
-                  />
-                  <path
-                    d="M38 8v10h10"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="3"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M24 34h16M24 42h16"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </div>
+              !previewLoading ? (
+                <div className="flex h-full w-full items-center justify-center text-slate-300 dark:text-zinc-600">
+                  <svg viewBox="0 0 64 64" className="h-10 w-10" aria-hidden="true">
+                    <path
+                      d="M18 8h20l10 10v34a4 4 0 0 1-4 4H18a4 4 0 0 1-4-4V12a4 4 0 0 1 4-4z"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                    />
+                    <path
+                      d="M38 8v10h10"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M24 34h16M24 42h16"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </div>
+              ) : null
             )}
           </div>
+          {previewLoading ? (
+            <span className="pointer-events-none absolute inset-0 z-[6] overflow-hidden rounded-[10px] bg-slate-200/70 dark:bg-zinc-700/50">
+              <span className="absolute inset-0 skeleton-shimmer opacity-90" />
+            </span>
+          ) : null}
           {showResumeBadge && !isDeleting ? (
             <Link
               href={`/studio?project=${encodeURIComponent(project.id)}`}

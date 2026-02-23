@@ -4,6 +4,7 @@ import GoogleProvider from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { ensureStripeCustomerForUser } from "@/lib/stripeCustomers";
 
 type AuthType = "oauth" | "credentials";
 export const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
@@ -143,6 +144,21 @@ export const authOptions: NextAuthOptions = {
           typeof token.stripeStatus === "string" ? token.stripeStatus : null;
       }
       return session;
+    },
+  },
+
+  events: {
+    async createUser({ user }) {
+      if (!user.id || !user.email) return;
+      try {
+        await ensureStripeCustomerForUser({
+          userId: user.id,
+          email: user.email,
+          name: user.name ?? null,
+        });
+      } catch (error) {
+        console.error("[auth.createUser] Failed to initialize Stripe customer", error);
+      }
     },
   },
 

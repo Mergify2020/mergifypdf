@@ -5,6 +5,7 @@ import { getStripe } from "@/lib/stripe";
 import { isSameOrigin } from "@/lib/requestGuards";
 import { prisma } from "@/lib/prisma";
 import { randomUUID } from "crypto";
+import { captureServerEvent } from "@/lib/posthogServer";
 import {
   ALLOWED_PRICE_IDS,
   getPlanTierFromPriceId,
@@ -132,6 +133,19 @@ export async function POST(req: NextRequest) {
     if (!checkoutSession.url) {
       return NextResponse.json({ error: "No checkout URL returned from Stripe" }, { status: 500 });
     }
+
+    await captureServerEvent({
+      distinctId: user.id,
+      event: "checkout_session_created",
+      properties: {
+        source: "api.billing.checkout",
+        planTier: selectedPlanTier,
+        priceId,
+        stripeCustomerId: customerId,
+        stripeCheckoutSessionId: checkoutSession.id,
+        trialAllowed,
+      },
+    });
 
     return NextResponse.json({ url: checkoutSession.url });
   } catch (error) {

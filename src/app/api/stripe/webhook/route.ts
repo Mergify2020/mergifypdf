@@ -3,6 +3,7 @@ import { getStripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
 import type Stripe from "stripe";
 import { getPlanTierFromPriceId } from "@/lib/billingPlans";
+import { captureServerEvent } from "@/lib/posthogServer";
 
 function normalizeAppUserId(candidate: unknown): string | null {
   if (typeof candidate !== "string") return null;
@@ -79,6 +80,20 @@ export async function POST(req: NextRequest) {
                   pendingCheckoutCreatedAt: null,
                 },
               });
+
+              await captureServerEvent({
+                distinctId: matchedUser.id,
+                event: "subscription_checkout_completed",
+                properties: {
+                  source: "api.stripe.webhook",
+                  stripeEventType: event.type,
+                  stripeCustomerId: customerId,
+                  stripeSubscriptionId: subscriptionId,
+                  stripePriceId: priceId,
+                  subscriptionStatus: status,
+                  planTier: getPlanTierFromPriceId(priceId) ?? "unknown",
+                },
+              });
             }
           }
         }
@@ -123,6 +138,24 @@ export async function POST(req: NextRequest) {
             },
           });
 
+          await captureServerEvent({
+            distinctId: matchedUser.id,
+            event: event.type === "customer.subscription.deleted"
+              ? "subscription_canceled"
+              : "subscription_status_changed",
+            properties: {
+              source: "api.stripe.webhook",
+              stripeEventType: event.type,
+              stripeCustomerId: customerId,
+              stripeSubscriptionId: subscriptionId,
+              stripePriceId: priceId,
+              subscriptionStatus: status,
+              planTier: getPlanTierFromPriceId(priceId) ?? "unknown",
+              trialStart: subscription.trial_start ?? null,
+              trialEnd: subscription.trial_end ?? null,
+            },
+          });
+
           const trialStart = subscription.trial_start ?? null;
           const trialEnd = subscription.trial_end ?? null;
           const isTrial = status === "trialing" || !!trialEnd;
@@ -155,6 +188,44 @@ export async function POST(req: NextRequest) {
               });
             }
           }
+        }
+        break;
+      case "invoice.paid":
+      case "invoice.payment_failed":
+        {
+          const invoice = event.data.object as Stripe.Invoice;
+          const customerId = typeof invoice.customer === "string" ? invoice.customer : null;
+          const invoiceSubscription = (invoice as { subscription?: unknown }).subscription;
+          const subscriptionId = typeof invoiceSubscription === "string"
+            ? invoiceSubscription
+            : null;
+          const matchedUser = await prisma.user.findFirst({
+            where: {
+              OR: [
+                ...(subscriptionId ? [{ stripeSubscriptionId: subscriptionId }] : []),
+                ...(customerId ? [{ stripeCustomerId: customerId }] : []),
+              ],
+            },
+            select: { id: true, stripePriceId: true, stripeStatus: true },
+          });
+          if (!matchedUser) break;
+
+          await captureServerEvent({
+            distinctId: matchedUser.id,
+            event: event.type === "invoice.paid" ? "invoice_paid" : "invoice_payment_failed",
+            properties: {
+              source: "api.stripe.webhook",
+              stripeEventType: event.type,
+              stripeCustomerId: customerId,
+              stripeSubscriptionId: subscriptionId,
+              stripePriceId: matchedUser.stripePriceId ?? null,
+              subscriptionStatus: matchedUser.stripeStatus ?? null,
+              amountDue: typeof invoice.amount_due === "number" ? invoice.amount_due : null,
+              amountPaid: typeof invoice.amount_paid === "number" ? invoice.amount_paid : null,
+              currency: invoice.currency ?? null,
+              planTier: getPlanTierFromPriceId(matchedUser.stripePriceId) ?? "unknown",
+            },
+          });
         }
         break;
       default:

@@ -174,9 +174,11 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
   const [pricingBillingPeriod, setPricingBillingPeriod] = useState<"monthly" | "annual">("monthly");
   const [pricingCheckoutLoading, setPricingCheckoutLoading] = useState<string | null>(null);
   const [pricingMessage, setPricingMessage] = useState<string | null>(null);
+  const [billingIdMessage, setBillingIdMessage] = useState<string | null>(null);
   const [pricingTrialStatus, setPricingTrialStatus] = useState<{
     eligibleForTrial: boolean;
     stripeStatus: string | null;
+    stripeCustomerId?: string | null;
     eligibleForTrialByPlan?: {
       essentialPlus?: boolean;
       signaturePro?: boolean;
@@ -346,6 +348,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
         const data = (await res.json()) as {
           eligibleForTrial?: boolean;
           stripeStatus?: string | null;
+          stripeCustomerId?: string | null;
           eligibleForTrialByPlan?: {
             essentialPlus?: boolean;
             signaturePro?: boolean;
@@ -355,6 +358,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
         setPricingTrialStatus({
           eligibleForTrial: data.eligibleForTrial !== false,
           stripeStatus: typeof data.stripeStatus === "string" ? data.stripeStatus : null,
+          stripeCustomerId: typeof data.stripeCustomerId === "string" ? data.stripeCustomerId : null,
           eligibleForTrialByPlan: data.eligibleForTrialByPlan,
         });
       } catch {
@@ -366,6 +370,17 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
       cancelled = true;
     };
   }, [activeSettingsTab]);
+
+  function handleCopyBillingId() {
+    const billingId = pricingTrialStatus?.stripeCustomerId;
+    if (!billingId) return;
+    if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) return;
+    void navigator.clipboard.writeText(billingId);
+    setBillingIdMessage("Billing ID copied.");
+    window.setTimeout(() => {
+      setBillingIdMessage((current) => (current === "Billing ID copied." ? null : current));
+    }, 1500);
+  }
 
   useEffect(() => {
     const handlePageShow = () => {
@@ -1961,7 +1976,27 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
               <p>Billing cycle: <span className="font-semibold">{pricingBillingPeriod === "monthly" ? "Monthly" : "Annual"}</span></p>
               <p>Trial eligibility: <span className="font-semibold">{pricingCanUseTrial ? "Available" : "Used"}</span></p>
               <p>Billing details: <span className="font-semibold">Managed in Stripe portal</span></p>
+              <p className="sm:col-span-2">
+                Billing ID:{" "}
+                <span className="font-mono font-semibold">
+                  {pricingTrialStatus?.stripeCustomerId ?? "Not available"}
+                </span>
+                {pricingTrialStatus?.stripeCustomerId ? (
+                  <button
+                    type="button"
+                    onClick={handleCopyBillingId}
+                    className="ml-2 rounded border border-gray-300 px-2 py-0.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-100 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                  >
+                    Copy
+                  </button>
+                ) : null}
+              </p>
             </div>
+            {billingIdMessage ? (
+              <p className="mt-2 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                {billingIdMessage}
+              </p>
+            ) : null}
             <button
               type="button"
               onClick={() => {

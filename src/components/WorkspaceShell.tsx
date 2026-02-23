@@ -166,8 +166,8 @@ interface WorkspaceShellProps {
   initialSidebarExpanded?: boolean;
 }
 
-function shouldShowBootLoader(pathname?: string | null): boolean {
-  return pathname === "/";
+function shouldShowBootLoader(): boolean {
+  return false;
 }
 
 export default function WorkspaceShell({
@@ -202,6 +202,12 @@ export default function WorkspaceShell({
   const [createBusy, setCreateBusy] = useState(false);
   const [createShowValidation, setCreateShowValidation] = useState(false);
   const [createRemoveConfirmId, setCreateRemoveConfirmId] = useState<string | null>(null);
+  const [contentSwapOut, setContentSwapOut] = useState(false);
+  const [contentSwapIn, setContentSwapIn] = useState(false);
+  const contentSwapTimerRef = useRef<number | null>(null);
+  const contentSettleTimerRef = useRef<number | null>(null);
+  const contentSwapSafetyRef = useRef<number | null>(null);
+  const pendingContentSwapPathRef = useRef<string | null>(null);
   const [billingPortalLoading, setBillingPortalLoading] = useState(false);
   const [homeStripeStatusOverride, setHomeStripeStatusOverride] = useState<string | null | undefined>(() => {
     if (typeof window === "undefined") return undefined;
@@ -238,10 +244,11 @@ export default function WorkspaceShell({
     left: number;
   } | null>(null);
   const [createDragActive, setCreateDragActive] = useState(false);
-  const [homeBootLoading, setHomeBootLoading] = useState(() => shouldShowBootLoader(pathname));
+  const [homeBootLoading, setHomeBootLoading] = useState(() => shouldShowBootLoader());
   const homeBootStartedAtRef = useRef(0);
   const homeBootShownAtRef = useRef(0);
   const homeBootVisibleRef = useRef(shouldShowBootLoader(pathname));
+  const manualLoadingSafetyRef = useRef<number | null>(null);
   const fallbackAvatar = getAvatarFallback(
     avatarKey,
     session?.user?.name ?? session?.user?.email ?? "Account"
@@ -267,13 +274,31 @@ export default function WorkspaceShell({
   }, [homeBootLoading]);
 
   useEffect(() => {
+    const clearManualLoadingSafety = () => {
+      if (manualLoadingSafetyRef.current !== null) {
+        window.clearTimeout(manualLoadingSafetyRef.current);
+        manualLoadingSafetyRef.current = null;
+      }
+    };
     const handleLoadingStart = () => {
       homeBootShownAtRef.current = performance.now();
       setHomeBootLoading(true);
+      clearManualLoadingSafety();
+      manualLoadingSafetyRef.current = window.setTimeout(() => {
+        setHomeBootLoading(false);
+        manualLoadingSafetyRef.current = null;
+      }, 8000);
+    };
+    const handleLoadingStop = () => {
+      clearManualLoadingSafety();
+      setHomeBootLoading(false);
     };
     window.addEventListener("workspace-loading-start", handleLoadingStart);
+    window.addEventListener("workspace-loading-stop", handleLoadingStop);
     return () => {
+      clearManualLoadingSafety();
       window.removeEventListener("workspace-loading-start", handleLoadingStart);
+      window.removeEventListener("workspace-loading-stop", handleLoadingStop);
     };
   }, []);
 
@@ -320,7 +345,11 @@ export default function WorkspaceShell({
   }, []);
 
   useEffect(() => {
-    if (!shouldShowBootLoader(pathname)) {
+    if (!shouldShowBootLoader()) {
+      if (manualLoadingSafetyRef.current !== null) {
+        window.clearTimeout(manualLoadingSafetyRef.current);
+        manualLoadingSafetyRef.current = null;
+      }
       setHomeBootLoading(false);
       return;
     }
@@ -345,6 +374,10 @@ export default function WorkspaceShell({
 
     const handleReady = () => {
       readyReceived = true;
+      if (manualLoadingSafetyRef.current !== null) {
+        window.clearTimeout(manualLoadingSafetyRef.current);
+        manualLoadingSafetyRef.current = null;
+      }
       if (showTimer !== null) window.clearTimeout(showTimer);
       const shownAt = homeBootShownAtRef.current;
       if (!homeBootVisibleRef.current || shownAt <= 0) {
@@ -568,7 +601,7 @@ export default function WorkspaceShell({
             ? "templates"
             : "default";
   const homeSidebarLocked = panelKey === "home";
-  const panelExpanded = homeSidebarLocked || panelKey === "templates" ? false : expanded;
+  const panelExpanded = false;
   const navExpanded = expanded;
   const activePanel = sidebarPanels[panelKey] ?? sidebarPanels.default;
   const simplePanelList =
@@ -581,6 +614,15 @@ export default function WorkspaceShell({
   const isProjectsPanel = panelKey === "projects";
   const isHomePanel = panelKey === "home";
   const isTemplatesPanel = panelKey === "templates";
+  const useUnifiedWorkspaceBackground =
+    pathname === "/" ||
+    (pathname?.startsWith("/projects") ?? false) ||
+    (pathname?.startsWith("/signature-center") ?? false);
+  const workspaceBackgroundClass = useUnifiedWorkspaceBackground
+    ? "bg-[#F1F4F9]"
+    : isHomePanel
+      ? "bg-[#F1F4F9]"
+      : "bg-slate-100";
   const isBillingBannerRoute = isHomePanel || isAccountRoute;
   const homeStripeStatus = homeStripeStatusOverride ?? (session?.user?.stripeStatus ?? null);
   const homeBillingIsDelinquent = homeStripeStatus === "past_due" || homeStripeStatus === "unpaid";
@@ -592,6 +634,55 @@ export default function WorkspaceShell({
   const shellLoadingLabel = billingPortalLoading
     ? "Opening billing portal…"
     : "Loading...";
+
+  const isHomeProjectsPath = (value?: string | null) =>
+    value === "/" || (value?.startsWith("/projects") ?? false);
+
+  const navigateWithContentSwap = (nextPath: string, closeMobile = false): boolean => {
+    const currentPath = pathname ?? "";
+    if (!nextPath || nextPath === currentPath) {
+      if (closeMobile) setMobileOpen(false);
+      return false;
+    }
+    const shouldAnimateSwap = isHomeProjectsPath(currentPath) && isHomeProjectsPath(nextPath);
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (!shouldAnimateSwap || reduceMotion) {
+      if (closeMobile) setMobileOpen(false);
+      router.push(nextPath);
+      return true;
+    }
+
+    if (contentSwapTimerRef.current !== null) {
+      window.clearTimeout(contentSwapTimerRef.current);
+      contentSwapTimerRef.current = null;
+    }
+    if (contentSettleTimerRef.current !== null) {
+      window.clearTimeout(contentSettleTimerRef.current);
+      contentSettleTimerRef.current = null;
+    }
+    if (contentSwapSafetyRef.current !== null) {
+      window.clearTimeout(contentSwapSafetyRef.current);
+      contentSwapSafetyRef.current = null;
+    }
+
+    pendingContentSwapPathRef.current = nextPath;
+    if (closeMobile) setMobileOpen(false);
+    setContentSwapIn(false);
+    setContentSwapOut(true);
+    contentSwapTimerRef.current = window.setTimeout(() => {
+      router.push(nextPath);
+      contentSwapTimerRef.current = null;
+    }, 24);
+    contentSwapSafetyRef.current = window.setTimeout(() => {
+      setContentSwapOut(false);
+      contentSwapSafetyRef.current = null;
+    }, 260);
+    return true;
+  };
   const PanelTitleIcon: LucideIcon =
     panelKey === "home"
       ? FolderKanban
@@ -624,6 +715,43 @@ export default function WorkspaceShell({
     const timer = setTimeout(prefetch, 200);
     return () => clearTimeout(timer);
   }, [router]);
+
+  useEffect(() => {
+    const pendingPath = pendingContentSwapPathRef.current;
+    if (!pendingPath || pathname !== pendingPath) return;
+    if (contentSwapTimerRef.current !== null) {
+      window.clearTimeout(contentSwapTimerRef.current);
+      contentSwapTimerRef.current = null;
+    }
+    if (contentSwapSafetyRef.current !== null) {
+      window.clearTimeout(contentSwapSafetyRef.current);
+      contentSwapSafetyRef.current = null;
+    }
+    pendingContentSwapPathRef.current = null;
+    setContentSwapOut(false);
+    setContentSwapIn(true);
+    if (contentSettleTimerRef.current !== null) {
+      window.clearTimeout(contentSettleTimerRef.current);
+    }
+    contentSettleTimerRef.current = window.setTimeout(() => {
+      setContentSwapIn(false);
+      contentSettleTimerRef.current = null;
+    }, 120);
+  }, [pathname]);
+
+  useEffect(() => {
+    return () => {
+      if (contentSwapTimerRef.current !== null) {
+        window.clearTimeout(contentSwapTimerRef.current);
+      }
+      if (contentSettleTimerRef.current !== null) {
+        window.clearTimeout(contentSettleTimerRef.current);
+      }
+      if (contentSwapSafetyRef.current !== null) {
+        window.clearTimeout(contentSwapSafetyRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!isBillingBannerRoute) {
@@ -1290,8 +1418,10 @@ export default function WorkspaceShell({
           key={label}
           href={targetHref}
           prefetch
-          onClick={() => {
-            setMobileOpen(false);
+          onClick={(event) => {
+            if (navigateWithContentSwap(targetHref, true)) {
+              event.preventDefault();
+            }
             resetLogoutConfirm();
           }}
           aria-label={logoutArmedA11yLabel}
@@ -1376,9 +1506,11 @@ export default function WorkspaceShell({
           key={label}
           href={targetHref}
           prefetch
-          onClick={() => {
+          onClick={(event) => {
             resetLogoutConfirm();
-            setMobileOpen(false);
+            if (navigateWithContentSwap(targetHref, true)) {
+              event.preventDefault();
+            }
           }}
           aria-label={logoutArmedA11yLabel}
           className={`${baseClasses} ${stateClasses} ${confirmClasses}`}
@@ -1393,11 +1525,11 @@ export default function WorkspaceShell({
     {isBillingBannerRoute ? (
       <div
         aria-hidden
-        className={`fixed inset-0 z-0 ${isHomePanel ? "bg-[#F1F4F9]" : "bg-slate-100"} dark:bg-[#222224]`}
+        className={`fixed inset-0 z-0 ${workspaceBackgroundClass} dark:bg-[#222224]`}
       />
     ) : null}
     <div
-      className={`relative z-10 flex pt-0 ${homeBillingBannerExiting ? "transition-[padding-top,min-height] duration-300 ease-out" : "transition-none"} md:pt-[var(--home-banner-offset)] ${isHomePanel ? "bg-[#F1F4F9]" : "bg-slate-100"} ${sidebarCompact ? "sidebar-collapsed" : ""} ${expanded ? "" : "sidebar-minimized"} dark:bg-[#222224]`}
+      className={`relative z-10 flex pt-0 ${homeBillingBannerExiting ? "transition-[padding-top,min-height] duration-300 ease-out" : "transition-none"} md:pt-[var(--home-banner-offset)] ${workspaceBackgroundClass} ${sidebarCompact ? "sidebar-collapsed" : ""} ${expanded ? "" : "sidebar-minimized"} dark:bg-[#222224]`}
       style={
         {
           minHeight: "calc(100vh - var(--home-banner-offset))",
@@ -1443,7 +1575,7 @@ export default function WorkspaceShell({
           <div
             ref={sidebarRef}
             className={`flex h-full ${railWidthClass} flex-col ${
-              homeSidebarLocked
+              useUnifiedWorkspaceBackground
                 ? "rounded-xl border-[1.5px] border-[#E5E7EB] bg-white shadow-[0_10px_30px_rgba(0,0,0,0.08)] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_12px_30px_rgba(0,0,0,0.35)]"
                 : "rounded-xl border-[1.5px] border-[#E5E7EB] bg-white shadow-[0_10px_30px_rgba(0,0,0,0.08)] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_12px_30px_rgba(0,0,0,0.35)]"
             } w-full ${sidebarCompact ? "z-10" : "z-20"}`}
@@ -2074,112 +2206,6 @@ export default function WorkspaceShell({
                 Start New Project
               </button>
 
-              <div className="border-t border-slate-200 pt-4">
-                {activePanel.title ? (
-                  <div className="pb-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                      {activePanel.subtitle}
-                    </p>
-                    <p className="mt-2 text-base font-semibold text-slate-800">{activePanel.title}</p>
-                  </div>
-                ) : null}
-
-                <div className={isHomePanel ? "space-y-1" : simplePanelList ? "space-y-1" : "space-y-2"}>
-                  {activePanelItems.map((item) => {
-                    const ItemIcon = item.icon;
-                    if (simplePanelList && ItemIcon) {
-                      return (
-                        <button
-                          key={item.key ?? item.label}
-                          type="button"
-                          onClick={() => {
-                            const newValue = item.key ?? item.label;
-                            setActiveProjectsFilter(newValue);
-                            setMobileOpen(false);
-                            const onProjectsRoute = pathname?.startsWith("/projects") ?? false;
-                            if (!onProjectsRoute) {
-                              router.push("/projects/all");
-                            } else if (newValue === "all" && pathname !== "/projects/all") {
-                              router.push("/projects/all");
-                            }
-                          }}
-                          className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-sm font-semibold transition ${
-                            activeProjectsFilter === (item.key ?? item.label)
-                              ? "bg-sky-50 text-sky-700"
-                              : "text-slate-700 hover:bg-slate-50"
-                          }`}
-                        >
-                          <ItemIcon
-                            className={`h-5 w-5 ${
-                              activeProjectsFilter === (item.key ?? item.label) ? "text-sky-600" : "text-slate-500"
-                            }`}
-                            aria-hidden
-                          />
-                          <span className="truncate">{item.label}</span>
-                        </button>
-                      );
-                    }
-
-                    if (isHomePanel && typeof item.key === "string" && item.key.length > 0) {
-                      return (
-                        <button
-                          key={item.key}
-                          type="button"
-                          onClick={() => {
-                            setMobileOpen(false);
-                            router.push(`/studio?project=${encodeURIComponent(item.key as string)}`);
-                          }}
-                          className="flex w-full min-w-0 items-center gap-3 rounded-2xl px-1 py-1 text-left transition hover:bg-slate-50"
-                        >
-                          <span className="relative inline-flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white text-slate-500 shadow-sm dark:shadow-none ring-1 ring-slate-200 dark:bg-zinc-800 dark:text-zinc-300 dark:ring-zinc-700">
-                            {item.previewUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                src={item.previewUrl}
-                                alt=""
-                                loading="lazy"
-                                decoding="async"
-                                className="h-full w-full object-cover object-top"
-                                onError={() => {
-                                  if (typeof item.key === "string" && item.key.length > 0) {
-                                    void refreshPreviewUrl(item.key, item.previewUrl);
-                                  }
-                                }}
-                              />
-                            ) : (
-                              <div className="h-full w-full animate-pulse bg-slate-100" />
-                            )}
-                          </span>
-                          <span className="min-w-0">
-                            <span className="block truncate text-sm font-semibold text-slate-800">{item.label}</span>
-                          </span>
-                        </button>
-                      );
-                    }
-
-                    return (
-                      <div key={item.key ?? item.label} className="rounded-2xl px-3 py-2">
-                        <p className="text-sm font-semibold text-slate-800">{item.label}</p>
-                        {item.description ? <p className="text-xs text-slate-500">{item.description}</p> : null}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {activePanel.action ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMobileOpen(false);
-                      router.push(activePanel.action!.href);
-                    }}
-                    className="mt-3 w-full text-center text-sm font-semibold text-sky-600 transition hover:text-sky-700"
-                  >
-                    {activePanel.action.label}
-                  </button>
-                ) : null}
-              </div>
-
               {bottomSidebarItems.length > 0 ? (
                 <div className="border-t border-slate-200 pt-4">
                   <div className="flex flex-col gap-1">
@@ -2273,11 +2299,13 @@ export default function WorkspaceShell({
           </div>
         </header>
 
-        <Suspense fallback={<PageLoadingSkeleton />}>
+        <Suspense fallback={null}>
           <main className="relative z-0 flex-1 lg:z-40">
             <div className={`flex w-full ${hideWorkspaceSidebar ? "justify-center px-6" : "justify-start pr-6"}`}>
               <div
-                className="workspace-content-shell w-full"
+                className={`workspace-content-shell w-full ${
+                  contentSwapOut ? "workspace-content-swap-out" : contentSwapIn ? "workspace-content-swap-in" : ""
+                }`}
                 style={{ maxWidth: "var(--shell-content-width)" }}
               >
                 {children}

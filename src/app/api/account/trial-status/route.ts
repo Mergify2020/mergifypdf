@@ -22,6 +22,7 @@ export async function GET() {
       hasActivePlan: false,
       stripeStatus: null,
       currentPlanTier: null,
+      stripeCustomerId: null,
     });
   }
 
@@ -33,6 +34,7 @@ export async function GET() {
       signatureProTrialUsedAt: true,
       stripeStatus: true,
       stripePriceId: true,
+      stripeCustomerId: true,
     },
   });
   const hasActivePlan = user?.stripeStatus === "active" || user?.stripeStatus === "trialing";
@@ -57,5 +59,6 @@ export async function GET() {
     hasActivePlan,
     stripeStatus: user?.stripeStatus ?? null,
     currentPlanTier,
+    stripeCustomerId: user?.stripeCustomerId ?? null,
   });
 }

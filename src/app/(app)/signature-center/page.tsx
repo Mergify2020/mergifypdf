@@ -16,7 +16,7 @@ export default async function SignatureCenterPage() {
   const waitingForYouCount = 1;
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] text-slate-900">
+    <div className="min-h-screen bg-transparent text-slate-900">
       <div className="mx-auto flex max-w-[1120px] flex-col gap-6 px-6 py-8">
 
         <section className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
