@@ -247,7 +247,7 @@ export default function WorkspaceShell({
   const [homeBootLoading, setHomeBootLoading] = useState(() => shouldShowBootLoader());
   const homeBootStartedAtRef = useRef(0);
   const homeBootShownAtRef = useRef(0);
-  const homeBootVisibleRef = useRef(shouldShowBootLoader(pathname));
+  const homeBootVisibleRef = useRef(shouldShowBootLoader());
   const manualLoadingSafetyRef = useRef<number | null>(null);
   const fallbackAvatar = getAvatarFallback(
     avatarKey,
