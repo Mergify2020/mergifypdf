@@ -20,6 +20,8 @@ model User {
   stripePriceId        String?
   stripeStatus         String?
   stripeCurrentPeriodEnd DateTime?
+  essentialPlusTrialUsedAt DateTime?
+  signatureProTrialUsedAt  DateTime?
   trialUsedAt          DateTime?
   pendingCheckoutId    String?
   pendingCheckoutCreatedAt DateTime?

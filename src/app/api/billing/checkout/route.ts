@@ -5,13 +5,11 @@ import { getStripe } from "@/lib/stripe";
 import { isSameOrigin } from "@/lib/requestGuards";
 import { prisma } from "@/lib/prisma";
 import { randomUUID } from "crypto";
-
-const ALLOWED_PRICE_IDS = new Set([
-  "price_1T3SEvJCQrZL3P2hfpX6i8qx",
-  "price_1T3SGJJCQrZL3P2h1rkd9yRY",
-  "price_1T3SH0JCQrZL3P2hoyT8N2yN",
-  "price_1T3SI2JCQrZL3P2hchDkvXBd",
-]);
+import {
+  ALLOWED_PRICE_IDS,
+  getPlanTierFromPriceId,
+  getTrialEligibilityForUser,
+} from "@/lib/billingPlans";
 
 export async function POST(req: NextRequest) {
   if (!isSameOrigin(req)) {
@@ -43,6 +41,10 @@ export async function POST(req: NextRequest) {
   if (!ALLOWED_PRICE_IDS.has(priceId)) {
     return NextResponse.json({ error: "Unknown priceId" }, { status: 400 });
   }
+  const selectedPlanTier = getPlanTierFromPriceId(priceId);
+  if (!selectedPlanTier) {
+    return NextResponse.json({ error: "Unknown plan for provided priceId" }, { status: 400 });
+  }
 
   try {
     const origin = req.nextUrl.origin;
@@ -50,7 +52,15 @@ export async function POST(req: NextRequest) {
     const cancelUrl = `${origin}/pricing?canceled=true`;
 
     const wantsTrial = skipTrial !== true;
-    const eligibleForTrial = !user?.trialUsedAt;
+    const trialEligibility = getTrialEligibilityForUser({
+      essentialPlusTrialUsedAt: user?.essentialPlusTrialUsedAt,
+      signatureProTrialUsedAt: user?.signatureProTrialUsedAt,
+      legacyTrialUsedAt: user?.trialUsedAt,
+    });
+    const eligibleForTrial =
+      selectedPlanTier === "essential_plus"
+        ? trialEligibility.eligibleForTrialByPlan.essentialPlus
+        : trialEligibility.eligibleForTrialByPlan.signaturePro;
     const trialAllowed = wantsTrial && eligibleForTrial;
 
     const now = new Date();

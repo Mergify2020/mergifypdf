@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Check, CreditCard, ShieldCheck, Download, Lock } from "lucide-react";
 import RevealOnScroll from "@/components/RevealOnScroll";
+import { BILLING_PRICE_IDS } from "@/lib/billingPlans";
 
 const tiers = [
   {
@@ -56,27 +57,34 @@ export default function PricingPlans() {
   const monthlyRef = useRef<HTMLButtonElement | null>(null);
   const annualRef = useRef<HTMLButtonElement | null>(null);
   const [toggleHighlight, setToggleHighlight] = useState({ left: 0, width: 0 });
-  const [trialStatus, setTrialStatus] = useState<null | { eligibleForTrial: boolean }>(null);
+  const [trialStatus, setTrialStatus] = useState<null | {
+    eligibleForTrial: boolean;
+    eligibleForTrialByPlan?: {
+      essentialPlus?: boolean;
+      signaturePro?: boolean;
+    };
+  }>(null);
   const [shouldAnimateToggle, setShouldAnimateToggle] = useState(false);
-  const canUseTrial = trialStatus?.eligibleForTrial !== false;
   const toggleMeasured = toggleHighlight.width > 0;
 
-  const PRICE_IDS: Record<
-    string,
-    {
-      monthly?: string;
-      annual?: string;
-    }
-  > = {
+  const PRICE_IDS: Record<string, { monthly?: string; annual?: string }> = {
     "Essential Plus": {
-      monthly: "price_1T3SEvJCQrZL3P2hfpX6i8qx",
-      annual: "price_1T3SGJJCQrZL3P2h1rkd9yRY",
+      monthly: BILLING_PRICE_IDS.essential_plus.monthly,
+      annual: BILLING_PRICE_IDS.essential_plus.annual,
     },
     "Signature Pro": {
-      monthly: "price_1T3SH0JCQrZL3P2hoyT8N2yN",
-      annual: "price_1T3SI2JCQrZL3P2hchDkvXBd",
+      monthly: BILLING_PRICE_IDS.signature_pro.monthly,
+      annual: BILLING_PRICE_IDS.signature_pro.annual,
     },
   };
+
+  function canUseTrialForPlan(planName: string) {
+    const byPlan = trialStatus?.eligibleForTrialByPlan;
+    if (!byPlan) return trialStatus?.eligibleForTrial !== false;
+    if (planName === "Essential Plus") return byPlan.essentialPlus !== false;
+    if (planName === "Signature Pro") return byPlan.signaturePro !== false;
+    return trialStatus?.eligibleForTrial !== false;
+  }
 
   async function handleSelectPlan(tierName: string, options?: { skipTrial?: boolean }) {
     const tierPrices = PRICE_IDS[tierName];
@@ -170,9 +178,18 @@ export default function PricingPlans() {
       try {
         const res = await fetch("/api/account/trial-status");
         if (!res.ok) return;
-        const data = (await res.json()) as { eligibleForTrial?: boolean };
+        const data = (await res.json()) as {
+          eligibleForTrial?: boolean;
+          eligibleForTrialByPlan?: {
+            essentialPlus?: boolean;
+            signaturePro?: boolean;
+          };
+        };
         if (active && typeof data.eligibleForTrial === "boolean") {
-          setTrialStatus({ eligibleForTrial: data.eligibleForTrial });
+          setTrialStatus({
+            eligibleForTrial: data.eligibleForTrial,
+            eligibleForTrialByPlan: data.eligibleForTrialByPlan,
+          });
         }
       } catch {
         // no-op
@@ -267,6 +284,7 @@ export default function PricingPlans() {
         <div className="mx-auto w-full max-w-full md:max-w-4xl">
           <div id="pricing-plan-cards" className="grid w-full scroll-mt-28 gap-10 md:grid-cols-2">
           {tiers.map((tier, index) => {
+            const canUseTrial = canUseTrialForPlan(tier.name);
             let yearlyPrice: string | null = null;
             let savingsLabel: string | null = null;
 

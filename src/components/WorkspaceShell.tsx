@@ -62,6 +62,7 @@ const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
 const STARTUP_OVERLAY_KEY = "mpdf:startup-overlay";
 const STARTUP_OVERLAY_CONTEXT_KEY = "mpdf:startup-overlay-context";
 const SIDEBAR_EXPANDED_KEY = "mpdf:sidebar-expanded";
+const STRIPE_STATUS_CACHE_KEY = "mpdf:stripe-status";
 
 async function resetWorkspaceStorage() {
   try {
@@ -166,11 +167,7 @@ interface WorkspaceShellProps {
 }
 
 function shouldShowBootLoader(pathname?: string | null): boolean {
-  return (
-    pathname === "/" ||
-    pathname?.startsWith("/account") === true ||
-    pathname?.startsWith("/settings") === true
-  );
+  return pathname === "/";
 }
 
 export default function WorkspaceShell({
@@ -206,12 +203,20 @@ export default function WorkspaceShell({
   const [createShowValidation, setCreateShowValidation] = useState(false);
   const [createRemoveConfirmId, setCreateRemoveConfirmId] = useState<string | null>(null);
   const [billingPortalLoading, setBillingPortalLoading] = useState(false);
-  const [homeStripeStatusOverride, setHomeStripeStatusOverride] = useState<string | null | undefined>(
-    undefined
-  );
+  const [homeStripeStatusOverride, setHomeStripeStatusOverride] = useState<string | null | undefined>(() => {
+    if (typeof window === "undefined") return undefined;
+    try {
+      const cached = window.localStorage?.getItem(STRIPE_STATUS_CACHE_KEY);
+      return cached && cached.length > 0 ? cached : undefined;
+    } catch {
+      return undefined;
+    }
+  });
   const [homeBillingBannerDismissed, setHomeBillingBannerDismissed] = useState(false);
   const [homeBillingBannerMounted, setHomeBillingBannerMounted] = useState(false);
   const [homeBillingBannerVisible, setHomeBillingBannerVisible] = useState(false);
+  const [homeBillingBannerExiting, setHomeBillingBannerExiting] = useState(false);
+  const [accountPageLoading, setAccountPageLoading] = useState(() => pathname?.startsWith("/account") ?? false);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const [compactSidebar, setCompactSidebar] = useState(false);
   const [narrowSidebar, setNarrowSidebar] = useState(false);
@@ -269,6 +274,48 @@ export default function WorkspaceShell({
     window.addEventListener("workspace-loading-start", handleLoadingStart);
     return () => {
       window.removeEventListener("workspace-loading-start", handleLoadingStart);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleBillingStart = () => {
+      setBillingPortalLoading(true);
+    };
+    const handleBillingStop = () => {
+      setBillingPortalLoading(false);
+    };
+
+    window.addEventListener("workspace-billing-portal-start", handleBillingStart);
+    window.addEventListener("workspace-billing-portal-stop", handleBillingStop);
+    return () => {
+      window.removeEventListener("workspace-billing-portal-start", handleBillingStart);
+      window.removeEventListener("workspace-billing-portal-stop", handleBillingStop);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleAccountLoadingStart = () => {
+      setAccountPageLoading(true);
+    };
+    const handleAccountLoadingStop = () => {
+      setAccountPageLoading(false);
+    };
+
+    window.addEventListener("workspace-account-loading-start", handleAccountLoadingStart);
+    window.addEventListener("workspace-account-loading-stop", handleAccountLoadingStop);
+    return () => {
+      window.removeEventListener("workspace-account-loading-start", handleAccountLoadingStart);
+      window.removeEventListener("workspace-account-loading-stop", handleAccountLoadingStop);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handlePageShow = () => {
+      setBillingPortalLoading(false);
+    };
+    window.addEventListener("pageshow", handlePageShow);
+    return () => {
+      window.removeEventListener("pageshow", handlePageShow);
     };
   }, []);
 
@@ -534,10 +581,17 @@ export default function WorkspaceShell({
   const isProjectsPanel = panelKey === "projects";
   const isHomePanel = panelKey === "home";
   const isTemplatesPanel = panelKey === "templates";
+  const isBillingBannerRoute = isHomePanel || isAccountRoute;
   const homeStripeStatus = homeStripeStatusOverride ?? (session?.user?.stripeStatus ?? null);
   const homeBillingIsDelinquent = homeStripeStatus === "past_due" || homeStripeStatus === "unpaid";
-  const showHomeBillingBanner = isHomePanel && homeBillingIsDelinquent && !homeBillingBannerDismissed;
-  const renderHomeBillingBanner = homeBillingBannerMounted;
+  const showHomeBillingBanner = isBillingBannerRoute && homeBillingIsDelinquent && !homeBillingBannerDismissed;
+  const renderHomeBillingBanner =
+    (showHomeBillingBanner || homeBillingBannerMounted) && !billingPortalLoading && !accountPageLoading;
+  const homeBillingBannerOccupiesSpace = showHomeBillingBanner || homeBillingBannerVisible;
+  const shellLoadingOpen = billingPortalLoading || accountPageLoading || homeBootLoading;
+  const shellLoadingLabel = billingPortalLoading
+    ? "Opening billing portal…"
+    : "Loading...";
   const PanelTitleIcon: LucideIcon =
     panelKey === "home"
       ? FolderKanban
@@ -546,6 +600,14 @@ export default function WorkspaceShell({
         : panelKey === "signatures"
           ? PenSquare
           : BookOpen;
+
+  useEffect(() => {
+    if (!isAccountRoute) {
+      setAccountPageLoading(false);
+      return;
+    }
+    setAccountPageLoading(true);
+  }, [isAccountRoute]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -564,8 +626,12 @@ export default function WorkspaceShell({
   }, [router]);
 
   useEffect(() => {
-    if (!isHomePanel || !session?.user?.email) {
+    if (!isBillingBannerRoute) {
       setHomeStripeStatusOverride(undefined);
+      return;
+    }
+    if (!session?.user?.email) {
+      // Keep cached/local session status until auth data arrives to avoid banner pop-in on refresh.
       return;
     }
     let cancelled = false;
@@ -578,7 +644,17 @@ export default function WorkspaceShell({
         }
         const data = (await response.json()) as { stripeStatus?: string | null };
         if (!cancelled) {
-          setHomeStripeStatusOverride(typeof data.stripeStatus === "string" ? data.stripeStatus : null);
+          const nextStatus = typeof data.stripeStatus === "string" ? data.stripeStatus : null;
+          setHomeStripeStatusOverride(nextStatus);
+          try {
+            if (nextStatus) {
+              window.localStorage?.setItem(STRIPE_STATUS_CACHE_KEY, nextStatus);
+            } else {
+              window.localStorage?.removeItem(STRIPE_STATUS_CACHE_KEY);
+            }
+          } catch {
+            // ignore storage write errors
+          }
         }
       } catch {
         if (!cancelled) setHomeStripeStatusOverride(undefined);
@@ -588,43 +664,47 @@ export default function WorkspaceShell({
     return () => {
       cancelled = true;
     };
-  }, [isHomePanel, session?.user?.email]);
+  }, [isBillingBannerRoute, session?.user?.email]);
 
   useEffect(() => {
-    // Dismiss is page-local only; banner should return on refresh while delinquent.
-    setHomeBillingBannerDismissed(false);
-  }, [homeStripeStatus, isHomePanel]);
+    const sessionStripeStatus = session?.user?.stripeStatus;
+    if (typeof sessionStripeStatus !== "string") return;
+    try {
+      window.localStorage?.setItem(STRIPE_STATUS_CACHE_KEY, sessionStripeStatus);
+    } catch {
+      // ignore storage write errors
+    }
+  }, [session?.user?.stripeStatus]);
+
+  useEffect(() => {
+    // Keep dismiss state across in-app navigation. Reset only after billing is no longer delinquent,
+    // so a future delinquent state can show the banner again.
+    if (!homeBillingIsDelinquent) {
+      setHomeBillingBannerDismissed(false);
+    }
+  }, [homeBillingIsDelinquent]);
 
   useEffect(() => {
     let cancelled = false;
-    let firstFrame = 0;
-    let showTimer = 0;
     let hideTimer = 0;
 
     if (showHomeBillingBanner) {
+      setHomeBillingBannerExiting(false);
       setHomeBillingBannerMounted(true);
-      setHomeBillingBannerVisible(false);
-      // Ensure hidden state paints first, then run a noticeable entrance.
-      firstFrame = window.requestAnimationFrame(() => {
-        showTimer = window.setTimeout(() => {
-          if (!cancelled) {
-            setHomeBillingBannerVisible(true);
-          }
-        }, 2200);
-      });
+      setHomeBillingBannerVisible(true);
     } else {
+      setHomeBillingBannerExiting(true);
       setHomeBillingBannerVisible(false);
       hideTimer = window.setTimeout(() => {
         if (!cancelled) {
           setHomeBillingBannerMounted(false);
+          setHomeBillingBannerExiting(false);
         }
       }, 300);
     }
 
     return () => {
       cancelled = true;
-      if (firstFrame) window.cancelAnimationFrame(firstFrame);
-      if (showTimer) window.clearTimeout(showTimer);
       if (hideTimer) window.clearTimeout(hideTimer);
     };
   }, [showHomeBillingBanner]);
@@ -1310,28 +1390,40 @@ export default function WorkspaceShell({
 
   const workspaceShell = (
     <>
-    {isHomePanel ? <div aria-hidden className="fixed inset-0 z-0 bg-[#F1F4F9] dark:bg-[#222224]" /> : null}
+    {isBillingBannerRoute ? (
+      <div
+        aria-hidden
+        className={`fixed inset-0 z-0 ${isHomePanel ? "bg-[#F1F4F9]" : "bg-slate-100"} dark:bg-[#222224]`}
+      />
+    ) : null}
     <div
-      className={`relative z-10 flex pt-0 transition-[padding-top,min-height] duration-300 ease-out md:pt-[var(--home-banner-offset)] ${isHomePanel ? "bg-[#F1F4F9]" : "bg-slate-100"} ${sidebarCompact ? "sidebar-collapsed" : ""} ${expanded ? "" : "sidebar-minimized"} dark:bg-[#222224]`}
+      className={`relative z-10 flex pt-0 ${homeBillingBannerExiting ? "transition-[padding-top,min-height] duration-300 ease-out" : "transition-none"} md:pt-[var(--home-banner-offset)] ${isHomePanel ? "bg-[#F1F4F9]" : "bg-slate-100"} ${sidebarCompact ? "sidebar-collapsed" : ""} ${expanded ? "" : "sidebar-minimized"} dark:bg-[#222224]`}
       style={
         {
           minHeight: "calc(100vh - var(--home-banner-offset))",
-          "--shell-content-width": expanded ? "1680px" : "1960px",
+          "--shell-content-width": isAccountRoute ? "1960px" : expanded ? "1680px" : "1960px",
           "--shell-left":
             "max(24px, calc((100vw - (var(--shell-content-width) + var(--shell-sidebar-width) + 24px)) / 2))",
           "--shell-sidebar-width": expanded ? "256px" : "80px",
-          "--home-banner-offset": homeBillingBannerVisible ? "56px" : "0px",
+          "--home-banner-offset": homeBillingBannerOccupiesSpace ? "56px" : "0px",
         } as React.CSSProperties
       }
     >
       {renderHomeBillingBanner ? (
         <div className="pointer-events-none absolute left-0 right-0 top-0 z-[70] hidden md:block">
           <div
-            className={`pointer-events-auto transition-all duration-300 ease-out ${
-              homeBillingBannerVisible ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0"
+            className={`pointer-events-auto ${
+              homeBillingBannerExiting
+                ? "transition-all duration-300 ease-out -translate-y-full opacity-0"
+                : "translate-y-0 opacity-100"
             }`}
           >
             <BillingStatusBanner
+              contentMaxWidth={
+                isAccountRoute
+                  ? "var(--shell-content-width)"
+                  : "calc(var(--shell-content-width) + var(--shell-sidebar-width) + 24px)"
+              }
               onUpdatePaymentMethod={() => {
                 void openBillingPortal({ collapseSidebarAfter: false });
               }}
@@ -1345,7 +1437,7 @@ export default function WorkspaceShell({
       {/* Desktop sidebar */}
       <aside
         id={isHomePanel ? "home-sidebar" : undefined}
-        className="page-fade-in absolute left-[var(--shell-left)] top-[calc(24px+var(--home-banner-offset))] z-50 hidden h-[calc(100vh-48px-var(--home-banner-offset))] w-[var(--shell-sidebar-width)] text-slate-800 transition-[width,top,height] duration-300 ease-out dark:text-zinc-100 md:flex"
+        className={`page-fade-in absolute left-[var(--shell-left)] top-[calc(24px+var(--home-banner-offset))] z-50 hidden h-[calc(100vh-48px-var(--home-banner-offset))] w-[var(--shell-sidebar-width)] text-slate-800 transition-[width,top,height] ${homeBillingBannerExiting ? "duration-300 ease-out" : "duration-0"} dark:text-zinc-100 md:flex`}
       >
         <div className="relative flex h-full w-full">
           <div
@@ -2183,7 +2275,7 @@ export default function WorkspaceShell({
 
         <Suspense fallback={<PageLoadingSkeleton />}>
           <main className="relative z-0 flex-1 lg:z-40">
-            <div className="flex w-full justify-start pr-6">
+            <div className={`flex w-full ${hideWorkspaceSidebar ? "justify-center px-6" : "justify-start pr-6"}`}>
               <div
                 className="workspace-content-shell w-full"
                 style={{ maxWidth: "var(--shell-content-width)" }}
@@ -2415,10 +2507,10 @@ export default function WorkspaceShell({
           )
         : null}
 
-      <LoadingOverlay open={billingPortalLoading} label="Opening billing portal…" />
       <LoadingOverlay
-        open={homeBootLoading}
-        label="Loading..."
+        open={shellLoadingOpen}
+        keepMounted
+        label={shellLoadingLabel}
         zIndexClassName="z-[1200]"
       />
       {sidebarTooltip

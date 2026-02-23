@@ -1,10 +1,13 @@
 "use client";
 
+import { createPortal } from "react-dom";
+
 type Props = {
   open: boolean;
   label?: string;
   zIndexClassName?: string;
   variant?: "fullscreen" | "container";
+  keepMounted?: boolean;
   backdropClassName?: string;
   panelClassName?: string;
   spinnerClassName?: string;
@@ -16,12 +19,14 @@ export default function LoadingOverlay({
   label = "Loading…",
   zIndexClassName = "z-[60]",
   variant = "fullscreen",
+  keepMounted = false,
   backdropClassName,
   panelClassName,
   spinnerClassName,
   labelClassName,
 }: Props) {
-  if (!open) return null;
+  if (!open && !keepMounted) return null;
+  const isVisible = open;
   const spinnerSizeClass = "h-10 w-10 border-4";
   const labelSizeClass = "mt-4 text-sm font-semibold";
 
@@ -45,13 +50,17 @@ export default function LoadingOverlay({
 
   const overlay = (
     <div
-      className={`${variant === "fullscreen" ? "fixed" : "absolute"} inset-0 ${zIndexClassName} isolate flex items-center justify-center`}
+      className={`${variant === "fullscreen" ? "fixed" : "absolute"} inset-0 ${zIndexClassName} isolate flex items-center justify-center transition-opacity duration-150 ${
+        isVisible ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
+      }`}
+      aria-hidden={!isVisible}
+      style={variant === "fullscreen" ? { zIndex: 2147483647 } : undefined}
     >
       <div className={`absolute inset-0 z-0 ${resolvedBackdropClassName}`} />
       <div
         className={`relative z-10 flex flex-col items-center ${resolvedPanelClassName}`}
-        role="status"
-        aria-live="polite"
+        role={isVisible ? "status" : undefined}
+        aria-live={isVisible ? "polite" : undefined}
       >
         <div
           className={`${spinnerSizeClass} animate-spin rounded-full ${resolvedSpinnerClassName}`}
@@ -63,5 +72,6 @@ export default function LoadingOverlay({
   );
 
   if (variant === "container") return overlay;
-  return overlay;
+  if (typeof document === "undefined") return overlay;
+  return createPortal(overlay, document.body);
 }

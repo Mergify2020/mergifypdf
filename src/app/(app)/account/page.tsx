@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, MoveLeft, PencilLine, User, Mail, Lock, Shield, CreditCard, Star, Smile, Sun } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, MoveLeft, PencilLine, User, Mail, Lock, Shield, CreditCard, Star, Smile, Sun } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { useEffect, useRef, useState } from "react";
@@ -11,9 +11,8 @@ import {
   NEW_PASSWORD_REQUIREMENTS_ERROR,
   NEW_PASSWORD_REQUIREMENTS_HINT,
 } from "@/lib/passwordPolicy";
-import PricingPlans from "@/components/PricingPlans";
+import { BILLING_PRICE_IDS } from "@/lib/billingPlans";
 import SettingsMenu from "@/components/SettingsMenu";
-import LoadingOverlay from "@/components/LoadingOverlay";
 
 const PREVIEW_STAGE_SIZE = 256; // matches Tailwind h-64
 const MIN_CROP_SIZE = 56;
@@ -29,7 +28,48 @@ type DisplayMeta = {
 type CropRect = { x: number; y: number; size: number };
 type Bounds = { left: number; top: number; right: number; bottom: number };
 type CropHandle = "nw" | "ne" | "sw" | "se";
-type SettingsTab = "account" | "security";
+type SettingsTab = "account" | "security" | "pricing";
+
+const ACCOUNT_PLAN_OPTIONS = [
+  {
+    name: "Essential Plus",
+    monthlyPrice: "$12.99",
+    annualPrice: "$7.99",
+    annualSavings: "Save 42%",
+    features: [
+      "Unlimited uploads & projects",
+      "Advanced PDF editing",
+      "Create reusable templates",
+      "Secure cloud storage",
+    ],
+  },
+  {
+    name: "Signature Pro",
+    monthlyPrice: "$19.99",
+    annualPrice: "$11.99",
+    annualSavings: "Save 37%",
+    features: [
+      "Everything in Essential Plus",
+      "Unlimited signature requests",
+      "Real-time signing tracking",
+      "Complete signing activity history",
+    ],
+  },
+] as const;
+
+const ACCOUNT_PLAN_PRICE_IDS: Record<
+  (typeof ACCOUNT_PLAN_OPTIONS)[number]["name"],
+  { monthly: string; annual: string }
+> = {
+  "Essential Plus": {
+    monthly: BILLING_PRICE_IDS.essential_plus.monthly,
+    annual: BILLING_PRICE_IDS.essential_plus.annual,
+  },
+  "Signature Pro": {
+    monthly: BILLING_PRICE_IDS.signature_pro.monthly,
+    annual: BILLING_PRICE_IDS.signature_pro.annual,
+  },
+};
 const HANDLE_POSITIONS: Record<CropHandle, string> = {
   nw: "-top-2 -left-2",
   ne: "-top-2 -right-2",
@@ -110,7 +150,7 @@ function resizeRectByHandle(
 
 function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { activeSettingsTab: SettingsTab }) {
   const router = useRouter();
-  const { data: session, update: updateSession } = useSession();
+  const { data: session, status: sessionStatus, update: updateSession } = useSession();
   const providers = session?.user?.providers ?? [];
   const hasCredentialsAccess = providers.length === 0 || providers.includes("credentials");
   const managedByGoogle = !hasCredentialsAccess && providers.includes("google");
@@ -131,6 +171,17 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
   const [billingPortalError, setBillingPortalError] = useState<string | null>(null);
   const [warmedBillingPortalUrl, setWarmedBillingPortalUrl] = useState<string | null>(null);
   const [warmedBillingPortalAt, setWarmedBillingPortalAt] = useState<number>(0);
+  const [pricingBillingPeriod, setPricingBillingPeriod] = useState<"monthly" | "annual">("monthly");
+  const [pricingCheckoutLoading, setPricingCheckoutLoading] = useState<string | null>(null);
+  const [pricingMessage, setPricingMessage] = useState<string | null>(null);
+  const [pricingTrialStatus, setPricingTrialStatus] = useState<{
+    eligibleForTrial: boolean;
+    stripeStatus: string | null;
+    eligibleForTrialByPlan?: {
+      essentialPlus?: boolean;
+      signaturePro?: boolean;
+    };
+  } | null>(null);
   const [firstNameValue, setFirstNameValue] = useState("");
   const [lastNameValue, setLastNameValue] = useState("");
   const [savedFirstName, setSavedFirstName] = useState("");
@@ -148,9 +199,12 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
   const accountEmail = email || session?.user?.email || null;
   const avatarKey = session?.user?.id ?? session?.user?.email ?? null;
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
-  const accountName = [firstNameValue.trim(), lastNameValue.trim()].filter(Boolean).join(" ")
+  const accountNameFromSavedFields = [savedFirstName.trim(), savedLastName.trim()].filter(Boolean).join(" ");
+  const accountName =
+    accountNameFromSavedFields
+    || (session?.user?.name ?? "").trim()
     || session?.user?.email
-    || "Account";
+    || "";
   const fallbackAvatar = getAvatarFallback(
     avatarKey,
     accountName || session?.user?.email || "User"
@@ -184,6 +238,9 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
   const [disconnectError, setDisconnectError] = useState<string | null>(null);
   const [activeSettingsTab, setActiveSettingsTab] = useState<SettingsTab>(initialSettingsTab);
   const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [accountHydrating, setAccountHydrating] = useState(true);
+  const [themeHydrated, setThemeHydrated] = useState(false);
+  const [suppressAccountLoader, setSuppressAccountLoader] = useState(false);
   const showAvatarImage = Boolean(avatar) && !avatarLoadFailed;
   const passwordMessageText = passwordMessage ?? "";
   const isEmailConfirmationMismatch =
@@ -209,10 +266,60 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
     (passwordSubmitAttempted && !confirmPassword.trim())
     || isNewPasswordMismatch
     || isNewPasswordRequirementsError;
+  const accountPageLoading = sessionStatus === "loading" && !suppressAccountLoader;
+  const isNameMissing = !firstNameValue.trim() || !lastNameValue.trim();
+  const accountStripeStatus = pricingTrialStatus?.stripeStatus ?? session?.user?.stripeStatus ?? null;
+  const pricingHasActivePlan = accountStripeStatus === "active" || accountStripeStatus === "trialing";
+  const pricingIsDelinquent = accountStripeStatus === "past_due" || accountStripeStatus === "unpaid";
+  const pricingCanUseTrial = pricingTrialStatus?.eligibleForTrial !== false;
+  const pricingStatusTone =
+    accountStripeStatus === "active"
+      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
+      : accountStripeStatus === "trialing"
+        ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
+        : pricingIsDelinquent
+          ? "bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300"
+          : "bg-slate-100 text-slate-700 dark:bg-zinc-800 dark:text-zinc-300";
+  const pricingStatusLabel =
+    accountStripeStatus === "active"
+      ? "Active"
+      : accountStripeStatus === "trialing"
+        ? "Trial"
+        : pricingIsDelinquent
+          ? "Past due"
+          : "No active plan";
+  const pricingCurrentPlanLabel =
+    accountStripeStatus === "trialing"
+      ? "Current plan: Trial"
+      : pricingHasActivePlan
+        ? "Current plan: Active subscription"
+        : pricingIsDelinquent
+          ? "Current plan: Payment issue"
+          : "Current plan: No active plan";
+  const pricingSummaryActionLabel = pricingIsDelinquent
+    ? "Update payment method"
+    : pricingHasActivePlan
+      ? "Manage billing"
+      : "Start free trial";
+  const pricingCanUseTrialForPlan = (planName: (typeof ACCOUNT_PLAN_OPTIONS)[number]["name"]) => {
+    const byPlan = pricingTrialStatus?.eligibleForTrialByPlan;
+    if (!byPlan) return pricingCanUseTrial;
+    if (planName === "Essential Plus") return byPlan.essentialPlus !== false;
+    if (planName === "Signature Pro") return byPlan.signaturePro !== false;
+    return pricingCanUseTrial;
+  };
 
   useEffect(() => {
     setActiveSettingsTab(initialSettingsTab);
   }, [initialSettingsTab]);
+
+  useEffect(() => {
+    if (activeSettingsTab === "account") return;
+    setEditingNameField(null);
+    setNameMessage(null);
+    setFirstNameValue(savedFirstName);
+    setLastNameValue(savedLastName);
+  }, [activeSettingsTab, savedFirstName, savedLastName]);
 
   useEffect(() => {
     const stored = window.localStorage.getItem("theme");
@@ -222,11 +329,53 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
       document.body.classList.remove("dark");
     }
     setTheme(initialTheme);
+    setThemeHydrated(true);
   }, []);
 
   useEffect(() => {
     router.prefetch("/");
   }, [router]);
+
+  useEffect(() => {
+    if (activeSettingsTab !== "pricing") return;
+    let cancelled = false;
+    async function loadPricingStatus() {
+      try {
+        const res = await fetch("/api/account/trial-status", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          eligibleForTrial?: boolean;
+          stripeStatus?: string | null;
+          eligibleForTrialByPlan?: {
+            essentialPlus?: boolean;
+            signaturePro?: boolean;
+          };
+        };
+        if (cancelled) return;
+        setPricingTrialStatus({
+          eligibleForTrial: data.eligibleForTrial !== false,
+          stripeStatus: typeof data.stripeStatus === "string" ? data.stripeStatus : null,
+          eligibleForTrialByPlan: data.eligibleForTrialByPlan,
+        });
+      } catch {
+        // no-op
+      }
+    }
+    void loadPricingStatus();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSettingsTab]);
+
+  useEffect(() => {
+    const handlePageShow = () => {
+      setBillingPortalLoading(false);
+    };
+    window.addEventListener("pageshow", handlePageShow);
+    return () => {
+      window.removeEventListener("pageshow", handlePageShow);
+    };
+  }, []);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -241,7 +390,12 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
     if (nextTab === activeSettingsTab) return;
     setActiveSettingsTab(nextTab);
     if (typeof window !== "undefined") {
-      const nextUrl = nextTab === "security" ? "/account?view=security" : "/account";
+      const nextUrl =
+        nextTab === "security"
+          ? "/account?view=security"
+          : nextTab === "pricing"
+            ? "/account?view=pricing"
+            : "/account";
       window.history.pushState(window.history.state, "", nextUrl);
     }
   }
@@ -282,6 +436,43 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
     setFirstNameValue(parsedFirstName);
     setLastNameValue(parsedLastName);
   }, [session?.user?.name]);
+
+  useEffect(() => {
+    if (!accountHydrating) return;
+    if (sessionStatus === "loading") return;
+
+    const fullName = (session?.user?.name ?? "").trim();
+    const parts = fullName.split(/\s+/).filter(Boolean);
+    const parsedFirstName = parts[0] ?? "";
+    const parsedLastName = parts.length > 1 ? parts.slice(1).join(" ") : "";
+    const sessionEmail = session?.user?.email ?? "";
+
+    if (
+      email === sessionEmail &&
+      firstNameValue === parsedFirstName &&
+      lastNameValue === parsedLastName
+    ) {
+      setAccountHydrating(false);
+    }
+  }, [
+    accountHydrating,
+    sessionStatus,
+    session?.user?.email,
+    session?.user?.name,
+    email,
+    firstNameValue,
+    lastNameValue,
+  ]);
+
+  useEffect(() => {
+    window.dispatchEvent(new Event(accountPageLoading ? "workspace-account-loading-start" : "workspace-account-loading-stop"));
+  }, [accountPageLoading]);
+
+  useEffect(() => {
+    return () => {
+      window.dispatchEvent(new Event("workspace-account-loading-stop"));
+    };
+  }, []);
 
   function openNameEditor(field: "first" | "last") {
     if (editingNameField === field) return;
@@ -458,8 +649,17 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
 
   async function openBillingPortal() {
     if (billingPortalLoading) return;
+    const accountViewQuery =
+      activeSettingsTab === "security"
+        ? "?view=security"
+        : activeSettingsTab === "pricing"
+          ? "?view=pricing"
+          : "";
     try {
       setBillingPortalLoading(true);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("workspace-billing-portal-start"));
+      }
       setBillingPortalError(null);
       const now = Date.now();
       if (
@@ -473,7 +673,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
       const returnUrl =
         typeof window === "undefined"
           ? undefined
-          : `${window.location.origin}/account${activeSettingsTab === "security" ? "?view=security" : ""}`;
+          : `${window.location.origin}/account${accountViewQuery}`;
       const response = await fetch("/api/billing-portal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -487,11 +687,20 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
     } catch {
       setBillingPortalError("Unable to open billing portal right now.");
       setBillingPortalLoading(false);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("workspace-billing-portal-stop"));
+      }
     }
   }
 
   async function warmBillingPortal() {
     if (billingPortalLoading) return;
+    const accountViewQuery =
+      activeSettingsTab === "security"
+        ? "?view=security"
+        : activeSettingsTab === "pricing"
+          ? "?view=pricing"
+          : "";
     const now = Date.now();
     if (
       warmedBillingPortalUrl &&
@@ -504,7 +713,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
       const returnUrl =
         typeof window === "undefined"
           ? undefined
-          : `${window.location.origin}/account${activeSettingsTab === "security" ? "?view=security" : ""}`;
+          : `${window.location.origin}/account${accountViewQuery}`;
       const response = await fetch("/api/billing-portal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -519,8 +728,60 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
     }
   }
 
+  async function handlePricingPlanSelect(
+    planName: (typeof ACCOUNT_PLAN_OPTIONS)[number]["name"],
+    options?: { skipTrial?: boolean }
+  ) {
+    const priceId = ACCOUNT_PLAN_PRICE_IDS[planName][pricingBillingPeriod];
+    if (!priceId) return;
+
+    try {
+      setPricingCheckoutLoading(planName);
+      setPricingMessage(null);
+
+      const res = await fetch("/api/billing/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ priceId, skipTrial: options?.skipTrial === true }),
+      });
+
+      if (res.status === 401) {
+        if (typeof window !== "undefined") {
+          window.location.href = "/login?callbackUrl=/account?view=pricing";
+        }
+        return;
+      }
+
+      const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+      if (!res.ok || typeof data.url !== "string") {
+        setPricingMessage(data.error ?? "Unable to open checkout right now.");
+        return;
+      }
+
+      window.location.href = data.url;
+    } catch {
+      setPricingMessage("Unable to open checkout right now.");
+    } finally {
+      setPricingCheckoutLoading(null);
+    }
+  }
+
   async function handleNameSubmit() {
     if (nameBusy) return;
+    const trimmedFirstName = firstNameValue.trim();
+    const trimmedLastName = lastNameValue.trim();
+
+    if (!trimmedFirstName || !trimmedLastName) {
+      setNameMessage("First and last name are required.");
+      return;
+    }
+
+    if (trimmedFirstName === savedFirstName && trimmedLastName === savedLastName) {
+      setEditingNameField(null);
+      setNameMessage(null);
+      return;
+    }
+
     setNameBusy(true);
     setNameMessage(null);
     try {
@@ -528,24 +789,29 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          firstName: firstNameValue,
-          lastName: lastNameValue,
+          firstName: trimmedFirstName,
+          lastName: trimmedLastName,
         }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         throw new Error(data?.error ?? "Unable to update name.");
       }
-      const mergedName = [firstNameValue.trim(), lastNameValue.trim()].filter(Boolean).join(" ");
-      setSavedFirstName(firstNameValue.trim());
-      setSavedLastName(lastNameValue.trim());
-      try {
-        await updateSession({ name: mergedName || null });
-      } catch {
-        router.refresh();
-      }
+      const mergedName = `${trimmedFirstName} ${trimmedLastName}`.trim();
+      setSavedFirstName(trimmedFirstName);
+      setSavedLastName(trimmedLastName);
+      setFirstNameValue(trimmedFirstName);
+      setLastNameValue(trimmedLastName);
       setEditingNameField(null);
-      setNameMessage("Name updated.");
+      setNameMessage(null);
+      setSuppressAccountLoader(true);
+      void updateSession({ name: mergedName })
+        .catch(() => {
+          router.refresh();
+        })
+        .finally(() => {
+          setSuppressAccountLoader(false);
+        });
     } catch (error) {
       setNameMessage(error instanceof Error ? error.message : "Unable to update name.");
     } finally {
@@ -994,8 +1260,8 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
   }
 
   return (
-    <main className="w-full bg-slate-100 px-4 py-6 text-slate-900 sm:px-6 lg:px-8 dark:bg-[#222224] dark:text-zinc-100">
-      <div className="mx-auto max-w-[1400px]">
+    <main className="w-full bg-slate-100 py-6 text-slate-900 dark:bg-[#222224] dark:text-zinc-100">
+      <div className="mx-auto w-full max-w-[var(--shell-content-width)]">
         <div className="mb-5 flex items-center justify-between gap-3">
           <div className="min-w-0 flex items-center gap-3">
             <button
@@ -1063,7 +1329,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
           </div>
         </div>
 
-        <div className="grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start">
+        <div className="grid gap-5 lg:grid-cols-[304px_minmax(0,1fr)] lg:items-start">
           <aside className="self-start rounded-2xl border-[1.5px] border-gray-200 bg-white p-4 shadow-sm lg:sticky lg:top-6 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_8px_22px_rgba(0,0,0,0.28),0_24px_52px_rgba(0,0,0,0.24)]">
             <p className="px-2 text-xs font-bold uppercase tracking-[0.14em] text-gray-600 dark:text-zinc-400">Settings</p>
             <nav className="mt-3 space-y-1">
@@ -1104,15 +1370,22 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
               <button
                 type="button"
                 onClick={() => {
-                  router.push("/account?view=pricing");
+                  switchSettingsTab("pricing");
                 }}
-                className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-gray-800 transition hover:bg-gray-50 hover:text-gray-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${
+                  activeSettingsTab === "pricing"
+                    ? "bg-[rgba(108,71,255,0.10)] text-[#5B38E6] dark:bg-zinc-800/60 dark:text-white"
+                    : "text-gray-800 hover:bg-gray-50 hover:text-gray-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                }`}
               >
-                <span className="relative h-5 w-5 text-gray-600 dark:text-zinc-400" aria-hidden>
+                <span
+                  className={`relative h-5 w-5 ${activeSettingsTab === "pricing" ? "text-[#5B38E6] dark:text-white" : "text-gray-600 dark:text-zinc-400"}`}
+                  aria-hidden
+                >
                   <Star className="h-5 w-5 stroke-[2.2]" />
                   <Smile className="absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 stroke-[2.4]" />
                 </span>
-                <span>Plan &amp; usage</span>
+                <span>Plans &amp; pricing</span>
               </button>
               <button
                 type="button"
@@ -1139,7 +1412,11 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
 
           <div className="rounded-2xl border-[1.5px] border-gray-200 bg-white p-6 shadow-sm sm:p-7 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_8px_22px_rgba(0,0,0,0.28),0_24px_52px_rgba(0,0,0,0.24)]">
             <h2 className="text-3xl font-semibold tracking-tight text-gray-900 dark:text-zinc-100">
-              {activeSettingsTab === "security" ? "Security" : "Personal details"}
+              {activeSettingsTab === "security"
+                ? "Security"
+                : activeSettingsTab === "pricing"
+                  ? "Plans & pricing"
+                  : "Personal details"}
             </h2>
 
           {activeSettingsTab === "account" ? (
@@ -1153,7 +1430,10 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
               <div className="inline-fade-in-soft mt-2">
                 <input
                   value={firstNameValue}
-                  onChange={(event) => setFirstNameValue(event.target.value)}
+                  onChange={(event) => {
+                    setFirstNameValue(event.target.value);
+                    if (nameMessage) setNameMessage(null);
+                  }}
                   autoComplete="given-name"
                   className="w-full rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                 />
@@ -1163,7 +1443,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                     onClick={() => {
                       void handleNameSubmit();
                     }}
-                    disabled={nameBusy}
+                    disabled={nameBusy || isNameMissing}
                     className="rounded-md bg-[#6C47FF] px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-[#5B38E6] disabled:opacity-60"
                   >
                     {nameBusy ? "Saving..." : "Save"}
@@ -1179,7 +1459,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
               </div>
             ) : (
               <div className="mt-1 flex items-center justify-between gap-2">
-                <dd className="text-base text-gray-900 dark:text-zinc-100">{firstNameValue || "Not provided"}</dd>
+                <dd className="text-base text-gray-900 dark:text-zinc-100">{firstNameValue || ""}</dd>
                 <button
                   type="button"
                   onClick={() => openNameEditor("first")}
@@ -1199,7 +1479,10 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
               <div className="inline-fade-in-soft mt-2">
                 <input
                   value={lastNameValue}
-                  onChange={(event) => setLastNameValue(event.target.value)}
+                  onChange={(event) => {
+                    setLastNameValue(event.target.value);
+                    if (nameMessage) setNameMessage(null);
+                  }}
                   autoComplete="family-name"
                   className="w-full rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                 />
@@ -1209,7 +1492,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                     onClick={() => {
                       void handleNameSubmit();
                     }}
-                    disabled={nameBusy}
+                    disabled={nameBusy || isNameMissing}
                     className="rounded-md bg-[#6C47FF] px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-[#5B38E6] disabled:opacity-60"
                   >
                     {nameBusy ? "Saving..." : "Save"}
@@ -1225,7 +1508,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
               </div>
             ) : (
               <div className="mt-1 flex items-center justify-between gap-2">
-                <dd className="text-base text-gray-900 dark:text-zinc-100">{lastNameValue || "Not provided"}</dd>
+                <dd className="text-base text-gray-900 dark:text-zinc-100">{lastNameValue || ""}</dd>
                 <button
                   type="button"
                   onClick={() => openNameEditor("last")}
@@ -1243,11 +1526,11 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
 
           <div className="min-w-0">
             <dt className="text-sm font-medium text-gray-700 dark:text-zinc-300">Email</dt>
-            <dd className="mt-1 text-sm text-gray-800 dark:text-zinc-200">{email || "Unknown"}</dd>
+            <dd className="mt-1 text-sm text-gray-800 dark:text-zinc-200">{email || ""}</dd>
           </div>
 
         </dl>
-        {nameMessage ? <p className="mt-2 text-sm text-gray-600 dark:text-zinc-400">{nameMessage}</p> : null}
+        {nameMessage ? <p className="mt-2 text-sm text-rose-600 dark:text-rose-400">{nameMessage}</p> : null}
         </section>
 
         <section className="mt-8 border-t border-gray-200 pt-6 dark:border-zinc-800">
@@ -1465,7 +1748,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
             <div className="relative inline-flex h-11 w-[150px] items-center rounded-lg border border-gray-300 bg-white p-1 dark:border-zinc-700 dark:bg-zinc-900">
               <span
                 aria-hidden
-                className={`absolute top-1 h-[34px] w-[70px] rounded-md bg-[#6C47FF] transition-transform duration-300 ease-out ${
+                className={`absolute top-1 h-[34px] w-[70px] rounded-md bg-[#6C47FF] ${
                   theme === "dark" ? "translate-x-[72px]" : "translate-x-0"
                 }`}
               />
@@ -1499,6 +1782,199 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
 
         </>
           ) : null}
+
+        {activeSettingsTab === "pricing" ? (
+        <>
+        <div className="mt-6 border-t border-gray-200 dark:border-zinc-800" />
+        <section className="mt-6 space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-gray-600 dark:text-zinc-400">
+              Choose the plan that fits your workflow.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                router.push("/pricing");
+              }}
+              className="text-sm font-semibold text-[#5B38E6] transition hover:text-[#4A2ED9]"
+            >
+              Compare features
+            </button>
+          </div>
+
+          <div className="rounded-2xl border border-gray-200 bg-gray-50/80 p-4 dark:border-zinc-700 dark:bg-zinc-800/50">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="space-y-1">
+                <p className="text-base font-semibold text-gray-900 dark:text-zinc-100">{pricingCurrentPlanLabel}</p>
+                <div className="flex items-center gap-2">
+                  <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${pricingStatusTone}`}>
+                    {pricingStatusLabel}
+                  </span>
+                  {pricingTrialStatus?.eligibleForTrial === false && !pricingHasActivePlan && !pricingIsDelinquent ? (
+                    <span className="text-xs font-medium text-gray-500 dark:text-zinc-400">Trial already used</span>
+                  ) : null}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (pricingHasActivePlan || pricingIsDelinquent) {
+                    void openBillingPortal();
+                    return;
+                  }
+                  document.getElementById("account-pricing-cards")?.scrollIntoView({
+                    behavior: "smooth",
+                    block: "start",
+                  });
+                }}
+                className={`rounded-md px-4 py-2 text-sm font-semibold text-white transition ${
+                  pricingIsDelinquent
+                    ? "bg-rose-600 hover:bg-rose-700"
+                    : "bg-[#6C47FF] hover:bg-[#5B38E6]"
+                }`}
+              >
+                {pricingSummaryActionLabel}
+              </button>
+            </div>
+          </div>
+
+          {pricingIsDelinquent ? (
+            <div className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-3 text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-300">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+              <p className="text-sm font-medium">
+                We couldn&apos;t process your latest payment. Please update your payment method.
+              </p>
+            </div>
+          ) : null}
+
+          <div className="inline-flex items-center rounded-full border border-gray-300 bg-white p-1 dark:border-zinc-700 dark:bg-zinc-900">
+            <button
+              type="button"
+              onClick={() => setPricingBillingPeriod("monthly")}
+              className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
+                pricingBillingPeriod === "monthly"
+                  ? "bg-[#6C47FF] text-white"
+                  : "text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              }`}
+            >
+              Monthly
+            </button>
+            <button
+              type="button"
+              onClick={() => setPricingBillingPeriod("annual")}
+              className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
+                pricingBillingPeriod === "annual"
+                  ? "bg-[#6C47FF] text-white"
+                  : "text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              }`}
+            >
+              Annual
+            </button>
+          </div>
+
+          <div id="account-pricing-cards" className="grid gap-4 lg:grid-cols-2">
+            {ACCOUNT_PLAN_OPTIONS.map((plan) => {
+              const isAnnual = pricingBillingPeriod === "annual";
+              const displayedPrice = isAnnual ? plan.annualPrice : plan.monthlyPrice;
+              const isLoading = pricingCheckoutLoading === plan.name;
+              const canUseTrialForCurrentPlan = pricingCanUseTrialForPlan(plan.name);
+              const showManageBillingAction = pricingHasActivePlan || pricingIsDelinquent;
+              const primaryLabel = showManageBillingAction
+                ? pricingIsDelinquent
+                  ? "Update payment method"
+                  : "Manage billing"
+                : canUseTrialForCurrentPlan
+                  ? "Start 7-day trial"
+                  : "Subscribe now";
+
+              return (
+                <div key={plan.name} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-zinc-700 dark:bg-zinc-900/80">
+                  <div className="mb-4 flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-xl font-semibold text-gray-900 dark:text-zinc-100">{plan.name}</h3>
+                      <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-zinc-100">
+                        {displayedPrice}
+                        <span className="ml-1 text-sm font-medium text-gray-500 dark:text-zinc-400">per month</span>
+                      </p>
+                    </div>
+                    {isAnnual ? (
+                      <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
+                        {plan.annualSavings}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <ul className="space-y-2 text-sm text-gray-700 dark:text-zinc-300">
+                    {plan.features.map((feature) => (
+                      <li key={feature} className="flex items-start gap-2">
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#5B38E6]" aria-hidden />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <div className="mt-5 space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (showManageBillingAction) {
+                          void openBillingPortal();
+                          return;
+                        }
+                        void handlePricingPlanSelect(
+                          plan.name,
+                          canUseTrialForCurrentPlan ? undefined : { skipTrial: true },
+                        );
+                      }}
+                      disabled={isLoading}
+                      className="w-full rounded-md bg-[#6C47FF] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#5B38E6] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isLoading ? "Redirecting..." : primaryLabel}
+                    </button>
+                    {!showManageBillingAction && canUseTrialForCurrentPlan ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void handlePricingPlanSelect(plan.name, { skipTrial: true });
+                        }}
+                        className="w-full text-center text-xs font-semibold text-gray-600 underline underline-offset-4 transition hover:text-gray-900 dark:text-zinc-400 dark:hover:text-zinc-200"
+                      >
+                        Pay now
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {pricingMessage ? (
+            <p className="text-sm font-medium text-rose-600 dark:text-rose-400">{pricingMessage}</p>
+          ) : null}
+
+          <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900/70">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-700 dark:text-zinc-300">
+              Billing snapshot
+            </h3>
+            <div className="mt-3 grid gap-3 text-sm text-gray-700 dark:text-zinc-300 sm:grid-cols-2">
+              <p>Billing status: <span className="font-semibold">{pricingStatusLabel}</span></p>
+              <p>Billing cycle: <span className="font-semibold">{pricingBillingPeriod === "monthly" ? "Monthly" : "Annual"}</span></p>
+              <p>Trial eligibility: <span className="font-semibold">{pricingCanUseTrial ? "Available" : "Used"}</span></p>
+              <p>Billing details: <span className="font-semibold">Managed in Stripe portal</span></p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                void openBillingPortal();
+              }}
+              className="mt-4 rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-800 transition hover:bg-gray-100 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800"
+            >
+              Open billing portal
+            </button>
+          </div>
+        </section>
+        </>
+        ) : null}
 
         {activeSettingsTab === "security" && canChangePassword && (
         <section className="mt-8 border-t border-gray-200 pt-6 dark:border-zinc-800">
@@ -2046,11 +2522,6 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
         </div>
       ) : null}
 
-      <LoadingOverlay
-        open={billingPortalLoading}
-        label="Opening Billing Portal..."
-        zIndexClassName="z-[1200]"
-      />
     </main>
   );
 }
@@ -2058,11 +2529,8 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
 export default function AccountPage() {
   const searchParams = useSearchParams();
   const view = searchParams.get("view");
-  const activeSettingsTab: SettingsTab = view === "security" ? "security" : "account";
-
-  if (view === "pricing") {
-    return <PricingPlans />;
-  }
+  const activeSettingsTab: SettingsTab =
+    view === "security" ? "security" : view === "pricing" ? "pricing" : "account";
 
   return <AccountSettingsPage activeSettingsTab={activeSettingsTab} />;
 }

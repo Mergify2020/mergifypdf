@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getStripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
 import type Stripe from "stripe";
+import { getPlanTierFromPriceId } from "@/lib/billingPlans";
 
 export async function POST(req: NextRequest) {
   const stripe = getStripe();
@@ -99,15 +100,32 @@ export async function POST(req: NextRequest) {
           const isTrial = status === "trialing" || !!trialEnd;
           if (isTrial) {
             const trialDate = new Date(((trialStart ?? Math.floor(Date.now() / 1000)) as number) * 1000);
-            await prisma.user.updateMany({
-              where: {
-                OR: matchFilters,
-                trialUsedAt: null,
-              },
-              data: {
-                trialUsedAt: trialDate,
-              },
-            });
+            const planTier = getPlanTierFromPriceId(priceId);
+
+            if (planTier === "essential_plus") {
+              await prisma.user.updateMany({
+                where: {
+                  OR: matchFilters,
+                  essentialPlusTrialUsedAt: null,
+                },
+                data: {
+                  essentialPlusTrialUsedAt: trialDate,
+                  trialUsedAt: trialDate,
+                },
+              });
+            } else {
+              // Signature Pro trial (or unknown legacy tier) should block further trials.
+              await prisma.user.updateMany({
+                where: {
+                  OR: matchFilters,
+                  signatureProTrialUsedAt: null,
+                },
+                data: {
+                  signatureProTrialUsedAt: trialDate,
+                  trialUsedAt: trialDate,
+                },
+              });
+            }
           }
         }
         break;

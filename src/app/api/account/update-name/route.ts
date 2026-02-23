@@ -17,6 +17,9 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const firstName = typeof body.firstName === "string" ? body.firstName.trim() : "";
   const lastName = typeof body.lastName === "string" ? body.lastName.trim() : "";
+  if (!firstName || !lastName) {
+    return NextResponse.json({ error: "First and last name are required." }, { status: 400 });
+  }
   const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
 
   if (fullName.length > 120) {

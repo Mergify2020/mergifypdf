@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { CircleHelp, CreditCard, ExternalLink, LogOut, Settings, User } from "lucide-react";
+import { CircleHelp, CreditCard, ExternalLink, Home, LogOut, PenLine, Settings, User } from "lucide-react";
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
 import { getAvatarFallback } from "@/lib/avatarFallback";
 
@@ -113,6 +113,9 @@ export default function SettingsMenu({
 
   async function handleBillingPortal() {
     setOpen(false);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("workspace-billing-portal-start"));
+    }
     try {
       const response = await fetch("/api/billing-portal", {
         method: "POST",
@@ -129,12 +132,25 @@ export default function SettingsMenu({
     } catch {
       // fall through to account page
     }
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("workspace-billing-portal-stop"));
+    }
     router.push("/account?view=security");
   }
 
   function handleAccountSettings() {
     setOpen(false);
     router.push("/account");
+  }
+
+  function handleHome() {
+    setOpen(false);
+    router.push("/");
+  }
+
+  function handleSignatures() {
+    setOpen(false);
+    router.push("/signature-center");
   }
 
   function handleHelpCenter() {
@@ -258,6 +274,22 @@ export default function SettingsMenu({
               ) : null}
               <button
                 type="button"
+                onClick={handleHome}
+                className="group flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-[15px] font-medium text-[#1E293B] transition hover:bg-[#F8FAFC] hover:text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/35 focus:ring-offset-2 focus:ring-offset-white dark:text-zinc-100 dark:hover:bg-zinc-800/80 dark:hover:text-zinc-50 dark:focus:ring-offset-zinc-900"
+              >
+                <Home className="h-4 w-4 text-[#64748B] dark:text-zinc-400" aria-hidden />
+                <span>Home</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleSignatures}
+                className="group flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-[15px] font-medium text-[#1E293B] transition hover:bg-[#F8FAFC] hover:text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/35 focus:ring-offset-2 focus:ring-offset-white dark:text-zinc-100 dark:hover:bg-zinc-800/80 dark:hover:text-zinc-50 dark:focus:ring-offset-zinc-900"
+              >
+                <PenLine className="h-4 w-4 text-[#64748B] dark:text-zinc-400" aria-hidden />
+                <span>Signatures</span>
+              </button>
+              <button
+                type="button"
                 onClick={handleAccountSettings}
                 className="group flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-[15px] font-medium text-[#1E293B] transition hover:bg-[#F8FAFC] hover:text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/35 focus:ring-offset-2 focus:ring-offset-white dark:text-zinc-100 dark:hover:bg-zinc-800/80 dark:hover:text-zinc-50 dark:focus:ring-offset-zinc-900"
               >
@@ -266,11 +298,13 @@ export default function SettingsMenu({
               </button>
               <button
                 type="button"
-                onClick={handlePricing}
+                onClick={() => {
+                  void handleBillingPortal();
+                }}
                 className="group flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-[15px] font-medium text-[#1E293B] transition hover:bg-[#F8FAFC] hover:text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/35 focus:ring-offset-2 focus:ring-offset-white dark:text-zinc-100 dark:hover:bg-zinc-800/80 dark:hover:text-zinc-50 dark:focus:ring-offset-zinc-900"
               >
                 <CreditCard className="h-4 w-4 text-[#64748B] dark:text-zinc-400" aria-hidden />
-                <span>Subscription &amp; Billing</span>
+                <span>Billing portal</span>
               </button>
               <button
                 type="button"
