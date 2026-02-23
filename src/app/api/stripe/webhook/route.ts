@@ -4,6 +4,12 @@ import { prisma } from "@/lib/prisma";
 import type Stripe from "stripe";
 import { getPlanTierFromPriceId } from "@/lib/billingPlans";
 
+function normalizeAppUserId(candidate: unknown): string | null {
+  if (typeof candidate !== "string") return null;
+  const normalized = candidate.trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
 export async function POST(req: NextRequest) {
   const stripe = getStripe();
   const sig = req.headers.get("stripe-signature");
@@ -15,12 +21,13 @@ export async function POST(req: NextRequest) {
 
   const body = await req.text();
 
-  let event;
+  let event: Stripe.Event;
   try {
     event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
-  } catch (err: any) {
-    console.error("Stripe webhook signature verification failed", err?.message ?? err);
-    return new NextResponse(`Webhook Error: ${err?.message ?? "Invalid signature"}`, {
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : "Invalid signature";
+    console.error("Stripe webhook signature verification failed", errorMessage);
+    return new NextResponse(`Webhook Error: ${errorMessage}`, {
       status: 400,
     });
   }
@@ -34,8 +41,11 @@ export async function POST(req: NextRequest) {
           const customerId = typeof session.customer === "string" ? session.customer : null;
           const subscriptionId =
             typeof session.subscription === "string" ? session.subscription : null;
+          const appUserId =
+            normalizeAppUserId(session.client_reference_id)
+            ?? normalizeAppUserId(session.metadata?.appUserId);
 
-          if (email && customerId && subscriptionId) {
+          if (customerId && subscriptionId) {
             const subscriptionResponse = await stripe.subscriptions.retrieve(subscriptionId);
             const subscription = subscriptionResponse as Stripe.Subscription;
             const priceId = subscription.items.data[0]?.price?.id ?? null;
@@ -45,19 +55,31 @@ export async function POST(req: NextRequest) {
             const currentPeriodEnd = currentPeriodEndSeconds
               ? new Date(currentPeriodEndSeconds * 1000)
               : null;
-
-            await prisma.user.updateMany({
-              where: { email },
-              data: {
-                stripeCustomerId: customerId,
-                stripeSubscriptionId: subscriptionId,
-                stripePriceId: priceId,
-                stripeStatus: status,
-                stripeCurrentPeriodEnd: currentPeriodEnd,
-                pendingCheckoutId: null,
-                pendingCheckoutCreatedAt: null,
-              },
+            const matchFilters = [
+              ...(appUserId ? [{ id: appUserId }] : []),
+              { stripeSubscriptionId: subscriptionId },
+              { stripeCustomerId: customerId },
+              ...(email ? [{ email }] : []),
+            ];
+            const matchedUser = await prisma.user.findFirst({
+              where: { OR: matchFilters },
+              select: { id: true },
             });
+
+            if (matchedUser) {
+              await prisma.user.update({
+                where: { id: matchedUser.id },
+                data: {
+                  stripeCustomerId: customerId,
+                  stripeSubscriptionId: subscriptionId,
+                  stripePriceId: priceId,
+                  stripeStatus: status,
+                  stripeCurrentPeriodEnd: currentPeriodEnd,
+                  pendingCheckoutId: null,
+                  pendingCheckoutCreatedAt: null,
+                },
+              });
+            }
           }
         }
         break;
@@ -70,20 +92,26 @@ export async function POST(req: NextRequest) {
           const customerId = typeof subscription.customer === "string" ? subscription.customer : null;
           const priceId = subscription.items.data[0]?.price?.id ?? null;
           const status = subscription.status ?? null;
+          const appUserId = normalizeAppUserId(subscription.metadata?.appUserId);
           const currentPeriodEndSeconds = (subscription as { current_period_end?: number })
             .current_period_end;
           const currentPeriodEnd = currentPeriodEndSeconds
             ? new Date(currentPeriodEndSeconds * 1000)
             : null;
           const matchFilters = [
+            ...(appUserId ? [{ id: appUserId }] : []),
             { stripeSubscriptionId: subscriptionId },
             ...(customerId ? [{ stripeCustomerId: customerId }] : []),
           ];
+          const matchedUser = await prisma.user.findFirst({
+            where: { OR: matchFilters },
+            select: { id: true },
+          });
 
-          await prisma.user.updateMany({
-            where: {
-              OR: matchFilters,
-            },
+          if (!matchedUser) break;
+
+          await prisma.user.update({
+            where: { id: matchedUser.id },
             data: {
               stripeCustomerId: customerId ?? undefined,
               stripeSubscriptionId: subscriptionId,
@@ -103,9 +131,9 @@ export async function POST(req: NextRequest) {
             const planTier = getPlanTierFromPriceId(priceId);
 
             if (planTier === "essential_plus") {
-              await prisma.user.updateMany({
+              await prisma.user.update({
                 where: {
-                  OR: matchFilters,
+                  id: matchedUser.id,
                   essentialPlusTrialUsedAt: null,
                 },
                 data: {
@@ -115,9 +143,9 @@ export async function POST(req: NextRequest) {
               });
             } else {
               // Signature Pro trial (or unknown legacy tier) should block further trials.
-              await prisma.user.updateMany({
+              await prisma.user.update({
                 where: {
-                  OR: matchFilters,
+                  id: matchedUser.id,
                   signatureProTrialUsedAt: null,
                 },
                 data: {

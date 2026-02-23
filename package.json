@@ -29,6 +29,7 @@
     "next-auth": "^4.24.13",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^3.11.174",
+    "posthog-js": "^1.352.0",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-dropzone": "^14.3.8",

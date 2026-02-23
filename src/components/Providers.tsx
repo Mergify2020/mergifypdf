@@ -2,6 +2,8 @@
 
 import type { Session } from "next-auth";
 import { SessionProvider } from "next-auth/react";
+import PostHogInit from "@/components/PostHogInit";
+import PostHogIdentify from "@/components/PostHogIdentify";
 
 export default function Providers({
   children,
@@ -12,6 +14,8 @@ export default function Providers({
 }) {
   return (
     <SessionProvider session={session}>
+      <PostHogInit />
+      <PostHogIdentify />
       {children}
     </SessionProvider>
   );

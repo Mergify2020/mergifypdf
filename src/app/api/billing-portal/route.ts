@@ -50,13 +50,11 @@ export async function POST(req: NextRequest) {
     let customerId = user?.stripeCustomerId ?? null;
 
     if (!customerId) {
-      const existing = await stripe.customers.list({ email, limit: 1 });
-      const customer =
-        existing.data[0] ??
-        (await stripe.customers.create({
-          email: targetEmail,
-          name: targetName,
-        }));
+      const customer = await stripe.customers.create({
+        email: targetEmail,
+        name: targetName,
+        metadata: { appUserId: userId },
+      });
       customerId = customer.id;
 
       await prisma.user.update({
@@ -69,6 +67,7 @@ export async function POST(req: NextRequest) {
     await stripe.customers.update(customerId, {
       email: targetEmail,
       name: targetName,
+      metadata: { appUserId: userId },
     });
 
     const portalSession = await stripe.billingPortal.sessions.create({

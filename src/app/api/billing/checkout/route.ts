@@ -22,6 +22,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const user = await prisma.user.findUnique({ where: { email: session.user.email } });
+  if (!user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   if (user?.stripeStatus === "active" || user?.stripeStatus === "trialing") {
     return NextResponse.json({ error: "Subscription already active" }, { status: 409 });
   }
@@ -63,6 +66,32 @@ export async function POST(req: NextRequest) {
         : trialEligibility.eligibleForTrialByPlan.signaturePro;
     const trialAllowed = wantsTrial && eligibleForTrial;
 
+    const normalizedEmail = (user.email ?? session.user.email ?? "").trim().toLowerCase();
+    if (!normalizedEmail) {
+      return NextResponse.json({ error: "User email missing" }, { status: 400 });
+    }
+    const customerName = user.name ?? session.user.name ?? undefined;
+    let customerId = user.stripeCustomerId ?? null;
+
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: normalizedEmail,
+        name: customerName,
+        metadata: { appUserId: user.id },
+      });
+      customerId = customer.id;
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { stripeCustomerId: customerId },
+      });
+    } else {
+      await stripe.customers.update(customerId, {
+        email: normalizedEmail,
+        name: customerName,
+        metadata: { appUserId: user.id },
+      });
+    }
+
     const now = new Date();
     const isPendingFresh =
       user?.pendingCheckoutId &&
@@ -71,7 +100,7 @@ export async function POST(req: NextRequest) {
     const pendingCheckoutId = isPendingFresh ? user?.pendingCheckoutId : randomUUID();
     if (!isPendingFresh) {
       await prisma.user.update({
-        where: { email: session.user.email ?? "" },
+        where: { id: user.id },
         data: {
           pendingCheckoutId,
           pendingCheckoutCreatedAt: now,
@@ -81,17 +110,22 @@ export async function POST(req: NextRequest) {
 
     const checkoutSession = await stripe.checkout.sessions.create(
       {
-      mode: "subscription",
-      payment_method_types: ["card"],
-      line_items: [{ price: priceId, quantity: 1 }],
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-      customer_email: session.user.email ?? undefined,
-      allow_promotion_codes: true,
-      subscription_data: trialAllowed ? { trial_period_days: 7 } : undefined,
+        mode: "subscription",
+        payment_method_types: ["card"],
+        line_items: [{ price: priceId, quantity: 1 }],
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+        customer: customerId,
+        client_reference_id: user.id,
+        metadata: { appUserId: user.id },
+        allow_promotion_codes: true,
+        subscription_data: {
+          metadata: { appUserId: user.id },
+          ...(trialAllowed ? { trial_period_days: 7 } : {}),
+        },
       },
       {
-        idempotencyKey: `checkout-${user?.id ?? "unknown"}-${pendingCheckoutId}`,
+        idempotencyKey: `checkout-${user.id}-${pendingCheckoutId}`,
       }
     );
 
