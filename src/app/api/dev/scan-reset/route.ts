@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { guardDevRoute } from "@/lib/devRouteGuard";
 
 type TableColumn = {
   column_name: string;
@@ -14,10 +15,9 @@ type TableDetails = {
   rows: Record<string, unknown>[];
 };
 
-export async function GET() {
-  if (process.env.NODE_ENV === "production") {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
+export async function GET(req: Request) {
+  const blocked = guardDevRoute(req);
+  if (blocked) return blocked;
   try {
     // 1) list all non-system tables
     const tables = await prisma.$queryRaw<

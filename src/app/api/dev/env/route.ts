@@ -1,10 +1,10 @@
 // src/app/api/dev/env/route.ts (NEW FILE - paste entire file)
 import { NextResponse } from "next/server";
+import { guardDevRoute } from "@/lib/devRouteGuard";
 
-export async function GET() {
-  if (process.env.NODE_ENV === "production") {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
+export async function GET(req: Request) {
+  const blocked = guardDevRoute(req);
+  if (blocked) return blocked;
   const base =
     process.env.NEXTAUTH_URL ||
     process.env.NEXT_PUBLIC_APP_URL ||

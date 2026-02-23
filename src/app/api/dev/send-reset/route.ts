@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { sendResetEmail } from "@/lib/email";
+import { guardDevRoute } from "@/lib/devRouteGuard";
 
-export async function GET() {
-  if (process.env.NODE_ENV === "production") {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
+export async function GET(req: Request) {
+  const blocked = guardDevRoute(req);
+  if (blocked) return blocked;
   const to = "morrisalan2020@gmail.com";
   const code = "123456";
   const result = await sendResetEmail({ to, code });

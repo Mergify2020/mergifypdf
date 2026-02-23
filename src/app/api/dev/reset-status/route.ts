@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { guardDevRoute } from "@/lib/devRouteGuard";
 
 // ⚠ Keep this equal to the value in /api/auth/request-reset
 const THROTTLE_MS = 2 * 60 * 1000; // 2 minutes
 
 export async function GET(req: Request) {
-  if (process.env.NODE_ENV === "production") {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
+  const blocked = guardDevRoute(req);
+  if (blocked) return blocked;
   try {
     const url = new URL(req.url);
     const email = url.searchParams.get("email");

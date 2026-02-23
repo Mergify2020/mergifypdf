@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
+import { guardDevRoute } from "@/lib/devRouteGuard";
 
 type DevSubscriptionState =
   | "none"
@@ -28,10 +29,9 @@ function fakeSubscriptionId(userId: string) {
   return `dev_sub_${userId.slice(-10)}`;
 }
 
-export async function GET() {
-  if (process.env.NODE_ENV === "production") {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
+export async function GET(req: Request) {
+  const blocked = guardDevRoute(req);
+  if (blocked) return blocked;
 
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
@@ -54,9 +54,8 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  if (process.env.NODE_ENV === "production") {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
+  const blocked = guardDevRoute(req);
+  if (blocked) return blocked;
 
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {

@@ -2,11 +2,11 @@ export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { guardDevRoute } from "@/lib/devRouteGuard";
 
-export async function GET() {
-  if (process.env.NODE_ENV === "production") {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
+export async function GET(req: Request) {
+  const blocked = guardDevRoute(req);
+  if (blocked) return blocked;
   try {
     const count = await prisma.user.count();
     return NextResponse.json({ ok: true, users: count });

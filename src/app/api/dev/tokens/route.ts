@@ -1,11 +1,11 @@
 // src/app/api/dev/tokens/route.ts (NEW FILE - paste entire file)
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { guardDevRoute } from "@/lib/devRouteGuard";
 
 export async function GET(req: Request) {
-  if (process.env.NODE_ENV === "production") {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
+  const blocked = guardDevRoute(req);
+  if (blocked) return blocked;
   try {
     const url = new URL(req.url);
     const email = url.searchParams.get("email");

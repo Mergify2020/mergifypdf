@@ -1,11 +1,11 @@
 // (paste together) — CREATE NEW FILE
 import { NextResponse } from "next/server";
 import { sendResetEmail } from "@/lib/email";
+import { guardDevRoute } from "@/lib/devRouteGuard";
 
 export async function GET(req: Request) {
-  if (process.env.NODE_ENV === "production") {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
+  const blocked = guardDevRoute(req);
+  if (blocked) return blocked;
   try {
     const { searchParams } = new URL(req.url);
     const to = searchParams.get("to");

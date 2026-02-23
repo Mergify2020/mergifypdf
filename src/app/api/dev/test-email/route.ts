@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
+import { guardDevRoute } from "@/lib/devRouteGuard";
 
-export async function GET() {
-  if (process.env.NODE_ENV === "production") {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
+export async function GET(req: Request) {
+  const blocked = guardDevRoute(req);
+  if (blocked) return blocked;
   try {
     const resend = new Resend(process.env.RESEND_API_KEY);
     const to = "morrisalan2020@gmail.com";
