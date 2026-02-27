@@ -2521,7 +2521,7 @@ export default function WorkspaceShell({
                         }}
                       >
                         <div className="w-full">
-                          <div className="grid h-full w-full max-w-[1680px] min-h-0 gap-[24px] lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start">
+                          <div className="grid h-full w-full min-h-0 gap-[24px] xl:grid-cols-[minmax(0,1fr)_280px] xl:items-start">
                             <div className="relative z-40 flex h-full min-h-0 w-full flex-col pl-1 pr-0 pt-0">
                               <div className="w-full">
                                 <section className="mt-0 w-full">
@@ -2545,7 +2545,7 @@ export default function WorkspaceShell({
                                       style={{ paddingRight: 4, paddingLeft: 6, paddingBottom: 6 }}
                                     >
                                       {fallbackProjectCardCount > 0 ? (
-                                        <div className="recent-projects-grid projects-grid mt-2 grid w-full max-w-[1560px] items-start gap-6 grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(240px,1fr))]">
+                                        <div className="recent-projects-grid projects-grid mt-2 grid w-full max-w-[1560px] items-start gap-6 grid-cols-2">
                                           {Array.from({ length: fallbackProjectCardCount }).map((_, index) => (
                                             <div key={`home-refresh-skeleton-${index}`} className="flex w-full flex-col text-left">
                                               <div className="relative rounded-[10px] bg-[#F9FAFC] dark:bg-zinc-900/60">

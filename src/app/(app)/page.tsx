@@ -8,7 +8,7 @@ import LogoCarousel from "@/components/LogoCarousel";
 import { hasUsedToday } from "@/lib/quota";
 import { prisma } from "@/lib/prisma";
 import ContainerShadowOverlay from "@/components/ContainerShadowOverlay";
-import RightSidebarColumn from "@/components/RightSidebarColumn";
+import RightSidebarColumn, { HomeQuickActionsCard } from "@/components/RightSidebarColumn";
 import HomeProjectsSearch from "@/components/HomeProjectsSearch";
 import RevealOnScroll from "@/components/RevealOnScroll";
 import HeroUploadAndBullets from "@/components/HeroUploadAndBullets";
@@ -193,12 +193,15 @@ async function ProjectsDashboard({
       }}
     >
       <div className="w-full">
-        <div className="home-content-grid grid h-full w-full max-w-[1680px] min-h-0 gap-[24px] lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start">
+        <div className="home-content-grid grid h-full w-full min-h-0 gap-[24px] xl:grid-cols-[minmax(0,1fr)_280px] xl:items-start">
           <div
             id="home-projects-container"
             className="relative z-40 flex h-full min-h-0 w-full flex-col pl-1 pr-0 pt-0 data-[shadow-overlay=true]:border-transparent data-[shadow-overlay=true]:shadow-none"
           >
             <div className="w-full">
+              <div className="mb-4 xl:hidden">
+                <HomeQuickActionsCard />
+              </div>
               <HomeProjectsSearch
                 accountName={displayName}
                 ownerKey={userId}

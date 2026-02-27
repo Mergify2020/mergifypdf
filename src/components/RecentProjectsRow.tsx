@@ -60,7 +60,7 @@ export default function RecentProjectsRow({
 
   if (loading && !projects.length) {
     return (
-      <div className="recent-projects-grid projects-grid mt-2 grid w-full max-w-[1560px] items-start gap-6 grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(240px,1fr))]">
+      <div className="recent-projects-grid projects-grid mt-2 grid w-full max-w-[1560px] items-start gap-6 grid-cols-2">
         {Array.from({ length: 6 }).map((_, index) => (
           <div
             key={`home-loading-project-${index}`}
@@ -113,7 +113,7 @@ export default function RecentProjectsRow({
       <div className="relative">
         <div
           aria-hidden="true"
-          className="recent-projects-grid projects-grid mt-2 grid w-full max-w-[1560px] items-start gap-6 grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(240px,1fr))]"
+          className="recent-projects-grid projects-grid mt-2 grid w-full max-w-[1560px] items-start gap-6 grid-cols-2"
         >
           {Array.from({ length: 6 }).map((_, index) => (
           <div
@@ -140,7 +140,7 @@ export default function RecentProjectsRow({
   }
 
   return (
-    <div className="recent-projects-grid projects-grid mt-2 grid w-full max-w-[1560px] items-start gap-6 grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(240px,1fr))]">
+    <div className="recent-projects-grid projects-grid mt-2 grid w-full max-w-[1560px] items-start gap-6 grid-cols-2">
       {mapped.map((project, index) => {
         const isSelected = !!selected[project.id];
         return (

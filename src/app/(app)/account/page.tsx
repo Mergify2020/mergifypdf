@@ -1805,31 +1805,39 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
         <>
         <div className="mt-6 border-t border-gray-200 dark:border-zinc-800" />
         <section className="mt-6 space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-gray-600 dark:text-zinc-400">
-              Choose the plan that fits your workflow.
-            </p>
-            <button
-              type="button"
-              onClick={() => {
-                router.push("/pricing");
-              }}
-              className="text-sm font-semibold text-[#5B38E6] transition hover:text-[#4A2ED9]"
-            >
-              Compare features
-            </button>
+          <div className="relative overflow-hidden rounded-3xl border border-indigo-100 bg-gradient-to-br from-white via-[#F7F5FF] to-[#EDF2FF] p-5 shadow-[0_18px_45px_rgba(56,37,149,0.08)] dark:border-indigo-500/25 dark:from-zinc-900 dark:via-zinc-900 dark:to-zinc-950">
+            <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-[#6C47FF]/10 blur-3xl dark:bg-[#6C47FF]/20" aria-hidden />
+            <div className="relative flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#5B38E6] dark:text-indigo-300">Subscription</p>
+                <p className="mt-2 max-w-xl text-sm text-gray-700 dark:text-zinc-300">
+                  Choose the plan that fits your workflow and switch anytime.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  router.push("/pricing");
+                }}
+                className="inline-flex items-center rounded-full border border-[#6C47FF]/20 bg-white/90 px-4 py-2 text-sm font-semibold text-[#5B38E6] transition hover:border-[#6C47FF]/50 hover:bg-white dark:border-indigo-400/40 dark:bg-zinc-900/70 dark:text-indigo-200"
+              >
+                Compare features
+              </button>
+            </div>
           </div>
 
-          <div className="rounded-2xl border border-gray-200 bg-gray-50/80 p-4 dark:border-zinc-700 dark:bg-zinc-800/50">
+          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-900/80">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="space-y-1">
                 <p className="text-base font-semibold text-gray-900 dark:text-zinc-100">{pricingCurrentPlanLabel}</p>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${pricingStatusTone}`}>
                     {pricingStatusLabel}
                   </span>
                   {pricingTrialStatus?.eligibleForTrial === false && !pricingHasActivePlan && !pricingIsDelinquent ? (
-                    <span className="text-xs font-medium text-gray-500 dark:text-zinc-400">Trial already used</span>
+                    <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600 dark:bg-zinc-800 dark:text-zinc-300">
+                      Trial already used
+                    </span>
                   ) : null}
                 </div>
               </div>
@@ -1845,7 +1853,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                     block: "start",
                   });
                 }}
-                className={`rounded-md px-4 py-2 text-sm font-semibold text-white transition ${
+                className={`rounded-lg px-4 py-2 text-sm font-semibold text-white shadow-sm transition ${
                   pricingIsDelinquent
                     ? "bg-rose-600 hover:bg-rose-700"
                     : "bg-[#6C47FF] hover:bg-[#5B38E6]"
@@ -1865,29 +1873,34 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
             </div>
           ) : null}
 
-          <div className="inline-flex items-center rounded-full border border-gray-300 bg-white p-1 dark:border-zinc-700 dark:bg-zinc-900">
-            <button
-              type="button"
-              onClick={() => setPricingBillingPeriod("monthly")}
-              className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
-                pricingBillingPeriod === "monthly"
-                  ? "bg-[#6C47FF] text-white"
-                  : "text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-              }`}
-            >
-              Monthly
-            </button>
-            <button
-              type="button"
-              onClick={() => setPricingBillingPeriod("annual")}
-              className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
-                pricingBillingPeriod === "annual"
-                  ? "bg-[#6C47FF] text-white"
-                  : "text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-              }`}
-            >
-              Annual
-            </button>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="inline-flex items-center rounded-full border border-gray-300 bg-white p-1 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+              <button
+                type="button"
+                onClick={() => setPricingBillingPeriod("monthly")}
+                className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
+                  pricingBillingPeriod === "monthly"
+                    ? "bg-[#6C47FF] text-white"
+                    : "text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                }`}
+              >
+                Monthly
+              </button>
+              <button
+                type="button"
+                onClick={() => setPricingBillingPeriod("annual")}
+                className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
+                  pricingBillingPeriod === "annual"
+                    ? "bg-[#6C47FF] text-white"
+                    : "text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                }`}
+              >
+                Annual
+              </button>
+            </div>
+            <p className="text-xs font-medium text-gray-500 dark:text-zinc-400">
+              Annual billing unlocks the lowest monthly equivalent rate.
+            </p>
           </div>
 
           <div id="account-pricing-cards" className="grid gap-4 lg:grid-cols-2">
@@ -1897,6 +1910,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
               const isLoading = pricingCheckoutLoading === plan.name;
               const canUseTrialForCurrentPlan = pricingCanUseTrialForPlan(plan.name);
               const showManageBillingAction = pricingHasActivePlan || pricingIsDelinquent;
+              const isSignaturePlan = plan.name === "Signature Pro";
               const primaryLabel = showManageBillingAction
                 ? pricingIsDelinquent
                   ? "Update payment method"
@@ -1906,13 +1920,29 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                   : "Subscribe now";
 
               return (
-                <div key={plan.name} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-zinc-700 dark:bg-zinc-900/80">
+                <div
+                  key={plan.name}
+                  className={`rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:bg-zinc-900/80 ${
+                    isSignaturePlan
+                      ? "border-[#6C47FF]/35 shadow-[0_14px_28px_rgba(76,54,181,0.14)] dark:border-indigo-400/50"
+                      : "border-gray-200 dark:border-zinc-700"
+                  }`}
+                >
                   <div className="mb-4 flex items-start justify-between gap-3">
                     <div>
-                      <h3 className="text-xl font-semibold text-gray-900 dark:text-zinc-100">{plan.name}</h3>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-xl font-semibold text-gray-900 dark:text-zinc-100">{plan.name}</h3>
+                        {isSignaturePlan ? (
+                          <span className="rounded-full bg-[#6C47FF]/10 px-2 py-0.5 text-[11px] font-semibold text-[#5B38E6] dark:bg-indigo-500/20 dark:text-indigo-200">
+                            Popular
+                          </span>
+                        ) : null}
+                      </div>
                       <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-zinc-100">
                         {displayedPrice}
-                        <span className="ml-1 text-sm font-medium text-gray-500 dark:text-zinc-400">per month</span>
+                        <span className="ml-1 text-sm font-medium text-gray-500 dark:text-zinc-400">
+                          {pricingBillingPeriod === "monthly" ? "per month" : "per month, billed annually"}
+                        </span>
                       </p>
                     </div>
                     {isAnnual ? (
@@ -1945,7 +1975,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                         );
                       }}
                       disabled={isLoading}
-                      className="w-full rounded-md bg-[#6C47FF] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#5B38E6] disabled:cursor-not-allowed disabled:opacity-60"
+                      className="w-full rounded-lg bg-[#6C47FF] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#5B38E6] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {isLoading ? "Redirecting..." : primaryLabel}
                     </button>
@@ -1970,8 +2000,8 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
             <p className="text-sm font-medium text-rose-600 dark:text-rose-400">{pricingMessage}</p>
           ) : null}
 
-          <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900/70">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-700 dark:text-zinc-300">
+          <div className="rounded-2xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-5 shadow-sm dark:border-zinc-700 dark:from-zinc-900 dark:to-zinc-900">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-gray-700 dark:text-zinc-300">
               Billing snapshot
             </h3>
             <div className="mt-3 grid gap-3 text-sm text-gray-700 dark:text-zinc-300 sm:grid-cols-2">
