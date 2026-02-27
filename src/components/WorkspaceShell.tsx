@@ -7,6 +7,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   BookOpen,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CreditCard,
@@ -18,12 +19,14 @@ import {
   Home,
   LogOut,
   Menu,
+  Moon,
   PanelLeftClose,
   PenSquare,
   Plus,
   Settings,
   Sparkles,
   Star,
+  Sun,
   Trash2,
   User,
   Users,
@@ -50,6 +53,7 @@ import { useAvatarPreference } from "@/lib/useAvatarPreference";
 import { getAvatarFallback } from "@/lib/avatarFallback";
 import { useWorkspaceFilePreloader, type PendingWorkspaceFile } from "@/components/useWorkspaceFilePreloader";
 import { uploadProjectPreviewFromFile } from "@/lib/projectPreview";
+import { WorkspaceHomeQueryProvider } from "@/components/workspaceHomeQueryContext";
 import {
   getProjectsSummaryCache,
   refreshProjectsSummary,
@@ -63,6 +67,18 @@ const STARTUP_OVERLAY_KEY = "mpdf:startup-overlay";
 const STARTUP_OVERLAY_CONTEXT_KEY = "mpdf:startup-overlay-context";
 const SIDEBAR_EXPANDED_KEY = "mpdf:sidebar-expanded";
 const STRIPE_STATUS_CACHE_KEY = "mpdf:stripe-status";
+const PROFILE_DISPLAY_CACHE_KEY = "mpdf:profile-display";
+
+function isPlaceholderProfileName(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return true;
+  return (
+    normalized === "user" ||
+    normalized === "mergify user" ||
+    normalized === "mergifypdf user" ||
+    normalized === "account"
+  );
+}
 
 async function resetWorkspaceStorage() {
   try {
@@ -164,18 +180,32 @@ const sidebarPanels: Record<string, SidebarPanel> = {
 interface WorkspaceShellProps {
   children: React.ReactNode;
   initialSidebarExpanded?: boolean;
+  initialProfile?: {
+    id?: string | null;
+    name?: string | null;
+    email?: string | null;
+  };
 }
 
 function shouldShowBootLoader(): boolean {
   return false;
 }
 
+function bootLoaderMinVisibleMs(): number {
+  return 450;
+}
+
+function bootLoaderShowDelayMs(): number {
+  return 240;
+}
+
 export default function WorkspaceShell({
   children,
   initialSidebarExpanded = true,
+  initialProfile,
 }: WorkspaceShellProps) {
   const router = useRouter();
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
   const firstName = useMemo(() => {
     const source = session?.user?.name ?? session?.user?.email ?? "";
     const trimmed = source.trim();
@@ -189,6 +219,7 @@ export default function WorkspaceShell({
   const [homeRecentProjects, setHomeRecentProjects] = useState<
     { id?: string; title: string; updatedAt?: number; previewUrl?: string | null; hasPreview?: boolean }[]
   >([]);
+  const [fallbackProjectCountReady, setFallbackProjectCountReady] = useState(false);
   const [expanded, setExpanded] = useState(initialSidebarExpanded);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -204,6 +235,8 @@ export default function WorkspaceShell({
   const [createRemoveConfirmId, setCreateRemoveConfirmId] = useState<string | null>(null);
   const [contentSwapOut, setContentSwapOut] = useState(false);
   const [contentSwapIn, setContentSwapIn] = useState(false);
+  const [homeProjectsQuery, setHomeProjectsQuery] = useState("");
+  const [shellTheme, setShellTheme] = useState<"light" | "dark">("light");
   const contentSwapTimerRef = useRef<number | null>(null);
   const contentSettleTimerRef = useRef<number | null>(null);
   const contentSwapSafetyRef = useRef<number | null>(null);
@@ -222,7 +255,6 @@ export default function WorkspaceShell({
   const [homeBillingBannerMounted, setHomeBillingBannerMounted] = useState(false);
   const [homeBillingBannerVisible, setHomeBillingBannerVisible] = useState(false);
   const [homeBillingBannerExiting, setHomeBillingBannerExiting] = useState(false);
-  const [accountPageLoading, setAccountPageLoading] = useState(() => pathname?.startsWith("/account") ?? false);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const [compactSidebar, setCompactSidebar] = useState(false);
   const [narrowSidebar, setNarrowSidebar] = useState(false);
@@ -233,8 +265,29 @@ export default function WorkspaceShell({
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const createRef = useRef<HTMLDivElement>(null);
   const createFileInputRef = useRef<HTMLInputElement | null>(null);
+  const homeProjectsSearchInputRef = useRef<HTMLInputElement | null>(null);
   const avatarKey = session?.user?.id ?? session?.user?.email ?? null;
   const { avatar } = useAvatarPreference(avatarKey);
+  const [stableProfile, setStableProfile] = useState<{ name: string; email: string }>(() => {
+    const initialNameRaw = typeof initialProfile?.name === "string" ? initialProfile.name.trim() : "";
+    const initialName = isPlaceholderProfileName(initialNameRaw) ? "" : initialNameRaw;
+    const initialEmail = typeof initialProfile?.email === "string" ? initialProfile.email.trim() : "";
+    const initialValue =
+      initialName || initialEmail ? { name: initialName || initialEmail, email: initialEmail } : null;
+    if (typeof window === "undefined") return initialValue ?? { name: "", email: "" };
+    try {
+      const raw = window.sessionStorage?.getItem(PROFILE_DISPLAY_CACHE_KEY);
+      if (!raw) return initialValue ?? { name: "", email: "" };
+      const parsed = JSON.parse(raw) as { name?: unknown; email?: unknown };
+      const cachedNameRaw = typeof parsed.name === "string" ? parsed.name.trim() : "";
+      const cachedName = isPlaceholderProfileName(cachedNameRaw) ? "" : cachedNameRaw;
+      const cachedEmail = typeof parsed.email === "string" ? parsed.email.trim() : "";
+      if (!cachedName && !cachedEmail) return initialValue ?? { name: "", email: "" };
+      return { name: cachedName || cachedEmail || "", email: cachedEmail };
+    } catch {
+      return initialValue ?? { name: "", email: "" };
+    }
+  });
   const [signingOut, setSigningOut] = useState(false);
   const [logoutConfirmArmed, setLogoutConfirmArmed] = useState(false);
   const logoutConfirmTimeoutRef = useRef<number | null>(null);
@@ -249,15 +302,68 @@ export default function WorkspaceShell({
   const homeBootShownAtRef = useRef(0);
   const homeBootVisibleRef = useRef(shouldShowBootLoader());
   const manualLoadingSafetyRef = useRef<number | null>(null);
-  const fallbackAvatar = getAvatarFallback(
-    avatarKey,
-    session?.user?.name ?? session?.user?.email ?? "Account"
-  );
+  const profileName = stableProfile.name || "";
+  const profileEmail = stableProfile.email;
+  const hasProfileInfo = Boolean(profileName || profileEmail);
+  const fallbackAvatar = getAvatarFallback(avatarKey, profileName || profileEmail || null);
   const showAvatarImage = Boolean(avatar) && !avatarLoadFailed;
+  const homeProjectsQueryContext = useMemo(
+    () => ({ query: homeProjectsQuery, setQuery: setHomeProjectsQuery }),
+    [homeProjectsQuery],
+  );
 
   useEffect(() => {
     setAvatarLoadFailed(false);
   }, [avatar]);
+
+  useEffect(() => {
+    const nextNameRaw = (session?.user?.name ?? "").trim();
+    const nextName = isPlaceholderProfileName(nextNameRaw) ? "" : nextNameRaw;
+    const nextEmail = (session?.user?.email ?? "").trim();
+    if (!nextName && !nextEmail) return;
+    if (sessionStatus === "loading" && stableProfile.name) return;
+    setStableProfile((prev) => ({
+      name: nextName || nextEmail || prev.name || "",
+      email: nextEmail || prev.email || "",
+    }));
+  }, [session?.user?.email, session?.user?.name, sessionStatus, stableProfile.name]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      if (!stableProfile.name && !stableProfile.email) {
+        window.sessionStorage?.removeItem(PROFILE_DISPLAY_CACHE_KEY);
+        return;
+      }
+      window.sessionStorage?.setItem(PROFILE_DISPLAY_CACHE_KEY, JSON.stringify(stableProfile));
+    } catch {
+      // ignore storage write failures
+    }
+  }, [stableProfile]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem("theme");
+    const initialTheme = stored === "dark" ? "dark" : "light";
+    document.documentElement.classList.toggle("dark", initialTheme === "dark");
+    document.body.classList.remove("dark");
+    setShellTheme(initialTheme);
+  }, []);
+
+  const toggleShellTheme = () => {
+    document.documentElement.classList.add("theme-transition");
+    const nextTheme = shellTheme === "dark" ? "light" : "dark";
+    document.documentElement.classList.toggle("dark", nextTheme === "dark");
+    if (nextTheme === "light") {
+      document.body.classList.remove("dark");
+    }
+    window.localStorage.setItem("theme", nextTheme);
+    document.cookie = `theme=${nextTheme}; path=/; max-age=31536000`;
+    setShellTheme(nextTheme);
+    window.setTimeout(() => {
+      document.documentElement.classList.remove("theme-transition");
+    }, 200);
+  };
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -318,21 +424,6 @@ export default function WorkspaceShell({
     };
   }, []);
 
-  useEffect(() => {
-    const handleAccountLoadingStart = () => {
-      setAccountPageLoading(true);
-    };
-    const handleAccountLoadingStop = () => {
-      setAccountPageLoading(false);
-    };
-
-    window.addEventListener("workspace-account-loading-start", handleAccountLoadingStart);
-    window.addEventListener("workspace-account-loading-stop", handleAccountLoadingStop);
-    return () => {
-      window.removeEventListener("workspace-account-loading-start", handleAccountLoadingStart);
-      window.removeEventListener("workspace-account-loading-stop", handleAccountLoadingStop);
-    };
-  }, []);
 
   useEffect(() => {
     const handlePageShow = () => {
@@ -356,8 +447,8 @@ export default function WorkspaceShell({
     homeBootStartedAtRef.current = performance.now();
 
     let readyReceived = false;
-    const showDelayMs = 240;
-    const minVisibleMs = 450;
+    const showDelayMs = bootLoaderShowDelayMs();
+    const minVisibleMs = bootLoaderMinVisibleMs();
     const showTimer = !homeBootVisibleRef.current
       ? window.setTimeout(() => {
           if (readyReceived) return;
@@ -628,15 +719,20 @@ export default function WorkspaceShell({
   const homeBillingIsDelinquent = homeStripeStatus === "past_due" || homeStripeStatus === "unpaid";
   const showHomeBillingBanner = isBillingBannerRoute && homeBillingIsDelinquent && !homeBillingBannerDismissed;
   const renderHomeBillingBanner =
-    (showHomeBillingBanner || homeBillingBannerMounted) && !billingPortalLoading && !accountPageLoading;
+    (showHomeBillingBanner || homeBillingBannerMounted) && !billingPortalLoading;
   const homeBillingBannerOccupiesSpace = showHomeBillingBanner || homeBillingBannerVisible;
-  const shellLoadingOpen = billingPortalLoading || accountPageLoading || homeBootLoading;
+  const shellLoadingOpen = billingPortalLoading || homeBootLoading;
   const shellLoadingLabel = billingPortalLoading
     ? "Opening billing portal…"
     : "Loading...";
 
   const isHomeProjectsPath = (value?: string | null) =>
     value === "/" || (value?.startsWith("/projects") ?? false);
+  const showPersistentHomeProjectsTopBar = pathname === "/" || pathname === "/projects/all";
+  const isAllProjectsRoute = pathname === "/projects/all";
+  const fallbackProjectCardCount = fallbackProjectCountReady
+    ? (isAllProjectsRoute ? Math.min(homeRecentProjects.length, 60) : Math.min(homeRecentProjects.length, 9))
+    : 0;
 
   const navigateWithContentSwap = (nextPath: string, closeMobile = false): boolean => {
     const currentPath = pathname ?? "";
@@ -691,14 +787,6 @@ export default function WorkspaceShell({
         : panelKey === "signatures"
           ? PenSquare
           : BookOpen;
-
-  useEffect(() => {
-    if (!isAccountRoute) {
-      setAccountPageLoading(false);
-      return;
-    }
-    setAccountPageLoading(true);
-  }, [isAccountRoute]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -849,11 +937,13 @@ export default function WorkspaceShell({
     const ownerKey = session?.user?.id ?? null;
     if (!ownerKey) {
       setHomeRecentProjects([]);
+      setFallbackProjectCountReady(true);
       return;
     }
 
     let cancelled = false;
     setHomeRecentProjects([]);
+    setFallbackProjectCountReady(false);
 
     const preloadImages = (urls: string[]) => {
       urls.forEach((url) => {
@@ -882,6 +972,7 @@ export default function WorkspaceShell({
       const mapped = mapSummary(projects);
       if (cancelled) return;
       setHomeRecentProjects(mapped);
+      setFallbackProjectCountReady(true);
       mapped
         .filter((project) => project.hasPreview && !project.previewUrl && project.id)
         .slice(0, 12)
@@ -905,7 +996,9 @@ export default function WorkspaceShell({
       const fresh = await refreshProjectsSummary(ownerKey);
       if (fresh && !cancelled) {
         hydrate(fresh);
+        return;
       }
+      if (!cancelled) setFallbackProjectCountReady(true);
     };
 
     void load();
@@ -1533,11 +1626,14 @@ export default function WorkspaceShell({
       style={
         {
           minHeight: "calc(100vh - var(--home-banner-offset))",
-          "--shell-content-width": isAccountRoute ? "1960px" : expanded ? "1680px" : "1960px",
+          "--shell-content-width":
+            isAccountRoute ? "1960px" : "calc(1960px - (var(--shell-sidebar-width) - 80px))",
           "--shell-left":
             "max(24px, calc((100vw - (var(--shell-content-width) + var(--shell-sidebar-width) + 24px)) / 2))",
           "--shell-sidebar-width": expanded ? "256px" : "80px",
           "--home-banner-offset": homeBillingBannerOccupiesSpace ? "56px" : "0px",
+          "--home-topbar-offset": showPersistentHomeProjectsTopBar ? "68px" : "0px",
+          "--home-right-column-offset": showPersistentHomeProjectsTopBar ? "0px" : "240px",
         } as React.CSSProperties
       }
     >
@@ -1569,15 +1665,15 @@ export default function WorkspaceShell({
       {/* Desktop sidebar */}
       <aside
         id={isHomePanel ? "home-sidebar" : undefined}
-        className={`page-fade-in absolute left-[var(--shell-left)] top-[calc(24px+var(--home-banner-offset))] z-50 hidden h-[calc(100vh-48px-var(--home-banner-offset))] w-[var(--shell-sidebar-width)] text-slate-800 transition-[width,top,height] ${homeBillingBannerExiting ? "duration-300 ease-out" : "duration-0"} dark:text-zinc-100 md:flex`}
+        className={`absolute left-[var(--shell-left)] top-[calc(24px+var(--home-banner-offset))] z-50 hidden h-[calc(100vh-48px-var(--home-banner-offset))] w-[var(--shell-sidebar-width)] text-slate-800 ${homeBillingBannerExiting ? "transition-[width,top,height] duration-300 ease-out" : "transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"} dark:text-zinc-100 md:flex`}
       >
         <div className="relative flex h-full w-full">
           <div
             ref={sidebarRef}
             className={`flex h-full ${railWidthClass} flex-col ${
               useUnifiedWorkspaceBackground
-                ? "rounded-xl border-[1.5px] border-[#E5E7EB] bg-white shadow-[0_10px_30px_rgba(0,0,0,0.08)] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_12px_30px_rgba(0,0,0,0.35)]"
-                : "rounded-xl border-[1.5px] border-[#E5E7EB] bg-white shadow-[0_10px_30px_rgba(0,0,0,0.08)] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_12px_30px_rgba(0,0,0,0.35)]"
+                ? "rounded-xl border-[1.5px] border-gray-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)]"
+                : "rounded-xl border-[1.5px] border-gray-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)]"
             } w-full ${sidebarCompact ? "z-10" : "z-20"}`}
           >
             <div className="flex flex-1 flex-col gap-4 overflow-y-auto overflow-x-hidden px-1 py-5 lg:px-2">
@@ -1745,7 +1841,7 @@ export default function WorkspaceShell({
                         } items-center justify-center rounded-full font-semibold uppercase text-white`}
                         style={{ backgroundColor: fallbackAvatar.color }}
                       >
-                        {fallbackAvatar.initials}
+                        {hasProfileInfo ? fallbackAvatar.initials : ""}
                       </span>
                     )}
                   </span>
@@ -1784,16 +1880,16 @@ export default function WorkspaceShell({
                             className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold uppercase text-white"
                             style={{ backgroundColor: fallbackAvatar.color }}
                           >
-                            {fallbackAvatar.initials}
+                            {hasProfileInfo ? fallbackAvatar.initials : ""}
                           </span>
                         )}
                       </span>
-                      <div className="flex-1">
-                        <p className="text-lg font-semibold text-slate-900">{session?.user?.name ?? "Account"}</p>
-                        {session?.user?.email ? (
-                          <p className="text-sm text-slate-500">{session.user.email}</p>
-                        ) : null}
-                      </div>
+                      {hasProfileInfo ? (
+                        <div className="flex-1">
+                          {profileName ? <p className="text-lg font-semibold text-slate-900">{profileName}</p> : null}
+                          {profileEmail ? <p className="text-sm text-slate-500">{profileEmail}</p> : null}
+                        </div>
+                      ) : null}
                     </div>
                     <div className="mt-4 space-y-2">
                       {isAccountRoute ? (
@@ -2276,7 +2372,7 @@ export default function WorkspaceShell({
       ) : null}
 
       <div
-        className={`flex min-h-0 w-full flex-1 flex-col bg-transparent transition-all duration-300 ease-in-out ${contentOffsetClass}`}
+        className={`flex min-h-0 w-full flex-1 flex-col bg-transparent transition-[padding-left] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${contentOffsetClass}`}
       >
         <header className="sticky top-0 z-20 w-full border-b border-slate-200 bg-white/90 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/90 md:hidden">
           <div className="mx-auto flex h-[76px] w-full max-w-7xl items-center justify-between px-3 lg:px-6">
@@ -2299,20 +2395,244 @@ export default function WorkspaceShell({
           </div>
         </header>
 
-        <Suspense fallback={null}>
-          <main className="relative z-0 flex-1 lg:z-40">
-            <div className={`flex w-full ${hideWorkspaceSidebar ? "justify-center px-6" : "justify-start pr-6"}`}>
+        <WorkspaceHomeQueryProvider value={homeProjectsQueryContext}>
+          {showPersistentHomeProjectsTopBar ? (
+            <div className={`relative z-[80] flex w-full ${hideWorkspaceSidebar ? "justify-center px-6" : "justify-start pr-6"} pt-6`}>
               <div
-                className={`workspace-content-shell w-full ${
-                  contentSwapOut ? "workspace-content-swap-out" : contentSwapIn ? "workspace-content-swap-in" : ""
-                }`}
                 style={{ maxWidth: "var(--shell-content-width)" }}
+                className="w-full transition-[max-width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
               >
-                {children}
+                <div className="flex w-full items-center justify-between gap-3">
+                  <div className="flex flex-1 items-center gap-3">
+                    <div className="flex w-full max-w-xl">
+                      <div
+                        className="flex h-11 w-full cursor-text rounded-full border-[1.5px] border-gray-200 bg-white shadow-sm transition focus-within:border-[#2563EB] focus-within:ring-2 focus-within:ring-[#2563EB]/15 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] dark:focus-within:border-[#2563EB] dark:focus-within:ring-[#2563EB]/30"
+                        onMouseDown={(event) => {
+                          const target = event.target;
+                          if (target instanceof HTMLInputElement) return;
+                          event.preventDefault();
+                          homeProjectsSearchInputRef.current?.focus();
+                        }}
+                        onClick={() => {
+                          homeProjectsSearchInputRef.current?.focus();
+                        }}
+                      >
+                        <div className="flex h-full w-full items-center gap-2 rounded-full bg-white px-4 text-[#1F2A37] dark:bg-zinc-900 dark:text-zinc-100">
+                          <svg
+                            aria-hidden="true"
+                            viewBox="0 0 24 24"
+                            className="h-4 w-4"
+                            fill="none"
+                            stroke="#4F46E5"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <circle cx="11" cy="11" r="8" />
+                            <path d="m21 21-4.35-4.35" />
+                          </svg>
+                          <input
+                            ref={homeProjectsSearchInputRef}
+                            type="text"
+                            value={homeProjectsQuery}
+                            onChange={(event) => setHomeProjectsQuery(event.target.value)}
+                            placeholder="Search projects..."
+                            className="h-full min-w-0 flex-1 border-none bg-white text-sm text-[#1F2A37] placeholder:text-[#6B7280] outline-none focus:outline-none focus:ring-0 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-400 sm:text-base"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex h-11 w-[276px] min-w-[276px] max-w-[276px] flex-nowrap items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={toggleShellTheme}
+                      className="shrink-0 flex h-11 w-11 items-center justify-center rounded-full border-[1.5px] border-gray-200 bg-white text-[#1F2A37] shadow-sm transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/15 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] dark:hover:bg-zinc-800 dark:focus-visible:ring-[#2563EB]/30"
+                      aria-label={shellTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                      aria-pressed={shellTheme === "dark"}
+                    >
+                      {shellTheme === "dark" ? (
+                        <Sun className="h-4 w-4" aria-hidden />
+                      ) : (
+                        <Moon className="h-4 w-4" aria-hidden />
+                      )}
+                    </button>
+                    <SettingsMenu
+                      trigger="custom"
+                      triggerLabel="Open profile menu"
+                      triggerClassName="w-full min-w-0 max-w-full overflow-hidden flex h-11 items-center gap-1.5 rounded-full border-[1.5px] border-gray-200 bg-white py-1.5 pl-1 pr-1.5 shadow-sm transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/15 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F1F4F9] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] dark:hover:bg-zinc-800 dark:focus-visible:ring-[#2563EB]/30 dark:focus-visible:ring-offset-[#222224]"
+                      triggerContent={
+                        <>
+                          <span className="shrink-0 pointer-events-none">
+                            {showAvatarImage ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={avatar!}
+                                alt="Your avatar"
+                                className="h-8 w-8 rounded-full object-cover"
+                                onError={() => setAvatarLoadFailed(true)}
+                              />
+                            ) : (
+                              <span
+                                className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold uppercase text-white"
+                                style={{ backgroundColor: fallbackAvatar.color }}
+                              >
+                                {hasProfileInfo ? fallbackAvatar.initials : ""}
+                              </span>
+                            )}
+                          </span>
+                          {hasProfileInfo ? (
+                            <span className="flex min-w-0 flex-1 flex-col leading-tight text-left">
+                              {profileName ? (
+                                <span className="truncate text-[13px] font-semibold text-[#1F2A37] dark:text-zinc-100">
+                                  {profileName}
+                                </span>
+                              ) : null}
+                              {profileEmail ? (
+                                <span className="truncate text-[11px] font-medium text-[#64748B] dark:text-zinc-400">
+                                  {profileEmail}
+                                </span>
+                              ) : null}
+                            </span>
+                          ) : null}
+                          <ChevronDown className="h-4 w-4 shrink-0 text-[#94A3B8] dark:text-zinc-400" aria-hidden="true" />
+                        </>
+                      }
+                    />
+                  </div>
+                </div>
               </div>
             </div>
-          </main>
-        </Suspense>
+          ) : null}
+          <Suspense
+            fallback={
+              showPersistentHomeProjectsTopBar ? (
+                <main className="relative z-0 flex-1 lg:z-40">
+                  <div className={`flex w-full ${hideWorkspaceSidebar ? "justify-center px-6" : "justify-start pr-6"}`}>
+                    <div
+                      className="workspace-content-shell w-full transition-[max-width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+                      style={{ maxWidth: "var(--shell-content-width)" }}
+                    >
+                      <div
+                        className="w-full bg-[#F1F4F9] py-6 transition-[height] duration-300 ease-out dark:bg-[#222224]"
+                        style={{
+                          height:
+                            "calc(100vh - var(--home-banner-offset, 0px) - var(--home-topbar-offset, 0px) - 48px)",
+                        }}
+                      >
+                        <div className="w-full">
+                          <div className="grid h-full w-full max-w-[1680px] min-h-0 gap-[24px] lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start">
+                            <div className="relative z-40 flex h-full min-h-0 w-full flex-col pl-1 pr-0 pt-0">
+                              <div className="w-full">
+                                <section className="mt-0 w-full">
+                                  <div
+                                    className="flex min-h-0 flex-col rounded-xl border-[1.5px] border-gray-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] sm:p-5"
+                                    style={{
+                                      height:
+                                        "calc(100dvh - 48px - var(--home-banner-offset, 0px) - var(--home-topbar-offset, 0px) - var(--home-right-column-offset, 0px))",
+                                    }}
+                                  >
+                                    <div className="flex items-center justify-between gap-4">
+                                      <h2 className="text-base font-semibold text-[#1F2A37] dark:text-zinc-100 sm:text-lg">
+                                        {isAllProjectsRoute ? "All projects" : "Recent projects"}
+                                      </h2>
+                                      {isAllProjectsRoute ? (
+                                        <div className="h-10 w-32 rounded-full bg-slate-100 skeleton-shimmer dark:bg-zinc-800/70" />
+                                      ) : null}
+                                    </div>
+                                    <div
+                                      className="mt-6 flex-1 overflow-y-hidden overflow-x-hidden"
+                                      style={{ paddingRight: 4, paddingLeft: 6, paddingBottom: 6 }}
+                                    >
+                                      {fallbackProjectCardCount > 0 ? (
+                                        <div className="recent-projects-grid projects-grid mt-2 grid w-full max-w-[1560px] items-start gap-6 grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(240px,1fr))]">
+                                          {Array.from({ length: fallbackProjectCardCount }).map((_, index) => (
+                                            <div key={`home-refresh-skeleton-${index}`} className="flex w-full flex-col text-left">
+                                              <div className="relative rounded-[10px] bg-[#F9FAFC] dark:bg-zinc-900/60">
+                                                <div className="relative m-[3px] aspect-square w-[calc(100%-6px)] overflow-hidden rounded-[10px] border border-[rgba(0,0,0,0.06)] bg-[#EEF1F5] dark:border-zinc-800 dark:bg-zinc-800/70">
+                                                  <div className="absolute inset-0 rounded-[10px] skeleton-shimmer opacity-90" />
+                                                </div>
+                                              </div>
+                                              <div className="mt-2 space-y-0.5">
+                                                <div className="h-4 w-[58%] rounded-full bg-slate-100 skeleton-shimmer dark:bg-zinc-800/70" />
+                                                <div className="h-3 w-[42%] rounded-full bg-slate-100 skeleton-shimmer dark:bg-zinc-800/70" />
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ) : null}
+                                    </div>
+                                    {!isAllProjectsRoute ? (
+                                      <div className="mt-4 flex items-center">
+                                        <Link
+                                          href="/projects/all"
+                                          className="inline-flex items-center rounded-full border-2 border-[#E6EBF2] px-4 py-2 text-xs font-semibold text-[#1F2A37] transition hover:border-[#D8DEE8] active:translate-y-[1px] active:scale-[0.98] active:bg-[#2563EB]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#51bdff]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F1F4F9] dark:border-zinc-700 dark:text-zinc-100 dark:hover:border-zinc-600 dark:active:bg-[#2563EB]/20 dark:focus-visible:ring-offset-[#222224]"
+                                        >
+                                          View all projects
+                                        </Link>
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                </section>
+                              </div>
+                            </div>
+                            <aside
+                              className="relative z-10 w-full min-h-0 overflow-visible"
+                              style={{ marginTop: "var(--home-right-column-offset, 240px)" }}
+                            >
+                              <div className="flex min-h-0 flex-col gap-[24px] overflow-visible">
+                                {isAllProjectsRoute ? (
+                                  <div className="rounded-xl border-[1.5px] border-gray-200 bg-white px-4 py-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)]">
+                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#6B7280] dark:text-zinc-400">
+                                      Templates
+                                    </p>
+                                    <div className="mt-3 h-24 rounded-xl border border-dashed border-[#E6EBF2] bg-[#F7F9FC] dark:border-zinc-700 dark:bg-zinc-900/60" />
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div className="rounded-xl border-[1.5px] border-gray-200 bg-white px-4 py-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)]">
+                                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#6B7280] dark:text-zinc-400">
+                                        SIGN DOCUMENTS
+                                      </p>
+                                      <div className="mt-3 space-y-2">
+                                        <div className="h-9 rounded-lg bg-slate-100 dark:bg-zinc-800/70" />
+                                        <div className="h-9 rounded-lg bg-slate-100 dark:bg-zinc-800/70" />
+                                        <div className="h-9 rounded-lg bg-slate-100 dark:bg-zinc-800/70" />
+                                      </div>
+                                    </div>
+                                    <div className="rounded-xl border-[1.5px] border-gray-200 bg-white px-4 py-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)]">
+                                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#6B7280] dark:text-zinc-400">
+                                        Activity
+                                      </p>
+                                      <div className="mt-3 h-24 rounded-xl border border-dashed border-[#E6EBF2] bg-[#F7F9FC] dark:border-zinc-700 dark:bg-zinc-900/60" />
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            </aside>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </main>
+              ) : null
+            }
+          >
+            <main className="relative z-0 flex-1 lg:z-40">
+              <div className={`flex w-full ${hideWorkspaceSidebar ? "justify-center px-6" : "justify-start pr-6"}`}>
+                <div
+                  className={`workspace-content-shell w-full transition-[max-width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                    contentSwapOut ? "workspace-content-swap-out" : contentSwapIn ? "workspace-content-swap-in" : ""
+                  }`}
+                  style={{ maxWidth: "var(--shell-content-width)" }}
+                >
+                  {children}
+                </div>
+              </div>
+            </main>
+          </Suspense>
+        </WorkspaceHomeQueryProvider>
       </div>
     </div>
 

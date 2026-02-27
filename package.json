@@ -8,9 +8,11 @@
   "scripts": {
     "dev": "next dev --webpack",
     "dev:lan": "echo 'Open on other devices: http://10.0.0.163:3000' && NEXTAUTH_URL=http://10.0.0.163:3000 next dev --webpack --hostname 0.0.0.0 --port 3000",
-    "build": "next build --webpack",
+    "build": "NODE_OPTIONS='--max-old-space-size=4096' NEXT_DISABLE_SWC_NATIVE=1 next build --webpack",
+    "build:stable": "pnpm build",
     "start": "next start",
     "start:lan": "echo 'Open on other devices: http://10.0.0.163:3000' && NEXTAUTH_URL=http://10.0.0.163:3000 next start --hostname 0.0.0.0 --port 3000",
+    "prod:lan": "pnpm build:stable && pnpm start:lan",
     "lint": "eslint",
     "postinstall": "prisma generate"
   },
@@ -27,7 +29,7 @@
     "bcryptjs": "^3.0.2",
     "framer-motion": "^12.23.24",
     "lucide-react": "^0.553.0",
-    "next": "^16.0.7",
+    "next": "16.0.7",
     "next-auth": "^4.24.13",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^3.11.174",
@@ -49,7 +51,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.0.0",
+    "eslint-config-next": "16.0.7",
     "prisma": "^6.18.0",
     "tailwindcss": "^4",
     "typescript": "^5"

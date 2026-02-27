@@ -72,8 +72,8 @@ export default function RecentProjectsRow({
               </div>
             </div>
             <div className="mt-2 space-y-0.5">
-              <div className="h-7 w-2/3 rounded-full bg-slate-100 dark:bg-zinc-800/70" />
-              <div className="h-5 w-1/2 rounded-full bg-slate-100 dark:bg-zinc-800/70" />
+              <div className="h-4 w-[58%] rounded-full bg-slate-100 dark:bg-zinc-800/70" />
+              <div className="h-3 w-[42%] rounded-full bg-slate-100 dark:bg-zinc-800/70" />
             </div>
           </div>
         ))}
@@ -124,8 +124,8 @@ export default function RecentProjectsRow({
               <div className="relative m-[3px] aspect-square w-[calc(100%-6px)] overflow-hidden rounded-[10px] border border-[rgba(0,0,0,0.06)] bg-[#EEF1F5] dark:border-zinc-800 dark:bg-zinc-800/70" />
             </div>
               <div className="mt-2 space-y-0.5">
-                <div className="h-7 w-2/3 rounded-full bg-slate-100 dark:bg-zinc-800/70" />
-                <div className="h-5 w-1/2 rounded-full bg-slate-100 dark:bg-zinc-800/70" />
+                <div className="h-4 w-[58%] rounded-full bg-slate-100 dark:bg-zinc-800/70" />
+                <div className="h-3 w-[42%] rounded-full bg-slate-100 dark:bg-zinc-800/70" />
               </div>
             </div>
           ))}

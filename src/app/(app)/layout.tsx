@@ -25,7 +25,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const authedWorkspace = session?.user && !lockedByTwoFactor;
 
   return authedWorkspace ? (
-    <WorkspaceShell initialSidebarExpanded={initialSidebarExpanded}>{children}</WorkspaceShell>
+    <WorkspaceShell
+      initialSidebarExpanded={initialSidebarExpanded}
+      initialProfile={{
+        id: session?.user?.id ?? null,
+        name: session?.user?.name ?? null,
+        email: session?.user?.email ?? null,
+      }}
+    >
+      {children}
+    </WorkspaceShell>
   ) : (
     <>
       <HeroHeader>

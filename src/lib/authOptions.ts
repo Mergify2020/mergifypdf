@@ -93,15 +93,30 @@ export const authOptions: NextAuthOptions = {
           : "credentials";
       }
 
-      const dbUser = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { twoFactorEnabled: true, twoFactorMethod: true, stripeStatus: true },
-      });
+      let dbUser:
+        | { twoFactorEnabled: boolean | null; twoFactorMethod: string | null; stripeStatus: string | null }
+        | null = null;
+      try {
+        dbUser = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { twoFactorEnabled: true, twoFactorMethod: true, stripeStatus: true },
+        });
+      } catch (error) {
+        // Avoid tearing down valid sessions during transient DB connectivity issues.
+        const message = error instanceof Error ? error.message : String(error);
+        console.error("[auth.jwt] Failed to refresh auth flags from DB; using token fallback.", message);
+      }
 
-      const twoFactorEnabled = !!dbUser?.twoFactorEnabled;
+      const twoFactorEnabled = dbUser
+        ? !!dbUser.twoFactorEnabled
+        : typeof token.twoFactorEnabled === "boolean"
+          ? token.twoFactorEnabled
+          : false;
       token.twoFactorEnabled = twoFactorEnabled;
-      token.twoFactorMethod = dbUser?.twoFactorMethod ?? null;
-      token.stripeStatus = dbUser?.stripeStatus ?? null;
+      token.twoFactorMethod = dbUser?.twoFactorMethod
+        ?? (typeof token.twoFactorMethod === "string" ? token.twoFactorMethod : null);
+      token.stripeStatus = dbUser?.stripeStatus
+        ?? (typeof token.stripeStatus === "string" ? token.stripeStatus : null);
 
       if (account) {
         // Fresh sign-in: always reset 2FA pass flag based on whether 2FA is enabled
@@ -142,6 +157,22 @@ export const authOptions: NextAuthOptions = {
         session.user.twoFactorPassed = twoFactorPassed;
         session.user.stripeStatus =
           typeof token.stripeStatus === "string" ? token.stripeStatus : null;
+
+        // Keep profile fields fresh across devices/tabs on normal refresh,
+        // even when JWT payload on another device is stale.
+        if (session.user.id) {
+          try {
+            const dbUser = await prisma.user.findUnique({
+              where: { id: session.user.id },
+              select: { name: true, email: true },
+            });
+            if (dbUser?.name) session.user.name = dbUser.name;
+            if (dbUser?.email) session.user.email = dbUser.email;
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            console.error("[auth.session] Failed to refresh profile fields from DB.", message);
+          }
+        }
       }
       return session;
     },

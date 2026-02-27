@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { sendResetEmail } from "@/lib/email";
 import { generateSixDigitCode, hashVerificationCode } from "@/lib/verificationCode";
 import { isSameOrigin } from "@/lib/requestGuards";
 import { rateLimit } from "@/lib/rateLimit";
@@ -35,6 +34,7 @@ export async function POST(req: Request) {
           expiresAt: new Date(Date.now() + 10 * 60 * 1000),
         },
       });
+      const { sendResetEmail } = await import("@/lib/email");
       await sendResetEmail({ to: normalized, code });
     }
 

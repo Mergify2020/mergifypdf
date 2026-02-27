@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowDown,
@@ -8,22 +8,19 @@ import {
   Check,
   ChevronDown,
   Clock,
-  Moon,
   Search,
-  Sun,
   UserRound,
   UsersRound,
 } from "lucide-react";
-import { useSession } from "next-auth/react";
 import RecentProjectsRow from "@/components/RecentProjectsRow";
-import SettingsMenu from "@/components/SettingsMenu";
-import { useAvatarPreference } from "@/lib/useAvatarPreference";
-import { getAvatarFallback } from "@/lib/avatarFallback";
 import {
   getProjectsSummaryCache,
+  refreshProjectsSummary,
+  setProjectsSummaryCache,
   subscribeProjectsSummary,
   type ProjectsSummaryProject,
 } from "@/lib/projectsSummaryCache";
+import { useWorkspaceHomeQuery } from "@/components/workspaceHomeQueryContext";
 
 type SummaryProject = {
   id: string;
@@ -36,14 +33,10 @@ type SummaryProject = {
 };
 
 type Props = {
-  firstName: string;
   accountName: string;
-  accountEmail?: string | null;
   ownerKey?: string | null;
   projects: SummaryProject[];
-  headline?: string;
   sectionLabel?: string;
-  hideHeadline?: boolean;
   showAllProjects?: boolean;
   showOwnerFilter?: boolean;
   showResumeBadge?: boolean;
@@ -81,24 +74,36 @@ const mapProjectsFromSummary = (projects: ProjectsSummaryProject[]): SummaryProj
     hasPreview: project.hasPreview ?? false,
   }));
 
+const mapProjectsToSummary = (projects: SummaryProject[]): ProjectsSummaryProject[] =>
+  projects.map((project) => ({
+    id: project.id,
+    name: project.name,
+    updatedAt: project.updatedAt,
+    hasPreview: project.hasPreview ?? false,
+    pagesCount: project.pagesCount ?? 0,
+    rotation: project.rotation ?? 0,
+  }));
+
 export default function HomeProjectsSearch({
-  firstName,
   accountName,
-  accountEmail,
   ownerKey,
   projects,
-  headline,
   sectionLabel = "Recent projects",
-  hideHeadline = false,
   showAllProjects = false,
   showOwnerFilter = true,
   showResumeBadge = false,
 }: Props) {
-  const [query, setQuery] = useState("");
-  const [projectsState, setProjectsState] = useState<SummaryProject[]>(projects);
+  const queryBridge = useWorkspaceHomeQuery();
+  const query = queryBridge?.query ?? "";
+  const [projectsState, setProjectsState] = useState<SummaryProject[]>(() => {
+    if (typeof window !== "undefined" && ownerKey) {
+      const cached = getProjectsSummaryCache(ownerKey);
+      if (cached) return mapProjectsFromSummary(cached);
+    }
+    return projects;
+  });
   const initialProjects = useMemo(() => projectsState, [projectsState]);
   const hasProjects = (projectsState.length ?? 0) > 0;
-  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [sortOption, setSortOption] = useState<SortOption>("activity");
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const sortMenuRef = useRef<HTMLDivElement | null>(null);
@@ -106,25 +111,30 @@ export default function HomeProjectsSearch({
   const [ownerMenuOpen, setOwnerMenuOpen] = useState(false);
   const ownerMenuRef = useRef<HTMLDivElement | null>(null);
   const [ownerSearch, setOwnerSearch] = useState("");
-  const heroBlockRef = useRef<HTMLDivElement | null>(null);
   const recentListRef = useRef<HTMLDivElement | null>(null);
   const [recentHasOverflow, setRecentHasOverflow] = useState(false);
   const [recentScrollbarWidth, setRecentScrollbarWidth] = useState(0);
   const [forceStableScrollbar, setForceStableScrollbar] = useState(false);
-  const [theme, setTheme] = useState<"light" | "dark">("light");
-  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
-  const { data: session } = useSession();
 
   useEffect(() => {
-    setProjectsState(projects);
-  }, [projects]);
+    if (!ownerKey) {
+      setProjectsState(projects);
+      return;
+    }
 
-  useEffect(() => {
-    if (!ownerKey) return;
     const cached = getProjectsSummaryCache(ownerKey);
     if (cached) {
       setProjectsState(mapProjectsFromSummary(cached));
+    } else {
+      setProjectsState(projects);
     }
+
+    // Seed shared cache from route payload, but avoid shrinking a fuller cached list.
+    const routeProjectsSummary = mapProjectsToSummary(projects);
+    if (!cached || routeProjectsSummary.length >= cached.length) {
+      setProjectsSummaryCache(ownerKey, routeProjectsSummary);
+    }
+    void refreshProjectsSummary(ownerKey);
 
     const unsubscribe = subscribeProjectsSummary((update) => {
       if (update.ownerKey !== ownerKey || !update.projects) return;
@@ -134,7 +144,7 @@ export default function HomeProjectsSearch({
     return () => {
       unsubscribe();
     };
-  }, [ownerKey]);
+  }, [ownerKey, projects]);
 
   const accountInitials = useMemo(() => {
     const parts = accountName
@@ -146,17 +156,6 @@ export default function HomeProjectsSearch({
     const initials = `${first}${second}`.toUpperCase();
     return initials.length ? initials : "Y";
   }, [accountName]);
-  const avatarKey = session?.user?.id ?? session?.user?.email ?? null;
-  const { avatar } = useAvatarPreference(avatarKey);
-  const fallbackAvatar = useMemo(
-    () => getAvatarFallback(avatarKey, accountName || accountEmail || "User"),
-    [accountEmail, accountName, avatarKey]
-  );
-
-  useEffect(() => {
-    setAvatarLoadFailed(false);
-  }, [avatar]);
-
   useEffect(() => {
     if (!sortMenuOpen) return;
 
@@ -198,31 +197,6 @@ export default function HomeProjectsSearch({
       document.removeEventListener("keydown", handleKey);
     };
   }, [ownerMenuOpen]);
-
-  useLayoutEffect(() => {
-    if (typeof window === "undefined") return;
-    const root = document.documentElement;
-    const updateOffset = () => {
-      const node = heroBlockRef.current;
-      if (!node) return;
-      const height = Math.round(node.getBoundingClientRect().height);
-      const gap = 24;
-      root.style.setProperty("--home-section-gap", `${gap}px`);
-      root.style.setProperty("--home-right-column-offset", `${height + gap}px`);
-    };
-
-    updateOffset();
-    window.addEventListener("resize", updateOffset);
-    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(updateOffset) : null;
-    if (observer && heroBlockRef.current) {
-      observer.observe(heroBlockRef.current);
-    }
-
-    return () => {
-      window.removeEventListener("resize", updateOffset);
-      if (observer) observer.disconnect();
-    };
-  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -355,31 +329,6 @@ export default function HomeProjectsSearch({
     };
   }, []);
 
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const stored = window.localStorage.getItem("theme");
-    const initialTheme = stored === "dark" ? "dark" : "light";
-    document.documentElement.classList.toggle("dark", initialTheme === "dark");
-    document.body.classList.remove("dark");
-    setTheme(initialTheme);
-  }, []);
-
-  const toggleTheme = () => {
-    document.documentElement.classList.add("theme-transition");
-    const nextTheme = theme === "dark" ? "light" : "dark";
-    document.documentElement.classList.toggle("dark", nextTheme === "dark");
-    if (nextTheme === "light") {
-      document.body.classList.remove("dark");
-    }
-    window.localStorage.setItem("theme", nextTheme);
-    document.cookie = `theme=${nextTheme}; path=/; max-age=31536000`;
-    setTheme(nextTheme);
-    window.setTimeout(() => {
-      document.documentElement.classList.remove("theme-transition");
-    }, 200);
-  };
-
   useEffect(() => {
     if (typeof document === "undefined") return;
     const body = document.body;
@@ -392,119 +341,12 @@ export default function HomeProjectsSearch({
 
   return (
     <>
-      <section className="pt-0">
+      <section className="mt-0 w-full">
         <div
-          ref={heroBlockRef}
-          className="flex w-full flex-col"
-          style={{ gap: "var(--home-section-gap, 24px)" }}
-        >
-          <div className="flex w-full items-center justify-between gap-3 lg:mr-[-304px] lg:w-[calc(100%+304px)]">
-            <div className={`flex flex-1 items-center ${hideHeadline ? "gap-0" : "gap-6"}`}>
-              {!hideHeadline ? (
-                <p className="whitespace-nowrap text-2xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-[#7C3AED] to-[#2563EB] dark:text-zinc-200 dark:bg-none">
-                  {headline ?? `Hello, ${firstName}`}
-                </p>
-              ) : null}
-              <div className={`flex w-full items-center ${hideHeadline ? "gap-3" : "gap-6"}`}>
-                <div className={`flex w-full ${hideHeadline ? "max-w-xl" : "max-w-sm"}`}>
-                  <div
-                    className="flex h-11 w-full cursor-text rounded-full border border-[#E5E7EB] bg-transparent p-[1px] shadow-[12px_0_36px_rgba(15,23,42,0.10)] focus-within:border-[#2563EB] dark:border-zinc-800 dark:bg-zinc-900/60 dark:shadow-[0_8px_22px_rgba(0,0,0,0.28),0_24px_52px_rgba(0,0,0,0.24)] dark:focus-within:border-[#2563EB]"
-                    onMouseDown={(event) => {
-                      const target = event.target;
-                      if (target instanceof HTMLInputElement) return;
-                      event.preventDefault();
-                      searchInputRef.current?.focus();
-                    }}
-                    onClick={() => {
-                      searchInputRef.current?.focus();
-                    }}
-                  >
-                    <div className="flex h-full w-full items-center gap-2 rounded-full bg-white px-4 text-[#1F2A37] dark:bg-zinc-900 dark:text-zinc-100">
-                      <svg
-                        aria-hidden="true"
-                        viewBox="0 0 24 24"
-                        className="h-4 w-4"
-                        fill="none"
-                        stroke="#4F46E5"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <circle cx="11" cy="11" r="8" />
-                        <path d="m21 21-4.35-4.35" />
-                      </svg>
-                      <input
-                        ref={searchInputRef}
-                        type="text"
-                        value={query}
-                        onChange={(event) => setQuery(event.target.value)}
-                        placeholder="Search projects..."
-                        className="h-full min-w-0 flex-1 border-none bg-white text-sm text-[#1F2A37] placeholder:text-[#6B7280] outline-none focus:outline-none focus:ring-0 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-400 sm:text-base"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="flex h-11 w-[276px] min-w-[276px] max-w-[276px] flex-nowrap items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={toggleTheme}
-                className="shrink-0 flex h-11 w-11 items-center justify-center rounded-full border border-[#E5E7EB] bg-white text-[#1F2A37] shadow-[12px_0_36px_rgba(15,23,42,0.10)] transition hover:bg-slate-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:shadow-[0_8px_22px_rgba(0,0,0,0.28),0_24px_52px_rgba(0,0,0,0.24)] dark:hover:bg-zinc-800"
-                aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-                aria-pressed={theme === "dark"}
-              >
-                {theme === "dark" ? <Sun className="h-4 w-4" aria-hidden /> : <Moon className="h-4 w-4" aria-hidden />}
-              </button>
-              <SettingsMenu
-                trigger="custom"
-                triggerLabel="Open profile menu"
-                triggerClassName="w-full min-w-0 max-w-full overflow-hidden flex h-11 items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white py-1.5 pl-1 pr-1.5 shadow-[12px_0_36px_rgba(15,23,42,0.10)] transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F1F4F9] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_8px_22px_rgba(0,0,0,0.28),0_24px_52px_rgba(0,0,0,0.24)] dark:hover:bg-zinc-800 dark:focus-visible:ring-offset-[#222224]"
-                triggerContent={
-                  <>
-                    <span className="shrink-0 pointer-events-none">
-                      {avatar && !avatarLoadFailed ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={avatar}
-                          alt="Your avatar"
-                          className="h-8 w-8 rounded-full object-cover"
-                          onError={() => setAvatarLoadFailed(true)}
-                        />
-                      ) : (
-                        <span
-                          className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold uppercase text-white"
-                          style={{ backgroundColor: fallbackAvatar.color }}
-                        >
-                          {fallbackAvatar.initials}
-                        </span>
-                      )}
-                    </span>
-                    <span className="flex min-w-0 flex-1 flex-col leading-tight text-left">
-                      <span className="truncate text-[13px] font-semibold text-[#1F2A37] dark:text-zinc-100">
-                        {accountName}
-                      </span>
-                      {accountEmail ? (
-                        <span className="truncate text-[11px] font-medium text-[#64748B] dark:text-zinc-400">
-                          {accountEmail}
-                        </span>
-                      ) : null}
-                    </span>
-                    <ChevronDown className="h-4 w-4 shrink-0 text-[#94A3B8] dark:text-zinc-400" aria-hidden="true" />
-                  </>
-                }
-              />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="mt-6 w-full">
-        <div
-          className="flex min-h-0 flex-col rounded-xl border-[1.5px] border-[#E5E7EB] bg-white p-4 transition-[height] duration-300 ease-out shadow-[0_12px_36px_rgba(15,23,42,0.10)] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_8px_22px_rgba(0,0,0,0.28),0_24px_52px_rgba(0,0,0,0.24)] sm:p-5"
+          className="flex min-h-0 flex-col rounded-xl border-[1.5px] border-gray-200 bg-white p-4 transition-[height] duration-300 ease-out shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] sm:p-5"
           style={{
             height:
-              "calc(100dvh - 48px - var(--home-banner-offset, 0px) - var(--home-right-column-offset, 0px))",
+              "calc(100dvh - 48px - var(--home-banner-offset, 0px) - var(--home-topbar-offset, 0px) - var(--home-right-column-offset, 0px))",
           }}
         >
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -512,86 +354,95 @@ export default function HomeProjectsSearch({
               {query.trim() ? "Search results" : sectionLabel}
             </h2>
             <div className="flex items-center gap-2">
-              <div ref={sortMenuRef} className="relative">
-                <button
-                  type="button"
-                  onClick={() => setSortMenuOpen((prev) => !prev)}
-                  className={`inline-flex items-center gap-2 rounded-full border-2 border-[#E6EBF2] px-4 py-2 text-xs font-semibold transition dark:border-zinc-700 ${
-                    sortMenuOpen
-                      ? "bg-[var(--color-primary-light)] text-[#1F2A37] ring-2 ring-[rgba(37,99,235,0.18)] dark:text-zinc-100"
-                      : "bg-white text-[#1F2A37] hover:border-[#D8DEE8] dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-zinc-600"
-                  }`}
-                  aria-haspopup="menu"
-                  aria-expanded={sortMenuOpen}
-                >
-                  {sortOption === "activity" ? (
-                    <Clock className="h-4 w-4" aria-hidden />
-                  ) : sortOption === "az" ? (
-                    <ArrowUp className="h-4 w-4" aria-hidden />
-                  ) : (
-                    <ArrowDown className="h-4 w-4" aria-hidden />
-                  )}
-                  <span className="whitespace-nowrap">
-                    {sortOption === "activity"
-                      ? "Last activity"
-                      : sortOption === "az"
-                        ? "Alphabetical (A-Z)"
-                        : "Alphabetical (Z-A)"}
-                  </span>
-                  <ChevronDown
-                    className={`ml-1 h-4 w-4 opacity-70 transition-transform ${
-                      sortMenuOpen ? "rotate-180" : ""
+              {showAllProjects ? (
+                <div ref={sortMenuRef} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setSortMenuOpen((prev) => !prev)}
+                    className={`inline-flex items-center gap-2 rounded-full border-2 border-[#E6EBF2] px-4 py-2 text-xs font-semibold transition dark:border-zinc-700 ${
+                      sortMenuOpen
+                        ? "border-[#CFC3FF] bg-white text-[#4C1D95] ring-1 ring-[rgba(108,71,255,0.16)] dark:border-[#5B4A85] dark:bg-zinc-900 dark:text-[#D8CCFF]"
+                        : "bg-white text-[#1F2A37] hover:border-[#D8DEE8] dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-zinc-600"
                     }`}
-                    aria-hidden
-                  />
-                </button>
-
-                {sortMenuOpen ? (
-                  <div
-                    role="menu"
-                    className="absolute left-0 top-full z-50 mt-2 min-w-full w-max overflow-hidden rounded-md bg-white text-sm text-[#1F2A37] shadow-[0_2px_8px_rgba(15,23,42,0.06)]"
+                    aria-haspopup="menu"
+                    aria-expanded={sortMenuOpen}
                   >
-                    <div className="py-2">
-                      {(
-                        [
-                          { key: "activity", label: "Last activity", Icon: Clock },
-                          { key: "az", label: "Alphabetical (A-Z)", Icon: ArrowUp },
-                          { key: "za", label: "Alphabetical (Z-A)", Icon: ArrowDown },
-                        ] as const
-                      ).map(({ key, label, Icon }) => (
-                        <button
-                          key={key}
-                          type="button"
-                          role="menuitem"
-                          onClick={() => {
-                            setSortOption(key);
-                            setSortMenuOpen(false);
-                          }}
-                          className={`mx-2 flex w-[calc(100%-1rem)] items-center justify-between rounded-md px-2.5 py-2.5 text-left transition ${
-                            sortOption === key ? "" : "hover:bg-slate-100 dark:hover:bg-zinc-800/60"
-                          }`}
-                        >
-                          <span className="flex items-center gap-2">
-                            <Icon className="h-3.5 w-3.5 text-slate-500" aria-hidden />
-                            <span
-                              className={`text-[13px] ${
-                                sortOption === key
-                                  ? "font-semibold text-[#0F172A]"
-                                  : "font-medium text-[#1F2A37]"
-                              }`}
-                            >
-                              {label}
+                    {sortOption === "activity" ? (
+                      <Clock className="h-4 w-4" aria-hidden />
+                    ) : sortOption === "az" ? (
+                      <ArrowUp className="h-4 w-4" aria-hidden />
+                    ) : (
+                      <ArrowDown className="h-4 w-4" aria-hidden />
+                    )}
+                    <span className="whitespace-nowrap">
+                      {sortOption === "activity"
+                        ? "Last activity"
+                        : sortOption === "az"
+                          ? "Name (A-Z)"
+                          : "Name (Z-A)"}
+                    </span>
+                    <ChevronDown
+                      className={`ml-1 h-4 w-4 opacity-70 transition-transform ${
+                        sortMenuOpen ? "rotate-180" : ""
+                      }`}
+                      aria-hidden
+                    />
+                  </button>
+
+                  {sortMenuOpen ? (
+                    <div
+                      role="menu"
+                      className="dropdown-pop-in absolute left-0 top-full z-50 mt-3 w-full overflow-hidden rounded-xl border border-[#E5E7EB] bg-white p-1.5 text-sm text-[#1F2A37] shadow-[0_16px_36px_rgba(15,23,42,0.14)] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:shadow-[0_20px_44px_rgba(0,0,0,0.5)]"
+                    >
+                      <div className="py-0">
+                        {(
+                          [
+                            { key: "activity", label: "Last activity", Icon: Clock },
+                            { key: "az", label: "Name (A-Z)", Icon: ArrowUp },
+                            { key: "za", label: "Name (Z-A)", Icon: ArrowDown },
+                          ] as const
+                        ).map(({ key, label, Icon }) => (
+                          <button
+                            key={key}
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              setSortOption(key);
+                              setSortMenuOpen(false);
+                            }}
+                            className={`flex w-full items-center justify-between rounded-lg px-2.5 py-2.5 text-left transition ${
+                              sortOption === key
+                                ? "bg-[#F8F5FF] dark:bg-[#2A223D]"
+                                : "hover:bg-slate-50 dark:hover:bg-zinc-800/60"
+                            }`}
+                          >
+                            <span className="flex items-center gap-2">
+                              <Icon
+                                className={`h-3.5 w-3.5 ${
+                                  sortOption === key ? "text-[#6C47FF] dark:text-[#BBA6FF]" : "text-slate-500"
+                                }`}
+                                aria-hidden
+                              />
+                              <span
+                                className={`text-[13px] ${
+                                  sortOption === key
+                                    ? "font-semibold text-[#4C1D95] dark:text-[#D8CCFF]"
+                                    : "font-medium text-[#1F2A37]"
+                                }`}
+                              >
+                                {label}
+                              </span>
                             </span>
-                          </span>
-                          {sortOption === key ? (
-                            <Check className="h-4.5 w-4.5 text-[#1F2A37]" aria-hidden />
-                          ) : null}
-                        </button>
-                      ))}
+                            {sortOption === key ? (
+                              <Check className="h-4.5 w-4.5 text-[#4C1D95] dark:text-[#D8CCFF]" aria-hidden />
+                            ) : null}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ) : null}
-              </div>
+                  ) : null}
+                </div>
+              ) : null}
 
               {showOwnerFilter ? (
                 <div ref={ownerMenuRef} className="relative">

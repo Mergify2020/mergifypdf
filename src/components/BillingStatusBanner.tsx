@@ -64,7 +64,7 @@ export default function BillingStatusBanner({
               ref={actionRef}
               type="button"
               onClick={onUpdatePaymentMethod}
-              className="inline-flex items-center whitespace-nowrap rounded-md bg-[#6C47FF] px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-[#5B38E6] focus:outline-none focus:ring-2 focus:ring-[#6C47FF]/40 focus:ring-offset-2 focus:ring-offset-rose-50 dark:focus:ring-offset-rose-900/20"
+              className="inline-flex items-center whitespace-nowrap rounded-md bg-rose-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-500/45 focus:ring-offset-2 focus:ring-offset-rose-50 dark:bg-rose-600 dark:hover:bg-rose-700 dark:focus:ring-offset-rose-900/20"
             >
               Update payment method
             </button>

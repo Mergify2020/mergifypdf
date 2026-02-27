@@ -2,7 +2,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateSixDigitCode, hashVerificationCode } from "@/lib/verificationCode";
-import { sendResetEmail } from "@/lib/email";
 import { randomUUID } from "crypto";
 import { isSameOrigin } from "@/lib/requestGuards";
 import { rateLimit } from "@/lib/rateLimit";
@@ -123,6 +122,7 @@ export async function POST(req: Request) {
     }
 
     // 4) send the email
+    const { sendResetEmail } = await import("@/lib/email");
     const emailRes = await sendResetEmail({ to: user.email!, code });
 
     if (!emailRes.ok) {

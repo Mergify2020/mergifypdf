@@ -8,6 +8,30 @@ import { useSession } from "next-auth/react";
 import { refreshProjectsSummary } from "@/lib/projectsSummaryCache";
 import { sanitizeProjectName } from "@/lib/projectName";
 
+type PreviewCacheEntry = {
+  url: string;
+  fetchedAt: number;
+};
+
+const PREVIEW_CACHE_MAX_AGE_MS = 10 * 60 * 1000;
+const previewMemoryCache = new Map<string, PreviewCacheEntry>();
+
+function readPreviewCache(projectId: string): PreviewCacheEntry | null {
+  const now = Date.now();
+  const memory = previewMemoryCache.get(projectId);
+  if (memory && now - memory.fetchedAt <= PREVIEW_CACHE_MAX_AGE_MS) return memory;
+  return null;
+}
+
+function writePreviewCache(projectId: string, url: string) {
+  const entry: PreviewCacheEntry = { url, fetchedAt: Date.now() };
+  previewMemoryCache.set(projectId, entry);
+}
+
+function clearPreviewCache(projectId: string) {
+  previewMemoryCache.delete(projectId);
+}
+
 type Project = {
   id: string;
   title: string;
@@ -96,9 +120,18 @@ export default function ProjectCard({
     if (!project.hasPreview) {
       setPreviewUrl(null);
       setPreviewLoading(false);
+      clearPreviewCache(project.id);
       return;
     }
-    setPreviewLoading(true);
+
+    const cached = readPreviewCache(project.id);
+    if (cached?.url) {
+      setPreviewUrl(cached.url);
+      setPreviewLoading(false);
+    } else {
+      setPreviewLoading(true);
+    }
+
     let cancelled = false;
     const controller = new AbortController();
     const load = async () => {
@@ -106,9 +139,10 @@ export default function ProjectCard({
         const url = await fetchPreviewUrl(controller.signal);
         if (cancelled) return;
         lastFailedPreviewRef.current = null;
+        writePreviewCache(project.id, url);
         setPreviewUrl(url);
       } catch {
-        if (!cancelled) setPreviewLoading(false);
+        if (!cancelled && !cached?.url) setPreviewLoading(false);
         // fail silently
       }
     };
@@ -126,8 +160,10 @@ export default function ProjectCard({
     try {
       const url = await fetchPreviewUrl();
       lastFailedPreviewRef.current = null;
+      writePreviewCache(project.id, url);
       setPreviewUrl(url);
     } catch {
+      clearPreviewCache(project.id);
       setPreviewUrl(null);
       setPreviewLoading(false);
     } finally {
@@ -504,6 +540,7 @@ export default function ProjectCard({
                     lastFailedPreviewRef.current = previewUrl;
                     void refreshPreviewUrl();
                   } else {
+                    clearPreviewCache(project.id);
                     setPreviewUrl(null);
                   }
                 }}

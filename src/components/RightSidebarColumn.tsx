@@ -25,7 +25,7 @@ export default function RightSidebarColumn() {
         }}
       >
         <div className="flex min-h-0 flex-col gap-[24px] overflow-visible">
-          <div className="relative rounded-xl border-[1.5px] border-[#E5E7EB] bg-white px-4 py-4 shadow-[12px_0_36px_rgba(15,23,42,0.10)] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_8px_22px_rgba(0,0,0,0.28),0_24px_52px_rgba(0,0,0,0.24)]">
+          <div className="relative rounded-xl border-[1.5px] border-gray-200 bg-white px-4 py-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)]">
             <Link
               href="/signature-center"
               className="text-xs font-semibold uppercase tracking-[0.14em] text-[#6B7280] hover:text-[#4B5563] dark:text-zinc-400 dark:hover:text-zinc-200"
@@ -65,7 +65,7 @@ export default function RightSidebarColumn() {
               </Link>
             </div>
           </div>
-          <div className="relative rounded-xl border-[1.5px] border-[#E5E7EB] bg-white px-4 py-4 shadow-[12px_0_36px_rgba(15,23,42,0.10)] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_8px_22px_rgba(0,0,0,0.28),0_24px_52px_rgba(0,0,0,0.24)]">
+          <div className="relative rounded-xl border-[1.5px] border-gray-200 bg-white px-4 py-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)]">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#6B7280] dark:text-zinc-400">Activity</p>
             <div className="mt-3 flex h-24 flex-col items-start justify-center gap-2 rounded-xl border border-dashed border-[#E6EBF2] bg-[#F7F9FC] px-3 text-xs text-[#6B7280] dark:border-zinc-700 dark:bg-zinc-900/60 dark:text-zinc-400">
               <span className="h-2.5 w-2.5 rounded-full bg-[#E6EBF2] dark:bg-zinc-700" />

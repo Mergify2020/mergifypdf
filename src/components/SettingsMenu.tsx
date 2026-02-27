@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { CircleHelp, CreditCard, ExternalLink, Home, LogOut, PenLine, Settings, User } from "lucide-react";
+import { AlertTriangle, CircleHelp, CreditCard, ExternalLink, Home, LogOut, PenLine, Settings, User } from "lucide-react";
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
 import { getAvatarFallback } from "@/lib/avatarFallback";
 
@@ -32,10 +32,10 @@ export default function SettingsMenu({
   const [stripeStatus, setStripeStatus] = useState<string | null>(null);
   const avatarKey = session?.user?.id ?? session?.user?.email ?? null;
   const { avatar } = useAvatarPreference(avatarKey);
-  const fallback = getAvatarFallback(
-    avatarKey,
-    session?.user?.name ?? session?.user?.email ?? "User"
-  );
+  const profileName = (session?.user?.name ?? "").trim();
+  const profileEmail = (session?.user?.email ?? "").trim();
+  const hasProfileInfo = Boolean(profileName || profileEmail);
+  const fallback = getAvatarFallback(avatarKey, profileName || profileEmail || null);
 
   const outerSizeClass = variant === "pricing" ? "h-12 w-12" : "h-9 w-9";
   const innerSizeClass = variant === "pricing" ? "h-11 w-11" : "h-8 w-8";
@@ -209,7 +209,7 @@ export default function SettingsMenu({
             className={`flex items-center justify-center rounded-full text-xs font-semibold uppercase text-white ${innerSizeClass}`}
             style={{ backgroundColor: fallback.color }}
           >
-            {fallback.initials}
+            {hasProfileInfo ? fallback.initials : ""}
           </span>
         ) : null}
       </button>
@@ -237,19 +237,23 @@ export default function SettingsMenu({
                   className="flex h-11 w-11 items-center justify-center rounded-md text-base font-semibold uppercase text-white"
                   style={{ backgroundColor: fallback.color }}
                 >
-                  {fallback.initials}
+                  {hasProfileInfo ? fallback.initials : ""}
                 </span>
               )}
-              <div className="min-w-0">
-                <p className="max-w-[190px] truncate text-base font-semibold text-[#0F172A] dark:text-zinc-100">
-                  {session?.user?.name ?? "Mergify user"}
-                </p>
-                {session?.user?.email && (
-                  <p className="max-w-[190px] truncate text-sm text-[#64748B] dark:text-zinc-400">
-                    {session.user.email}
-                  </p>
-                )}
-              </div>
+              {hasProfileInfo ? (
+                <div className="min-w-0">
+                  {profileName ? (
+                    <p className="max-w-[190px] truncate text-base font-semibold text-[#0F172A] dark:text-zinc-100">
+                      {profileName}
+                    </p>
+                  ) : null}
+                  {profileEmail ? (
+                    <p className="max-w-[190px] truncate text-sm text-[#64748B] dark:text-zinc-400">
+                      {profileEmail}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
 
             <div className="border-t border-[#E6EBF2] pt-2 dark:border-zinc-700">
@@ -259,8 +263,9 @@ export default function SettingsMenu({
                   onClick={() => {
                     void handleBillingPortal();
                   }}
-                  className="mb-2 flex w-full items-center justify-center rounded-md bg-[#6C47FF] px-3 py-2.5 text-[15px] font-semibold text-white transition hover:bg-[#5B38E6] focus:outline-none focus:ring-2 focus:ring-[#6C47FF]/40 focus:ring-offset-2 focus:ring-offset-white dark:bg-[#6C47FF] dark:hover:bg-[#5B38E6] dark:focus:ring-offset-zinc-900"
+                  className="mb-2 flex w-full items-center justify-center gap-2 rounded-md bg-rose-600 px-3 py-2.5 text-[15px] font-semibold text-white transition hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-500/45 focus:ring-offset-2 focus:ring-offset-white dark:bg-rose-600 dark:hover:bg-rose-700 dark:focus:ring-offset-zinc-900"
                 >
+                  <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
                   Update payment method
                 </button>
               ) : hasActivePlan === false ? (

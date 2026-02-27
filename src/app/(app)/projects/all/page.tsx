@@ -23,8 +23,6 @@ export default async function AllProjectsPage() {
   }
 
   const displayName = session.user.name ?? session.user.email ?? "Guest";
-  const email = session.user.email ?? null;
-  const firstName = displayName.split(" ")[0] ?? "there";
 
   const shapedProjects = await prisma.project.findMany({
     where: { userId, trashedAt: null },
@@ -65,23 +63,23 @@ export default async function AllProjectsPage() {
   return (
     <main
       className="w-full bg-[#F1F4F9] py-6 transition-[height] duration-300 ease-out dark:bg-[#222224]"
-      style={{ height: "calc(100vh - var(--home-banner-offset, 0px) - 48px)" }}
+      style={{
+        height:
+          "calc(100vh - var(--home-banner-offset, 0px) - var(--home-topbar-offset, 0px) - 48px)",
+      }}
     >
       <div className="w-full">
         <div className="projects-content-grid grid h-full w-full max-w-[1680px] min-h-0 gap-[24px] lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start">
           <div
             id="home-projects-container"
-            className="relative z-40 flex h-full min-h-0 w-full flex-col pl-1 pr-0 pb-10 pt-0 data-[shadow-overlay=true]:border-transparent data-[shadow-overlay=true]:shadow-none"
+            className="relative z-40 flex h-full min-h-0 w-full flex-col pl-1 pr-0 pt-0 data-[shadow-overlay=true]:border-transparent data-[shadow-overlay=true]:shadow-none"
           >
             <div className="w-full">
               <HomeProjectsSearch
-                firstName={firstName}
                 accountName={displayName}
-                accountEmail={email}
                 ownerKey={userId}
                 projects={summaryProjects}
                 sectionLabel="All projects"
-                hideHeadline
                 showAllProjects
                 showOwnerFilter={false}
               />
@@ -94,7 +92,10 @@ export default async function AllProjectsPage() {
             }}
           >
             <div className="flex min-h-0 flex-col gap-[24px] overflow-visible">
-              <div className="rounded-xl border border-[#E5E7EB] bg-white px-4 py-4 shadow-[12px_0_36px_rgba(15,23,42,0.10)] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[12px_0_36px_rgba(0,0,0,0.45)]" style={{ height: "500px" }}>
+              <div
+                className="rounded-xl border-[1.5px] border-gray-200 bg-white px-4 py-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)]"
+                style={{ height: "500px" }}
+              >
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#6B7280] dark:text-zinc-400">
                   Templates
                 </p>

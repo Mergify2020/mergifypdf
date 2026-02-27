@@ -1282,7 +1282,10 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
             <button
               type="button"
               onClick={() => {
-                window.dispatchEvent(new Event("workspace-loading-start"));
+                if (typeof window !== "undefined") {
+                  window.location.assign("/");
+                  return;
+                }
                 router.push("/");
               }}
               className="inline-flex h-9 w-9 items-center justify-center text-gray-700 transition hover:text-gray-900 dark:text-zinc-100 dark:hover:text-white"

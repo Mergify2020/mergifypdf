@@ -50,11 +50,12 @@ export default async function Home({
         ? landingParam[0]
         : undefined;
 
-  const session = await getServerSessionSafe();
+  // Keep auth resolution behavior in sync with the app layout to avoid mixed
+  // renders (workspace shell + marketing hero) during first load.
+  const session = await getServerSessionSafe(0);
 
-  // When explicitly requested, always show the marketing hero,
-  // even if the user already has an active session.
-  if (landing === "hero") {
+  // Only honor marketing-hero forcing for signed-out visitors.
+  if (landing === "hero" && !session?.user) {
     const usedToday = await hasUsedToday();
     return <MarketingLanding usedToday={usedToday} />;
   }
@@ -70,7 +71,6 @@ export default async function Home({
     return (
       <ProjectsDashboard
         displayName={session.user.name ?? session.user.email ?? "Guest"}
-        email={session.user.email ?? null}
         userId={userId}
       />
     );
@@ -146,14 +146,11 @@ function MarketingLanding({ usedToday }: { usedToday: boolean }) {
 
 async function ProjectsDashboard({
   displayName,
-  email,
   userId,
 }: {
   displayName: string;
-  email: string | null;
   userId: string;
 }) {
-  const firstName = displayName.split(" ")[0] ?? "there";
   const shapedProjects = await prisma.project.findMany({
     where: { userId, trashedAt: null },
     orderBy: { updatedAt: "desc" },
@@ -190,22 +187,22 @@ async function ProjectsDashboard({
   return (
     <main
       className="w-full bg-[#F1F4F9] py-6 transition-[height] duration-300 ease-out dark:bg-[#222224]"
-      style={{ height: "calc(100vh - var(--home-banner-offset, 0px) - 48px)" }}
+      style={{
+        height:
+          "calc(100vh - var(--home-banner-offset, 0px) - var(--home-topbar-offset, 0px) - 48px)",
+      }}
     >
       <div className="w-full">
         <div className="home-content-grid grid h-full w-full max-w-[1680px] min-h-0 gap-[24px] lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start">
           <div
             id="home-projects-container"
-            className="relative z-40 flex h-full min-h-0 w-full flex-col pl-1 pr-0 pb-10 pt-0 data-[shadow-overlay=true]:border-transparent data-[shadow-overlay=true]:shadow-none"
+            className="relative z-40 flex h-full min-h-0 w-full flex-col pl-1 pr-0 pt-0 data-[shadow-overlay=true]:border-transparent data-[shadow-overlay=true]:shadow-none"
           >
             <div className="w-full">
               <HomeProjectsSearch
-                firstName={firstName}
                 accountName={displayName}
-                accountEmail={email}
                 ownerKey={userId}
                 projects={summaryProjects}
-                hideHeadline
                 showOwnerFilter={false}
                 showResumeBadge
               />
