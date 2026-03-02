@@ -186,20 +186,20 @@ async function ProjectsDashboard({
   }));
   return (
     <main
-      className="w-full bg-[#F1F4F9] py-6 transition-[height] duration-300 ease-out dark:bg-[#222224]"
+      className="box-border w-full bg-[#F1F4F9] pt-3 pb-0 sm:py-6 transition-[height] duration-300 ease-out dark:bg-[#222224]"
       style={{
         height:
-          "calc(100vh - var(--home-banner-offset, 0px) - var(--home-topbar-offset, 0px) - 48px)",
+          "calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset, 0px) - var(--home-topbar-offset, 0px) - var(--workspace-frame-gutter, 48px))",
       }}
     >
-      <div className="w-full">
+      <div className="h-full min-h-0 w-full">
         <div className="home-content-grid grid h-full w-full min-h-0 gap-[24px] xl:grid-cols-[minmax(0,1fr)_280px] xl:items-start">
           <div
             id="home-projects-container"
-            className="relative z-40 flex h-full min-h-0 w-full flex-col pl-1 pr-0 pt-0 data-[shadow-overlay=true]:border-transparent data-[shadow-overlay=true]:shadow-none"
+            className="relative z-40 flex h-full min-h-0 w-full flex-col px-0 pt-0 data-[shadow-overlay=true]:border-transparent data-[shadow-overlay=true]:shadow-none md:pl-1 md:pr-0"
           >
-            <div className="w-full">
-              <div className="mb-4 xl:hidden">
+            <div className="home-with-quick-actions flex h-full min-h-0 w-full flex-col">
+              <div className="mb-4 hidden md:block xl:hidden">
                 <HomeQuickActionsCard />
               </div>
               <HomeProjectsSearch

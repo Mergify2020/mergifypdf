@@ -2,8 +2,12 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  experimental: {
-    cpus: 1,
+  turbopack: {
+    resolveAlias: {
+      canvas: "./src/lib/emptyModule.ts",
+      "pdfjs-dist/build/pdf.worker": "./src/lib/emptyModule.ts",
+      "pdfjs-dist/legacy/build/pdf.worker": "./src/lib/emptyModule.ts",
+    },
   },
   allowedDevOrigins: [
     "http://localhost:3000",

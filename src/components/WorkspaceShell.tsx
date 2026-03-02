@@ -18,7 +18,6 @@ import {
   Folders,
   Home,
   LogOut,
-  Menu,
   Moon,
   PanelLeftClose,
   PenSquare,
@@ -236,6 +235,7 @@ export default function WorkspaceShell({
   const [contentSwapOut, setContentSwapOut] = useState(false);
   const [contentSwapIn, setContentSwapIn] = useState(false);
   const [homeProjectsQuery, setHomeProjectsQuery] = useState("");
+  const [mobileSearchExpanded, setMobileSearchExpanded] = useState(false);
   const [shellTheme, setShellTheme] = useState<"light" | "dark">("light");
   const contentSwapTimerRef = useRef<number | null>(null);
   const contentSettleTimerRef = useRef<number | null>(null);
@@ -259,6 +259,7 @@ export default function WorkspaceShell({
   const [compactSidebar, setCompactSidebar] = useState(false);
   const [narrowSidebar, setNarrowSidebar] = useState(false);
   const [overlaySidebar, setOverlaySidebar] = useState(false);
+  const [phoneViewport, setPhoneViewport] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
@@ -348,6 +349,16 @@ export default function WorkspaceShell({
     document.documentElement.classList.toggle("dark", initialTheme === "dark");
     document.body.classList.remove("dark");
     setShellTheme(initialTheme);
+  }, []);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.documentElement.classList.add("workspace-shell-active");
+    document.body.classList.add("workspace-shell-active");
+    return () => {
+      document.documentElement.classList.remove("workspace-shell-active");
+      document.body.classList.remove("workspace-shell-active");
+    };
   }, []);
 
   const toggleShellTheme = () => {
@@ -1198,6 +1209,7 @@ export default function WorkspaceShell({
       const width = window.innerWidth;
       setNarrowSidebar(width < 1280);
       setOverlaySidebar(width < 1024);
+      setPhoneViewport(width < 768);
     };
 
     updateWidth();
@@ -1206,6 +1218,16 @@ export default function WorkspaceShell({
       window.removeEventListener("resize", updateWidth);
     };
   }, []);
+
+  useEffect(() => {
+    if (!phoneViewport && mobileSearchExpanded) {
+      setMobileSearchExpanded(false);
+    }
+  }, [phoneViewport, mobileSearchExpanded]);
+
+  useEffect(() => {
+    setMobileSearchExpanded(false);
+  }, [pathname]);
 
   const sidebarCompact = compactSidebar || narrowSidebar;
   const shouldOverlay = overlaySidebar;
@@ -1613,6 +1635,29 @@ export default function WorkspaceShell({
       );
     });
 
+  const mobileBottomDockItems = [
+    { label: "Home", href: "/", icon: PhHouse, active: pathname === "/" },
+    {
+      label: "Projects",
+      href: "/projects/all",
+      icon: PhFolders,
+      active: isProjectsRoute || pathname === "/projects/all",
+    },
+    {
+      label: "Signatures",
+      href: "/signature-center",
+      icon: PhSignature,
+      active: pathname?.startsWith("/signature-center") ?? false,
+    },
+    {
+      label: "Templates",
+      href: "/templates",
+      icon: PhFileText,
+      active: pathname?.startsWith("/templates") ?? false,
+    },
+    { label: "Trash", href: "/projects/trash", icon: PhTrash, active: isTrashRoute },
+  ] as const;
+
   const workspaceShell = (
     <>
     {isBillingBannerRoute ? (
@@ -1622,10 +1667,10 @@ export default function WorkspaceShell({
       />
     ) : null}
     <div
-      className={`relative z-10 flex pt-0 ${homeBillingBannerExiting ? "transition-[padding-top,min-height] duration-300 ease-out" : "transition-none"} md:pt-[var(--home-banner-offset)] ${workspaceBackgroundClass} ${sidebarCompact ? "sidebar-collapsed" : ""} ${expanded ? "" : "sidebar-minimized"} dark:bg-[#222224]`}
+      className={`workspace-shell-root relative z-10 flex pt-0 ${homeBillingBannerExiting ? "transition-[padding-top,min-height] duration-300 ease-out" : "transition-none"} md:pt-[var(--home-banner-offset)] ${workspaceBackgroundClass} ${sidebarCompact ? "sidebar-collapsed" : ""} ${expanded ? "" : "sidebar-minimized"} dark:bg-[#222224]`}
       style={
         {
-          minHeight: "calc(100vh - var(--home-banner-offset))",
+          minHeight: "calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset))",
           "--shell-content-width":
             isAccountRoute ? "1960px" : "calc(1960px - (var(--shell-sidebar-width) - 80px))",
           "--shell-left":
@@ -1665,7 +1710,11 @@ export default function WorkspaceShell({
       {/* Desktop sidebar */}
       <aside
         id={isHomePanel ? "home-sidebar" : undefined}
-        className={`absolute left-[var(--shell-left)] top-[calc(24px+var(--home-banner-offset))] z-50 hidden h-[calc(100vh-48px-var(--home-banner-offset))] w-[var(--shell-sidebar-width)] text-slate-800 ${homeBillingBannerExiting ? "transition-[width,top,height] duration-300 ease-out" : "transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"} dark:text-zinc-100 md:flex`}
+        className={`workspace-desktop-sidebar absolute left-[var(--shell-left)] top-[calc(24px+var(--home-banner-offset))] z-50 hidden w-[var(--shell-sidebar-width)] text-slate-800 ${homeBillingBannerExiting ? "transition-[top,height] duration-300 ease-out" : "transition-none 2xl:transition-[width] 2xl:duration-300 2xl:ease-[cubic-bezier(0.22,1,0.36,1)]"} dark:text-zinc-100 md:flex`}
+        style={{
+          height:
+            "calc(var(--workspace-vh, 100dvh) - var(--workspace-frame-gutter, 48px) - var(--home-banner-offset, 0px))",
+        }}
       >
         <div className="relative flex h-full w-full">
           <div
@@ -2372,48 +2421,37 @@ export default function WorkspaceShell({
       ) : null}
 
       <div
-        className={`flex min-h-0 w-full flex-1 flex-col bg-transparent transition-[padding-left] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${contentOffsetClass}`}
+        className={`workspace-main-with-dock flex min-h-0 w-full flex-1 flex-col bg-transparent transition-none 2xl:transition-[padding-left] 2xl:duration-300 2xl:ease-[cubic-bezier(0.22,1,0.36,1)] ${contentOffsetClass}`}
       >
-        <header className="sticky top-0 z-20 w-full border-b border-slate-200 bg-white/90 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/90 md:hidden">
-          <div className="mx-auto flex h-[76px] w-full max-w-7xl items-center justify-between px-3 lg:px-6">
-            <div className="flex items-center gap-2">
-              {!hideWorkspaceSidebar ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMobileOpen(true);
-                  }}
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-transparent text-slate-900 shadow-none transition hover:bg-slate-100 active:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-800 focus:ring-offset-2 md:hidden"
-                >
-                  <Menu className="h-7 w-7" />
-                  <span className="sr-only">Open workspace menu</span>
-                </button>
-              ) : null}
-              <AppHeaderBrand />
-            </div>
-            <div className="relative flex items-center" />
-          </div>
-        </header>
-
         <WorkspaceHomeQueryProvider value={homeProjectsQueryContext}>
           {showPersistentHomeProjectsTopBar ? (
-            <div className={`relative z-[80] flex w-full ${hideWorkspaceSidebar ? "justify-center px-6" : "justify-start pr-6"} pt-6`}>
+            <div
+              className={`relative z-[80] flex w-full ${
+                hideWorkspaceSidebar ? "justify-center px-6" : "justify-start px-3 sm:px-4 md:pl-0 md:pr-6"
+              } pt-3 sm:pt-6`}
+            >
               <div
                 style={{ maxWidth: "var(--shell-content-width)" }}
-                className="w-full transition-[max-width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+                className="w-full transition-none 2xl:transition-[max-width] 2xl:duration-300 2xl:ease-[cubic-bezier(0.22,1,0.36,1)]"
               >
-                <div className="flex w-full items-center justify-between gap-3">
-                  <div className="flex flex-1 items-center gap-3">
-                    <div className="flex w-full max-w-xl">
+                <div className="flex w-full items-center gap-2 sm:gap-3">
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    <div
+                      className={`flex w-full transition-[max-width] duration-200 ease-out ${
+                        phoneViewport ? (mobileSearchExpanded ? "max-w-none" : "max-w-[210px]") : "max-w-xl"
+                      }`}
+                    >
                       <div
-                        className="flex h-11 w-full cursor-text rounded-full border-[1.5px] border-gray-200 bg-white shadow-sm transition focus-within:border-[#2563EB] focus-within:ring-2 focus-within:ring-[#2563EB]/15 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] dark:focus-within:border-[#2563EB] dark:focus-within:ring-[#2563EB]/30"
+                        className="flex h-11 w-full cursor-text rounded-full border-[1.5px] border-gray-200 bg-white shadow-sm transition focus-within:border-[#4F46E5] focus-within:ring-2 focus-within:ring-[#4F46E5]/15 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] dark:focus-within:border-[#4F46E5] dark:focus-within:ring-[#4F46E5]/30"
                         onMouseDown={(event) => {
                           const target = event.target;
                           if (target instanceof HTMLInputElement) return;
+                          if (phoneViewport) setMobileSearchExpanded(true);
                           event.preventDefault();
                           homeProjectsSearchInputRef.current?.focus();
                         }}
                         onClick={() => {
+                          if (phoneViewport) setMobileSearchExpanded(true);
                           homeProjectsSearchInputRef.current?.focus();
                         }}
                       >
@@ -2436,18 +2474,32 @@ export default function WorkspaceShell({
                             type="text"
                             value={homeProjectsQuery}
                             onChange={(event) => setHomeProjectsQuery(event.target.value)}
+                            onFocus={() => {
+                              if (phoneViewport) setMobileSearchExpanded(true);
+                            }}
+                            onBlur={() => {
+                              if (phoneViewport) setMobileSearchExpanded(false);
+                            }}
                             placeholder="Search projects..."
-                            className="h-full min-w-0 flex-1 border-none bg-white text-sm text-[#1F2A37] placeholder:text-[#6B7280] outline-none focus:outline-none focus:ring-0 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-400 sm:text-base"
+                            className="h-full min-w-0 flex-1 border-none bg-white text-base text-[#1F2A37] placeholder:text-[#6B7280] outline-none focus:outline-none focus:ring-0 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-400"
                           />
                         </div>
                       </div>
                     </div>
                   </div>
-                  <div className="flex h-11 w-[276px] min-w-[276px] max-w-[276px] flex-nowrap items-center gap-2 shrink-0">
+                  <div
+                    className={`flex h-11 flex-nowrap items-center gap-2 shrink-0 transition-[width,max-width,opacity] duration-200 ease-out ${
+                      phoneViewport
+                        ? mobileSearchExpanded
+                          ? "pointer-events-none w-0 min-w-0 max-w-0 overflow-hidden opacity-0"
+                          : "w-[188px] min-w-[188px] max-w-[188px] opacity-100"
+                        : "w-[276px] min-w-[276px] max-w-[276px] opacity-100"
+                    }`}
+                  >
                     <button
                       type="button"
                       onClick={toggleShellTheme}
-                      className="shrink-0 flex h-11 w-11 items-center justify-center rounded-full border-[1.5px] border-gray-200 bg-white text-[#1F2A37] shadow-sm transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/15 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] dark:hover:bg-zinc-800 dark:focus-visible:ring-[#2563EB]/30"
+                      className="hidden shrink-0 h-11 w-11 items-center justify-center rounded-full border-[1.5px] border-gray-200 bg-white text-[#1F2A37] shadow-sm transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/15 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] dark:hover:bg-zinc-800 dark:focus-visible:ring-[#2563EB]/30 sm:flex"
                       aria-label={shellTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
                       aria-pressed={shellTheme === "dark"}
                     >
@@ -2508,28 +2560,32 @@ export default function WorkspaceShell({
             fallback={
               showPersistentHomeProjectsTopBar ? (
                 <main className="relative z-0 flex-1 lg:z-40">
-                  <div className={`flex w-full ${hideWorkspaceSidebar ? "justify-center px-6" : "justify-start pr-6"}`}>
+                  <div
+                    className={`flex w-full ${
+                      hideWorkspaceSidebar ? "justify-center px-6" : "justify-start px-3 sm:px-4 md:pl-0 md:pr-6"
+                    }`}
+                  >
                     <div
-                      className="workspace-content-shell w-full transition-[max-width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+                      className="workspace-content-shell w-full transition-none 2xl:transition-[max-width] 2xl:duration-300 2xl:ease-[cubic-bezier(0.22,1,0.36,1)]"
                       style={{ maxWidth: "var(--shell-content-width)" }}
                     >
                       <div
-                        className="w-full bg-[#F1F4F9] py-6 transition-[height] duration-300 ease-out dark:bg-[#222224]"
+                        className="box-border w-full bg-[#F1F4F9] pt-3 pb-0 sm:py-6 transition-[height] duration-300 ease-out dark:bg-[#222224]"
                         style={{
                           height:
-                            "calc(100vh - var(--home-banner-offset, 0px) - var(--home-topbar-offset, 0px) - 48px)",
+                            "calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset, 0px) - var(--home-topbar-offset, 0px) - var(--workspace-frame-gutter, 48px))",
                         }}
                       >
-                        <div className="w-full">
+                        <div className="h-full min-h-0 w-full">
                           <div className="grid h-full w-full min-h-0 gap-[24px] xl:grid-cols-[minmax(0,1fr)_280px] xl:items-start">
-                            <div className="relative z-40 flex h-full min-h-0 w-full flex-col pl-1 pr-0 pt-0">
-                              <div className="w-full">
-                                <section className="mt-0 w-full">
+                            <div className="relative z-40 flex h-full min-h-0 w-full flex-col px-0 pt-0 md:pl-1 md:pr-0">
+                              <div className="flex h-full min-h-0 w-full flex-col">
+                                <section className="mt-0 flex w-full min-h-0 flex-1 flex-col">
                                   <div
-                                    className="flex min-h-0 flex-col rounded-xl border-[1.5px] border-gray-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] sm:p-5"
+                                    className="box-border flex min-h-0 flex-col rounded-xl border-[1.5px] border-gray-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] sm:p-5"
                                     style={{
                                       height:
-                                        "calc(100dvh - 48px - var(--home-banner-offset, 0px) - var(--home-topbar-offset, 0px) - var(--home-right-column-offset, 0px))",
+                                        "calc(100% - var(--workspace-projects-bottom-gap, 0px))",
                                     }}
                                   >
                                     <div className="flex items-center justify-between gap-4">
@@ -2542,10 +2598,10 @@ export default function WorkspaceShell({
                                     </div>
                                     <div
                                       className="mt-6 flex-1 overflow-y-hidden overflow-x-hidden"
-                                      style={{ paddingRight: 4, paddingLeft: 6, paddingBottom: 6 }}
+                                      style={{ paddingRight: 6, paddingLeft: 6, paddingBottom: 6 }}
                                     >
                                       {fallbackProjectCardCount > 0 ? (
-                                        <div className="recent-projects-grid projects-grid mt-2 grid w-full max-w-[1560px] items-start gap-6 grid-cols-2">
+                                        <div className="recent-projects-grid projects-grid mt-2 grid w-full max-w-[1880px] items-start gap-6 grid-cols-2">
                                           {Array.from({ length: fallbackProjectCardCount }).map((_, index) => (
                                             <div key={`home-refresh-skeleton-${index}`} className="flex w-full flex-col text-left">
                                               <div className="relative rounded-[10px] bg-[#F9FAFC] dark:bg-zinc-900/60">
@@ -2620,9 +2676,13 @@ export default function WorkspaceShell({
             }
           >
             <main className="relative z-0 flex-1 lg:z-40">
-              <div className={`flex w-full ${hideWorkspaceSidebar ? "justify-center px-6" : "justify-start pr-6"}`}>
+              <div
+                className={`flex w-full ${
+                  hideWorkspaceSidebar ? "justify-center px-6" : "justify-start px-3 sm:px-4 md:pl-0 md:pr-6"
+                }`}
+              >
                 <div
-                  className={`workspace-content-shell w-full transition-[max-width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                  className={`workspace-content-shell w-full transition-none 2xl:transition-[max-width] 2xl:duration-300 2xl:ease-[cubic-bezier(0.22,1,0.36,1)] ${
                     contentSwapOut ? "workspace-content-swap-out" : contentSwapIn ? "workspace-content-swap-in" : ""
                   }`}
                   style={{ maxWidth: "var(--shell-content-width)" }}
@@ -2635,6 +2695,50 @@ export default function WorkspaceShell({
         </WorkspaceHomeQueryProvider>
       </div>
     </div>
+
+      {!hideWorkspaceSidebar ? (
+        <div className="workspace-bottom-dock fixed inset-x-0 bottom-0 z-[75] hidden border-t border-slate-200 bg-white/95 px-2 pt-2 pb-[calc(10px+env(safe-area-inset-bottom))] backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/95">
+          <div className="mx-auto grid max-w-xl grid-cols-6 items-end gap-1">
+            <button
+              type="button"
+              onClick={openCreateModal}
+              className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1 py-2 text-[11px] font-semibold text-[#4B5563] transition hover:bg-[rgba(0,0,0,0.04)]"
+            >
+              <span className="flex h-[22px] w-[22px] items-center justify-center rounded-full bg-[#6C47FF] text-white">
+                <Plus className="h-[14px] w-[14px]" aria-hidden />
+              </span>
+              <span className="truncate leading-none">Create</span>
+            </button>
+            {mobileBottomDockItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  prefetch
+                  onClick={(event) => {
+                    if (navigateWithContentSwap(item.href, true)) {
+                      event.preventDefault();
+                    }
+                  }}
+                  className={`flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1 py-2 text-[11px] font-semibold transition ${
+                    item.active
+                      ? "text-[#4C34C9]"
+                      : "text-[#4B5563] hover:bg-[rgba(0,0,0,0.04)]"
+                  }`}
+                >
+                  <Icon
+                    className="h-[20px] w-[20px]"
+                    aria-hidden
+                    weight={item.label === "Signatures" ? "regular" : item.active ? "fill" : "regular"}
+                  />
+                  <span className="truncate leading-none">{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
 
       {createOpen
         ? createPortal(

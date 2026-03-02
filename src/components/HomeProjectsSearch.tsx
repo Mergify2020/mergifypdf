@@ -45,23 +45,6 @@ type Props = {
 type OwnerFilter = "any" | "shared" | "you";
 type SortOption = "activity" | "az" | "za";
 
-const measureScrollbarWidth = () => {
-  if (typeof document === "undefined") return 0;
-  const outer = document.createElement("div");
-  outer.style.visibility = "hidden";
-  outer.style.overflow = "scroll";
-  outer.style.width = "100px";
-  outer.style.position = "absolute";
-  outer.style.top = "-9999px";
-  document.body.appendChild(outer);
-  const inner = document.createElement("div");
-  inner.style.width = "100%";
-  outer.appendChild(inner);
-  const width = outer.offsetWidth - inner.offsetWidth;
-  outer.remove();
-  return width;
-};
-
 const mapProjectsFromSummary = (projects: ProjectsSummaryProject[]): SummaryProject[] =>
   projects.map((project) => ({
     id: project.id,
@@ -112,9 +95,6 @@ export default function HomeProjectsSearch({
   const ownerMenuRef = useRef<HTMLDivElement | null>(null);
   const [ownerSearch, setOwnerSearch] = useState("");
   const recentListRef = useRef<HTMLDivElement | null>(null);
-  const [recentHasOverflow, setRecentHasOverflow] = useState(false);
-  const [recentScrollbarWidth, setRecentScrollbarWidth] = useState(0);
-  const [forceStableScrollbar, setForceStableScrollbar] = useState(false);
 
   useEffect(() => {
     if (!ownerKey) {
@@ -208,147 +188,10 @@ export default function HomeProjectsSearch({
     };
   }, []);
 
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    const width = measureScrollbarWidth();
-    if (width > 0) setRecentScrollbarWidth(width);
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const list = recentListRef.current;
-    if (!list) return;
-    let raf = 0;
-    let clearTimer: number | null = null;
-    const lastColumnsRef = { current: "" };
-    const lastChangeRef = { current: 0 };
-
-    const updateColumns = () => {
-      const grid = list.querySelector(".projects-grid");
-      if (!grid) return;
-      const computed = window.getComputedStyle(grid);
-      const columns = computed.gridTemplateColumns;
-      if (columns !== lastColumnsRef.current) {
-        const now = Date.now();
-        if (lastColumnsRef.current && now - lastChangeRef.current < 250) {
-          setForceStableScrollbar(true);
-          if (clearTimer) window.clearTimeout(clearTimer);
-          clearTimer = window.setTimeout(() => {
-            setForceStableScrollbar(false);
-          }, 800);
-        }
-        lastColumnsRef.current = columns;
-        lastChangeRef.current = now;
-      }
-    };
-
-    const schedule = () => {
-      if (raf) cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(updateColumns);
-    };
-
-    schedule();
-    window.addEventListener("resize", schedule);
-    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(schedule) : null;
-    if (observer) observer.observe(list);
-
-    return () => {
-      if (raf) cancelAnimationFrame(raf);
-      if (clearTimer) window.clearTimeout(clearTimer);
-      window.removeEventListener("resize", schedule);
-      if (observer) observer.disconnect();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const list = recentListRef.current;
-    if (!list) return;
-    let raf = 0;
-
-    const updateOverflow = () => {
-      const overflowAmount = list.scrollHeight - list.clientHeight;
-      const scrollbarWidth = list.offsetWidth - list.clientWidth;
-      if (scrollbarWidth > 0) {
-        setRecentScrollbarWidth(scrollbarWidth);
-      }
-      setRecentHasOverflow((prev) => {
-        if (overflowAmount > 12) return true;
-        if (overflowAmount < 4) return false;
-        return prev;
-      });
-    };
-
-    const schedule = () => {
-      if (raf) cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(updateOverflow);
-    };
-
-    schedule();
-    window.addEventListener("resize", schedule);
-    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(schedule) : null;
-    if (observer) observer.observe(list);
-
-    return () => {
-      if (raf) cancelAnimationFrame(raf);
-      window.removeEventListener("resize", schedule);
-      if (observer) observer.disconnect();
-    };
-  }, [query, ownerFilter, sortOption, initialProjects]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const list = recentListRef.current;
-    if (!list) return;
-    let raf = 0;
-    let lastValue = "";
-
-    const update = () => {
-      const width = list.getBoundingClientRect().width;
-      const next = width < 940 ? "200px" : "240px";
-      if (next !== lastValue) {
-        list.style.setProperty("--projects-grid-min", next);
-        lastValue = next;
-      }
-    };
-
-    const schedule = () => {
-      if (raf) cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(update);
-    };
-
-    schedule();
-    window.addEventListener("resize", schedule);
-    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(schedule) : null;
-    if (observer) observer.observe(list);
-
-    return () => {
-      if (raf) cancelAnimationFrame(raf);
-      window.removeEventListener("resize", schedule);
-      if (observer) observer.disconnect();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    const body = document.body;
-    const prevOverflow = body.style.overflow;
-    body.style.overflow = "hidden";
-    return () => {
-      body.style.overflow = prevOverflow;
-    };
-  }, []);
-
   return (
     <>
-      <section className="mt-0 w-full">
-        <div
-          className="flex min-h-0 flex-col rounded-xl border-[1.5px] border-gray-200 bg-white p-4 transition-[height] duration-300 ease-out shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] sm:p-5"
-          style={{
-            height:
-              "calc(100dvh - 48px - var(--home-banner-offset, 0px) - var(--home-topbar-offset, 0px) - var(--home-right-column-offset, 0px))",
-          }}
-        >
+      <section className="mt-0 flex w-full min-h-0 flex-1 flex-col">
+        <div className="box-border flex min-h-0 flex-1 flex-col rounded-xl border-[1.5px] border-gray-200 bg-white p-4 transition-[height] duration-300 ease-out shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <h2 className="text-base font-semibold text-[#1F2A37] dark:text-zinc-100 sm:text-lg">
               {query.trim() ? "Search results" : sectionLabel}
@@ -561,15 +404,16 @@ export default function HomeProjectsSearch({
           </div>
           <div
             ref={recentListRef}
-            className={`mt-6 flex-1 ${
-              forceStableScrollbar || recentHasOverflow ? "overflow-y-auto" : "overflow-y-hidden"
-            } overflow-x-hidden`}
+            className={`recent-projects-container mt-0 h-0 min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain ${
+              showAllProjects ? "mt-4" : "mt-6"
+            }`}
             style={{
-              paddingRight:
-                forceStableScrollbar || recentHasOverflow ? 4 : 4 + recentScrollbarWidth,
+              paddingRight: 6,
               paddingLeft: 6,
               paddingBottom: 6,
-              scrollbarGutter: forceStableScrollbar ? "stable" : undefined,
+              scrollbarGutter: "stable",
+              WebkitOverflowScrolling: "touch",
+              touchAction: "pan-y",
             }}
           >
             <RecentProjectsRow

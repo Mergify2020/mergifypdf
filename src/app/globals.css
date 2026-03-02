@@ -933,32 +933,103 @@ header[data-hero="true"] .app-brand-dark {
   filter: drop-shadow(0 1px 2px rgba(15, 23, 42, 0.6));
 }
 
-@media (min-width: 980px) {
+.recent-projects-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.recent-projects-container {
+  container-type: inline-size;
+}
+
+.workspace-shell-root {
+  --workspace-frame-gutter: 48px;
+  --workspace-bottom-dock-reserve: 0px;
+  --workspace-projects-bottom-gap: 0px;
+}
+
+@container (min-width: 640px) {
+  .recent-projects-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container (min-width: 980px) {
   .recent-projects-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
-@media (min-width: 1460px) {
+@container (min-width: 1280px) {
   .recent-projects-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
-@media (min-width: 1820px) {
+@container (min-width: 1400px) {
   .recent-projects-grid {
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }
 
-@media (min-width: 1320px) {
+@container (min-width: 1540px) {
+  .recent-projects-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) and (max-width: 1699px) {
+  .recent-projects-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
   .sidebar-minimized .recent-projects-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   }
 }
 
-@media (min-width: 1820px) {
-  .sidebar-minimized .recent-projects-grid {
-    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+@media (max-width: 1279px) {
+  .home-with-quick-actions {
+    --home-quick-actions-offset: 60px;
+  }
+}
+
+@media (max-width: 767px) {
+  .home-with-quick-actions {
+    --home-quick-actions-offset: 0px;
+  }
+}
+
+/* Phone + portrait iPad: move workspace nav to a bottom dock. */
+@media (max-width: 767px), (max-width: 1024px) and (orientation: portrait) {
+  html.workspace-shell-active,
+  body.workspace-shell-active {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior-y: none;
+  }
+
+  .workspace-shell-root {
+    --workspace-vh: 100svh;
+    --workspace-frame-gutter: 12px;
+    --workspace-bottom-dock-reserve: calc(68px + env(safe-area-inset-bottom, 0px));
+    --workspace-projects-bottom-gap: 6px;
+    height: calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset, 0px));
+    min-height: calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset, 0px));
+    overflow: hidden;
+  }
+
+  .workspace-desktop-sidebar {
+    display: none !important;
+  }
+
+  .workspace-bottom-dock {
+    display: block !important;
+  }
+
+  .workspace-main-with-dock {
+    padding-left: 0 !important;
+    padding-bottom: var(--workspace-bottom-dock-reserve, 0px) !important;
+    overflow: hidden;
+    min-height: 0;
   }
 }
