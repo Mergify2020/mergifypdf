@@ -62,10 +62,10 @@ export default async function AllProjectsPage() {
 
   return (
     <main
-      className="box-border w-full bg-[#F1F4F9] pt-3 pb-0 sm:py-6 transition-[height] duration-300 ease-out dark:bg-[#222224]"
+      className="box-border w-full bg-[#F1F4F9] pt-3 pb-0 sm:pt-6 sm:pb-0 transition-[height] duration-300 ease-out dark:bg-[#222224]"
       style={{
         height:
-          "calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset, 0px) - var(--home-topbar-offset, 0px) - var(--workspace-frame-gutter, 48px))",
+          "calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset, 0px) - var(--home-topbar-offset, 0px) - var(--workspace-content-bottom-subtract, var(--workspace-frame-gutter, 48px)))",
       }}
     >
       <div className="h-full min-h-0 w-full">
@@ -94,7 +94,6 @@ export default async function AllProjectsPage() {
             <div className="flex min-h-0 flex-col gap-[24px] overflow-visible">
               <div
                 className="rounded-xl border-[1.5px] border-gray-200 bg-white px-4 py-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)]"
-                style={{ height: "500px" }}
               >
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#6B7280] dark:text-zinc-400">
                   Templates

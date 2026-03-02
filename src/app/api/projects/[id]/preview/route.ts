@@ -76,11 +76,27 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  try {
+    await ensureDbConnection();
+  } catch {
+    return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
+  }
+
   const userId = session.user.id;
-  const project = await prisma.project.findFirst({
-    where: { id, userId, trashedAt: null },
-    select: { previewKey: true },
-  });
+  let project: { previewKey: string | null } | null = null;
+  try {
+    project = await prisma.project.findFirst({
+      where: { id, userId, trashedAt: null },
+      select: { previewKey: true },
+    });
+  } catch (err: unknown) {
+    const code =
+      err && typeof err === "object" && "code" in err ? (err as { code?: unknown }).code : null;
+    if (code === "P1017" || code === "P1001") {
+      return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
+    }
+    throw err;
+  }
 
   if (!project?.previewKey) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });

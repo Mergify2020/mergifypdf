@@ -943,6 +943,7 @@ header[data-hero="true"] .app-brand-dark {
 
 .workspace-shell-root {
   --workspace-frame-gutter: 48px;
+  --workspace-content-bottom-subtract: calc(var(--workspace-frame-gutter) / 2);
   --workspace-bottom-dock-reserve: 0px;
   --workspace-projects-bottom-gap: 0px;
 }
@@ -1011,6 +1012,7 @@ header[data-hero="true"] .app-brand-dark {
   .workspace-shell-root {
     --workspace-vh: 100svh;
     --workspace-frame-gutter: 12px;
+    --workspace-content-bottom-subtract: calc(var(--workspace-frame-gutter) + 4px);
     --workspace-bottom-dock-reserve: calc(68px + env(safe-area-inset-bottom, 0px));
     --workspace-projects-bottom-gap: 6px;
     height: calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset, 0px));
@@ -1031,5 +1033,11 @@ header[data-hero="true"] .app-brand-dark {
     padding-bottom: var(--workspace-bottom-dock-reserve, 0px) !important;
     overflow: hidden;
     min-height: 0;
+  }
+}
+
+@media (max-width: 767px) {
+  .workspace-shell-root {
+    --workspace-projects-bottom-gap: 4px;
   }
 }

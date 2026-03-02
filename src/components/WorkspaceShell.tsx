@@ -2434,15 +2434,19 @@ export default function WorkspaceShell({
                 style={{ maxWidth: "var(--shell-content-width)" }}
                 className="w-full transition-none 2xl:transition-[max-width] 2xl:duration-300 2xl:ease-[cubic-bezier(0.22,1,0.36,1)]"
               >
-                <div className="flex w-full items-center gap-2 sm:gap-3">
-                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                <div className="flex w-full items-center gap-2">
+                  <div className={`flex min-w-0 items-center ${phoneViewport ? "" : "flex-1 gap-3"}`}>
                     <div
-                      className={`flex w-full transition-[max-width] duration-200 ease-out ${
-                        phoneViewport ? (mobileSearchExpanded ? "max-w-none" : "max-w-[210px]") : "max-w-xl"
+                      className={`flex transition-[max-width,width] duration-200 ease-out ${
+                        phoneViewport
+                          ? mobileSearchExpanded
+                            ? "min-w-0 flex-1 w-full max-w-none transition-[max-width,width] duration-200 ease-out"
+                            : "w-full max-w-none transition-none"
+                          : "w-full max-w-xl transition-[max-width,width] duration-200 ease-out"
                       }`}
                     >
                       <div
-                        className="flex h-11 w-full cursor-text rounded-full border-[1.5px] border-gray-200 bg-white shadow-sm transition focus-within:border-[#4F46E5] focus-within:ring-2 focus-within:ring-[#4F46E5]/15 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] dark:focus-within:border-[#4F46E5] dark:focus-within:ring-[#4F46E5]/30"
+                        className="flex h-11 w-full cursor-text rounded-full border-[1.5px] border-gray-200 bg-white shadow-sm transition focus-within:border-[3.5px] focus-within:border-[#4F46E5] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] dark:focus-within:border-[#4F46E5]"
                         onMouseDown={(event) => {
                           const target = event.target;
                           if (target instanceof HTMLInputElement) return;
@@ -2459,7 +2463,7 @@ export default function WorkspaceShell({
                           <svg
                             aria-hidden="true"
                             viewBox="0 0 24 24"
-                            className="h-4 w-4"
+                            className="h-5 w-5"
                             fill="none"
                             stroke="#4F46E5"
                             strokeWidth="2"
@@ -2488,12 +2492,12 @@ export default function WorkspaceShell({
                     </div>
                   </div>
                   <div
-                    className={`flex h-11 flex-nowrap items-center gap-2 shrink-0 transition-[width,max-width,opacity] duration-200 ease-out ${
+                    className={`flex h-11 flex-nowrap items-center gap-2 shrink-0 ${
                       phoneViewport
                         ? mobileSearchExpanded
-                          ? "pointer-events-none w-0 min-w-0 max-w-0 overflow-hidden opacity-0"
-                          : "w-[188px] min-w-[188px] max-w-[188px] opacity-100"
-                        : "w-[276px] min-w-[276px] max-w-[276px] opacity-100"
+                          ? "pointer-events-none w-0 min-w-0 max-w-0 overflow-hidden opacity-0 transition-[width,max-width,opacity] duration-200 ease-out"
+                          : "w-[168px] min-w-[168px] max-w-[168px] opacity-100 transition-none"
+                        : "w-[276px] min-w-[276px] max-w-[276px] opacity-100 transition-[width,max-width,opacity] duration-200 ease-out"
                     }`}
                   >
                     <button
@@ -2570,10 +2574,10 @@ export default function WorkspaceShell({
                       style={{ maxWidth: "var(--shell-content-width)" }}
                     >
                       <div
-                        className="box-border w-full bg-[#F1F4F9] pt-3 pb-0 sm:py-6 transition-[height] duration-300 ease-out dark:bg-[#222224]"
+                        className="box-border w-full bg-[#F1F4F9] pt-3 pb-0 sm:pt-6 sm:pb-0 transition-[height] duration-300 ease-out dark:bg-[#222224]"
                         style={{
                           height:
-                            "calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset, 0px) - var(--home-topbar-offset, 0px) - var(--workspace-frame-gutter, 48px))",
+                            "calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset, 0px) - var(--home-topbar-offset, 0px) - var(--workspace-content-bottom-subtract, var(--workspace-frame-gutter, 48px)))",
                         }}
                       >
                         <div className="h-full min-h-0 w-full">
