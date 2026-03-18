@@ -72,7 +72,7 @@ export default async function AllProjectsPage() {
 
   const summaryProjects = shapedProjects.map((project) => ({
     id: project.id,
-    name: project.name,
+    name: project.name ?? "Untitled project",
     updatedAt: project.updatedAt,
     pagesCount: project.pagesCount ?? 0,
     previewUrl: null,
