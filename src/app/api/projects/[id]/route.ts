@@ -214,7 +214,7 @@ export async function PUT(
     data === undefined
       ? await prisma.project.findFirst({
           where: { id, userId, trashedAt: null },
-          select: { id: true, userId: true, name: true, previewKey: true },
+          select: { id: true, userId: true, name: true, previewKey: true, updatedAt: true },
         })
       : await prisma.project.findFirst({
           where: { id, userId, trashedAt: null },
@@ -223,6 +223,9 @@ export async function PUT(
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+
+  const shouldPreserveUpdatedAt =
+    data === undefined && previewUrlRaw.length === 0 && typeof name === "string" && name !== existing.name;
 
   let resolvedPreviewKey: string | null | undefined = undefined;
   if (previewUrlRaw.length > 0) {
@@ -263,15 +266,23 @@ export async function PUT(
   if (data === undefined) {
     const existingPreviewKey =
       (existing as typeof existing & { previewKey?: string | null }).previewKey ?? null;
-    await prisma.project.updateMany({
-      where: { id: existing.id, userId },
-      data: {
-        name: name ?? existing.name,
-        ...(resolvedPreviewKey || existingPreviewKey === null
-          ? { previewKey: resolvedPreviewKey ?? existingPreviewKey }
-          : {}),
-      },
-    });
+    if (shouldPreserveUpdatedAt) {
+      await prisma.$executeRaw`
+        UPDATE "Project"
+        SET "name" = ${name ?? existing.name}
+        WHERE "id" = ${existing.id} AND "userId" = ${userId}
+      `;
+    } else {
+      await prisma.project.updateMany({
+        where: { id: existing.id, userId },
+        data: {
+          name: name ?? existing.name,
+          ...(resolvedPreviewKey || existingPreviewKey === null
+            ? { previewKey: resolvedPreviewKey ?? existingPreviewKey }
+            : {}),
+        },
+      });
+    }
   } else {
     const existingWithData = existing as typeof existing & { data: unknown };
     const nextData = (data ?? existingWithData.data) as

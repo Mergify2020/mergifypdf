@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
-import { ArrowDown, ArrowUp, Check, ChevronDown, Clock, Search, UserRound, UsersRound } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, ChevronDown, Clock, Search, Star, UserRound, UsersRound } from "lucide-react";
 import AllProjectsGrid from "@/components/AllProjectsGrid";
 import ContainerShadowOverlay from "@/components/ContainerShadowOverlay";
 import StartProjectButton from "@/components/StartProjectButton";
@@ -37,6 +37,34 @@ type ProjectCard = {
   hasPreview?: boolean;
 };
 
+const STARRED_STORAGE_KEY = "mpdf:starred-projects";
+
+function readStarredFromStorage(): Record<string, true> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(STARRED_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, boolean> | null;
+    if (!parsed || typeof parsed !== "object") return {};
+    const next: Record<string, true> = {};
+    Object.keys(parsed).forEach((id) => {
+      if (parsed[id]) next[id] = true;
+    });
+    return next;
+  } catch {
+    return {};
+  }
+}
+
+function writeStarredToStorage(starredById: Record<string, true>) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(STARRED_STORAGE_KEY, JSON.stringify(starredById));
+  } catch {
+    // ignore storage write errors
+  }
+}
+
 function mapSummaryProjects(projects: ProjectsSummaryProject[]): ProjectCard[] {
   return projects.map((project) => {
     const updatedAt =
@@ -65,13 +93,14 @@ export default function AllProjectsClient() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement | null>(null);
-  const [sortOption, setSortOption] = useState<"activity" | "az" | "za">("activity");
+  const [sortOption, setSortOption] = useState<"activity" | "starred" | "az" | "za">("activity");
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const sortMenuRef = useRef<HTMLDivElement | null>(null);
   const [ownerFilter, setOwnerFilter] = useState<"any" | "shared" | "you">("any");
   const [ownerMenuOpen, setOwnerMenuOpen] = useState(false);
   const ownerMenuRef = useRef<HTMLDivElement | null>(null);
   const [ownerSearch, setOwnerSearch] = useState("");
+  const [starredById, setStarredById] = useState<Record<string, true>>({});
 
   const accountInitials = useMemo(() => {
     const parts = accountName
@@ -86,11 +115,15 @@ export default function AllProjectsClient() {
 
   const filteredProjects = useMemo(() => {
     const trimmed = query.trim();
-    const visibleProjects = ownerFilter === "shared" ? [] : projects;
+    let visibleProjects = ownerFilter === "shared" ? [] : projects;
+    if (sortOption === "starred") {
+      visibleProjects = visibleProjects.filter((project) => starredById[project.id]);
+    }
     const searched = trimmed
       ? visibleProjects.filter((project) => matchesSearch(project.title, trimmed))
       : visibleProjects;
     const sorted = [...searched].sort((a, b) => {
+      if (sortOption === "starred") return (b.updatedAtMs ?? 0) - (a.updatedAtMs ?? 0);
       if (sortOption === "activity") return (b.updatedAtMs ?? 0) - (a.updatedAtMs ?? 0);
       const aTitle = (a.title ?? "").trim().toLowerCase();
       const bTitle = (b.title ?? "").trim().toLowerCase();
@@ -98,7 +131,7 @@ export default function AllProjectsClient() {
       return sortOption === "az" ? cmp : -cmp;
     });
     return sorted;
-  }, [ownerFilter, projects, query, sortOption]);
+  }, [ownerFilter, projects, query, sortOption, starredById]);
 
   useEffect(() => {
     if (!sortMenuOpen) return;
@@ -141,6 +174,10 @@ export default function AllProjectsClient() {
       document.removeEventListener("keydown", handleKey);
     };
   }, [ownerMenuOpen]);
+
+  useEffect(() => {
+    setStarredById(readStarredFromStorage());
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -261,7 +298,7 @@ export default function AllProjectsClient() {
                   onClick={() => setSortMenuOpen((prev) => !prev)}
                   className={`inline-flex items-center gap-2 rounded-full border-[3px] px-4 py-2 text-sm font-semibold shadow-sm transition ${
                     sortMenuOpen
-                      ? "border-[#51bdff] bg-[#008ade] text-white shadow-[0_14px_40px_rgba(15,23,42,0.18)]"
+                      ? "!border-slate-600 bg-white text-slate-900"
                       : "border-slate-300 bg-white text-slate-800 hover:border-slate-400 hover:bg-slate-50"
                   }`}
                   aria-haspopup="menu"
@@ -269,6 +306,8 @@ export default function AllProjectsClient() {
                 >
                   {sortOption === "activity" ? (
                     <Clock className="h-4 w-4" aria-hidden />
+                  ) : sortOption === "starred" ? (
+                    <Star className="h-4 w-4" aria-hidden />
                   ) : sortOption === "az" ? (
                     <ArrowUp className="h-4 w-4" aria-hidden />
                   ) : (
@@ -277,6 +316,8 @@ export default function AllProjectsClient() {
                   <span className="whitespace-nowrap">
                     {sortOption === "activity"
                       ? "Last activity"
+                      : sortOption === "starred"
+                        ? "Starred"
                       : sortOption === "az"
                         ? "Alphabetical (A-Z)"
                         : "Alphabetical (Z-A)"}
@@ -287,12 +328,13 @@ export default function AllProjectsClient() {
                 {sortMenuOpen ? (
                   <div
                     role="menu"
-                    className="absolute left-0 z-50 mt-3 w-[320px] overflow-hidden rounded-3xl border border-slate-200 bg-white text-sm text-slate-800 shadow-[0_24px_70px_rgba(15,23,42,0.20)]"
+                    className="project-actions-menu absolute left-0 z-50 mt-2 w-64 overflow-hidden rounded-xl border border-[#E5E7EB] bg-white text-sm text-slate-800 shadow-[0_16px_36px_rgba(15,23,42,0.14)]"
                   >
-                    <div className="pb-3 pt-2">
+                    <div className="pb-1.5 pt-1.5">
                       {(
                         [
                           { key: "activity", label: "Last activity", Icon: Clock },
+                          { key: "starred", label: "Starred", Icon: Star },
                           { key: "az", label: "Alphabetical (A-Z)", Icon: ArrowUp },
                           { key: "za", label: "Alphabetical (Z-A)", Icon: ArrowDown },
                         ] as const
@@ -305,17 +347,17 @@ export default function AllProjectsClient() {
                             setSortOption(key);
                             setSortMenuOpen(false);
                           }}
-                          className={`mx-3 flex w-[calc(100%-1.5rem)] items-center justify-between rounded-2xl px-3 py-3 text-left transition ${
-                            sortOption === key ? "bg-slate-100" : "hover:bg-slate-50"
+                          className={`project-actions-stagger-item mx-2 flex w-[calc(100%-1rem)] items-center justify-between rounded-lg px-2.5 py-2 text-left transition ${
+                            sortOption === key ? "bg-[#F8FAFC]" : "hover:bg-[#F8FAFC]"
                           }`}
                         >
-                          <span className="flex min-w-0 items-center gap-3">
-                            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-slate-700">
-                              <Icon className="h-5 w-5" aria-hidden />
+                          <span className="flex min-w-0 items-center gap-2.5 text-slate-900">
+                            <span className="flex h-5 w-5 items-center justify-center text-current">
+                              <Icon className="h-4 w-4" aria-hidden />
                             </span>
-                            <span className="truncate text-base font-medium text-slate-900">{label}</span>
+                            <span className="truncate text-[15px] font-medium text-slate-900">{label}</span>
                           </span>
-                          {sortOption === key ? <Check className="h-6 w-6 text-slate-900" aria-hidden /> : null}
+                          {sortOption === key ? <Check className="h-5 w-5 text-slate-900" aria-hidden /> : null}
                         </button>
                       ))}
                     </div>
@@ -505,7 +547,7 @@ export default function AllProjectsClient() {
                   onClick={() => setSortMenuOpen((prev) => !prev)}
                   className={`inline-flex items-center gap-2 rounded-full border-[3px] px-4 py-2 text-sm font-semibold shadow-sm transition ${
                     sortMenuOpen
-                      ? "border-[#51bdff] bg-[#008ade] text-white shadow-[0_14px_40px_rgba(15,23,42,0.18)]"
+                      ? "!border-slate-600 bg-white text-slate-900"
                       : "border-slate-300 bg-white text-slate-800 hover:border-slate-400 hover:bg-slate-50"
                   }`}
                   aria-haspopup="menu"
@@ -513,6 +555,8 @@ export default function AllProjectsClient() {
                 >
                   {sortOption === "activity" ? (
                     <Clock className="h-4 w-4" aria-hidden />
+                  ) : sortOption === "starred" ? (
+                    <Star className="h-4 w-4" aria-hidden />
                   ) : sortOption === "az" ? (
                     <ArrowUp className="h-4 w-4" aria-hidden />
                   ) : (
@@ -521,6 +565,8 @@ export default function AllProjectsClient() {
                   <span className="whitespace-nowrap">
                     {sortOption === "activity"
                       ? "Last activity"
+                      : sortOption === "starred"
+                        ? "Starred"
                       : sortOption === "az"
                         ? "Alphabetical (A-Z)"
                         : "Alphabetical (Z-A)"}
@@ -531,12 +577,13 @@ export default function AllProjectsClient() {
                 {sortMenuOpen ? (
                   <div
                     role="menu"
-                    className="absolute left-0 z-50 mt-3 w-[320px] overflow-hidden rounded-3xl border border-slate-200 bg-white text-sm text-slate-800 shadow-[0_24px_70px_rgba(15,23,42,0.20)]"
+                    className="project-actions-menu absolute left-0 z-50 mt-2 w-64 overflow-hidden rounded-xl border border-[#E5E7EB] bg-white text-sm text-slate-800 shadow-[0_16px_36px_rgba(15,23,42,0.14)]"
                   >
-                    <div className="pb-3 pt-2">
+                    <div className="pb-1.5 pt-1.5">
                       {(
                         [
                           { key: "activity", label: "Last activity", Icon: Clock },
+                          { key: "starred", label: "Starred", Icon: Star },
                           { key: "az", label: "Alphabetical (A-Z)", Icon: ArrowUp },
                           { key: "za", label: "Alphabetical (Z-A)", Icon: ArrowDown },
                         ] as const
@@ -549,17 +596,17 @@ export default function AllProjectsClient() {
                             setSortOption(key);
                             setSortMenuOpen(false);
                           }}
-                          className={`mx-3 flex w-[calc(100%-1.5rem)] items-center justify-between rounded-2xl px-3 py-3 text-left transition ${
-                            sortOption === key ? "bg-slate-100" : "hover:bg-slate-50"
+                          className={`project-actions-stagger-item mx-2 flex w-[calc(100%-1rem)] items-center justify-between rounded-lg px-2.5 py-2 text-left transition ${
+                            sortOption === key ? "bg-[#F8FAFC]" : "hover:bg-[#F8FAFC]"
                           }`}
                         >
-                          <span className="flex min-w-0 items-center gap-3">
-                            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-slate-700">
-                              <Icon className="h-5 w-5" aria-hidden />
+                          <span className="flex min-w-0 items-center gap-2.5 text-slate-900">
+                            <span className="flex h-5 w-5 items-center justify-center text-current">
+                              <Icon className="h-4 w-4" aria-hidden />
                             </span>
-                            <span className="truncate text-base font-medium text-slate-900">{label}</span>
+                            <span className="truncate text-[15px] font-medium text-slate-900">{label}</span>
                           </span>
-                          {sortOption === key ? <Check className="h-6 w-6 text-slate-900" aria-hidden /> : null}
+                          {sortOption === key ? <Check className="h-5 w-5 text-slate-900" aria-hidden /> : null}
                         </button>
                       ))}
                     </div>
@@ -745,7 +792,7 @@ export default function AllProjectsClient() {
                 onClick={() => setSortMenuOpen((prev) => !prev)}
                 className={`inline-flex items-center gap-2 rounded-full border-[3px] px-4 py-2 text-sm font-semibold shadow-sm transition ${
                   sortMenuOpen
-                    ? "border-[#51bdff] bg-[#008ade] text-white shadow-[0_14px_40px_rgba(15,23,42,0.18)]"
+                    ? "!border-slate-600 bg-white text-slate-900"
                     : "border-slate-300 bg-white text-slate-800 hover:border-slate-400 hover:bg-slate-50"
                 }`}
                 aria-haspopup="menu"
@@ -753,6 +800,8 @@ export default function AllProjectsClient() {
               >
                 {sortOption === "activity" ? (
                   <Clock className="h-4 w-4" aria-hidden />
+                ) : sortOption === "starred" ? (
+                  <Star className="h-4 w-4" aria-hidden />
                 ) : sortOption === "az" ? (
                   <ArrowUp className="h-4 w-4" aria-hidden />
                 ) : (
@@ -761,6 +810,8 @@ export default function AllProjectsClient() {
                 <span className="whitespace-nowrap">
                   {sortOption === "activity"
                     ? "Last activity"
+                    : sortOption === "starred"
+                      ? "Starred"
                     : sortOption === "az"
                       ? "Alphabetical (A-Z)"
                       : "Alphabetical (Z-A)"}
@@ -771,12 +822,13 @@ export default function AllProjectsClient() {
               {sortMenuOpen ? (
                 <div
                   role="menu"
-                  className="absolute left-0 z-50 mt-3 w-[320px] overflow-hidden rounded-3xl border border-slate-200 bg-white text-sm text-slate-800 shadow-[0_24px_70px_rgba(15,23,42,0.20)]"
+                  className="project-actions-menu absolute left-0 z-50 mt-2 w-64 overflow-hidden rounded-xl border border-[#E5E7EB] bg-white text-sm text-slate-800 shadow-[0_16px_36px_rgba(15,23,42,0.14)]"
                 >
-                  <div className="pb-3 pt-2">
+                  <div className="pb-1.5 pt-1.5">
                     {(
                       [
                         { key: "activity", label: "Last activity", Icon: Clock },
+                        { key: "starred", label: "Starred", Icon: Star },
                         { key: "az", label: "Alphabetical (A-Z)", Icon: ArrowUp },
                         { key: "za", label: "Alphabetical (Z-A)", Icon: ArrowDown },
                       ] as const
@@ -789,17 +841,17 @@ export default function AllProjectsClient() {
                           setSortOption(key);
                           setSortMenuOpen(false);
                         }}
-                        className={`mx-3 flex w-[calc(100%-1.5rem)] items-center justify-between rounded-2xl px-3 py-3 text-left transition ${
-                          sortOption === key ? "bg-slate-100" : "hover:bg-slate-50"
+                        className={`project-actions-stagger-item mx-2 flex w-[calc(100%-1rem)] items-center justify-between rounded-lg px-2.5 py-2 text-left transition ${
+                          sortOption === key ? "bg-[#F8FAFC]" : "hover:bg-[#F8FAFC]"
                         }`}
                       >
-                        <span className="flex min-w-0 items-center gap-3">
-                          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-slate-700">
-                            <Icon className="h-5 w-5" aria-hidden />
+                        <span className="flex min-w-0 items-center gap-2.5 text-slate-900">
+                          <span className="flex h-5 w-5 items-center justify-center text-current">
+                            <Icon className="h-4 w-4" aria-hidden />
                           </span>
-                          <span className="truncate text-base font-medium text-slate-900">{label}</span>
+                          <span className="truncate text-[15px] font-medium text-slate-900">{label}</span>
                         </span>
-                        {sortOption === key ? <Check className="h-6 w-6 text-slate-900" aria-hidden /> : null}
+                        {sortOption === key ? <Check className="h-5 w-5 text-slate-900" aria-hidden /> : null}
                       </button>
                     ))}
                   </div>
@@ -917,7 +969,24 @@ export default function AllProjectsClient() {
             </div>
           </div>
           <AllProjectsGrid
-            projects={filteredProjects}
+            projects={filteredProjects.map((project) => ({
+              ...project,
+              starred: starredById[project.id] === true,
+            }))}
+            onProjectStarToggled={(id, next) => {
+              setStarredById((prev) => {
+                let updated: Record<string, true>;
+                if (next) {
+                  updated = { ...prev, [id]: true };
+                } else {
+                  const copy: Record<string, true> = { ...prev };
+                  delete copy[id];
+                  updated = copy;
+                }
+                writeStarredToStorage(updated);
+                return updated;
+              });
+            }}
             onProjectRenamed={(id, title) => {
               setProjects((prev) =>
                 prev.map((project) => (project.id === id ? { ...project, title } : project))
@@ -935,6 +1004,7 @@ export default function AllProjectsClient() {
                 pdfUrl: duplicated.pdfUrl ?? null,
                 pagesCount: duplicated.pagesCount ?? 0,
                 rotation: 0,
+                hasPreview: duplicated.hasPreview ?? false,
               };
               setProjects((prev) => {
                 const withoutNew = prev.filter((project) => project.id !== nextId);

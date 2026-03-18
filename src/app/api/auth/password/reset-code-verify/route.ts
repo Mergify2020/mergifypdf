@@ -5,6 +5,10 @@ import { hashVerificationCode } from "@/lib/verificationCode";
 import { isSameOrigin } from "@/lib/requestGuards";
 import { rateLimit } from "@/lib/rateLimit";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 type Json = Record<string, unknown>;
 
 function ok(json: Json) {

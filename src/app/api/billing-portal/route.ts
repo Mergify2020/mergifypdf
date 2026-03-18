@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
+import { resolveStripeCustomerIdForUser } from "@/lib/stripeCustomers";
 import { getStripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
 import { isSameOrigin } from "@/lib/requestGuards";
@@ -47,27 +48,11 @@ export async function POST(req: NextRequest) {
     const targetEmail = (user?.email ?? email).trim().toLowerCase();
     const targetName = user?.name ?? session?.user?.name ?? undefined;
 
-    let customerId = user?.stripeCustomerId ?? null;
-
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: targetEmail,
-        name: targetName,
-        metadata: { appUserId: userId },
-      });
-      customerId = customer.id;
-
-      await prisma.user.update({
-        where: { id: userId },
-        data: { stripeCustomerId: customerId },
-      });
-    }
-
-    // Keep identity source-of-truth in app auth profile, not Stripe portal edits.
-    await stripe.customers.update(customerId, {
+    const customerId = await resolveStripeCustomerIdForUser({
+      userId,
       email: targetEmail,
       name: targetName,
-      metadata: { appUserId: userId },
+      stripeCustomerId: user?.stripeCustomerId ?? null,
     });
 
     const portalSession = await stripe.billingPortal.sessions.create({

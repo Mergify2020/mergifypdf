@@ -6,6 +6,23 @@ export function sanitizeProjectName(raw: string | null | undefined): string {
   return trimmed.length > 0 ? trimmed : DEFAULT_PROJECT_NAME;
 }
 
+export function deriveProjectNameFromFilename(filename: string | null | undefined): string {
+  const trimmed = (filename ?? "").trim();
+  if (!trimmed) return DEFAULT_PROJECT_NAME;
+  const withoutPdfExtension = trimmed.replace(/\.pdf$/i, "").trim();
+  return sanitizeProjectName(withoutPdfExtension);
+}
+
+export function projectNameToEditable(raw: string | null | undefined): string {
+  const safe = sanitizeProjectName(raw);
+  return safe.toLowerCase().endsWith(".pdf") ? safe.slice(0, -4) : safe;
+}
+
+export function projectNameToDisplay(raw: string | null | undefined): string {
+  const safe = sanitizeProjectName(raw);
+  return safe.toLowerCase().endsWith(".pdf") ? safe : `${safe}.pdf`;
+}
+
 export function projectNameToFile(raw: string | null | undefined): string {
   const base = sanitizeProjectName(raw)
     .replace(/[^\w\s.-]/g, "")

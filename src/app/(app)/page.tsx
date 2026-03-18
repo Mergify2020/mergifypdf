@@ -64,16 +64,10 @@ export default async function Home({
     if (session.user.twoFactorEnabled && !session.user.twoFactorPassed) {
       redirect("/2fa");
     }
-    const userId = session.user.id;
-    if (!userId) {
+    if (!session.user.id) {
       redirect("/login");
     }
-    return (
-      <ProjectsDashboard
-        displayName={session.user.name ?? session.user.email ?? "Guest"}
-        userId={userId}
-      />
-    );
+    redirect("/projects/all");
   }
 
   const usedToday = await hasUsedToday();

@@ -2,12 +2,71 @@ import type { NextAuthOptions } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
-import { prisma } from "@/lib/prisma";
+import {
+  clearPrismaDatabaseUnavailable,
+  isPrismaDatabaseUnavailableError,
+  isPrismaDatabaseCooldownActive,
+  markPrismaDatabaseUnavailable,
+  prisma,
+} from "@/lib/prisma";
+import { assertAppSafeForAuth } from "@/lib/appSafety";
 import bcrypt from "bcryptjs";
 import { ensureStripeCustomerForUser } from "@/lib/stripeCustomers";
 
 type AuthType = "oauth" | "credentials";
 export const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
+const AUTH_DB_UNAVAILABLE_ERROR = "AUTH_DB_UNAVAILABLE";
+const authDbIssueLogTimestamps = new Map<string, number>();
+const AUTH_DB_ISSUE_LOG_WINDOW_MS = 30_000;
+
+async function runAuthDbOperationWithRetry<T>(operation: () => Promise<T>) {
+  try {
+    const result = await operation();
+    clearPrismaDatabaseUnavailable();
+    return result;
+  } catch (error) {
+    if (!isPrismaDatabaseUnavailableError(error)) {
+      throw error;
+    }
+
+    markPrismaDatabaseUnavailable(error);
+
+    try {
+      await prisma.$disconnect();
+      await prisma.$connect();
+      const result = await operation();
+      clearPrismaDatabaseUnavailable();
+      return result;
+    } catch (retryError) {
+      markPrismaDatabaseUnavailable(retryError);
+      throw new Error(AUTH_DB_UNAVAILABLE_ERROR);
+    }
+  }
+}
+
+function logAuthDbRefreshIssue(scope: "jwt" | "session", error: unknown) {
+  const prefix =
+    scope === "jwt"
+      ? "[auth.jwt] Failed to refresh auth flags from DB; using token fallback."
+      : "[auth.session] Failed to refresh profile fields from DB.";
+  const dedupeKey = scope;
+  const now = Date.now();
+  const lastLoggedAt = authDbIssueLogTimestamps.get(dedupeKey) ?? 0;
+
+  if (now - lastLoggedAt < AUTH_DB_ISSUE_LOG_WINDOW_MS) {
+    return;
+  }
+
+  authDbIssueLogTimestamps.set(dedupeKey, now);
+  markPrismaDatabaseUnavailable(error);
+
+  if (process.env.NODE_ENV === "production") {
+    console.error(prefix);
+    return;
+  }
+
+  console.warn(prefix);
+}
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -23,14 +82,19 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(creds) {
         if (!creds?.email || !creds?.password) return null;
+        await assertAppSafeForAuth();
 
         const normalizedEmail = creds.email.trim().toLowerCase();
-        const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+        const user = await runAuthDbOperationWithRetry(() =>
+          prisma.user.findUnique({ where: { email: normalizedEmail } })
+        );
         if (!user?.password) return null;
 
-        const oauthLinks = await prisma.account.count({
-          where: { userId: user.id, provider: { not: "credentials" } },
-        });
+        const oauthLinks = await runAuthDbOperationWithRetry(() =>
+          prisma.account.count({
+            where: { userId: user.id, provider: { not: "credentials" } },
+          })
+        );
         if (oauthLinks > 0) {
           throw new Error("OAUTH_ONLY");
         }
@@ -62,6 +126,11 @@ export const authOptions: NextAuthOptions = {
   ],
 
   callbacks: {
+    async signIn() {
+      await assertAppSafeForAuth();
+      return true;
+    },
+
     async jwt({ token, account, user, profile, trigger, session }) {
       const userId = token.sub ?? user?.id;
       if (!userId) return token;
@@ -76,13 +145,27 @@ export const authOptions: NextAuthOptions = {
       }
 
       if (account || !token.providers) {
-        const linkedAccounts = await prisma.account.findMany({
-          where: { userId },
-          select: { provider: true },
-        });
+        let linkedAccounts: Array<{ provider: string }> = [];
+        if (!isPrismaDatabaseCooldownActive()) {
+          try {
+            linkedAccounts = await prisma.account.findMany({
+              where: { userId },
+              select: { provider: true },
+            });
+            clearPrismaDatabaseUnavailable();
+          } catch (error) {
+            logAuthDbRefreshIssue("jwt", error);
+          }
+        }
 
         const providerIds = new Set<string>(linkedAccounts.map((entry) => entry.provider));
         if (account?.provider) providerIds.add(account.provider);
+        if (providerIds.size === 0) {
+          const existingProviders = Array.isArray(token.providers) ? token.providers : [];
+          existingProviders.forEach((provider) => {
+            if (typeof provider === "string") providerIds.add(provider);
+          });
+        }
         if (providerIds.size === 0) providerIds.add("credentials");
 
         token.providers = Array.from(providerIds);
@@ -96,15 +179,17 @@ export const authOptions: NextAuthOptions = {
       let dbUser:
         | { twoFactorEnabled: boolean | null; twoFactorMethod: string | null; stripeStatus: string | null }
         | null = null;
-      try {
-        dbUser = await prisma.user.findUnique({
-          where: { id: userId },
-          select: { twoFactorEnabled: true, twoFactorMethod: true, stripeStatus: true },
-        });
-      } catch (error) {
-        // Avoid tearing down valid sessions during transient DB connectivity issues.
-        const message = error instanceof Error ? error.message : String(error);
-        console.error("[auth.jwt] Failed to refresh auth flags from DB; using token fallback.", message);
+      if (!isPrismaDatabaseCooldownActive()) {
+        try {
+          dbUser = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { twoFactorEnabled: true, twoFactorMethod: true, stripeStatus: true },
+          });
+          clearPrismaDatabaseUnavailable();
+        } catch (error) {
+          // Avoid tearing down valid sessions during transient DB connectivity issues.
+          logAuthDbRefreshIssue("jwt", error);
+        }
       }
 
       const twoFactorEnabled = dbUser
@@ -160,17 +245,17 @@ export const authOptions: NextAuthOptions = {
 
         // Keep profile fields fresh across devices/tabs on normal refresh,
         // even when JWT payload on another device is stale.
-        if (session.user.id) {
+        if (session.user.id && !isPrismaDatabaseCooldownActive()) {
           try {
             const dbUser = await prisma.user.findUnique({
               where: { id: session.user.id },
               select: { name: true, email: true },
             });
+            clearPrismaDatabaseUnavailable();
             if (dbUser?.name) session.user.name = dbUser.name;
             if (dbUser?.email) session.user.email = dbUser.email;
           } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            console.error("[auth.session] Failed to refresh profile fields from DB.", message);
+            logAuthDbRefreshIssue("session", error);
           }
         }
       }

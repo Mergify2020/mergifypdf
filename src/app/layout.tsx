@@ -1,13 +1,12 @@
 ﻿// src/app/layout.tsx
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
 import Script from "next/script";
 import { cookies } from "next/headers";
 import Providers from "@/components/Providers";
+import AppMaintenanceScreen from "@/components/AppMaintenanceScreen";
+import { getAppSafetyStatus, isAppSafetyBlocking } from "@/lib/appSafety";
 import { getServerSessionSafe } from "@/lib/serverSession";
 import "./globals.css";
-
-const inter = Inter({ subsets: ["latin"], display: "swap" });
 
 export const metadata: Metadata = {
   title: "MergifyPDF",
@@ -35,7 +34,8 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const session = await getServerSessionSafe();
+  const appSafety = await getAppSafetyStatus();
+  const session = isAppSafetyBlocking(appSafety) ? null : await getServerSessionSafe();
   const cookieStore = await cookies();
   const themeCookie = cookieStore.get?.("theme")?.value;
   const themeClass = themeCookie === "dark" ? "dark" : undefined;
@@ -84,9 +84,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         />
       </head>
 
-      <body className={`${inter.className} min-h-screen bg-white text-gray-900 dark:bg-[#222224] dark:text-zinc-100`}>
+      <body className="min-h-screen bg-white text-gray-900 dark:bg-[#222224] dark:text-zinc-100">
         <Providers session={session}>
-          {children}
+          {isAppSafetyBlocking(appSafety) ? (
+            <AppMaintenanceScreen status={appSafety} />
+          ) : (
+            children
+          )}
         </Providers>
       </body>
     </html>

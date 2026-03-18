@@ -4,6 +4,10 @@ import { hashPassword } from "@/lib/hash";
 import { isSameOrigin } from "@/lib/requestGuards";
 import { rateLimit } from "@/lib/rateLimit";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function POST(req: Request) {
   try {
     if (!isSameOrigin(req)) {

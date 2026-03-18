@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { AlertTriangle, CircleHelp, CreditCard, ExternalLink, Home, LogOut, PenLine, Settings, User } from "lucide-react";
+import { AlertTriangle, CircleHelp, CreditCard, ExternalLink, Folders, LogOut, PenLine, Settings, User } from "lucide-react";
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
 import { getAvatarFallback } from "@/lib/avatarFallback";
 
@@ -143,9 +143,9 @@ export default function SettingsMenu({
     router.push("/account");
   }
 
-  function handleHome() {
+  function handleProjects() {
     setOpen(false);
-    router.push("/");
+    router.push("/projects/all");
   }
 
   function handleSignatures() {
@@ -222,7 +222,7 @@ export default function SettingsMenu({
             : "pointer-events-none opacity-0 translate-y-1 scale-95")
         }
       >
-        <div className="space-y-3 text-sm text-slate-700 dark:text-zinc-200">
+        <div className={`space-y-3 text-sm text-slate-700 dark:text-zinc-200 ${open ? "avatar-dropdown-menu" : ""}`}>
             <div className="flex items-center gap-3 px-3 py-2.5">
               {showAvatarImage ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -279,18 +279,18 @@ export default function SettingsMenu({
               ) : null}
               <button
                 type="button"
-                onClick={handleHome}
+                onClick={handleProjects}
                 className="group flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-[15px] font-medium text-[#1E293B] transition hover:bg-[#F8FAFC] hover:text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/35 focus:ring-offset-2 focus:ring-offset-white dark:text-zinc-100 dark:hover:bg-zinc-800/80 dark:hover:text-zinc-50 dark:focus:ring-offset-zinc-900"
               >
-                <Home className="h-4 w-4 text-[#64748B] dark:text-zinc-400" aria-hidden />
-                <span>Home</span>
+                <Folders className="h-4 w-4 text-current" aria-hidden />
+                <span>All projects</span>
               </button>
               <button
                 type="button"
                 onClick={handleSignatures}
                 className="group flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-[15px] font-medium text-[#1E293B] transition hover:bg-[#F8FAFC] hover:text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/35 focus:ring-offset-2 focus:ring-offset-white dark:text-zinc-100 dark:hover:bg-zinc-800/80 dark:hover:text-zinc-50 dark:focus:ring-offset-zinc-900"
               >
-                <PenLine className="h-4 w-4 text-[#64748B] dark:text-zinc-400" aria-hidden />
+                <PenLine className="h-4 w-4 text-current" aria-hidden />
                 <span>Signatures</span>
               </button>
               <button
@@ -298,7 +298,7 @@ export default function SettingsMenu({
                 onClick={handleAccountSettings}
                 className="group flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-[15px] font-medium text-[#1E293B] transition hover:bg-[#F8FAFC] hover:text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/35 focus:ring-offset-2 focus:ring-offset-white dark:text-zinc-100 dark:hover:bg-zinc-800/80 dark:hover:text-zinc-50 dark:focus:ring-offset-zinc-900"
               >
-                <Settings className="h-4 w-4 text-[#64748B] dark:text-zinc-400" aria-hidden />
+                <Settings className="h-4 w-4 text-current" aria-hidden />
                 <span>Account Settings</span>
               </button>
               <button
@@ -308,7 +308,7 @@ export default function SettingsMenu({
                 }}
                 className="group flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-[15px] font-medium text-[#1E293B] transition hover:bg-[#F8FAFC] hover:text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/35 focus:ring-offset-2 focus:ring-offset-white dark:text-zinc-100 dark:hover:bg-zinc-800/80 dark:hover:text-zinc-50 dark:focus:ring-offset-zinc-900"
               >
-                <CreditCard className="h-4 w-4 text-[#64748B] dark:text-zinc-400" aria-hidden />
+                <CreditCard className="h-4 w-4 text-current" aria-hidden />
                 <span>Billing portal</span>
               </button>
               <button
@@ -317,7 +317,7 @@ export default function SettingsMenu({
                 className="group flex w-full items-center justify-between rounded-md px-3 py-2.5 text-left text-[15px] font-medium text-[#1E293B] transition hover:bg-[#F8FAFC] hover:text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/35 focus:ring-offset-2 focus:ring-offset-white dark:text-zinc-100 dark:hover:bg-zinc-800/80 dark:hover:text-zinc-50 dark:focus:ring-offset-zinc-900"
               >
                 <span className="flex items-center gap-3">
-                  <CircleHelp className="h-4 w-4 text-[#64748B] dark:text-zinc-400" aria-hidden />
+                  <CircleHelp className="h-4 w-4 text-current" aria-hidden />
                   <span>Help Center</span>
                 </span>
                 <ExternalLink

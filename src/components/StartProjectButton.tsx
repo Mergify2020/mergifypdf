@@ -3,9 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
-import { FileText, FileUp, X } from "lucide-react";
+import { FileText, FileUp, Trash2 } from "lucide-react";
 import { createPortal } from "react-dom";
-import { PROJECT_NAME_STORAGE_KEY, sanitizeProjectName } from "@/lib/projectName";
+import {
+  PROJECT_NAME_STORAGE_KEY,
+  deriveProjectNameFromFilename,
+} from "@/lib/projectName";
 import { useWorkspaceFilePreloader, type PendingWorkspaceFile } from "@/components/useWorkspaceFilePreloader";
 import { uploadProjectPreviewFromFile } from "@/lib/projectPreview";
 
@@ -18,6 +21,7 @@ type Props = {
   className?: string;
   variant?: "default" | "custom";
   iconOnly?: boolean;
+  onOpen?: () => void;
 };
 
 async function resetWorkspaceStorage() {
@@ -38,17 +42,22 @@ async function resetWorkspaceStorage() {
   }
 }
 
-export default function StartProjectButton({ className, variant = "default", iconOnly = false }: Props) {
+function getFileTypeLabel(file: File) {
+  const extension = file.name.split(".").pop()?.trim();
+  if (extension) return extension.toUpperCase();
+  const subtype = file.type.split("/").pop()?.trim();
+  return subtype ? subtype.toUpperCase() : "FILE";
+}
+
+export default function StartProjectButton({ className, variant = "default", iconOnly = false, onOpen }: Props) {
   const router = useRouter();
   const { data: session } = useSession();
   const { queuePreload } = useWorkspaceFilePreloader();
   const [open, setOpen] = useState(false);
-  const [value, setValue] = useState("");
   const [pendingFiles, setPendingFiles] = useState<PendingWorkspaceFile[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
-  const [removeConfirmId, setRemoveConfirmId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const dragDepthRef = useRef(0);
@@ -91,9 +100,7 @@ export default function StartProjectButton({ className, variant = "default", ico
     };
   }, [open]);
 
-  const missingName = !value.trim();
   const missingFiles = pendingFiles.length === 0;
-  const showNameError = showValidation && missingName;
   const showFilesError = showValidation && missingFiles;
 
   const createId = () =>
@@ -130,11 +137,13 @@ export default function StartProjectButton({ className, variant = "default", ico
   }
 
   function launchModal() {
-    setValue("");
+    onOpen?.();
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("workspace-clear-project-selection"));
+    }
     setError(null);
     setPendingFiles([]);
     setShowValidation(false);
-    setRemoveConfirmId(null);
     setOpen(true);
   }
 
@@ -146,11 +155,11 @@ export default function StartProjectButton({ className, variant = "default", ico
   async function handleStart() {
     const startedAt = Date.now();
     setShowValidation(true);
-    if (missingName || missingFiles) {
+    if (missingFiles) {
       setError(null);
       return;
     }
-    const clean = sanitizeProjectName(value);
+    const clean = deriveProjectNameFromFilename(pendingFiles[0]?.file?.name);
     try {
       window.localStorage?.setItem(PROJECT_NAME_STORAGE_KEY, clean);
     } catch {
@@ -218,80 +227,31 @@ export default function StartProjectButton({ className, variant = "default", ico
         ? createPortal(
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
           <div
-            className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm"
-            onClick={closeModal}
+            className="absolute inset-0 bg-black/40 dark:bg-black/55 dark:backdrop-blur-sm"
           />
-          <div className="page-fade-in relative z-10 w-full max-w-3xl rounded-2xl border border-white/60 bg-white/35 bg-gradient-to-b from-white/90 via-white/70 to-white/40 p-1.5 text-slate-900 shadow-[0_0_0_1px_rgba(255,255,255,0.65),0_22px_60px_rgba(15,23,42,0.22)] backdrop-blur-lg sm:p-2">
+          <div className="page-fade-in relative z-10 w-full max-w-4xl text-slate-900 dark:text-zinc-100">
             <form
-              className="flex max-h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-[18px] bg-white/85 shadow-[0_0_0_1px_rgba(148,163,184,0.14)]"
+              className="flex max-h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-2xl bg-white shadow-[0_22px_60px_rgba(15,23,42,0.22),0_0_0_1px_rgba(148,163,184,0.14)] dark:bg-zinc-900 dark:shadow-[0_22px_60px_rgba(0,0,0,0.5)]"
               onSubmit={(event) => {
                 event.preventDefault();
                 void handleStart();
               }}
             >
-              <div className="overflow-y-auto px-6 pt-8 pb-4 sm:px-10 sm:pt-10">
-                <h2 className="text-[23px] font-semibold tracking-tight text-slate-900 sm:text-[26px]">
-                  Create a new project
+              <div className="overflow-y-auto px-6 pt-6 pb-0 sm:px-10 sm:pt-7">
+                <h2 className="text-[23px] font-semibold tracking-tight text-slate-900 dark:text-zinc-100 sm:text-[26px]">
+                  Start with your files
                 </h2>
-                <div className="mt-6 space-y-2">
-                  <div className="relative">
-                    <input
-                      type="text"
-                      autoFocus
-                      value={value}
-                      onChange={(event) => {
-                        setValue(event.target.value);
-                        if (error) setError(null);
-                      }}
-                      aria-label="Project name (required)"
-                      className={`peer w-full rounded-2xl border-[3px] bg-white py-4 pl-[29px] pr-5 text-lg text-slate-900 shadow-sm transition focus:outline-none focus:ring-0 ${
-                        showNameError
-                          ? "border-rose-400 hover:border-rose-500 focus:border-rose-500"
-                          : "border-slate-300 hover:border-[#51bdff] focus:border-[#51bdff]"
-                      }`}
-                      disabled={busy}
-                    />
-                    {!value ? (
-                      <div
-                        aria-hidden
-                        className="pointer-events-none absolute inset-y-0 left-[29px] flex items-center text-base"
-                      >
-                        <span
-                          className={`relative pl-1 ${
-                            showNameError ? "text-rose-500" : "text-slate-500"
-                          }`}
-                        >
-                          {showNameError ? (
-                            <span className="absolute -left-3 font-bold text-rose-500">*</span>
-                          ) : null}
-                          <span>Name your project</span>
-                        </span>
-                      </div>
-                    ) : null}
-                  </div>
-                  <p className="text-xs text-slate-500">This helps you find and organize projects later.</p>
-                  {error ? <p className="text-sm text-rose-500">{error}</p> : null}
-                </div>
-
-                <div className="mt-6">
+                <div className="mt-5">
                   <div
-                    role="button"
-                    tabIndex={busy ? -1 : 0}
-                    className={`group relative flex w-full flex-col items-center justify-center rounded-[18px] border border-solid px-6 py-12 text-center transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#51bdff] focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
+                    className={`group flex min-h-[360px] w-full flex-col overflow-hidden rounded-[10px] text-center transition duration-200 sm:min-h-[400px] ${
                       showFilesError
-                        ? "border-rose-300 bg-gradient-to-b from-rose-50/70 via-white/90 to-white text-rose-600 shadow-[0_0_0_1px_rgba(251,113,133,0.15)]"
+                        ? "border border-rose-300 bg-gradient-to-b from-rose-50/70 via-white/90 to-white text-rose-600 shadow-[0_0_0_1px_rgba(251,113,133,0.15)] dark:bg-zinc-900/60"
                         : dragActive
-                          ? "scale-[1.01] border-sky-400/80 bg-gradient-to-b from-white/80 via-sky-50/70 to-white shadow-[0_0_0_1px_rgba(56,189,248,0.35),0_0_30px_rgba(56,189,248,0.25)]"
-                          : "border-slate-200/80 bg-gradient-to-b from-white/70 via-slate-50/80 to-white/90 shadow-[0_0_0_1px_rgba(148,163,184,0.15),0_18px_40px_rgba(15,23,42,0.06)] hover:border-slate-300/80"
-                    } ${busy ? "opacity-70" : "cursor-pointer"}`}
-                    onClick={() => fileInputRef.current?.click()}
-                    onKeyDown={(event) => {
-                      if (busy) return;
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        fileInputRef.current?.click();
-                      }
-                    }}
+                          ? "scale-[1.01] border border-sky-400/80 bg-gradient-to-b from-white/80 via-sky-50/70 to-white shadow-[0_0_0_1px_rgba(56,189,248,0.35),0_0_30px_rgba(56,189,248,0.25)] dark:bg-zinc-900/70"
+                          : pendingFiles.length === 0
+                            ? "border-2 border-dashed border-[#D1D5DB] bg-[#F5F5F5] dark:border-zinc-700 dark:bg-zinc-800/80"
+                            : "bg-transparent dark:bg-transparent"
+                    } ${busy ? "opacity-70" : ""}`}
                     onDragEnter={(event) => {
                       event.preventDefault();
                       if (busy) return;
@@ -315,23 +275,91 @@ export default function StartProjectButton({ className, variant = "default", ico
                       if (busy) return;
                       if (event.dataTransfer?.files?.length) addFiles(event.dataTransfer.files);
                     }}
-                    aria-label="Upload PDF files"
-                    aria-disabled={busy}
                   >
-                    <FileUp
-                      className={`h-12 w-12 ${
-                        showFilesError ? "text-rose-500" : "text-slate-700"
-                      } drop-shadow-[0_0_14px_rgba(56,189,248,0.25)]`}
-                      aria-hidden
-                    />
-                    <p
-                      className={`mt-4 text-base font-semibold ${
-                        showFilesError ? "text-rose-600" : "text-slate-900"
-                      }`}
-                    >
-                      {dragActive ? "Release to upload" : "Drag & drop or click to upload"}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-500">PDF files only</p>
+                    {pendingFiles.length === 0 ? (
+                      <div className="flex min-h-[360px] flex-1 flex-col items-center justify-center px-8 py-10 sm:min-h-[400px]">
+                        <div className="relative mb-1 h-16 w-18">
+                          <FileUp
+                            className={`absolute left-1/2 top-1/2 h-14 w-14 -translate-x-[58%] -translate-y-1/2 ${
+                              showFilesError ? "text-rose-500" : "text-[#6C47FF]"
+                            }`}
+                            aria-hidden
+                          />
+                        </div>
+                        <p
+                          className={`mt-4 text-base font-semibold ${
+                            showFilesError ? "text-rose-600" : "text-slate-900 dark:text-zinc-100"
+                          }`}
+                        >
+                          {dragActive ? (
+                            "Release to add your files"
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                className="cursor-pointer text-[1.05em] font-bold text-slate-900 underline decoration-1 underline-offset-2 transition hover:text-slate-900 disabled:cursor-not-allowed dark:text-zinc-100 dark:hover:text-zinc-100"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  fileInputRef.current?.click();
+                                }}
+                                disabled={busy}
+                              >
+                                select files
+                              </button>{" "}
+                              or drop your files to get started
+                            </>
+                          )}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex h-[360px] flex-col gap-4 pt-0 pb-0 text-left sm:h-[400px]">
+                        <div className="overflow-hidden rounded-[10px] border-2 border-dashed border-[#D1D5DB] bg-[#F5F5F5] px-8 py-3 shadow-none dark:border-zinc-700 dark:bg-zinc-800/80">
+                          <p className="text-[15px] font-medium text-slate-700 dark:text-zinc-300">
+                            Drag and drop, or{" "}
+                            <button
+                              type="button"
+                              className="cursor-pointer text-[1.05em] font-bold text-slate-900 underline decoration-1 underline-offset-2 transition hover:text-slate-900 disabled:cursor-not-allowed dark:text-zinc-100 dark:hover:text-zinc-100"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                fileInputRef.current?.click();
+                              }}
+                              disabled={busy}
+                            >
+                              select files
+                            </button>
+                          </p>
+                        </div>
+                        <div className="min-h-0 flex-1 overflow-hidden rounded-[10px] border-2 border-solid border-[#D1D5DB] bg-white shadow-none dark:border-zinc-700 dark:bg-zinc-900">
+                          <div className="upload-list-scroll h-full overflow-y-auto">
+                            {pendingFiles.map(({ id, file }) => (
+                              <div
+                                key={id}
+                                className="group flex items-center justify-between gap-3 border-b border-[#DDD4FC] bg-[#F6F2FF] px-4 py-3 text-sm text-slate-800 last:border-b-0 dark:border-zinc-800 dark:bg-zinc-800/70 dark:text-zinc-200"
+                              >
+                                <div className="flex min-w-0 items-center gap-3">
+                                  <FileText className="h-4 w-4 shrink-0 text-slate-500 dark:text-zinc-400" aria-hidden />
+                                  <div className="min-w-0">
+                                    <span className="block truncate font-semibold text-slate-900 dark:text-zinc-100">{file.name}</span>
+                                    <span className="block text-xs font-semibold text-slate-900 dark:text-zinc-300">
+                                      {getFileTypeLabel(file)} - {formatBytes(file.size)}
+                                    </span>
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setPendingFiles((prev) => prev.filter((entry) => entry.id !== id))}
+                                  className="rounded-full p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                                  aria-label={`Remove ${file.name}`}
+                                  disabled={busy}
+                                >
+                                  <Trash2 className="h-5 w-5" aria-hidden />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -347,83 +375,24 @@ export default function StartProjectButton({ className, variant = "default", ico
                     />
                   </div>
 
-                  {pendingFiles.length > 0 ? (
-                    <div className="mt-4 rounded-2xl border border-slate-200 bg-white/70 p-3">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-900">
-                        You&apos;re uploading ({pendingFiles.length})
-                      </p>
-                      <div className="mt-2 space-y-2">
-                        {pendingFiles.map(({ id, file }) => (
-                          <div
-                            key={id}
-                            className="group flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 transition hover:border-[#51bdff] hover:bg-sky-50/60"
-                          >
-                            <div className="flex min-w-0 items-center gap-2">
-                              <FileText className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
-                              <span className="min-w-0 truncate">{file.name}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {removeConfirmId === id ? (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={() => setRemoveConfirmId(null)}
-                                    className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
-                                    disabled={busy}
-                                  >
-                                    Cancel
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setPendingFiles((prev) => prev.filter((entry) => entry.id !== id));
-                                      setRemoveConfirmId(null);
-                                    }}
-                                    className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
-                                    disabled={busy}
-                                  >
-                                    Delete
-                                  </button>
-                                </>
-                              ) : (
-                                <>
-                                  <span className="whitespace-nowrap text-xs text-slate-500">
-                                    {formatBytes(file.size)}
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => setRemoveConfirmId(id)}
-                                    className="rounded-full p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
-                                    aria-label={`Remove ${file.name}`}
-                                    disabled={busy}
-                                  >
-                                    <X className="h-4 w-4" aria-hidden />
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
+                  {error ? <p className="mt-3 text-sm text-rose-500">{error}</p> : null}
                 </div>
               </div>
 
-              <div className="shrink-0 rounded-b-[18px] bg-slate-50/80">
-                <div className="flex justify-end gap-3 px-6 pt-[10px] pb-4 text-sm sm:px-10">
+              <div className="shrink-0 bg-white dark:bg-zinc-900">
+                <div className="flex min-h-[76px] items-center justify-end gap-3 px-6 py-0 text-sm sm:px-10">
                   <button
                     type="button"
                     onClick={closeModal}
-                    className="px-2 py-2 text-slate-500 transition hover:text-slate-900"
+                    className="px-2 py-2 font-semibold text-slate-500 transition hover:text-slate-900 dark:text-zinc-400 dark:hover:text-zinc-100"
                     disabled={busy}
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="inline-flex items-center justify-center rounded-[12px] border-[3px] border-[#51bdff] bg-[#008ade] px-5 py-2 font-semibold text-white shadow-[0_14px_40px_rgba(15,23,42,0.25)] transition hover:-translate-y-0.5 hover:bg-[#007fcd] hover:shadow-[0_18px_50px_rgba(15,23,42,0.32)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#51bdff] focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:translate-y-0 disabled:opacity-60"
-                    disabled={busy}
+                    className="inline-flex items-center justify-center rounded-full bg-[#6C47FF] px-5 py-2 font-semibold text-white shadow-[0_14px_40px_rgba(15,23,42,0.25)] transition hover:-translate-y-0.5 hover:bg-[#5B38E6] hover:shadow-[0_18px_50px_rgba(15,23,42,0.32)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6] focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:translate-y-0 disabled:bg-[#6C47FF] disabled:shadow-[0_14px_40px_rgba(15,23,42,0.25)] disabled:opacity-60 disabled:pointer-events-none"
+                    disabled={busy || missingFiles}
                   >
                     {busy ? (
                       <span className="flex items-center gap-2">

@@ -33,3 +33,21 @@ export function formatProjectLastEdited(value: string | number | Date): string {
   return `Edited ${formatter.format(target)}`;
 }
 
+export function formatProjectActivityDate(value: string | number | Date): string {
+  const target = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(target.getTime())) return "Oct 2, 2025";
+
+  const now = new Date();
+  const isToday =
+    target.getFullYear() === now.getFullYear() &&
+    target.getMonth() === now.getMonth() &&
+    target.getDate() === now.getDate();
+
+  if (isToday) return "Today";
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(target);
+}

@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
+import { assertAppSafe } from "@/lib/appSafety";
 import { prisma } from "@/lib/prisma";
 import { verifySignupCode, issueSignupVerificationCode } from "@/lib/signupVerification";
 import { isSameOrigin } from "@/lib/requestGuards";
 import { rateLimit } from "@/lib/rateLimit";
+import { ensureStripeCustomerForUser } from "@/lib/stripeCustomers";
 
 export async function POST(req: Request) {
   try {
+    await assertAppSafe();
     if (!isSameOrigin(req)) {
       return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
     }
@@ -41,6 +44,13 @@ export async function POST(req: Request) {
       data: { emailVerified: new Date() },
     });
 
+    await ensureStripeCustomerForUser({
+      userId: user.id,
+      email: user.email ?? email,
+      name: user.name ?? null,
+      stripeCustomerId: user.stripeCustomerId ?? null,
+    });
+
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("[signup.verify] error", error);
@@ -50,6 +60,7 @@ export async function POST(req: Request) {
 
 export async function PUT(req: Request) {
   try {
+    await assertAppSafe();
     if (!isSameOrigin(req)) {
       return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
     }

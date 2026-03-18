@@ -70,7 +70,9 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       userId,
       name: copyName,
       data: existing.data ?? Prisma.JsonNull,
-      previewKey: null,
+      // Reuse the existing preview image for copied projects so thumbnails
+      // are available immediately and persist after refresh.
+      previewKey: existing.previewKey,
       pdfKey: existing.pdfKey,
       pagesCount: existing.pagesCount ?? 0,
     },

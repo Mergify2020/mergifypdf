@@ -78,6 +78,17 @@ model ResetToken {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+model AppRuntimeGuard {
+  id            String   @id
+  appName       String
+  environment   String
+  databaseLabel String?
+  requireUsers  Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
 model Project {
   id        String   @id @default(cuid())
   userId    String

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { assertAppSafe } from "@/lib/appSafety";
 import { getStripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
 import type Stripe from "stripe";
@@ -12,6 +13,7 @@ function normalizeAppUserId(candidate: unknown): string | null {
 }
 
 export async function POST(req: NextRequest) {
+  await assertAppSafe();
   const stripe = getStripe();
   const sig = req.headers.get("stripe-signature");
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;

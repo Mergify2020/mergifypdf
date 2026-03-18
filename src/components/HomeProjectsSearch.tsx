@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowDown,
@@ -8,7 +8,10 @@ import {
   Check,
   ChevronDown,
   Clock,
+  List,
+  LayoutGrid,
   Search,
+  Star,
   UserRound,
   UsersRound,
 } from "lucide-react";
@@ -40,10 +43,14 @@ type Props = {
   showAllProjects?: boolean;
   showOwnerFilter?: boolean;
   showResumeBadge?: boolean;
+  initialViewMode?: ViewMode;
 };
 
 type OwnerFilter = "any" | "shared" | "you";
-type SortOption = "activity" | "az" | "za";
+type SortOption = "activity" | "starred" | "az" | "za";
+type ViewMode = "grid" | "list";
+const ALL_PROJECTS_VIEW_MODE_KEY = "mpdf:all-projects-view-mode";
+const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 const mapProjectsFromSummary = (projects: ProjectsSummaryProject[]): SummaryProject[] =>
   projects.map((project) => ({
@@ -75,6 +82,7 @@ export default function HomeProjectsSearch({
   showAllProjects = false,
   showOwnerFilter = true,
   showResumeBadge = false,
+  initialViewMode = "grid",
 }: Props) {
   const queryBridge = useWorkspaceHomeQuery();
   const query = queryBridge?.query ?? "";
@@ -88,6 +96,7 @@ export default function HomeProjectsSearch({
   const initialProjects = useMemo(() => projectsState, [projectsState]);
   const hasProjects = (projectsState.length ?? 0) > 0;
   const [sortOption, setSortOption] = useState<SortOption>("activity");
+  const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode);
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const sortMenuRef = useRef<HTMLDivElement | null>(null);
   const [ownerFilter, setOwnerFilter] = useState<OwnerFilter>("any");
@@ -178,6 +187,22 @@ export default function HomeProjectsSearch({
     };
   }, [ownerMenuOpen]);
 
+  useIsomorphicLayoutEffect(() => {
+    if (!showAllProjects) return;
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem(ALL_PROJECTS_VIEW_MODE_KEY);
+    if (stored === "grid" || stored === "list") {
+      setViewMode(stored);
+    }
+  }, [showAllProjects]);
+
+  useEffect(() => {
+    if (!showAllProjects) return;
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(ALL_PROJECTS_VIEW_MODE_KEY, viewMode);
+    document.cookie = `${ALL_PROJECTS_VIEW_MODE_KEY}=${viewMode}; path=/; max-age=31536000; samesite=lax`;
+  }, [showAllProjects, viewMode]);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     const frame = window.requestAnimationFrame(() => {
@@ -193,7 +218,7 @@ export default function HomeProjectsSearch({
       <section className="mt-0 flex w-full min-h-0 flex-1 flex-col">
         <div
           className="box-border flex min-h-0 flex-1 flex-col rounded-xl border-[1.5px] border-gray-200 bg-white p-4 transition-[height] duration-300 ease-out shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] sm:p-5"
-          style={{ marginBottom: "var(--workspace-projects-bottom-gap, 0px)" }}
+          style={{ height: "calc(100% - var(--workspace-projects-bottom-gap, 0px))" }}
         >
           <div className="flex flex-wrap items-center justify-between gap-4">
             <h2 className="text-base font-semibold text-[#1F2A37] dark:text-zinc-100 sm:text-lg">
@@ -201,92 +226,127 @@ export default function HomeProjectsSearch({
             </h2>
             <div className="flex items-center gap-2">
               {showAllProjects ? (
-                <div ref={sortMenuRef} className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setSortMenuOpen((prev) => !prev)}
-                    className={`inline-flex items-center gap-2 rounded-full border-2 border-[#E6EBF2] px-4 py-2 text-xs font-semibold transition dark:border-zinc-700 ${
-                      sortMenuOpen
-                        ? "border-[#CFC3FF] bg-white text-[#4C1D95] ring-1 ring-[rgba(108,71,255,0.16)] dark:border-[#5B4A85] dark:bg-zinc-900 dark:text-[#D8CCFF]"
-                        : "bg-white text-[#1F2A37] hover:border-[#D8DEE8] dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-zinc-600"
-                    }`}
-                    aria-haspopup="menu"
-                    aria-expanded={sortMenuOpen}
-                  >
-                    {sortOption === "activity" ? (
-                      <Clock className="h-4 w-4" aria-hidden />
-                    ) : sortOption === "az" ? (
-                      <ArrowUp className="h-4 w-4" aria-hidden />
-                    ) : (
-                      <ArrowDown className="h-4 w-4" aria-hidden />
-                    )}
-                    <span className="whitespace-nowrap">
-                      {sortOption === "activity"
-                        ? "Last activity"
-                        : sortOption === "az"
-                          ? "Name (A-Z)"
-                          : "Name (Z-A)"}
-                    </span>
-                    <ChevronDown
-                      className={`ml-1 h-4 w-4 opacity-70 transition-transform ${
-                        sortMenuOpen ? "rotate-180" : ""
-                      }`}
+                <div className="flex items-center gap-2">
+                  <div className="relative inline-flex items-center rounded-full border-2 border-[#E6EBF2] bg-white p-0.5 dark:border-zinc-700 dark:bg-zinc-900">
+                    <span
                       aria-hidden
+                      className={`pointer-events-none absolute left-0.5 top-0.5 h-[30px] w-[68px] rounded-full bg-[#E5E7EB] shadow-[inset_0_0_0_1px_rgba(100,116,139,0.26)] transition-transform duration-200 ease-out dark:bg-[#2A2A31] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)] ${
+                        viewMode === "grid" ? "translate-x-0" : "translate-x-[68px]"
+                      }`}
                     />
-                  </button>
-
-                  {sortMenuOpen ? (
-                    <div
-                      role="menu"
-                      className="dropdown-pop-in absolute left-0 top-full z-50 mt-3 w-full overflow-hidden rounded-xl border border-[#E5E7EB] bg-white p-1.5 text-sm text-[#1F2A37] shadow-[0_16px_36px_rgba(15,23,42,0.14)] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:shadow-[0_20px_44px_rgba(0,0,0,0.5)]"
+                    <button
+                      type="button"
+                      onClick={() => setViewMode("grid")}
+                      className={`relative z-10 inline-flex h-[30px] w-[68px] items-center justify-center gap-1.5 rounded-full px-3 text-xs font-semibold transition ${
+                        viewMode === "grid"
+                          ? "text-slate-700 dark:text-[#F4F4F5]"
+                          : "text-slate-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                      }`}
+                      aria-label="Grid view"
+                      aria-pressed={viewMode === "grid"}
                     >
-                      <div className="py-0">
-                        {(
-                          [
-                            { key: "activity", label: "Last activity", Icon: Clock },
-                            { key: "az", label: "Name (A-Z)", Icon: ArrowUp },
-                            { key: "za", label: "Name (Z-A)", Icon: ArrowDown },
-                          ] as const
-                        ).map(({ key, label, Icon }) => (
-                          <button
-                            key={key}
-                            type="button"
-                            role="menuitem"
-                            onClick={() => {
-                              setSortOption(key);
-                              setSortMenuOpen(false);
-                            }}
-                            className={`flex w-full items-center justify-between rounded-lg px-2.5 py-2.5 text-left transition ${
-                              sortOption === key
-                                ? "bg-[#F8F5FF] dark:bg-[#2A223D]"
-                                : "hover:bg-slate-50 dark:hover:bg-zinc-800/60"
-                            }`}
-                          >
-                            <span className="flex items-center gap-2">
-                              <Icon
-                                className={`h-3.5 w-3.5 ${
-                                  sortOption === key ? "text-[#6C47FF] dark:text-[#BBA6FF]" : "text-slate-500"
-                                }`}
-                                aria-hidden
-                              />
-                              <span
-                                className={`text-[13px] ${
-                                  sortOption === key
-                                    ? "font-semibold text-[#4C1D95] dark:text-[#D8CCFF]"
-                                    : "font-medium text-[#1F2A37]"
-                                }`}
-                              >
-                                {label}
+                      <LayoutGrid className="h-4.5 w-4.5" aria-hidden />
+                      <span>Grid</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode("list")}
+                      className={`relative z-10 inline-flex h-[30px] w-[68px] items-center justify-center gap-1.5 rounded-full px-3 text-xs font-semibold transition ${
+                        viewMode === "list"
+                          ? "text-slate-700 dark:text-[#F4F4F5]"
+                          : "text-slate-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                      }`}
+                      aria-label="List view"
+                      aria-pressed={viewMode === "list"}
+                    >
+                      <List className="h-4.5 w-4.5" aria-hidden />
+                      <span>List</span>
+                    </button>
+                  </div>
+                  <div ref={sortMenuRef} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setSortMenuOpen((prev) => !prev)}
+                      className={`inline-flex items-center gap-2 rounded-full border-2 px-4 py-2 text-xs font-semibold transition ${
+                        sortMenuOpen
+                          ? "!border-[#7489A8] bg-white text-[#1F2A37] dark:!border-zinc-400 dark:bg-zinc-900 dark:text-zinc-100"
+                          : "border-[#E6EBF2] bg-white text-[#1F2A37] hover:border-[#D8DEE8] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-zinc-600"
+                      }`}
+                      aria-haspopup="menu"
+                      aria-expanded={sortMenuOpen}
+                    >
+                      {sortOption === "activity" ? (
+                        <Clock className="h-4 w-4" aria-hidden />
+                      ) : sortOption === "starred" ? (
+                        <Star className="h-4 w-4" aria-hidden />
+                      ) : sortOption === "az" ? (
+                        <ArrowUp className="h-4 w-4" aria-hidden />
+                      ) : (
+                        <ArrowDown className="h-4 w-4" aria-hidden />
+                      )}
+                      <span className="whitespace-nowrap">
+                        {sortOption === "activity"
+                          ? "Last activity"
+                          : sortOption === "starred"
+                            ? "Starred"
+                          : sortOption === "az"
+                            ? "Name (A-Z)"
+                            : "Name (Z-A)"}
+                      </span>
+                      <ChevronDown
+                        className={`ml-1 h-4 w-4 opacity-70 transition-transform ${
+                          sortMenuOpen ? "rotate-180" : ""
+                        }`}
+                        aria-hidden
+                      />
+                    </button>
+
+                    {sortMenuOpen ? (
+                      <div
+                        role="menu"
+                        className="project-actions-menu absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-[#E5E7EB] bg-white text-sm text-[#1F2A37] shadow-[0_16px_36px_rgba(15,23,42,0.14)] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:shadow-[0_20px_44px_rgba(0,0,0,0.5)]"
+                      >
+                        <div className="pb-1.5 pt-1.5">
+                          {(
+                            [
+                              { key: "activity", label: "Last activity", Icon: Clock },
+                              { key: "starred", label: "Starred", Icon: Star },
+                              { key: "az", label: "Name (A-Z)", Icon: ArrowUp },
+                              { key: "za", label: "Name (Z-A)", Icon: ArrowDown },
+                            ] as const
+                          ).map(({ key, label, Icon }) => (
+                            <button
+                              key={key}
+                              type="button"
+                              role="menuitem"
+                              onClick={() => {
+                                setSortOption(key);
+                                setSortMenuOpen(false);
+                              }}
+                              className={`project-actions-stagger-item mx-2 flex w-[calc(100%-1rem)] items-center justify-between rounded-lg px-2.5 py-2 text-left transition ${
+                                sortOption === key
+                                  ? "bg-[#F8FAFC] dark:bg-zinc-800/60"
+                                  : "hover:bg-[#F8FAFC] dark:hover:bg-zinc-800/60"
+                              }`}
+                            >
+                              <span className="flex min-w-0 items-center gap-2.5 text-slate-900 dark:text-zinc-100">
+                                <Icon
+                                  className="h-4 w-4 text-current"
+                                  aria-hidden
+                                />
+                                <span className="truncate text-[15px] font-medium text-slate-900 dark:text-zinc-100">
+                                  {label}
+                                </span>
                               </span>
-                            </span>
-                            {sortOption === key ? (
-                              <Check className="h-4.5 w-4.5 text-[#4C1D95] dark:text-[#D8CCFF]" aria-hidden />
-                            ) : null}
-                          </button>
-                        ))}
+                              {sortOption === key ? (
+                                <Check className="h-5 w-5 text-slate-900 dark:text-zinc-100" aria-hidden />
+                              ) : null}
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  ) : null}
+                    ) : null}
+                  </div>
                 </div>
               ) : null}
 
@@ -424,6 +484,7 @@ export default function HomeProjectsSearch({
               query={query}
               ownerFilter={ownerFilter}
               sortOption={sortOption}
+              viewMode={viewMode}
               showAllProjects={showAllProjects}
               showResumeBadge={showResumeBadge}
             />

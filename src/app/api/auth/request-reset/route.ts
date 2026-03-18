@@ -6,6 +6,10 @@ import { randomUUID } from "crypto";
 import { isSameOrigin } from "@/lib/requestGuards";
 import { rateLimit } from "@/lib/rateLimit";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 // how many times to retry if "token" hits the unique constraint
 const MAX_TOKEN_RETRIES = 3;
 

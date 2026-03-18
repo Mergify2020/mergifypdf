@@ -24,9 +24,9 @@ export default function AppHeaderBrand({
   const useHardNav = process.env.NODE_ENV === "development" && isStudio;
 
   const handleBrandClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
-    if (pathname === "/") {
+    if (pathname === "/projects/all") {
       event.preventDefault();
-      window.history.replaceState(null, "", "/");
+      window.history.replaceState(null, "", "/projects/all");
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
@@ -43,7 +43,7 @@ export default function AppHeaderBrand({
   if (isSignatureExperience) {
     return (
       useHardNav ? (
-        <a href="/" className="inline-flex items-center gap-2" aria-label="Back to dashboard">
+        <a href="/projects/all" className="inline-flex items-center gap-2" aria-label="Back to dashboard">
           <Image
             src="/Mergify-Sign.svg"
             alt="Mergify Sign"
@@ -53,7 +53,7 @@ export default function AppHeaderBrand({
           />
         </a>
       ) : (
-        <Link href="/" className="inline-flex items-center gap-2" aria-label="Back to dashboard">
+        <Link href="/projects/all" className="inline-flex items-center gap-2" aria-label="Back to dashboard">
           <Image
             src="/Mergify-Sign.svg"
             alt="Mergify Sign"
@@ -68,7 +68,7 @@ export default function AppHeaderBrand({
 
   return useHardNav ? (
     <a
-      href="/"
+      href="/projects/all"
       className="inline-flex items-center gap-2"
       aria-label="Back to dashboard"
       onClick={handleBrandClick}
@@ -96,7 +96,7 @@ export default function AppHeaderBrand({
     </a>
   ) : (
     <Link
-      href="/"
+      href="/projects/all"
       className="inline-flex items-center gap-2"
       aria-label="Back to dashboard"
       onClick={handleBrandClick}

@@ -17,6 +17,9 @@
     "start:lan": "echo 'Open on other devices: http://10.0.0.163:3000' && NEXTAUTH_URL=http://10.0.0.163:3000 next start --hostname 0.0.0.0 --port 3000",
     "prod:lan": "pnpm build:stable && pnpm start:lan",
     "lint": "eslint",
+    "stripe:audit-duplicates": "node scripts/audit-stripe-duplicates.mjs",
+    "safety:init": "node scripts/init-app-runtime-guard.mjs",
+    "safety:env": "node scripts/check-env-db-drift.mjs",
     "postinstall": "prisma generate"
   },
   "dependencies": {

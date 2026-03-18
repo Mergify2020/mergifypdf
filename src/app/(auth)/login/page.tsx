@@ -11,6 +11,8 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   CredentialsSignin: "Invalid email or password.",
   EMAIL_NOT_VERIFIED: "Please verify your email before logging in. Check your inbox for the 6-digit code.",
   OAUTH_ONLY: "This account now uses Google login. Continue with Google instead.",
+  AUTH_DB_UNAVAILABLE: "Sign-in is temporarily unavailable. Please try again in a moment.",
+  SERVICE_UNAVAILABLE: "Sign-in is temporarily unavailable while the app verifies its database configuration.",
   OAuthSignin: "Google login failed. Please try again.",
   OAuthCallback: "Google login failed. Please try again.",
   OAuthAccountNotLinked: "This email is already linked to a different login method.",

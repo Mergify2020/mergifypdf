@@ -41,12 +41,16 @@ import {
 } from "@phosphor-icons/react";
 import { useSession, signOut } from "next-auth/react";
 import StartProjectButton from "@/components/StartProjectButton";
-import { PROJECT_NAME_STORAGE_KEY, sanitizeProjectName } from "@/lib/projectName";
+import {
+  PROJECT_NAME_STORAGE_KEY,
+  deriveProjectNameFromFilename,
+} from "@/lib/projectName";
 import AppHeaderBrand from "./AppHeaderBrand";
 import SettingsMenu from "./SettingsMenu";
 import HeroHeader from "./HeroHeader";
 import PageLoadingSkeleton from "./PageLoadingSkeleton";
 import LoadingOverlay from "./LoadingOverlay";
+import UiTooltip from "./UiTooltip";
 import BillingStatusBanner from "@/components/BillingStatusBanner";
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
 import { getAvatarFallback } from "@/lib/avatarFallback";
@@ -66,6 +70,7 @@ const STARTUP_OVERLAY_KEY = "mpdf:startup-overlay";
 const STARTUP_OVERLAY_CONTEXT_KEY = "mpdf:startup-overlay-context";
 const SIDEBAR_EXPANDED_KEY = "mpdf:sidebar-expanded";
 const STRIPE_STATUS_CACHE_KEY = "mpdf:stripe-status";
+const STRIPE_PLAN_TIER_CACHE_KEY = "mpdf:stripe-plan-tier";
 const PROFILE_DISPLAY_CACHE_KEY = "mpdf:profile-display";
 
 function isPlaceholderProfileName(value: string): boolean {
@@ -97,6 +102,13 @@ async function resetWorkspaceStorage() {
   }
 }
 
+function getFileTypeLabel(file: File) {
+  const extension = file.name.split(".").pop()?.trim();
+  if (extension) return extension.toUpperCase();
+  const subtype = file.type.split("/").pop()?.trim();
+  return subtype ? subtype.toUpperCase() : "FILE";
+}
+
 type SidebarNavIcon = React.ComponentType<{
   className?: string;
   weight?: "regular" | "fill";
@@ -113,15 +125,13 @@ type SidebarItem = {
 };
 
 const navigationItems: SidebarItem[] = [
-  { label: "Home", icon: PhHouse, href: "/" },
   { label: "Projects", icon: PhFolders, href: "/projects" },
   { label: "Signatures", icon: PhSignature, href: "/signature-center" },
   { label: "Templates", icon: PhFileText, href: "/templates" },
-];
-
-const bottomSidebarItems: SidebarItem[] = [
   { label: "Trash", icon: PhTrash, href: "/projects/trash" },
 ];
+
+const bottomSidebarItems: SidebarItem[] = [];
 
 type SidebarPanel = {
   title: string;
@@ -226,12 +236,10 @@ export default function WorkspaceShell({
     null,
   );
   const [createOpen, setCreateOpen] = useState(false);
-  const [createValue, setCreateValue] = useState("");
   const [createPendingFiles, setCreatePendingFiles] = useState<PendingWorkspaceFile[]>([]);
   const [createError, setCreateError] = useState<string | null>(null);
   const [createBusy, setCreateBusy] = useState(false);
   const [createShowValidation, setCreateShowValidation] = useState(false);
-  const [createRemoveConfirmId, setCreateRemoveConfirmId] = useState<string | null>(null);
   const [contentSwapOut, setContentSwapOut] = useState(false);
   const [contentSwapIn, setContentSwapIn] = useState(false);
   const [homeProjectsQuery, setHomeProjectsQuery] = useState("");
@@ -242,24 +250,19 @@ export default function WorkspaceShell({
   const contentSwapSafetyRef = useRef<number | null>(null);
   const pendingContentSwapPathRef = useRef<string | null>(null);
   const [billingPortalLoading, setBillingPortalLoading] = useState(false);
-  const [homeStripeStatusOverride, setHomeStripeStatusOverride] = useState<string | null | undefined>(() => {
-    if (typeof window === "undefined") return undefined;
-    try {
-      const cached = window.localStorage?.getItem(STRIPE_STATUS_CACHE_KEY);
-      return cached && cached.length > 0 ? cached : undefined;
-    } catch {
-      return undefined;
-    }
-  });
+  const [homeStripeStatusOverride, setHomeStripeStatusOverride] = useState<string | null | undefined>(undefined);
   const [homeBillingBannerDismissed, setHomeBillingBannerDismissed] = useState(false);
   const [homeBillingBannerMounted, setHomeBillingBannerMounted] = useState(false);
   const [homeBillingBannerVisible, setHomeBillingBannerVisible] = useState(false);
   const [homeBillingBannerExiting, setHomeBillingBannerExiting] = useState(false);
+  const [homeCurrentPlanTier, setHomeCurrentPlanTier] = useState<string | null>(null);
+  const [homeBillingMetaReady, setHomeBillingMetaReady] = useState<boolean>(false);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const [compactSidebar, setCompactSidebar] = useState(false);
   const [narrowSidebar, setNarrowSidebar] = useState(false);
   const [overlaySidebar, setOverlaySidebar] = useState(false);
   const [phoneViewport, setPhoneViewport] = useState(false);
+  const [mobileDockViewport, setMobileDockViewport] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
@@ -617,19 +620,15 @@ export default function WorkspaceShell({
     if (createError) setCreateError(null);
   }
 
-  const createMissingName = !createValue.trim();
   const createMissingFiles = createPendingFiles.length === 0;
-  const showCreateNameError = createShowValidation && createMissingName;
   const showCreateFilesError = createShowValidation && createMissingFiles;
 
   function openCreateModal() {
-    setCreateValue("");
     setCreateError(null);
     setCreateBusy(false);
     setCreatePendingFiles([]);
     setCreateDragActive(false);
     setCreateShowValidation(false);
-    setCreateRemoveConfirmId(null);
     setCreateOpen(true);
   }
 
@@ -641,11 +640,11 @@ export default function WorkspaceShell({
   async function handleCreateStart() {
     const startedAt = Date.now();
     setCreateShowValidation(true);
-    if (createMissingName || createMissingFiles) {
+    if (createMissingFiles) {
       setCreateError(null);
       return;
     }
-    const clean = sanitizeProjectName(createValue);
+    const clean = deriveProjectNameFromFilename(createPendingFiles[0]?.file?.name);
     try {
       window.localStorage?.setItem(PROJECT_NAME_STORAGE_KEY, clean);
     } catch {
@@ -715,6 +714,7 @@ export default function WorkspaceShell({
   const isStudioRoute = pathname?.startsWith("/studio");
   const isProjectsPanel = panelKey === "projects";
   const isHomePanel = panelKey === "home";
+  const isSignaturesPanel = panelKey === "signatures";
   const isTemplatesPanel = panelKey === "templates";
   const useUnifiedWorkspaceBackground =
     pathname === "/" ||
@@ -729,9 +729,16 @@ export default function WorkspaceShell({
   const homeStripeStatus = homeStripeStatusOverride ?? (session?.user?.stripeStatus ?? null);
   const homeBillingIsDelinquent = homeStripeStatus === "past_due" || homeStripeStatus === "unpaid";
   const showHomeBillingBanner = isBillingBannerRoute && homeBillingIsDelinquent && !homeBillingBannerDismissed;
-  const renderHomeBillingBanner =
-    (showHomeBillingBanner || homeBillingBannerMounted) && !billingPortalLoading;
-  const homeBillingBannerOccupiesSpace = showHomeBillingBanner || homeBillingBannerVisible;
+  const renderHomeBillingBanner = false;
+  const showHomeBillingModal = showHomeBillingBanner && !billingPortalLoading && homeBillingMetaReady;
+  const homeBillingBannerOccupiesSpace = false;
+  const homePlanName =
+    homeCurrentPlanTier === "essential_plus"
+      ? "Essential Plus"
+      : homeCurrentPlanTier === "signature_pro"
+        ? "Signature Pro"
+        : "Your plan";
+  const homeBillingModalBody = "Update your payment details to continue accessing your workspace.";
   const shellLoadingOpen = billingPortalLoading || homeBootLoading;
   const shellLoadingLabel = billingPortalLoading
     ? "Opening billing portal…"
@@ -855,6 +862,7 @@ export default function WorkspaceShell({
   useEffect(() => {
     if (!isBillingBannerRoute) {
       setHomeStripeStatusOverride(undefined);
+      setHomeBillingMetaReady(false);
       return;
     }
     if (!session?.user?.email) {
@@ -866,25 +874,43 @@ export default function WorkspaceShell({
       try {
         const response = await fetch("/api/account/trial-status", { cache: "no-store" });
         if (!response.ok) {
-          if (!cancelled) setHomeStripeStatusOverride(undefined);
+          if (!cancelled) {
+            setHomeStripeStatusOverride(undefined);
+            setHomeBillingMetaReady(true);
+          }
           return;
         }
-        const data = (await response.json()) as { stripeStatus?: string | null };
+        const data = (await response.json()) as {
+          stripeStatus?: string | null;
+          currentPlanTier?: string | null;
+        };
         if (!cancelled) {
           const nextStatus = typeof data.stripeStatus === "string" ? data.stripeStatus : null;
+          const nextPlanTier =
+            typeof data.currentPlanTier === "string" ? data.currentPlanTier : null;
           setHomeStripeStatusOverride(nextStatus);
+          setHomeCurrentPlanTier(nextPlanTier);
           try {
             if (nextStatus) {
               window.localStorage?.setItem(STRIPE_STATUS_CACHE_KEY, nextStatus);
             } else {
               window.localStorage?.removeItem(STRIPE_STATUS_CACHE_KEY);
             }
+            if (nextPlanTier) {
+              window.localStorage?.setItem(STRIPE_PLAN_TIER_CACHE_KEY, nextPlanTier);
+            } else {
+              window.localStorage?.removeItem(STRIPE_PLAN_TIER_CACHE_KEY);
+            }
           } catch {
             // ignore storage write errors
           }
+          setHomeBillingMetaReady(true);
         }
       } catch {
-        if (!cancelled) setHomeStripeStatusOverride(undefined);
+        if (!cancelled) {
+          setHomeStripeStatusOverride(undefined);
+          setHomeBillingMetaReady(true);
+        }
       }
     }
     void reconcileHomeStripeStatus();
@@ -1207,9 +1233,11 @@ export default function WorkspaceShell({
     const updateWidth = () => {
       if (typeof window === "undefined") return;
       const width = window.innerWidth;
+      const isPortraitDockViewport = width <= 1024 && window.innerHeight > width;
       setNarrowSidebar(width < 1280);
       setOverlaySidebar(width < 1024);
       setPhoneViewport(width < 768);
+      setMobileDockViewport(width < 768 || isPortraitDockViewport);
     };
 
     updateWidth();
@@ -1252,16 +1280,43 @@ export default function WorkspaceShell({
     offset = 12,
     useSidebarEdge = false
   ) => {
-    if (label === "Expand sidebar" && expanded) return;
-    if (label === "Collapse sidebar" && !expanded) return;
+    if ((label === "Expand sidebar" || label === "Show navigation") && expanded) return;
+    if ((label === "Collapse sidebar" || label === "Hide navigation") && !expanded) return;
     const rect = event.currentTarget.getBoundingClientRect();
     const sidebarRect = sidebarRef.current?.getBoundingClientRect();
     const leftAnchor = useSidebarEdge ? sidebarRect?.right ?? rect.right : rect.right;
     setSidebarTooltip({
       label,
-      top: rect.top + rect.height / 2 + (label === "Expand sidebar" || label === "Collapse sidebar" ? 6 : 0),
+      top:
+        rect.top +
+        rect.height / 2 +
+        (label === "Expand sidebar" ||
+        label === "Collapse sidebar" ||
+        label === "Show navigation" ||
+        label === "Hide navigation"
+          ? 6
+          : 0),
       left: leftAnchor + offset,
     });
+  };
+
+  const getSidebarTooltipLabel = (label: string) => {
+    switch (label) {
+      case "Projects":
+        return "Browse all projects";
+      case "Signatures":
+        return "Open signature requests";
+      case "Templates":
+        return "Browse templates";
+      case "Trash":
+        return "View deleted projects";
+      case "Log out":
+        return "Sign out";
+      case "Tap again to log out":
+        return "Tap again to sign out";
+      default:
+        return label;
+    }
   };
 
   useEffect(() => {
@@ -1474,7 +1529,7 @@ export default function WorkspaceShell({
         if (isExpanded) return;
         const rect = event.currentTarget.getBoundingClientRect();
         setSidebarTooltip({
-          label: logoutArmedA11yLabel,
+          label: getSidebarTooltipLabel(logoutArmedA11yLabel),
           top: rect.top + rect.height / 2,
           left: rect.right + 12,
         });
@@ -1636,7 +1691,6 @@ export default function WorkspaceShell({
     });
 
   const mobileBottomDockItems = [
-    { label: "Home", href: "/", icon: PhHouse, active: pathname === "/" },
     {
       label: "Projects",
       href: "/projects/all",
@@ -1705,6 +1759,43 @@ export default function WorkspaceShell({
           </div>
         </div>
       ) : null}
+      {showHomeBillingModal ? (
+        <div className="fixed inset-0 z-[90]">
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 bg-black/45 backdrop-blur-sm"
+          />
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-3 sm:p-4">
+            <div className="pointer-events-auto w-full max-w-[600px] overflow-hidden rounded-2xl border border-[#D9DDF0] bg-white text-[#1F2A37] shadow-[0_20px_50px_rgba(15,23,42,0.28)] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100">
+              <div className="flex items-center justify-between gap-3 bg-rose-100 px-5 py-3.5 dark:bg-rose-900/40">
+                <p className="text-lg font-semibold text-rose-700 dark:text-rose-200">{homePlanName} failed to renew</p>
+                <button
+                  type="button"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-rose-700 transition hover:bg-rose-200 dark:text-rose-200 dark:hover:bg-rose-900/60"
+                  onClick={dismissHomeBillingBanner}
+                  aria-label="Dismiss payment notice"
+                >
+                  <X className="h-5 w-5" aria-hidden />
+                </button>
+              </div>
+              <div className="space-y-4 px-5 py-5">
+                <p className="text-lg leading-7 text-[#475569] dark:text-zinc-300">{homeBillingModalBody}</p>
+                <div className="flex items-center justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void openBillingPortal({ collapseSidebarAfter: false });
+                    }}
+                    className="inline-flex items-center rounded-full bg-rose-600 px-5 py-2.5 text-base font-semibold text-white transition hover:bg-rose-700 dark:bg-rose-600 dark:hover:bg-rose-700"
+                  >
+                    Update payment
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {!hideWorkspaceSidebar ? (
       <>
       {/* Desktop sidebar */}
@@ -1753,13 +1844,13 @@ export default function WorkspaceShell({
                       className="relative z-10 inline-flex items-center justify-center p-1 text-slate-500 transition hover:text-slate-900 dark:text-zinc-300 dark:hover:text-white"
                       aria-label="Collapse sidebar"
                       onMouseEnter={(event) => {
-                        setSidebarTooltipFromEvent(event, "Collapse sidebar", 3, true);
+                        setSidebarTooltipFromEvent(event, "Hide navigation", 3, true);
                       }}
                       onMouseLeave={() => {
                         setSidebarTooltip(null);
                       }}
                       onFocus={(event) => {
-                        setSidebarTooltipFromEvent(event, "Collapse sidebar", 3, true);
+                        setSidebarTooltipFromEvent(event, "Hide navigation", 3, true);
                       }}
                       onBlur={() => {
                         setSidebarTooltip(null);
@@ -1781,13 +1872,13 @@ export default function WorkspaceShell({
                     className="inline-flex items-center justify-center overflow-visible"
                     aria-label="Expand sidebar"
                     onMouseEnter={(event) => {
-                      setSidebarTooltipFromEvent(event, "Expand sidebar", 3, true);
+                      setSidebarTooltipFromEvent(event, "Show navigation", 3, true);
                     }}
                     onMouseLeave={() => {
                       setSidebarTooltip(null);
                     }}
                     onFocus={(event) => {
-                      setSidebarTooltipFromEvent(event, "Expand sidebar", 3, true);
+                      setSidebarTooltipFromEvent(event, "Show navigation", 3, true);
                     }}
                     onBlur={() => {
                       setSidebarTooltip(null);
@@ -1815,14 +1906,14 @@ export default function WorkspaceShell({
                     className="relative"
                     onMouseEnter={(event) => {
                       if (navExpanded) return;
-                      setSidebarTooltipFromEvent(event, "Start a new project", 3, true);
+                      setSidebarTooltipFromEvent(event, "Create a new project", 3, true);
                     }}
                     onMouseLeave={() => {
                       if (!navExpanded) setSidebarTooltip(null);
                     }}
                     onFocus={(event) => {
                       if (navExpanded) return;
-                      setSidebarTooltipFromEvent(event, "Start a new project", 3, true);
+                      setSidebarTooltipFromEvent(event, "Create a new project", 3, true);
                     }}
                     onBlur={() => {
                       if (!navExpanded) setSidebarTooltip(null);
@@ -1831,6 +1922,7 @@ export default function WorkspaceShell({
                     <StartProjectButton
                       variant="custom"
                       iconOnly={!navExpanded}
+                      onOpen={() => setSidebarTooltip(null)}
                       className={
                         navExpanded
                           ? "flex h-12 w-[220px] items-center justify-center rounded-xl border border-transparent bg-[#6C47FF] px-5 text-sm font-semibold tracking-wide text-white shadow-[0_8px_18px_rgba(15,23,42,0.14)] transition-[width,transform,opacity,background-color,box-shadow] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] origin-left transform-gpu opacity-100 scale-100 hover:bg-[#5B38E6] hover:shadow-[0_10px_22px_rgba(15,23,42,0.18)] dark:border-zinc-700/40 dark:bg-[#6C47FF] dark:text-zinc-100 dark:shadow-[0_10px_22px_rgba(0,0,0,0.35)] dark:hover:bg-[#5B38E6] dark:hover:border-zinc-600/60 dark:hover:shadow-[0_12px_26px_rgba(0,0,0,0.42)] dark:active:bg-[#4E2FD1]"
@@ -1852,7 +1944,7 @@ export default function WorkspaceShell({
             </div>
             </div>
 
-            {!isHomePanel && !isTemplatesPanel ? (
+            {!isHomePanel && !isTemplatesPanel && !isSignaturesPanel ? (
               <div
                 ref={profileRef}
                 className={`relative z-50 px-3 pb-6 ${
@@ -1902,7 +1994,7 @@ export default function WorkspaceShell({
               ? createPortal(
                   <div
                     ref={profileMenuRef}
-                    className={`fixed z-[60] w-80 rounded-3xl border border-slate-100 bg-white p-4 text-sm text-slate-800 shadow-[0_30px_80px_rgba(15,23,42,0.35)] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:shadow-[0_30px_80px_rgba(0,0,0,0.55)] ${
+                    className={`avatar-dropdown-menu fixed z-[60] w-80 rounded-3xl border border-slate-100 bg-white p-4 text-sm text-slate-800 shadow-[0_30px_80px_rgba(15,23,42,0.35)] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:shadow-[0_30px_80px_rgba(0,0,0,0.55)] ${
                       isHomePanel ? "right-8 top-[92px] max-h-[calc(100vh-120px)] overflow-auto" : ""
                     }`}
                     style={
@@ -2435,14 +2527,12 @@ export default function WorkspaceShell({
                 className="w-full transition-none 2xl:transition-[max-width] 2xl:duration-300 2xl:ease-[cubic-bezier(0.22,1,0.36,1)]"
               >
                 <div className="flex w-full items-center gap-2">
-                  <div className={`flex min-w-0 items-center ${phoneViewport ? "" : "flex-1 gap-3"}`}>
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
                     <div
                       className={`flex transition-[max-width,width] duration-200 ease-out ${
-                        phoneViewport
-                          ? mobileSearchExpanded
-                            ? "min-w-0 flex-1 w-full max-w-none transition-[max-width,width] duration-200 ease-out"
-                            : "w-full max-w-none transition-none"
-                          : "w-full max-w-xl transition-[max-width,width] duration-200 ease-out"
+                        mobileSearchExpanded
+                          ? "min-w-0 flex-1 w-full max-w-none transition-[max-width,width] duration-200 ease-out"
+                          : "w-full max-w-none transition-none md:max-w-xl md:transition-[max-width,width] md:duration-200 md:ease-out"
                       }`}
                     >
                       <div
@@ -2493,26 +2583,26 @@ export default function WorkspaceShell({
                   </div>
                   <div
                     className={`flex h-11 flex-nowrap items-center gap-2 shrink-0 ${
-                      phoneViewport
-                        ? mobileSearchExpanded
-                          ? "pointer-events-none w-0 min-w-0 max-w-0 overflow-hidden opacity-0 transition-[width,max-width,opacity] duration-200 ease-out"
-                          : "w-[168px] min-w-[168px] max-w-[168px] opacity-100 transition-none"
-                        : "w-[276px] min-w-[276px] max-w-[276px] opacity-100 transition-[width,max-width,opacity] duration-200 ease-out"
+                      mobileSearchExpanded
+                        ? "pointer-events-none w-0 min-w-0 max-w-0 overflow-hidden opacity-0 transition-[width,max-width,opacity] duration-200 ease-out"
+                        : "w-[168px] min-w-[168px] max-w-[168px] opacity-100 transition-none md:w-[276px] md:min-w-[276px] md:max-w-[276px] md:transition-[width,max-width,opacity] md:duration-200 md:ease-out"
                     }`}
                   >
-                    <button
-                      type="button"
-                      onClick={toggleShellTheme}
-                      className="hidden shrink-0 h-11 w-11 items-center justify-center rounded-full border-[1.5px] border-gray-200 bg-white text-[#1F2A37] shadow-sm transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/15 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] dark:hover:bg-zinc-800 dark:focus-visible:ring-[#2563EB]/30 sm:flex"
-                      aria-label={shellTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-                      aria-pressed={shellTheme === "dark"}
-                    >
-                      {shellTheme === "dark" ? (
-                        <Sun className="h-4 w-4" aria-hidden />
-                      ) : (
-                        <Moon className="h-4 w-4" aria-hidden />
-                      )}
-                    </button>
+                    <UiTooltip label={shellTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
+                      <button
+                        type="button"
+                        onClick={toggleShellTheme}
+                        className="hidden shrink-0 h-11 w-11 items-center justify-center rounded-full border-[1.5px] border-gray-200 bg-white text-[#1F2A37] shadow-sm transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/15 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] dark:hover:bg-zinc-800 dark:focus-visible:ring-[#2563EB]/30 sm:flex"
+                        aria-label={shellTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                        aria-pressed={shellTheme === "dark"}
+                      >
+                        {shellTheme === "dark" ? (
+                          <Sun className="h-4 w-4" aria-hidden />
+                        ) : (
+                          <Moon className="h-4 w-4" aria-hidden />
+                        )}
+                      </button>
+                    </UiTooltip>
                     <SettingsMenu
                       trigger="custom"
                       triggerLabel="Open profile menu"
@@ -2581,12 +2671,16 @@ export default function WorkspaceShell({
                         }}
                       >
                         <div className="h-full min-h-0 w-full">
-                          <div className="grid h-full w-full min-h-0 gap-[24px] xl:grid-cols-[minmax(0,1fr)_280px] xl:items-start">
+                          <div
+                            className={`grid h-full w-full min-h-0 gap-[24px] ${
+                              isAllProjectsRoute ? "" : "xl:grid-cols-[minmax(0,1fr)_280px] xl:items-start"
+                            }`}
+                          >
                             <div className="relative z-40 flex h-full min-h-0 w-full flex-col px-0 pt-0 md:pl-1 md:pr-0">
                               <div className="flex h-full min-h-0 w-full flex-col">
                                 <section className="mt-0 flex w-full min-h-0 flex-1 flex-col">
                                   <div
-                                    className="box-border flex min-h-0 flex-col rounded-xl border-[1.5px] border-gray-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] sm:p-5"
+                                    className="box-border flex min-h-0 flex-1 flex-col rounded-xl border-[1.5px] border-gray-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] sm:p-5"
                                     style={{
                                       height:
                                         "calc(100% - var(--workspace-projects-bottom-gap, 0px))",
@@ -2597,7 +2691,10 @@ export default function WorkspaceShell({
                                         {isAllProjectsRoute ? "All projects" : "Recent projects"}
                                       </h2>
                                       {isAllProjectsRoute ? (
-                                        <div className="h-10 w-32 rounded-full bg-slate-100 skeleton-shimmer dark:bg-zinc-800/70" />
+                                        <div className="flex items-center gap-2">
+                                          <div className="h-10 w-[140px] rounded-full bg-slate-100 skeleton-shimmer dark:bg-zinc-800/70" />
+                                          <div className="h-10 w-32 rounded-full bg-slate-100 skeleton-shimmer dark:bg-zinc-800/70" />
+                                        </div>
                                       ) : null}
                                     </div>
                                     <div
@@ -2636,40 +2733,31 @@ export default function WorkspaceShell({
                                 </section>
                               </div>
                             </div>
-                            <aside
-                              className="relative z-10 w-full min-h-0 overflow-visible"
-                              style={{ marginTop: "var(--home-right-column-offset, 240px)" }}
-                            >
-                              <div className="flex min-h-0 flex-col gap-[24px] overflow-visible">
-                                {isAllProjectsRoute ? (
+                            {!isAllProjectsRoute ? (
+                              <aside
+                                className="relative z-10 w-full min-h-0 overflow-visible"
+                                style={{ marginTop: "var(--home-right-column-offset, 240px)" }}
+                              >
+                                <div className="flex min-h-0 flex-col gap-[24px] overflow-visible">
+                                  <div className="rounded-xl border-[1.5px] border-gray-200 bg-white px-4 py-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)]">
+                                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#6B7280] dark:text-zinc-400">
+                                      SIGN DOCUMENTS
+                                    </p>
+                                    <div className="mt-3 space-y-2">
+                                      <div className="h-9 rounded-lg bg-slate-100 dark:bg-zinc-800/70" />
+                                      <div className="h-9 rounded-lg bg-slate-100 dark:bg-zinc-800/70" />
+                                      <div className="h-9 rounded-lg bg-slate-100 dark:bg-zinc-800/70" />
+                                    </div>
+                                  </div>
                                   <div className="rounded-xl border-[1.5px] border-gray-200 bg-white px-4 py-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)]">
                                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#6B7280] dark:text-zinc-400">
-                                      Templates
+                                      Activity
                                     </p>
                                     <div className="mt-3 h-24 rounded-xl border border-dashed border-[#E6EBF2] bg-[#F7F9FC] dark:border-zinc-700 dark:bg-zinc-900/60" />
                                   </div>
-                                ) : (
-                                  <>
-                                    <div className="rounded-xl border-[1.5px] border-gray-200 bg-white px-4 py-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)]">
-                                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#6B7280] dark:text-zinc-400">
-                                        SIGN DOCUMENTS
-                                      </p>
-                                      <div className="mt-3 space-y-2">
-                                        <div className="h-9 rounded-lg bg-slate-100 dark:bg-zinc-800/70" />
-                                        <div className="h-9 rounded-lg bg-slate-100 dark:bg-zinc-800/70" />
-                                        <div className="h-9 rounded-lg bg-slate-100 dark:bg-zinc-800/70" />
-                                      </div>
-                                    </div>
-                                    <div className="rounded-xl border-[1.5px] border-gray-200 bg-white px-4 py-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)]">
-                                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#6B7280] dark:text-zinc-400">
-                                        Activity
-                                      </p>
-                                      <div className="mt-3 h-24 rounded-xl border border-dashed border-[#E6EBF2] bg-[#F7F9FC] dark:border-zinc-700 dark:bg-zinc-900/60" />
-                                    </div>
-                                  </>
-                                )}
-                              </div>
-                            </aside>
+                                </div>
+                              </aside>
+                            ) : null}
                           </div>
                         </div>
                       </div>
@@ -2701,7 +2789,11 @@ export default function WorkspaceShell({
     </div>
 
       {!hideWorkspaceSidebar ? (
-        <div className="workspace-bottom-dock fixed inset-x-0 bottom-0 z-[75] hidden border-t border-slate-200 bg-white/95 px-2 pt-2 pb-[calc(10px+env(safe-area-inset-bottom))] backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/95">
+        <div
+          className={`workspace-bottom-dock fixed inset-x-0 bottom-0 z-[75] hidden border-t border-slate-200 bg-white/95 px-2 pt-2 pb-[calc(10px+env(safe-area-inset-bottom))] backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/95 ${
+            showHomeBillingModal ? "pointer-events-none blur-sm opacity-55" : ""
+          }`}
+        >
           <div className="mx-auto grid max-w-xl grid-cols-6 items-end gap-1">
             <button
               type="button"
@@ -2711,7 +2803,7 @@ export default function WorkspaceShell({
               <span className="flex h-[22px] w-[22px] items-center justify-center rounded-full bg-[#6C47FF] text-white">
                 <Plus className="h-[14px] w-[14px]" aria-hidden />
               </span>
-              <span className="truncate leading-none">Create</span>
+              <span className="truncate leading-[1.15]">Create</span>
             </button>
             {mobileBottomDockItems.map((item) => {
               const Icon = item.icon;
@@ -2732,11 +2824,11 @@ export default function WorkspaceShell({
                   }`}
                 >
                   <Icon
-                    className="h-[20px] w-[20px]"
+                    className="h-[22px] w-[22px]"
                     aria-hidden
                     weight={item.label === "Signatures" ? "regular" : item.active ? "fill" : "regular"}
                   />
-                  <span className="truncate leading-none">{item.label}</span>
+                  <span className="truncate leading-[1.15]">{item.label}</span>
                 </Link>
               );
             })}
@@ -2748,75 +2840,34 @@ export default function WorkspaceShell({
         ? createPortal(
             <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
               <div
-                className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm dark:bg-zinc-950/70"
-                onClick={closeCreateModal}
+                className="absolute inset-0 bg-black/40 dark:bg-black/55 dark:backdrop-blur-sm"
               />
               <div
                 ref={createRef}
-                className="page-fade-in relative z-10 w-full max-w-3xl rounded-2xl border border-white/60 bg-white/35 bg-gradient-to-b from-white/90 via-white/70 to-white/40 p-1.5 text-slate-900 shadow-[0_0_0_1px_rgba(255,255,255,0.65),0_22px_60px_rgba(15,23,42,0.22)] dark:shadow-[0_22px_60px_rgba(0,0,0,0.5)] backdrop-blur-lg dark:border-zinc-700 dark:bg-zinc-900/60 dark:from-zinc-900/80 dark:via-zinc-900/60 dark:to-zinc-900/40 dark:text-zinc-100 sm:p-2"
+                className="page-fade-in relative z-10 w-full max-w-4xl text-slate-900 dark:text-zinc-100"
               >
                 <form
-                  className="flex max-h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-[18px] bg-white/85 shadow-[0_0_0_1px_rgba(148,163,184,0.14)] dark:bg-zinc-900/80 dark:shadow-[0_12px_30px_rgba(0,0,0,0.35)]"
+                  className="flex max-h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-2xl bg-white shadow-[0_22px_60px_rgba(15,23,42,0.22),0_0_0_1px_rgba(148,163,184,0.14)] dark:bg-zinc-900 dark:shadow-[0_22px_60px_rgba(0,0,0,0.5)]"
                   onSubmit={(event) => {
                     event.preventDefault();
                     void handleCreateStart();
                   }}
                 >
-                  <div className="overflow-y-auto px-6 pt-8 pb-4 sm:px-10 sm:pt-10">
+                  <div className="overflow-y-auto px-6 pt-6 pb-0 sm:px-10 sm:pt-7">
                     <h2 className="text-[23px] font-semibold tracking-tight text-slate-900 dark:text-zinc-100 sm:text-[26px]">
-                      Create a new project
+                      Start with your files
                     </h2>
 
-                    <div className="mt-6 space-y-2">
-                      <div className="relative">
-                        <input
-                          type="text"
-                          autoFocus
-                          value={createValue}
-                          onChange={(event) => {
-                            setCreateValue(event.target.value);
-                            if (createError) setCreateError(null);
-                          }}
-                          aria-label="Project name (required)"
-                          className={`peer w-full rounded-2xl border-[3px] bg-white py-4 pl-[29px] pr-5 text-lg text-slate-900 shadow-sm dark:shadow-none transition focus:outline-none focus:ring-0 dark:bg-zinc-900 dark:text-zinc-100 ${
-                            showCreateNameError
-                              ? "border-rose-400 hover:border-rose-500 focus:border-rose-500"
-                              : "border-slate-300 hover:border-[#51bdff] focus:border-[#51bdff] dark:border-zinc-700 dark:hover:border-zinc-500 dark:focus:border-zinc-500"
-                          }`}
-                          disabled={createBusy}
-                        />
-                        {!createValue ? (
-                          <div
-                            aria-hidden
-                            className="pointer-events-none absolute inset-y-0 left-[29px] flex items-center text-base"
-                          >
-                            <span
-                              className={`relative pl-1 ${
-                                showCreateNameError ? "text-rose-500" : "text-slate-500 dark:text-zinc-400"
-                              }`}
-                            >
-                              {showCreateNameError ? (
-                                <span className="absolute -left-3 font-bold text-rose-500">*</span>
-                              ) : null}
-                              <span>Name your project</span>
-                            </span>
-                          </div>
-                        ) : null}
-                      </div>
-                      <p className="text-xs text-slate-500 dark:text-zinc-400">
-                        This helps you find and organize projects later.
-                      </p>
-                      {createError ? <p className="text-sm text-rose-500">{createError}</p> : null}
-                    </div>
-
-                    <div className="mt-6">
+                    <div className="mt-5">
                       <div
-                        className={`flex flex-col items-center justify-center rounded-[18px] border-[3px] border-dashed px-6 py-10 text-center transition ${
+                        className={`flex min-h-[360px] flex-col overflow-hidden rounded-[10px] text-center transition sm:min-h-[400px] ${
                           showCreateFilesError
-                            ? "border-rose-400 bg-rose-50/40 dark:bg-zinc-900/60"
+                            ? "border-[3px] border-rose-400 bg-rose-50/40 dark:bg-zinc-900/60"
                             : createDragActive
-                              ? "border-[#51bdff] bg-sky-50/60 dark:border-zinc-500 dark:bg-zinc-900/70"
-                              : "border-slate-300 bg-white/60 hover:border-[#51bdff] dark:border-zinc-700 dark:bg-zinc-900/50 dark:hover:border-zinc-500"
+                              ? "border-[3px] border-[#51bdff] bg-sky-50/60 dark:bg-zinc-900/70"
+                              : createPendingFiles.length === 0
+                                ? "border-2 border-dashed border-[#D1D5DB] bg-[#F5F5F5] dark:border-zinc-700 dark:bg-zinc-800/80"
+                                : "bg-transparent dark:bg-transparent"
                         } ${createBusy ? "opacity-70" : ""}`}
                         onDragOver={(event) => {
                           event.preventDefault();
@@ -2830,25 +2881,84 @@ export default function WorkspaceShell({
                           if (event.dataTransfer?.files?.length) addCreateFiles(event.dataTransfer.files);
                         }}
                       >
-                        <FileUp
-                          className={`h-9 w-9 ${showCreateFilesError ? "text-rose-500" : "text-slate-500"}`}
-                          aria-hidden
-                        />
-                        <p
-                          className={`mt-3 text-base font-semibold ${
-                            showCreateFilesError ? "text-rose-600" : "text-slate-900"
-                          }`}
-                        >
-                          Drop document here to upload
-                        </p>
-                        <button
-                          type="button"
-                          className="mt-4 inline-flex items-center justify-center rounded-[12px] border-[3px] border-[#51bdff] bg-white px-5 py-2 text-sm font-semibold text-[#013d63] shadow-sm dark:shadow-none transition hover:-translate-y-0.5 hover:bg-slate-50"
-                          onClick={() => createFileInputRef.current?.click()}
-                          disabled={createBusy}
-                        >
-                          Select from device
-                        </button>
+                        {createPendingFiles.length === 0 ? (
+                          <div className="flex min-h-[360px] flex-1 flex-col items-center justify-center px-8 py-10 sm:min-h-[400px]">
+                            <div className="relative mb-1 h-14 w-16">
+                              <FileUp
+                                className={`absolute left-1/2 top-1/2 h-12 w-12 -translate-x-[58%] -translate-y-1/2 ${
+                                  showCreateFilesError ? "text-rose-500" : "text-[#6C47FF]"
+                                }`}
+                                aria-hidden
+                              />
+                            </div>
+                            <p
+                              className={`mt-3 text-base font-semibold ${
+                                showCreateFilesError ? "text-rose-600" : "text-slate-900"
+                              }`}
+                            >
+                              {createDragActive ? (
+                                "Release to add your files"
+                              ) : (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="cursor-pointer text-[1.05em] font-bold text-slate-900 underline decoration-1 underline-offset-2 transition hover:text-slate-900 disabled:cursor-not-allowed"
+                                    onClick={() => createFileInputRef.current?.click()}
+                                    disabled={createBusy}
+                                  >
+                                    select files
+                                  </button>{" "}
+                                  or drop your files to get started
+                                </>
+                              )}
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="flex h-[360px] flex-col gap-4 pt-0 pb-0 text-left sm:h-[400px]">
+                            <div className="overflow-hidden rounded-[10px] border-2 border-dashed border-[#D1D5DB] bg-[#F5F5F5] px-8 py-3 shadow-none">
+                              <p className="text-[15px] font-medium text-slate-700">
+                                Drag and drop, or{" "}
+                                <button
+                                  type="button"
+                                  className="cursor-pointer text-[1.05em] font-bold text-slate-900 underline decoration-1 underline-offset-2 transition hover:text-slate-900 disabled:cursor-not-allowed"
+                                  onClick={() => createFileInputRef.current?.click()}
+                                  disabled={createBusy}
+                                >
+                                  select files
+                                </button>
+                              </p>
+                            </div>
+                            <div className="min-h-0 flex-1 overflow-hidden rounded-[10px] border-[4px] border-solid border-[#D1D5DB] bg-white shadow-none">
+                              <div className="upload-list-scroll h-full overflow-y-auto">
+                                {createPendingFiles.map(({ id, file }) => (
+                                  <div
+                                    key={id}
+                                    className="group flex items-center justify-between gap-3 border-b border-[#DDD4FC] bg-[#F6F2FF] px-4 py-3 text-sm text-slate-800 last:border-b-0"
+                                  >
+                                    <div className="flex min-w-0 items-center gap-3">
+                                      <FileText className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
+                                      <div className="min-w-0">
+                                        <span className="block truncate font-semibold text-slate-900">{file.name}</span>
+                                        <span className="block text-xs font-semibold text-slate-900">
+                                          {getFileTypeLabel(file)} - {formatBytes(file.size)}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => setCreatePendingFiles((prev) => prev.filter((entry) => entry.id !== id))}
+                                      className="rounded-full p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+                                      aria-label={`Remove ${file.name}`}
+                                      disabled={createBusy}
+                                    >
+                                      <Trash2 className="h-5 w-5" aria-hidden />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
                         <input
                           ref={createFileInputRef}
                           type="file"
@@ -2864,83 +2974,24 @@ export default function WorkspaceShell({
                         />
                       </div>
 
-                      {createPendingFiles.length > 0 ? (
-                        <div className="mt-4 rounded-2xl border border-slate-200 bg-white/70 p-3">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-900">
-                            You&apos;re uploading ({createPendingFiles.length})
-                          </p>
-                          <div className="mt-2 space-y-2">
-                      {createPendingFiles.map(({ id, file }) => (
-                        <div
-                          key={id}
-                          className="group flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 transition hover:border-[#51bdff] hover:bg-sky-50/60"
-                        >
-                          <div className="flex min-w-0 items-center gap-2">
-                            <FileText className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
-                            <span className="min-w-0 truncate">{file.name}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {createRemoveConfirmId === id ? (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => setCreateRemoveConfirmId(null)}
-                                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
-                                  disabled={createBusy}
-                                >
-                                  Cancel
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setCreatePendingFiles((prev) => prev.filter((entry) => entry.id !== id));
-                                    setCreateRemoveConfirmId(null);
-                                  }}
-                                  className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
-                                  disabled={createBusy}
-                                >
-                                  Delete
-                                </button>
-                              </>
-                            ) : (
-                              <>
-                                <span className="whitespace-nowrap text-xs text-slate-500">
-                                  {formatBytes(file.size)}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => setCreateRemoveConfirmId(id)}
-                                  className="rounded-full p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
-                                  aria-label={`Remove ${file.name}`}
-                                  disabled={createBusy}
-                                >
-                                  <X className="h-4 w-4" aria-hidden />
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                          </div>
-                        </div>
-                      ) : null}
+                      {createError ? <p className="mt-3 text-sm text-rose-500">{createError}</p> : null}
                     </div>
                   </div>
 
-                  <div className="shrink-0 rounded-b-[18px] bg-slate-50/80">
-                    <div className="flex justify-end gap-3 px-6 pt-[10px] pb-4 text-sm sm:px-10">
+                  <div className="shrink-0 bg-white">
+                    <div className="flex min-h-[76px] items-center justify-end gap-3 px-6 py-0 text-sm sm:px-10">
                       <button
                         type="button"
                         onClick={closeCreateModal}
-                        className="px-2 py-2 text-slate-500 transition hover:text-slate-900"
+                        className="px-2 py-2 font-semibold text-slate-500 transition hover:text-slate-900"
                         disabled={createBusy}
                       >
                         Cancel
                       </button>
                       <button
                         type="submit"
-                        className="inline-flex items-center justify-center rounded-[12px] border-[3px] border-[#51bdff] bg-[#008ade] px-5 py-2 font-semibold text-white shadow-[0_14px_40px_rgba(15,23,42,0.25)] transition hover:-translate-y-0.5 hover:bg-[#007fcd] hover:shadow-[0_18px_50px_rgba(15,23,42,0.32)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#51bdff] focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:translate-y-0 disabled:opacity-60"
-                        disabled={createBusy}
+                        className="inline-flex items-center justify-center rounded-full bg-[#6C47FF] px-5 py-2 font-semibold text-white shadow-[0_14px_40px_rgba(15,23,42,0.25)] transition hover:-translate-y-0.5 hover:bg-[#5B38E6] hover:shadow-[0_18px_50px_rgba(15,23,42,0.32)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6] focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:translate-y-0 disabled:bg-[#6C47FF] disabled:shadow-[0_14px_40px_rgba(15,23,42,0.25)] disabled:opacity-60 disabled:pointer-events-none"
+                        disabled={createBusy || createMissingFiles}
                       >
                         {createBusy ? (
                           <span className="flex items-center gap-2">
@@ -2969,16 +3020,17 @@ export default function WorkspaceShell({
         label={shellLoadingLabel}
         zIndexClassName="z-[1200]"
       />
-      {sidebarTooltip
+      {sidebarTooltip && document.body.dataset.modalOpen !== "true"
         ? createPortal(
           <div
-            className="fixed z-[200] -translate-y-1/2 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white shadow-lg"
+            className="workspace-tooltip fixed z-[200] -translate-y-1/2"
             style={{
               top: sidebarTooltip.top,
               left: sidebarTooltip.left,
             }}
           >
             {sidebarTooltip.label}
+            <span aria-hidden className="workspace-tooltip-right-arrow" />
           </div>,
           document.body,
         )

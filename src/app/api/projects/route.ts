@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
-import { prisma } from "@/lib/prisma";
+import {
+  clearPrismaDatabaseUnavailable,
+  isPrismaDatabaseCooldownActive,
+  markPrismaDatabaseUnavailable,
+  prisma,
+} from "@/lib/prisma";
 import { isSameOrigin } from "@/lib/requestGuards";
 
 function extractPagesCountFromData(data: unknown): number | null {
@@ -26,13 +31,19 @@ function extractRotationFromData(data: unknown): number | null {
 }
 
 async function ensureDbConnection() {
+  if (isPrismaDatabaseCooldownActive()) {
+    throw new Error("PRISMA_DB_COOLDOWN_ACTIVE");
+  }
+
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
       await prisma.$connect();
+      clearPrismaDatabaseUnavailable();
       return;
     } catch (err: any) {
       const code = err?.code;
       if (code === "P1017" || code === "P1001") {
+        markPrismaDatabaseUnavailable(err);
         try {
           await prisma.$disconnect();
         } catch {
@@ -66,58 +77,71 @@ export async function GET(request: NextRequest) {
 
   // Lightweight summary payload used by the All Projects grid.
   if (summary === "1") {
-    const projects = await prisma.project.findMany({
+    try {
+      const projects = await prisma.project.findMany({
+        where: { userId, trashedAt: trashedFilter },
+        orderBy: { updatedAt: "desc" },
+        take: 60,
+        select: {
+          id: true,
+          name: true,
+          updatedAt: true,
+          previewKey: true,
+          pdfKey: true,
+          pagesCount: true,
+          data: true,
+        },
+      });
+      clearPrismaDatabaseUnavailable();
+
+      return NextResponse.json(
+        {
+          projects: projects.map((project) => {
+            const derivedPagesCount = extractPagesCountFromData(project.data);
+            return {
+              id: project.id,
+              name: project.name,
+              updatedAt: project.updatedAt,
+              hasPreview: !!project.previewKey,
+              hasPdf: !!project.pdfKey,
+              pagesCount: project.pagesCount ?? derivedPagesCount ?? 0,
+              rotation: extractRotationFromData(project.data) ?? 0,
+            };
+          }),
+        },
+        {
+          headers: {
+            "Cache-Control": "no-store",
+          },
+        }
+      );
+    } catch (error) {
+      markPrismaDatabaseUnavailable(error);
+      return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
+    }
+  }
+
+  let projects;
+  try {
+    projects = await prisma.project.findMany({
       where: { userId, trashedAt: trashedFilter },
-      orderBy: { updatedAt: "desc" },
-      take: 60,
+      orderBy: { createdAt: "desc" },
       select: {
         id: true,
         name: true,
-        updatedAt: true,
-        previewKey: true,
-        pdfKey: true,
-        pagesCount: true,
         data: true,
+        pdfKey: true,
+        previewKey: true,
+        createdAt: true,
+        updatedAt: true,
+        pagesCount: true,
       },
     });
-
-    return NextResponse.json(
-      {
-        projects: projects.map((project) => {
-          const derivedPagesCount = extractPagesCountFromData(project.data);
-          return {
-            id: project.id,
-            name: project.name,
-            updatedAt: project.updatedAt,
-            hasPreview: !!project.previewKey,
-            hasPdf: !!project.pdfKey,
-            pagesCount: project.pagesCount ?? derivedPagesCount ?? 0,
-            rotation: extractRotationFromData(project.data) ?? 0,
-          };
-        }),
-      },
-      {
-        headers: {
-          "Cache-Control": "no-store",
-        },
-      }
-    );
+    clearPrismaDatabaseUnavailable();
+  } catch (error) {
+    markPrismaDatabaseUnavailable(error);
+    return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
   }
-
-  const projects = await prisma.project.findMany({
-    where: { userId, trashedAt: trashedFilter },
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      name: true,
-      data: true,
-      pdfKey: true,
-      previewKey: true,
-      createdAt: true,
-      updatedAt: true,
-      pagesCount: true,
-    },
-  });
 
   const sanitized = projects.map((project) => {
     const { pdfKey: _pdfKey, previewKey: _previewKey, ...rest } = project;
@@ -182,10 +206,12 @@ export async function POST(req: Request) {
           userId,
         },
       });
+      clearPrismaDatabaseUnavailable();
       break;
     } catch (err: any) {
       const code = err?.code;
       if (attempt === 0 && (code === "P1017" || code === "P1001")) {
+        markPrismaDatabaseUnavailable(err);
         try {
           await prisma.$disconnect();
         } catch {

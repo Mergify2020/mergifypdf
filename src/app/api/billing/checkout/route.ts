@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
+import { assertAppSafe } from "@/lib/appSafety";
 import { getStripe } from "@/lib/stripe";
 import { isSameOrigin } from "@/lib/requestGuards";
 import { prisma } from "@/lib/prisma";
 import { randomUUID } from "crypto";
 import { captureServerEvent } from "@/lib/posthogServer";
+import { resolveStripeCustomerIdForUser } from "@/lib/stripeCustomers";
 import {
   ALLOWED_PRICE_IDS,
   getPlanTierFromPriceId,
@@ -13,6 +15,7 @@ import {
 } from "@/lib/billingPlans";
 
 export async function POST(req: NextRequest) {
+  await assertAppSafe();
   if (!isSameOrigin(req)) {
     return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
   }
@@ -72,26 +75,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "User email missing" }, { status: 400 });
     }
     const customerName = user.name ?? session.user.name ?? undefined;
-    let customerId = user.stripeCustomerId ?? null;
-
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: normalizedEmail,
-        name: customerName,
-        metadata: { appUserId: user.id },
-      });
-      customerId = customer.id;
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { stripeCustomerId: customerId },
-      });
-    } else {
-      await stripe.customers.update(customerId, {
-        email: normalizedEmail,
-        name: customerName,
-        metadata: { appUserId: user.id },
-      });
-    }
+    const customerId = await resolveStripeCustomerIdForUser({
+      userId: user.id,
+      email: normalizedEmail,
+      name: customerName,
+      stripeCustomerId: user.stripeCustomerId,
+    });
 
     const now = new Date();
     const isPendingFresh =

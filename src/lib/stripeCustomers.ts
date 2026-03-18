@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getStripe } from "@/lib/stripe";
+import type Stripe from "stripe";
 
 type EnsureStripeCustomerInput = {
   userId: string;
@@ -8,8 +9,34 @@ type EnsureStripeCustomerInput = {
   stripeCustomerId?: string | null;
 };
 
-export async function ensureStripeCustomerForUser(input: EnsureStripeCustomerInput): Promise<string> {
-  const email = input.email.trim().toLowerCase();
+function normalizeEmail(email: string) {
+  return email.trim().toLowerCase();
+}
+
+async function pickStripeCustomerByEmail(
+  stripe: Stripe,
+  email: string,
+  userId: string,
+): Promise<string | null> {
+  const customers = await stripe.customers.list({ email, limit: 100 });
+  const exactMatches = customers.data.filter((customer) => {
+    if (customer.deleted) return false;
+    return normalizeEmail(customer.email ?? "") === email;
+  });
+
+  if (exactMatches.length === 0) {
+    return null;
+  }
+
+  const alreadyLinked = exactMatches.find((customer) => customer.metadata?.appUserId === userId);
+  if (alreadyLinked) {
+    return alreadyLinked.id;
+  }
+  return null;
+}
+
+export async function resolveStripeCustomerIdForUser(input: EnsureStripeCustomerInput): Promise<string> {
+  const email = normalizeEmail(input.email);
   if (!email) {
     throw new Error("Cannot create Stripe customer without email");
   }
@@ -23,6 +50,10 @@ export async function ensureStripeCustomerForUser(input: EnsureStripeCustomerInp
       select: { stripeCustomerId: true },
     });
     customerId = user?.stripeCustomerId ?? null;
+  }
+
+  if (!customerId) {
+    customerId = await pickStripeCustomerByEmail(stripe, email, input.userId);
   }
 
   if (!customerId) {
@@ -46,4 +77,8 @@ export async function ensureStripeCustomerForUser(input: EnsureStripeCustomerInp
   });
 
   return customerId;
+}
+
+export async function ensureStripeCustomerForUser(input: EnsureStripeCustomerInput): Promise<string> {
+  return resolveStripeCustomerIdForUser(input);
 }

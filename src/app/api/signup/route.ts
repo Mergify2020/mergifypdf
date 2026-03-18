@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { assertAppSafe } from "@/lib/appSafety";
 import bcrypt from "bcryptjs";
 import { issueSignupVerificationCode } from "@/lib/signupVerification";
 import { isSameOrigin } from "@/lib/requestGuards";
 import { rateLimit } from "@/lib/rateLimit";
-import { ensureStripeCustomerForUser } from "@/lib/stripeCustomers";
 
 export async function POST(req: Request) {
   try {
+    await assertAppSafe();
     if (!isSameOrigin(req)) {
       return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
     }
@@ -61,19 +62,6 @@ export async function POST(req: Request) {
         select: { id: true },
       });
       userId = created.id;
-    }
-
-    const userForBilling = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { email: true, name: true, stripeCustomerId: true },
-    });
-    if (userForBilling?.email) {
-      await ensureStripeCustomerForUser({
-        userId,
-        email: userForBilling.email,
-        name: userForBilling.name,
-        stripeCustomerId: userForBilling.stripeCustomerId,
-      });
     }
 
     await issueSignupVerificationCode(userId, email);
