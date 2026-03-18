@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
   type FocusEvent,
+  type HTMLAttributes,
   type MouseEvent,
   type ReactElement,
 } from "react";
@@ -21,7 +22,7 @@ type TooltipPosition = {
 
 type UiTooltipProps = {
   label: string;
-  children: ReactElement;
+  children: ReactElement<HTMLAttributes<HTMLElement>>;
 };
 
 type TriggerRect = {
@@ -84,13 +85,7 @@ export default function UiTooltip({ label, children }: UiTooltipProps) {
     });
   }, [visible, triggerRect, label]);
 
-  const childProps = children.props as {
-    onMouseEnter?: (event: MouseEvent<HTMLElement>) => void;
-    onMouseLeave?: (event: MouseEvent<HTMLElement>) => void;
-    onFocus?: (event: FocusEvent<HTMLElement>) => void;
-    onBlur?: (event: FocusEvent<HTMLElement>) => void;
-    "aria-describedby"?: string;
-  };
+  const childProps = children.props;
 
   const wrappedChild = cloneElement(children, {
     onMouseEnter: (event: MouseEvent<HTMLElement>) => {
