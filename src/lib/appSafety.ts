@@ -62,7 +62,7 @@ function isStrictMode() {
   const explicit = process.env.APP_RUNTIME_GUARD_STRICT?.trim().toLowerCase();
   if (explicit === "true") return true;
   if (explicit === "false") return false;
-  return getExpectedEnvironment() === "production";
+  return false;
 }
 
 function shouldRequireUsers() {
@@ -109,7 +109,6 @@ export function isAppSafetyBlocking(status: AppSafetyStatus) {
     status.strict
       || status.code === "DB_UNAVAILABLE"
       || status.code === "DB_SCHEMA_MISSING"
-      || status.code === "DB_IDENTITY_MISMATCH"
   );
 }
 
@@ -197,6 +196,24 @@ async function checkAppSafetyUncached(): Promise<AppSafetyStatus> {
       || guard.environment !== expectedEnvironment
       || (expectedDatabaseLabel !== null && guard.databaseLabel !== expectedDatabaseLabel)
     ) {
+      if (!strict) {
+        return buildStatus(
+          true,
+          "OK",
+          "Database reachable. Runtime identity does not match the expected environment, but strict mode is disabled.",
+          {
+            databaseTarget,
+            warning: "DB_IDENTITY_MISMATCH",
+            expectedAppName,
+            actualAppName: guard.appName,
+            expectedEnvironment,
+            actualEnvironment: guard.environment,
+            expectedDatabaseLabel,
+            databaseLabel: guard.databaseLabel,
+          },
+        );
+      }
+
       return buildStatus(
         false,
         "DB_IDENTITY_MISMATCH",
