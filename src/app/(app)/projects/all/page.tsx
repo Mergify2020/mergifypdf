@@ -7,10 +7,29 @@ import {
   markPrismaDatabaseUnavailable,
   prisma,
 } from "@/lib/prisma";
+import { getR2Config, getR2ObjectSize } from "@/lib/r2";
 import HomeProjectsSearch from "@/components/HomeProjectsSearch";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+function extractFileSizeFromData(data: unknown): number | null {
+  if (!data || typeof data !== "object") return null;
+  const record = data as Record<string, unknown>;
+  const sources = Array.isArray(record.sources) ? record.sources : null;
+  if (!sources || sources.length === 0) return null;
+
+  const sizes = sources
+    .map((source) =>
+      source && typeof source === "object" && typeof (source as { size?: unknown }).size === "number"
+        ? (source as { size: number }).size
+        : null
+    )
+    .filter((size): size is number => typeof size === "number" && Number.isFinite(size) && size >= 0);
+
+  if (sizes.length === 0) return null;
+  return sizes.reduce((total, size) => total + size, 0);
+}
 
 export default async function AllProjectsPage() {
   const session = await getServerSessionSafe();
@@ -70,30 +89,53 @@ export default async function AllProjectsPage() {
     }
   }
 
-  const summaryProjects = shapedProjects.map((project) => ({
-    id: project.id,
-    name: project.name ?? "Untitled project",
-    updatedAt: project.updatedAt,
-    pagesCount: project.pagesCount ?? 0,
-    previewUrl: null,
-    pdfUrl: null,
-    hasPreview: !!project.previewKey,
-    rotation: (() => {
-      if (!project.data || typeof project.data !== "object") return 0;
-      const record = project.data as Record<string, unknown>;
-      const pages = Array.isArray(record.pages) ? record.pages : null;
-      if (!pages || pages.length === 0) return 0;
-      const first = pages[0];
-      if (!first || typeof first !== "object") return 0;
-      return typeof (first as { rotation?: unknown }).rotation === "number"
-        ? (first as { rotation: number }).rotation
-        : 0;
-    })(),
-  }));
+  let r2Config: ReturnType<typeof getR2Config> | null = null;
+  try {
+    r2Config = getR2Config();
+  } catch {
+    r2Config = null;
+  }
+
+  const summaryProjects = await Promise.all(
+    shapedProjects.map(async (project) => {
+      let fileSizeBytes: number | null = null;
+      if (r2Config && project.pdfKey) {
+        try {
+          fileSizeBytes = await getR2ObjectSize(r2Config, project.pdfKey);
+        } catch {
+          fileSizeBytes = extractFileSizeFromData(project.data);
+        }
+      } else {
+        fileSizeBytes = extractFileSizeFromData(project.data);
+      }
+
+      return {
+        id: project.id,
+        name: project.name ?? "Untitled project",
+        updatedAt: project.updatedAt,
+        pagesCount: project.pagesCount ?? 0,
+        previewUrl: null,
+        pdfUrl: null,
+        hasPreview: !!project.previewKey,
+        fileSizeBytes,
+        rotation: (() => {
+          if (!project.data || typeof project.data !== "object") return 0;
+          const record = project.data as Record<string, unknown>;
+          const pages = Array.isArray(record.pages) ? record.pages : null;
+          if (!pages || pages.length === 0) return 0;
+          const first = pages[0];
+          if (!first || typeof first !== "object") return 0;
+          return typeof (first as { rotation?: unknown }).rotation === "number"
+            ? (first as { rotation: number }).rotation
+            : 0;
+        })(),
+      };
+    })
+  );
 
   return (
     <main
-      className="box-border w-full bg-[#F1F4F9] pt-3 pb-0 sm:pt-6 sm:pb-0 transition-[height] duration-300 ease-out dark:bg-[#222224]"
+      className="box-border w-full bg-[#F1F4F9] pt-3 pb-0 md:pt-6 md:pb-0 transition-[height] duration-300 ease-out dark:bg-[#222224]"
       style={{
         height:
           "calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset, 0px) - var(--home-topbar-offset, 0px) - var(--workspace-content-bottom-subtract, var(--workspace-frame-gutter, 48px)))",

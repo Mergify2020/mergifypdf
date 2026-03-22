@@ -1274,6 +1274,11 @@ export default function WorkspaceShell({
   const contentOffsetClass = hideWorkspaceSidebar
     ? ""
     : `${baseContentOffsetClass} ${expandedContentOffsetClass} ${sidebarExpandedClass}`.trim();
+  const contentShellWrapperClass = mobileDockViewport
+    ? "justify-center px-[13px]"
+    : hideWorkspaceSidebar
+      ? "justify-center px-6"
+      : "justify-start px-3 sm:px-4 md:pl-0 md:pr-6";
   const setSidebarTooltipFromEvent = (
     event: React.MouseEvent<HTMLElement> | React.FocusEvent<HTMLElement>,
     label: string,
@@ -1943,53 +1948,6 @@ export default function WorkspaceShell({
               ) : null}
             </div>
             </div>
-
-            {!isHomePanel && !isTemplatesPanel && !isSignaturesPanel ? (
-              <div
-                ref={profileRef}
-                className={`relative z-50 px-3 pb-6 ${
-                  sidebarCompact ? "mt-14 sticky bottom-0" : "mt-auto sticky bottom-4"
-                }`}
-              >
-                <button
-                  type="button"
-                  onClick={() => setProfileOpen((prev) => !prev)}
-                  className="flex w-full items-center justify-center rounded-2xl px-3 py-2 transition hover:bg-white/70 dark:hover:bg-zinc-800/60"
-                >
-                  <span
-                    className={`relative flex ${
-                      sidebarCompact ? "h-[72px] w-[72px]" : "h-20 w-20"
-                    } shrink-0 items-center justify-center rounded-full ${
-                      sidebarCompact ? "border-[5px]" : "border-[6px]"
-                    } ${
-                      profileOpen ? "border-sky-300" : "border-transparent"
-                    }`}
-                  >
-                    {showAvatarImage ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={avatar!}
-                        alt="Your avatar"
-                        className={`${
-                          sidebarCompact ? "h-[58px] w-[58px]" : "h-16 w-16"
-                        } shrink-0 rounded-full object-cover`}
-                        onError={() => setAvatarLoadFailed(true)}
-                      />
-                    ) : (
-                      <span
-                        className={`flex ${
-                          sidebarCompact ? "h-[58px] w-[58px] text-sm" : "h-16 w-16 text-base"
-                        } items-center justify-center rounded-full font-semibold uppercase text-white`}
-                        style={{ backgroundColor: fallbackAvatar.color }}
-                      >
-                        {hasProfileInfo ? fallbackAvatar.initials : ""}
-                      </span>
-                    )}
-                  </span>
-                </button>
-              </div>
-            ) : null}
-
             {typeof document !== "undefined" && profileOpen && (isHomePanel || profileMenuPosition)
               ? createPortal(
                   <div
@@ -2518,21 +2476,19 @@ export default function WorkspaceShell({
         <WorkspaceHomeQueryProvider value={homeProjectsQueryContext}>
           {showPersistentHomeProjectsTopBar ? (
             <div
-              className={`relative z-[80] flex w-full ${
-                hideWorkspaceSidebar ? "justify-center px-6" : "justify-start px-3 sm:px-4 md:pl-0 md:pr-6"
-              } pt-3 sm:pt-6`}
+              className={`relative z-[80] flex w-full ${contentShellWrapperClass} pt-3 md:pt-6`}
             >
               <div
                 style={{ maxWidth: "var(--shell-content-width)" }}
                 className="w-full transition-none 2xl:transition-[max-width] 2xl:duration-300 2xl:ease-[cubic-bezier(0.22,1,0.36,1)]"
               >
-                <div className="flex w-full items-center gap-2">
+                <div className="flex w-full items-center gap-3">
                   <div className="flex min-w-0 flex-1 items-center gap-3">
                     <div
                       className={`flex transition-[max-width,width] duration-200 ease-out ${
                         mobileSearchExpanded
                           ? "min-w-0 flex-1 w-full max-w-none transition-[max-width,width] duration-200 ease-out"
-                          : "w-full max-w-none transition-none md:max-w-xl md:transition-[max-width,width] md:duration-200 md:ease-out"
+                          : "w-full max-w-[440px] transition-none md:max-w-xl md:transition-[max-width,width] md:duration-200 md:ease-out"
                       }`}
                     >
                       <div
@@ -2568,12 +2524,6 @@ export default function WorkspaceShell({
                             type="text"
                             value={homeProjectsQuery}
                             onChange={(event) => setHomeProjectsQuery(event.target.value)}
-                            onFocus={() => {
-                              if (phoneViewport) setMobileSearchExpanded(true);
-                            }}
-                            onBlur={() => {
-                              if (phoneViewport) setMobileSearchExpanded(false);
-                            }}
                             placeholder="Search projects..."
                             className="h-full min-w-0 flex-1 border-none bg-white text-base text-[#1F2A37] placeholder:text-[#6B7280] outline-none focus:outline-none focus:ring-0 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-400"
                           />
@@ -2585,14 +2535,14 @@ export default function WorkspaceShell({
                     className={`flex h-11 flex-nowrap items-center gap-2 shrink-0 ${
                       mobileSearchExpanded
                         ? "pointer-events-none w-0 min-w-0 max-w-0 overflow-hidden opacity-0 transition-[width,max-width,opacity] duration-200 ease-out"
-                        : "w-[168px] min-w-[168px] max-w-[168px] opacity-100 transition-none md:w-[276px] md:min-w-[276px] md:max-w-[276px] md:transition-[width,max-width,opacity] md:duration-200 md:ease-out"
+                        : "w-[44px] min-w-[44px] max-w-[44px] opacity-100 transition-none md:w-[276px] md:min-w-[276px] md:max-w-[276px] md:transition-[width,max-width,opacity] md:duration-200 md:ease-out"
                     }`}
                   >
                     <UiTooltip label={shellTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
                       <button
                         type="button"
                         onClick={toggleShellTheme}
-                        className="hidden shrink-0 h-11 w-11 items-center justify-center rounded-full border-[1.5px] border-gray-200 bg-white text-[#1F2A37] shadow-sm transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/15 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] dark:hover:bg-zinc-800 dark:focus-visible:ring-[#2563EB]/30 sm:flex"
+                        className="hidden shrink-0 h-11 w-11 items-center justify-center rounded-full border-[1.5px] border-gray-200 bg-white text-[#1F2A37] shadow-sm transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/15 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] dark:hover:bg-zinc-800 dark:focus-visible:ring-[#2563EB]/30 md:flex"
                         aria-label={shellTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
                         aria-pressed={shellTheme === "dark"}
                       >
@@ -2606,7 +2556,7 @@ export default function WorkspaceShell({
                     <SettingsMenu
                       trigger="custom"
                       triggerLabel="Open profile menu"
-                      triggerClassName="w-full min-w-0 max-w-full overflow-hidden flex h-11 items-center gap-1.5 rounded-full border-[1.5px] border-gray-200 bg-white py-1.5 pl-1 pr-1.5 shadow-sm transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/15 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F1F4F9] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] dark:hover:bg-zinc-800 dark:focus-visible:ring-[#2563EB]/30 dark:focus-visible:ring-offset-[#222224]"
+                      triggerClassName="w-full min-w-0 max-w-full overflow-hidden flex h-11 items-center justify-center rounded-full border-[1.5px] border-gray-200 bg-white p-1 shadow-sm transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/15 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F1F4F9] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] dark:hover:bg-zinc-800 dark:focus-visible:ring-[#2563EB]/30 dark:focus-visible:ring-offset-[#222224] md:justify-start md:gap-1.5 md:p-0 md:py-1.5 md:pl-1 md:pr-1.5"
                       triggerContent={
                         <>
                           <span className="shrink-0 pointer-events-none">
@@ -2628,20 +2578,20 @@ export default function WorkspaceShell({
                             )}
                           </span>
                           {hasProfileInfo ? (
-                            <span className="flex min-w-0 flex-1 flex-col leading-tight text-left">
+                            <span className="hidden min-w-0 flex-1 flex-col leading-tight text-left md:flex">
                               {profileName ? (
                                 <span className="truncate text-[13px] font-semibold text-[#1F2A37] dark:text-zinc-100">
                                   {profileName}
                                 </span>
                               ) : null}
                               {profileEmail ? (
-                                <span className="truncate text-[11px] font-medium text-[#64748B] dark:text-zinc-400">
+                                <span className="hidden truncate text-[11px] font-medium text-[#64748B] dark:text-zinc-400 md:block">
                                   {profileEmail}
                                 </span>
                               ) : null}
                             </span>
                           ) : null}
-                          <ChevronDown className="h-4 w-4 shrink-0 text-[#94A3B8] dark:text-zinc-400" aria-hidden="true" />
+                          <ChevronDown className="hidden h-4 w-4 shrink-0 text-[#94A3B8] dark:text-zinc-400 md:block" aria-hidden="true" />
                         </>
                       }
                     />
@@ -2655,16 +2605,14 @@ export default function WorkspaceShell({
               showPersistentHomeProjectsTopBar ? (
                 <main className="relative z-0 flex-1 lg:z-40">
                   <div
-                    className={`flex w-full ${
-                      hideWorkspaceSidebar ? "justify-center px-6" : "justify-start px-3 sm:px-4 md:pl-0 md:pr-6"
-                    }`}
-                  >
+                className={`flex w-full ${contentShellWrapperClass}`}
+              >
                     <div
                       className="workspace-content-shell w-full transition-none 2xl:transition-[max-width] 2xl:duration-300 2xl:ease-[cubic-bezier(0.22,1,0.36,1)]"
                       style={{ maxWidth: "var(--shell-content-width)" }}
                     >
                       <div
-                        className="box-border w-full bg-[#F1F4F9] pt-3 pb-0 sm:pt-6 sm:pb-0 transition-[height] duration-300 ease-out dark:bg-[#222224]"
+                        className="box-border w-full bg-[#F1F4F9] pt-3 pb-0 md:pt-6 md:pb-0 transition-[height] duration-300 ease-out dark:bg-[#222224]"
                         style={{
                           height:
                             "calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset, 0px) - var(--home-topbar-offset, 0px) - var(--workspace-content-bottom-subtract, var(--workspace-frame-gutter, 48px)))",
@@ -2770,7 +2718,7 @@ export default function WorkspaceShell({
             <main className="relative z-0 flex-1 lg:z-40">
               <div
                 className={`flex w-full ${
-                  hideWorkspaceSidebar ? "justify-center px-6" : "justify-start px-3 sm:px-4 md:pl-0 md:pr-6"
+                  contentShellWrapperClass
                 }`}
               >
                 <div

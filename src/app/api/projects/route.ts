@@ -7,6 +7,7 @@ import {
   markPrismaDatabaseUnavailable,
   prisma,
 } from "@/lib/prisma";
+import { getR2Config, getR2ObjectSize } from "@/lib/r2";
 import { isSameOrigin } from "@/lib/requestGuards";
 
 function extractPagesCountFromData(data: unknown): number | null {
@@ -28,6 +29,24 @@ function extractRotationFromData(data: unknown): number | null {
       ? (first as { rotation: number }).rotation
       : null;
   return rotation;
+}
+
+function extractFileSizeFromData(data: unknown): number | null {
+  if (!data || typeof data !== "object") return null;
+  const record = data as Record<string, unknown>;
+  const sources = Array.isArray(record.sources) ? record.sources : null;
+  if (!sources || sources.length === 0) return null;
+
+  const sizes = sources
+    .map((source) =>
+      source && typeof source === "object" && typeof (source as { size?: unknown }).size === "number"
+        ? (source as { size: number }).size
+        : null
+    )
+    .filter((size): size is number => typeof size === "number" && Number.isFinite(size) && size >= 0);
+
+  if (sizes.length === 0) return null;
+  return sizes.reduce((total, size) => total + size, 0);
 }
 
 async function ensureDbConnection() {
@@ -78,6 +97,13 @@ export async function GET(request: NextRequest) {
   // Lightweight summary payload used by the All Projects grid.
   if (summary === "1") {
     try {
+      let r2Config: ReturnType<typeof getR2Config> | null = null;
+      try {
+        r2Config = getR2Config();
+      } catch {
+        r2Config = null;
+      }
+
       const projects = await prisma.project.findMany({
         where: { userId, trashedAt: trashedFilter },
         orderBy: { updatedAt: "desc" },
@@ -96,8 +122,19 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json(
         {
-          projects: projects.map((project) => {
+          projects: await Promise.all(projects.map(async (project) => {
             const derivedPagesCount = extractPagesCountFromData(project.data);
+            let fileSizeBytes: number | null = null;
+            if (r2Config && project.pdfKey) {
+              try {
+                fileSizeBytes = await getR2ObjectSize(r2Config, project.pdfKey);
+              } catch {
+                fileSizeBytes = extractFileSizeFromData(project.data);
+              }
+            } else {
+              fileSizeBytes = extractFileSizeFromData(project.data);
+            }
+
             return {
               id: project.id,
               name: project.name,
@@ -106,8 +143,9 @@ export async function GET(request: NextRequest) {
               hasPdf: !!project.pdfKey,
               pagesCount: project.pagesCount ?? derivedPagesCount ?? 0,
               rotation: extractRotationFromData(project.data) ?? 0,
+              fileSizeBytes,
             };
-          }),
+          })),
         },
         {
           headers: {

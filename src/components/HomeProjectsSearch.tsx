@@ -33,6 +33,7 @@ type SummaryProject = {
   pagesCount?: number | null;
   rotation?: number | null;
   hasPreview?: boolean;
+  fileSizeBytes?: number | null;
 };
 
 type Props = {
@@ -62,6 +63,7 @@ const mapProjectsFromSummary = (projects: ProjectsSummaryProject[]): SummaryProj
     pagesCount: project.pagesCount ?? 0,
     rotation: project.rotation ?? 0,
     hasPreview: project.hasPreview ?? false,
+    fileSizeBytes: project.fileSizeBytes ?? null,
   }));
 
 const mapProjectsToSummary = (projects: SummaryProject[]): ProjectsSummaryProject[] =>
@@ -72,6 +74,7 @@ const mapProjectsToSummary = (projects: SummaryProject[]): ProjectsSummaryProjec
     hasPreview: project.hasPreview ?? false,
     pagesCount: project.pagesCount ?? 0,
     rotation: project.rotation ?? 0,
+    fileSizeBytes: project.fileSizeBytes ?? null,
   }));
 
 export default function HomeProjectsSearch({
@@ -217,27 +220,33 @@ export default function HomeProjectsSearch({
     <>
       <section className="mt-0 flex w-full min-h-0 flex-1 flex-col">
         <div
-          className="box-border flex min-h-0 flex-1 flex-col rounded-xl border-[1.5px] border-gray-200 bg-white p-4 transition-[height] duration-300 ease-out shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] sm:p-5"
+          className="box-border flex min-h-0 flex-1 flex-col rounded-xl border-[1.5px] border-gray-200 bg-white p-3 transition-[height] duration-300 ease-out shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] md:p-5"
           style={{ height: "calc(100% - var(--workspace-projects-bottom-gap, 0px))" }}
         >
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <h2 className="text-base font-semibold text-[#1F2A37] dark:text-zinc-100 sm:text-lg">
-              {query.trim() ? "Search results" : sectionLabel}
+          <div className="flex flex-col items-start gap-3 md:flex-row md:items-center md:justify-between md:gap-4 md:px-[21px]">
+            <h2 className="text-2xl font-semibold text-[#1F2A37] dark:text-zinc-100">
+              {query.trim() ? (
+                "Search results"
+              ) : (
+                <span>
+                  {sectionLabel} <span className="text-slate-500 dark:text-zinc-400">({projectsState.length})</span>
+                </span>
+              )}
             </h2>
-            <div className="flex items-center gap-2">
+            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
               {showAllProjects ? (
-                <div className="flex items-center gap-2">
-                  <div className="relative inline-flex items-center rounded-full border-2 border-[#E6EBF2] bg-white p-0.5 dark:border-zinc-700 dark:bg-zinc-900">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="relative inline-flex items-center rounded-full border-2 border-[#E6EBF2] bg-white dark:border-zinc-700 dark:bg-zinc-900">
                     <span
                       aria-hidden
-                      className={`pointer-events-none absolute left-0.5 top-0.5 h-[30px] w-[68px] rounded-full bg-[#E5E7EB] shadow-[inset_0_0_0_1px_rgba(100,116,139,0.26)] transition-transform duration-200 ease-out dark:bg-[#2A2A31] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)] ${
+                      className={`pointer-events-none absolute left-0 top-0 h-full w-[68px] rounded-full bg-[#E5E7EB] transition-transform duration-200 ease-out dark:bg-[#2A2A31] ${
                         viewMode === "grid" ? "translate-x-0" : "translate-x-[68px]"
                       }`}
                     />
                     <button
                       type="button"
                       onClick={() => setViewMode("grid")}
-                      className={`relative z-10 inline-flex h-[30px] w-[68px] items-center justify-center gap-1.5 rounded-full px-3 text-xs font-semibold transition ${
+                      className={`relative z-10 inline-flex h-[34px] w-[68px] items-center justify-center gap-1.5 rounded-full px-3 text-xs font-semibold transition ${
                         viewMode === "grid"
                           ? "text-slate-700 dark:text-[#F4F4F5]"
                           : "text-slate-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-zinc-100"
@@ -251,7 +260,7 @@ export default function HomeProjectsSearch({
                     <button
                       type="button"
                       onClick={() => setViewMode("list")}
-                      className={`relative z-10 inline-flex h-[30px] w-[68px] items-center justify-center gap-1.5 rounded-full px-3 text-xs font-semibold transition ${
+                      className={`relative z-10 inline-flex h-[34px] w-[68px] items-center justify-center gap-1.5 rounded-full px-3 text-xs font-semibold transition ${
                         viewMode === "list"
                           ? "text-slate-700 dark:text-[#F4F4F5]"
                           : "text-slate-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-zinc-100"
@@ -269,7 +278,7 @@ export default function HomeProjectsSearch({
                       onClick={() => setSortMenuOpen((prev) => !prev)}
                       className={`inline-flex items-center gap-2 rounded-full border-2 px-4 py-2 text-xs font-semibold transition ${
                         sortMenuOpen
-                          ? "!border-[#7489A8] bg-white text-[#1F2A37] dark:!border-zinc-400 dark:bg-zinc-900 dark:text-zinc-100"
+                          ? "border-[#E6EBF2] bg-[#E5E7EB] text-[#1F2A37] dark:border-zinc-700 dark:bg-[#2A2A31] dark:text-zinc-100"
                           : "border-[#E6EBF2] bg-white text-[#1F2A37] hover:border-[#D8DEE8] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-zinc-600"
                       }`}
                       aria-haspopup="menu"
@@ -468,11 +477,11 @@ export default function HomeProjectsSearch({
           <div
             ref={recentListRef}
             className={`recent-projects-container mt-0 h-0 min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain ${
-              showAllProjects ? "mt-4" : "mt-6"
+              showAllProjects ? "mt-3 sm:mt-4" : "mt-5 sm:mt-6"
             }`}
             style={{
-              paddingRight: 6,
-              paddingLeft: 6,
+              paddingRight: showAllProjects ? 0 : 4,
+              paddingLeft: 4,
               paddingBottom: 6,
               scrollbarGutter: "stable",
               WebkitOverflowScrolling: "touch",

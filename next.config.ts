@@ -2,9 +2,6 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  experimental: {
-    cpus: 1,
-  },
   turbopack: {
     resolveAlias: {
       canvas: "./src/lib/emptyModule.ts",

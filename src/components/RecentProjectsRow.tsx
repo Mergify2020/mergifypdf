@@ -4,10 +4,11 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import Image from "next/image";
-import { Check, ChevronRight, Copy, Download, ExternalLink, Loader2, MoreHorizontal, Pencil, Printer, Star, Trash2, X } from "lucide-react";
+import { Check, ChevronRight, Copy, Download, ExternalLink, Loader2, MoreHorizontal, Pencil, Printer, SearchX, Star, Trash2, X } from "lucide-react";
 import ProjectCard from "./ProjectCard";
 import { matchesSearch } from "@/lib/search";
 import { formatProjectActivityDate, formatProjectLastEdited } from "@/lib/formatProjectLastEdited";
+import { formatFileSize } from "@/lib/formatFileSize";
 import { projectNameToDisplay, projectNameToEditable, sanitizeProjectName } from "@/lib/projectName";
 
 type SummaryProject = {
@@ -18,6 +19,7 @@ type SummaryProject = {
   pagesCount?: number | null;
   rotation?: number | null;
   hasPreview?: boolean;
+  fileSizeBytes?: number | null;
 };
 
 type Props = {
@@ -170,8 +172,7 @@ export default function RecentProjectsRow({
       if (!res.ok) return;
       const data = (await res.json().catch(() => null)) as { url?: string } | null;
       if (!data?.url) return;
-      const printUrl = `/print?src=${encodeURIComponent(data.url)}&title=${encodeURIComponent(project.title)}`;
-      window.open(printUrl, "_blank", "noopener,noreferrer");
+      window.open(data.url, "_blank", "noopener,noreferrer");
       setListMenuOpenId(null);
       setListMenuPosition(null);
     } finally {
@@ -198,7 +199,7 @@ export default function RecentProjectsRow({
 
   if (loading && !projects.length) {
     return (
-      <div className="recent-projects-grid projects-grid mt-2 grid w-full max-w-[1880px] items-start gap-6 grid-cols-2">
+      <div className="recent-projects-grid projects-grid mt-2 grid w-full max-w-[1880px] items-start gap-4 grid-cols-1 sm:gap-6">
         {Array.from({ length: 6 }).map((_, index) => (
           <div
             key={`home-loading-project-${index}`}
@@ -248,6 +249,7 @@ export default function RecentProjectsRow({
     pagesCount: project.pagesCount ?? 0,
     rotation: project.rotation ?? 0,
     hasPreview: project.hasPreview ?? false,
+    fileSizeBytes: project.fileSizeBytes ?? null,
   }));
   const selectedIds = mapped.filter((project) => selected[project.id]).map((project) => project.id);
   const selectedCount = selectedIds.length;
@@ -318,35 +320,32 @@ export default function RecentProjectsRow({
   if (trimmed && mapped.length === 0) {
     if (viewMode === "list" && showAllProjects) {
       return (
-        <div className="mt-2 rounded-xl border border-[#E6EBF2] bg-white px-5 py-10 text-center text-sm font-semibold text-slate-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
-          No projects match &quot;{trimmed}&quot;.
+        <div className="mt-2 px-6 py-14">
+          <div className="flex flex-col items-center text-center">
+            <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-500 dark:bg-zinc-800 dark:text-zinc-300">
+              <SearchX className="h-5 w-5" aria-hidden />
+            </span>
+            <p className="mt-4 text-lg font-semibold text-slate-900 dark:text-zinc-100">
+              No projects found for &quot;{trimmed}&quot;
+            </p>
+            <p className="mt-2 text-sm text-slate-500 dark:text-zinc-400">
+              Try a different name or clear the search.
+            </p>
+          </div>
         </div>
       );
     }
     return (
-      <div className="relative">
-        <div
-          aria-hidden="true"
-          className="recent-projects-grid projects-grid mt-2 grid w-full max-w-[1880px] items-start gap-6 grid-cols-2"
-        >
-          {Array.from({ length: 6 }).map((_, index) => (
-          <div
-            key={`home-empty-project-${index}`}
-            className="invisible flex w-full flex-col text-left"
-          >
-            <div className="relative rounded-[10px] bg-[#F9FAFC] dark:bg-zinc-900/60">
-              <div className="relative m-[3px] aspect-square w-[calc(100%-6px)] overflow-hidden rounded-[10px] border border-[rgba(0,0,0,0.06)] bg-[#EEF1F5] dark:border-zinc-800 dark:bg-zinc-800/70" />
-            </div>
-              <div className="mt-2 space-y-0.5">
-                <div className="h-4 w-[58%] rounded-full bg-slate-100 dark:bg-zinc-800/70" />
-                <div className="h-3 w-[42%] rounded-full bg-slate-100 dark:bg-zinc-800/70" />
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="pointer-events-none absolute inset-0 flex items-start justify-center pt-10">
-          <p className="rounded-full bg-white/85 px-5 py-2 text-sm font-semibold text-slate-500 shadow-sm dark:shadow-none backdrop-blur dark:bg-zinc-900/80 dark:text-zinc-300 sm:text-base">
-            No projects match &quot;{trimmed}&quot;.
+      <div className="mt-2 flex min-h-[320px] items-center justify-center px-6 py-16">
+        <div className="flex flex-col items-center text-center">
+          <span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-500 dark:bg-zinc-800 dark:text-zinc-300">
+            <SearchX className="h-6 w-6" aria-hidden />
+          </span>
+          <p className="mt-4 text-xl font-semibold text-slate-900 dark:text-zinc-100">
+            No projects found for &quot;{trimmed}&quot;
+          </p>
+          <p className="mt-2 max-w-md text-sm text-slate-500 dark:text-zinc-400">
+            Try a different project name, or clear the search to see everything again.
           </p>
         </div>
       </div>
@@ -465,7 +464,7 @@ export default function RecentProjectsRow({
     <>
       {viewMode === "list" && showAllProjects ? (
         <div className="mt-2 bg-white dark:bg-zinc-900">
-          <div className="grid grid-cols-[36px_minmax(0,1.8fr)_minmax(0,1fr)_88px_120px] items-center gap-3 border-b border-[#E6EBF2] px-4 py-3 text-sm font-bold uppercase tracking-[0.08em] text-slate-700 dark:border-zinc-700 dark:text-zinc-200">
+          <div className="grid grid-cols-[36px_minmax(260px,340px)_1fr_180px_180px_96px_72px] items-center gap-x-5 border-b border-[#E6EBF2] px-4 py-3 text-sm font-bold uppercase tracking-[0.08em] text-slate-700 dark:border-zinc-700 dark:text-zinc-200 xl:grid-cols-[36px_minmax(260px,340px)_1fr_196px_196px_112px_84px] xl:gap-x-7 2xl:grid-cols-[36px_minmax(260px,340px)_1fr_208px_208px_120px_92px] 2xl:gap-x-8">
             <button
               type="button"
               onClick={() => {
@@ -498,9 +497,11 @@ export default function RecentProjectsRow({
             >
               <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden />
             </button>
-            <span>Name</span>
-            <span>Opened</span>
-            <span className="text-right">Pages</span>
+            <span className="text-left">Name</span>
+            <span aria-hidden />
+            <span aria-hidden />
+            <span className="text-left">Opened</span>
+            <span className="text-left">Pages</span>
             <span className="text-right">Actions</span>
           </div>
           <div className="divide-y divide-[#E6EBF2] dark:divide-zinc-700">
@@ -509,7 +510,7 @@ export default function RecentProjectsRow({
               return (
                 <div
                   key={project.id}
-                  className={`grid grid-cols-[36px_minmax(0,1.8fr)_minmax(0,1fr)_88px_120px] items-center gap-3 px-4 py-3 transition ${
+                  className={`grid grid-cols-[36px_minmax(260px,340px)_1fr_180px_180px_96px_72px] items-center gap-x-5 px-4 py-3 transition xl:grid-cols-[36px_minmax(260px,340px)_1fr_196px_196px_112px_84px] xl:gap-x-7 2xl:grid-cols-[36px_minmax(260px,340px)_1fr_208px_208px_120px_92px] 2xl:gap-x-8 ${
                     isSelected ? "bg-[#F5F3FF] dark:bg-zinc-800/60" : "hover:bg-[#F8FAFC] dark:hover:bg-zinc-800/40"
                   }`}
                 >
@@ -591,16 +592,23 @@ export default function RecentProjectsRow({
                           aria-hidden
                         />
                       </button>
-                      <Link
-                        href={`/studio?project=${encodeURIComponent(project.id)}`}
-                        className={`min-w-0 truncate text-[16px] font-semibold text-slate-900 dark:text-zinc-100 ${
-                          renamedProjectId === project.id
-                            ? "[animation:rename-text-flash_1400ms_ease-out_forwards]"
-                            : ""
-                        }`}
-                      >
-                        {project.title}
-                      </Link>
+                      <div className="min-w-0">
+                        <Link
+                          href={`/studio?project=${encodeURIComponent(project.id)}`}
+                          className={`block min-w-0 truncate text-[16px] font-semibold text-slate-900 dark:text-zinc-100 ${
+                            renamedProjectId === project.id
+                              ? "[animation:rename-text-flash_1400ms_ease-out_forwards]"
+                              : ""
+                          }`}
+                        >
+                          {project.title}
+                        </Link>
+                        <span className="mt-0.5 block text-xs text-slate-500 dark:text-zinc-400">
+                          {formatFileSize(project.fileSizeBytes)
+                            ? `PDF · ${formatFileSize(project.fileSizeBytes)}`
+                            : "PDF"}
+                        </span>
+                      </div>
                       <button
                         type="button"
                         aria-label="Rename project"
@@ -614,13 +622,15 @@ export default function RecentProjectsRow({
                       </button>
                     </div>
                   )}
-                  <span className="truncate text-[15px] text-slate-600 dark:text-zinc-300">
+                  <span aria-hidden />
+                  <span aria-hidden />
+                  <span className="truncate text-left text-[15px] text-slate-600 dark:text-zinc-300">
                     {formatProjectActivityDate(
                       projects.find((entry) => entry.id === project.id)?.updatedAt ?? project.updated
                     )}
                   </span>
-                  <span className="text-right text-[15px] text-slate-600 dark:text-zinc-300">{project.pagesCount ?? 0}</span>
-                  <div className="ml-auto flex items-center justify-end gap-1">
+                  <span className="text-left text-[15px] text-slate-600 dark:text-zinc-300">{project.pagesCount ?? 0}</span>
+                  <div className="flex items-center justify-end gap-1">
                     <button
                       type="button"
                       onMouseDown={(event) => {
@@ -667,13 +677,13 @@ export default function RecentProjectsRow({
           </div>
         </div>
       ) : (
-        <div className="recent-projects-grid projects-grid mt-2 grid w-full max-w-[1880px] items-start gap-6 grid-cols-2">
+        <div className="recent-projects-grid projects-grid mt-2 grid w-full max-w-[1880px] items-start gap-4 grid-cols-1 sm:gap-6">
           {mapped.map((project, index) => {
           const isSelected = !!selected[project.id];
           return (
             <div
               key={project.id}
-              className="w-full"
+              className="w-full max-w-[320px] sm:max-w-none"
             >
               <ProjectCard
                 project={project}

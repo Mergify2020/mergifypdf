@@ -1,11 +1,29 @@
-import Image from "next/image";
 import TrashProjectsList from "@/components/TrashProjectsList";
 import { redirect } from "next/navigation";
 import { getServerSessionSafe } from "@/lib/serverSession";
 import { prisma } from "@/lib/prisma";
 import { formatProjectLastEdited } from "@/lib/formatProjectLastEdited";
+import { getR2Config, getR2ObjectSize } from "@/lib/r2";
 
 export const dynamic = "force-dynamic";
+
+function extractFileSizeFromData(data: unknown): number | null {
+  if (!data || typeof data !== "object") return null;
+  const record = data as Record<string, unknown>;
+  const sources = Array.isArray(record.sources) ? record.sources : null;
+  if (!sources || sources.length === 0) return null;
+
+  const sizes = sources
+    .map((source) =>
+      source && typeof source === "object" && typeof (source as { size?: unknown }).size === "number"
+        ? (source as { size: number }).size
+        : null
+    )
+    .filter((size): size is number => typeof size === "number" && Number.isFinite(size) && size >= 0);
+
+  if (sizes.length === 0) return null;
+  return sizes.reduce((total, size) => total + size, 0);
+}
 
 export default async function TrashProjectsPage() {
   const session = await getServerSessionSafe();
@@ -31,19 +49,46 @@ export default async function TrashProjectsPage() {
       name: true,
       updatedAt: true,
       trashedAt: true,
+      pdfKey: true,
+      data: true,
+      pagesCount: true,
     },
   });
 
-  const trashProjects = projects.map((project) => ({
-    id: project.id,
-    title: project.name?.trim() || "Untitled project",
-    updatedLabel: formatProjectLastEdited(project.updatedAt),
-    trashedAt: project.trashedAt?.toISOString() ?? new Date().toISOString(),
-  }));
+  let r2Config: ReturnType<typeof getR2Config> | null = null;
+  try {
+    r2Config = getR2Config();
+  } catch {
+    r2Config = null;
+  }
+
+  const trashProjects = await Promise.all(
+    projects.map(async (project) => {
+      let fileSizeBytes: number | null = null;
+      if (r2Config && project.pdfKey) {
+        try {
+          fileSizeBytes = await getR2ObjectSize(r2Config, project.pdfKey);
+        } catch {
+          fileSizeBytes = extractFileSizeFromData(project.data);
+        }
+      } else {
+        fileSizeBytes = extractFileSizeFromData(project.data);
+      }
+
+      return {
+        id: project.id,
+        title: project.name?.trim() || "Untitled project",
+        updatedLabel: formatProjectLastEdited(project.updatedAt),
+        trashedAt: project.trashedAt?.toISOString() ?? new Date().toISOString(),
+        fileSizeBytes,
+        pagesCount: project.pagesCount ?? 0,
+      };
+    })
+  );
 
   return (
     <main
-      className="box-border w-full bg-[#F1F4F9] pt-3 pb-0 sm:pt-6 sm:pb-0 transition-[height] duration-300 ease-out dark:bg-[#222224]"
+      className="box-border w-full bg-[#F1F4F9] pt-3 pb-0 md:pt-6 md:pb-0 transition-[height] duration-300 ease-out dark:bg-[#222224]"
       style={{
         height:
           "calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset, 0px) - var(--home-topbar-offset, 0px) - var(--workspace-content-bottom-subtract, var(--workspace-frame-gutter, 48px)))",
@@ -51,26 +96,11 @@ export default async function TrashProjectsPage() {
     >
       <div className="h-full min-h-0 w-full">
         <div className="flex h-full w-full min-h-0 flex-col md:pl-1 md:pr-0">
-          {projects.length === 0 ? (
-            <div className="mt-10 flex flex-1 flex-col items-center justify-center px-6 py-10 text-center text-sm text-slate-500">
-              <Image
-                src="/nothingdeletedyet.svg"
-                alt=""
-                width={405}
-                height={405}
-                className="mt-[-100px] h-[318px] w-[318px] opacity-90 sm:h-[405px] sm:w-[405px]"
-                priority
-              />
-              <p className="mt-0 text-lg font-semibold text-slate-900">Trash is currently empty.</p>
-              <p className="mt-2 text-sm text-slate-500">Restore a project or keep things tidy here.</p>
-            </div>
-          ) : (
-            <TrashProjectsList
-              projects={trashProjects}
-              accountName={session.user.name ?? "Account"}
-              accountEmail={session.user.email ?? null}
-            />
-          )}
+          <TrashProjectsList
+            projects={trashProjects}
+            accountName={session.user.name ?? "Account"}
+            accountEmail={session.user.email ?? null}
+          />
         </div>
       </div>
     </main>

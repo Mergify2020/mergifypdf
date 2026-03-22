@@ -172,8 +172,7 @@ export default function ProjectCard({
       if (!res.ok) return;
       const data = (await res.json().catch(() => null)) as { url?: string } | null;
       if (!data?.url) return;
-      const printUrl = `/print?src=${encodeURIComponent(data.url)}&title=${encodeURIComponent(project.title)}`;
-      window.open(printUrl, "_blank", "noopener,noreferrer");
+      window.open(data.url, "_blank", "noopener,noreferrer");
       setMenuOpen(false);
       setMenuPosition(null);
     } finally {

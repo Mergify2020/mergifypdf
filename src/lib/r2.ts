@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectsCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectsCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 export type R2Config = {
@@ -89,4 +89,14 @@ export async function deleteR2Objects(config: R2Config, keys: string[]) {
       },
     })
   );
+}
+
+export async function getR2ObjectSize(config: R2Config, key: string) {
+  const response = await config.client.send(
+    new HeadObjectCommand({
+      Bucket: config.bucket,
+      Key: key,
+    })
+  );
+  return typeof response.ContentLength === "number" ? response.ContentLength : null;
 }

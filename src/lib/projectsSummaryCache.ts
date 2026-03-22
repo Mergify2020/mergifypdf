@@ -8,6 +8,7 @@ export type ProjectsSummaryProject = {
   hasPdf?: boolean;
   pagesCount?: number | null;
   rotation?: number | null;
+  fileSizeBytes?: number | null;
 };
 
 export type ProjectsSummaryUpdate = {

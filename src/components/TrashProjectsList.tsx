@@ -1,12 +1,14 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { ArrowDown, ArrowUp, Check, ChevronDown, Clock, RotateCcw, Search, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, ChevronDown, Clock, RotateCcw, Search, SearchX, Trash2 } from "lucide-react";
 import { createPortal } from "react-dom";
 import TrashProjectActions from "@/components/TrashProjectActions";
 import TrashHeaderControls from "@/components/TrashHeaderControls";
+import { formatFileSize } from "@/lib/formatFileSize";
 import { refreshProjectsSummary } from "@/lib/projectsSummaryCache";
 
 type TrashProject = {
@@ -14,6 +16,8 @@ type TrashProject = {
   title: string;
   updatedLabel: string;
   trashedAt: string;
+  fileSizeBytes?: number | null;
+  pagesCount?: number | null;
 };
 
 type Props = {
@@ -48,7 +52,7 @@ function SelectionCheckbox({
       className={`inline-flex h-5 w-5 items-center justify-center rounded-[4px] border-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/25 ${
         checked || indeterminate
           ? "border-[#6C47FF] bg-[#6C47FF] text-white"
-          : "border-slate-400 bg-white text-transparent dark:border-zinc-500 dark:bg-zinc-900"
+          : "border-slate-300 bg-white text-transparent hover:border-slate-400 dark:border-zinc-600 dark:bg-zinc-900"
       } ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
     >
       {indeterminate ? (
@@ -205,7 +209,7 @@ export default function TrashProjectsList({ projects, accountName, accountEmail 
         <div className="w-full flex-1 md:max-w-xl">
           <div className="flex h-11 items-center rounded-full border-[1.5px] border-gray-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)]">
             <div className="flex h-full w-full items-center gap-2 rounded-full bg-white px-4 text-[#1F2A37] dark:bg-zinc-900 dark:text-zinc-100">
-              <Search className="h-5 w-5 text-[#4F46E5]" aria-hidden />
+              <Search className="h-5 w-5 text-rose-500 dark:text-rose-400" aria-hidden />
               <input
                 type="text"
                 value={query}
@@ -221,16 +225,14 @@ export default function TrashProjectsList({ projects, accountName, accountEmail 
       </div>
 
       <section className="box-border flex min-h-0 flex-1 flex-col rounded-xl border-[1.5px] border-gray-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] sm:p-5">
-        <div className="mb-4 flex h-9 items-center justify-between gap-3 px-[21px]">
+        <div className="mb-4 flex items-center justify-between gap-4 pl-[21px] pr-0">
           <div className="flex items-center gap-3">
-            <SelectionCheckbox
-              checked={allVisibleSelected}
-              indeterminate={someVisibleSelected}
-              disabled={visibleIds.length === 0}
-              onToggle={toggleSelectAll}
-              ariaLabel="Select all deleted projects"
-            />
-            <h2 className="text-base font-semibold text-[#1F2A37] dark:text-zinc-100 sm:text-lg">
+            {!hasSelection ? (
+              <span className="inline-flex items-center justify-center text-rose-600 dark:text-rose-300">
+                <Trash2 className="h-5 w-5" aria-hidden />
+              </span>
+            ) : null}
+            <h2 className="text-2xl font-semibold text-[#1F2A37] dark:text-zinc-100">
               {hasSelection ? (
                 <span>
                   {selectedCount} <span className="text-slate-500 dark:text-zinc-400">selected</span>
@@ -284,7 +286,7 @@ export default function TrashProjectsList({ projects, accountName, accountEmail 
                 onClick={() => setSortMenuOpen((prev) => !prev)}
                 className={`inline-flex items-center gap-2 rounded-full border-2 px-4 py-2 text-xs font-semibold transition ${
                   sortMenuOpen
-                    ? "!border-[#7489A8] bg-white text-[#1F2A37] dark:!border-zinc-400 dark:bg-zinc-900 dark:text-zinc-100"
+                    ? "border-[#E6EBF2] bg-[#E5E7EB] text-[#1F2A37] dark:border-zinc-700 dark:bg-[#2A2A31] dark:text-zinc-100"
                     : "border-[#E6EBF2] bg-white text-[#1F2A37] hover:border-[#D8DEE8] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-zinc-600"
                 }`}
                 aria-haspopup="menu"
@@ -357,59 +359,116 @@ export default function TrashProjectsList({ projects, accountName, accountEmail 
         </div>
 
         {sortedProjects.length === 0 ? (
-          <div className="rounded-2xl border border-slate-200 bg-white px-5 py-8 text-sm text-slate-500 shadow-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
-            No projects match your search.
+          <div className="flex min-h-0 flex-1 items-start justify-center px-6 pt-16 pb-10 text-center sm:pt-20">
+            {projects.length === 0 ? (
+              <div className="flex flex-col items-center">
+                <Image
+                  src="/nothingdeletedyet.svg"
+                  alt=""
+                  width={405}
+                  height={405}
+                  className="mb-2 h-[285px] w-[285px] opacity-90 sm:h-[360px] sm:w-[360px]"
+                  priority
+                />
+                <p className="text-lg font-semibold text-slate-900 dark:text-zinc-100">Trash is currently empty.</p>
+                <p className="mt-2 text-sm text-slate-500 dark:text-zinc-400">Restore a project, or leave it here until it&apos;s removed automatically.</p>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center">
+                <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#FFF1F4] text-[#E11D48] dark:bg-[#3A1B23] dark:text-[#FDA4AF]">
+                  <SearchX className="h-5 w-5" aria-hidden />
+                </span>
+                <p className="mt-4 text-lg font-semibold text-slate-900 dark:text-zinc-100">
+                  No deleted projects found for &quot;{query.trim()}&quot;
+                </p>
+                <p className="mt-2 text-sm text-slate-500 dark:text-zinc-400">
+                  Try a different search or clear it to see everything in trash.
+                </p>
+              </div>
+            )}
           </div>
         ) : (
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
-            {sortedProjects.map((project) => {
-              const trashedAtMs = new Date(project.trashedAt).getTime();
-              const deleteAtMs = trashedAtMs + TRASH_RETENTION_DAYS * DAY_MS;
-              const daysRemaining = Math.max(0, Math.ceil((deleteAtMs - now) / DAY_MS));
-              const deleteAtLabel = new Intl.DateTimeFormat("en-US", {
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-              }).format(new Date(deleteAtMs));
-              const deleteText =
-                daysRemaining <= 0
-                  ? "Deletes today"
-                  : `Deletes in ${daysRemaining} ${daysRemaining === 1 ? "day" : "days"}`;
-              const deleteToneClass =
-                daysRemaining <= 3
-                  ? "font-semibold text-rose-700 dark:text-rose-300"
-                  : "font-medium text-rose-600 dark:text-rose-400";
+          <div className="min-h-0 flex-1 overflow-y-auto px-[6px] pb-[6px]">
+            <div className="grid grid-cols-[36px_minmax(260px,340px)_1fr_180px_180px_96px_72px] items-center gap-x-5 border-b border-[#E6EBF2] px-4 py-3 text-sm font-bold uppercase tracking-[0.08em] text-slate-700 dark:border-zinc-700 dark:text-zinc-200 xl:grid-cols-[36px_minmax(260px,340px)_1fr_196px_196px_112px_84px] xl:gap-x-7 2xl:grid-cols-[36px_minmax(260px,340px)_1fr_208px_208px_120px_92px] 2xl:gap-x-8">
+              <div className="flex justify-start">
+                <SelectionCheckbox
+                  checked={allVisibleSelected}
+                  indeterminate={someVisibleSelected}
+                  disabled={visibleIds.length === 0}
+                  onToggle={toggleSelectAll}
+                  ariaLabel="Select all deleted projects"
+                />
+              </div>
+              <div className="text-left">Name</div>
+              <div aria-hidden />
+              <div className="text-left">Deletes</div>
+              <div className="text-left">Opened</div>
+              <div className="text-left">Pages</div>
+              <div className="text-right">Actions</div>
+            </div>
+            <div className="divide-y divide-[#E6EBF2] dark:divide-zinc-700">
+              {sortedProjects.map((project) => {
+                const trashedAtMs = new Date(project.trashedAt).getTime();
+                const deleteAtMs = trashedAtMs + TRASH_RETENTION_DAYS * DAY_MS;
+                const daysRemaining = Math.max(0, Math.ceil((deleteAtMs - now) / DAY_MS));
+                const deleteAtLabel = new Intl.DateTimeFormat("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                }).format(new Date(deleteAtMs));
+                const deleteText =
+                  daysRemaining <= 0
+                    ? "Deletes today"
+                    : `Deletes in ${daysRemaining} ${daysRemaining === 1 ? "day" : "days"}`;
+                const deleteToneClass =
+                  daysRemaining <= 3
+                    ? "font-semibold text-rose-700 dark:text-rose-300"
+                    : "font-medium text-rose-600 dark:text-rose-400";
 
-              return (
-                <div
-                  key={project.id}
-                  className="group flex flex-wrap items-center justify-between gap-4 rounded-2xl border-2 border-[#D8DEE8] bg-white px-5 py-4 shadow-none dark:border-zinc-600 dark:bg-zinc-900"
-                >
-                  <div className="flex min-w-0 items-center gap-3">
-                    <SelectionCheckbox
-                      checked={!!selected[project.id]}
-                      onToggle={() => {
-                        setSelected((prev) => ({ ...prev, [project.id]: !prev[project.id] }));
-                      }}
-                      ariaLabel={`Select ${project.title}`}
-                    />
+                return (
+                  <div
+                    key={project.id}
+                    className="grid grid-cols-[36px_minmax(260px,340px)_1fr_180px_180px_96px_72px] items-center gap-x-5 px-4 py-3 xl:grid-cols-[36px_minmax(260px,340px)_1fr_196px_196px_112px_84px] xl:gap-x-7 2xl:grid-cols-[36px_minmax(260px,340px)_1fr_208px_208px_120px_92px] 2xl:gap-x-8"
+                  >
+                    <div className="flex justify-start">
+                      <SelectionCheckbox
+                        checked={!!selected[project.id]}
+                        onToggle={() => {
+                          setSelected((prev) => ({ ...prev, [project.id]: !prev[project.id] }));
+                        }}
+                        ariaLabel={`Select ${project.title}`}
+                      />
+                    </div>
                     <div className="min-w-0">
-                      <p className="truncate text-base font-semibold text-slate-900 dark:text-zinc-100">{project.title}</p>
-                      <p className="mt-1 text-sm text-slate-500 dark:text-zinc-400">{project.updatedLabel}</p>
+                      <p className="truncate text-[15px] font-semibold text-slate-900 dark:text-zinc-100">{project.title}</p>
+                      <p className="mt-0.5 text-xs text-slate-500 dark:text-zinc-400">
+                        {formatFileSize(project.fileSizeBytes)
+                          ? `PDF · ${formatFileSize(project.fileSizeBytes)}`
+                          : "PDF"}
+                      </p>
+                    </div>
+                    <div aria-hidden />
+                    <div className="text-left">
+                      <span
+                        title={`Permanently deletes on ${deleteAtLabel}`}
+                        className={`text-sm ${deleteToneClass}`}
+                      >
+                        {deleteText}
+                      </span>
+                    </div>
+                    <div className="truncate text-left text-[15px] text-slate-600 dark:text-zinc-300">
+                      {project.updatedLabel}
+                    </div>
+                    <div className="text-left text-[15px] text-slate-600 dark:text-zinc-300">
+                      {project.pagesCount ?? 0}
+                    </div>
+                    <div className="flex justify-end">
+                      <TrashProjectActions projectId={project.id} />
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span
-                      title={`Permanently deletes on ${deleteAtLabel}`}
-                      className={`text-sm ${deleteToneClass}`}
-                    >
-                      {deleteText}
-                    </span>
-                    <TrashProjectActions projectId={project.id} />
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         )}
 
