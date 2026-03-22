@@ -199,7 +199,7 @@ export default function RecentProjectsRow({
 
   if (loading && !projects.length) {
     return (
-      <div className="recent-projects-grid projects-grid mt-2 grid w-full max-w-[1880px] items-start gap-4 grid-cols-1 sm:gap-6">
+      <div className="recent-projects-grid projects-grid mt-2 grid w-full max-w-[1880px] items-start gap-4 grid-cols-2 sm:gap-6">
         {Array.from({ length: 6 }).map((_, index) => (
           <div
             key={`home-loading-project-${index}`}
@@ -677,13 +677,13 @@ export default function RecentProjectsRow({
           </div>
         </div>
       ) : (
-        <div className="recent-projects-grid projects-grid mt-2 grid w-full max-w-[1880px] items-start gap-4 grid-cols-1 sm:gap-6">
+        <div className="recent-projects-grid projects-grid mt-2 grid w-full max-w-[1880px] items-start gap-4 grid-cols-2 sm:gap-6">
           {mapped.map((project, index) => {
           const isSelected = !!selected[project.id];
           return (
             <div
               key={project.id}
-              className="w-full max-w-[320px] sm:max-w-none"
+              className="w-full"
             >
               <ProjectCard
                 project={project}
