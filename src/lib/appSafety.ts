@@ -21,6 +21,8 @@ export type AppSafetyStatus = {
 
 const APP_RUNTIME_GUARD_ID = "primary";
 const APP_SAFETY_CACHE_MS = 10_000;
+const APP_SAFETY_DB_UNAVAILABLE_CACHE_MS = 1_500;
+const APP_SAFETY_DB_RETRY_DELAYS_MS = [150, 400] as const;
 const REQUIRED_TABLES = [
   "User",
   "Account",
@@ -105,11 +107,18 @@ function buildStatus(
 }
 
 export function isAppSafetyBlocking(status: AppSafetyStatus) {
+  const shouldBlockDbUnavailable = status.code === "DB_UNAVAILABLE"
+    && (status.strict || process.env.NODE_ENV === "production");
+
   return !status.ok && (
     status.strict
-      || status.code === "DB_UNAVAILABLE"
+      || shouldBlockDbUnavailable
       || status.code === "DB_SCHEMA_MISSING"
   );
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function queryExistingTables() {
@@ -272,10 +281,21 @@ export async function getAppSafetyStatus(options?: { forceRefresh?: boolean }) {
     return cached.status;
   }
 
-  const status = await checkAppSafetyUncached();
+  let status = await checkAppSafetyUncached();
+
+  if (status.code === "DB_UNAVAILABLE") {
+    for (const delayMs of APP_SAFETY_DB_RETRY_DELAYS_MS) {
+      await sleep(delayMs);
+      status = await checkAppSafetyUncached();
+      if (status.code !== "DB_UNAVAILABLE") break;
+    }
+  }
+
   globalForAppSafety.__appSafetyCache = {
     status,
-    expiresAt: now + APP_SAFETY_CACHE_MS,
+    expiresAt: now + (status.code === "DB_UNAVAILABLE"
+      ? APP_SAFETY_DB_UNAVAILABLE_CACHE_MS
+      : APP_SAFETY_CACHE_MS),
   };
   return status;
 }
