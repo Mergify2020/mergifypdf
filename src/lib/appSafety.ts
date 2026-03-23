@@ -108,7 +108,7 @@ function buildStatus(
 
 export function isAppSafetyBlocking(status: AppSafetyStatus) {
   const shouldBlockDbUnavailable = status.code === "DB_UNAVAILABLE"
-    && (status.strict || process.env.NODE_ENV === "production");
+    && status.strict;
 
   return !status.ok && (
     status.strict
