@@ -111,11 +111,16 @@ export default function ProjectCard({
   const [isCopying, setIsCopying] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
   const [copyToast, setCopyToast] = useState<CopyToastState | null>(null);
+  const [copyToastDismissing, setCopyToastDismissing] = useState(false);
+  const copyToastTouchStartY = useRef<number | null>(null);
   const [draftName, setDraftName] = useState("");
   const [renameBusy, setRenameBusy] = useState(false);
   const [renameError, setRenameError] = useState<string | null>(null);
   const [renameJustSaved, setRenameJustSaved] = useState(false);
   const starred = Boolean(starredProp || localStarred);
+  const compactUpdatedLabel = project.updated.startsWith("Edited ")
+    ? project.updated.slice("Edited ".length)
+    : project.updated;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -152,6 +157,7 @@ export default function ProjectCard({
 
   useEffect(() => {
     if (!copyToast) return;
+    setCopyToastDismissing(false);
     const timer = window.setTimeout(() => {
       setCopyToast(null);
     }, 6500);
@@ -296,10 +302,10 @@ export default function ProjectCard({
   const checkboxClasses = [
     "absolute left-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-[10px] border-[3px] text-xs font-semibold shadow-md dark:shadow-none transition-transform transition-opacity duration-150 xl:h-9 xl:w-9",
     isSelected
-      ? "bg-[#6C47FF] border-[#6C47FF] text-white opacity-100 scale-100 dark:bg-[#A78BFA] dark:border-[#A78BFA] dark:text-zinc-900"
-      : [
+        ? "bg-[#6C47FF] border-[#6C47FF] text-white opacity-100 scale-100 dark:bg-[#A78BFA] dark:border-[#A78BFA] dark:text-zinc-900"
+        : [
           // Always visible on very small screens (no hover), hover-only from sm and up.
-          "bg-white border-slate-300 text-slate-500 shadow-[0_3px_10px_rgba(15,23,42,0.14)] opacity-100 scale-100 dark:bg-zinc-900/95 dark:border-zinc-600 dark:text-zinc-300",
+          "bg-white border-slate-300 text-slate-500 shadow-[0_3px_10px_rgba(15,23,42,0.14)] opacity-100 scale-90 dark:bg-zinc-900/95 dark:border-zinc-600 dark:text-zinc-300",
           "sm:opacity-0 sm:scale-90",
           hasSelection ? "sm:!opacity-100 sm:!scale-100" : "",
         ].join(" "),
@@ -307,7 +313,7 @@ export default function ProjectCard({
     .filter(Boolean)
     .join(" ");
   const actionsContainerClasses = [
-    "absolute right-3 top-2 z-10 inline-flex items-center overflow-hidden rounded-[10px] bg-white/95 text-slate-400 shadow-[0_4px_12px_rgba(15,23,42,0.18)] dark:bg-zinc-900/95 dark:text-zinc-200 dark:shadow-none",
+    "absolute right-3 top-3 z-10 inline-flex items-center overflow-hidden rounded-[10px] bg-white/95 text-slate-400 shadow-[0_4px_12px_rgba(15,23,42,0.18)] dark:bg-zinc-900/95 dark:text-zinc-200 dark:shadow-none",
     "opacity-100 transition-opacity duration-150",
     "sm:opacity-0",
     menuOpen ? "sm:!opacity-100" : "",
@@ -385,6 +391,24 @@ export default function ProjectCard({
       event.preventDefault();
       event.stopPropagation();
       void submitRename();
+    }
+  };
+
+  const handleCopyToastTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    copyToastTouchStartY.current = event.touches[0]?.clientY ?? null;
+  };
+
+  const handleCopyToastTouchEnd = (event: React.TouchEvent<HTMLDivElement>) => {
+    const startY = copyToastTouchStartY.current;
+    copyToastTouchStartY.current = null;
+    const endY = event.changedTouches[0]?.clientY;
+    if (startY == null || endY == null) return;
+    if (startY - endY >= 36) {
+      setCopyToastDismissing(true);
+      window.setTimeout(() => {
+        setCopyToast(null);
+        setCopyToastDismissing(false);
+      }, 220);
     }
   };
 
@@ -744,7 +768,15 @@ export default function ProjectCard({
         )}
         {typeof document !== "undefined" && copyToast
           ? createPortal(
-              <div className="fixed left-1/2 top-4 z-[10000] w-[min(420px,calc(100vw-1.5rem))] [animation:copy-toast-in-out_6500ms_ease-in-out_forwards]">
+              <div
+                className={`fixed left-1/2 top-4 z-[10000] w-[min(420px,calc(100vw-1.5rem))] ${
+                  copyToastDismissing
+                    ? "[animation:copy-toast-dismiss-up_220ms_ease-out_forwards]"
+                    : "[animation:copy-toast-in-out_6500ms_ease-in-out_forwards]"
+                }`}
+                onTouchStart={handleCopyToastTouchStart}
+                onTouchEnd={handleCopyToastTouchEnd}
+              >
                 <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-700/70 bg-[#171923] px-3.5 py-2.5 text-white shadow-[0_10px_20px_rgba(15,23,42,0.34)]">
                   <p className="min-w-0 truncate pr-1.5 text-sm font-semibold">
                     {`Created "Copy of ${copyToast.name}"`}
@@ -780,7 +812,7 @@ export default function ProjectCard({
             }}
           />
           {typeof project.pagesCount === "number" && project.pagesCount > 0 ? (
-            <div className="project-card-pages pointer-events-none absolute bottom-2.5 left-2.5 z-10 rounded-full bg-black/60 px-3.5 py-1 text-[12px] font-semibold text-white opacity-0 shadow-sm dark:shadow-none backdrop-blur-sm transition-opacity dark:bg-zinc-800/80 dark:text-zinc-100">
+            <div className="project-card-pages pointer-events-none absolute bottom-2.5 left-2.5 z-10 hidden rounded-full bg-black/60 px-3.5 py-1 text-[12px] font-semibold text-white opacity-0 shadow-sm dark:shadow-none backdrop-blur-sm transition-opacity dark:bg-zinc-800/80 dark:text-zinc-100 sm:block">
               {project.pagesCount} {project.pagesCount === 1 ? "page" : "pages"}
             </div>
           ) : null}
@@ -900,12 +932,7 @@ export default function ProjectCard({
           </div>
         ) : (
           <div className="project-card-title flex items-start gap-2">
-            <button
-              type="button"
-              onClick={startRenaming}
-              aria-label="Rename project"
-              className="project-card-rename group/rename min-w-0 flex-1 rounded-lg py-1 text-left"
-            >
+            <div className="project-card-rename group/rename min-w-0 flex-1 rounded-lg py-1 text-left">
               <div className="flex items-center gap-2">
                 <span
                   className={`min-w-0 truncate text-base font-semibold text-slate-900 dark:text-zinc-100 ${
@@ -915,15 +942,20 @@ export default function ProjectCard({
                   {project.title}
                 </span>
                 {!hasSelection ? (
-                  <span className="project-card-pencil inline-flex items-center justify-center text-black transition-opacity duration-150 dark:text-zinc-200 md:opacity-0 md:group-hover/rename:opacity-100 md:group-focus-visible/rename:opacity-100">
+                  <span className="project-card-pencil hidden items-center justify-center text-black transition-opacity duration-150 dark:text-zinc-200 md:inline-flex md:opacity-0 md:group-hover/rename:opacity-100 md:group-focus-visible/rename:opacity-100">
                     <Pencil className="h-4 w-4" aria-hidden />
                   </span>
                 ) : null}
               </div>
               <p className="mt-0.5 text-xs font-medium text-slate-500 dark:text-zinc-400" suppressHydrationWarning>
-                {project.updated}
+                <span className="sm:hidden">
+                  {typeof project.pagesCount === "number" && project.pagesCount > 0
+                    ? `${project.pagesCount} ${project.pagesCount === 1 ? "page" : "pages"} · ${compactUpdatedLabel}`
+                    : compactUpdatedLabel}
+                </span>
+                <span className="hidden sm:inline">{project.updated}</span>
               </p>
-            </button>
+            </div>
             {showResumeBadge ? <span className="mt-1 ml-auto shrink-0" /> : null}
           </div>
         )}

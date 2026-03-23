@@ -923,10 +923,30 @@ html.theme-scroll-reveal:not(.dark) ::-webkit-scrollbar-thumb {
 }
 
 @media (hover: none) and (pointer: coarse) {
+  .project-card:has(.project-card-preview:hover) {
+    transform: none !important;
+  }
+
+  .project-card:has(.project-card-preview:hover) .project-card-preview {
+    background-color: #eef1f5 !important;
+  }
+
+  .dark .project-card:has(.project-card-preview:hover) .project-card-preview {
+    background-color: rgb(39 39 42 / 0.7) !important;
+  }
+
+  .project-card:has(.project-card-preview:hover) .project-card-overlay {
+    opacity: 0 !important;
+  }
+
   .project-card .project-card-select,
   .project-card .project-card-actions,
   .project-card .project-card-pages {
     opacity: 1 !important;
+  }
+
+  .project-card .project-card-actions,
+  .project-card .project-card-pages {
     transform: none !important;
   }
 }
@@ -1018,6 +1038,17 @@ html.theme-scroll-reveal:not(.dark) ::-webkit-scrollbar-thumb {
   100% {
     opacity: 0;
     transform: translate(-50%, -6px);
+  }
+}
+
+@keyframes copy-toast-dismiss-up {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -26px);
   }
 }
 
@@ -1247,7 +1278,7 @@ header[data-hero="true"] .app-brand-dark {
     --workspace-vh: 100svh;
     --workspace-frame-gutter: 12px;
     --workspace-content-bottom-subtract: calc(var(--workspace-frame-gutter) + 4px);
-    --workspace-bottom-dock-reserve: calc(68px + env(safe-area-inset-bottom, 0px));
+    --workspace-bottom-dock-reserve: calc(62px + env(safe-area-inset-bottom, 0px));
     --workspace-projects-bottom-gap: 6px;
     height: calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset, 0px));
     min-height: calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset, 0px));

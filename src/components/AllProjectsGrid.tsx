@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Download, Trash2, X } from "lucide-react";
 import ProjectCard from "./ProjectCard";
@@ -57,7 +57,9 @@ export default function AllProjectsGrid({
   const [hiddenIds, setHiddenIds] = useState<Record<string, true>>({});
   const [mounted, setMounted] = useState(false);
   const [trashToast, setTrashToast] = useState<TrashToastState | null>(null);
+  const [trashToastDismissing, setTrashToastDismissing] = useState(false);
   const [undoBusy, setUndoBusy] = useState(false);
+  const trashToastTouchStartY = useRef<number | null>(null);
 
   const visibleProjects = projects.filter((project) => !hiddenIds[project.id]);
   const selectedIds = visibleProjects.filter((project) => selected[project.id]).map((project) => project.id);
@@ -74,6 +76,7 @@ export default function AllProjectsGrid({
 
   useEffect(() => {
     if (!trashToast) return;
+    setTrashToastDismissing(false);
     const timer = window.setTimeout(() => {
       setTrashToast(null);
     }, TRASH_TOAST_MS);
@@ -116,6 +119,24 @@ export default function AllProjectsGrid({
       )
     );
     setUndoBusy(false);
+  };
+
+  const handleTrashToastTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    trashToastTouchStartY.current = event.touches[0]?.clientY ?? null;
+  };
+
+  const handleTrashToastTouchEnd = (event: React.TouchEvent<HTMLDivElement>) => {
+    const startY = trashToastTouchStartY.current;
+    trashToastTouchStartY.current = null;
+    const endY = event.changedTouches[0]?.clientY;
+    if (startY == null || endY == null) return;
+    if (startY - endY >= 36) {
+      setTrashToastDismissing(true);
+      window.setTimeout(() => {
+        setTrashToast(null);
+        setTrashToastDismissing(false);
+      }, 220);
+    }
   };
 
   const handleBulkDownload = async () => {
@@ -207,7 +228,7 @@ export default function AllProjectsGrid({
         ? createPortal(
             <>
               <div
-                className={`fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+84px)] z-[80] flex justify-center px-4 transition-all duration-200 ease-out sm:bottom-10 lg:bottom-14 xl:bottom-18 sm:px-6 ${
+                className={`fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+96px)] z-[80] flex justify-center px-4 transition-all duration-200 ease-out sm:bottom-10 lg:bottom-14 xl:bottom-18 sm:px-6 ${
                   hasSelection
                     ? "pointer-events-auto translate-y-0 opacity-100"
                     : "pointer-events-none translate-y-3 opacity-0"
@@ -298,7 +319,15 @@ export default function AllProjectsGrid({
                 </div>
               ) : null}
               {trashToast ? (
-                <div className="fixed left-1/2 top-4 z-[10000] w-[min(460px,calc(100vw-1.5rem))] [animation:copy-toast-in-out_6500ms_ease-in-out_forwards]">
+                <div
+                  className={`fixed left-1/2 top-4 z-[10000] w-[min(460px,calc(100vw-1.5rem))] ${
+                    trashToastDismissing
+                      ? "[animation:copy-toast-dismiss-up_220ms_ease-out_forwards]"
+                      : "[animation:copy-toast-in-out_6500ms_ease-in-out_forwards]"
+                  }`}
+                  onTouchStart={handleTrashToastTouchStart}
+                  onTouchEnd={handleTrashToastTouchEnd}
+                >
                   <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-700/70 bg-[#171923] px-3.5 py-2.5 text-white shadow-[0_10px_20px_rgba(15,23,42,0.34)]">
                     <p className="min-w-0 truncate pr-1.5 text-sm font-semibold">{trashToast.label}</p>
                     <button

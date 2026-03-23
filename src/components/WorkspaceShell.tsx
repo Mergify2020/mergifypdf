@@ -750,7 +750,9 @@ export default function WorkspaceShell({
   const isAllProjectsRoute = pathname === "/projects/all";
   const fallbackProjectCardCount = fallbackProjectCountReady
     ? (isAllProjectsRoute ? Math.min(homeRecentProjects.length, 60) : Math.min(homeRecentProjects.length, 9))
-    : 0;
+    : isAllProjectsRoute
+      ? 8
+      : 6;
 
   const navigateWithContentSwap = (nextPath: string, closeMobile = false): boolean => {
     const currentPath = pathname ?? "";
@@ -2496,12 +2498,10 @@ export default function WorkspaceShell({
                         onMouseDown={(event) => {
                           const target = event.target;
                           if (target instanceof HTMLInputElement) return;
-                          if (phoneViewport) setMobileSearchExpanded(true);
                           event.preventDefault();
                           homeProjectsSearchInputRef.current?.focus();
                         }}
                         onClick={() => {
-                          if (phoneViewport) setMobileSearchExpanded(true);
                           homeProjectsSearchInputRef.current?.focus();
                         }}
                       >
@@ -2635,13 +2635,13 @@ export default function WorkspaceShell({
                                     }}
                                   >
                                     <div className="flex items-center justify-between gap-4">
-                                      <h2 className="text-base font-semibold text-[#1F2A37] dark:text-zinc-100 sm:text-lg">
+                                      <h2 className="whitespace-nowrap text-lg font-semibold text-[#1F2A37] min-[560px]:text-xl dark:text-zinc-100 md:text-2xl">
                                         {isAllProjectsRoute ? "All projects" : "Recent projects"}
                                       </h2>
                                       {isAllProjectsRoute ? (
                                         <div className="flex items-center gap-2">
-                                          <div className="h-10 w-[140px] rounded-full bg-slate-100 skeleton-shimmer dark:bg-zinc-800/70" />
-                                          <div className="h-10 w-32 rounded-full bg-slate-100 skeleton-shimmer dark:bg-zinc-800/70" />
+                                          <div className="h-[34px] w-[110px] rounded-full bg-slate-100 skeleton-shimmer dark:bg-zinc-800/70" />
+                                          <div className="h-[34px] w-[96px] rounded-full bg-slate-100 skeleton-shimmer dark:bg-zinc-800/70" />
                                         </div>
                                       ) : null}
                                     </div>
@@ -2655,12 +2655,17 @@ export default function WorkspaceShell({
                                             <div key={`home-refresh-skeleton-${index}`} className="flex w-full flex-col text-left">
                                               <div className="relative rounded-[10px] bg-[#F9FAFC] dark:bg-zinc-900/60">
                                                 <div className="relative m-[3px] aspect-square w-[calc(100%-6px)] overflow-hidden rounded-[10px] border border-[rgba(0,0,0,0.06)] bg-[#EEF1F5] dark:border-zinc-800 dark:bg-zinc-800/70">
+                                                  <div className="absolute left-3 top-3 h-8 w-8 rounded-[10px] border-[3px] border-slate-200 bg-white shadow-md dark:border-zinc-700 dark:bg-zinc-900" />
+                                                  <div className="absolute right-3 top-3 flex h-8 w-[74px] items-center rounded-[10px] bg-white/95 px-2 shadow-[0_4px_12px_rgba(15,23,42,0.12)] dark:bg-zinc-900/95">
+                                                    <div className="h-5 w-5 rounded-full bg-slate-100 skeleton-shimmer dark:bg-zinc-800/70" />
+                                                    <div className="ml-2 h-5 w-5 rounded-full bg-slate-100 skeleton-shimmer dark:bg-zinc-800/70" />
+                                                  </div>
                                                   <div className="absolute inset-0 rounded-[10px] skeleton-shimmer opacity-90" />
                                                 </div>
                                               </div>
-                                              <div className="mt-2 space-y-0.5">
-                                                <div className="h-4 w-[58%] rounded-full bg-slate-100 skeleton-shimmer dark:bg-zinc-800/70" />
-                                                <div className="h-3 w-[42%] rounded-full bg-slate-100 skeleton-shimmer dark:bg-zinc-800/70" />
+                                              <div className="mt-2 space-y-1">
+                                                <div className="h-5 w-[72%] rounded-full bg-slate-100 skeleton-shimmer dark:bg-zinc-800/70" />
+                                                <div className="h-3.5 w-[48%] rounded-full bg-slate-100 skeleton-shimmer dark:bg-zinc-800/70" />
                                               </div>
                                             </div>
                                           ))}
@@ -2683,7 +2688,7 @@ export default function WorkspaceShell({
                             </div>
                             {!isAllProjectsRoute ? (
                               <aside
-                                className="relative z-10 w-full min-h-0 overflow-visible"
+                                className="relative z-10 hidden w-full min-h-0 overflow-visible xl:block"
                                 style={{ marginTop: "var(--home-right-column-offset, 240px)" }}
                               >
                                 <div className="flex min-h-0 flex-col gap-[24px] overflow-visible">
@@ -2738,11 +2743,11 @@ export default function WorkspaceShell({
 
       {!hideWorkspaceSidebar ? (
         <div
-          className={`workspace-bottom-dock fixed inset-x-0 bottom-0 z-[75] hidden border-t border-slate-200 bg-white/95 px-2 pt-2 pb-[calc(10px+env(safe-area-inset-bottom))] backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/95 ${
+          className={`workspace-bottom-dock fixed inset-x-0 bottom-0 z-[75] hidden border-t border-slate-200 bg-white/95 px-2 pt-1 pb-[calc(6px+env(safe-area-inset-bottom))] backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/95 ${
             showHomeBillingModal ? "pointer-events-none blur-sm opacity-55" : ""
           }`}
         >
-          <div className="mx-auto grid max-w-xl grid-cols-6 items-end gap-1">
+          <div className="mx-auto grid max-w-xl grid-cols-5 items-end gap-1">
             <button
               type="button"
               onClick={openCreateModal}

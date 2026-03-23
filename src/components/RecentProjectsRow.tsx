@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import Image from "next/image";
@@ -39,6 +39,11 @@ type TrashToastState = {
   ids: string[];
   label: string;
   projects: SummaryProject[];
+};
+
+type CopyToastState = {
+  id: string;
+  name: string;
 };
 
 const STARRED_STORAGE_KEY = "mpdf:starred-projects";
@@ -84,6 +89,9 @@ export default function RecentProjectsRow({
   const [confirmTrashOpen, setConfirmTrashOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [trashToast, setTrashToast] = useState<TrashToastState | null>(null);
+  const [trashToastDismissing, setTrashToastDismissing] = useState(false);
+  const [copyToast, setCopyToast] = useState<CopyToastState | null>(null);
+  const [copyToastDismissing, setCopyToastDismissing] = useState(false);
   const [undoBusy, setUndoBusy] = useState(false);
   const [starredById, setStarredById] = useState<Record<string, true>>({});
   const [listMenuOpenId, setListMenuOpenId] = useState<string | null>(null);
@@ -95,6 +103,8 @@ export default function RecentProjectsRow({
   const [listRenameDraft, setListRenameDraft] = useState("");
   const [listRenameBusy, setListRenameBusy] = useState(false);
   const [renamedProjectId, setRenamedProjectId] = useState<string | null>(null);
+  const trashToastTouchStartY = useRef<number | null>(null);
+  const copyToastTouchStartY = useRef<number | null>(null);
   const loading = false;
 
   useEffect(() => {
@@ -111,6 +121,7 @@ export default function RecentProjectsRow({
 
   useEffect(() => {
     if (!trashToast) return;
+    setTrashToastDismissing(false);
     const timer = window.setTimeout(() => {
       setTrashToast(null);
     }, TRASH_TOAST_MS);
@@ -118,6 +129,17 @@ export default function RecentProjectsRow({
       window.clearTimeout(timer);
     };
   }, [trashToast]);
+
+  useEffect(() => {
+    if (!copyToast) return;
+    setCopyToastDismissing(false);
+    const timer = window.setTimeout(() => {
+      setCopyToast(null);
+    }, TRASH_TOAST_MS);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [copyToast]);
 
   useEffect(() => {
     if (!renamedProjectId) return;
@@ -420,6 +442,24 @@ export default function RecentProjectsRow({
     setUndoBusy(false);
   };
 
+  const handleTrashToastTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    trashToastTouchStartY.current = event.touches[0]?.clientY ?? null;
+  };
+
+  const handleTrashToastTouchEnd = (event: React.TouchEvent<HTMLDivElement>) => {
+    const startY = trashToastTouchStartY.current;
+    trashToastTouchStartY.current = null;
+    const endY = event.changedTouches[0]?.clientY;
+    if (startY == null || endY == null) return;
+    if (startY - endY >= 36) {
+      setTrashToastDismissing(true);
+      window.setTimeout(() => {
+        setTrashToast(null);
+        setTrashToastDismissing(false);
+      }, 220);
+    }
+  };
+
   const handleProjectCopied = (
     duplicated: {
       id?: string;
@@ -454,6 +494,28 @@ export default function RecentProjectsRow({
       next.splice(sourceIndex + 1, 0, nextEntry);
       return next;
     });
+    setCopyToast({
+      id: nextId,
+      name: nextName,
+    });
+  };
+
+  const handleCopyToastTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    copyToastTouchStartY.current = event.touches[0]?.clientY ?? null;
+  };
+
+  const handleCopyToastTouchEnd = (event: React.TouchEvent<HTMLDivElement>) => {
+    const startY = copyToastTouchStartY.current;
+    copyToastTouchStartY.current = null;
+    const endY = event.changedTouches[0]?.clientY;
+    if (startY == null || endY == null) return;
+    if (startY - endY >= 36) {
+      setCopyToastDismissing(true);
+      window.setTimeout(() => {
+        setCopyToast(null);
+        setCopyToastDismissing(false);
+      }, 220);
+    }
   };
 
   const activeListMenuProject = listMenuOpenId
@@ -464,135 +526,122 @@ export default function RecentProjectsRow({
     <>
       {viewMode === "list" && showAllProjects ? (
         <div className="mt-2 bg-white dark:bg-zinc-900">
-          <div className="grid grid-cols-[36px_minmax(260px,340px)_1fr_180px_180px_96px_72px] items-center gap-x-5 border-b border-[#E6EBF2] px-4 py-3 text-sm font-bold uppercase tracking-[0.08em] text-slate-700 dark:border-zinc-700 dark:text-zinc-200 xl:grid-cols-[36px_minmax(260px,340px)_1fr_196px_196px_112px_84px] xl:gap-x-7 2xl:grid-cols-[36px_minmax(260px,340px)_1fr_208px_208px_120px_92px] 2xl:gap-x-8">
-            <button
-              type="button"
-              onClick={() => {
-                if (allVisibleSelected) {
+          <div className="md:hidden">
+            <div className="grid grid-cols-[36px_minmax(0,1fr)_40px] items-center gap-x-4 border-b border-[#E6EBF2] px-4 py-3 text-sm font-bold uppercase tracking-[0.08em] text-slate-700 dark:border-zinc-700 dark:text-zinc-200">
+              <button
+                type="button"
+                onClick={() => {
+                  if (allVisibleSelected) {
+                    setSelected((prev) => {
+                      const next = { ...prev };
+                      mapped.forEach((project) => {
+                        delete next[project.id];
+                      });
+                      return next;
+                    });
+                    return;
+                  }
+
                   setSelected((prev) => {
                     const next = { ...prev };
                     mapped.forEach((project) => {
-                      delete next[project.id];
+                      next[project.id] = true;
                     });
                     return next;
                   });
-                  return;
-                }
+                }}
+                className={`inline-flex h-5 w-5 items-center justify-center rounded-[5px] border-2 transition ${
+                  allVisibleSelected
+                    ? "border-[#6C47FF] bg-[#6C47FF] text-white"
+                    : "border-slate-300 text-transparent hover:border-slate-400 dark:border-zinc-600"
+                }`}
+                aria-label={allVisibleSelected ? "Deselect all projects" : "Select all projects"}
+                aria-pressed={allVisibleSelected}
+              >
+                <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden />
+              </button>
+              <span className="text-left">Name</span>
+              <span aria-hidden />
+            </div>
+            <div className="divide-y divide-[#E6EBF2] dark:divide-zinc-700">
+              {mapped.map((project) => {
+                const isSelected = !!selected[project.id];
+                const fileSize = formatFileSize(project.fileSizeBytes);
+                const primaryMetaParts = [
+                  "PDF",
+                  fileSize,
+                  typeof project.pagesCount === "number"
+                    ? `${project.pagesCount} ${project.pagesCount === 1 ? "page" : "pages"}`
+                    : null,
+                ].filter(Boolean) as string[];
 
-                setSelected((prev) => {
-                  const next = { ...prev };
-                  mapped.forEach((project) => {
-                    next[project.id] = true;
-                  });
-                  return next;
-                });
-              }}
-              className={`inline-flex h-5 w-5 items-center justify-center rounded-[5px] border-2 transition ${
-                allVisibleSelected
-                  ? "border-[#6C47FF] bg-[#6C47FF] text-white"
-                  : "border-slate-300 text-transparent hover:border-slate-400 dark:border-zinc-600"
-              }`}
-              aria-label={allVisibleSelected ? "Deselect all projects" : "Select all projects"}
-              aria-pressed={allVisibleSelected}
-            >
-              <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden />
-            </button>
-            <span className="text-left">Name</span>
-            <span aria-hidden />
-            <span aria-hidden />
-            <span className="text-left">Opened</span>
-            <span className="text-left">Pages</span>
-            <span className="text-right">Actions</span>
-          </div>
-          <div className="divide-y divide-[#E6EBF2] dark:divide-zinc-700">
-            {mapped.map((project) => {
-              const isSelected = !!selected[project.id];
-              return (
-                <div
-                  key={project.id}
-                  className={`grid grid-cols-[36px_minmax(260px,340px)_1fr_180px_180px_96px_72px] items-center gap-x-5 px-4 py-3 transition xl:grid-cols-[36px_minmax(260px,340px)_1fr_196px_196px_112px_84px] xl:gap-x-7 2xl:grid-cols-[36px_minmax(260px,340px)_1fr_208px_208px_120px_92px] 2xl:gap-x-8 ${
-                    isSelected ? "bg-[#F5F3FF] dark:bg-zinc-800/60" : "hover:bg-[#F8FAFC] dark:hover:bg-zinc-800/40"
-                  }`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => setSelected((prev) => ({ ...prev, [project.id]: !prev[project.id] }))}
-                    className={`inline-flex h-5 w-5 items-center justify-center rounded-[5px] border-2 transition ${
-                      isSelected
-                        ? "border-[#6C47FF] bg-[#6C47FF] text-white"
-                        : "border-slate-300 text-transparent hover:border-slate-400 dark:border-zinc-600"
+                return (
+                  <div
+                    key={project.id}
+                    className={`grid grid-cols-[36px_minmax(0,1fr)_40px] items-start gap-x-4 px-4 py-3 transition ${
+                      isSelected ? "bg-[#F5F3FF] dark:bg-zinc-800/60" : "hover:bg-[#F8FAFC] dark:hover:bg-zinc-800/40"
                     }`}
-                    aria-label={isSelected ? "Deselect project" : "Select project"}
-                    aria-pressed={isSelected}
                   >
-                    <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden />
-                  </button>
-                  {listRenamingId === project.id ? (
-                    <div className="flex min-w-0 items-center gap-2">
-                      <input
-                        value={listRenameDraft}
-                        autoFocus
-                        spellCheck={false}
-                        autoComplete="off"
-                        disabled={listRenameBusy}
-                        onChange={(event) => {
-                          setListRenameDraft(event.target.value);
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key === "Escape") {
-                            event.preventDefault();
+                    <button
+                      type="button"
+                      onClick={() => setSelected((prev) => ({ ...prev, [project.id]: !prev[project.id] }))}
+                      className={`mt-1 inline-flex h-5 w-5 items-center justify-center rounded-[5px] border-2 transition ${
+                        isSelected
+                          ? "border-[#6C47FF] bg-[#6C47FF] text-white"
+                          : "border-slate-300 text-transparent hover:border-slate-400 dark:border-zinc-600"
+                      }`}
+                      aria-label={isSelected ? "Deselect project" : "Select project"}
+                      aria-pressed={isSelected}
+                    >
+                      <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden />
+                    </button>
+                    {listRenamingId === project.id ? (
+                      <div className="flex min-w-0 items-center gap-2 pt-0.5">
+                        <input
+                          value={listRenameDraft}
+                          autoFocus
+                          spellCheck={false}
+                          autoComplete="off"
+                          disabled={listRenameBusy}
+                          onChange={(event) => {
+                            setListRenameDraft(event.target.value);
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === "Escape") {
+                              event.preventDefault();
+                              setListRenamingId(null);
+                              setListRenameDraft("");
+                              return;
+                            }
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              void submitListRename(project.id);
+                            }
+                          }}
+                          onBlur={() => {
+                            if (listRenameBusy) return;
                             setListRenamingId(null);
                             setListRenameDraft("");
-                            return;
-                          }
-                          if (event.key === "Enter") {
-                            event.preventDefault();
-                            void submitListRename(project.id);
-                          }
-                        }}
-                        onBlur={() => {
-                          if (listRenameBusy) return;
-                          setListRenamingId(null);
-                          setListRenameDraft("");
-                        }}
-                        className="w-full rounded-md border-2 border-[#6C47FF]/55 bg-slate-50/70 px-2 py-1 text-[16px] font-semibold leading-tight text-slate-900 outline-none focus:border-[#6C47FF] focus:ring-0 disabled:opacity-70 dark:border-[#6C47FF]/65 dark:bg-zinc-900/60 dark:text-zinc-100"
-                      />
-                      <button
-                        type="button"
-                        aria-label="Confirm rename"
-                        disabled={listRenameBusy}
-                        onMouseDown={(event) => {
-                          event.preventDefault();
-                        }}
-                        onClick={() => {
-                          void submitListRename(project.id);
-                        }}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#6C47FF] transition hover:bg-[#F8FAFC] hover:text-[#5B38E6] disabled:opacity-60 dark:text-[#BBA6FF] dark:hover:bg-zinc-800/70 dark:hover:text-[#CFC4FF]"
-                      >
-                        <Check className="h-4 w-4" strokeWidth={2.5} aria-hidden />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="group/rename flex min-w-0 items-center gap-2 rounded-lg px-1.5 py-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          toggleProjectStar(project.id);
-                        }}
-                        className={`inline-flex h-5 w-5 flex-none items-center justify-center transition ${
-                          starredById[project.id]
-                            ? "text-amber-500 dark:text-amber-300"
-                            : "text-slate-300 hover:text-amber-400 dark:text-zinc-600 dark:hover:text-amber-300"
-                        }`}
-                        aria-label={starredById[project.id] ? "Unstar project" : "Star project"}
-                        aria-pressed={starredById[project.id] === true}
-                      >
-                        <Star
-                          className={`h-4 w-4 ${starredById[project.id] ? "fill-current" : ""}`}
-                          aria-hidden
+                          }}
+                          className="w-full rounded-md border-2 border-[#6C47FF]/55 bg-slate-50/70 px-2 py-1 text-[16px] font-semibold leading-tight text-slate-900 outline-none focus:border-[#6C47FF] focus:ring-0 disabled:opacity-70 dark:border-[#6C47FF]/65 dark:bg-zinc-900/60 dark:text-zinc-100"
                         />
-                      </button>
-                      <div className="min-w-0">
+                        <button
+                          type="button"
+                          aria-label="Confirm rename"
+                          disabled={listRenameBusy}
+                          onMouseDown={(event) => {
+                            event.preventDefault();
+                          }}
+                          onClick={() => {
+                            void submitListRename(project.id);
+                          }}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#6C47FF] transition hover:bg-[#F8FAFC] hover:text-[#5B38E6] disabled:opacity-60 dark:text-[#BBA6FF] dark:hover:bg-zinc-800/70 dark:hover:text-[#CFC4FF]"
+                        >
+                          <Check className="h-4 w-4" strokeWidth={2.5} aria-hidden />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="min-w-0 flex-1 pt-0.5">
                         <Link
                           href={`/studio?project=${encodeURIComponent(project.id)}`}
                           className={`block min-w-0 truncate text-[16px] font-semibold text-slate-900 dark:text-zinc-100 ${
@@ -603,77 +652,268 @@ export default function RecentProjectsRow({
                         >
                           {project.title}
                         </Link>
-                        <span className="mt-0.5 block text-xs text-slate-500 dark:text-zinc-400">
-                          {formatFileSize(project.fileSizeBytes)
-                            ? `PDF · ${formatFileSize(project.fileSizeBytes)}`
-                            : "PDF"}
+                        <span className="mt-1 flex flex-wrap items-center gap-y-0.5 text-xs text-slate-500 dark:text-zinc-400">
+                          <span className="whitespace-nowrap">{primaryMetaParts.join(" · ")}</span>
+                          <span className="whitespace-nowrap before:mx-1 before:content-['·']">
+                            {project.updated}
+                          </span>
                         </span>
                       </div>
+                    )}
+                    <div className="flex items-start justify-end pt-0.5">
                       <button
                         type="button"
-                        aria-label="Rename project"
-                        onClick={() => {
-                          setListRenamingId(project.id);
-                          setListRenameDraft(projectNameToEditable(project.title));
+                        onMouseDown={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          const nextOpen = listMenuOpenId !== project.id;
+                          if (!nextOpen) {
+                            setListMenuOpenId(null);
+                            setListMenuPosition(null);
+                            setListMenuRenamingId(null);
+                            return;
+                          }
+                          const trigger = event.currentTarget.getBoundingClientRect();
+                          const menuWidth = 256;
+                          const menuHeight = 252;
+                          const margin = 16;
+                          const clampLeft = (value: number) =>
+                            Math.min(Math.max(value, margin), window.innerWidth - menuWidth - margin);
+                          const left = clampLeft(trigger.right - menuWidth);
+                          const preferredBelow = trigger.bottom + 8;
+                          const maxTop = window.innerHeight - menuHeight - margin;
+                          const top =
+                            preferredBelow <= maxTop
+                              ? preferredBelow
+                              : Math.max(margin, trigger.top - menuHeight - 8);
+                          setListMenuPosition({ top, left });
+                          setListMenuOpenId(project.id);
                         }}
-                        className="inline-flex h-6 w-6 flex-none items-center justify-center text-slate-500 transition hover:text-slate-700 md:opacity-0 md:group-hover/rename:opacity-100 md:group-focus-within/rename:opacity-100 dark:text-zinc-400 dark:hover:text-zinc-100"
+                        className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition ${
+                          listMenuOpenId === project.id
+                            ? "bg-[#6C47FF] text-white"
+                            : "text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                        }`}
+                        aria-label="Project actions"
+                        aria-expanded={listMenuOpenId === project.id}
+                        aria-haspopup="menu"
                       >
-                        <Pencil className="h-4 w-4" aria-hidden />
+                        <MoreHorizontal className="h-4 w-4" aria-hidden />
                       </button>
                     </div>
-                  )}
-                  <span aria-hidden />
-                  <span aria-hidden />
-                  <span className="truncate text-left text-[15px] text-slate-600 dark:text-zinc-300">
-                    {formatProjectActivityDate(
-                      projects.find((entry) => entry.id === project.id)?.updatedAt ?? project.updated
-                    )}
-                  </span>
-                  <span className="text-left text-[15px] text-slate-600 dark:text-zinc-300">{project.pagesCount ?? 0}</span>
-                  <div className="flex items-center justify-end gap-1">
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div className="hidden md:block">
+            <div className="grid grid-cols-[36px_minmax(280px,1fr)_120px_64px_56px] items-center gap-x-5 border-b border-[#E6EBF2] px-4 py-3 text-sm font-bold uppercase tracking-[0.08em] text-slate-700 dark:border-zinc-700 dark:text-zinc-200 xl:grid-cols-[36px_minmax(420px,1fr)_180px_96px_72px] xl:gap-x-7 2xl:grid-cols-[36px_minmax(560px,1fr)_208px_120px_84px] 2xl:gap-x-8">
+              <button
+                type="button"
+                onClick={() => {
+                  if (allVisibleSelected) {
+                    setSelected((prev) => {
+                      const next = { ...prev };
+                      mapped.forEach((project) => {
+                        delete next[project.id];
+                      });
+                      return next;
+                    });
+                    return;
+                  }
+
+                  setSelected((prev) => {
+                    const next = { ...prev };
+                    mapped.forEach((project) => {
+                      next[project.id] = true;
+                    });
+                    return next;
+                  });
+                }}
+                className={`inline-flex h-5 w-5 items-center justify-center rounded-[5px] border-2 transition ${
+                  allVisibleSelected
+                    ? "border-[#6C47FF] bg-[#6C47FF] text-white"
+                    : "border-slate-300 text-transparent hover:border-slate-400 dark:border-zinc-600"
+                }`}
+                aria-label={allVisibleSelected ? "Deselect all projects" : "Select all projects"}
+                aria-pressed={allVisibleSelected}
+              >
+                <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden />
+              </button>
+              <span className="text-left">Name</span>
+              <span className="text-left">Opened</span>
+              <span className="text-left">Pages</span>
+              <span className="text-right">Actions</span>
+            </div>
+            <div className="divide-y divide-[#E6EBF2] dark:divide-zinc-700">
+              {mapped.map((project) => {
+                const isSelected = !!selected[project.id];
+                return (
+                  <div
+                    key={project.id}
+                    className={`grid grid-cols-[36px_minmax(280px,1fr)_120px_64px_56px] items-center gap-x-5 px-4 py-3 transition xl:grid-cols-[36px_minmax(420px,1fr)_180px_96px_72px] xl:gap-x-7 2xl:grid-cols-[36px_minmax(560px,1fr)_208px_120px_84px] 2xl:gap-x-8 ${
+                      isSelected ? "bg-[#F5F3FF] dark:bg-zinc-800/60" : "hover:bg-[#F8FAFC] dark:hover:bg-zinc-800/40"
+                    }`}
+                  >
                     <button
                       type="button"
-                      onMouseDown={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        const nextOpen = listMenuOpenId !== project.id;
-                        if (!nextOpen) {
-                          setListMenuOpenId(null);
-                          setListMenuPosition(null);
-                          setListMenuRenamingId(null);
-                          return;
-                        }
-                        const trigger = event.currentTarget.getBoundingClientRect();
-                        const menuWidth = 256;
-                        const menuHeight = 252;
-                        const margin = 16;
-                        const clampLeft = (value: number) =>
-                          Math.min(Math.max(value, margin), window.innerWidth - menuWidth - margin);
-                        const left = clampLeft(trigger.right - menuWidth);
-                        const preferredBelow = trigger.bottom + 8;
-                        const maxTop = window.innerHeight - menuHeight - margin;
-                        const top =
-                          preferredBelow <= maxTop
-                            ? preferredBelow
-                            : Math.max(margin, trigger.top - menuHeight - 8);
-                        setListMenuPosition({ top, left });
-                        setListMenuOpenId(project.id);
-                      }}
-                      className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition ${
-                        listMenuOpenId === project.id
-                          ? "bg-[#6C47FF] text-white"
-                          : "text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                      onClick={() => setSelected((prev) => ({ ...prev, [project.id]: !prev[project.id] }))}
+                      className={`inline-flex h-5 w-5 items-center justify-center rounded-[5px] border-2 transition ${
+                        isSelected
+                          ? "border-[#6C47FF] bg-[#6C47FF] text-white"
+                          : "border-slate-300 text-transparent hover:border-slate-400 dark:border-zinc-600"
                       }`}
-                      aria-label="Project actions"
-                      aria-expanded={listMenuOpenId === project.id}
-                      aria-haspopup="menu"
+                      aria-label={isSelected ? "Deselect project" : "Select project"}
+                      aria-pressed={isSelected}
                     >
-                      <MoreHorizontal className="h-4 w-4" aria-hidden />
+                      <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden />
                     </button>
+                    {listRenamingId === project.id ? (
+                      <div className="flex min-w-0 items-center gap-2">
+                        <input
+                          value={listRenameDraft}
+                          autoFocus
+                          spellCheck={false}
+                          autoComplete="off"
+                          disabled={listRenameBusy}
+                          onChange={(event) => {
+                            setListRenameDraft(event.target.value);
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === "Escape") {
+                              event.preventDefault();
+                              setListRenamingId(null);
+                              setListRenameDraft("");
+                              return;
+                            }
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              void submitListRename(project.id);
+                            }
+                          }}
+                          onBlur={() => {
+                            if (listRenameBusy) return;
+                            setListRenamingId(null);
+                            setListRenameDraft("");
+                          }}
+                          className="w-full rounded-md border-2 border-[#6C47FF]/55 bg-slate-50/70 px-2 py-1 text-[16px] font-semibold leading-tight text-slate-900 outline-none focus:border-[#6C47FF] focus:ring-0 disabled:opacity-70 dark:border-[#6C47FF]/65 dark:bg-zinc-900/60 dark:text-zinc-100"
+                        />
+                        <button
+                          type="button"
+                          aria-label="Confirm rename"
+                          disabled={listRenameBusy}
+                          onMouseDown={(event) => {
+                            event.preventDefault();
+                          }}
+                          onClick={() => {
+                            void submitListRename(project.id);
+                          }}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#6C47FF] transition hover:bg-[#F8FAFC] hover:text-[#5B38E6] disabled:opacity-60 dark:text-[#BBA6FF] dark:hover:bg-zinc-800/70 dark:hover:text-[#CFC4FF]"
+                        >
+                          <Check className="h-4 w-4" strokeWidth={2.5} aria-hidden />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="group/rename flex min-w-0 items-center gap-2 rounded-lg px-1.5 py-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            toggleProjectStar(project.id);
+                          }}
+                          className={`inline-flex h-5 w-5 flex-none items-center justify-center transition ${
+                            starredById[project.id]
+                              ? "text-amber-500 dark:text-amber-300"
+                              : "text-slate-300 hover:text-amber-400 dark:text-zinc-600 dark:hover:text-amber-300"
+                          }`}
+                          aria-label={starredById[project.id] ? "Unstar project" : "Star project"}
+                          aria-pressed={starredById[project.id] === true}
+                        >
+                          <Star
+                            className={`h-4 w-4 ${starredById[project.id] ? "fill-current" : ""}`}
+                            aria-hidden
+                          />
+                        </button>
+                        <div className="min-w-0">
+                          <Link
+                            href={`/studio?project=${encodeURIComponent(project.id)}`}
+                            className={`block min-w-0 truncate text-[16px] font-semibold text-slate-900 dark:text-zinc-100 ${
+                              renamedProjectId === project.id
+                                ? "[animation:rename-text-flash_1400ms_ease-out_forwards]"
+                                : ""
+                            }`}
+                          >
+                            {project.title}
+                          </Link>
+                          <span className="mt-0.5 block text-xs text-slate-500 dark:text-zinc-400">
+                            {formatFileSize(project.fileSizeBytes)
+                              ? `PDF · ${formatFileSize(project.fileSizeBytes)}`
+                              : "PDF"}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          aria-label="Rename project"
+                          onClick={() => {
+                            setListRenamingId(project.id);
+                            setListRenameDraft(projectNameToEditable(project.title));
+                          }}
+                          className="inline-flex h-6 w-6 flex-none items-center justify-center text-slate-500 transition hover:text-slate-700 md:opacity-0 md:group-hover/rename:opacity-100 md:group-focus-within/rename:opacity-100 dark:text-zinc-400 dark:hover:text-zinc-100"
+                        >
+                          <Pencil className="h-4 w-4" aria-hidden />
+                        </button>
+                      </div>
+                    )}
+                    <span className="truncate text-left text-[15px] text-slate-600 dark:text-zinc-300">
+                      {formatProjectActivityDate(
+                        projects.find((entry) => entry.id === project.id)?.updatedAt ?? project.updated
+                      )}
+                    </span>
+                    <span className="text-left text-[15px] text-slate-600 dark:text-zinc-300">{project.pagesCount ?? 0}</span>
+                    <div className="flex items-center justify-end gap-1">
+                      <button
+                        type="button"
+                        onMouseDown={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          const nextOpen = listMenuOpenId !== project.id;
+                          if (!nextOpen) {
+                            setListMenuOpenId(null);
+                            setListMenuPosition(null);
+                            setListMenuRenamingId(null);
+                            return;
+                          }
+                          const trigger = event.currentTarget.getBoundingClientRect();
+                          const menuWidth = 256;
+                          const menuHeight = 252;
+                          const margin = 16;
+                          const clampLeft = (value: number) =>
+                            Math.min(Math.max(value, margin), window.innerWidth - menuWidth - margin);
+                          const left = clampLeft(trigger.right - menuWidth);
+                          const preferredBelow = trigger.bottom + 8;
+                          const maxTop = window.innerHeight - menuHeight - margin;
+                          const top =
+                            preferredBelow <= maxTop
+                              ? preferredBelow
+                              : Math.max(margin, trigger.top - menuHeight - 8);
+                          setListMenuPosition({ top, left });
+                          setListMenuOpenId(project.id);
+                        }}
+                        className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition ${
+                          listMenuOpenId === project.id
+                            ? "bg-[#6C47FF] text-white"
+                            : "text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                        }`}
+                        aria-label="Project actions"
+                        aria-expanded={listMenuOpenId === project.id}
+                        aria-haspopup="menu"
+                      >
+                        <MoreHorizontal className="h-4 w-4" aria-hidden />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </div>
       ) : (
@@ -1132,7 +1372,15 @@ export default function RecentProjectsRow({
                   )
                 : null}
               {trashToast ? (
-                <div className="fixed left-1/2 top-4 z-[10000] w-[min(460px,calc(100vw-1.5rem))] [animation:copy-toast-in-out_6500ms_ease-in-out_forwards]">
+                <div
+                  className={`fixed left-1/2 top-4 z-[10000] w-[min(460px,calc(100vw-1.5rem))] ${
+                    trashToastDismissing
+                      ? "[animation:copy-toast-dismiss-up_220ms_ease-out_forwards]"
+                      : "[animation:copy-toast-in-out_6500ms_ease-in-out_forwards]"
+                  }`}
+                  onTouchStart={handleTrashToastTouchStart}
+                  onTouchEnd={handleTrashToastTouchEnd}
+                >
                   <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-700/70 bg-[#171923] px-3.5 py-2.5 text-white shadow-[0_10px_20px_rgba(15,23,42,0.34)]">
                     <p className="min-w-0 truncate pr-1.5 text-sm font-semibold">{trashToast.label}</p>
                     <button
@@ -1145,6 +1393,30 @@ export default function RecentProjectsRow({
                     >
                       {undoBusy ? "Undoing..." : "Undo"}
                     </button>
+                  </div>
+                </div>
+              ) : null}
+              {copyToast ? (
+                <div
+                  className={`fixed left-1/2 top-4 z-[10000] w-[min(420px,calc(100vw-1.5rem))] ${
+                    copyToastDismissing
+                      ? "[animation:copy-toast-dismiss-up_220ms_ease-out_forwards]"
+                      : "[animation:copy-toast-in-out_6500ms_ease-in-out_forwards]"
+                  }`}
+                  onTouchStart={handleCopyToastTouchStart}
+                  onTouchEnd={handleCopyToastTouchEnd}
+                >
+                  <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-700/70 bg-[#171923] px-3.5 py-2.5 text-white shadow-[0_10px_20px_rgba(15,23,42,0.34)]">
+                    <p className="min-w-0 truncate pr-1.5 text-sm font-semibold">
+                      {`Created "Copy of ${copyToast.name}"`}
+                    </p>
+                    <Link
+                      href={`/studio?project=${encodeURIComponent(copyToast.id)}`}
+                      className="shrink-0 rounded-md border-2 border-white/25 px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-white/10"
+                      onClick={() => setCopyToast(null)}
+                    >
+                      Open
+                    </Link>
                   </div>
                 </div>
               ) : null}

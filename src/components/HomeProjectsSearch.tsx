@@ -223,8 +223,8 @@ export default function HomeProjectsSearch({
           className="box-border flex min-h-0 flex-1 flex-col rounded-xl border-[1.5px] border-gray-200 bg-white p-3 transition-[height] duration-300 ease-out shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] md:p-5"
           style={{ height: "calc(100% - var(--workspace-projects-bottom-gap, 0px))" }}
         >
-          <div className="flex flex-col items-start gap-3 md:flex-row md:items-center md:justify-between md:gap-4 md:px-[21px]">
-            <h2 className="text-2xl font-semibold text-[#1F2A37] dark:text-zinc-100">
+          <div className="flex flex-row items-center justify-between gap-2 md:gap-4 md:pl-[21px]">
+            <h2 className="min-w-0 shrink-0 text-lg font-semibold text-[#1F2A37] min-[560px]:text-xl dark:text-zinc-100 md:text-2xl">
               {query.trim() ? (
                 "Search results"
               ) : (
@@ -233,20 +233,22 @@ export default function HomeProjectsSearch({
                 </span>
               )}
             </h2>
-            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+            <div className="flex min-w-0 shrink items-center justify-end gap-1.5 md:gap-2">
               {showAllProjects ? (
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex min-w-0 items-center gap-1.5 md:gap-2">
                   <div className="relative inline-flex items-center rounded-full border-2 border-[#E6EBF2] bg-white dark:border-zinc-700 dark:bg-zinc-900">
                     <span
                       aria-hidden
-                      className={`pointer-events-none absolute left-0 top-0 h-full w-[68px] rounded-full bg-[#E5E7EB] transition-transform duration-200 ease-out dark:bg-[#2A2A31] ${
-                        viewMode === "grid" ? "translate-x-0" : "translate-x-[68px]"
+                      className={`pointer-events-none absolute left-0 top-0 h-full w-[48px] rounded-full bg-[#E5E7EB] transition-[width,transform] duration-200 ease-out min-[470px]:w-[68px] dark:bg-[#2A2A31] ${
+                        viewMode === "grid"
+                          ? "translate-x-0"
+                          : "translate-x-[48px] min-[470px]:translate-x-[68px]"
                       }`}
                     />
                     <button
                       type="button"
                       onClick={() => setViewMode("grid")}
-                      className={`relative z-10 inline-flex h-[34px] w-[68px] items-center justify-center gap-1.5 rounded-full px-3 text-xs font-semibold transition ${
+                      className={`relative z-10 inline-flex h-[34px] w-[48px] items-center justify-center gap-1.5 rounded-full px-3 text-xs font-semibold transition min-[470px]:w-[68px] ${
                         viewMode === "grid"
                           ? "text-slate-700 dark:text-[#F4F4F5]"
                           : "text-slate-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-zinc-100"
@@ -255,12 +257,12 @@ export default function HomeProjectsSearch({
                       aria-pressed={viewMode === "grid"}
                     >
                       <LayoutGrid className="h-4.5 w-4.5" aria-hidden />
-                      <span>Grid</span>
+                      <span className="hidden min-[470px]:inline">Grid</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setViewMode("list")}
-                      className={`relative z-10 inline-flex h-[34px] w-[68px] items-center justify-center gap-1.5 rounded-full px-3 text-xs font-semibold transition ${
+                      className={`relative z-10 inline-flex h-[34px] w-[48px] items-center justify-center gap-1.5 rounded-full px-3 text-xs font-semibold transition min-[470px]:w-[68px] ${
                         viewMode === "list"
                           ? "text-slate-700 dark:text-[#F4F4F5]"
                           : "text-slate-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-zinc-100"
@@ -269,14 +271,14 @@ export default function HomeProjectsSearch({
                       aria-pressed={viewMode === "list"}
                     >
                       <List className="h-4.5 w-4.5" aria-hidden />
-                      <span>List</span>
+                      <span className="hidden min-[470px]:inline">List</span>
                     </button>
                   </div>
                   <div ref={sortMenuRef} className="relative">
                     <button
                       type="button"
                       onClick={() => setSortMenuOpen((prev) => !prev)}
-                      className={`inline-flex items-center gap-2 rounded-full border-2 px-4 py-2 text-xs font-semibold transition ${
+                      className={`inline-flex items-center gap-2 rounded-full border-2 px-2.5 py-2 text-xs font-semibold transition min-[410px]:px-3 md:px-4 ${
                         sortMenuOpen
                           ? "border-[#E6EBF2] bg-[#E5E7EB] text-[#1F2A37] dark:border-zinc-700 dark:bg-[#2A2A31] dark:text-zinc-100"
                           : "border-[#E6EBF2] bg-white text-[#1F2A37] hover:border-[#D8DEE8] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-zinc-600"
@@ -288,12 +290,13 @@ export default function HomeProjectsSearch({
                         <Clock className="h-4 w-4" aria-hidden />
                       ) : sortOption === "starred" ? (
                         <Star className="h-4 w-4" aria-hidden />
-                      ) : sortOption === "az" ? (
-                        <ArrowUp className="h-4 w-4" aria-hidden />
-                      ) : (
-                        <ArrowDown className="h-4 w-4" aria-hidden />
-                      )}
-                      <span className="whitespace-nowrap">
+                      ) : null}
+                      {sortOption === "az" || sortOption === "za" ? (
+                        <span className="whitespace-nowrap min-[450px]:hidden">
+                          {sortOption === "az" ? "A-Z" : "Z-A"}
+                        </span>
+                      ) : null}
+                      <span className="hidden whitespace-nowrap min-[450px]:inline">
                         {sortOption === "activity"
                           ? "Last activity"
                           : sortOption === "starred"
@@ -480,9 +483,9 @@ export default function HomeProjectsSearch({
               showAllProjects ? "mt-3 sm:mt-4" : "mt-5 sm:mt-6"
             }`}
             style={{
-              paddingRight: showAllProjects ? 0 : 4,
+              paddingRight: showAllProjects ? 12 : 4,
               paddingLeft: 4,
-              paddingBottom: 6,
+              paddingBottom: "calc(40px + env(safe-area-inset-bottom, 0px))",
               scrollbarGutter: "stable",
               WebkitOverflowScrolling: "touch",
               touchAction: "pan-y",

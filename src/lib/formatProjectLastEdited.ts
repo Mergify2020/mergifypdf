@@ -1,7 +1,11 @@
 export function formatProjectLastEdited(value: string | number | Date): string {
+  return `Edited ${formatProjectRelativeTime(value)}`;
+}
+
+export function formatProjectRelativeTime(value: string | number | Date): string {
   const target = value instanceof Date ? value : new Date(value);
   const targetMs = target.getTime();
-  if (Number.isNaN(targetMs)) return "Edited recently";
+  if (Number.isNaN(targetMs)) return "recently";
 
   const now = new Date();
   const diffMs = Math.max(0, now.getTime() - targetMs);
@@ -11,18 +15,18 @@ export function formatProjectLastEdited(value: string | number | Date): string {
 
   if (diffMs < hourMs) {
     const minutes = Math.max(1, Math.floor(diffMs / minuteMs));
-    return `Edited ${minutes} min ago`;
+    return `${minutes} min ago`;
   }
 
   if (diffMs < dayMs) {
     const hours = Math.max(1, Math.floor(diffMs / hourMs));
-    return `Edited ${hours} ${hours === 1 ? "hour" : "hours"} ago`;
+    return `${hours} ${hours === 1 ? "hour" : "hours"} ago`;
   }
 
   const days = Math.floor(diffMs / dayMs);
   if (days < 30) {
     const displayDays = Math.max(1, days);
-    return `Edited ${displayDays} ${displayDays === 1 ? "day" : "days"} ago`;
+    return `${displayDays} ${displayDays === 1 ? "day" : "days"} ago`;
   }
 
   const inSameYear = target.getFullYear() === now.getFullYear();
@@ -30,7 +34,7 @@ export function formatProjectLastEdited(value: string | number | Date): string {
     ? { month: "short", day: "numeric" }
     : { month: "short", day: "numeric", year: "numeric" });
 
-  return `Edited ${formatter.format(target)}`;
+  return formatter.format(target);
 }
 
 export function formatProjectActivityDate(value: string | number | Date): string {
