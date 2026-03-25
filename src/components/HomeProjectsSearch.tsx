@@ -479,9 +479,10 @@ export default function HomeProjectsSearch({
           </div>
           <div
             ref={recentListRef}
+            data-projects-scroll-layer="true"
             className={`recent-projects-container mt-0 h-0 min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain ${
               showAllProjects ? "mt-3 sm:mt-4" : "mt-5 sm:mt-6"
-            }`}
+            } relative`}
             style={{
               paddingRight: showAllProjects ? 12 : 4,
               paddingLeft: 4,

@@ -1,35 +1,70 @@
-"use client";
-
 import type { AppSafetyStatus } from "@/lib/appSafety";
 
+type IncidentContent = {
+  title: string;
+  instruction: string;
+  referenceCode: string;
+};
+
+const INCIDENT_CONTENT: Record<string, IncidentContent> = {
+  DB_UNAVAILABLE: {
+    title: "This page couldn’t load",
+    instruction: "Please refresh and try again.",
+    referenceCode: "201",
+  },
+  DB_SCHEMA_MISSING: {
+    title: "This page couldn’t load",
+    instruction: "Please refresh and try again.",
+    referenceCode: "301",
+  },
+  DB_GUARD_MISSING: {
+    title: "This page couldn’t load",
+    instruction: "Please refresh and try again.",
+    referenceCode: "302",
+  },
+  DB_IDENTITY_MISMATCH: {
+    title: "This page couldn’t load",
+    instruction: "Please refresh and try again.",
+    referenceCode: "303",
+  },
+  DATABASE_URL_MISSING: {
+    title: "This page couldn’t load",
+    instruction: "Please refresh and try again.",
+    referenceCode: "101",
+  },
+  DB_EMPTY_USERS: {
+    title: "This page couldn’t load",
+    instruction: "Please refresh and try again.",
+    referenceCode: "401",
+  },
+  UNKNOWN: {
+    title: "This page couldn’t load",
+    instruction: "Please refresh and try again.",
+    referenceCode: "901",
+  },
+};
+
+function getIncidentContent(status: AppSafetyStatus): IncidentContent {
+  return INCIDENT_CONTENT[status.code] ?? INCIDENT_CONTENT.UNKNOWN;
+}
+
 export default function AppMaintenanceScreen({ status }: { status: AppSafetyStatus }) {
+  const incident = getIncidentContent(status);
+
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-950 px-6 py-12 text-white">
-      <div className="w-full max-w-2xl rounded-2xl border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur">
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">
-          Service Unavailable
+    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-6 py-12 text-slate-900">
+      <div className="w-full max-w-2xl text-center">
+        <p className="text-8xl font-semibold tracking-tight text-slate-800 sm:text-9xl">
+          {incident.referenceCode}
         </p>
-        <h1 className="mt-3 text-3xl font-semibold text-white">
-          The app blocked startup to protect your data.
+        <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
+          {incident.title}
         </h1>
-        <p className="mt-4 text-base text-slate-200">
-          A database safety check failed. This prevents the app from silently using the wrong or
-          uninitialized database.
+        <p className="mt-4 text-base text-slate-600 sm:text-lg">
+          {incident.instruction}
         </p>
-
-        <div className="mt-6 rounded-xl border border-amber-300/20 bg-black/20 p-4 text-sm text-slate-100">
-          <p>
-            <span className="font-semibold text-white">Code:</span>{" "}
-            <span className="font-mono">{status.code}</span>
-          </p>
-          <p className="mt-2">
-            <span className="font-semibold text-white">Message:</span> {status.message}
-          </p>
-        </div>
-
-        <p className="mt-6 text-sm text-slate-300">
-          Resolve the database configuration, run migrations if needed, and initialize the runtime
-          guard for the correct environment before serving traffic again.
+        <p className="mt-6 text-sm text-slate-500">
+          If the issue persists, please contact support.
         </p>
       </div>
     </main>

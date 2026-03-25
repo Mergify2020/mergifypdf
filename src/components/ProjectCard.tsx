@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronRight, Star, MoreHorizontal, ExternalLink, Copy, Trash2, Pencil, Loader2, Printer } from "lucide-react";
 import { useSession } from "next-auth/react";
@@ -102,7 +102,19 @@ export default function ProjectCard({
   const [localStarred, setLocalStarred] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const [desktopMenuPosition, setDesktopMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const [desktopMenuTarget, setDesktopMenuTarget] = useState<HTMLDivElement | null>(null);
+  const [menuTriggerRect, setMenuTriggerRect] = useState<{
+    triggerLeft: number;
+    triggerRight: number;
+    left: number;
+    top: number;
+    bottom: number;
+    right: number;
+  } | null>(null);
   const cardRef = useRef<HTMLDivElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const menuTriggerButtonRef = useRef<HTMLButtonElement | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(Boolean(project.hasPreview));
   const previewRefreshInFlight = useRef(false);
@@ -117,10 +129,139 @@ export default function ProjectCard({
   const [renameBusy, setRenameBusy] = useState(false);
   const [renameError, setRenameError] = useState<string | null>(null);
   const [renameJustSaved, setRenameJustSaved] = useState(false);
+  const menuScrollRafRef = useRef<number | null>(null);
   const starred = Boolean(starredProp || localStarred);
   const compactUpdatedLabel = project.updated.startsWith("Edited ")
     ? project.updated.slice("Edited ".length)
     : project.updated;
+  const mobileMenuWidth = 224;
+
+  function isMobileViewport() {
+    return typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
+  }
+
+  function measureMenuPosition(triggerRect: {
+    triggerLeft: number;
+    triggerRight: number;
+    left: number;
+    top: number;
+    bottom: number;
+    right: number;
+  }) {
+    if (typeof window === "undefined") return null;
+
+    const menuEl = menuRef.current;
+    const menuWidth = menuEl?.offsetWidth ?? mobileMenuWidth;
+    const menuHeight = menuEl?.offsetHeight ?? 336;
+    const margin = 16;
+    const mobileBottomDockReserve =
+      window.matchMedia("(max-width: 767px), (max-width: 1024px) and (orientation: portrait)").matches
+        ? 72
+        : 0;
+    const mobileViewport = window.matchMedia("(max-width: 767px)").matches;
+
+    const clampLeft = (value: number) =>
+      Math.min(Math.max(value, margin), window.innerWidth - menuWidth - margin);
+
+    const leftColumnMobile = mobileViewport && triggerRect.right <= window.innerWidth / 2;
+    const preferredBelow = triggerRect.bottom + 8;
+    const maxTop = window.innerHeight - menuHeight - margin - mobileBottomDockReserve;
+    const canOpenBelow = preferredBelow <= maxTop;
+    const sideAnchorMobile = mobileViewport && !canOpenBelow;
+    const anchorLeft = sideAnchorMobile
+      ? leftColumnMobile
+        ? triggerRect.triggerRight + 2
+        : triggerRect.triggerLeft - menuWidth - 2
+      : triggerRect.right - menuWidth;
+    const left = clampLeft(anchorLeft);
+    const top = sideAnchorMobile
+      ? Math.min(triggerRect.top, maxTop)
+      : canOpenBelow
+        ? preferredBelow
+        : Math.max(margin, triggerRect.top - menuHeight - 8);
+
+    return { top, left };
+  }
+
+  function updateMenuFromTrigger(trigger: HTMLButtonElement) {
+    const rect = trigger.getBoundingClientRect();
+    const nextRect = {
+      triggerLeft: rect.left,
+      triggerRight: rect.right,
+      left: rect.left,
+      top: rect.top,
+      bottom: rect.bottom,
+      right: rect.right,
+    };
+    setMenuTriggerRect(nextRect);
+
+    if (isMobileViewport()) {
+      setDesktopMenuPosition(null);
+      const nextPosition = measureMenuPosition(nextRect);
+      if (!nextPosition) return;
+      setMenuPosition((prev) =>
+        prev && prev.top === nextPosition.top && prev.left === nextPosition.left ? prev : nextPosition
+      );
+      return;
+    }
+
+    const scrollLayer = trigger.closest('[data-projects-scroll-layer="true"]') as HTMLDivElement | null;
+    const layerRect = scrollLayer?.getBoundingClientRect();
+    const menuEl = menuRef.current;
+    const menuWidth = menuEl?.offsetWidth ?? 256;
+    const menuHeight = menuEl?.offsetHeight ?? 336;
+    if (!scrollLayer || !layerRect) return;
+    const minLeft = scrollLayer.scrollLeft + 8;
+    const maxLeft = scrollLayer.scrollLeft + scrollLayer.clientWidth - menuWidth - 8;
+    const defaultLeft = rect.right - layerRect.left + scrollLayer.scrollLeft - menuWidth;
+    const belowTop = rect.bottom - layerRect.top + scrollLayer.scrollTop + 8;
+    const sideTop = rect.top - layerRect.top + scrollLayer.scrollTop;
+    const minTop = scrollLayer.scrollTop + 8;
+    const maxVisibleTop = scrollLayer.scrollTop + scrollLayer.clientHeight - menuHeight - 8;
+    const overflowBottom = belowTop > maxVisibleTop;
+    const openRightLeft = rect.right - layerRect.left + scrollLayer.scrollLeft + 2;
+    const openLeftLeft = rect.left - layerRect.left + scrollLayer.scrollLeft - menuWidth - 2;
+    const canOpenRight = openRightLeft <= maxLeft;
+    const canOpenLeft = openLeftLeft >= minLeft;
+    const anchoredLeft = overflowBottom
+      ? canOpenRight
+        ? openRightLeft
+        : canOpenLeft
+          ? openLeftLeft
+          : Math.min(Math.max(defaultLeft, minLeft), maxLeft)
+      : defaultLeft;
+    const nextPosition = {
+      top: overflowBottom
+        ? Math.min(Math.max(sideTop, minTop), Math.max(minTop, maxVisibleTop))
+        : Math.min(belowTop, Math.max(minTop, maxVisibleTop)),
+      left: Math.min(Math.max(anchoredLeft, minLeft), maxLeft),
+    };
+    setDesktopMenuTarget(scrollLayer);
+    setMenuPosition(null);
+    setDesktopMenuPosition((prev) =>
+      prev && prev.top === nextPosition.top && prev.left === nextPosition.left ? prev : nextPosition
+    );
+  }
+
+  function closeMenu() {
+    setMenuOpen(false);
+    setMenuPosition(null);
+    setDesktopMenuPosition(null);
+    setDesktopMenuTarget(null);
+    setMenuTriggerRect(null);
+    if (menuScrollRafRef.current !== null && typeof window !== "undefined") {
+      window.cancelAnimationFrame(menuScrollRafRef.current);
+      menuScrollRafRef.current = null;
+    }
+  }
+
+  function openMenu(trigger: HTMLButtonElement) {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("project-card-menu-close-all", { detail: { projectId: project.id } }));
+    }
+    setMenuOpen(true);
+    updateMenuFromTrigger(trigger);
+  }
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -144,16 +285,81 @@ export default function ProjectCard({
   useEffect(() => {
     if (!menuOpen) return;
 
-    function handleGlobalMouseDown() {
-      setMenuOpen(false);
-      setMenuPosition(null);
+    function handleGlobalMouseDown(event: MouseEvent) {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (menuRef.current?.contains(target)) return;
+      if (menuTriggerButtonRef.current?.contains(target)) return;
+      closeMenu();
     }
 
-    document.addEventListener("mousedown", handleGlobalMouseDown);
+    function handleCloseAll(event: Event) {
+      const sourceProjectId = (event as CustomEvent<{ projectId?: string }>).detail?.projectId;
+      if (sourceProjectId === project.id) return;
+      closeMenu();
+    }
+
+    function handleScroll() {
+      if (typeof window === "undefined") return;
+      const trigger = menuTriggerButtonRef.current;
+      if (!trigger) return;
+
+      if (shouldCloseOnScroll) {
+        closeMenu();
+        return;
+      }
+
+      if (menuScrollRafRef.current !== null) {
+        window.cancelAnimationFrame(menuScrollRafRef.current);
+      }
+      menuScrollRafRef.current = window.requestAnimationFrame(() => {
+        updateMenuFromTrigger(trigger);
+        menuScrollRafRef.current = null;
+      });
+    }
+
+    function updatePosition() {
+      const trigger = menuTriggerButtonRef.current;
+      if (!trigger) return;
+      if (menuScrollRafRef.current !== null) {
+        window.cancelAnimationFrame(menuScrollRafRef.current);
+      }
+      menuScrollRafRef.current = window.requestAnimationFrame(() => {
+        updateMenuFromTrigger(trigger);
+        menuScrollRafRef.current = null;
+      });
+    }
+
+    const shouldCloseOnScroll = isMobileViewport();
+
+    document.addEventListener("mousedown", handleGlobalMouseDown, true);
+    window.addEventListener("project-card-menu-close-all", handleCloseAll as EventListener);
+    if (shouldCloseOnScroll) {
+      document.addEventListener("scroll", handleScroll, true);
+    }
+    window.addEventListener("resize", updatePosition);
     return () => {
-      document.removeEventListener("mousedown", handleGlobalMouseDown);
+      document.removeEventListener("mousedown", handleGlobalMouseDown, true);
+      window.removeEventListener("project-card-menu-close-all", handleCloseAll as EventListener);
+      if (shouldCloseOnScroll) {
+        document.removeEventListener("scroll", handleScroll, true);
+      }
+      window.removeEventListener("resize", updatePosition);
+      if (menuScrollRafRef.current !== null) {
+        window.cancelAnimationFrame(menuScrollRafRef.current);
+        menuScrollRafRef.current = null;
+      }
     };
   }, [menuOpen]);
+
+  useLayoutEffect(() => {
+    if (!menuOpen || !menuTriggerRect || !isMobileViewport()) return;
+    const nextPosition = measureMenuPosition(menuTriggerRect);
+    if (!nextPosition) return;
+    setMenuPosition((prev) =>
+      prev && prev.top === nextPosition.top && prev.left === nextPosition.left ? prev : nextPosition
+    );
+  }, [menuOpen, menuTriggerRect]);
 
   useEffect(() => {
     if (!copyToast) return;
@@ -412,8 +618,264 @@ export default function ProjectCard({
     }
   };
 
+  const handleCopy = async (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (isCopying) return;
+    setIsCopying(true);
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(project.id)}/copy`, {
+        method: "POST",
+      });
+      if (!res.ok) return;
+      const json = (await res.json().catch(() => null)) as
+        | {
+            project?: {
+              id?: string;
+              name?: string | null;
+              updatedAt?: string | number | Date;
+              pdfUrl?: string | null;
+              pagesCount?: number | null;
+              hasPreview?: boolean;
+            };
+          }
+        | null;
+      const duplicated = json?.project;
+      if (!duplicated?.id) return;
+      onCopied?.(
+        { ...duplicated, id: duplicated.id, pdfUrl: duplicated.pdfUrl ?? null },
+        project.id
+      );
+      setCopyToast({
+        id: duplicated.id,
+        name: duplicated.name?.trim() || "Untitled project",
+      });
+      closeMenu();
+      void refreshProjectsSummary(ownerKey);
+    } catch {
+      // ignore
+    } finally {
+      setIsCopying(false);
+    }
+  };
+
+  const menuClassName =
+    "project-actions-menu z-[9999] w-56 overflow-hidden rounded-xl border border-[#E5E7EB] bg-white text-sm text-slate-800 shadow-[0_16px_36px_rgba(15,23,42,0.14)] sm:w-64 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:shadow-[0_20px_44px_rgba(0,0,0,0.5)]";
+
+  const renderMenuPanel = (style: CSSProperties, useFixed: boolean) => (
+    <div
+      ref={menuRef}
+      role="menu"
+      aria-label="Project actions"
+      className={`${menuClassName} ${useFixed ? "fixed" : "absolute"}`}
+      onMouseDown={(event) => {
+        // Prevent the global outside-click handler from firing for clicks inside the menu
+        event.stopPropagation();
+      }}
+      style={style}
+    >
+      <div className="px-3 py-2.5">
+        {renaming ? (
+          <div className="flex items-center gap-2">
+            <input
+              value={draftName}
+              autoFocus
+              spellCheck={false}
+              autoComplete="off"
+              disabled={renameBusy}
+              onClick={(event) => {
+                event.stopPropagation();
+              }}
+              onMouseDown={(event) => {
+                event.stopPropagation();
+              }}
+              onChange={(event) => {
+                setDraftName(event.target.value);
+                if (renameError) setRenameError(null);
+              }}
+              onKeyDown={handleRenameKeyDown}
+              onBlur={() => {
+                cancelRenaming();
+              }}
+              className="w-full rounded-md border-2 border-[#6C47FF]/55 bg-slate-50/70 px-2 py-1 text-sm font-semibold leading-tight text-slate-900 outline-none focus:border-[#6C47FF] focus:ring-0 disabled:opacity-70 dark:border-[#6C47FF]/65 dark:bg-zinc-900/60 dark:text-zinc-100"
+            />
+            <button
+              type="button"
+              aria-label="Confirm rename"
+              disabled={renameBusy}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                void submitRename();
+              }}
+              onMouseDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+              className="inline-flex h-6 w-6 items-center justify-center text-[#6C47FF] transition hover:text-[#5B38E6] disabled:opacity-60 dark:text-[#BBA6FF] dark:hover:text-[#CFC4FF]"
+            >
+              <Check className="h-5 w-5" strokeWidth={2.5} aria-hidden />
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                const next = !starred;
+                setLocalStarred(next);
+                writeStoredStarred(project.id, next);
+                if (onToggleStar) {
+                  onToggleStar(project.id, next);
+                }
+              }}
+              className={`inline-flex h-5 w-5 flex-none items-center justify-center transition ${
+                starred
+                  ? "text-amber-500 dark:text-amber-300"
+                  : "text-slate-300 hover:text-amber-400 dark:text-zinc-600 dark:hover:text-amber-300"
+              }`}
+              aria-label={starred ? "Unstar project" : "Star project"}
+              aria-pressed={starred}
+            >
+              <Star className={`h-4 w-4 ${starred ? "fill-current" : ""}`} aria-hidden />
+            </button>
+            <div className="min-w-0 flex items-center gap-1.5">
+              <p className="truncate text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                {project.title}
+              </p>
+              <button
+                type="button"
+                aria-label="Rename project"
+                className="inline-flex h-7 w-7 flex-none items-center justify-center rounded-md text-slate-500 transition hover:bg-[#F8FAFC] hover:text-slate-700 dark:text-zinc-300 dark:hover:bg-zinc-800/70 dark:hover:text-zinc-100"
+                onClick={(event) => {
+                  startRenaming(event);
+                }}
+              >
+                <Pencil className="h-4 w-4" aria-hidden />
+              </button>
+            </div>
+          </div>
+        )}
+        <p className="mt-1 text-xs font-medium text-slate-500 dark:text-zinc-400">{project.updated}</p>
+      </div>
+      <div className="h-px bg-[#E6EBF2] dark:bg-zinc-800" />
+      <button
+        type="button"
+        role="menuitem"
+        className="mx-2 mt-1 flex w-[calc(100%-1rem)] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-slate-900 transition hover:bg-[#F8FAFC] dark:text-zinc-100 dark:hover:bg-zinc-800/70"
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          closeMenu();
+        }}
+      >
+        <span className="flex h-5 w-5 items-center justify-center text-current">
+          <ExternalLink className="h-4 w-4" aria-hidden />
+        </span>
+        <span className="text-[15px] font-medium text-slate-900 dark:text-zinc-100">Open in new tab</span>
+      </button>
+      <button
+        type="button"
+        role="menuitem"
+        className="mx-2 flex w-[calc(100%-1rem)] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-slate-900 transition hover:bg-[#F8FAFC] dark:text-zinc-100 dark:hover:bg-zinc-800/70"
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          startRenaming(event);
+        }}
+      >
+        <span className="flex h-5 w-5 items-center justify-center text-current">
+          <Pencil className="h-4 w-4" aria-hidden />
+        </span>
+        <span className="text-[15px] font-medium text-slate-900 dark:text-zinc-100">Rename</span>
+      </button>
+      <button
+        type="button"
+        role="menuitem"
+        disabled={isPrinting}
+        aria-disabled={isPrinting}
+        className="mx-2 flex w-[calc(100%-1rem)] items-center justify-between rounded-lg px-2.5 py-2 text-left text-slate-900 transition hover:bg-[#F8FAFC] disabled:cursor-not-allowed disabled:opacity-60 dark:text-zinc-100 dark:hover:bg-zinc-800/70"
+        onClick={handlePrint}
+      >
+        <span className="flex min-w-0 items-center gap-2.5">
+          <span className="flex h-5 w-5 items-center justify-center text-current">
+            {isPrinting ? (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+            ) : (
+              <Printer className="h-4 w-4" aria-hidden />
+            )}
+          </span>
+          <span className="text-[15px] font-medium">Print</span>
+        </span>
+      </button>
+      <button
+        type="button"
+        role="menuitem"
+        disabled
+        aria-disabled="true"
+        className="mx-2 flex w-[calc(100%-1rem)] items-center justify-between rounded-lg px-2.5 py-2 text-left text-slate-500 opacity-55 transition disabled:cursor-not-allowed dark:text-zinc-400"
+      >
+        <span className="flex min-w-0 items-center gap-2.5">
+          <span className="flex h-5 w-5 items-center justify-center text-current">
+            <Copy className="h-4 w-4" aria-hidden />
+          </span>
+          <span className="text-[15px] font-medium">Convert to...</span>
+        </span>
+        <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
+      </button>
+      <button
+        type="button"
+        role="menuitem"
+        disabled={isCopying}
+        className="mx-2 flex w-[calc(100%-1rem)] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-slate-900 transition hover:bg-[#F8FAFC] disabled:cursor-not-allowed disabled:opacity-60 dark:text-zinc-100 dark:hover:bg-zinc-800/70"
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          void handleCopy(event);
+        }}
+      >
+        <span className="flex h-5 w-5 items-center justify-center text-current">
+          {isCopying ? (
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+          ) : (
+            <Copy className="h-4 w-4" aria-hidden />
+          )}
+        </span>
+        <span className="text-[15px] font-medium text-slate-900 dark:text-zinc-100">Make a copy</span>
+      </button>
+      <div className="mx-3 mt-1 h-px bg-[#E6EBF2] dark:bg-zinc-800" />
+      <button
+        type="button"
+        role="menuitem"
+        className="mx-2 mb-1.5 flex w-[calc(100%-1rem)] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-rose-700 transition hover:bg-rose-50 dark:hover:bg-zinc-800/60"
+        onClick={async (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          try {
+            const res = await fetch(`/api/projects/${encodeURIComponent(project.id)}`, {
+              method: "DELETE",
+              credentials: "include",
+            });
+            if (res.ok) {
+              onTrashed?.(project);
+            }
+          } finally {
+            closeMenu();
+          }
+        }}
+      >
+        <span className="flex h-5 w-5 items-center justify-center text-current">
+          <Trash2 className="h-4 w-4" aria-hidden />
+        </span>
+        <span className="text-[15px] font-medium">Move to trash</span>
+      </button>
+    </div>
+  );
+
   return (
-    <div className="project-card group flex flex-col text-left transition" aria-label={project.title}>
+    <div className="project-card group relative flex flex-col text-left transition" aria-label={project.title}>
       <div ref={cardRef} className={cardClasses}>
         <button
           type="button"
@@ -459,34 +921,17 @@ export default function ProjectCard({
               </button>
               <div className="h-6 w-px bg-slate-200/80" aria-hidden />
               <button
+                ref={menuTriggerButtonRef}
                 type="button"
                 className={actionButtonBase}
                 onMouseDown={(event) => {
                   event.preventDefault();
                   event.stopPropagation();
-                  const nextOpen = !menuOpen;
-                  setMenuOpen(nextOpen);
-                  if (!nextOpen) {
-                    setMenuPosition(null);
-                  } else if (typeof window !== "undefined") {
-                    const trigger = event.currentTarget.getBoundingClientRect();
-                    const menuWidth = 256;
-                    const menuHeight = 252;
-                    const margin = 16;
-                    const clampLeft = (value: number) =>
-                      Math.min(Math.max(value, margin), window.innerWidth - menuWidth - margin);
-                    const left = clampLeft(trigger.right - menuWidth);
-                    const preferredBelow = trigger.bottom + 8;
-                    const maxTop = window.innerHeight - menuHeight - margin;
-                    const top =
-                      preferredBelow <= maxTop
-                        ? preferredBelow
-                        : Math.max(margin, trigger.top - menuHeight - 8);
-                    setMenuPosition({
-                      top,
-                      left,
-                    });
+                  if (menuOpen) {
+                    closeMenu();
+                    return;
                   }
+                  openMenu(event.currentTarget);
                 }}
                 onClick={(event) => {
                   event.preventDefault();
@@ -505,265 +950,15 @@ export default function ProjectCard({
                 </span>
               </button>
             </div>
-            {typeof document !== "undefined" &&
-              menuOpen &&
-              menuPosition &&
-              createPortal(
-                <div
-                  role="menu"
-                  aria-label="Project actions"
-                  className="project-actions-menu fixed z-[9999] w-64 overflow-hidden rounded-xl border border-[#E5E7EB] bg-white text-sm text-slate-800 shadow-[0_16px_36px_rgba(15,23,42,0.14)] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:shadow-[0_20px_44px_rgba(0,0,0,0.5)]"
-                  onMouseDown={(event) => {
-                    // Prevent the global outside-click handler from firing for clicks inside the menu
-                    event.stopPropagation();
-                  }}
-                  style={{ top: menuPosition.top, left: menuPosition.left }}
-                >
-                  <div className="px-3 py-2.5">
-                    {renaming ? (
-                      <div className="flex items-center gap-2">
-                        <input
-                          value={draftName}
-                          autoFocus
-                          spellCheck={false}
-                          autoComplete="off"
-                          disabled={renameBusy}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                          }}
-                          onMouseDown={(event) => {
-                            event.stopPropagation();
-                          }}
-                          onChange={(event) => {
-                            setDraftName(event.target.value);
-                            if (renameError) setRenameError(null);
-                          }}
-                          onKeyDown={handleRenameKeyDown}
-                          onBlur={() => {
-                            cancelRenaming();
-                          }}
-                          className="w-full rounded-md border-2 border-[#6C47FF]/55 bg-slate-50/70 px-2 py-1 text-sm font-semibold leading-tight text-slate-900 outline-none focus:border-[#6C47FF] focus:ring-0 disabled:opacity-70 dark:border-[#6C47FF]/65 dark:bg-zinc-900/60 dark:text-zinc-100"
-                        />
-                        <button
-                          type="button"
-                          aria-label="Confirm rename"
-                          disabled={renameBusy}
-                          onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            void submitRename();
-                          }}
-                          onMouseDown={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                          }}
-                          className="inline-flex h-6 w-6 items-center justify-center text-[#6C47FF] transition hover:text-[#5B38E6] disabled:opacity-60 dark:text-[#BBA6FF] dark:hover:text-[#CFC4FF]"
-                        >
-                          <Check className="h-5 w-5" strokeWidth={2.5} aria-hidden />
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            const next = !starred;
-                            setLocalStarred(next);
-                            writeStoredStarred(project.id, next);
-                            if (onToggleStar) {
-                              onToggleStar(project.id, next);
-                            }
-                          }}
-                          className={`inline-flex h-5 w-5 flex-none items-center justify-center transition ${
-                            starred
-                              ? "text-amber-500 dark:text-amber-300"
-                              : "text-slate-300 hover:text-amber-400 dark:text-zinc-600 dark:hover:text-amber-300"
-                          }`}
-                          aria-label={starred ? "Unstar project" : "Star project"}
-                          aria-pressed={starred}
-                        >
-                          <Star className={`h-4 w-4 ${starred ? "fill-current" : ""}`} aria-hidden />
-                        </button>
-                        <div className="min-w-0 flex items-center gap-1.5">
-                          <p className="truncate text-sm font-semibold text-slate-900 dark:text-zinc-100">
-                            {project.title}
-                          </p>
-                          <button
-                            type="button"
-                            aria-label="Rename project"
-                            className="inline-flex h-7 w-7 flex-none items-center justify-center rounded-md text-slate-500 transition hover:bg-[#F8FAFC] hover:text-slate-700 dark:text-zinc-300 dark:hover:bg-zinc-800/70 dark:hover:text-zinc-100"
-                            onClick={(event) => {
-                              startRenaming(event);
-                            }}
-                          >
-                            <Pencil className="h-4 w-4" aria-hidden />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                    <p className="mt-1 text-xs font-medium text-slate-500 dark:text-zinc-400">{project.updated}</p>
-                  </div>
-                  <div className="h-px bg-[#E6EBF2] dark:bg-zinc-800" />
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="mx-2 mt-1 flex w-[calc(100%-1rem)] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-slate-900 transition hover:bg-[#F8FAFC] dark:text-zinc-100 dark:hover:bg-zinc-800/70"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      setMenuOpen(false);
-                      setMenuPosition(null);
-                    }}
-                  >
-                    <span className="flex h-5 w-5 items-center justify-center text-current">
-                      <ExternalLink className="h-4 w-4" aria-hidden />
-                    </span>
-                    <span className="text-[15px] font-medium text-slate-900 dark:text-zinc-100">Open in new tab</span>
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="mx-2 flex w-[calc(100%-1rem)] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-slate-900 transition hover:bg-[#F8FAFC] dark:text-zinc-100 dark:hover:bg-zinc-800/70"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      startRenaming(event);
-                    }}
-                  >
-                    <span className="flex h-5 w-5 items-center justify-center text-current">
-                      <Pencil className="h-4 w-4" aria-hidden />
-                    </span>
-                    <span className="text-[15px] font-medium text-slate-900 dark:text-zinc-100">Rename</span>
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    disabled={isPrinting}
-                    aria-disabled={isPrinting}
-                    className="mx-2 flex w-[calc(100%-1rem)] items-center justify-between rounded-lg px-2.5 py-2 text-left text-slate-900 transition hover:bg-[#F8FAFC] disabled:cursor-not-allowed disabled:opacity-60 dark:text-zinc-100 dark:hover:bg-zinc-800/70"
-                    onClick={handlePrint}
-                  >
-                    <span className="flex min-w-0 items-center gap-2.5">
-                      <span className="flex h-5 w-5 items-center justify-center text-current">
-                        {isPrinting ? (
-                          <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                        ) : (
-                          <Printer className="h-4 w-4" aria-hidden />
-                        )}
-                      </span>
-                      <span className="text-[15px] font-medium">Print</span>
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    disabled
-                    aria-disabled="true"
-                    className="mx-2 flex w-[calc(100%-1rem)] items-center justify-between rounded-lg px-2.5 py-2 text-left text-slate-500 opacity-55 transition disabled:cursor-not-allowed dark:text-zinc-400"
-                  >
-                    <span className="flex min-w-0 items-center gap-2.5">
-                      <span className="flex h-5 w-5 items-center justify-center text-current">
-                        <Copy className="h-4 w-4" aria-hidden />
-                      </span>
-                      <span className="text-[15px] font-medium">Convert to...</span>
-                    </span>
-                    <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    disabled={isCopying}
-                    className="mx-2 flex w-[calc(100%-1rem)] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-slate-900 transition hover:bg-[#F8FAFC] disabled:cursor-not-allowed disabled:opacity-60 dark:text-zinc-100 dark:hover:bg-zinc-800/70"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      if (isCopying) return;
-                      setIsCopying(true);
-                      void (async () => {
-                        try {
-                          const res = await fetch(
-                            `/api/projects/${encodeURIComponent(project.id)}/copy`,
-                            { method: "POST" }
-                          );
-                          if (!res.ok) return;
-                          const json = (await res.json().catch(() => null)) as
-                            | {
-                                project?: {
-                                  id?: string;
-                                  name?: string | null;
-                                  updatedAt?: string | number | Date;
-                                  pdfUrl?: string | null;
-                                  pagesCount?: number | null;
-                                  hasPreview?: boolean;
-                                };
-                              }
-                            | null;
-                          const duplicated = json?.project;
-                          if (!duplicated?.id) return;
-                          onCopied?.(
-                            { ...duplicated, id: duplicated.id, pdfUrl: duplicated.pdfUrl ?? null },
-                            project.id
-                          );
-                          setCopyToast({
-                            id: duplicated.id,
-                            name: duplicated.name?.trim() || "Untitled project",
-                          });
-                          setMenuOpen(false);
-                          setMenuPosition(null);
-                          void refreshProjectsSummary(ownerKey);
-                        } catch {
-                          // ignore
-                        } finally {
-                          setIsCopying(false);
-                        }
-                      })();
-                    }}
-                  >
-                    <span className="flex h-5 w-5 items-center justify-center text-current">
-                      {isCopying ? (
-                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                      ) : (
-                        <Copy className="h-4 w-4" aria-hidden />
-                      )}
-                    </span>
-                    <span className="text-[15px] font-medium text-slate-900 dark:text-zinc-100">Make a copy</span>
-                  </button>
-                  <div className="mx-2 my-1 h-px bg-[#E6EBF2] dark:bg-zinc-800" />
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="mx-2 mb-1.5 flex w-[calc(100%-1rem)] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-rose-700 transition hover:bg-rose-50 dark:hover:bg-zinc-800/60"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      setMenuOpen(false);
-                      setMenuPosition(null);
-                      onTrashed?.(project);
-                      void (async () => {
-                        try {
-                          const res = await fetch(`/api/projects/${encodeURIComponent(project.id)}/trash`, {
-                            method: "POST",
-                          });
-                          if (!res.ok) {
-                            throw new Error(`Trash request failed with status ${res.status}`);
-                          }
-                          await refreshProjectsSummary(ownerKey);
-                        } catch (err) {
-                          console.error("Failed to move project to trash.", err);
-                        }
-                      })();
-                    }}
-                  >
-                    <span className="flex h-5 w-5 items-center justify-center text-rose-700">
-                      <Trash2 className="h-4 w-4" aria-hidden />
-                    </span>
-                    <span className="text-[15px] font-semibold text-rose-700">Move to trash</span>
-                  </button>
-                </div>,
-                document.body
-              )}
+            {typeof document !== "undefined" && desktopMenuPosition && desktopMenuTarget
+              ? createPortal(
+                  renderMenuPanel({ top: desktopMenuPosition.top, left: desktopMenuPosition.left }, false),
+                  desktopMenuTarget
+                )
+              : null}
+            {typeof document !== "undefined" && menuPosition
+              ? createPortal(renderMenuPanel({ top: menuPosition.top, left: menuPosition.left }, true), document.body)
+              : null}
           </>
         )}
         {typeof document !== "undefined" && copyToast
