@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
-import { createSignedR2Url, getR2Config, uploadR2Object } from "@/lib/r2";
+import { createSignedR2Url, getR2Config, getR2ObjectBuffer, uploadR2Object } from "@/lib/r2";
 import { isSameOrigin } from "@/lib/requestGuards";
+import { createWatermarkedPdf } from "@/lib/pdfWatermark";
 
 async function ensureDbConnection() {
   for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -106,7 +107,7 @@ export async function POST(
 }
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
@@ -126,6 +127,10 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  const mode = req.nextUrl.searchParams.get("mode");
+  const hasActivePlan =
+    session.user.stripeStatus === "active" || session.user.stripeStatus === "trialing";
+
   let r2Config;
   try {
     r2Config = getR2Config();
@@ -134,6 +139,26 @@ export async function GET(
       { error: err instanceof Error ? err.message : "PDF storage is not configured" },
       { status: 500 }
     );
+  }
+
+  if (mode === "file" || !hasActivePlan) {
+    try {
+      const source = await getR2ObjectBuffer(r2Config, project.pdfKey);
+      const bytes = hasActivePlan ? source : await createWatermarkedPdf(source);
+      return new NextResponse(Buffer.from(bytes), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `inline; filename="${id}.pdf"`,
+          "Cache-Control": "no-store",
+        },
+      });
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "Unable to load PDF" },
+        { status: 500 }
+      );
+    }
   }
 
   const url = await createSignedR2Url(r2Config, project.pdfKey);

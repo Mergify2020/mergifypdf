@@ -305,8 +305,9 @@ export default function StartProjectButton({ className, variant = "default", ico
                                 disabled={busy}
                               >
                                 select files
-                              </button>{" "}
-                              or drop your files to get started
+                              </button>
+                              <span className="sm:hidden"> to get started</span>
+                              <span className="hidden sm:inline"> or drop your files to get started</span>
                             </>
                           )}
                         </p>
@@ -363,7 +364,7 @@ export default function StartProjectButton({ className, variant = "default", ico
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept="application/pdf"
+                      accept=".pdf,application/pdf"
                       multiple
                       className="hidden"
                       onChange={(event) => {

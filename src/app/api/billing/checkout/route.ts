@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
-import { assertAppSafe } from "@/lib/appSafety";
 import { getStripe } from "@/lib/stripe";
 import { isSameOrigin } from "@/lib/requestGuards";
 import { prisma } from "@/lib/prisma";
@@ -15,7 +14,6 @@ import {
 } from "@/lib/billingPlans";
 
 export async function POST(req: NextRequest) {
-  await assertAppSafe();
   if (!isSameOrigin(req)) {
     return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
   }

@@ -46,10 +46,16 @@ export default function SettingsMenu({
   }, [avatar]);
 
   useEffect(() => {
+    const sessionStripeStatus = session?.user?.stripeStatus ?? null;
+    setStripeStatus(sessionStripeStatus);
+    setHasActivePlan(sessionStripeStatus === "active" || sessionStripeStatus === "trialing");
+  }, [session?.user?.stripeStatus]);
+
+  useEffect(() => {
     let active = true;
+
     async function loadPlanStatus() {
-      if (!session?.user?.email) {
-        if (active) setHasActivePlan(false);
+      if (!open || !session?.user?.email) {
         return;
       }
       try {
@@ -73,11 +79,12 @@ export default function SettingsMenu({
         }
       }
     }
+
     void loadPlanStatus();
     return () => {
       active = false;
     };
-  }, [session?.user?.email]);
+  }, [open, session?.user?.email]);
 
   useEffect(() => {
     if (!open) return;

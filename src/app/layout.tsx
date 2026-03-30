@@ -3,8 +3,6 @@ import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import { cookies } from "next/headers";
 import Providers from "@/components/Providers";
-import AppMaintenanceScreen from "@/components/AppMaintenanceScreen";
-import { getAppSafetyStatus, isAppSafetyBlocking } from "@/lib/appSafety";
 import { getServerSessionSafe } from "@/lib/serverSession";
 import "./globals.css";
 
@@ -34,8 +32,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const appSafety = await getAppSafetyStatus();
-  const session = isAppSafetyBlocking(appSafety) ? null : await getServerSessionSafe();
+  const session = await getServerSessionSafe();
   const cookieStore = await cookies();
   const themeCookie = cookieStore.get?.("theme")?.value;
   const themeClass = themeCookie === "dark" ? "dark" : undefined;
@@ -85,13 +82,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
 
       <body className="min-h-screen bg-white text-gray-900 dark:bg-[#222224] dark:text-zinc-100">
-        <Providers session={session}>
-          {isAppSafetyBlocking(appSafety) ? (
-            <AppMaintenanceScreen status={appSafety} />
-          ) : (
-            children
-          )}
-        </Providers>
+        <Providers session={session}>{children}</Providers>
       </body>
     </html>
   );

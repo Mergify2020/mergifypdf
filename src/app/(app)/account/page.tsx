@@ -1208,6 +1208,15 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
       }
 
       setTwoFactorMethod("email");
+      try {
+        await updateSession({
+          twoFactorEnabled: true,
+          twoFactorPassed: true,
+          twoFactorMethod: "email",
+        });
+      } catch {
+        // Keep the local UI responsive even if the auth token refresh lags.
+      }
       resetTwoFactorModalState();
       setTwoFactorModalMode(null);
     } catch {
@@ -1223,6 +1232,15 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
       await fetch("/api/account/two-factor", { method: "DELETE" });
     } catch {
       // ignore; best-effort
+    }
+    try {
+      await updateSession({
+        twoFactorEnabled: false,
+        twoFactorPassed: true,
+        twoFactorMethod: null,
+      });
+    } catch {
+      // ignore; local state is still updated below
     }
     setTwoFactorMethod(null);
     resetTwoFactorModalState();

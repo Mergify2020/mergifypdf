@@ -1,4 +1,14 @@
 {
-    "chatgpt.openOnStartup": true,
-    "chatgpt.runCodexInWindowsSubsystemForLinux": true
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/.next/**": true,
+    "**/.vercel/**": true,
+    "**/dist/**": true
+  },
+  "search.exclude": {
+    "**/node_modules/**": true,
+    "**/.next/**": true
+  },
+  "chatgpt.openOnStartup": false,
+  "chatgpt.runCodexInWindowsSubsystemForLinux": false
 }

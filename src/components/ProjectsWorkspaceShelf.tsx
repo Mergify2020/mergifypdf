@@ -4,6 +4,12 @@ import Link from "next/link";
 import { ArrowUpRight, Clock } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
+import {
+  getProjectsSummaryCache,
+  refreshProjectsSummary,
+  subscribeProjectsSummary,
+  type ProjectsSummaryProject,
+} from "@/lib/projectsSummaryCache";
 type ResumeSnapshot = { fileName: string; lastEditedLabel: string };
 
 function formatLastEdited(timestamp: number) {
@@ -40,44 +46,43 @@ export default function ProjectsWorkspaceShelf() {
     let cancelled = false;
     setSnapshot(null);
 
-    const load = async () => {
-      try {
-        const res = await fetch("/api/projects?summary=1", { cache: "no-store" });
-        if (!res.ok) {
-          if (!cancelled) setSnapshot(null);
-          return;
-        }
-        const data = (await res.json()) as {
-          projects?: { name?: string | null; updatedAt: string | number | Date }[];
-        };
-        if (!Array.isArray(data.projects) || cancelled) {
-          if (!cancelled) setSnapshot(null);
-          return;
-        }
-        if (data.projects.length === 0) {
-          setSnapshot(null);
-          return;
-        }
-        const [latest] = [...data.projects].sort(
-          (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-        );
-        if (!latest) {
-          setSnapshot(null);
-          return;
-        }
-        const updatedAt = new Date(latest.updatedAt).getTime();
-        setSnapshot({
-          fileName: latest.name?.trim() || "Untitled project",
-          lastEditedLabel: formatLastEdited(updatedAt),
-        });
-      } catch {
-        if (!cancelled) setSnapshot(null);
+    const applySnapshot = (projects: ProjectsSummaryProject[] | null) => {
+      if (cancelled) return;
+      if (!projects || projects.length === 0) {
+        setSnapshot(null);
+        return;
       }
+      const [latest] = [...projects].sort(
+        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      );
+      if (!latest) {
+        setSnapshot(null);
+        return;
+      }
+      const updatedAt = new Date(latest.updatedAt).getTime();
+      setSnapshot({
+        fileName: latest.name?.trim() || "Untitled project",
+        lastEditedLabel: formatLastEdited(updatedAt),
+      });
     };
 
-    void load();
+    const cached = getProjectsSummaryCache(ownerId);
+    if (cached) {
+      applySnapshot(cached);
+    } else {
+      void refreshProjectsSummary(ownerId).then((projects) => {
+        applySnapshot(projects);
+      });
+    }
+
+    const unsubscribe = subscribeProjectsSummary((update) => {
+      if (update.ownerKey !== ownerId) return;
+      applySnapshot(update.projects);
+    });
+
     return () => {
       cancelled = true;
+      unsubscribe();
     };
   }, [session?.user?.id]);
 

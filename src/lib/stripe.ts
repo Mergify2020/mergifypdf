@@ -8,7 +8,7 @@ export function getStripe(): Stripe {
     throw new Error("STRIPE_SECRET_KEY is not set");
   }
   if (!cachedStripe) {
-    cachedStripe = new Stripe(key, { apiVersion: "2025-12-15.clover" });
+    cachedStripe = new Stripe(key, { apiVersion: "2026-02-25.clover" });
   }
   return cachedStripe;
 }

@@ -2,7 +2,6 @@
 
 import { useEffect } from "react";
 import {
-  refreshProjectsSummary,
   setProjectsSummaryCache,
   type ProjectsSummaryProject,
 } from "@/lib/projectsSummaryCache";
@@ -17,8 +16,6 @@ export default function ProjectsSummarySeed({
   useEffect(() => {
     if (!Array.isArray(projects)) return;
     setProjectsSummaryCache(ownerKey, projects);
-    if (!ownerKey) return;
-    void refreshProjectsSummary(ownerKey);
   }, [ownerKey, projects]);
 
   return null;

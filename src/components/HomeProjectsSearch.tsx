@@ -18,7 +18,6 @@ import {
 import RecentProjectsRow from "@/components/RecentProjectsRow";
 import {
   getProjectsSummaryCache,
-  refreshProjectsSummary,
   setProjectsSummaryCache,
   subscribeProjectsSummary,
   type ProjectsSummaryProject,
@@ -126,7 +125,6 @@ export default function HomeProjectsSearch({
     if (!cached || routeProjectsSummary.length >= cached.length) {
       setProjectsSummaryCache(ownerKey, routeProjectsSummary);
     }
-    void refreshProjectsSummary(ownerKey);
 
     const unsubscribe = subscribeProjectsSummary((update) => {
       if (update.ownerKey !== ownerKey || !update.projects) return;

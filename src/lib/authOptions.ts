@@ -9,7 +9,6 @@ import {
   markPrismaDatabaseUnavailable,
   prisma,
 } from "@/lib/prisma";
-import { assertAppSafeForAuth } from "@/lib/appSafety";
 import bcrypt from "bcryptjs";
 import { ensureStripeCustomerForUser } from "@/lib/stripeCustomers";
 
@@ -82,7 +81,6 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(creds) {
         if (!creds?.email || !creds?.password) return null;
-        await assertAppSafeForAuth();
 
         const normalizedEmail = creds.email.trim().toLowerCase();
         const user = await runAuthDbOperationWithRetry(() =>
@@ -126,11 +124,6 @@ export const authOptions: NextAuthOptions = {
   ],
 
   callbacks: {
-    async signIn() {
-      await assertAppSafeForAuth();
-      return true;
-    },
-
     async jwt({ token, account, user, profile, trigger, session }) {
       const userId = token.sub ?? user?.id;
       if (!userId) return token;
@@ -141,6 +134,24 @@ export const authOptions: NextAuthOptions = {
         }
         if (typeof session.name === "string") {
           token.name = session.name;
+        }
+        if (typeof session.twoFactorEnabled === "boolean") {
+          token.twoFactorEnabled = session.twoFactorEnabled;
+        }
+        if (typeof session.twoFactorPassed === "boolean") {
+          token.twoFactorPassed = session.twoFactorPassed;
+        }
+        if (
+          typeof session.twoFactorMethod === "string"
+          || session.twoFactorMethod === null
+        ) {
+          token.twoFactorMethod = session.twoFactorMethod;
+        }
+        if (
+          typeof session.stripeStatus === "string"
+          || session.stripeStatus === null
+        ) {
+          token.stripeStatus = session.stripeStatus;
         }
       }
 
@@ -176,10 +187,19 @@ export const authOptions: NextAuthOptions = {
           : "credentials";
       }
 
+      const shouldRefreshAuthState = (
+        account != null
+        || user != null
+        || trigger === "update"
+        || typeof token.twoFactorEnabled !== "boolean"
+        || (typeof token.twoFactorMethod !== "string" && token.twoFactorMethod !== null)
+        || (typeof token.stripeStatus !== "string" && token.stripeStatus !== null)
+      );
+
       let dbUser:
         | { twoFactorEnabled: boolean | null; twoFactorMethod: string | null; stripeStatus: string | null }
         | null = null;
-      if (!isPrismaDatabaseCooldownActive()) {
+      if (shouldRefreshAuthState && !isPrismaDatabaseCooldownActive()) {
         try {
           dbUser = await prisma.user.findUnique({
             where: { id: userId },
@@ -243,21 +263,6 @@ export const authOptions: NextAuthOptions = {
         session.user.stripeStatus =
           typeof token.stripeStatus === "string" ? token.stripeStatus : null;
 
-        // Keep profile fields fresh across devices/tabs on normal refresh,
-        // even when JWT payload on another device is stale.
-        if (session.user.id && !isPrismaDatabaseCooldownActive()) {
-          try {
-            const dbUser = await prisma.user.findUnique({
-              where: { id: session.user.id },
-              select: { name: true, email: true },
-            });
-            clearPrismaDatabaseUnavailable();
-            if (dbUser?.name) session.user.name = dbUser.name;
-            if (dbUser?.email) session.user.email = dbUser.email;
-          } catch (error) {
-            logAuthDbRefreshIssue("session", error);
-          }
-        }
       }
       return session;
     },

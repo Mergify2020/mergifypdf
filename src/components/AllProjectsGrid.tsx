@@ -44,6 +44,18 @@ type TrashToastState = {
   label: string;
 };
 
+async function getPdfAccessTarget(res: Response) {
+  const contentType = res.headers.get("content-type") ?? "";
+  if (contentType.includes("application/pdf")) {
+    const blob = await res.blob();
+    return { url: URL.createObjectURL(blob), revoke: true };
+  }
+
+  const data = (await res.json().catch(() => null)) as { url?: string } | null;
+  if (!data?.url) return null;
+  return { url: data.url, revoke: false };
+}
+
 export default function AllProjectsGrid({
   projects,
   onProjectTrashed,
@@ -147,16 +159,21 @@ export default function AllProjectsGrid({
         const project = visibleProjects.find((entry) => entry.id === id);
         const res = await fetch(`/api/projects/${encodeURIComponent(id)}/pdf`, { cache: "no-store" });
         if (!res.ok) continue;
-        const data = (await res.json().catch(() => null)) as { url?: string } | null;
-        if (!data?.url) continue;
+        const target = await getPdfAccessTarget(res);
+        if (!target?.url) continue;
         const anchor = document.createElement("a");
-        anchor.href = data.url;
+        anchor.href = target.url;
         anchor.target = "_blank";
         anchor.rel = "noopener noreferrer";
         anchor.download = `${(project?.title || "Project").replace(/[\\/:*?\"<>|]+/g, "").trim() || "Project"}.pdf`;
         document.body.appendChild(anchor);
         anchor.click();
         anchor.remove();
+        if (target.revoke) {
+          window.setTimeout(() => {
+            URL.revokeObjectURL(target.url);
+          }, 60_000);
+        }
       }
     } finally {
       setBulkBusy(null);

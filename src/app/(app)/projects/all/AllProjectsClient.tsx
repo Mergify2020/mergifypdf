@@ -186,15 +186,18 @@ export default function AllProjectsClient() {
 
     const load = async () => {
       try {
+        let hasCachedProjects = false;
         if (ownerKey) {
           const cached = getProjectsSummaryCache(ownerKey);
           if (cached && !cancelled) {
+            hasCachedProjects = true;
             setProjects(mapSummaryProjects(cached));
             setLoading(false);
           }
         }
 
         if (ownerKey) {
+          if (hasCachedProjects) return;
           const fresh = await refreshProjectsSummary(ownerKey);
           if (!fresh || cancelled) return;
           const mapped = mapSummaryProjects(fresh);

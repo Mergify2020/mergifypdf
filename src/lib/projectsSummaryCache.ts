@@ -22,8 +22,10 @@ type CacheEntry = {
 };
 
 const CACHE_MAX_AGE_MS = 120_000;
+const REFRESH_MIN_AGE_MS = 60_000;
 const CACHE_PREFIX = "mpdf:projects-summary:";
 const memoryCache = new Map<string, CacheEntry>();
+const inFlightRefreshes = new Map<string, Promise<ProjectsSummaryProject[] | null>>();
 const listeners = new Set<(update: ProjectsSummaryUpdate) => void>();
 
 function getCacheKey(ownerKey: string | null | undefined) {
@@ -58,13 +60,19 @@ function notify(update: ProjectsSummaryUpdate) {
   });
 }
 
-export function getProjectsSummaryCache(ownerKey: string | null | undefined) {
+function getExistingCacheEntry(ownerKey: string | null | undefined) {
   if (!ownerKey || typeof window === "undefined") return null;
-  const now = Date.now();
   const existing = memoryCache.get(ownerKey) ?? readStorage(ownerKey);
   if (!existing) return null;
-  if (now - existing.fetchedAt > CACHE_MAX_AGE_MS) return null;
   memoryCache.set(ownerKey, existing);
+  return existing;
+}
+
+export function getProjectsSummaryCache(ownerKey: string | null | undefined) {
+  const now = Date.now();
+  const existing = getExistingCacheEntry(ownerKey);
+  if (!existing) return null;
+  if (now - existing.fetchedAt > CACHE_MAX_AGE_MS) return null;
   return existing.projects;
 }
 
@@ -82,6 +90,7 @@ export function setProjectsSummaryCache(
 export function clearProjectsSummaryCache(ownerKey: string | null | undefined) {
   if (!ownerKey || typeof window === "undefined") return;
   memoryCache.delete(ownerKey);
+  inFlightRefreshes.delete(ownerKey);
   try {
     window.sessionStorage?.removeItem(getCacheKey(ownerKey) ?? "");
   } catch {
@@ -97,16 +106,39 @@ export function subscribeProjectsSummary(listener: (update: ProjectsSummaryUpdat
   };
 }
 
-export async function refreshProjectsSummary(ownerKey: string | null | undefined) {
+export async function refreshProjectsSummary(
+  ownerKey: string | null | undefined,
+  options?: { force?: boolean; minAgeMs?: number }
+) {
   if (!ownerKey) return null;
+  const minAgeMs = options?.minAgeMs ?? REFRESH_MIN_AGE_MS;
+  const existing = getExistingCacheEntry(ownerKey);
+  if (!options?.force && existing && Date.now() - existing.fetchedAt < minAgeMs) {
+    return existing.projects;
+  }
+
+  const inFlight = inFlightRefreshes.get(ownerKey);
+  if (inFlight) {
+    return inFlight;
+  }
+
+  const refreshPromise = (async () => {
   try {
     const res = await fetch("/api/projects?summary=1", { cache: "no-store" });
-    if (!res.ok) return null;
+    if (!res.ok) return existing?.projects ?? null;
     const data = (await res.json()) as { projects?: ProjectsSummaryProject[] };
-    if (!Array.isArray(data.projects)) return null;
+    if (!Array.isArray(data.projects)) return existing?.projects ?? null;
     setProjectsSummaryCache(ownerKey, data.projects);
     return data.projects;
   } catch {
-    return null;
+    return existing?.projects ?? null;
+  }
+  })();
+
+  inFlightRefreshes.set(ownerKey, refreshPromise);
+  try {
+    return await refreshPromise;
+  } finally {
+    inFlightRefreshes.delete(ownerKey);
   }
 }

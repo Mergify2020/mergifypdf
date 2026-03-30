@@ -871,6 +871,17 @@ export default function WorkspaceShell({
       // Keep cached/local session status until auth data arrives to avoid banner pop-in on refresh.
       return;
     }
+    const sessionStripeStatus = session?.user?.stripeStatus ?? null;
+    const shouldFetchBillingMeta =
+      sessionStripeStatus === "past_due" || sessionStripeStatus === "unpaid";
+
+    if (!shouldFetchBillingMeta) {
+      setHomeStripeStatusOverride(undefined);
+      setHomeCurrentPlanTier(null);
+      setHomeBillingMetaReady(true);
+      return;
+    }
+
     let cancelled = false;
     async function reconcileHomeStripeStatus() {
       try {
@@ -919,7 +930,7 @@ export default function WorkspaceShell({
     return () => {
       cancelled = true;
     };
-  }, [isBillingBannerRoute, session?.user?.email]);
+  }, [isBillingBannerRoute, session?.user?.email, session?.user?.stripeStatus]);
 
   useEffect(() => {
     const sessionStripeStatus = session?.user?.stripeStatus;
@@ -1029,41 +1040,27 @@ export default function WorkspaceShell({
     const cached = getProjectsSummaryCache(ownerKey);
     if (cached) {
       hydrate(cached);
+      setFallbackProjectCountReady(true);
+    } else {
+      const load = async () => {
+        const fresh = await refreshProjectsSummary(ownerKey);
+        if (fresh && !cancelled) {
+          hydrate(fresh);
+          return;
+        }
+        if (!cancelled) setFallbackProjectCountReady(true);
+      };
+
+      void load();
     }
-
-    const load = async () => {
-      const fresh = await refreshProjectsSummary(ownerKey);
-      if (fresh && !cancelled) {
-        hydrate(fresh);
-        return;
-      }
-      if (!cancelled) setFallbackProjectCountReady(true);
-    };
-
-    void load();
 
     const unsubscribe = subscribeProjectsSummary((update) => {
       if (update.ownerKey !== ownerKey || !update.projects || cancelled) return;
       hydrate(update.projects);
     });
-
-    const handleFocus = () => {
-      void load();
-    };
-
-    const handleVisibility = () => {
-      if (document.visibilityState === "visible") {
-        void load();
-      }
-    };
-
-    window.addEventListener("focus", handleFocus);
-    document.addEventListener("visibilitychange", handleVisibility);
     return () => {
       cancelled = true;
       unsubscribe();
-      window.removeEventListener("focus", handleFocus);
-      document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [session?.user?.id]);
 
@@ -2860,8 +2857,9 @@ export default function WorkspaceShell({
                                     disabled={createBusy}
                                   >
                                     select files
-                                  </button>{" "}
-                                  or drop your files to get started
+                                  </button>
+                                  <span className="sm:hidden"> to get started</span>
+                                  <span className="hidden sm:inline"> or drop your files to get started</span>
                                 </>
                               )}
                             </p>
@@ -2915,7 +2913,7 @@ export default function WorkspaceShell({
                         <input
                           ref={createFileInputRef}
                           type="file"
-                          accept="application/pdf"
+                          accept=".pdf,application/pdf"
                           multiple
                           className="hidden"
                           onChange={(event) => {

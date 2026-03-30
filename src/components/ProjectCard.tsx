@@ -35,6 +35,27 @@ function clearPreviewCache(projectId: string) {
   previewMemoryCache.delete(projectId);
 }
 
+function openReservedTab() {
+  if (typeof window === "undefined") return null;
+  const reserved = window.open("", "_blank");
+  if (reserved) {
+    reserved.opener = null;
+  }
+  return reserved;
+}
+
+async function getPdfAccessTarget(res: Response) {
+  const contentType = res.headers.get("content-type") ?? "";
+  if (contentType.includes("application/pdf")) {
+    const blob = await res.blob();
+    return { url: URL.createObjectURL(blob), revoke: true };
+  }
+
+  const data = (await res.json().catch(() => null)) as { url?: string } | null;
+  if (!data?.url) return null;
+  return { url: data.url, revoke: false };
+}
+
 function writeStoredStarred(projectId: string, next: boolean) {
   if (typeof window === "undefined") return;
   try {
@@ -215,26 +236,19 @@ export default function ProjectCard({
     const maxLeft = scrollLayer.scrollLeft + scrollLayer.clientWidth - menuWidth - 8;
     const defaultLeft = rect.right - layerRect.left + scrollLayer.scrollLeft - menuWidth;
     const belowTop = rect.bottom - layerRect.top + scrollLayer.scrollTop + 8;
+    const sideLeft = rect.left - layerRect.left + scrollLayer.scrollLeft - menuWidth - 2;
     const sideTop = rect.top - layerRect.top + scrollLayer.scrollTop;
     const minTop = scrollLayer.scrollTop + 8;
     const maxVisibleTop = scrollLayer.scrollTop + scrollLayer.clientHeight - menuHeight - 8;
     const overflowBottom = belowTop > maxVisibleTop;
-    const openRightLeft = rect.right - layerRect.left + scrollLayer.scrollLeft + 2;
-    const openLeftLeft = rect.left - layerRect.left + scrollLayer.scrollLeft - menuWidth - 2;
-    const canOpenRight = openRightLeft <= maxLeft;
-    const canOpenLeft = openLeftLeft >= minLeft;
     const anchoredLeft = overflowBottom
-      ? canOpenRight
-        ? openRightLeft
-        : canOpenLeft
-          ? openLeftLeft
-          : Math.min(Math.max(defaultLeft, minLeft), maxLeft)
-      : defaultLeft;
+      ? Math.min(Math.max(sideLeft, minLeft), maxLeft)
+      : Math.min(Math.max(defaultLeft, minLeft), maxLeft);
     const nextPosition = {
       top: overflowBottom
         ? Math.min(Math.max(sideTop, minTop), Math.max(minTop, maxVisibleTop))
         : Math.min(belowTop, Math.max(minTop, maxVisibleTop)),
-      left: Math.min(Math.max(anchoredLeft, minLeft), maxLeft),
+      left: anchoredLeft,
     };
     setDesktopMenuTarget(scrollLayer);
     setMenuPosition(null);
@@ -376,17 +390,35 @@ export default function ProjectCard({
     event.preventDefault();
     event.stopPropagation();
     if (isPrinting) return;
+    const reservedTab = openReservedTab();
     setIsPrinting(true);
     try {
       const res = await fetch(`/api/projects/${encodeURIComponent(project.id)}/pdf`, {
         cache: "no-store",
       });
-      if (!res.ok) return;
-      const data = (await res.json().catch(() => null)) as { url?: string } | null;
-      if (!data?.url) return;
-      window.open(data.url, "_blank", "noopener,noreferrer");
+      if (!res.ok) {
+        reservedTab?.close();
+        return;
+      }
+      const target = await getPdfAccessTarget(res);
+      if (!target?.url) {
+        reservedTab?.close();
+        return;
+      }
+      if (reservedTab) {
+        reservedTab.location.href = target.url;
+      } else {
+        window.location.href = target.url;
+      }
+      if (target.revoke) {
+        window.setTimeout(() => {
+          URL.revokeObjectURL(target.url);
+        }, 60_000);
+      }
       setMenuOpen(false);
       setMenuPosition(null);
+      setDesktopMenuPosition(null);
+      setDesktopMenuTarget(null);
     } finally {
       setIsPrinting(false);
     }

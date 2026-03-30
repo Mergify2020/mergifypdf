@@ -273,6 +273,10 @@ async function checkAppSafetyUncached(): Promise<AppSafetyStatus> {
 }
 
 export async function getAppSafetyStatus(options?: { forceRefresh?: boolean }) {
+  if (process.env.NEXT_PHASE === "phase-production-build") {
+    return buildStatus(true, "OK", "Skipped app safety checks during production build.");
+  }
+
   const forceRefresh = options?.forceRefresh === true;
   const now = Date.now();
   const cached = globalForAppSafety.__appSafetyCache;
