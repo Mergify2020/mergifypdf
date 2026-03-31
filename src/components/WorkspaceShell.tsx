@@ -51,6 +51,7 @@ import HeroHeader from "./HeroHeader";
 import PageLoadingSkeleton from "./PageLoadingSkeleton";
 import LoadingOverlay from "./LoadingOverlay";
 import UiTooltip from "./UiTooltip";
+import PendingFilesReorderList from "@/components/PendingFilesReorderList";
 import BillingStatusBanner from "@/components/BillingStatusBanner";
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
 import { getAvatarFallback } from "@/lib/avatarFallback";
@@ -68,6 +69,7 @@ const WORKSPACE_META_KEY = "mpdf:files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
 const STARTUP_OVERLAY_KEY = "mpdf:startup-overlay";
 const STARTUP_OVERLAY_CONTEXT_KEY = "mpdf:startup-overlay-context";
+const MAX_PENDING_FILES = 12;
 const SIDEBAR_EXPANDED_KEY = "mpdf:sidebar-expanded";
 const STRIPE_STATUS_CACHE_KEY = "mpdf:stripe-status";
 const STRIPE_PLAN_TIER_CACHE_KEY = "mpdf:stripe-plan-tier";
@@ -100,13 +102,6 @@ async function resetWorkspaceStorage() {
   } catch {
     // ignore
   }
-}
-
-function getFileTypeLabel(file: File) {
-  const extension = file.name.split(".").pop()?.trim();
-  if (extension) return extension.toUpperCase();
-  const subtype = file.type.split("/").pop()?.trim();
-  return subtype ? subtype.toUpperCase() : "FILE";
 }
 
 type SidebarNavIcon = React.ComponentType<{
@@ -237,6 +232,7 @@ export default function WorkspaceShell({
   );
   const [createOpen, setCreateOpen] = useState(false);
   const [createPendingFiles, setCreatePendingFiles] = useState<PendingWorkspaceFile[]>([]);
+  const [createLimitFlashSignal, setCreateLimitFlashSignal] = useState(0);
   const [createError, setCreateError] = useState<string | null>(null);
   const [createBusy, setCreateBusy] = useState(false);
   const [createShowValidation, setCreateShowValidation] = useState(false);
@@ -593,16 +589,6 @@ export default function WorkspaceShell({
       ? crypto.randomUUID()
       : `file_${Math.random().toString(16).slice(2)}_${Date.now()}`;
 
-  function formatBytes(bytes: number) {
-    if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
-    const units = ["B", "KB", "MB", "GB"] as const;
-    const base = 1024;
-    const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(base)), units.length - 1);
-    const value = bytes / Math.pow(base, exponent);
-    const decimals = exponent === 0 ? 0 : 2;
-    return `${value.toFixed(decimals)} ${units[exponent]}`;
-  }
-
   function addCreateFiles(files: FileList | File[]) {
     const list = Array.from(files);
     const filtered = list.filter(
@@ -613,11 +599,22 @@ export default function WorkspaceShell({
       return;
     }
 
-    setCreatePendingFiles((prev) => [
-      ...prev,
-      ...filtered.map((file) => ({ id: createId(), file })),
-    ]);
-    if (createError) setCreateError(null);
+    setCreatePendingFiles((prev) => {
+      const remainingSlots = Math.max(0, MAX_PENDING_FILES - prev.length);
+      if (remainingSlots === 0) {
+        setCreateLimitFlashSignal((value) => value + 1);
+        return prev;
+      }
+      const filesToAdd = filtered.slice(0, remainingSlots);
+      const next = [...prev, ...filesToAdd.map((file) => ({ id: createId(), file }))];
+      if (filesToAdd.length < filtered.length) {
+        setCreateLimitFlashSignal((value) => value + 1);
+        if (createError) setCreateError(null);
+      } else if (createError) {
+        setCreateError(null);
+      }
+      return next;
+    });
   }
 
   const createMissingFiles = createPendingFiles.length === 0;
@@ -627,6 +624,7 @@ export default function WorkspaceShell({
     setCreateError(null);
     setCreateBusy(false);
     setCreatePendingFiles([]);
+    setCreateLimitFlashSignal(0);
     setCreateDragActive(false);
     setCreateShowValidation(false);
     setCreateOpen(true);
@@ -2865,50 +2863,13 @@ export default function WorkspaceShell({
                             </p>
                           </div>
                         ) : (
-                          <div className="flex h-[360px] flex-col gap-4 pt-0 pb-0 text-left sm:h-[400px]">
-                            <div className="overflow-hidden rounded-[10px] border-2 border-dashed border-[#D1D5DB] bg-[#F5F5F5] px-8 py-3 shadow-none">
-                              <p className="text-[15px] font-medium text-slate-700">
-                                Drag and drop, or{" "}
-                                <button
-                                  type="button"
-                                  className="cursor-pointer text-[1.05em] font-bold text-slate-900 underline decoration-1 underline-offset-2 transition hover:text-slate-900 disabled:cursor-not-allowed"
-                                  onClick={() => createFileInputRef.current?.click()}
-                                  disabled={createBusy}
-                                >
-                                  select files
-                                </button>
-                              </p>
-                            </div>
-                            <div className="min-h-0 flex-1 overflow-hidden rounded-[10px] border-[4px] border-solid border-[#D1D5DB] bg-white shadow-none">
-                              <div className="upload-list-scroll h-full overflow-y-auto">
-                                {createPendingFiles.map(({ id, file }) => (
-                                  <div
-                                    key={id}
-                                    className="group flex items-center justify-between gap-3 border-b border-[#DDD4FC] bg-[#F6F2FF] px-4 py-3 text-sm text-slate-800 last:border-b-0"
-                                  >
-                                    <div className="flex min-w-0 items-center gap-3">
-                                      <FileText className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
-                                      <div className="min-w-0">
-                                        <span className="block truncate font-semibold text-slate-900">{file.name}</span>
-                                        <span className="block text-xs font-semibold text-slate-900">
-                                          {getFileTypeLabel(file)} - {formatBytes(file.size)}
-                                        </span>
-                                      </div>
-                                    </div>
-                                    <button
-                                      type="button"
-                                      onClick={() => setCreatePendingFiles((prev) => prev.filter((entry) => entry.id !== id))}
-                                      className="rounded-full p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
-                                      aria-label={`Remove ${file.name}`}
-                                      disabled={createBusy}
-                                    >
-                                      <Trash2 className="h-5 w-5" aria-hidden />
-                                    </button>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
+                          <PendingFilesReorderList
+                            files={createPendingFiles}
+                            busy={createBusy}
+                            onChange={setCreatePendingFiles}
+                            onOpenFilePicker={() => createFileInputRef.current?.click()}
+                            limitFlashSignal={createLimitFlashSignal}
+                          />
                         )}
                         <input
                           ref={createFileInputRef}

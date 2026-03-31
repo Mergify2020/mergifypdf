@@ -2,20 +2,21 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { useSession } from "next-auth/react";
-import { FileText, FileUp, Trash2 } from "lucide-react";
+import { FileUp } from "lucide-react";
 import { createPortal } from "react-dom";
 import {
   PROJECT_NAME_STORAGE_KEY,
   deriveProjectNameFromFilename,
 } from "@/lib/projectName";
 import { useWorkspaceFilePreloader, type PendingWorkspaceFile } from "@/components/useWorkspaceFilePreloader";
+import PendingFilesReorderList from "@/components/PendingFilesReorderList";
 import { uploadProjectPreviewFromFile } from "@/lib/projectPreview";
 
 const WORKSPACE_META_KEY = "mpdf:files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
 const STARTUP_OVERLAY_KEY = "mpdf:startup-overlay";
 const STARTUP_OVERLAY_CONTEXT_KEY = "mpdf:startup-overlay-context";
+const MAX_PENDING_FILES = 12;
 
 type Props = {
   className?: string;
@@ -42,19 +43,12 @@ async function resetWorkspaceStorage() {
   }
 }
 
-function getFileTypeLabel(file: File) {
-  const extension = file.name.split(".").pop()?.trim();
-  if (extension) return extension.toUpperCase();
-  const subtype = file.type.split("/").pop()?.trim();
-  return subtype ? subtype.toUpperCase() : "FILE";
-}
-
 export default function StartProjectButton({ className, variant = "default", iconOnly = false, onOpen }: Props) {
   const router = useRouter();
-  const { data: session } = useSession();
   const { queuePreload } = useWorkspaceFilePreloader();
   const [open, setOpen] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<PendingWorkspaceFile[]>([]);
+  const [limitFlashSignal, setLimitFlashSignal] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
@@ -108,16 +102,6 @@ export default function StartProjectButton({ className, variant = "default", ico
       ? crypto.randomUUID()
       : `file_${Math.random().toString(16).slice(2)}_${Date.now()}`;
 
-  function formatBytes(bytes: number) {
-    if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
-    const units = ["B", "KB", "MB", "GB"] as const;
-    const base = 1024;
-    const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(base)), units.length - 1);
-    const value = bytes / Math.pow(base, exponent);
-    const decimals = exponent === 0 ? 0 : 2;
-    return `${value.toFixed(decimals)} ${units[exponent]}`;
-  }
-
   function addFiles(files: FileList | File[]) {
     const list = Array.from(files);
     const filtered = list.filter(
@@ -129,11 +113,22 @@ export default function StartProjectButton({ className, variant = "default", ico
       return;
     }
 
-    setPendingFiles((prev) => [
-      ...prev,
-      ...filtered.map((file) => ({ id: createId(), file })),
-    ]);
-    if (error) setError(null);
+    setPendingFiles((prev) => {
+      const remainingSlots = Math.max(0, MAX_PENDING_FILES - prev.length);
+      if (remainingSlots === 0) {
+        setLimitFlashSignal((value) => value + 1);
+        return prev;
+      }
+      const filesToAdd = filtered.slice(0, remainingSlots);
+      const next = [...prev, ...filesToAdd.map((file) => ({ id: createId(), file }))];
+      if (filesToAdd.length < filtered.length) {
+        setLimitFlashSignal((value) => value + 1);
+        if (error) setError(null);
+      } else if (error) {
+        setError(null);
+      }
+      return next;
+    });
   }
 
   function launchModal() {
@@ -142,6 +137,7 @@ export default function StartProjectButton({ className, variant = "default", ico
       window.dispatchEvent(new Event("workspace-clear-project-selection"));
     }
     setError(null);
+    setLimitFlashSignal(0);
     setPendingFiles([]);
     setShowValidation(false);
     setOpen(true);
@@ -313,53 +309,13 @@ export default function StartProjectButton({ className, variant = "default", ico
                         </p>
                       </div>
                     ) : (
-                      <div className="flex h-[360px] flex-col gap-4 pt-0 pb-0 text-left sm:h-[400px]">
-                        <div className="overflow-hidden rounded-[10px] border-2 border-dashed border-[#D1D5DB] bg-[#F5F5F5] px-8 py-3 shadow-none dark:border-zinc-700 dark:bg-zinc-800/80">
-                          <p className="text-[15px] font-medium text-slate-700 dark:text-zinc-300">
-                            Drag and drop, or{" "}
-                            <button
-                              type="button"
-                              className="cursor-pointer text-[1.05em] font-bold text-slate-900 underline decoration-1 underline-offset-2 transition hover:text-slate-900 disabled:cursor-not-allowed dark:text-zinc-100 dark:hover:text-zinc-100"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                fileInputRef.current?.click();
-                              }}
-                              disabled={busy}
-                            >
-                              select files
-                            </button>
-                          </p>
-                        </div>
-                        <div className="min-h-0 flex-1 overflow-hidden rounded-[10px] border-2 border-solid border-[#D1D5DB] bg-white shadow-none dark:border-zinc-700 dark:bg-zinc-900">
-                          <div className="upload-list-scroll h-full overflow-y-auto">
-                            {pendingFiles.map(({ id, file }) => (
-                              <div
-                                key={id}
-                                className="group flex items-center justify-between gap-3 border-b border-[#DDD4FC] bg-[#F6F2FF] px-4 py-3 text-sm text-slate-800 last:border-b-0 dark:border-zinc-800 dark:bg-zinc-800/70 dark:text-zinc-200"
-                              >
-                                <div className="flex min-w-0 items-center gap-3">
-                                  <FileText className="h-4 w-4 shrink-0 text-slate-500 dark:text-zinc-400" aria-hidden />
-                                  <div className="min-w-0">
-                                    <span className="block truncate font-semibold text-slate-900 dark:text-zinc-100">{file.name}</span>
-                                    <span className="block text-xs font-semibold text-slate-900 dark:text-zinc-300">
-                                      {getFileTypeLabel(file)} - {formatBytes(file.size)}
-                                    </span>
-                                  </div>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => setPendingFiles((prev) => prev.filter((entry) => entry.id !== id))}
-                                  className="rounded-full p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
-                                  aria-label={`Remove ${file.name}`}
-                                  disabled={busy}
-                                >
-                                  <Trash2 className="h-5 w-5" aria-hidden />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
+                      <PendingFilesReorderList
+                        files={pendingFiles}
+                        busy={busy}
+                        onChange={setPendingFiles}
+                        onOpenFilePicker={() => fileInputRef.current?.click()}
+                        limitFlashSignal={limitFlashSignal}
+                      />
                     )}
                     <input
                       ref={fileInputRef}
