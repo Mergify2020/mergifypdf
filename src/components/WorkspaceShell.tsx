@@ -48,10 +48,10 @@ import {
 import AppHeaderBrand from "./AppHeaderBrand";
 import SettingsMenu from "./SettingsMenu";
 import HeroHeader from "./HeroHeader";
-import PageLoadingSkeleton from "./PageLoadingSkeleton";
 import LoadingOverlay from "./LoadingOverlay";
 import UiTooltip from "./UiTooltip";
 import PendingFilesReorderList from "@/components/PendingFilesReorderList";
+import WorkspaceLaunchLoadingState from "@/components/WorkspaceLaunchLoadingState";
 import BillingStatusBanner from "@/components/BillingStatusBanner";
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
 import { getAvatarFallback } from "@/lib/avatarFallback";
@@ -67,9 +67,20 @@ import {
 
 const WORKSPACE_META_KEY = "mpdf:files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
+const MAX_PENDING_FILES = 12;
+const WORKSPACE_LAUNCH_MIN_MS = 4000;
+const WORKSPACE_LAUNCH_HOLD_FOR_TESTING = false;
+const WORKSPACE_LAUNCH_MODAL_EXIT_MS = 180;
+const WORKSPACE_LAUNCH_FILE_FLASH_MS = 130;
+const WORKSPACE_LAUNCH_PANEL_COMPLETE_MS = 980;
+const WORKSPACE_LAUNCH_OVERLAY_COMPLETE_HOLD_MS = 1100;
+const WORKSPACE_LAUNCH_OVERLAY_EXIT_MS = 260;
+const WORKSPACE_LAUNCH_OVERLAY_STORAGE_KEY = "mpdf:workspace-launch-overlay";
 const STARTUP_OVERLAY_KEY = "mpdf:startup-overlay";
 const STARTUP_OVERLAY_CONTEXT_KEY = "mpdf:startup-overlay-context";
-const MAX_PENDING_FILES = 12;
+const EXISTING_PROJECT_OVERLAY_STORAGE_KEY = "mpdf:existing-project-overlay";
+const EXISTING_PROJECT_OVERLAY_EXIT_MS = 220;
+const EXISTING_PROJECT_OVERLAY_MIN_VISIBLE_MS = 1500;
 const SIDEBAR_EXPANDED_KEY = "mpdf:sidebar-expanded";
 const STRIPE_STATUS_CACHE_KEY = "mpdf:stripe-status";
 const STRIPE_PLAN_TIER_CACHE_KEY = "mpdf:stripe-plan-tier";
@@ -203,6 +214,11 @@ function bootLoaderShowDelayMs(): number {
   return 240;
 }
 
+type PersistedWorkspaceLaunchOverlay = {
+  files: PendingWorkspaceFile[];
+  startedAtMs: number | null;
+};
+
 export default function WorkspaceShell({
   children,
   initialSidebarExpanded = true,
@@ -220,6 +236,38 @@ export default function WorkspaceShell({
   const lastFailedPreviewRef = useRef<Map<string, string>>(new Map());
   const pathname = usePathname();
   const { queuePreload } = useWorkspaceFilePreloader();
+  const readPersistedWorkspaceLaunchOverlay = (): PersistedWorkspaceLaunchOverlay => {
+    if (typeof window === "undefined") return { files: [], startedAtMs: null };
+    try {
+      const raw = window.sessionStorage?.getItem(WORKSPACE_LAUNCH_OVERLAY_STORAGE_KEY);
+      if (!raw) return { files: [], startedAtMs: null };
+      const parsed = JSON.parse(raw) as { names?: unknown; startedAtMs?: unknown };
+      const names = Array.isArray(parsed?.names)
+        ? parsed.names.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+        : [];
+      const startedAtMs =
+        typeof parsed?.startedAtMs === "number" && Number.isFinite(parsed.startedAtMs)
+          ? parsed.startedAtMs
+          : null;
+      return {
+        files: names.map((name, index) => ({
+          id: `launch-overlay-${index}-${name}`,
+          file: new File([], name, { type: "application/pdf" }),
+        })),
+        startedAtMs,
+      };
+    } catch {
+      return { files: [], startedAtMs: null };
+    }
+  };
+  const [workspaceLaunchOverlayFiles, setWorkspaceLaunchOverlayFiles] = useState<PendingWorkspaceFile[]>([]);
+  const [workspaceLaunchOverlayOpen, setWorkspaceLaunchOverlayOpen] = useState(false);
+  const [workspaceLaunchOverlayStartedAtMs, setWorkspaceLaunchOverlayStartedAtMs] = useState<number | null>(null);
+  const [workspaceLaunchOverlayCompleting, setWorkspaceLaunchOverlayCompleting] = useState(false);
+  const [workspaceLaunchOverlayExiting, setWorkspaceLaunchOverlayExiting] = useState(false);
+  const [existingProjectOverlayOpen, setExistingProjectOverlayOpen] = useState(false);
+  const [existingProjectOverlayExiting, setExistingProjectOverlayExiting] = useState(false);
+  const existingProjectOverlayShownAtRef = useRef<number>(0);
   const [homeRecentProjects, setHomeRecentProjects] = useState<
     { id?: string; title: string; updatedAt?: number; previewUrl?: string | null; hasPreview?: boolean }[]
   >([]);
@@ -235,6 +283,11 @@ export default function WorkspaceShell({
   const [createLimitFlashSignal, setCreateLimitFlashSignal] = useState(0);
   const [createError, setCreateError] = useState<string | null>(null);
   const [createBusy, setCreateBusy] = useState(false);
+  const [createLaunchReadyForTesting, setCreateLaunchReadyForTesting] = useState(false);
+  const [createLaunchStartedAtMs, setCreateLaunchStartedAtMs] = useState<number | null>(null);
+  const [createLaunchExiting, setCreateLaunchExiting] = useState(false);
+  const [showCreateLaunchLoader, setShowCreateLaunchLoader] = useState(false);
+  const [createLaunchFileFlash, setCreateLaunchFileFlash] = useState(false);
   const [createShowValidation, setCreateShowValidation] = useState(false);
   const [contentSwapOut, setContentSwapOut] = useState(false);
   const [contentSwapIn, setContentSwapIn] = useState(false);
@@ -265,6 +318,12 @@ export default function WorkspaceShell({
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const createRef = useRef<HTMLDivElement>(null);
   const createFileInputRef = useRef<HTMLInputElement | null>(null);
+  const createLaunchLoaderTimerRef = useRef<number | null>(null);
+  const createLaunchFlashTimerRef = useRef<number | null>(null);
+  const workspaceLaunchOverlayHideTimerRef = useRef<number | null>(null);
+  const workspaceLaunchOverlayCompleteTimerRef = useRef<number | null>(null);
+  const existingProjectOverlayHideTimerRef = useRef<number | null>(null);
+  const wasStudioRouteRef = useRef(false);
   const homeProjectsSearchInputRef = useRef<HTMLInputElement | null>(null);
   const avatarKey = session?.user?.id ?? session?.user?.email ?? null;
   const { avatar } = useAvatarPreference(avatarKey);
@@ -272,25 +331,12 @@ export default function WorkspaceShell({
     const initialNameRaw = typeof initialProfile?.name === "string" ? initialProfile.name.trim() : "";
     const initialName = isPlaceholderProfileName(initialNameRaw) ? "" : initialNameRaw;
     const initialEmail = typeof initialProfile?.email === "string" ? initialProfile.email.trim() : "";
-    const initialValue =
-      initialName || initialEmail ? { name: initialName || initialEmail, email: initialEmail } : null;
-    if (typeof window === "undefined") return initialValue ?? { name: "", email: "" };
-    try {
-      const raw = window.sessionStorage?.getItem(PROFILE_DISPLAY_CACHE_KEY);
-      if (!raw) return initialValue ?? { name: "", email: "" };
-      const parsed = JSON.parse(raw) as { name?: unknown; email?: unknown };
-      const cachedNameRaw = typeof parsed.name === "string" ? parsed.name.trim() : "";
-      const cachedName = isPlaceholderProfileName(cachedNameRaw) ? "" : cachedNameRaw;
-      const cachedEmail = typeof parsed.email === "string" ? parsed.email.trim() : "";
-      if (!cachedName && !cachedEmail) return initialValue ?? { name: "", email: "" };
-      return { name: cachedName || cachedEmail || "", email: cachedEmail };
-    } catch {
-      return initialValue ?? { name: "", email: "" };
-    }
+    return initialName || initialEmail ? { name: initialName || initialEmail, email: initialEmail } : { name: "", email: "" };
   });
   const [signingOut, setSigningOut] = useState(false);
   const [logoutConfirmArmed, setLogoutConfirmArmed] = useState(false);
   const logoutConfirmTimeoutRef = useRef<number | null>(null);
+  const sidebarTooltipTimeoutRef = useRef<number | null>(null);
   const [sidebarTooltip, setSidebarTooltip] = useState<{
     label: string;
     top: number;
@@ -315,6 +361,39 @@ export default function WorkspaceShell({
   useEffect(() => {
     setAvatarLoadFailed(false);
   }, [avatar]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.sessionStorage?.getItem(PROFILE_DISPLAY_CACHE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { name?: unknown; email?: unknown };
+      const cachedNameRaw = typeof parsed.name === "string" ? parsed.name.trim() : "";
+      const cachedName = isPlaceholderProfileName(cachedNameRaw) ? "" : cachedNameRaw;
+      const cachedEmail = typeof parsed.email === "string" ? parsed.email.trim() : "";
+      if (!cachedName && !cachedEmail) return;
+      setStableProfile((current) => {
+        const next = { name: cachedName || cachedEmail || "", email: cachedEmail };
+        return current.name === next.name && current.email === next.email ? current : next;
+      });
+    } catch {
+      // ignore storage read failures
+    }
+  }, []);
+
+  useEffect(() => {
+    const persistedWorkspaceLaunchOverlay = readPersistedWorkspaceLaunchOverlay();
+    if (persistedWorkspaceLaunchOverlay.files.length === 0) return;
+    setWorkspaceLaunchOverlayFiles((current) =>
+      current.length > 0 ? current : persistedWorkspaceLaunchOverlay.files,
+    );
+    setWorkspaceLaunchOverlayStartedAtMs((current) =>
+      current ?? persistedWorkspaceLaunchOverlay.startedAtMs,
+    );
+    setWorkspaceLaunchOverlayOpen((current) =>
+      current || persistedWorkspaceLaunchOverlay.files.length > 0,
+    );
+  }, []);
 
   useEffect(() => {
     const nextNameRaw = (session?.user?.name ?? "").trim();
@@ -514,6 +593,70 @@ export default function WorkspaceShell({
     setLogoutConfirmArmed(false);
   };
 
+  const markExistingProjectStartupOverlay = () => {
+    if (typeof window === "undefined") return;
+    if (workspaceLaunchOverlayOpen) return;
+    try {
+      window.sessionStorage?.setItem(EXISTING_PROJECT_OVERLAY_STORAGE_KEY, "1");
+    } catch {
+      // ignore storage write failures
+    }
+    if (existingProjectOverlayHideTimerRef.current !== null) {
+      window.clearTimeout(existingProjectOverlayHideTimerRef.current);
+      existingProjectOverlayHideTimerRef.current = null;
+    }
+    existingProjectOverlayShownAtRef.current = performance.now();
+    setExistingProjectOverlayExiting(false);
+    setExistingProjectOverlayOpen(true);
+  };
+
+  const maybeMarkExistingProjectNavigation = ({
+    defaultPrevented,
+    button,
+    metaKey,
+    ctrlKey,
+    shiftKey,
+    altKey,
+    target,
+  }: {
+    defaultPrevented: boolean;
+    button: number;
+    metaKey: boolean;
+    ctrlKey: boolean;
+    shiftKey: boolean;
+    altKey: boolean;
+    target: EventTarget | null;
+  }) => {
+    if (defaultPrevented) return;
+    if (button !== 0) return;
+    if (metaKey || ctrlKey || shiftKey || altKey) return;
+    if (!(target instanceof Element)) return;
+    const anchor = target.closest("a[href]");
+    if (!(anchor instanceof HTMLAnchorElement)) return;
+    if (anchor.target && anchor.target !== "_self") return;
+    try {
+      const url = new URL(anchor.href, window.location.href);
+      if (url.origin !== window.location.origin) return;
+      if (url.pathname !== "/studio") return;
+      if (!url.searchParams.get("project")) return;
+      markExistingProjectStartupOverlay();
+    } catch {
+      // ignore malformed hrefs
+    }
+  };
+
+  const handleExistingProjectLinkCapture = (event: React.MouseEvent<HTMLElement>) => {
+    maybeMarkExistingProjectNavigation({
+      defaultPrevented: event.defaultPrevented,
+      button: event.button,
+      metaKey: event.metaKey,
+      ctrlKey: event.ctrlKey,
+      shiftKey: event.shiftKey,
+      altKey: event.altKey,
+      target: event.target,
+    });
+  };
+
   const handleLogoutRequest = async ({
     closeProfile = false,
     closeMobile = false,
@@ -581,6 +724,147 @@ export default function WorkspaceShell({
   useEffect(() => {
     return () => {
       clearLogoutConfirmTimer();
+      if (sidebarTooltipTimeoutRef.current !== null) {
+        window.clearTimeout(sidebarTooltipTimeoutRef.current);
+      }
+      if (createLaunchLoaderTimerRef.current !== null) window.clearTimeout(createLaunchLoaderTimerRef.current);
+      if (createLaunchFlashTimerRef.current !== null) window.clearTimeout(createLaunchFlashTimerRef.current);
+      if (workspaceLaunchOverlayHideTimerRef.current !== null) {
+        window.clearTimeout(workspaceLaunchOverlayHideTimerRef.current);
+      }
+      if (workspaceLaunchOverlayCompleteTimerRef.current !== null) {
+        window.clearTimeout(workspaceLaunchOverlayCompleteTimerRef.current);
+      }
+      if (existingProjectOverlayHideTimerRef.current !== null) {
+        window.clearTimeout(existingProjectOverlayHideTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const handleDocumentClickCapture = (event: MouseEvent) => {
+      maybeMarkExistingProjectNavigation({
+        defaultPrevented: event.defaultPrevented,
+        button: event.button,
+        metaKey: event.metaKey,
+        ctrlKey: event.ctrlKey,
+        shiftKey: event.shiftKey,
+        altKey: event.altKey,
+        target: event.target,
+      });
+    };
+    document.addEventListener("click", handleDocumentClickCapture, true);
+    return () => {
+      document.removeEventListener("click", handleDocumentClickCapture, true);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleHide = () => {
+      if (!existingProjectOverlayOpen || existingProjectOverlayExiting) return;
+      const elapsedVisible =
+        existingProjectOverlayShownAtRef.current > 0
+          ? performance.now() - existingProjectOverlayShownAtRef.current
+          : EXISTING_PROJECT_OVERLAY_MIN_VISIBLE_MS;
+      const remainingVisible = Math.max(0, EXISTING_PROJECT_OVERLAY_MIN_VISIBLE_MS - elapsedVisible);
+      existingProjectOverlayHideTimerRef.current = window.setTimeout(() => {
+        setExistingProjectOverlayExiting(true);
+        existingProjectOverlayHideTimerRef.current = window.setTimeout(() => {
+          try {
+            window.sessionStorage?.removeItem(EXISTING_PROJECT_OVERLAY_STORAGE_KEY);
+          } catch {
+            // ignore storage write failures
+          }
+          setExistingProjectOverlayOpen(false);
+          setExistingProjectOverlayExiting(false);
+          existingProjectOverlayShownAtRef.current = 0;
+          existingProjectOverlayHideTimerRef.current = null;
+        }, EXISTING_PROJECT_OVERLAY_EXIT_MS);
+      }, remainingVisible);
+    };
+    window.addEventListener("workspace-launch-overlay-hide", handleHide);
+    return () => {
+      window.removeEventListener("workspace-launch-overlay-hide", handleHide);
+    };
+  }, [existingProjectOverlayExiting, existingProjectOverlayOpen]);
+
+  const showWorkspaceLaunchOverlay = (files: PendingWorkspaceFile[], startedAtMs: number | null = null) => {
+    if (workspaceLaunchOverlayCompleteTimerRef.current !== null) {
+      window.clearTimeout(workspaceLaunchOverlayCompleteTimerRef.current);
+      workspaceLaunchOverlayCompleteTimerRef.current = null;
+    }
+    if (workspaceLaunchOverlayHideTimerRef.current !== null) {
+      window.clearTimeout(workspaceLaunchOverlayHideTimerRef.current);
+      workspaceLaunchOverlayHideTimerRef.current = null;
+    }
+    try {
+      window.sessionStorage?.setItem(
+        WORKSPACE_LAUNCH_OVERLAY_STORAGE_KEY,
+        JSON.stringify({
+          names: files.map((entry) => entry.file.name).filter(Boolean),
+          startedAtMs,
+        }),
+      );
+    } catch {
+      // ignore storage write failures
+    }
+    setWorkspaceLaunchOverlayFiles(files);
+    setWorkspaceLaunchOverlayStartedAtMs(startedAtMs);
+    setWorkspaceLaunchOverlayCompleting(false);
+    setWorkspaceLaunchOverlayExiting(false);
+    setWorkspaceLaunchOverlayOpen(true);
+  };
+
+  const hideWorkspaceLaunchOverlay = () => {
+    if (workspaceLaunchOverlayCompleteTimerRef.current !== null) {
+      window.clearTimeout(workspaceLaunchOverlayCompleteTimerRef.current);
+      workspaceLaunchOverlayCompleteTimerRef.current = null;
+    }
+    if (workspaceLaunchOverlayHideTimerRef.current !== null) {
+      window.clearTimeout(workspaceLaunchOverlayHideTimerRef.current);
+      workspaceLaunchOverlayHideTimerRef.current = null;
+    }
+    setWorkspaceLaunchOverlayCompleting(true);
+  };
+
+  const beginWorkspaceLaunchOverlayExit = () => {
+    if (!workspaceLaunchOverlayCompleting || workspaceLaunchOverlayExiting) return;
+    if (workspaceLaunchOverlayCompleteTimerRef.current !== null) {
+      window.clearTimeout(workspaceLaunchOverlayCompleteTimerRef.current);
+    }
+    workspaceLaunchOverlayCompleteTimerRef.current = window.setTimeout(() => {
+      setWorkspaceLaunchOverlayExiting(true);
+      workspaceLaunchOverlayCompleteTimerRef.current = null;
+      workspaceLaunchOverlayHideTimerRef.current = window.setTimeout(() => {
+        try {
+          window.sessionStorage?.removeItem(WORKSPACE_LAUNCH_OVERLAY_STORAGE_KEY);
+        } catch {
+          // ignore storage write failures
+        }
+        setWorkspaceLaunchOverlayOpen(false);
+        setWorkspaceLaunchOverlayCompleting(false);
+        setWorkspaceLaunchOverlayExiting(false);
+        setWorkspaceLaunchOverlayStartedAtMs(null);
+        setWorkspaceLaunchOverlayFiles([]);
+        workspaceLaunchOverlayHideTimerRef.current = null;
+      }, WORKSPACE_LAUNCH_OVERLAY_EXIT_MS);
+    }, WORKSPACE_LAUNCH_OVERLAY_COMPLETE_HOLD_MS);
+  };
+
+  useEffect(() => {
+    const handleShow = (event: Event) => {
+      const detail = (event as CustomEvent<{ files?: PendingWorkspaceFile[]; startedAtMs?: number | null }>).detail;
+      showWorkspaceLaunchOverlay(detail?.files ?? [], detail?.startedAtMs ?? null);
+    };
+    const handleHide = () => {
+      hideWorkspaceLaunchOverlay();
+    };
+    window.addEventListener("workspace-launch-overlay-show", handleShow as EventListener);
+    window.addEventListener("workspace-launch-overlay-hide", handleHide);
+    return () => {
+      window.removeEventListener("workspace-launch-overlay-show", handleShow as EventListener);
+      window.removeEventListener("workspace-launch-overlay-hide", handleHide);
     };
   }, []);
 
@@ -620,10 +904,26 @@ export default function WorkspaceShell({
   const createMissingFiles = createPendingFiles.length === 0;
   const showCreateFilesError = createShowValidation && createMissingFiles;
 
+  const resetCreateLaunchTransition = () => {
+    if (createLaunchLoaderTimerRef.current !== null) {
+      window.clearTimeout(createLaunchLoaderTimerRef.current);
+      createLaunchLoaderTimerRef.current = null;
+    }
+    if (createLaunchFlashTimerRef.current !== null) {
+      window.clearTimeout(createLaunchFlashTimerRef.current);
+      createLaunchFlashTimerRef.current = null;
+    }
+    setCreateLaunchExiting(false);
+    setCreateLaunchFileFlash(false);
+    setCreateLaunchStartedAtMs(null);
+  };
+
   function openCreateModal() {
     setCreateError(null);
     setCreateBusy(false);
     setCreatePendingFiles([]);
+    setCreateLaunchReadyForTesting(false);
+    resetCreateLaunchTransition();
     setCreateLimitFlashSignal(0);
     setCreateDragActive(false);
     setCreateShowValidation(false);
@@ -632,11 +932,13 @@ export default function WorkspaceShell({
 
   function closeCreateModal() {
     if (createBusy) return;
+    resetCreateLaunchTransition();
     setCreateOpen(false);
   }
 
   async function handleCreateStart() {
     const startedAt = Date.now();
+    setCreateLaunchStartedAtMs(startedAt);
     setCreateShowValidation(true);
     if (createMissingFiles) {
       setCreateError(null);
@@ -648,7 +950,16 @@ export default function WorkspaceShell({
     } catch {
       // ignore storage failures
     }
+    setCreateLaunchExiting(true);
+    setCreateLaunchFileFlash(true);
+    if (createLaunchFlashTimerRef.current !== null) window.clearTimeout(createLaunchFlashTimerRef.current);
+    createLaunchFlashTimerRef.current = window.setTimeout(() => {
+      setCreateLaunchFileFlash(false);
+      createLaunchFlashTimerRef.current = null;
+    }, WORKSPACE_LAUNCH_FILE_FLASH_MS);
+    setShowCreateLaunchLoader(true);
     setCreateBusy(true);
+    setCreateLaunchReadyForTesting(false);
     await resetWorkspaceStorage();
     try {
       const res = await fetch("/api/projects", {
@@ -659,6 +970,8 @@ export default function WorkspaceShell({
       if (!res.ok) {
         setCreateError("Could not create that project. Please try again.");
         setCreateBusy(false);
+        setCreateLaunchReadyForTesting(false);
+        resetCreateLaunchTransition();
         return;
       }
       const json = (await res.json().catch(() => null)) as { project?: { id?: string } } | null;
@@ -666,22 +979,29 @@ export default function WorkspaceShell({
       if (!id) {
         setCreateError("Could not create that project. Please try again.");
         setCreateBusy(false);
+        setCreateLaunchReadyForTesting(false);
+        resetCreateLaunchTransition();
         return;
       }
       void uploadProjectPreviewFromFile(createPendingFiles[0]?.file, id);
       queuePreload(createPendingFiles, id);
       const elapsed = Date.now() - startedAt;
-      if (elapsed < 2000) {
-        await new Promise((resolve) => setTimeout(resolve, 2000 - elapsed));
+      if (elapsed < WORKSPACE_LAUNCH_MIN_MS) {
+        await new Promise((resolve) => setTimeout(resolve, WORKSPACE_LAUNCH_MIN_MS - elapsed));
       }
-      setCreateBusy(false);
-      setCreateOpen(false);
-      window.sessionStorage?.setItem(STARTUP_OVERLAY_KEY, "1");
-      window.sessionStorage?.setItem(STARTUP_OVERLAY_CONTEXT_KEY, "new");
+      setCreateLaunchReadyForTesting(true);
+      await new Promise((resolve) => setTimeout(resolve, WORKSPACE_LAUNCH_PANEL_COMPLETE_MS));
+      if (WORKSPACE_LAUNCH_HOLD_FOR_TESTING) {
+        return;
+      }
+      showWorkspaceLaunchOverlay(createPendingFiles, startedAt);
       router.push(`/studio?project=${encodeURIComponent(id)}`);
     } catch {
       setCreateError("Could not create that project. Please try again.");
       setCreateBusy(false);
+      setCreateLaunchReadyForTesting(false);
+      resetCreateLaunchTransition();
+      hideWorkspaceLaunchOverlay();
     }
   }
 
@@ -714,6 +1034,59 @@ export default function WorkspaceShell({
   const isHomePanel = panelKey === "home";
   const isSignaturesPanel = panelKey === "signatures";
   const isTemplatesPanel = panelKey === "templates";
+  useEffect(() => {
+    if (isStudioRoute || !workspaceLaunchOverlayOpen) return;
+    if (workspaceLaunchOverlayCompleteTimerRef.current !== null) {
+      window.clearTimeout(workspaceLaunchOverlayCompleteTimerRef.current);
+      workspaceLaunchOverlayCompleteTimerRef.current = null;
+    }
+    if (workspaceLaunchOverlayHideTimerRef.current !== null) {
+      window.clearTimeout(workspaceLaunchOverlayHideTimerRef.current);
+      workspaceLaunchOverlayHideTimerRef.current = null;
+    }
+    try {
+      window.sessionStorage?.removeItem(WORKSPACE_LAUNCH_OVERLAY_STORAGE_KEY);
+    } catch {
+      // ignore storage write failures
+    }
+    setWorkspaceLaunchOverlayOpen(false);
+    setWorkspaceLaunchOverlayCompleting(false);
+    setWorkspaceLaunchOverlayExiting(false);
+    setWorkspaceLaunchOverlayStartedAtMs(null);
+    setWorkspaceLaunchOverlayFiles([]);
+  }, [isStudioRoute, workspaceLaunchOverlayOpen]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!isStudioRoute) return;
+    try {
+      if (!window.sessionStorage?.getItem(EXISTING_PROJECT_OVERLAY_STORAGE_KEY)) return;
+    } catch {
+      return;
+    }
+    if (existingProjectOverlayHideTimerRef.current !== null) {
+      window.clearTimeout(existingProjectOverlayHideTimerRef.current);
+      existingProjectOverlayHideTimerRef.current = null;
+    }
+    existingProjectOverlayShownAtRef.current = performance.now();
+    setExistingProjectOverlayExiting(false);
+    setExistingProjectOverlayOpen(true);
+  }, [isStudioRoute]);
+  useEffect(() => {
+    const leftStudio = wasStudioRouteRef.current && !isStudioRoute;
+    if (!leftStudio || !existingProjectOverlayOpen) return;
+    if (existingProjectOverlayHideTimerRef.current !== null) {
+      window.clearTimeout(existingProjectOverlayHideTimerRef.current);
+      existingProjectOverlayHideTimerRef.current = null;
+    }
+    try {
+      window.sessionStorage?.removeItem(EXISTING_PROJECT_OVERLAY_STORAGE_KEY);
+    } catch {
+      // ignore storage write failures
+    }
+    setExistingProjectOverlayOpen(false);
+    setExistingProjectOverlayExiting(false);
+    existingProjectOverlayShownAtRef.current = 0;
+  }, [existingProjectOverlayOpen, isStudioRoute]);
   const useUnifiedWorkspaceBackground =
     pathname === "/" ||
     (pathname?.startsWith("/projects") ?? false) ||
@@ -745,7 +1118,7 @@ export default function WorkspaceShell({
   const isHomeProjectsPath = (value?: string | null) =>
     value === "/" || (value?.startsWith("/projects") ?? false);
   const showPersistentHomeProjectsTopBar = pathname === "/" || pathname === "/projects/all";
-  const isAllProjectsRoute = pathname === "/projects/all";
+  const isAllProjectsRoute = pathname === "/" || pathname === "/projects/all";
   const fallbackProjectCardCount = fallbackProjectCountReady
     ? (isAllProjectsRoute ? Math.min(homeRecentProjects.length, 60) : Math.min(homeRecentProjects.length, 9))
     : isAllProjectsRoute
@@ -821,6 +1194,18 @@ export default function WorkspaceShell({
     const timer = setTimeout(prefetch, 200);
     return () => clearTimeout(timer);
   }, [router]);
+
+  useEffect(() => {
+    const leftStudio = wasStudioRouteRef.current && !isStudioRoute;
+    wasStudioRouteRef.current = isStudioRoute;
+    if (!leftStudio) return;
+    if (existingProjectOverlayHideTimerRef.current !== null) {
+      window.clearTimeout(existingProjectOverlayHideTimerRef.current);
+      existingProjectOverlayHideTimerRef.current = null;
+    }
+    setExistingProjectOverlayOpen(false);
+    setExistingProjectOverlayExiting(false);
+  }, [isStudioRoute]);
 
   useEffect(() => {
     const pendingPath = pendingContentSwapPathRef.current;
@@ -1276,6 +1661,13 @@ export default function WorkspaceShell({
     : hideWorkspaceSidebar
       ? "justify-center px-6"
       : "justify-start px-3 sm:px-4 md:pl-0 md:pr-6";
+  const clearSidebarTooltip = () => {
+    if (sidebarTooltipTimeoutRef.current !== null) {
+      window.clearTimeout(sidebarTooltipTimeoutRef.current);
+      sidebarTooltipTimeoutRef.current = null;
+    }
+    setSidebarTooltip(null);
+  };
   const setSidebarTooltipFromEvent = (
     event: React.MouseEvent<HTMLElement> | React.FocusEvent<HTMLElement>,
     label: string,
@@ -1287,20 +1679,51 @@ export default function WorkspaceShell({
     const rect = event.currentTarget.getBoundingClientRect();
     const sidebarRect = sidebarRef.current?.getBoundingClientRect();
     const leftAnchor = useSidebarEdge ? sidebarRect?.right ?? rect.right : rect.right;
-    setSidebarTooltip({
-      label,
-      top:
-        rect.top +
-        rect.height / 2 +
-        (label === "Expand sidebar" ||
-        label === "Collapse sidebar" ||
-        label === "Show navigation" ||
-        label === "Hide navigation"
-          ? 6
-          : 0),
-      left: leftAnchor + offset,
-    });
+    if (sidebarTooltipTimeoutRef.current !== null) {
+      window.clearTimeout(sidebarTooltipTimeoutRef.current);
+    }
+    sidebarTooltipTimeoutRef.current = window.setTimeout(() => {
+      setSidebarTooltip({
+        label,
+        top:
+          rect.top +
+          rect.height / 2 +
+          (label === "Expand sidebar" ||
+          label === "Collapse sidebar" ||
+          label === "Show navigation" ||
+          label === "Hide navigation"
+            ? 6
+            : 0),
+        left: leftAnchor + offset,
+      });
+      sidebarTooltipTimeoutRef.current = null;
+    }, 500);
   };
+
+  useEffect(() => {
+    const handleWindowBlur = () => {
+      clearSidebarTooltip();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "visible") {
+        clearSidebarTooltip();
+      }
+    };
+    const handleDocumentMouseOut = (event: MouseEvent) => {
+      if (event.relatedTarget === null) {
+        clearSidebarTooltip();
+      }
+    };
+
+    window.addEventListener("blur", handleWindowBlur);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    document.addEventListener("mouseout", handleDocumentMouseOut);
+    return () => {
+      window.removeEventListener("blur", handleWindowBlur);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      document.removeEventListener("mouseout", handleDocumentMouseOut);
+    };
+  }, []);
 
   const getSidebarTooltipLabel = (label: string) => {
     switch (label) {
@@ -1530,16 +1953,26 @@ export default function WorkspaceShell({
       const handleTooltipEnter = (event: React.MouseEvent<HTMLElement> | React.FocusEvent<HTMLElement>) => {
         if (isExpanded) return;
         const rect = event.currentTarget.getBoundingClientRect();
-        setSidebarTooltip({
-          label: getSidebarTooltipLabel(logoutArmedA11yLabel),
-          top: rect.top + rect.height / 2,
-          left: rect.right + 12,
-        });
+        if (sidebarTooltipTimeoutRef.current !== null) {
+          window.clearTimeout(sidebarTooltipTimeoutRef.current);
+        }
+        sidebarTooltipTimeoutRef.current = window.setTimeout(() => {
+          setSidebarTooltip({
+            label: getSidebarTooltipLabel(logoutArmedA11yLabel),
+            top: rect.top + rect.height / 2,
+            left: rect.right + 12,
+          });
+          sidebarTooltipTimeoutRef.current = null;
+        }, 500);
       };
 
       const handleTooltipLeave = () => {
         if (isExpanded) return;
-        setSidebarTooltip(null);
+        if (sidebarTooltipTimeoutRef.current !== null) {
+          window.clearTimeout(sidebarTooltipTimeoutRef.current);
+          sidebarTooltipTimeoutRef.current = null;
+        }
+        clearSidebarTooltip();
       };
 
       if (disabled) {
@@ -1714,6 +2147,55 @@ export default function WorkspaceShell({
     { label: "Trash", href: "/projects/trash", icon: PhTrash, active: isTrashRoute },
   ] as const;
 
+  const routeHandoffOverlays = (
+    <>
+      {workspaceLaunchOverlayOpen ? (
+        <div
+          className={`pointer-events-none fixed inset-0 z-[1300] ${
+            workspaceLaunchOverlayExiting ? "workspace-handoff-overlay-exit" : "workspace-handoff-overlay-enter"
+          }`}
+        >
+          <div className="workspace-handoff-overlay-backdrop absolute inset-0 bg-white dark:bg-[#0F1117]" />
+          <div className={`relative min-h-screen ${workspaceLaunchOverlayExiting ? "workspace-handoff-content-exit" : ""}`}>
+            <WorkspaceLaunchLoadingState
+              files={workspaceLaunchOverlayFiles}
+              complete={workspaceLaunchOverlayCompleting || workspaceLaunchOverlayExiting}
+              startedAtMs={workspaceLaunchOverlayStartedAtMs}
+              onCompleteVisualReady={beginWorkspaceLaunchOverlayExit}
+              headlineOverride={
+                workspaceLaunchOverlayFiles.length > 0 ? undefined : "Preparing your workspace"
+              }
+            />
+          </div>
+        </div>
+      ) : null}
+      {existingProjectOverlayOpen ? (
+        <div
+          className={`pointer-events-none fixed inset-0 z-[1280] ${
+            existingProjectOverlayExiting ? "workspace-handoff-overlay-exit" : "workspace-handoff-overlay-enter"
+          }`}
+        >
+          <div className="workspace-handoff-overlay-backdrop absolute inset-0 bg-white dark:bg-[#0F1117]" />
+          <div
+            className={`relative flex min-h-screen items-center justify-center px-6 py-10 ${
+              existingProjectOverlayExiting ? "workspace-handoff-content-exit" : ""
+            }`}
+          >
+            <div className="pointer-events-none flex flex-col items-center text-center">
+              <p className="text-[24px] font-semibold tracking-tight text-slate-900 sm:text-[28px]">
+                Opening workspace...
+              </p>
+              <div
+                className="mt-5 h-14 w-14 animate-spin rounded-full border-[5px] border-[#D9CCFF] border-t-[#6C47FF]"
+                aria-hidden
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+
   const workspaceShell = (
     <>
     {isBillingBannerRoute ? (
@@ -1837,11 +2319,11 @@ export default function WorkspaceShell({
                     <button
                       type="button"
                       onClick={() => {
-                        setSidebarTooltip(null);
+                        clearSidebarTooltip();
                         setExpanded((prev) => !prev);
                       }}
                       onMouseDown={() => {
-                        setSidebarTooltip(null);
+                        clearSidebarTooltip();
                       }}
                       className="relative z-10 inline-flex items-center justify-center p-1 text-slate-500 transition hover:text-slate-900 dark:text-zinc-300 dark:hover:text-white"
                       aria-label="Collapse sidebar"
@@ -1849,13 +2331,13 @@ export default function WorkspaceShell({
                         setSidebarTooltipFromEvent(event, "Hide navigation", 3, true);
                       }}
                       onMouseLeave={() => {
-                        setSidebarTooltip(null);
+                        clearSidebarTooltip();
                       }}
                       onFocus={(event) => {
                         setSidebarTooltipFromEvent(event, "Hide navigation", 3, true);
                       }}
                       onBlur={() => {
-                        setSidebarTooltip(null);
+                        clearSidebarTooltip();
                       }}
                     >
                       <PanelLeftClose className="h-6 w-6" />
@@ -1865,11 +2347,11 @@ export default function WorkspaceShell({
                   <button
                     type="button"
                     onClick={() => {
-                      setSidebarTooltip(null);
+                      clearSidebarTooltip();
                       setExpanded(true);
                     }}
                     onMouseDown={() => {
-                      setSidebarTooltip(null);
+                      clearSidebarTooltip();
                     }}
                     className="inline-flex items-center justify-center overflow-visible"
                     aria-label="Expand sidebar"
@@ -1877,13 +2359,13 @@ export default function WorkspaceShell({
                       setSidebarTooltipFromEvent(event, "Show navigation", 3, true);
                     }}
                     onMouseLeave={() => {
-                      setSidebarTooltip(null);
+                      clearSidebarTooltip();
                     }}
                     onFocus={(event) => {
                       setSidebarTooltipFromEvent(event, "Show navigation", 3, true);
                     }}
                     onBlur={() => {
-                      setSidebarTooltip(null);
+                      clearSidebarTooltip();
                     }}
                   >
                     <Image
@@ -1911,20 +2393,20 @@ export default function WorkspaceShell({
                       setSidebarTooltipFromEvent(event, "Create a new project", 3, true);
                     }}
                     onMouseLeave={() => {
-                      if (!navExpanded) setSidebarTooltip(null);
+                      if (!navExpanded) clearSidebarTooltip();
                     }}
                     onFocus={(event) => {
                       if (navExpanded) return;
                       setSidebarTooltipFromEvent(event, "Create a new project", 3, true);
                     }}
                     onBlur={() => {
-                      if (!navExpanded) setSidebarTooltip(null);
+                      if (!navExpanded) clearSidebarTooltip();
                     }}
                   >
                     <StartProjectButton
                       variant="custom"
                       iconOnly={!navExpanded}
-                      onOpen={() => setSidebarTooltip(null)}
+                      onOpen={() => clearSidebarTooltip()}
                       className={
                         navExpanded
                           ? "flex h-12 w-[220px] items-center justify-center rounded-xl border border-transparent bg-[#6C47FF] px-5 text-sm font-semibold tracking-wide text-white shadow-[0_8px_18px_rgba(15,23,42,0.14)] transition-[width,transform,opacity,background-color,box-shadow] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] origin-left transform-gpu opacity-100 scale-100 hover:bg-[#5B38E6] hover:shadow-[0_10px_22px_rgba(15,23,42,0.18)] dark:border-zinc-700/40 dark:bg-[#6C47FF] dark:text-zinc-100 dark:shadow-[0_10px_22px_rgba(0,0,0,0.35)] dark:hover:bg-[#5B38E6] dark:hover:border-zinc-600/60 dark:hover:shadow-[0_12px_26px_rgba(0,0,0,0.42)] dark:active:bg-[#4E2FD1]"
@@ -2276,6 +2758,7 @@ export default function WorkspaceShell({
 	                              <button
 	                                type="button"
 	                                onClick={() => {
+                                      markExistingProjectStartupOverlay();
 	                                  router.push(`/studio?project=${encodeURIComponent(item.key as string)}`);
 	                                  if (shouldOverlay) {
 	                                    setExpanded(false);
@@ -2723,9 +3206,18 @@ export default function WorkspaceShell({
               >
                 <div
                   className={`workspace-content-shell w-full transition-none 2xl:transition-[max-width] 2xl:duration-300 2xl:ease-[cubic-bezier(0.22,1,0.36,1)] ${
-                    contentSwapOut ? "workspace-content-swap-out" : contentSwapIn ? "workspace-content-swap-in" : ""
+                    contentSwapOut
+                      ? "workspace-content-swap-out"
+                      : contentSwapIn
+                        ? "workspace-content-swap-in"
+                        : workspaceLaunchOverlayOpen
+                          ? workspaceLaunchOverlayExiting
+                            ? "workspace-launch-underlay-reveal"
+                            : "workspace-launch-underlay-prep"
+                          : ""
                   }`}
                   style={{ maxWidth: "var(--shell-content-width)" }}
+                  onClickCapture={handleExistingProjectLinkCapture}
                 >
                   {children}
                 </div>
@@ -2786,13 +3278,33 @@ export default function WorkspaceShell({
 
       {createOpen
         ? createPortal(
+            <>
+            <div
+              className={`fixed inset-0 z-[1100] transition-[opacity,transform,filter] duration-[260ms] ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                showCreateLaunchLoader
+                  ? "opacity-100 scale-100 blur-0"
+                  : "pointer-events-none opacity-0 scale-[1.01] blur-[2px]"
+              }`}
+            >
+              {showCreateLaunchLoader ? (
+                <WorkspaceLaunchLoadingState
+                  files={createPendingFiles}
+                  complete={createLaunchReadyForTesting}
+                  startedAtMs={createLaunchStartedAtMs}
+                />
+              ) : null}
+            </div>
             <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
               <div
-                className="absolute inset-0 bg-black/40 dark:bg-black/55 dark:backdrop-blur-sm"
+                className={`absolute inset-0 bg-black/40 transition-opacity duration-[${WORKSPACE_LAUNCH_MODAL_EXIT_MS}ms] ease-out dark:bg-black/55 dark:backdrop-blur-sm ${
+                  createLaunchExiting ? "opacity-0" : "opacity-100"
+                }`}
               />
               <div
                 ref={createRef}
-                className="page-fade-in relative z-10 w-full max-w-4xl text-slate-900 dark:text-zinc-100"
+                className={`page-fade-in relative z-10 w-full max-w-4xl text-slate-900 transition-[opacity,transform] duration-[${WORKSPACE_LAUNCH_MODAL_EXIT_MS}ms] ease-out dark:text-zinc-100 ${
+                  createLaunchExiting ? "pointer-events-none opacity-0 scale-[0.965]" : "opacity-100 scale-100"
+                }`}
               >
                 <form
                   className="flex max-h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-2xl bg-white shadow-[0_22px_60px_rgba(15,23,42,0.22),0_0_0_1px_rgba(148,163,184,0.14)] dark:bg-zinc-900 dark:shadow-[0_22px_60px_rgba(0,0,0,0.5)]"
@@ -2807,121 +3319,121 @@ export default function WorkspaceShell({
                     </h2>
 
                     <div className="mt-5">
-                      <div
-                        className={`flex min-h-[360px] flex-col overflow-hidden rounded-[10px] text-center transition sm:min-h-[400px] ${
-                          showCreateFilesError
-                            ? "border-[3px] border-rose-400 bg-rose-50/40 dark:bg-zinc-900/60"
-                            : createDragActive
-                              ? "border-[3px] border-[#51bdff] bg-sky-50/60 dark:bg-zinc-900/70"
-                              : createPendingFiles.length === 0
-                                ? "border-2 border-dashed border-[#D1D5DB] bg-[#F5F5F5] dark:border-zinc-700 dark:bg-zinc-800/80"
-                                : "bg-transparent dark:bg-transparent"
-                        } ${createBusy ? "opacity-70" : ""}`}
-                        onDragOver={(event) => {
-                          event.preventDefault();
-                          if (!createBusy) setCreateDragActive(true);
-                        }}
-                        onDragLeave={() => setCreateDragActive(false)}
-                        onDrop={(event) => {
-                          event.preventDefault();
-                          setCreateDragActive(false);
-                          if (createBusy) return;
-                          if (event.dataTransfer?.files?.length) addCreateFiles(event.dataTransfer.files);
-                        }}
-                      >
-                        {createPendingFiles.length === 0 ? (
-                          <div className="flex min-h-[360px] flex-1 flex-col items-center justify-center px-8 py-10 sm:min-h-[400px]">
-                            <div className="relative mb-1 h-14 w-16">
-                              <FileUp
-                                className={`absolute left-1/2 top-1/2 h-12 w-12 -translate-x-[58%] -translate-y-1/2 ${
-                                  showCreateFilesError ? "text-rose-500" : "text-[#6C47FF]"
-                                }`}
-                                aria-hidden
+                          <div
+                            className={`flex min-h-[360px] flex-col overflow-hidden rounded-[10px] text-center transition sm:min-h-[400px] ${
+                              showCreateFilesError
+                                ? "border-[3px] border-rose-400 bg-rose-50/40 dark:bg-zinc-900/60"
+                                : createDragActive
+                                  ? "border-[3px] border-[#51bdff] bg-sky-50/60 dark:bg-zinc-900/70"
+                                  : createPendingFiles.length === 0
+                                    ? "border-2 border-dashed border-[#D1D5DB] bg-[#F5F5F5] dark:border-zinc-700 dark:bg-zinc-800/80"
+                                    : "bg-transparent dark:bg-transparent"
+                            } ${createLaunchFileFlash ? "scale-[1.01] brightness-[1.02] shadow-[0_0_0_1px_rgba(108,71,255,0.15),0_18px_40px_rgba(108,71,255,0.12)]" : ""}`}
+                            onDragOver={(event) => {
+                              event.preventDefault();
+                              if (createBusy) return;
+                              setCreateDragActive(true);
+                            }}
+                            onDragLeave={() => {
+                              if (createBusy) return;
+                              setCreateDragActive(false);
+                            }}
+                            onDrop={(event) => {
+                              event.preventDefault();
+                              if (createBusy) return;
+                              setCreateDragActive(false);
+                              if (event.dataTransfer?.files?.length) addCreateFiles(event.dataTransfer.files);
+                            }}
+                          >
+                            {createPendingFiles.length === 0 ? (
+                              <div className="flex min-h-[360px] flex-1 flex-col items-center justify-center px-8 py-10 sm:min-h-[400px]">
+                                <div className="relative mb-1 h-14 w-16">
+                                  <FileUp
+                                    className={`absolute left-1/2 top-1/2 h-12 w-12 -translate-x-[58%] -translate-y-1/2 ${
+                                      showCreateFilesError ? "text-rose-500" : "text-[#6C47FF]"
+                                    }`}
+                                    aria-hidden
+                                  />
+                                </div>
+                                <p
+                                  className={`mt-3 text-base font-semibold ${
+                                    showCreateFilesError ? "text-rose-600" : "text-slate-900"
+                                  }`}
+                                >
+                                  {createDragActive ? (
+                                    "Release to add your files"
+                                  ) : (
+                                    <>
+                                      <button
+                                        type="button"
+                                        className="cursor-pointer text-[1.05em] font-bold text-slate-900 underline decoration-1 underline-offset-2 transition hover:text-slate-900 disabled:cursor-not-allowed"
+                                        onClick={() => createFileInputRef.current?.click()}
+                                        disabled={createBusy}
+                                      >
+                                        select files
+                                      </button>
+                                      <span className="sm:hidden"> to get started</span>
+                                      <span className="hidden sm:inline"> or drop your files to get started</span>
+                                    </>
+                                  )}
+                                </p>
+                                {!createDragActive ? (
+                                  <p className="mt-2 text-sm text-slate-500">Add up to 12 PDF files.</p>
+                                ) : null}
+                              </div>
+                            ) : (
+                              <PendingFilesReorderList
+                                files={createPendingFiles}
+                                busy={createBusy}
+                                onChange={setCreatePendingFiles}
+                                onOpenFilePicker={() => createFileInputRef.current?.click()}
+                                limitFlashSignal={createLimitFlashSignal}
                               />
-                            </div>
-                            <p
-                              className={`mt-3 text-base font-semibold ${
-                                showCreateFilesError ? "text-rose-600" : "text-slate-900"
-                              }`}
-                            >
-                              {createDragActive ? (
-                                "Release to add your files"
-                              ) : (
-                                <>
-                                  <button
-                                    type="button"
-                                    className="cursor-pointer text-[1.05em] font-bold text-slate-900 underline decoration-1 underline-offset-2 transition hover:text-slate-900 disabled:cursor-not-allowed"
-                                    onClick={() => createFileInputRef.current?.click()}
-                                    disabled={createBusy}
-                                  >
-                                    select files
-                                  </button>
-                                  <span className="sm:hidden"> to get started</span>
-                                  <span className="hidden sm:inline"> or drop your files to get started</span>
-                                </>
-                              )}
-                            </p>
+                            )}
+                            <input
+                              ref={createFileInputRef}
+                              type="file"
+                              accept=".pdf,application/pdf"
+                              multiple
+                              className="hidden"
+                              onChange={(event) => {
+                                const files = event.target.files;
+                                if (files) addCreateFiles(files);
+                                event.target.value = "";
+                              }}
+                              disabled={createBusy}
+                            />
                           </div>
-                        ) : (
-                          <PendingFilesReorderList
-                            files={createPendingFiles}
-                            busy={createBusy}
-                            onChange={setCreatePendingFiles}
-                            onOpenFilePicker={() => createFileInputRef.current?.click()}
-                            limitFlashSignal={createLimitFlashSignal}
-                          />
-                        )}
-                        <input
-                          ref={createFileInputRef}
-                          type="file"
-                          accept=".pdf,application/pdf"
-                          multiple
-                          className="hidden"
-                          onChange={(event) => {
-                            const files = event.target.files;
-                            if (files) addCreateFiles(files);
-                            event.target.value = "";
-                          }}
-                          disabled={createBusy}
-                        />
-                      </div>
 
-                      {createError ? <p className="mt-3 text-sm text-rose-500">{createError}</p> : null}
+                          {createError ? <p className="mt-3 text-sm text-rose-500">{createError}</p> : null}
                     </div>
                   </div>
 
                   <div className="shrink-0 bg-white">
-                    <div className="flex min-h-[76px] items-center justify-end gap-3 px-6 py-0 text-sm sm:px-10">
-                      <button
-                        type="button"
-                        onClick={closeCreateModal}
-                        className="px-2 py-2 font-semibold text-slate-500 transition hover:text-slate-900"
-                        disabled={createBusy}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        className="inline-flex items-center justify-center rounded-full bg-[#6C47FF] px-5 py-2 font-semibold text-white shadow-[0_14px_40px_rgba(15,23,42,0.25)] transition hover:-translate-y-0.5 hover:bg-[#5B38E6] hover:shadow-[0_18px_50px_rgba(15,23,42,0.32)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6] focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:translate-y-0 disabled:bg-[#6C47FF] disabled:shadow-[0_14px_40px_rgba(15,23,42,0.25)] disabled:opacity-60 disabled:pointer-events-none"
-                        disabled={createBusy || createMissingFiles}
-                      >
-                        {createBusy ? (
-                          <span className="flex items-center gap-2">
-                            <span
-                              className="h-4 w-4 animate-spin rounded-full border-2 border-white/60 border-t-white"
-                              aria-hidden
-                            />
-                            <span>Preparing…</span>
-                          </span>
-                        ) : (
-                          "Open Workspace"
-                        )}
-                      </button>
-                    </div>
+                      <div className="flex min-h-[76px] items-center justify-end gap-3 px-6 py-0 text-sm sm:px-10">
+                        <button
+                          type="button"
+                          onClick={closeCreateModal}
+                          className="px-2 py-2 font-semibold text-slate-500 transition hover:text-slate-900"
+                          disabled={createBusy}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className={`inline-flex items-center justify-center rounded-full bg-[#6C47FF] px-5 py-2 font-semibold text-white shadow-[0_14px_40px_rgba(15,23,42,0.25)] transition hover:-translate-y-0.5 hover:bg-[#5B38E6] hover:shadow-[0_18px_50px_rgba(15,23,42,0.32)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6] focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:translate-y-0 disabled:bg-[#6C47FF] disabled:shadow-[0_14px_40px_rgba(15,23,42,0.25)] disabled:opacity-60 disabled:pointer-events-none ${
+                            createLaunchExiting ? "scale-[0.97] brightness-95" : ""
+                          }`}
+                          disabled={createBusy || createMissingFiles}
+                        >
+                          Open Workspace
+                        </button>
+                      </div>
                   </div>
                 </form>
               </div>
-            </div>,
+            </div>
+            </>,
             document.body,
           )
         : null}
@@ -2969,13 +3481,20 @@ export default function WorkspaceShell({
     </div>
   );
 
-  if (isStudioRoute) {
-    return (
-      <Suspense fallback={<PageLoadingSkeleton />}>
-        <main>{children}</main>
-      </Suspense>
-    );
-  }
+  const primaryShell = isStudioRoute ? (
+    <Suspense fallback={null}>
+      <main>{children}</main>
+    </Suspense>
+  ) : isPricingRoute ? (
+    pricingShell
+  ) : (
+    workspaceShell
+  );
 
-  return isPricingRoute ? pricingShell : workspaceShell;
+  return (
+    <>
+      {primaryShell}
+      {routeHandoffOverlays}
+    </>
+  );
 }

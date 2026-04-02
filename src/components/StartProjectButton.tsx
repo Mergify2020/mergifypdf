@@ -10,13 +10,17 @@ import {
 } from "@/lib/projectName";
 import { useWorkspaceFilePreloader, type PendingWorkspaceFile } from "@/components/useWorkspaceFilePreloader";
 import PendingFilesReorderList from "@/components/PendingFilesReorderList";
+import WorkspaceLaunchLoadingState from "@/components/WorkspaceLaunchLoadingState";
 import { uploadProjectPreviewFromFile } from "@/lib/projectPreview";
 
 const WORKSPACE_META_KEY = "mpdf:files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
-const STARTUP_OVERLAY_KEY = "mpdf:startup-overlay";
-const STARTUP_OVERLAY_CONTEXT_KEY = "mpdf:startup-overlay-context";
 const MAX_PENDING_FILES = 12;
+const WORKSPACE_LAUNCH_MIN_MS = 4000;
+const WORKSPACE_LAUNCH_HOLD_FOR_TESTING = false;
+const WORKSPACE_LAUNCH_MODAL_EXIT_MS = 180;
+const WORKSPACE_LAUNCH_FILE_FLASH_MS = 130;
+const WORKSPACE_LAUNCH_PANEL_COMPLETE_MS = 980;
 
 type Props = {
   className?: string;
@@ -51,10 +55,30 @@ export default function StartProjectButton({ className, variant = "default", ico
   const [limitFlashSignal, setLimitFlashSignal] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [launchReadyForTesting, setLaunchReadyForTesting] = useState(false);
+  const [launchStartedAtMs, setLaunchStartedAtMs] = useState<number | null>(null);
   const [showValidation, setShowValidation] = useState(false);
+  const [launchExiting, setLaunchExiting] = useState(false);
+  const [showLaunchLoader, setShowLaunchLoader] = useState(false);
+  const [launchFileFlash, setLaunchFileFlash] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const dragDepthRef = useRef(0);
+  const launchLoaderTimerRef = useRef<number | null>(null);
+  const launchFlashTimerRef = useRef<number | null>(null);
+
+  const resetLaunchTransition = () => {
+    if (launchLoaderTimerRef.current !== null) {
+      window.clearTimeout(launchLoaderTimerRef.current);
+      launchLoaderTimerRef.current = null;
+    }
+    if (launchFlashTimerRef.current !== null) {
+      window.clearTimeout(launchFlashTimerRef.current);
+      launchFlashTimerRef.current = null;
+    }
+    setLaunchExiting(false);
+    setLaunchFileFlash(false);
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -93,6 +117,13 @@ export default function StartProjectButton({ className, variant = "default", ico
       window.scrollTo(0, scrollY);
     };
   }, [open]);
+
+  useEffect(() => {
+    return () => {
+      if (launchLoaderTimerRef.current !== null) window.clearTimeout(launchLoaderTimerRef.current);
+      if (launchFlashTimerRef.current !== null) window.clearTimeout(launchFlashTimerRef.current);
+    };
+  }, []);
 
   const missingFiles = pendingFiles.length === 0;
   const showFilesError = showValidation && missingFiles;
@@ -139,17 +170,21 @@ export default function StartProjectButton({ className, variant = "default", ico
     setError(null);
     setLimitFlashSignal(0);
     setPendingFiles([]);
+    setLaunchReadyForTesting(false);
+    resetLaunchTransition();
     setShowValidation(false);
     setOpen(true);
   }
 
   function closeModal() {
     if (busy) return;
+    resetLaunchTransition();
     setOpen(false);
   }
 
   async function handleStart() {
     const startedAt = Date.now();
+    setLaunchStartedAtMs(startedAt);
     setShowValidation(true);
     if (missingFiles) {
       setError(null);
@@ -161,7 +196,16 @@ export default function StartProjectButton({ className, variant = "default", ico
     } catch {
       // ignore storage failures
     }
+    setLaunchExiting(true);
+    setLaunchFileFlash(true);
+    if (launchFlashTimerRef.current !== null) window.clearTimeout(launchFlashTimerRef.current);
+    launchFlashTimerRef.current = window.setTimeout(() => {
+      setLaunchFileFlash(false);
+      launchFlashTimerRef.current = null;
+    }, WORKSPACE_LAUNCH_FILE_FLASH_MS);
+    setShowLaunchLoader(true);
     setBusy(true);
+    setLaunchReadyForTesting(false);
     await resetWorkspaceStorage();
       try {
       const res = await fetch("/api/projects", {
@@ -172,6 +216,8 @@ export default function StartProjectButton({ className, variant = "default", ico
       if (!res.ok) {
         setError("Could not create that project. Please try again.");
         setBusy(false);
+        setLaunchReadyForTesting(false);
+        resetLaunchTransition();
         return;
       }
       const json = (await res.json().catch(() => null)) as { project?: { id?: string } } | null;
@@ -179,22 +225,33 @@ export default function StartProjectButton({ className, variant = "default", ico
       if (!id) {
         setError("Could not create that project. Please try again.");
         setBusy(false);
+        setLaunchReadyForTesting(false);
+        resetLaunchTransition();
         return;
       }
       void uploadProjectPreviewFromFile(pendingFiles[0]?.file, id);
       queuePreload(pendingFiles, id);
       const elapsed = Date.now() - startedAt;
-      if (elapsed < 2000) {
-        await new Promise((resolve) => setTimeout(resolve, 2000 - elapsed));
+      if (elapsed < WORKSPACE_LAUNCH_MIN_MS) {
+        await new Promise((resolve) => setTimeout(resolve, WORKSPACE_LAUNCH_MIN_MS - elapsed));
       }
-      setBusy(false);
-      setOpen(false);
-      window.sessionStorage?.setItem(STARTUP_OVERLAY_KEY, "1");
-      window.sessionStorage?.setItem(STARTUP_OVERLAY_CONTEXT_KEY, "new");
+      setLaunchReadyForTesting(true);
+      await new Promise((resolve) => setTimeout(resolve, WORKSPACE_LAUNCH_PANEL_COMPLETE_MS));
+      if (WORKSPACE_LAUNCH_HOLD_FOR_TESTING) {
+        return;
+      }
+      window.dispatchEvent(
+        new CustomEvent("workspace-launch-overlay-show", {
+          detail: { files: pendingFiles, startedAtMs: startedAt },
+        }),
+      );
       router.push(`/studio?project=${encodeURIComponent(id)}`);
     } catch {
       setError("Could not create that project. Please try again.");
       setBusy(false);
+      setLaunchReadyForTesting(false);
+      resetLaunchTransition();
+      window.dispatchEvent(new Event("workspace-launch-overlay-hide"));
     }
   }
 
@@ -221,11 +278,31 @@ export default function StartProjectButton({ className, variant = "default", ico
 
       {open
         ? createPortal(
+        <>
+        <div
+          className={`fixed inset-0 z-[1100] transition-[opacity,transform,filter] duration-[260ms] ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            showLaunchLoader
+              ? "opacity-100 scale-100 blur-0"
+              : "pointer-events-none opacity-0 scale-[1.01] blur-[2px]"
+          }`}
+        >
+          {showLaunchLoader ? (
+            <WorkspaceLaunchLoadingState
+              files={pendingFiles}
+              complete={launchReadyForTesting}
+              startedAtMs={launchStartedAtMs}
+            />
+          ) : null}
+        </div>
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
           <div
-            className="absolute inset-0 bg-black/40 dark:bg-black/55 dark:backdrop-blur-sm"
+            className={`absolute inset-0 bg-black/40 transition-opacity duration-[${WORKSPACE_LAUNCH_MODAL_EXIT_MS}ms] ease-out dark:bg-black/55 dark:backdrop-blur-sm ${
+              launchExiting ? "opacity-0" : "opacity-100"
+            }`}
           />
-          <div className="page-fade-in relative z-10 w-full max-w-4xl text-slate-900 dark:text-zinc-100">
+          <div className={`page-fade-in relative z-10 w-full max-w-4xl text-slate-900 transition-[opacity,transform] duration-[${WORKSPACE_LAUNCH_MODAL_EXIT_MS}ms] ease-out dark:text-zinc-100 ${
+            launchExiting ? "pointer-events-none opacity-0 scale-[0.965]" : "opacity-100 scale-100"
+          }`}>
             <form
               className="flex max-h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-2xl bg-white shadow-[0_22px_60px_rgba(15,23,42,0.22),0_0_0_1px_rgba(148,163,184,0.14)] dark:bg-zinc-900 dark:shadow-[0_22px_60px_rgba(0,0,0,0.5)]"
               onSubmit={(event) => {
@@ -238,136 +315,132 @@ export default function StartProjectButton({ className, variant = "default", ico
                   Start with your files
                 </h2>
                 <div className="mt-5">
-                  <div
-                    className={`group flex min-h-[360px] w-full flex-col overflow-hidden rounded-[10px] text-center transition duration-200 sm:min-h-[400px] ${
-                      showFilesError
-                        ? "border border-rose-300 bg-gradient-to-b from-rose-50/70 via-white/90 to-white text-rose-600 shadow-[0_0_0_1px_rgba(251,113,133,0.15)] dark:bg-zinc-900/60"
-                        : dragActive
-                          ? "scale-[1.01] border border-sky-400/80 bg-gradient-to-b from-white/80 via-sky-50/70 to-white shadow-[0_0_0_1px_rgba(56,189,248,0.35),0_0_30px_rgba(56,189,248,0.25)] dark:bg-zinc-900/70"
-                          : pendingFiles.length === 0
-                            ? "border-2 border-dashed border-[#D1D5DB] bg-[#F5F5F5] dark:border-zinc-700 dark:bg-zinc-800/80"
-                            : "bg-transparent dark:bg-transparent"
-                    } ${busy ? "opacity-70" : ""}`}
-                    onDragEnter={(event) => {
-                      event.preventDefault();
-                      if (busy) return;
-                      dragDepthRef.current += 1;
-                      setDragActive(true);
-                    }}
-                    onDragOver={(event) => {
-                      event.preventDefault();
-                      if (!busy) setDragActive(true);
-                    }}
-                    onDragLeave={(event) => {
-                      event.preventDefault();
-                      if (busy) return;
-                      dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
-                      if (dragDepthRef.current === 0) setDragActive(false);
-                    }}
-                    onDrop={(event) => {
-                      event.preventDefault();
-                      dragDepthRef.current = 0;
-                      setDragActive(false);
-                      if (busy) return;
-                      if (event.dataTransfer?.files?.length) addFiles(event.dataTransfer.files);
-                    }}
-                  >
-                    {pendingFiles.length === 0 ? (
-                      <div className="flex min-h-[360px] flex-1 flex-col items-center justify-center px-8 py-10 sm:min-h-[400px]">
-                        <div className="relative mb-1 h-16 w-18">
-                          <FileUp
-                            className={`absolute left-1/2 top-1/2 h-14 w-14 -translate-x-[58%] -translate-y-1/2 ${
-                              showFilesError ? "text-rose-500" : "text-[#6C47FF]"
-                            }`}
-                            aria-hidden
+                      <div
+                        className={`group flex min-h-[360px] w-full flex-col overflow-hidden rounded-[10px] text-center transition duration-200 sm:min-h-[400px] ${
+                          showFilesError
+                            ? "border border-rose-300 bg-gradient-to-b from-rose-50/70 via-white/90 to-white text-rose-600 shadow-[0_0_0_1px_rgba(251,113,133,0.15)] dark:bg-zinc-900/60"
+                            : dragActive
+                              ? "scale-[1.01] border border-sky-400/80 bg-gradient-to-b from-white/80 via-sky-50/70 to-white shadow-[0_0_0_1px_rgba(56,189,248,0.35),0_0_30px_rgba(56,189,248,0.25)] dark:bg-zinc-900/70"
+                              : pendingFiles.length === 0
+                                ? "border-2 border-dashed border-[#D1D5DB] bg-[#F5F5F5] dark:border-zinc-700 dark:bg-zinc-800/80"
+                                : "bg-transparent dark:bg-transparent"
+                        } ${launchFileFlash ? "scale-[1.01] brightness-[1.02] shadow-[0_0_0_1px_rgba(108,71,255,0.15),0_18px_40px_rgba(108,71,255,0.12)]" : ""}`}
+                        onDragEnter={(event) => {
+                          event.preventDefault();
+                          if (busy) return;
+                          dragDepthRef.current += 1;
+                          setDragActive(true);
+                        }}
+                        onDragOver={(event) => {
+                          event.preventDefault();
+                          if (busy) return;
+                          setDragActive(true);
+                        }}
+                        onDragLeave={(event) => {
+                          event.preventDefault();
+                          if (busy) return;
+                          dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+                          if (dragDepthRef.current === 0) setDragActive(false);
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          dragDepthRef.current = 0;
+                          setDragActive(false);
+                          if (event.dataTransfer?.files?.length) addFiles(event.dataTransfer.files);
+                        }}
+                      >
+                        {pendingFiles.length === 0 ? (
+                          <div className="flex min-h-[360px] flex-1 flex-col items-center justify-center px-8 py-10 sm:min-h-[400px]">
+                            <div className="relative mb-1 h-16 w-18">
+                              <FileUp
+                                className={`absolute left-1/2 top-1/2 h-14 w-14 -translate-x-[58%] -translate-y-1/2 ${
+                                  showFilesError ? "text-rose-500" : "text-[#6C47FF]"
+                                }`}
+                                aria-hidden
+                              />
+                            </div>
+                            <p
+                              className={`mt-4 text-base font-semibold ${
+                                showFilesError ? "text-rose-600" : "text-slate-900 dark:text-zinc-100"
+                              }`}
+                            >
+                              {dragActive ? (
+                                "Release to add your files"
+                              ) : (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="cursor-pointer text-[1.05em] font-bold text-slate-900 underline decoration-1 underline-offset-2 transition hover:text-slate-900 disabled:cursor-not-allowed dark:text-zinc-100 dark:hover:text-zinc-100"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      fileInputRef.current?.click();
+                                    }}
+                                    disabled={busy}
+                                  >
+                                    select files
+                                  </button>
+                                  <span className="sm:hidden"> to get started</span>
+                                  <span className="hidden sm:inline"> or drop your files to get started</span>
+                                </>
+                              )}
+                            </p>
+                            {!dragActive ? (
+                              <p className="mt-2 text-sm text-slate-500 dark:text-zinc-400">Add up to 12 PDF files.</p>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <PendingFilesReorderList
+                            files={pendingFiles}
+                            busy={busy}
+                            onChange={setPendingFiles}
+                            onOpenFilePicker={() => fileInputRef.current?.click()}
+                            limitFlashSignal={limitFlashSignal}
                           />
-                        </div>
-                        <p
-                          className={`mt-4 text-base font-semibold ${
-                            showFilesError ? "text-rose-600" : "text-slate-900 dark:text-zinc-100"
-                          }`}
-                        >
-                          {dragActive ? (
-                            "Release to add your files"
-                          ) : (
-                            <>
-                              <button
-                                type="button"
-                                className="cursor-pointer text-[1.05em] font-bold text-slate-900 underline decoration-1 underline-offset-2 transition hover:text-slate-900 disabled:cursor-not-allowed dark:text-zinc-100 dark:hover:text-zinc-100"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  fileInputRef.current?.click();
-                                }}
-                                disabled={busy}
-                              >
-                                select files
-                              </button>
-                              <span className="sm:hidden"> to get started</span>
-                              <span className="hidden sm:inline"> or drop your files to get started</span>
-                            </>
-                          )}
-                        </p>
+                        )}
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept=".pdf,application/pdf"
+                          multiple
+                          className="hidden"
+                          onChange={(event) => {
+                            const files = event.target.files;
+                            if (files) addFiles(files);
+                            event.target.value = "";
+                          }}
+                          disabled={busy}
+                        />
                       </div>
-                    ) : (
-                      <PendingFilesReorderList
-                        files={pendingFiles}
-                        busy={busy}
-                        onChange={setPendingFiles}
-                        onOpenFilePicker={() => fileInputRef.current?.click()}
-                        limitFlashSignal={limitFlashSignal}
-                      />
-                    )}
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".pdf,application/pdf"
-                      multiple
-                      className="hidden"
-                      onChange={(event) => {
-                        const files = event.target.files;
-                        if (files) addFiles(files);
-                        event.target.value = "";
-                      }}
-                      disabled={busy}
-                    />
-                  </div>
 
-                  {error ? <p className="mt-3 text-sm text-rose-500">{error}</p> : null}
+                      {error ? <p className="mt-3 text-sm text-rose-500">{error}</p> : null}
                 </div>
               </div>
 
               <div className="shrink-0 bg-white dark:bg-zinc-900">
-                <div className="flex min-h-[76px] items-center justify-end gap-3 px-6 py-0 text-sm sm:px-10">
-                  <button
-                    type="button"
-                    onClick={closeModal}
-                    className="px-2 py-2 font-semibold text-slate-500 transition hover:text-slate-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-                    disabled={busy}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="inline-flex items-center justify-center rounded-full bg-[#6C47FF] px-5 py-2 font-semibold text-white shadow-[0_14px_40px_rgba(15,23,42,0.25)] transition hover:-translate-y-0.5 hover:bg-[#5B38E6] hover:shadow-[0_18px_50px_rgba(15,23,42,0.32)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6] focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:translate-y-0 disabled:bg-[#6C47FF] disabled:shadow-[0_14px_40px_rgba(15,23,42,0.25)] disabled:opacity-60 disabled:pointer-events-none"
-                    disabled={busy || missingFiles}
-                  >
-                    {busy ? (
-                      <span className="flex items-center gap-2">
-                        <span
-                          className="h-4 w-4 animate-spin rounded-full border-2 border-white/60 border-t-white"
-                          aria-hidden
-                        />
-                        <span>Preparing…</span>
-                      </span>
-                    ) : (
-                      "Open Workspace"
-                    )}
-                  </button>
-                </div>
+                  <div className="flex min-h-[76px] items-center justify-end gap-3 px-6 py-0 text-sm sm:px-10">
+                    <button
+                      type="button"
+                      onClick={closeModal}
+                      className="px-2 py-2 font-semibold text-slate-500 transition hover:text-slate-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                      disabled={busy}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className={`inline-flex items-center justify-center rounded-full bg-[#6C47FF] px-5 py-2 font-semibold text-white shadow-[0_14px_40px_rgba(15,23,42,0.25)] transition hover:-translate-y-0.5 hover:bg-[#5B38E6] hover:shadow-[0_18px_50px_rgba(15,23,42,0.32)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6] focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:translate-y-0 disabled:bg-[#6C47FF] disabled:shadow-[0_14px_40px_rgba(15,23,42,0.25)] disabled:opacity-60 disabled:pointer-events-none ${
+                        launchExiting ? "scale-[0.97] brightness-95" : ""
+                      }`}
+                      disabled={busy || missingFiles}
+                    >
+                      Open Workspace
+                    </button>
+                  </div>
               </div>
             </form>
           </div>
-        </div>,
+        </div>
+        </>,
         document.body,
           )
         : null}

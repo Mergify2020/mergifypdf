@@ -1055,8 +1055,8 @@ export default function RecentProjectsRow({
               })}
             </div>
           </div>
-          <div className="hidden md:block">
-            <div className="grid grid-cols-[36px_minmax(280px,1fr)_120px_64px_56px] items-center gap-x-5 border-b border-[#E6EBF2] px-4 py-3 text-sm font-bold uppercase tracking-[0.08em] text-slate-700 dark:border-zinc-700 dark:text-zinc-200 xl:grid-cols-[36px_minmax(420px,1fr)_180px_96px_72px] xl:gap-x-7 2xl:grid-cols-[36px_minmax(560px,1fr)_208px_120px_84px] 2xl:gap-x-8">
+          <div className="hidden md:flex md:max-h-[calc(100vh-280px)] md:flex-col">
+            <div className="z-10 grid grid-cols-[36px_20px_minmax(280px,1fr)_120px_96px_56px] items-center gap-x-3 border-b border-[#E6EBF2] bg-white px-4 py-3 text-sm font-bold uppercase tracking-[0.08em] text-slate-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 xl:grid-cols-[36px_20px_minmax(420px,1fr)_180px_120px_72px] xl:gap-x-5 2xl:grid-cols-[36px_20px_minmax(560px,1fr)_208px_132px_84px] 2xl:gap-x-6">
               <button
                 type="button"
                 onClick={() => {
@@ -1089,18 +1089,19 @@ export default function RecentProjectsRow({
               >
                 <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden />
               </button>
+              <span aria-hidden />
               <span className="text-left">Name</span>
               <span className="text-left">Opened</span>
-              <span className="text-left">Pages</span>
+              <span className="block w-full text-center">Pages</span>
               <span className="text-right">Actions</span>
             </div>
-            <div className="divide-y divide-[#E6EBF2] dark:divide-zinc-700">
+            <div className="min-h-0 overflow-y-auto divide-y divide-[#E6EBF2] dark:divide-zinc-700">
               {mapped.map((project) => {
                 const isSelected = !!selected[project.id];
                 return (
                   <div
                     key={project.id}
-                    className={`grid grid-cols-[36px_minmax(280px,1fr)_120px_64px_56px] items-center gap-x-5 px-4 py-3 transition xl:grid-cols-[36px_minmax(420px,1fr)_180px_96px_72px] xl:gap-x-7 2xl:grid-cols-[36px_minmax(560px,1fr)_208px_120px_84px] 2xl:gap-x-8 ${
+                    className={`grid grid-cols-[36px_20px_minmax(280px,1fr)_120px_96px_56px] items-center gap-x-3 px-4 py-3 transition xl:grid-cols-[36px_20px_minmax(420px,1fr)_180px_120px_72px] xl:gap-x-5 2xl:grid-cols-[36px_20px_minmax(560px,1fr)_208px_132px_84px] 2xl:gap-x-6 ${
                       isSelected ? "bg-[#F5F3FF] dark:bg-zinc-800/60" : "hover:bg-[#F8FAFC] dark:hover:bg-zinc-800/40"
                     }`}
                   >
@@ -1114,8 +1115,26 @@ export default function RecentProjectsRow({
                       }`}
                       aria-label={isSelected ? "Deselect project" : "Select project"}
                       aria-pressed={isSelected}
+                      >
+                        <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden />
+                      </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        toggleProjectStar(project.id);
+                      }}
+                      className={`inline-flex h-6 w-6 flex-none items-center justify-center transition ${
+                        starredById[project.id]
+                          ? "text-amber-500 dark:text-amber-300"
+                          : "text-slate-300 hover:text-amber-400 dark:text-zinc-600 dark:hover:text-amber-300"
+                      }`}
+                      aria-label={starredById[project.id] ? "Unstar project" : "Star project"}
+                      aria-pressed={starredById[project.id] === true}
                     >
-                      <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden />
+                      <Star
+                        className={`h-[18px] w-[18px] ${starredById[project.id] ? "fill-current" : ""}`}
+                        aria-hidden
+                      />
                     </button>
                     {listRenamingId === project.id ? (
                       <div className="flex min-w-0 items-center gap-2">
@@ -1163,53 +1182,37 @@ export default function RecentProjectsRow({
                         </button>
                       </div>
                     ) : (
-                      <div className="group/rename flex min-w-0 items-center gap-2 rounded-lg px-1.5 py-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            toggleProjectStar(project.id);
-                          }}
-                          className={`inline-flex h-5 w-5 flex-none items-center justify-center transition ${
-                            starredById[project.id]
-                              ? "text-amber-500 dark:text-amber-300"
-                              : "text-slate-300 hover:text-amber-400 dark:text-zinc-600 dark:hover:text-amber-300"
-                          }`}
-                          aria-label={starredById[project.id] ? "Unstar project" : "Star project"}
-                          aria-pressed={starredById[project.id] === true}
-                        >
-                          <Star
-                            className={`h-4 w-4 ${starredById[project.id] ? "fill-current" : ""}`}
-                            aria-hidden
-                          />
-                        </button>
+                      <div className="group/rename flex min-w-0 items-center gap-2 rounded-lg py-1">
                         <div className="min-w-0">
-                          <Link
-                            href={`/studio?project=${encodeURIComponent(project.id)}`}
-                            className={`block min-w-0 truncate text-[16px] font-semibold text-slate-900 dark:text-zinc-100 ${
-                              renamedProjectId === project.id
-                                ? "[animation:rename-text-flash_1400ms_ease-out_forwards]"
-                                : ""
-                            }`}
-                          >
-                            {project.title}
-                          </Link>
+                          <div className="flex min-w-0 items-center gap-1.5">
+                            <Link
+                              href={`/studio?project=${encodeURIComponent(project.id)}`}
+                              className={`block min-w-0 flex-1 truncate text-[16px] font-semibold text-slate-900 dark:text-zinc-100 ${
+                                renamedProjectId === project.id
+                                  ? "[animation:rename-text-flash_1400ms_ease-out_forwards]"
+                                  : ""
+                              }`}
+                            >
+                              {project.title}
+                            </Link>
+                            <button
+                              type="button"
+                              aria-label="Rename project"
+                              onClick={() => {
+                                setListRenamingId(project.id);
+                                setListRenameDraft(projectNameToEditable(project.title));
+                              }}
+                              className="inline-flex h-6 w-6 flex-none items-center justify-center text-slate-500 transition hover:text-slate-700 md:opacity-0 md:group-hover/rename:opacity-100 md:group-focus-within/rename:opacity-100 dark:text-zinc-400 dark:hover:text-zinc-100"
+                            >
+                              <Pencil className="h-4 w-4" aria-hidden />
+                            </button>
+                          </div>
                           <span className="mt-0.5 block text-xs text-slate-500 dark:text-zinc-400">
                             {formatFileSize(project.fileSizeBytes)
                               ? `PDF · ${formatFileSize(project.fileSizeBytes)}`
                               : "PDF"}
                           </span>
                         </div>
-                        <button
-                          type="button"
-                          aria-label="Rename project"
-                          onClick={() => {
-                            setListRenamingId(project.id);
-                            setListRenameDraft(projectNameToEditable(project.title));
-                          }}
-                          className="inline-flex h-6 w-6 flex-none items-center justify-center text-slate-500 transition hover:text-slate-700 md:opacity-0 md:group-hover/rename:opacity-100 md:group-focus-within/rename:opacity-100 dark:text-zinc-400 dark:hover:text-zinc-100"
-                        >
-                          <Pencil className="h-4 w-4" aria-hidden />
-                        </button>
                       </div>
                     )}
                     <span className="truncate text-left text-[15px] text-slate-600 dark:text-zinc-300">
@@ -1217,7 +1220,9 @@ export default function RecentProjectsRow({
                         projects.find((entry) => entry.id === project.id)?.updatedAt ?? project.updated
                       )}
                     </span>
-                    <span className="text-left text-[15px] text-slate-600 dark:text-zinc-300">{project.pagesCount ?? 0}</span>
+                    <span className="block w-full text-center text-[15px] text-slate-600 dark:text-zinc-300">
+                      {`${project.pagesCount ?? 0} ${(project.pagesCount ?? 0) === 1 ? "page" : "pages"}`}
+                    </span>
                     <div className="flex items-center justify-end gap-1">
                       <button
                         type="button"

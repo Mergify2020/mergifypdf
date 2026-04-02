@@ -407,6 +407,7 @@ const MIN_STARTUP_OVERLAY_MS = 4000;
 const STARTUP_OVERLAY_FULL_HOLD_MS = 1000;
 const STARTUP_OVERLAY_KEY = "mpdf:startup-overlay";
 const STARTUP_OVERLAY_CONTEXT_KEY = "mpdf:startup-overlay-context";
+const EXISTING_PROJECT_OVERLAY_STORAGE_KEY = "mpdf:existing-project-overlay";
 const WORKSPACE_PREVIEW_CACHE_KEY = "mpdf:preview-cache";
 const PREVIEW_CACHE_VERSION = 1;
 const PREVIEW_CACHE_NEAR_RANGE = 2;
@@ -1589,6 +1590,7 @@ function SortableThumb({
   onDelete,
   disableMoveDown,
   registerThumbNode,
+  onThumbLoad,
 }: {
   item: PageItem;
   index: number;
@@ -1599,6 +1601,7 @@ function SortableThumb({
   onDelete: () => void;
   disableMoveDown: boolean;
   registerThumbNode: (id: string) => (node: HTMLLIElement | null) => void;
+  onThumbLoad: (id: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
@@ -1667,6 +1670,10 @@ function SortableThumb({
                   thumbVisible ? "opacity-100" : "opacity-0"
                 }`}
                 draggable={false}
+                onLoad={() => {
+                  if (!item.thumb) return;
+                  onThumbLoad(item.id);
+                }}
               />
             </div>
 	            <div className="pointer-events-none absolute inset-x-2 bottom-2 z-20 flex justify-center opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
@@ -1906,9 +1913,27 @@ function WorkspaceClient() {
   const [highlightColor, setHighlightColor] = useState<HighlightColorKey>("yellow");
   const [highlightThickness, setHighlightThickness] = useState(14);
   const [highlightOpacity, setHighlightOpacity] = useState(0.35);
-  const [showStartupOverlay, setShowStartupOverlay] = useState(false);
+  const [showStartupOverlay, setShowStartupOverlay] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return (
+        Boolean(window.sessionStorage?.getItem(STARTUP_OVERLAY_KEY)) &&
+        window.sessionStorage?.getItem(STARTUP_OVERLAY_CONTEXT_KEY) === "new"
+      );
+    } catch {
+      return false;
+    }
+  });
   const [startupProgress, setStartupProgress] = useState(0);
-  const [startupOverlayVariant, setStartupOverlayVariant] = useState<"new" | "existing">("existing");
+  const [startupOverlayVariant, setStartupOverlayVariant] = useState<"new" | "existing">(() => {
+    if (typeof window === "undefined") return "existing";
+    try {
+      const context = window.sessionStorage?.getItem(STARTUP_OVERLAY_CONTEXT_KEY);
+      return context === "new" ? "new" : "existing";
+    } catch {
+      return "existing";
+    }
+  });
   const [startupOverlayMessage, setStartupOverlayMessage] = useState("Preparing your workspace");
   const startupOverlayActiveRef = useRef(false);
   const startupOverlayStartRef = useRef<number | null>(null);
@@ -1919,16 +1944,59 @@ function WorkspaceClient() {
   const startupProgressRef = useRef(0);
   const startupProgressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startupOverlayShownRef = useRef(false);
-  const startupOverlayProjectRef = useRef<string | null>(null);
+  const startupOverlayProjectRef = useRef<string | null>(projectParam);
+  const existingProjectOverlayHideSentRef = useRef(false);
+  const [loadedPreviewIds, setLoadedPreviewIds] = useState<Set<string>>(() => new Set());
+  const [loadedThumbIds, setLoadedThumbIds] = useState<Set<string>>(() => new Set());
+
+  useEffect(() => {
+    if (showStartupOverlay) {
+      startupOverlayActiveRef.current = true;
+    }
+  }, [showStartupOverlay]);
 
   useEffect(() => {
     if (startupOverlayProjectRef.current !== projectParam) {
       startupOverlayProjectRef.current = projectParam;
       startupOverlayShownRef.current = false;
+      existingProjectOverlayHideSentRef.current = false;
       setShowStartupOverlay(false);
+      setLoadedPreviewIds(new Set());
+      setLoadedThumbIds(new Set());
       startupOverlayActiveRef.current = false;
     }
   }, [projectParam]);
+
+  useEffect(() => {
+    setLoadedPreviewIds((prev) => {
+      if (prev.size === 0) return prev;
+      const validIds = new Set(pages.map((page) => page.id));
+      let changed = false;
+      const next = new Set<string>();
+      prev.forEach((id) => {
+        if (validIds.has(id)) {
+          next.add(id);
+        } else {
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+    setLoadedThumbIds((prev) => {
+      if (prev.size === 0) return prev;
+      const validIds = new Set(pages.map((page) => page.id));
+      let changed = false;
+      const next = new Set<string>();
+      prev.forEach((id) => {
+        if (validIds.has(id)) {
+          next.add(id);
+        } else {
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [pages]);
   const [penMode, setPenMode] = useState(false);
   const [penThickness, setPenThickness] = useState(3);
   const [penColor, setPenColor] = useState(PEN_COLOR);
@@ -2029,6 +2097,7 @@ const [listType, setListType] = useState<"bullet" | "number" | null>(null);
     visible: false,
   });
   const toolbarTooltipTargetRef = useRef<HTMLElement | null>(null);
+  const toolbarTooltipTimeoutRef = useRef<number | null>(null);
   const [textFont, setTextFont] = useState<TextFont>("Arial");
   const [textSize, setTextSize] = useState(DEFAULT_TEXT_SIZE_PT);
   const [textColor, setTextColor] = useState("#111827");
@@ -5459,6 +5528,66 @@ const timer =
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (existingProjectOverlayHideSentRef.current) return;
+    let hasExistingOverlayMarker = false;
+    try {
+      hasExistingOverlayMarker = Boolean(window.sessionStorage?.getItem(EXISTING_PROJECT_OVERLAY_STORAGE_KEY));
+    } catch {
+      hasExistingOverlayMarker = false;
+    }
+    if (!hasExistingOverlayMarker) return;
+    if (!sourcesHydrated || loading || pages.length === 0) return;
+    existingProjectOverlayHideSentRef.current = true;
+    const timeoutId = window.setTimeout(() => {
+      window.dispatchEvent(new Event("workspace-launch-overlay-hide"));
+    }, 180);
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [loading, pages.length, sourcesHydrated]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (existingProjectOverlayHideSentRef.current) return;
+    let hasExistingOverlayMarker = false;
+    try {
+      hasExistingOverlayMarker = Boolean(window.sessionStorage?.getItem(EXISTING_PROJECT_OVERLAY_STORAGE_KEY));
+    } catch {
+      hasExistingOverlayMarker = false;
+    }
+    if (!hasExistingOverlayMarker) return;
+    if (!error && (loading || !sourcesHydrated)) return;
+    existingProjectOverlayHideSentRef.current = true;
+    const timeoutId = window.setTimeout(() => {
+      window.dispatchEvent(new Event("workspace-launch-overlay-hide"));
+    }, error ? 120 : 260);
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [error, loading, sourcesHydrated]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (existingProjectOverlayHideSentRef.current) return;
+    let hasExistingOverlayMarker = false;
+    try {
+      hasExistingOverlayMarker = Boolean(window.sessionStorage?.getItem(EXISTING_PROJECT_OVERLAY_STORAGE_KEY));
+    } catch {
+      hasExistingOverlayMarker = false;
+    }
+    if (!hasExistingOverlayMarker) return;
+    const timeoutId = window.setTimeout(() => {
+      if (existingProjectOverlayHideSentRef.current) return;
+      existingProjectOverlayHideSentRef.current = true;
+      window.dispatchEvent(new Event("workspace-launch-overlay-hide"));
+    }, 5000);
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [projectParam]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
     if (startupOverlayShownRef.current) return;
 
     const startOverlay = (variant: "new" | "existing") => {
@@ -5476,12 +5605,12 @@ const timer =
     const session = getSessionStorage();
     let cleanup: (() => void) | undefined;
     if (session?.getItem(STARTUP_OVERLAY_KEY)) {
-      session.removeItem(STARTUP_OVERLAY_KEY);
       const context = session.getItem(STARTUP_OVERLAY_CONTEXT_KEY) as "new" | "existing" | null;
-      if (context) {
+      if (context === "new") {
+        session.removeItem(STARTUP_OVERLAY_KEY);
         session.removeItem(STARTUP_OVERLAY_CONTEXT_KEY);
+        cleanup = startOverlay("new");
       }
-      cleanup = startOverlay(context === "new" ? "new" : "existing");
     }
 
     const storage = getLocalStorage();
@@ -5599,7 +5728,7 @@ const timer =
       startupOverlayActiveRef.current = false;
     }, 400);
     return () => clearTimeout(timer);
-  }, [loading, pages, showStartupOverlay, sourcesHydrated]);
+  }, [loading, pages, showStartupOverlay, sourcesHydrated, startupOverlayVariant]);
 
   useEffect(() => {
     if (!showStartupOverlay) return;
@@ -5647,7 +5776,7 @@ const timer =
         startupProgressTimerRef.current = null;
       }
     };
-  }, [computeStartupProgress, showStartupOverlay]);
+  }, [computeStartupProgress, showStartupOverlay, startupOverlayVariant]);
 
   useEffect(() => {
     if (!startupOverlayActiveRef.current || !showStartupOverlay) return;
@@ -5719,7 +5848,7 @@ const timer =
         startupOverlayFullTimerRef.current = null;
       }
     };
-  }, [largeDocMode, pages, showStartupOverlay]);
+  }, [largeDocMode, pages, showStartupOverlay, startupOverlayVariant]);
 
   /** Add more PDFs (create object URLs and append to sources) */
   function handleAddClick() {
@@ -6270,6 +6399,15 @@ const timer =
                   page.preview ? "opacity-100" : "opacity-0"
                 }`}
                 draggable={false}
+                onLoad={() => {
+                  if (!page.preview) return;
+                  setLoadedPreviewIds((prev) => {
+                    if (prev.has(page.id)) return prev;
+                    const next = new Set(prev);
+                    next.add(page.id);
+                    return next;
+                  });
+                }}
               />
               <svg
                 className="absolute inset-0 h-full w-full"
@@ -7831,6 +7969,64 @@ const timer =
   const isLoadingPages = loading && pages.length === 0;
   const downloadDisabled = busy || pages.length === 0 || isLoadingPages;
 	  const activePageIndex = activePageIndexState >= 0 && activePageIndexState < pages.length ? activePageIndexState : -1;
+  useEffect(() => {
+    if (!sourcesHydrated || loading || pages.length === 0) return;
+    let cancelled = false;
+    let frameId = 0;
+    let stableFrames = 0;
+
+    const tick = () => {
+      if (cancelled) return;
+      const activePreviewPage =
+        activePageIndexState >= 0 && activePageIndexState < pages.length ? pages[activePageIndexState] : pages[0];
+      const firstThumbPage = pages[0];
+      const previewNode = activePreviewPage ? previewNodeMap.current.get(activePreviewPage.id) : null;
+      const thumbNode = firstThumbPage ? thumbNodeMapRef.current.get(firstThumbPage.id) : null;
+      const previewRect = previewNode?.getBoundingClientRect();
+      const thumbRect = thumbNode?.getBoundingClientRect();
+
+      const previewRendered = Boolean(
+        activePreviewPage?.preview &&
+          loadedPreviewIds.has(activePreviewPage.id) &&
+          previewRect &&
+          previewRect.width > 120 &&
+          previewRect.height > 160,
+      );
+      const thumbRendered = Boolean(
+        firstThumbPage?.thumb &&
+          loadedThumbIds.has(firstThumbPage.id) &&
+          (
+            !thumbNode ||
+            (thumbRect && thumbRect.width > 28 && thumbRect.height > 40)
+          ),
+      );
+
+      if (previewRendered && thumbRendered) {
+        stableFrames += 1;
+      } else {
+        stableFrames = 0;
+      }
+
+      if (stableFrames >= 3) {
+        window.setTimeout(() => {
+          if (!cancelled) {
+            window.dispatchEvent(new Event("workspace-launch-overlay-hide"));
+          }
+        }, 220);
+        return;
+      }
+
+      frameId = window.requestAnimationFrame(tick);
+    };
+
+    frameId = window.requestAnimationFrame(tick);
+    return () => {
+      cancelled = true;
+      if (frameId) {
+        window.cancelAnimationFrame(frameId);
+      }
+    };
+  }, [activePageIndexState, loadedPreviewIds, loadedThumbIds, loading, pages, sourcesHydrated]);
   const zoomLabel = `${Math.round(zoomPercent)}%`;
   const highlightButtonDisabled = pages.length === 0 || loading;
   const highlightColorEntries = Object.entries(
@@ -8203,14 +8399,24 @@ const timer =
     const toolbarRect = target.closest("[data-text-toolbar]")?.getBoundingClientRect();
     const baseY = toolbarRect ? toolbarRect.bottom - 6 : rect.bottom - 6;
     toolbarTooltipTargetRef.current = target;
-    setToolbarTooltip({
-      label,
-      x: rect.left + rect.width / 2,
-      y: baseY + 8,
-      visible: true,
-    });
+    if (toolbarTooltipTimeoutRef.current !== null) {
+      window.clearTimeout(toolbarTooltipTimeoutRef.current);
+    }
+    toolbarTooltipTimeoutRef.current = window.setTimeout(() => {
+      setToolbarTooltip({
+        label,
+        x: rect.left + rect.width / 2,
+        y: baseY + 8,
+        visible: true,
+      });
+      toolbarTooltipTimeoutRef.current = null;
+    }, 500);
   }, [fontMenuOpen, alignMenuOpen, lineSpacingMenuOpen, lineStyleMenuOpen, shapeLineStyleMenuOpen]);
   const hideToolbarTooltip = useCallback(() => {
+    if (toolbarTooltipTimeoutRef.current !== null) {
+      window.clearTimeout(toolbarTooltipTimeoutRef.current);
+      toolbarTooltipTimeoutRef.current = null;
+    }
     setToolbarTooltip((prev) => (prev.visible ? { ...prev, visible: false } : prev));
   }, []);
   const applyTextAlignment = useCallback(
@@ -8240,6 +8446,13 @@ const timer =
       window.removeEventListener("resize", updatePosition);
     };
   }, [toolbarTooltip.visible]);
+  useEffect(() => {
+    return () => {
+      if (toolbarTooltipTimeoutRef.current !== null) {
+        window.clearTimeout(toolbarTooltipTimeoutRef.current);
+      }
+    };
+  }, []);
   const signaturePlacementCount = useMemo(
     () => Object.values(signaturePlacements).reduce((sum, list) => sum + (list?.length ?? 0), 0),
     [signaturePlacements]
@@ -10650,16 +10863,21 @@ const timer =
     <main className="flex h-screen flex-col overflow-hidden bg-[#f3f6fb]">
       {showStartupOverlay ? (
         startupOverlayVariant === "existing" ? (
-          <div className="pointer-events-none fixed inset-0 z-[120] flex items-center justify-center">
-            <div
-              className="h-10 w-10 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700"
-              aria-hidden
-            />
-            <span className="sr-only">Loading</span>
+          <div className="fixed inset-0 z-[120] flex items-center justify-center bg-white opacity-0 animate-[mpdf-startup-overlay-fade_0.24s_ease-out_forwards]">
+            <div className="pointer-events-none flex flex-col items-center text-center">
+              <p className="text-[24px] font-semibold tracking-tight text-slate-900 sm:text-[28px]">
+                Opening workspace...
+              </p>
+              <div
+                className="mt-5 h-10 w-10 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700"
+                aria-hidden
+              />
+              <span className="sr-only">Opening workspace</span>
+            </div>
           </div>
         ) : (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/50 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-[28px] border border-white/60 bg-white/85 px-8 py-7 text-center shadow-[0_28px_80px_rgba(15,23,42,0.35)] backdrop-blur-xl">
+          <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/50 opacity-0 backdrop-blur-sm animate-[mpdf-startup-overlay-fade_0.24s_ease-out_forwards]">
+            <div className="w-full max-w-md rounded-[28px] border border-white/60 bg-white/85 px-8 py-7 text-center opacity-0 shadow-[0_28px_80px_rgba(15,23,42,0.35)] backdrop-blur-xl animate-[page-enter_0.28s_ease-out_forwards]">
               <p className="text-[15px] font-semibold uppercase tracking-[0.24em] text-slate-500">
                 MergifyPDF
               </p>
@@ -10688,6 +10906,7 @@ const timer =
           </div>
         )
       ) : null}
+      <div className="transition-opacity duration-[260ms] ease-out opacity-100">
       <header className="sticky top-0 z-40 border-b border-slate-200/60 bg-white shadow-[0_1px_4px_rgba(15,23,42,0.06)]">
         {/* Top row */}
         <div className="w-full border-b border-slate-100 bg-white">
@@ -12280,6 +12499,14 @@ const timer =
 		                                        onDelete={() => handleDeletePage(p.id)}
 		                                        disableMoveDown={i === pages.length - 1}
                                             registerThumbNode={registerThumbNode}
+                                            onThumbLoad={(id) => {
+                                              setLoadedThumbIds((prev) => {
+                                                if (prev.has(id)) return prev;
+                                                const next = new Set(prev);
+                                                next.add(id);
+                                                return next;
+                                              });
+                                            }}
 		                                      />
 		                                      {i < pages.length - 1 ? (
 		                                        <li className="group relative flex h-12 items-center justify-center">
@@ -13607,7 +13834,7 @@ const timer =
       {toolbarTooltip.visible && (!fontMenuOpen || toolbarTooltip.label !== "Font") && typeof document !== "undefined"
         ? createPortal(
             <div
-              className="pointer-events-none fixed z-[10000] whitespace-nowrap rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white shadow-lg transition-opacity duration-150"
+              className="pointer-events-none fixed z-[10000] whitespace-nowrap rounded-[8px] bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white shadow-lg animate-[workspace-tooltip-enter_160ms_cubic-bezier(0.22,1,0.36,1)]"
               style={{ left: toolbarTooltip.x, top: toolbarTooltip.y, transform: "translateX(-50%)" }}
             >
               {toolbarTooltip.label}
@@ -13764,6 +13991,14 @@ const timer =
             transform: scale(1);
           }
         }
+        @keyframes mpdf-startup-overlay-fade {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
         @keyframes mpdf-progress {
           from {
             transform: translateX(-100%);
@@ -13781,6 +14016,7 @@ const timer =
           }
         }
       `}</style>
+      </div>
     </main>
   );
 }

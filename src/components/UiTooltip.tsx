@@ -34,6 +34,7 @@ type TriggerRect = {
 
 const VIEWPORT_MARGIN = 12;
 const TOOLTIP_GAP = 10;
+const TOOLTIP_SHOW_DELAY_MS = 500;
 
 export default function UiTooltip({ label, children }: UiTooltipProps) {
   const [visible, setVisible] = useState(false);
@@ -41,6 +42,7 @@ export default function UiTooltip({ label, children }: UiTooltipProps) {
   const [triggerRect, setTriggerRect] = useState<TriggerRect | null>(null);
   const tooltipId = useId();
   const tooltipRef = useRef<HTMLDivElement | null>(null);
+  const showTimeoutRef = useRef<number | null>(null);
 
   if (!isValidElement(children)) {
     return children;
@@ -59,12 +61,30 @@ export default function UiTooltip({ label, children }: UiTooltipProps) {
 
   const showTooltip = (event: MouseEvent<HTMLElement> | FocusEvent<HTMLElement>) => {
     updatePosition(event.currentTarget);
-    setVisible(true);
+    if (showTimeoutRef.current !== null) {
+      window.clearTimeout(showTimeoutRef.current);
+    }
+    showTimeoutRef.current = window.setTimeout(() => {
+      setVisible(true);
+      showTimeoutRef.current = null;
+    }, TOOLTIP_SHOW_DELAY_MS);
   };
 
   const hideTooltip = () => {
+    if (showTimeoutRef.current !== null) {
+      window.clearTimeout(showTimeoutRef.current);
+      showTimeoutRef.current = null;
+    }
     setVisible(false);
   };
+
+  useEffect(() => {
+    return () => {
+      if (showTimeoutRef.current !== null) {
+        window.clearTimeout(showTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!visible || !triggerRect || !tooltipRef.current || typeof window === "undefined") return;
@@ -116,7 +136,7 @@ export default function UiTooltip({ label, children }: UiTooltipProps) {
               ref={tooltipRef}
               id={tooltipId}
               role="tooltip"
-              className="workspace-tooltip fixed z-[220]"
+              className="workspace-tooltip fixed z-[1200]"
               style={{ top: position.top, left: position.left }}
             >
               {label}

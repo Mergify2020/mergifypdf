@@ -1,7 +1,8 @@
 "use client";
 
-import { ChevronDown, ChevronUp, FileText, GripVertical, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, GripVertical, Trash2 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import UiTooltip from "@/components/UiTooltip";
 import type { PendingWorkspaceFile } from "@/components/useWorkspaceFilePreloader";
 
 type Props = {
@@ -332,18 +333,7 @@ export default function PendingFilesReorderList({
       if (listNode) {
         const rect = listNode.getBoundingClientRect();
         const edge = 44;
-        const rowHeights = rowRefs.current
-          .map((node, idx) => (idx === currentIndex ? null : node?.getBoundingClientRect().height ?? null))
-          .filter((value): value is number => value !== null);
-        const rowCount = rowHeights.length;
-        const gap = 0;
-        const spacerHeight = overlay.height;
-        const totalHeight =
-          rowHeights.reduce((sum, h) => sum + h, 0) +
-          Math.max(0, rowCount - 1) * gap +
-          (insertIndexRef.current !== null ? spacerHeight : 0) +
-          (insertIndexRef.current !== null && rowCount > 0 ? gap : 0);
-        maxScrollRef.current = Math.max(0, totalHeight - listNode.clientHeight);
+        maxScrollRef.current = Math.max(0, listNode.scrollHeight - listNode.clientHeight);
         if (event.clientY < rect.top + edge) {
           autoScrollRef.current.direction = -1;
         } else if (event.clientY > rect.bottom - edge) {
@@ -404,6 +394,7 @@ export default function PendingFilesReorderList({
       const dir = autoScrollRef.current.direction;
       if (listNode && dir !== 0) {
         dragDirectionRef.current = dir;
+        maxScrollRef.current = Math.max(0, listNode.scrollHeight - listNode.clientHeight);
         const prevScroll = listNode.scrollTop;
         listNode.scrollTop = Math.min(maxScrollRef.current, Math.max(0, listNode.scrollTop + dir * 6));
         if (listNode.scrollTop === 0 && dir === -1) autoScrollRef.current.direction = 0;
@@ -494,13 +485,13 @@ export default function PendingFilesReorderList({
                     if (node) rowWrapperNodesByIdRef.current.set(id, node);
                     else rowWrapperNodesByIdRef.current.delete(id);
                   }}
-                  className={`overflow-hidden border-b ${index === 0 ? "border-t" : ""} border-[#DDD4FC] dark:border-zinc-800 ${
+                  className={`overflow-hidden border-b ${rowPosition === 0 ? "border-t" : ""} border-[#D1D5DB] dark:border-zinc-700 ${
                     isDeletingRow ? "pointer-events-none" : ""
                   }`}
                 >
                   {showSpacer ? (
                     <div
-                      className="bg-[#F6F2FF]/55 dark:bg-zinc-800/60"
+                      className="border-y border-[#D1D5DB] bg-[#F6F2FF]/55 dark:border-zinc-700 dark:bg-zinc-800/60"
                       style={{ height: dragOverlay?.height ?? 40 }}
                     />
                   ) : null}
@@ -508,11 +499,11 @@ export default function PendingFilesReorderList({
                     ref={(node) => {
                       rowRefs.current[index] = node;
                     }}
-                    className={`group flex items-center justify-between gap-3 bg-white px-4 py-3 text-sm text-slate-800 transition-[transform,opacity,filter] duration-180 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                    className={`group/file-row flex items-center justify-between gap-3 bg-white px-4 py-3 text-sm text-slate-800 transition-[transform,opacity,filter] duration-180 ease-[cubic-bezier(0.22,1,0.36,1)] ${
                       busy ? "opacity-70" : dragIndex !== null ? "" : "hover:bg-[#F6F2FF]"
                     } ${isDeletingRow ? "translate-x-3 scale-[0.985] opacity-0 blur-[1px]" : ""} dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200`}
                   >
-                    <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex min-w-0 items-center gap-3 sm:gap-4">
                       {useTouchReorderControls ? (
                         <div className="flex w-8 shrink-0 self-stretch py-0.5">
                           <div className="grid h-full w-8 grid-rows-2 overflow-hidden rounded-md border border-slate-200/80 bg-white dark:border-zinc-700 dark:bg-zinc-900">
@@ -549,10 +540,9 @@ export default function PendingFilesReorderList({
                           <GripVertical className="h-4 w-4" aria-hidden />
                         </button>
                       )}
-                      <span className="shrink-0 text-sm font-semibold text-slate-500 dark:text-zinc-400">
+                      <span className="w-5 shrink-0 text-center text-sm font-semibold text-slate-500 dark:text-zinc-400 sm:w-6">
                         {liveDisplayPositions.get(index) ?? index + 1}
                       </span>
-                      <FileText className="hidden h-4 w-4 shrink-0 text-slate-500 sm:block dark:text-zinc-400" aria-hidden />
                       <div className="min-w-0">
                         <span className="block truncate font-semibold text-slate-900 dark:text-zinc-100">
                           {file.name}
@@ -562,15 +552,21 @@ export default function PendingFilesReorderList({
                         </span>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteFile(id)}
-                      className="rounded-full p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
-                      aria-label={`Remove ${file.name}`}
-                      disabled={busy || deletingFileId !== null}
-                    >
-                      <Trash2 className="h-5 w-5" aria-hidden />
-                    </button>
+                    <UiTooltip label="Remove file">
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteFile(id)}
+                        className={`rounded-full p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 ${
+                          useTouchReorderControls
+                            ? ""
+                            : "opacity-0 group-hover/file-row:opacity-100 group-focus-within/file-row:opacity-100"
+                        }`}
+                        aria-label={`Remove ${file.name}`}
+                        disabled={busy || deletingFileId !== null}
+                      >
+                        <Trash2 className="h-5 w-5" aria-hidden />
+                      </button>
+                    </UiTooltip>
                   </div>
                 </div>
               );
@@ -580,7 +576,7 @@ export default function PendingFilesReorderList({
               dragMoved && dragOverlay && effectiveInsertIndex === visibleIndices.length ? (
                 <div
                   key="drag-tail-spacer"
-                  className="bg-[#F6F2FF]/55 dark:bg-zinc-800/60"
+                  className="border-y border-[#D1D5DB] bg-[#F6F2FF]/55 dark:border-zinc-700 dark:bg-zinc-800/60"
                   style={{ height: dragOverlay.height }}
                 />
               ) : null;
@@ -598,7 +594,7 @@ export default function PendingFilesReorderList({
             }}
           >
             <div
-              className="flex items-center justify-between gap-3 border border-[#A98BFF] bg-[#F6F2FF] px-4 py-3 shadow-[0_14px_35px_rgba(15,23,42,0.18)] dark:border-[#7b67c5] dark:bg-zinc-900"
+              className="flex items-center justify-between gap-3 border-2 border-[#A98BFF] bg-[#F6F2FF] px-4 py-3 shadow-[0_14px_35px_rgba(15,23,42,0.18)] dark:border-[#7b67c5] dark:bg-zinc-900"
               style={{ height: dragOverlay.height, boxSizing: "border-box" }}
             >
               <div className="flex min-w-0 items-center gap-3">
@@ -608,7 +604,6 @@ export default function PendingFilesReorderList({
                 <span className="shrink-0 text-sm font-semibold text-[#5B38E6] dark:text-[#C4B5FD]">
                   {draggedDisplayPosition ?? dragOverlay.index + 1}
                 </span>
-                <FileText className="h-4 w-4 shrink-0 text-slate-500 dark:text-zinc-400" aria-hidden />
                 <div className="min-w-0">
                   <span className="block truncate font-semibold text-slate-900 dark:text-zinc-100">
                     {files[dragOverlay.index]?.file.name}
