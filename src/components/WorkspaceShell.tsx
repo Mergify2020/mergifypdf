@@ -81,6 +81,7 @@ const STARTUP_OVERLAY_CONTEXT_KEY = "mpdf:startup-overlay-context";
 const EXISTING_PROJECT_OVERLAY_STORAGE_KEY = "mpdf:existing-project-overlay";
 const EXISTING_PROJECT_OVERLAY_EXIT_MS = 220;
 const EXISTING_PROJECT_OVERLAY_MIN_VISIBLE_MS = 1500;
+const EXISTING_PROJECT_OVERLAY_MAX_WAIT_MS = 8000;
 const SIDEBAR_EXPANDED_KEY = "mpdf:sidebar-expanded";
 const STRIPE_STATUS_CACHE_KEY = "mpdf:stripe-status";
 const STRIPE_PLAN_TIER_CACHE_KEY = "mpdf:stripe-plan-tier";
@@ -113,6 +114,24 @@ async function resetWorkspaceStorage() {
   } catch {
     // ignore
   }
+  try {
+    window.sessionStorage?.removeItem(STARTUP_OVERLAY_KEY);
+    window.sessionStorage?.removeItem(STARTUP_OVERLAY_CONTEXT_KEY);
+    window.sessionStorage?.removeItem(EXISTING_PROJECT_OVERLAY_STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+async function uploadProjectPdfFromFile(file: File | null | undefined, projectId: string) {
+  if (!file || !projectId) return false;
+  const formData = new FormData();
+  formData.append("file", file, file.name);
+  const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/pdf`, {
+    method: "POST",
+    body: formData,
+  });
+  return res.ok;
 }
 
 type SidebarNavIcon = React.ComponentType<{
@@ -323,6 +342,7 @@ export default function WorkspaceShell({
   const workspaceLaunchOverlayHideTimerRef = useRef<number | null>(null);
   const workspaceLaunchOverlayCompleteTimerRef = useRef<number | null>(null);
   const existingProjectOverlayHideTimerRef = useRef<number | null>(null);
+  const existingProjectOverlaySafetyTimerRef = useRef<number | null>(null);
   const wasStudioRouteRef = useRef(false);
   const homeProjectsSearchInputRef = useRef<HTMLInputElement | null>(null);
   const avatarKey = session?.user?.id ?? session?.user?.email ?? null;
@@ -738,6 +758,9 @@ export default function WorkspaceShell({
       if (existingProjectOverlayHideTimerRef.current !== null) {
         window.clearTimeout(existingProjectOverlayHideTimerRef.current);
       }
+      if (existingProjectOverlaySafetyTimerRef.current !== null) {
+        window.clearTimeout(existingProjectOverlaySafetyTimerRef.current);
+      }
     };
   }, []);
 
@@ -780,6 +803,10 @@ export default function WorkspaceShell({
           setExistingProjectOverlayExiting(false);
           existingProjectOverlayShownAtRef.current = 0;
           existingProjectOverlayHideTimerRef.current = null;
+          if (existingProjectOverlaySafetyTimerRef.current !== null) {
+            window.clearTimeout(existingProjectOverlaySafetyTimerRef.current);
+            existingProjectOverlaySafetyTimerRef.current = null;
+          }
         }, EXISTING_PROJECT_OVERLAY_EXIT_MS);
       }, remainingVisible);
     };
@@ -984,6 +1011,13 @@ export default function WorkspaceShell({
         return;
       }
       void uploadProjectPreviewFromFile(createPendingFiles[0]?.file, id);
+      if (createPendingFiles.length === 1) {
+        try {
+          await uploadProjectPdfFromFile(createPendingFiles[0]?.file, id);
+        } catch {
+          // fall back to studio-side sync if immediate cloud upload fails
+        }
+      }
       queuePreload(createPendingFiles, id);
       const elapsed = Date.now() - startedAt;
       if (elapsed < WORKSPACE_LAUNCH_MIN_MS) {
@@ -1067,16 +1101,47 @@ export default function WorkspaceShell({
       window.clearTimeout(existingProjectOverlayHideTimerRef.current);
       existingProjectOverlayHideTimerRef.current = null;
     }
+    if (existingProjectOverlaySafetyTimerRef.current !== null) {
+      window.clearTimeout(existingProjectOverlaySafetyTimerRef.current);
+      existingProjectOverlaySafetyTimerRef.current = null;
+    }
     existingProjectOverlayShownAtRef.current = performance.now();
     setExistingProjectOverlayExiting(false);
     setExistingProjectOverlayOpen(true);
   }, [isStudioRoute]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!existingProjectOverlayOpen || existingProjectOverlayExiting || !isStudioRoute) {
+      if (existingProjectOverlaySafetyTimerRef.current !== null) {
+        window.clearTimeout(existingProjectOverlaySafetyTimerRef.current);
+        existingProjectOverlaySafetyTimerRef.current = null;
+      }
+      return;
+    }
+    if (existingProjectOverlaySafetyTimerRef.current !== null) {
+      window.clearTimeout(existingProjectOverlaySafetyTimerRef.current);
+    }
+    existingProjectOverlaySafetyTimerRef.current = window.setTimeout(() => {
+      existingProjectOverlaySafetyTimerRef.current = null;
+      window.dispatchEvent(new Event("workspace-launch-overlay-hide"));
+    }, EXISTING_PROJECT_OVERLAY_MAX_WAIT_MS);
+    return () => {
+      if (existingProjectOverlaySafetyTimerRef.current !== null) {
+        window.clearTimeout(existingProjectOverlaySafetyTimerRef.current);
+        existingProjectOverlaySafetyTimerRef.current = null;
+      }
+    };
+  }, [existingProjectOverlayExiting, existingProjectOverlayOpen, isStudioRoute]);
   useEffect(() => {
     const leftStudio = wasStudioRouteRef.current && !isStudioRoute;
     if (!leftStudio || !existingProjectOverlayOpen) return;
     if (existingProjectOverlayHideTimerRef.current !== null) {
       window.clearTimeout(existingProjectOverlayHideTimerRef.current);
       existingProjectOverlayHideTimerRef.current = null;
+    }
+    if (existingProjectOverlaySafetyTimerRef.current !== null) {
+      window.clearTimeout(existingProjectOverlaySafetyTimerRef.current);
+      existingProjectOverlaySafetyTimerRef.current = null;
     }
     try {
       window.sessionStorage?.removeItem(EXISTING_PROJECT_OVERLAY_STORAGE_KEY);
@@ -1202,6 +1267,10 @@ export default function WorkspaceShell({
     if (existingProjectOverlayHideTimerRef.current !== null) {
       window.clearTimeout(existingProjectOverlayHideTimerRef.current);
       existingProjectOverlayHideTimerRef.current = null;
+    }
+    if (existingProjectOverlaySafetyTimerRef.current !== null) {
+      window.clearTimeout(existingProjectOverlaySafetyTimerRef.current);
+      existingProjectOverlaySafetyTimerRef.current = null;
     }
     setExistingProjectOverlayOpen(false);
     setExistingProjectOverlayExiting(false);

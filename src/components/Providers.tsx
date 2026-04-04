@@ -13,7 +13,7 @@ export default function Providers({
   session?: Session | null;
 }) {
   return (
-    <SessionProvider session={session}>
+    <SessionProvider session={session} refetchOnWindowFocus={false}>
       <PostHogInit />
       <PostHogIdentify />
       {children}

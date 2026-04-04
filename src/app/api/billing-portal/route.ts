@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
-import { resolveStripeCustomerIdForUser } from "@/lib/stripeCustomers";
-import { getStripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
 import { isSameOrigin } from "@/lib/requestGuards";
 
@@ -21,6 +18,11 @@ export async function POST(req: NextRequest) {
   if (!isSameOrigin(req)) {
     return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
   }
+  const [{ authOptions }, { resolveStripeCustomerIdForUser }, { getStripe }] = await Promise.all([
+    import("@/lib/authOptions"),
+    import("@/lib/stripeCustomers"),
+    import("@/lib/stripe"),
+  ]);
   const stripe = getStripe();
   const session = await getServerSession(authOptions);
   const email = session?.user?.email ?? null;

@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
-import { issueLoginTwoFactorCode } from "@/lib/twoFactorLogin";
 import { isSameOrigin } from "@/lib/requestGuards";
 import { rateLimit } from "@/lib/rateLimit";
 
@@ -14,6 +12,10 @@ export async function POST(req: Request) {
   if (!isSameOrigin(req)) {
     return NextResponse.json({ ok: false, error: "Invalid origin" }, { status: 403 });
   }
+  const [{ authOptions }, { issueLoginTwoFactorCode }] = await Promise.all([
+    import("@/lib/authOptions"),
+    import("@/lib/twoFactorLogin"),
+  ]);
   const limit = await rateLimit(req, { keyPrefix: "2fa-challenge", windowMs: 60_000, max: 5 });
   if (!limit.ok) {
     return NextResponse.json({ ok: false, error: "Too many requests" }, { status: 429 });

@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions, SESSION_MAX_AGE } from "@/lib/authOptions";
-import { verifyLoginTwoFactorCode } from "@/lib/twoFactorLogin";
 import { decode, encode } from "next-auth/jwt";
 import type { JWT } from "next-auth/jwt";
 import { cookies } from "next/headers";
@@ -16,6 +14,10 @@ export async function POST(req: Request) {
   if (!isSameOrigin(req)) {
     return NextResponse.json({ ok: false, error: "Invalid origin" }, { status: 403 });
   }
+  const [{ authOptions, SESSION_MAX_AGE }, { verifyLoginTwoFactorCode }] = await Promise.all([
+    import("@/lib/authOptions"),
+    import("@/lib/twoFactorLogin"),
+  ]);
   const limit = await rateLimit(req, { keyPrefix: "2fa-verify", windowMs: 60_000, max: 8 });
   if (!limit.ok) {
     return NextResponse.json({ ok: false, error: "Too many requests" }, { status: 429 });

@@ -1,7 +1,14 @@
 import type { NextConfig } from "next";
 
+const shouldLimitCpus = process.env.CI === "1" || process.env.CI === "true";
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  experimental: shouldLimitCpus
+    ? {
+        cpus: 1,
+      }
+    : {},
   turbopack: {
     resolveAlias: {
       canvas: "./src/lib/emptyModule.ts",

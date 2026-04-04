@@ -15,6 +15,9 @@ import { uploadProjectPreviewFromFile } from "@/lib/projectPreview";
 
 const WORKSPACE_META_KEY = "mpdf:files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
+const STARTUP_OVERLAY_KEY = "mpdf:startup-overlay";
+const STARTUP_OVERLAY_CONTEXT_KEY = "mpdf:startup-overlay-context";
+const EXISTING_PROJECT_OVERLAY_STORAGE_KEY = "mpdf:existing-project-overlay";
 const MAX_PENDING_FILES = 12;
 const WORKSPACE_LAUNCH_MIN_MS = 4000;
 const WORKSPACE_LAUNCH_HOLD_FOR_TESTING = false;
@@ -45,6 +48,24 @@ async function resetWorkspaceStorage() {
   } catch {
     // ignore
   }
+  try {
+    window.sessionStorage?.removeItem(STARTUP_OVERLAY_KEY);
+    window.sessionStorage?.removeItem(STARTUP_OVERLAY_CONTEXT_KEY);
+    window.sessionStorage?.removeItem(EXISTING_PROJECT_OVERLAY_STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+async function uploadProjectPdfFromFile(file: File | null | undefined, projectId: string) {
+  if (!file || !projectId) return false;
+  const formData = new FormData();
+  formData.append("file", file, file.name);
+  const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/pdf`, {
+    method: "POST",
+    body: formData,
+  });
+  return res.ok;
 }
 
 export default function StartProjectButton({ className, variant = "default", iconOnly = false, onOpen }: Props) {
@@ -230,6 +251,13 @@ export default function StartProjectButton({ className, variant = "default", ico
         return;
       }
       void uploadProjectPreviewFromFile(pendingFiles[0]?.file, id);
+      if (pendingFiles.length === 1) {
+        try {
+          await uploadProjectPdfFromFile(pendingFiles[0]?.file, id);
+        } catch {
+          // fall back to studio-side sync if immediate cloud upload fails
+        }
+      }
       queuePreload(pendingFiles, id);
       const elapsed = Date.now() - startedAt;
       if (elapsed < WORKSPACE_LAUNCH_MIN_MS) {

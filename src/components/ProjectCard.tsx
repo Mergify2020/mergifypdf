@@ -44,6 +44,10 @@ function openReservedTab() {
   return reserved;
 }
 
+function shouldUsePrintHandoff() {
+  return typeof window !== "undefined" && !window.matchMedia("(max-width: 767px)").matches;
+}
+
 async function getPdfAccessTarget(res: Response) {
   const contentType = res.headers.get("content-type") ?? "";
   if (contentType.includes("application/pdf")) {
@@ -405,10 +409,13 @@ export default function ProjectCard({
         reservedTab?.close();
         return;
       }
+      const destinationUrl = shouldUsePrintHandoff()
+        ? `/print?src=${encodeURIComponent(target.url)}&title=${encodeURIComponent(project.name || "Document")}`
+        : target.url;
       if (reservedTab) {
-        reservedTab.location.href = target.url;
+        reservedTab.location.href = destinationUrl;
       } else {
-        window.location.href = target.url;
+        window.location.href = destinationUrl;
       }
       if (target.revoke) {
         window.setTimeout(() => {

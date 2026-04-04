@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
+import { Fragment, startTransition, useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { signIn, useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -61,6 +61,11 @@ import {
   Pipette,
   PanelRightClose,
   PanelRightOpen,
+  Expand,
+  Shrink,
+  ZoomIn,
+  ZoomOut,
+  Search,
   MoreHorizontal,
 	  Copy,
   List,
@@ -69,14 +74,21 @@ import {
 	  UploadCloud,
   X,
   Mail,
+  Download,
+  Printer,
+  FileUp,
 } from "lucide-react";
 import {
+  AutoScrollActivator,
   DndContext,
   PointerSensor,
   useSensor,
   useSensors,
   closestCenter,
+  DragOverEvent,
   DragEndEvent,
+  DragStartEvent,
+  type Modifier,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -186,6 +198,12 @@ type TextFont =
   | "Georgia"
   | "Poppins";
 type TextFontVariant = "normal" | "bold" | "italic" | "boldItalic";
+type SearchablePdfPage = {
+  getTextContent: () => Promise<{ items: Array<{ str?: string }> }>;
+};
+type SearchablePdfDocument = {
+  getPage: (pageNumber: number) => Promise<SearchablePdfPage>;
+};
 type SignaturePanelMode = "none" | "draw" | "upload" | "saved";
 type SavedSignature = {
   id: string;
@@ -893,6 +911,31 @@ function normalizeCssColor(value: string) {
   return null;
 }
 
+function openReservedTab() {
+  if (typeof window === "undefined") return null;
+  const reserved = window.open("", "_blank");
+  if (reserved) {
+    reserved.opener = null;
+  }
+  return reserved;
+}
+
+function shouldUsePrintHandoff() {
+  return typeof window !== "undefined" && !window.matchMedia("(max-width: 767px)").matches;
+}
+
+async function getPdfAccessTarget(res: Response) {
+  const contentType = res.headers.get("content-type") ?? "";
+  if (contentType.includes("application/pdf")) {
+    const blob = await res.blob();
+    return { url: URL.createObjectURL(blob), revoke: true };
+  }
+
+  const data = (await res.json().catch(() => null)) as { url?: string } | null;
+  if (!data?.url) return null;
+  return { url: data.url, revoke: false };
+}
+
 function useProjects(enabled = true) {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -1587,6 +1630,7 @@ function SortableThumb({
   onSelect,
   onMoveUp,
   onMoveDown,
+  onRotate,
   onDelete,
   disableMoveDown,
   registerThumbNode,
@@ -1598,6 +1642,7 @@ function SortableThumb({
   onSelect: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
+  onRotate: () => void;
   onDelete: () => void;
   disableMoveDown: boolean;
   registerThumbNode: (id: string) => (node: HTMLLIElement | null) => void;
@@ -1608,14 +1653,19 @@ function SortableThumb({
   });
 
   const style = {
-    transform: CSS.Transform.toString(transform),
+    transform: CSS.Transform.toString(transform ? { ...transform, x: 0 } : null),
     transition,
     cursor: "default",
   };
   const rotationDegrees = normalizeRotation(item.rotation);
   const isQuarterTurn = rotationDegrees % 180 !== 0;
-  const ratio = item.width && item.height ? item.width / item.height : 1;
-  const scaleFix = isQuarterTurn ? Math.min(ratio, 1 / ratio) : 1;
+  const frameWidth = isQuarterTurn ? item.height : item.width;
+  const frameHeight = isQuarterTurn ? item.width : item.height;
+  const thumbLongEdge = Math.max(frameWidth || 0, frameHeight || 0);
+  const thumbScale = thumbLongEdge > 0 ? 252 / thumbLongEdge : 1;
+  const thumbMaxWidth = Math.round(frameWidth * thumbScale);
+  const innerStageWidth = isQuarterTurn && frameWidth > 0 ? `${(frameHeight / frameWidth) * 100}%` : "100%";
+  const innerStageHeight = isQuarterTurn && frameHeight > 0 ? `${(frameWidth / frameHeight) * 100}%` : "100%";
   const thumbSrc = item.thumb || TRANSPARENT_PIXEL;
   const thumbVisible = Boolean(item.thumb);
 
@@ -1634,33 +1684,39 @@ function SortableThumb({
 	        role="button"
         tabIndex={0}
         onClick={onSelect}
-        onKeyDown={(event) => {
+	        onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
             onSelect();
           }
         }}
-	        className="group relative w-full max-w-[200px] cursor-pointer select-none"
+	        className="group relative w-full cursor-pointer select-none"
+          style={{ maxWidth: `${thumbMaxWidth}px` }}
 	        {...listeners}
 	      >
-	        <div className="relative w-full" style={{ paddingBottom: getAspectPadding(item.width, item.height) }}>
+	        <div className="relative w-full overflow-visible" style={{ paddingBottom: getAspectPadding(frameWidth, frameHeight) }}>
 	          <div
-		            className={`absolute inset-0 flex items-center justify-center overflow-hidden rounded-none border bg-white shadow-[0_8px_18px_rgba(15,23,42,0.10)] transition ${
+	            className={`absolute inset-0 flex items-center justify-center overflow-hidden rounded-none border bg-white shadow-[0_6px_16px_rgba(15,23,42,0.08)] transition ${
 		              selected
-		                ? "border-[3px] border-[#51bdff] shadow-[0_12px_26px_rgba(15,23,42,0.14)]"
-		                : "border-slate-200 hover:border-slate-300"
+		                ? "border-2 border-[#6D28D9] shadow-[0_8px_20px_rgba(15,23,42,0.10)]"
+		                : "border-2 border-slate-300 hover:border-slate-400"
 		            }`}
 	          >
 	            <span
 	              className={`absolute left-0 top-0 z-10 flex h-7 w-7 items-center justify-center rounded-none text-xs font-semibold tabular-nums ${
-	                selected ? "bg-[#51bdff] text-slate-900" : "bg-slate-200 text-slate-700"
+	                selected ? "bg-[#6D28D9] text-white" : "bg-slate-200 text-slate-700 group-hover:bg-slate-400 group-hover:text-white"
 	              }`}
 	            >
 	              {index + 1}
 	            </span>
             <div
               className="relative z-0 flex h-full w-full items-center justify-center"
-              style={{ transform: `rotate(${rotationDegrees}deg) scale(${scaleFix})`, transformOrigin: "center" }}
+              style={{
+                width: innerStageWidth,
+                height: innerStageHeight,
+                transform: `rotate(${rotationDegrees}deg)`,
+                transformOrigin: "center",
+              }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -1676,61 +1732,66 @@ function SortableThumb({
                 }}
               />
             </div>
-	            <div className="pointer-events-none absolute inset-x-2 bottom-2 z-20 flex justify-center opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
-	              <div className="flex items-center gap-1 rounded-md border border-slate-400 bg-white/95 p-1 shadow-[0_10px_24px_rgba(15,23,42,0.16)] backdrop-blur">
-	                <button
-	                  type="button"
-	                  onPointerDown={(event) => event.stopPropagation()}
-	                  onClick={(event) => {
-	                    event.stopPropagation();
-	                    onMoveUp();
-	                  }}
-	                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-600 transition hover:bg-slate-200 hover:text-slate-900 disabled:opacity-40"
-	                  aria-label="Move page up"
-	                  disabled={index === 0}
-	                >
-	                  <ChevronUp className="h-4 w-4" aria-hidden />
-	                </button>
-	                <div className="h-6 w-px bg-slate-400" aria-hidden />
-	                <button
-	                  type="button"
-	                  onPointerDown={(event) => event.stopPropagation()}
-	                  onClick={(event) => {
-	                    event.stopPropagation();
-	                    onMoveDown();
-	                  }}
-	                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-600 transition hover:bg-slate-200 hover:text-slate-900 disabled:opacity-40"
-	                  aria-label="Move page down"
-	                  disabled={disableMoveDown}
-	                >
-	                  <ChevronDown className="h-4 w-4" aria-hidden />
-	                </button>
-	                <div className="h-6 w-px bg-slate-400" aria-hidden />
-	                <button
-	                  type="button"
-	                  onPointerDown={(event) => event.stopPropagation()}
-	                  onClick={(event) => {
-	                    event.stopPropagation();
-	                    onDelete();
-	                  }}
-	                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-rose-600 transition hover:bg-rose-50 hover:text-rose-700"
-	                  aria-label="Delete page"
-	                >
-	                  <Trash2 className="h-4 w-4" aria-hidden />
-	                </button>
-	                <div className="h-6 w-px bg-slate-400" aria-hidden />
-	                <button
-	                  type="button"
-	                  onPointerDown={(event) => event.stopPropagation()}
-	                  onClick={(event) => {
-	                    event.stopPropagation();
-	                  }}
-	                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-600 transition hover:bg-slate-200 hover:text-slate-900"
-	                  aria-label="More page actions"
-	                >
-	                  <MoreHorizontal className="h-4 w-4" aria-hidden />
-	                </button>
-	              </div>
+	          </div>
+	          <div className="pointer-events-none absolute right-0 top-1/2 z-20 flex translate-x-1/2 -translate-y-1/2 justify-center opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+	            <div
+                className={`flex flex-col items-center justify-center gap-1 rounded-xl border bg-white/98 px-1.5 py-2 shadow-[0_10px_24px_rgba(15,23,42,0.14)] ${
+                  selected ? "border-[#6D28D9]" : "border-slate-300"
+                }`}
+              >
+	              <button
+	                type="button"
+	                onPointerDown={(event) => event.stopPropagation()}
+	                onClick={(event) => {
+	                  event.stopPropagation();
+	                  onMoveUp();
+	                }}
+	                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-200 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
+	                aria-label="Move page up"
+	                disabled={index === 0}
+	              >
+	                <ChevronUp className="h-4 w-4" aria-hidden />
+	              </button>
+	              <div className="h-px w-5 bg-slate-300" aria-hidden />
+	              <button
+	                type="button"
+	                onPointerDown={(event) => event.stopPropagation()}
+	                onClick={(event) => {
+	                  event.stopPropagation();
+	                  onMoveDown();
+	                }}
+	                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-200 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
+	                aria-label="Move page down"
+	                disabled={disableMoveDown}
+	              >
+	                <ChevronDown className="h-4 w-4" aria-hidden />
+	              </button>
+	              <div className="h-px w-5 bg-slate-300" aria-hidden />
+	              <button
+	                type="button"
+	                onPointerDown={(event) => event.stopPropagation()}
+	                onClick={(event) => {
+	                  event.stopPropagation();
+	                  onDelete();
+	                }}
+	                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-rose-600 transition hover:bg-rose-100 hover:text-rose-700"
+	                aria-label="Delete page"
+	              >
+	                <Trash2 className="h-4 w-4" aria-hidden />
+	              </button>
+	              <div className="h-px w-5 bg-slate-300" aria-hidden />
+	              <button
+	                type="button"
+	                onPointerDown={(event) => event.stopPropagation()}
+	                onClick={(event) => {
+	                  event.stopPropagation();
+	                  onRotate();
+	                }}
+	                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-200 hover:text-slate-950"
+	                aria-label="Rotate page"
+	              >
+	                <RotateCcw className="h-4 w-4" aria-hidden />
+	              </button>
 	            </div>
 	          </div>
 	        </div>
@@ -1861,16 +1922,23 @@ function WorkspaceClient() {
   const [authInfo, setAuthInfo] = useState<string | null>(null);
   const [authBusy, setAuthBusy] = useState(false);
   const [pendingExportAfterAuth, setPendingExportAfterAuth] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
   const [guestProject, setGuestProject] = useState<GuestProject | null>(null);
   const [sources, setSources] = useState<SourceRef[]>([]);
   const [pages, setPages] = useState<PageItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [thumbDragState, setThumbDragState] = useState<{ activeId: string; overId: string } | null>(null);
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
   const [activePageId, setActivePageId] = useState<string | null>(null);
   const [activePageIndexState, setActivePageIndex] = useState(0);
   const [pageNumberDraft, setPageNumberDraft] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchBusy, setSearchBusy] = useState(false);
+  const [searchResults, setSearchResults] = useState<number[]>([]);
+  const [activeSearchResultIndex, setActiveSearchResultIndex] = useState(0);
   const [pageActionMenuId, setPageActionMenuId] = useState<string | null>(null);
 		  const [shouldCenterOnChange, setShouldCenterOnChange] = useState(false);
 		  const [zoomPercent, setZoomPercent] = useState(100);
@@ -1879,10 +1947,13 @@ function WorkspaceClient() {
 		  // 100% = true document scale (1pt = 1/72in).
 		  const zoomMultiplier = clamp(zoomPercent / 100, ZOOM_MIN_PERCENT / 100, MAX_ZOOM_MULTIPLIER);
   const [showPageOrderPanel, setShowPageOrderPanel] = useState(true);
+  const [isBrowserFullscreen, setIsBrowserFullscreen] = useState(false);
   const largeDocMode = pages.length > LARGE_DOC_PAGE_THRESHOLD;
   const pageNavigationLockRef = useRef<{ until: number; targetId: string } | null>(null);
   const scrollRatioRef = useRef<{ x: number; y: number }>({ x: 0.5, y: 0 });
   const restoreScrollOnNextZoomRef = useRef(false);
+  const pageChangeScrollBehaviorRef = useRef<ScrollBehavior>("smooth");
+  const fullscreenWheelLockRef = useRef<number>(0);
   const pageLayoutRef = useRef<{ ids: string[]; centers: number[] }>({ ids: [], centers: [] });
   const pageLayoutRafRef = useRef<number | null>(null);
   const scrollUpdateRafRef = useRef<number | null>(null);
@@ -1907,6 +1978,10 @@ function WorkspaceClient() {
   const thumbRenderActiveRef = useRef(0);
   const thumbRenderStatusRef = useRef<Map<string, "ready" | "rendering">>(new Map());
   const thumbNodeMapRef = useRef<Map<string, HTMLLIElement>>(new Map());
+  const thumbScrollBoundsRef = useRef<{ minScrollTop: number; maxScrollTop: number } | null>(null);
+  const thumbDragClampRafRef = useRef<number | null>(null);
+  const thumbDropRestoreRef = useRef<{ id: string; offsetTop: number } | null>(null);
+  const thumbDropRestoreRafRef = useRef<number | null>(null);
   const thumbsScrollRef = useRef<HTMLDivElement | null>(null);
   const [previewHeightLimit, setPreviewHeightLimit] = useState<number | null>(null);
   const [highlightMode, setHighlightMode] = useState(false);
@@ -1945,6 +2020,7 @@ function WorkspaceClient() {
   const startupProgressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startupOverlayShownRef = useRef(false);
   const startupOverlayProjectRef = useRef<string | null>(projectParam);
+  const workspaceReadySettledRef = useRef(false);
   const existingProjectOverlayHideSentRef = useRef(false);
   const [loadedPreviewIds, setLoadedPreviewIds] = useState<Set<string>>(() => new Set());
   const [loadedThumbIds, setLoadedThumbIds] = useState<Set<string>>(() => new Set());
@@ -1959,6 +2035,7 @@ function WorkspaceClient() {
     if (startupOverlayProjectRef.current !== projectParam) {
       startupOverlayProjectRef.current = projectParam;
       startupOverlayShownRef.current = false;
+      workspaceReadySettledRef.current = false;
       existingProjectOverlayHideSentRef.current = false;
       setShowStartupOverlay(false);
       setLoadedPreviewIds(new Set());
@@ -3701,9 +3778,15 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   const renderedSourcesRef = useRef(0);
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const viewerScrollRef = previewContainerRef;
+  const workspaceFullscreenRef = useRef<HTMLElement | null>(null);
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const searchButtonRef = useRef<HTMLButtonElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const searchPanelRef = useRef<HTMLDivElement | null>(null);
   const previewNodeMap = useRef<Map<string, HTMLDivElement>>(new Map());
   const pagesRef = useRef<PageItem[]>([]);
+  const searchPageTextCacheRef = useRef<Map<string, string>>(new Map());
+  const searchDocumentCacheRef = useRef<Map<number, any>>(new Map());
   const previewSyncRef = useRef<Set<string>>(new Set());
   const previewUploadRef = useRef<Record<string, string>>({});
   const coverPreviewStatusRef = useRef<"idle" | "rendering" | "ready">("idle");
@@ -3928,6 +4011,13 @@ const timer =
   useEffect(() => {
     activePageIdRef.current = activePageId;
   }, [activePageId]);
+
+  useEffect(() => {
+    searchPageTextCacheRef.current.clear();
+    searchDocumentCacheRef.current.clear();
+    setSearchResults([]);
+    setActiveSearchResultIndex(0);
+  }, [projectKey, sources.length]);
   useEffect(() => {
     activePageIndexRef.current = activePageIndexState;
   }, [activePageIndexState]);
@@ -3995,6 +4085,12 @@ const timer =
     "border-transparent bg-[#F1F5F9] text-[#1f2937] shadow-none hover:bg-[#E5E7EB] hover:text-[#111827] hover:shadow-[0_1px_2px_rgba(0,0,0,0.06)]";
 	  const toolButtonActive =
 	    "border-transparent bg-[#024d7c] text-white shadow-md shadow-[#012a44]/25 hover:bg-[#013d63] hover:shadow-md";
+  const toolRailButtonBase =
+    "relative inline-flex h-9 w-9 items-center justify-center rounded-lg transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#009DFD]/25 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed";
+  const toolRailButtonInactive =
+    "bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900";
+  const toolRailButtonActive =
+    "bg-slate-100 text-slate-900 shadow-[inset_0_0_0_1px_rgba(148,163,184,0.18)]";
   const toolbarLoading = loading || !sourcesHydrated;
   const controlButtonClass =
     "flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,0.08)] transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-40";
@@ -4007,7 +4103,7 @@ const timer =
   const textOptionButtonBase =
     "inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-800 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60";
   const textOptionButtonHover = "hover:bg-slate-100 hover:text-slate-900";
-  const textOptionButtonActive = "bg-blue-100 text-blue-700 hover:bg-blue-100 hover:text-blue-700";
+  const textOptionButtonActive = "bg-slate-100 text-slate-900 hover:bg-slate-100 hover:text-slate-900";
   const textInputPill = "inline-flex h-9 items-center gap-1 pl-0 pr-2 text-sm font-semibold text-slate-800";
   const LineSpacingIcon = ({ className }: { className?: string }) => (
     <svg
@@ -4371,6 +4467,31 @@ const timer =
               json?.project?.pdfUrl && typeof json.project.pdfUrl === "string"
                 ? json.project.pdfUrl
                 : null;
+            const useCombinedCloudSource = (
+              nameHint?: string | null,
+              sizeHint?: number | null,
+            ) => {
+              if (!pdfUrl) {
+                throw new Error("Cloud PDF is not available for this project.");
+              }
+              const sameOriginProjectPdfUrl = `/api/projects/${encodeURIComponent(projectId)}/pdf?mode=file`;
+              const combinedStorageId = `cloud-project-${projectId}`;
+              const combinedSource: SourceRef = {
+                storageId: combinedStorageId,
+                url: sameOriginProjectPdfUrl,
+                name: nameHint?.trim() || "Document.pdf",
+                size: typeof sizeHint === "number" && Number.isFinite(sizeHint) ? sizeHint : 0,
+                updatedAt: Date.now(),
+              };
+              if (!cancelled) {
+                setSources([combinedSource]);
+                setError(null);
+              }
+              if (!cancelled) {
+                hasHydratedSources.current = true;
+                setSourcesHydrated(true);
+              }
+            };
             if (pdfUrl) {
               setProjectHasSources(true);
             }
@@ -4391,10 +4512,26 @@ const timer =
                   missing.push(id);
                 }
               }
-              if (missing.length > 0 && cloudSources.length > 1) {
-                throw new Error("Multiple source PDFs are not available in this browser.");
+              if (missing.length > 0) {
+                const combinedName =
+                  (cloudSources[0] &&
+                  typeof cloudSources[0] === "object" &&
+                  "name" in cloudSources[0] &&
+                  typeof (cloudSources[0] as { name?: unknown }).name === "string"
+                    ? (cloudSources[0] as { name: string }).name
+                    : "Document.pdf") ?? "Document.pdf";
+                const combinedSize =
+                  cloudSources.reduce((total, entry) => {
+                    if (!entry || typeof entry !== "object") return total;
+                    const size =
+                      "size" in entry && typeof (entry as { size?: unknown }).size === "number"
+                        ? (entry as { size: number }).size
+                        : 0;
+                    return total + size;
+                  }, 0);
+                useCombinedCloudSource(combinedName, combinedSize);
+                return;
               }
-              let downloadedBlob: Blob | null = null;
               for (const entry of cloudSources) {
                 if (!entry || typeof entry !== "object") continue;
                 const id =
@@ -4417,19 +4554,7 @@ const timer =
                 let stored = await readFileBlob(id);
                 let blobRecord = stored?.blob instanceof Blob ? stored.blob : null;
                 if (!blobRecord) {
-                  if (!pdfUrl) {
-                    throw new Error("Cloud PDF is not available for this project.");
-                  }
-                  if (!downloadedBlob) {
-                    const pdfRes = await fetch(pdfUrl, { cache: "no-store" });
-                    if (!pdfRes.ok) {
-                      throw new Error(`Cloud PDF download failed with status ${pdfRes.status}`);
-                    }
-                    downloadedBlob = await pdfRes.blob();
-                  }
-                  blobRecord = downloadedBlob;
-                  await storeFileBlob(id, blobRecord, name, blobRecord.size || size);
-                  stored = { blob: blobRecord, name, size: blobRecord.size || size, updatedAt };
+                  throw new Error("Expected local PDF blob to be available after missing-source fallback.");
                 }
                 const objectUrl = URL.createObjectURL(blobRecord);
                 restored.push({
@@ -4445,6 +4570,10 @@ const timer =
                 persistSourceMetadata(restored, projectId);
                 setError(null);
               }
+            }
+            if (pdfUrl && (!Array.isArray(cloudSources) || cloudSources.length === 0)) {
+              useCombinedCloudSource(null, null);
+              return;
             }
             if (!pdfUrl && Array.isArray(cloudSources) && cloudSources.length === 0) {
               setProjectHasSources(false);
@@ -4497,10 +4626,6 @@ const timer =
         }
 
         if (!cancelled) {
-          if (fromSession) {
-            startupOverlayActiveRef.current = true;
-            setShowStartupOverlay(true);
-          }
           if (restored.length > 0) {
             setProjectHasSources(true);
             setSources(restored);
@@ -4712,6 +4837,156 @@ const timer =
       }
     },
     []
+  );
+
+  const setThumbScrollBounds = useCallback(() => {
+    const container = thumbsScrollRef.current;
+    if (!container) {
+      thumbScrollBoundsRef.current = null;
+      return;
+    }
+
+    const minScrollTop = 0;
+    const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
+    thumbScrollBoundsRef.current = { minScrollTop, maxScrollTop };
+  }, []);
+
+  const clampThumbScrollPosition = useCallback(() => {
+    const container = thumbsScrollRef.current;
+    const bounds = thumbScrollBoundsRef.current;
+    if (!container || !bounds) return;
+    const clamped = clamp(container.scrollTop, bounds.minScrollTop, bounds.maxScrollTop);
+    if (Math.abs(container.scrollTop - clamped) > 0.5) {
+      container.scrollTop = clamped;
+    }
+  }, []);
+
+  const stopThumbDragClampLoop = useCallback(() => {
+    if (thumbDragClampRafRef.current !== null) {
+      window.cancelAnimationFrame(thumbDragClampRafRef.current);
+      thumbDragClampRafRef.current = null;
+    }
+  }, []);
+
+  const startThumbDragClampLoop = useCallback(() => {
+    if (thumbDragClampRafRef.current !== null) return;
+
+    const tick = () => {
+      clampThumbScrollPosition();
+      if (thumbScrollBoundsRef.current) {
+        thumbDragClampRafRef.current = window.requestAnimationFrame(tick);
+      } else {
+        thumbDragClampRafRef.current = null;
+      }
+    };
+
+    thumbDragClampRafRef.current = window.requestAnimationFrame(tick);
+  }, [clampThumbScrollPosition]);
+
+  const scheduleThumbDropScrollRestore = useCallback(() => {
+    if (thumbDropRestoreRafRef.current !== null) {
+      window.cancelAnimationFrame(thumbDropRestoreRafRef.current);
+      thumbDropRestoreRafRef.current = null;
+    }
+
+    const restoreScroll = () => {
+      const restore = thumbDropRestoreRef.current;
+      const container = thumbsScrollRef.current;
+      if (!restore || !container) {
+        thumbDropRestoreRafRef.current = null;
+        return;
+      }
+
+      const node = thumbNodeMapRef.current.get(restore.id);
+      if (!node) {
+        thumbDropRestoreRafRef.current = window.requestAnimationFrame(restoreScroll);
+        return;
+      }
+
+      const containerRect = container.getBoundingClientRect();
+      const nodeRect = node.getBoundingClientRect();
+      container.scrollTop += nodeRect.top - containerRect.top - restore.offsetTop;
+      thumbDropRestoreRef.current = null;
+      thumbDropRestoreRafRef.current = null;
+    };
+
+    thumbDropRestoreRafRef.current = window.requestAnimationFrame(() => {
+      thumbDropRestoreRafRef.current = window.requestAnimationFrame(restoreScroll);
+    });
+  }, []);
+
+  const restrictThumbDragToViewport: Modifier = useCallback(({ draggingNodeRect, transform }) => {
+    const container = thumbsScrollRef.current;
+    const firstThumbNode = thumbNodeMapRef.current.get(pages[0]?.id ?? "");
+    const lastThumbNode = thumbNodeMapRef.current.get(pages[pages.length - 1]?.id ?? "");
+    if (!container || !draggingNodeRect || !firstThumbNode || !lastThumbNode) return transform;
+
+    const containerRect = container.getBoundingClientRect();
+    const restingFirstTop = containerRect.top + firstThumbNode.offsetTop - container.scrollTop;
+    const restingLastBottom =
+      containerRect.top + lastThumbNode.offsetTop - container.scrollTop + lastThumbNode.offsetHeight;
+    const topInset = Math.max(0, restingFirstTop - containerRect.top);
+    const bottomInset = Math.max(0, containerRect.bottom - restingLastBottom);
+    const minY = containerRect.top + topInset - draggingNodeRect.top;
+    const maxY = containerRect.bottom - bottomInset - draggingNodeRect.bottom;
+
+    return {
+      ...transform,
+      y: clamp(transform.y, minY, maxY),
+    };
+  }, [pages]);
+
+  const handleThumbDragStart = useCallback(
+    (event: DragStartEvent) => {
+      const activeId = String(event.active.id);
+      setThumbDragState({ activeId, overId: activeId });
+      setThumbScrollBounds();
+      clampThumbScrollPosition();
+      startThumbDragClampLoop();
+    },
+    [clampThumbScrollPosition, setThumbScrollBounds, startThumbDragClampLoop]
+  );
+
+  const handleThumbDragOver = useCallback((event: DragOverEvent) => {
+    const overId = event.over ? String(event.over.id) : null;
+    if (!overId) return;
+    const activeId = String(event.active.id);
+    setThumbDragState((prev) => {
+      if (prev && prev.activeId === activeId && prev.overId === overId) return prev;
+      return { activeId, overId };
+    });
+  }, []);
+
+  const handleThumbDragCancel = useCallback(() => {
+    setThumbDragState(null);
+    thumbDropRestoreRef.current = null;
+    thumbScrollBoundsRef.current = null;
+    stopThumbDragClampLoop();
+  }, [stopThumbDragClampLoop]);
+
+  const handleThumbDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const container = thumbsScrollRef.current;
+      const activeNode = thumbNodeMapRef.current.get(String(event.active.id));
+      if (container && activeNode && event.over && event.active.id !== event.over.id) {
+        const containerRect = container.getBoundingClientRect();
+        const activeRect = activeNode.getBoundingClientRect();
+        thumbDropRestoreRef.current = {
+          id: String(event.active.id),
+          offsetTop: activeRect.top - containerRect.top,
+        };
+      } else {
+        thumbDropRestoreRef.current = null;
+      }
+      setThumbDragState(null);
+      thumbScrollBoundsRef.current = null;
+      stopThumbDragClampLoop();
+      handleDragEnd(event);
+      if (thumbDropRestoreRef.current) {
+        scheduleThumbDropScrollRestore();
+      }
+    },
+    [handleDragEnd, scheduleThumbDropScrollRestore, stopThumbDragClampLoop]
   );
 
   const scheduleBackgroundLowRes = useCallback(() => {
@@ -5335,8 +5610,10 @@ const timer =
     if (activePageIdRef.current !== nextId || activePageIndexRef.current !== closestIndex) {
       activePageIdRef.current = nextId;
       activePageIndexRef.current = closestIndex;
-      setActivePageId(nextId);
-      setActivePageIndex(closestIndex);
+      startTransition(() => {
+        setActivePageId(nextId);
+        setActivePageIndex(closestIndex);
+      });
     }
   }, [setActivePageId, setActivePageIndex]);
 
@@ -5428,7 +5705,9 @@ const timer =
           }
         });
         if (changed) {
-          setNearPageIds(Array.from(nearPageIdsRef.current));
+          startTransition(() => {
+            setNearPageIds(Array.from(nearPageIdsRef.current));
+          });
         }
       },
       { root: container, rootMargin: "120% 0px", threshold: 0.01 }
@@ -5458,7 +5737,9 @@ const timer =
           }
         });
         if (changed) {
-          setVisiblePageIds(Array.from(visiblePageIdsRef.current));
+          startTransition(() => {
+            setVisiblePageIds(Array.from(visiblePageIdsRef.current));
+          });
         }
       },
       { root: container, threshold: 0.4 }
@@ -5539,6 +5820,7 @@ const timer =
     if (!sourcesHydrated || loading || pages.length === 0) return;
     existingProjectOverlayHideSentRef.current = true;
     const timeoutId = window.setTimeout(() => {
+      window.dispatchEvent(new Event("workspace-content-ready"));
       window.dispatchEvent(new Event("workspace-launch-overlay-hide"));
     }, 180);
     return () => {
@@ -5559,6 +5841,7 @@ const timer =
     if (!error && (loading || !sourcesHydrated)) return;
     existingProjectOverlayHideSentRef.current = true;
     const timeoutId = window.setTimeout(() => {
+      window.dispatchEvent(new Event("workspace-content-ready"));
       window.dispatchEvent(new Event("workspace-launch-overlay-hide"));
     }, error ? 120 : 260);
     return () => {
@@ -5579,6 +5862,7 @@ const timer =
     const timeoutId = window.setTimeout(() => {
       if (existingProjectOverlayHideSentRef.current) return;
       existingProjectOverlayHideSentRef.current = true;
+      window.dispatchEvent(new Event("workspace-content-ready"));
       window.dispatchEvent(new Event("workspace-launch-overlay-hide"));
     }, 5000);
     return () => {
@@ -5914,14 +6198,59 @@ const timer =
     e.currentTarget.value = "";
   }
 
-  function handleSelectPage(index: number) {
+  function handleSelectPage(index: number, scrollBehavior: ScrollBehavior = "smooth") {
     setActivePageIndex(index);
+    pageChangeScrollBehaviorRef.current = scrollBehavior;
     setShouldCenterOnChange(true);
     const page = pages[index];
     if (page) {
       pageNavigationLockRef.current = { until: Date.now() + 700, targetId: page.id };
       setActivePageId(page.id);
     }
+  }
+
+  async function handleSearchSubmit(queryOverride?: string) {
+    const normalized = (queryOverride ?? searchQuery).trim().toLowerCase();
+    if (!normalized) {
+      setSearchResults([]);
+      setActiveSearchResultIndex(0);
+      return;
+    }
+
+    setSearchBusy(true);
+    try {
+      const matches: number[] = [];
+      for (let index = 0; index < pages.length; index += 1) {
+        const text = await getSearchTextForPage(pages[index]);
+        if (text.includes(normalized)) {
+          matches.push(index);
+        }
+      }
+
+      setSearchResults(matches);
+      if (matches.length === 0) {
+        setActiveSearchResultIndex(0);
+        return;
+      }
+
+      const currentPageIndex = activePageIndexRef.current;
+      const nearestResultIndex = matches.findIndex((matchIndex) => matchIndex >= currentPageIndex);
+      const nextResultIndex = nearestResultIndex >= 0 ? nearestResultIndex : 0;
+      setActiveSearchResultIndex(nextResultIndex);
+      handleSelectPage(matches[nextResultIndex], "auto");
+    } finally {
+      setSearchBusy(false);
+    }
+  }
+
+  function handleStepSearchResult(direction: 1 | -1) {
+    if (searchResults.length === 0) return;
+    const nextResultIndex =
+      direction === 1
+        ? (activeSearchResultIndex + 1) % searchResults.length
+        : (activeSearchResultIndex - 1 + searchResults.length) % searchResults.length;
+    setActiveSearchResultIndex(nextResultIndex);
+    handleSelectPage(searchResults[nextResultIndex], "auto");
   }
 
   async function handleAddBlankPageAfter(pageId: string) {
@@ -6140,7 +6469,7 @@ const timer =
     }
     const clamped = clamp(parsed, 1, Math.max(1, pages.length));
     setPageNumberDraft(String(clamped));
-    handleSelectPage(clamped - 1);
+    handleSelectPage(clamped - 1, "auto");
   }
 
   function registerPreviewRef(id: string) {
@@ -6334,8 +6663,8 @@ const timer =
         <div
           data-page-id={page.id}
           ref={registerPreviewRef(page.id)}
-          className={`relative bg-white shadow-[0_12px_30px_rgba(15,23,42,0.18)] transition ${
-            idx === activePageIndex ? "shadow-brand/30" : ""
+          className={`relative bg-white shadow-[0_8px_22px_rgba(15,23,42,0.10)] transition ${
+            idx === activePageIndex ? "shadow-[0_10px_26px_rgba(15,23,42,0.14)]" : ""
           }`}
           style={{
             width: fittedWidth,
@@ -7966,10 +8295,24 @@ const timer =
   }, []);
 
   const itemsIds = useMemo(() => pages.map((p) => p.id), [pages]);
+  const projectedThumbOrder = useMemo(() => {
+    if (!thumbDragState) return itemsIds;
+    const oldIndex = itemsIds.indexOf(thumbDragState.activeId);
+    const newIndex = itemsIds.indexOf(thumbDragState.overId);
+    if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return itemsIds;
+    return arrayMove(itemsIds, oldIndex, newIndex);
+  }, [itemsIds, thumbDragState]);
+  const projectedThumbIndexMap = useMemo(
+    () => new Map(projectedThumbOrder.map((id, index) => [id, index])),
+    [projectedThumbOrder]
+  );
   const isLoadingPages = loading && pages.length === 0;
   const downloadDisabled = busy || pages.length === 0 || isLoadingPages;
+  const printProjectId = projectParam ?? currentProjectId ?? null;
+  const printDisabled = isPrinting || busy || isLoadingPages || !printProjectId;
 	  const activePageIndex = activePageIndexState >= 0 && activePageIndexState < pages.length ? activePageIndexState : -1;
   useEffect(() => {
+    if (workspaceReadySettledRef.current) return;
     if (!sourcesHydrated || loading || pages.length === 0) return;
     let cancelled = false;
     let frameId = 0;
@@ -8008,8 +8351,10 @@ const timer =
       }
 
       if (stableFrames >= 3) {
+        workspaceReadySettledRef.current = true;
         window.setTimeout(() => {
           if (!cancelled) {
+            window.dispatchEvent(new Event("workspace-content-ready"));
             window.dispatchEvent(new Event("workspace-launch-overlay-hide"));
           }
         }, 220);
@@ -8027,7 +8372,6 @@ const timer =
       }
     };
   }, [activePageIndexState, loadedPreviewIds, loadedThumbIds, loading, pages, sourcesHydrated]);
-  const zoomLabel = `${Math.round(zoomPercent)}%`;
   const highlightButtonDisabled = pages.length === 0 || loading;
   const highlightColorEntries = Object.entries(
     HIGHLIGHT_COLORS
@@ -8427,6 +8771,73 @@ const timer =
     },
     [hideToolbarTooltip]
   );
+  const getPdfDocumentForSearch = useCallback(
+    async (srcIdx: number) => {
+      const cached =
+        pdfDocumentCacheRef.current.get(srcIdx) ?? searchDocumentCacheRef.current.get(srcIdx) ?? null;
+      if (cached) return cached;
+      const src = sources[srcIdx];
+      if (!src) return null;
+
+      const pdfjsLib = (await import("pdfjs-dist")) as typeof import("pdfjs-dist") & {
+        GlobalWorkerOptions: { workerSrc: string };
+      };
+      pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+        "pdfjs-dist/build/pdf.worker.min.js",
+        import.meta.url,
+      ).toString();
+
+      let pdf: SearchablePdfDocument | null = null;
+      if (src.url) {
+        try {
+          pdf = (await pdfjsLib.getDocument({ url: src.url } as never).promise) as unknown as SearchablePdfDocument;
+        } catch {
+          try {
+            pdf = (await pdfjsLib.getDocument({ url: src.url, disableWorker: true } as never).promise) as unknown as SearchablePdfDocument;
+          } catch {
+            pdf = null;
+          }
+        }
+      }
+
+      if (!pdf) {
+        const stored = await readFileBlob(src.storageId);
+        const blob = stored?.blob instanceof Blob ? stored.blob : null;
+        const bytes = blob
+          ? new Uint8Array(await blob.arrayBuffer())
+          : new Uint8Array(await (await fetch(src.url)).arrayBuffer());
+        try {
+          pdf = (await pdfjsLib.getDocument({ data: bytes } as never).promise) as unknown as SearchablePdfDocument;
+        } catch {
+          pdf = (await pdfjsLib.getDocument({ data: bytes, disableWorker: true } as never).promise) as unknown as SearchablePdfDocument;
+        }
+      }
+
+      if (!pdf) return null;
+      searchDocumentCacheRef.current.set(srcIdx, pdf);
+      return pdf;
+    },
+    [sources]
+  );
+  const getSearchTextForPage = useCallback(
+    async (page: PageItem) => {
+      const cached = searchPageTextCacheRef.current.get(page.id);
+      if (typeof cached === "string") return cached;
+      const pdf = await getPdfDocumentForSearch(page.srcIdx);
+      if (!pdf) return "";
+      const pdfPage = await pdf.getPage(page.pageIdx + 1);
+      const textContent = await pdfPage.getTextContent();
+      const text = textContent.items
+        .map((item) => ("str" in item && typeof item.str === "string" ? item.str : ""))
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .toLowerCase();
+      searchPageTextCacheRef.current.set(page.id, text);
+      return text;
+    },
+    [getPdfDocumentForSearch]
+  );
   useEffect(() => {
     if (!toolbarTooltip.visible) return;
     const updatePosition = () => {
@@ -8701,8 +9112,9 @@ const timer =
 	    container.scrollTo({
 	      top: Math.max(0, scrollTop),
 	      left: Math.max(0, scrollLeft),
-	      behavior: "smooth",
+	      behavior: pageChangeScrollBehaviorRef.current,
 	    });
+      pageChangeScrollBehaviorRef.current = "smooth";
 	    setShouldCenterOnChange(false);
   }, [activePageId, activePageIndex, baseScale, pages, shouldCenterOnChange, zoomMultiplier]);
 
@@ -8811,6 +9223,19 @@ const timer =
       if (draftHighlightLiveRafRef.current !== null) {
         window.cancelAnimationFrame(draftHighlightLiveRafRef.current);
         draftHighlightLiveRafRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (thumbDragClampRafRef.current !== null) {
+        window.cancelAnimationFrame(thumbDragClampRafRef.current);
+        thumbDragClampRafRef.current = null;
+      }
+      if (thumbDropRestoreRafRef.current !== null) {
+        window.cancelAnimationFrame(thumbDropRestoreRafRef.current);
+        thumbDropRestoreRafRef.current = null;
       }
     };
   }, []);
@@ -9137,9 +9562,86 @@ const timer =
     );
     const targetPage = pages[nextIndex];
     if (targetPage) {
-      handleSelectPage(nextIndex);
+      handleSelectPage(nextIndex, "auto");
     }
   }
+
+  function handlePresentationPageStep(direction: 1 | -1) {
+    if (pages.length === 0) return;
+    const currentIndex =
+      activePageIndexState >= 0 && activePageIndexState < pages.length
+        ? activePageIndexState
+        : 0;
+    const nextIndex = Math.min(pages.length - 1, Math.max(0, currentIndex + direction));
+    const nextPage = pages[nextIndex];
+    if (!nextPage) return;
+    setActivePageIndex(nextIndex);
+    setActivePageId(nextPage.id);
+    setPageNumberDraft(String(nextIndex + 1));
+  }
+
+  const activePresentationPage =
+    activePageIndexState >= 0 && activePageIndexState < pages.length ? pages[activePageIndexState] : pages[0] ?? null;
+
+  const toggleBrowserFullscreen = useCallback(async () => {
+    if (typeof document === "undefined") return;
+    const target = workspaceFullscreenRef.current;
+    if (!target) return;
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else {
+        await target.requestFullscreen();
+      }
+    } catch (error) {
+      console.error("Failed to toggle fullscreen", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const handleFullscreenChange = () => {
+      setIsBrowserFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    handleFullscreenChange();
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isBrowserFullscreen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "ArrowDown" || event.key === "ArrowRight" || event.key === "PageDown" || event.key === " ") {
+        event.preventDefault();
+        handlePresentationPageStep(1);
+        return;
+      }
+      if (event.key === "ArrowUp" || event.key === "ArrowLeft" || event.key === "PageUp") {
+        event.preventDefault();
+        handlePresentationPageStep(-1);
+      }
+    };
+
+    const handleWheel = (event: WheelEvent) => {
+      const now = Date.now();
+      if (now < fullscreenWheelLockRef.current) return;
+      if (Math.abs(event.deltaY) < 12) return;
+      event.preventDefault();
+      fullscreenWheelLockRef.current = now + 260;
+      handlePresentationPageStep(event.deltaY > 0 ? 1 : -1);
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("wheel", handleWheel, { passive: false });
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("wheel", handleWheel);
+      fullscreenWheelLockRef.current = 0;
+    };
+  }, [activePageIndexState, isBrowserFullscreen, pages]);
 
   const prepareDrawCanvas = useCallback(() => {
     const canvas = drawCanvasRef.current;
@@ -9580,6 +10082,56 @@ const timer =
   }
 
   /** Build final PDF respecting order + keep flags */
+  async function handlePrint() {
+    if (isGuest) {
+      if (!guestProject?.id) {
+        ensureGuestProjectMetadata();
+      }
+      setPendingExportAfterAuth(true);
+      resetAuthState("login");
+      setShowAuthGate(true);
+      return;
+    }
+
+    if (!printProjectId || isPrinting) return;
+
+    const reservedTab = openReservedTab();
+    setIsPrinting(true);
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(printProjectId)}/pdf`, {
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        reservedTab?.close();
+        return;
+      }
+
+      const target = await getPdfAccessTarget(res);
+      if (!target?.url) {
+        reservedTab?.close();
+        return;
+      }
+
+      const destinationUrl = shouldUsePrintHandoff()
+        ? `/print?src=${encodeURIComponent(target.url)}&title=${encodeURIComponent(projectName || "Document")}`
+        : target.url;
+
+      if (reservedTab) {
+        reservedTab.location.href = destinationUrl;
+      } else {
+        window.location.href = destinationUrl;
+      }
+
+      if (target.revoke) {
+        window.setTimeout(() => {
+          URL.revokeObjectURL(target.url);
+        }, 60_000);
+      }
+    } finally {
+      setIsPrinting(false);
+    }
+  }
+
   async function handleDownload() {
     if (pages.length === 0) {
       setError("Add at least one page first.");
@@ -10186,6 +10738,38 @@ const timer =
     if (pendingExportAfterAuth) return;
     setShowAuthGate(false);
   }, [authSession?.user, pendingExportAfterAuth, showAuthGate]);
+
+  useEffect(() => {
+    if (!searchOpen) return;
+    const frame = window.requestAnimationFrame(() => {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, [searchOpen]);
+
+  useEffect(() => {
+    if (!searchOpen) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (searchPanelRef.current?.contains(target)) return;
+      if (searchButtonRef.current?.contains(target)) return;
+      setSearchOpen(false);
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setSearchOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [searchOpen]);
 
   function handleProjectNameSave() {
     const clean = sanitizeProjectName(projectNameDraft);
@@ -10860,7 +11444,12 @@ const timer =
   }
 
   return (
-    <main className="flex h-screen flex-col overflow-hidden bg-[#f3f6fb]">
+    <main
+      ref={(node) => {
+        workspaceFullscreenRef.current = node;
+      }}
+      className="flex h-screen flex-col overflow-hidden bg-[#EEF1F4]"
+    >
       {showStartupOverlay ? (
         startupOverlayVariant === "existing" ? (
           <div className="fixed inset-0 z-[120] flex items-center justify-center bg-white opacity-0 animate-[mpdf-startup-overlay-fade_0.24s_ease-out_forwards]">
@@ -10906,26 +11495,44 @@ const timer =
           </div>
         )
       ) : null}
-      <div className="transition-opacity duration-[260ms] ease-out opacity-100">
-      <header className="sticky top-0 z-40 border-b border-slate-200/60 bg-white shadow-[0_1px_4px_rgba(15,23,42,0.06)]">
+      {isBrowserFullscreen && activePresentationPage ? (
+        <div className="fixed inset-0 z-[110] bg-[#EEF2F7]">
+          <div className="flex h-full w-full items-center justify-center px-8 py-10">
+            <div className="flex h-full w-full items-center justify-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={activePresentationPage.preview || TRANSPARENT_PIXEL}
+                alt={`Page ${activePageIndexState + 1}`}
+                className="max-h-full max-w-full object-contain shadow-[0_18px_48px_rgba(15,23,42,0.12)]"
+                draggable={false}
+              />
+            </div>
+          </div>
+          <div className="pointer-events-none absolute bottom-6 left-1/2 -translate-x-1/2 rounded-full bg-slate-900/80 px-4 py-2 text-sm font-semibold text-white shadow-lg">
+            {activePageIndexState + 1} / {pages.length}
+          </div>
+        </div>
+      ) : null}
+      <div className="flex min-h-0 flex-1 flex-col transition-opacity duration-[260ms] ease-out opacity-100">
+      <header className="sticky top-0 z-40 border-b border-slate-200/60 bg-white">
         {/* Top row */}
         <div className="w-full border-b border-slate-100 bg-white">
-          <div className="flex h-14 w-full items-center gap-4 px-4 lg:px-6">
+          <div className="relative flex h-14 w-full items-center justify-between gap-4 pl-4 pr-0 lg:pl-6 lg:pr-0">
             <Link
               href="/"
-              className="inline-flex items-center gap-2"
+              className="relative z-10 inline-flex shrink-0 items-center gap-2"
               aria-label="Back to workspace"
               onClickCapture={handleLogoNavigate}
             >
-              <Image src="/logo-wordmark2.svg" alt="MergifyPDF" width={160} height={40} priority />
+              <Image src="/logos/home-expanded-sidebar-logo-light-v6.svg" alt="MergifyPDF" width={170} height={40} priority />
             </Link>
 
-            <div className="flex min-w-0 flex-1 items-center gap-2">
-              <div className="flex min-w-0 flex-1 items-center gap-2">
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-56">
+              <div className="pointer-events-auto flex min-w-0 max-w-[420px] items-center justify-center gap-2 sm:max-w-[520px] md:max-w-[620px]">
                 {projectNameEditing ? (
-                  <div className="relative w-full max-w-[320px] sm:max-w-[420px] md:max-w-[520px]">
+                  <div className="relative w-full">
                     <input
-                      className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 pr-10 text-sm font-semibold text-slate-900 shadow-inner outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200/70"
+                      className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 pr-10 text-center text-sm font-semibold text-slate-900 shadow-inner outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200/70"
                       value={projectNameDraft}
                       onChange={(event) => {
                         setProjectNameDraft(event.target.value);
@@ -10961,7 +11568,7 @@ const timer =
                       setProjectNameError(null);
                       setProjectNameEditing(true);
                     }}
-                    className="group inline-flex w-full max-w-[320px] min-w-0 items-center gap-2 text-left text-sm font-semibold text-slate-900 outline-none transition hover:text-slate-950 focus-visible:ring-2 focus-visible:ring-slate-300/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white sm:max-w-[420px] md:max-w-[520px]"
+                    className="group inline-flex min-w-0 max-w-full items-center justify-center gap-2 text-center text-sm font-semibold text-slate-900 outline-none transition hover:text-slate-950 focus-visible:ring-2 focus-visible:ring-slate-300/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
                     aria-label="Edit project name"
                   >
                     <span className="block truncate">{projectName || "Untitled project"}</span>
@@ -10969,17 +11576,133 @@ const timer =
                   </button>
                 )}
               </div>
+            </div>
 
-              <div className="flex shrink-0 items-center gap-2">
-                <button className={`${buttonNeutral} px-5 py-2`} onClick={handleAddClick} disabled={isLoadingPages}>
-                  Add pages
-                </button>
-	                <button className={`${buttonPrimary} px-5 py-2`} onClick={() => handleDownload()} disabled={downloadDisabled}>
-	                  {busy ? "Building..." : "Download pages"}
-	                </button>
+            <div className="relative z-10 flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                className="inline-flex h-10 items-center justify-center text-sm font-semibold text-slate-700 transition hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={() => setOrganizeMode(true)}
+                disabled={pages.length === 0 || organizeMode}
+              >
+                Manage pages
+              </button>
+              <button
+                type="button"
+                className="inline-flex h-10 w-10 items-center justify-center text-[#024d7c] transition hover:text-[#013d63] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#51bdff]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={handleAddClick}
+                disabled={isLoadingPages}
+                aria-label="Add pages"
+                title="Add pages"
+              >
+                <FileUp className="h-5 w-5" aria-hidden />
+              </button>
+              <div className="h-5 w-px bg-slate-200" aria-hidden />
+              <button
+                ref={searchButtonRef}
+                type="button"
+                className={`inline-flex h-10 w-10 items-center justify-center transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#51bdff]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-40 ${
+                  searchOpen ? "text-[#7C5CFA]" : "text-[#024d7c] hover:text-[#013d63]"
+                }`}
+                onClick={() => setSearchOpen((prev) => !prev)}
+                disabled={pages.length === 0}
+                aria-label="Search document"
+                title="Search document"
+                aria-pressed={searchOpen}
+              >
+                <Search className="h-5 w-5" aria-hidden />
+              </button>
+              <div className="h-5 w-px bg-slate-200" aria-hidden />
+              <button
+                type="button"
+                className="inline-flex h-10 w-10 items-center justify-center text-[#024d7c] transition hover:text-[#013d63] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#51bdff]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={() => void handlePrint()}
+                disabled={printDisabled}
+                aria-label={isPrinting ? "Opening printable PDF" : "Print pages"}
+                title={isPrinting ? "Opening printable PDF" : "Print pages"}
+              >
+                <Printer className="h-5 w-5" aria-hidden />
+              </button>
+              <button
+                type="button"
+                className="inline-flex h-10 w-10 items-center justify-center text-[#024d7c] transition hover:text-[#013d63] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#51bdff]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={() => handleDownload()}
+                disabled={downloadDisabled}
+                aria-label={busy ? "Building PDF" : "Download pages"}
+                title={busy ? "Building PDF" : "Download pages"}
+              >
+                <Download className="h-5 w-5" aria-hidden />
+              </button>
+              <div className="flex w-12 items-center justify-center border-l border-slate-200">
+                <WorkspaceSettingsMenu />
               </div>
             </div>
           </div>
+
+          {searchOpen ? (
+            <div className="border-t border-slate-100 bg-white px-4 py-3 lg:px-6">
+              <div
+                ref={searchPanelRef}
+                className="ml-auto flex w-full max-w-md items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-[0_14px_36px_rgba(15,23,42,0.10)]"
+              >
+                <Search className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+                <input
+                  ref={searchInputRef}
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      if (event.shiftKey) {
+                        handleStepSearchResult(-1);
+                      } else if (searchResults.length > 0) {
+                        handleStepSearchResult(1);
+                      } else {
+                        void handleSearchSubmit();
+                      }
+                    }
+                  }}
+                  placeholder="Find in document"
+                  className="min-w-0 flex-1 bg-transparent text-sm font-medium text-slate-900 outline-none placeholder:text-slate-400"
+                />
+                <span className="min-w-[56px] text-right text-xs font-semibold text-slate-500">
+                  {searchBusy
+                    ? "Finding..."
+                    : searchQuery.trim()
+                      ? searchResults.length > 0
+                        ? `${activeSearchResultIndex + 1}/${searchResults.length}`
+                        : "0 results"
+                      : ""}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void handleSearchSubmit()}
+                  disabled={searchBusy || searchQuery.trim().length === 0}
+                  className="inline-flex h-8 items-center justify-center rounded-full border border-slate-200 px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Find
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleStepSearchResult(-1)}
+                  disabled={searchResults.length === 0}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label="Previous result"
+                >
+                  <ChevronUp className="h-4 w-4" aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleStepSearchResult(1)}
+                  disabled={searchResults.length === 0}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label="Next result"
+                >
+                  <ChevronDown className="h-4 w-4" aria-hidden />
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           {projectNameError ? (
             <div className="w-full px-4 pb-3 text-sm text-rose-500 lg:px-6">
@@ -10990,7 +11713,7 @@ const timer =
 
         {/* Bottom row (tools) */}
         <div
-          className="toolbar-font relative z-[100] w-full bg-[#F1F5F9] shadow-[0_1px_4px_rgba(15,23,42,0.06)]"
+          className="toolbar-font relative z-[100] w-full bg-[#F1F5F9] shadow-[0_1px_4px_rgba(15,23,42,0.06)] lg:hidden"
           data-text-toolbar
         >
 	          <div className="w-full pl-8 pr-4 py-0.5 lg:pl-10 lg:pr-6">
@@ -11364,19 +12087,327 @@ const timer =
 			                  className="editor-shell mx-auto flex h-full min-h-0 w-full flex-1 flex-col gap-6 overflow-hidden px-0"
                 >
 				                    <div className="flex h-full min-h-0 w-full items-stretch gap-0 overflow-hidden">
-				                      <div className="flex min-w-0 flex-1 min-h-0 flex-col overflow-hidden">
-				                        <AnimatePresence initial={false}>
-				                          {showToolOptionsBar ? (
-				                            <motion.div
-				                              key="tool-options-bar"
-				                              initial={{ height: 0, opacity: 0, y: -6 }}
-				                              animate={{ height: 44, opacity: 1, y: 0 }}
-				                              exit={{ height: 0, opacity: 0, y: -6 }}
-				                              transition={{ duration: 0.18, ease: SOFT_EASE }}
-				                              className="relative z-[30] min-w-0 overflow-hidden border-b border-slate-200 bg-white"
-				                            >
+                                  <aside className="toolbar-font hidden h-fit w-[58px] shrink-0 items-center self-start rounded-xl border border-slate-300/80 bg-white px-2 py-3 shadow-[0_8px_20px_rgba(15,23,42,0.06)] lg:ml-3 lg:mt-3 lg:flex lg:flex-col lg:gap-2">
+                                    <div className="flex flex-col gap-2 border-b border-slate-200/80 pb-2">
+                                      <button
+                                        type="button"
+                                        className={`${toolRailButtonBase} ${toolRailButtonInactive}`}
+                                        disabled={loading}
+                                        aria-disabled={!hasUndoHistory}
+                                        aria-label="Undo"
+                                        title="Undo"
+                                        onMouseEnter={(event) => showToolbarTooltip("Undo", event.currentTarget)}
+                                        onMouseLeave={hideToolbarTooltip}
+                                        onClick={() => {
+                                          if (loading) return;
+                                          if (!hasUndoHistory) return;
+                                          handleUndoHighlight();
+                                        }}
+                                      >
+                                        <Undo2 className="h-5 w-5 shrink-0" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className={`${toolRailButtonBase} ${toolRailButtonInactive}`}
+                                        disabled={loading}
+                                        aria-disabled={!hasRedoHistory}
+                                        aria-label="Redo"
+                                        title="Redo"
+                                        onMouseEnter={(event) => showToolbarTooltip("Redo", event.currentTarget)}
+                                        onMouseLeave={hideToolbarTooltip}
+                                        onClick={() => {
+                                          if (loading) return;
+                                          if (!hasRedoHistory) return;
+                                          handleRedoHighlight();
+                                        }}
+                                      >
+                                        <Redo2 className="h-5 w-5 shrink-0" />
+                                      </button>
+                                    </div>
+
+                                    <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
+                                      <button
+                                        type="button"
+                                        disabled={toolbarLoading}
+                                        aria-pressed={selectButtonOn}
+                                        aria-label="Select"
+                                        title="Select"
+                                        onMouseEnter={(event) => showToolbarTooltip("Select", event.currentTarget)}
+                                        onMouseLeave={hideToolbarTooltip}
+                                        className={`${toolRailButtonBase} ${
+                                          toolbarLoading || selectButtonOn ? toolRailButtonActive : toolRailButtonInactive
+                                        }`}
+                                        onClick={() => {
+                                          if (toolbarLoading) return;
+                                          setSelectMode(true);
+                                          setPenMode(false);
+                                          setShapeMode(false);
+                                          setHighlightMode(false);
+                                          setTextMode(false);
+                                          setDeleteMode(false);
+                                          setDraftHighlight(null);
+                                          setDraftShape(null);
+                                          setDraftTextBox(null);
+                                          setShowSignatureHub(false);
+                                          setSignaturePanelMode("none");
+                                          setPendingSignatureForPlacement(null);
+                                        }}
+                                      >
+                                        {selectButtonOn ? (
+                                          <span className="pointer-events-none absolute -left-2 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-slate-700" />
+                                        ) : null}
+                                        <MousePointer2 className="h-5 w-5 shrink-0" />
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        disabled={highlightButtonDisabled}
+                                        aria-pressed={textButtonOn}
+                                        aria-label="Text"
+                                        title="Text"
+                                        onMouseEnter={(event) => showToolbarTooltip("Text", event.currentTarget)}
+                                        onMouseLeave={hideToolbarTooltip}
+                                        className={`${toolRailButtonBase} ${textButtonOn ? toolRailButtonActive : toolRailButtonInactive}`}
+                                        onClick={() => {
+                                          if (highlightButtonDisabled) return;
+                                          setSelectMode(false);
+                                          setDeleteMode(false);
+                                          setTextMode(true);
+                                          setPenMode(false);
+                                          setHighlightMode(false);
+                                          setShapeMode(false);
+                                          setDraftHighlight(null);
+                                          setDraftShape(null);
+                                          setDraftTextBox(null);
+                                          setShowSignatureHub(false);
+                                          setSignaturePanelMode("none");
+                                          setPendingSignatureForPlacement(null);
+                                        }}
+                                      >
+                                        {textButtonOn ? (
+                                          <span className="pointer-events-none absolute -left-2 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-slate-700" />
+                                        ) : null}
+                                        <Type className="h-5 w-5 shrink-0" />
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        disabled={loading}
+                                        aria-label="Image"
+                                        title="Image"
+                                        onMouseEnter={(event) => showToolbarTooltip("Image", event.currentTarget)}
+                                        onMouseLeave={hideToolbarTooltip}
+                                        className={`${toolRailButtonBase} ${toolRailButtonInactive}`}
+                                        onClick={() => {
+                                          if (loading) return;
+                                          setSelectMode(false);
+                                          setDeleteMode(false);
+                                          setTextMode(false);
+                                          setPenMode(false);
+                                          setHighlightMode(false);
+                                          setShapeMode(false);
+                                          setDraftHighlight(null);
+                                          setDraftShape(null);
+                                          setDraftTextBox(null);
+                                          setShowSignatureHub(false);
+                                          setSignaturePanelMode("none");
+                                          setPendingSignatureForPlacement(null);
+                                          handleOpenImageUpload();
+                                        }}
+                                      >
+                                        <ImageIcon className="h-5 w-5 shrink-0" />
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        disabled={highlightButtonDisabled}
+                                        aria-pressed={shapeButtonVisualOn}
+                                        aria-label="Shapes"
+                                        title="Shapes"
+                                        onMouseEnter={(event) => showToolbarTooltip("Shapes", event.currentTarget)}
+                                        onMouseLeave={hideToolbarTooltip}
+                                        className={`${toolRailButtonBase} ${shapeButtonVisualOn ? toolRailButtonActive : toolRailButtonInactive}`}
+                                        onClick={() => {
+                                          if (highlightButtonDisabled) return;
+                                          clearTextFocus();
+                                          setSelectMode(false);
+                                          setDeleteMode(false);
+                                          setShapeMode(true);
+                                          setShapeType(null);
+                                          setPenMode(false);
+                                          setHighlightMode(false);
+                                          setTextMode(false);
+                                          setDraftHighlight(null);
+                                          setDraftShape(null);
+                                          setDraftTextBox(null);
+                                          setShowSignatureHub(false);
+                                          setSignaturePanelMode("none");
+                                          setPendingSignatureForPlacement(null);
+                                        }}
+                                      >
+                                        {shapeButtonVisualOn ? (
+                                          <span className="pointer-events-none absolute -left-2 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-slate-700" />
+                                        ) : null}
+                                        <Shapes className="h-5 w-5 shrink-0" />
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        disabled={highlightButtonDisabled}
+                                        aria-pressed={drawButtonOn}
+                                        aria-label="Draw"
+                                        title="Draw"
+                                        onMouseEnter={(event) => showToolbarTooltip("Draw", event.currentTarget)}
+                                        onMouseLeave={hideToolbarTooltip}
+                                        className={`${toolRailButtonBase} ${drawButtonOn ? toolRailButtonActive : toolRailButtonInactive}`}
+                                        onClick={() => {
+                                          if (highlightButtonDisabled) return;
+                                          setSelectMode(false);
+                                          setDeleteMode(false);
+                                          setPenMode(true);
+                                          setHighlightMode(false);
+                                          setShapeMode(false);
+                                          setTextMode(false);
+                                          setDraftHighlight(null);
+                                          setDraftShape(null);
+                                          setDraftTextBox(null);
+                                          setShowSignatureHub(false);
+                                          setSignaturePanelMode("none");
+                                          setPendingSignatureForPlacement(null);
+                                        }}
+                                      >
+                                        {drawButtonOn ? (
+                                          <span className="pointer-events-none absolute -left-2 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-slate-700" />
+                                        ) : null}
+                                        <PencilLine className="h-5 w-5 shrink-0" />
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        disabled={highlightButtonDisabled}
+                                        aria-pressed={highlightButtonVisualOn}
+                                        aria-label="Highlight"
+                                        title="Highlight"
+                                        onMouseEnter={(event) => showToolbarTooltip("Highlight", event.currentTarget)}
+                                        onMouseLeave={hideToolbarTooltip}
+                                        className={`${toolRailButtonBase} ${highlightButtonVisualOn ? toolRailButtonActive : toolRailButtonInactive}`}
+                                        onClick={() => {
+                                          if (highlightButtonDisabled) return;
+                                          setSelectMode(false);
+                                          setDeleteMode(false);
+                                          setHighlightMode(true);
+                                          setPenMode(false);
+                                          setShapeMode(false);
+                                          setTextMode(false);
+                                          setDraftHighlight(null);
+                                          setDraftShape(null);
+                                          setDraftTextBox(null);
+                                          setShowSignatureHub(false);
+                                          setSignaturePanelMode("none");
+                                          setPendingSignatureForPlacement(null);
+                                        }}
+                                      >
+                                        {highlightButtonVisualOn ? (
+                                          <span className="pointer-events-none absolute -left-2 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-slate-700" />
+                                        ) : null}
+                                        <Highlighter className="h-5 w-5 shrink-0" />
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        disabled={loading}
+                                        className={`${toolRailButtonBase} ${deleteMode ? toolRailButtonActive : toolRailButtonInactive}`}
+                                        onClick={handleToggleDeleteMode}
+                                        aria-pressed={deleteMode}
+                                        aria-disabled={!hasAnyAnnotations && !deleteMode}
+                                        aria-label="Eraser"
+                                        title="Eraser"
+                                        onMouseEnter={(event) => showToolbarTooltip("Eraser", event.currentTarget)}
+                                        onMouseLeave={hideToolbarTooltip}
+                                      >
+                                        {deleteMode ? (
+                                          <span className="pointer-events-none absolute -left-2 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-slate-700" />
+                                        ) : null}
+                                        <Eraser className="h-5 w-5 shrink-0" />
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        disabled={loading}
+                                        aria-label="Note"
+                                        title="Note"
+                                        onMouseEnter={(event) => showToolbarTooltip("Note", event.currentTarget)}
+                                        onMouseLeave={hideToolbarTooltip}
+                                        className={`${toolRailButtonBase} ${toolRailButtonInactive}`}
+                                        onClick={() => {
+                                          if (loading) return;
+                                          setSelectMode(false);
+                                          setDeleteMode(false);
+                                          setTextMode(true);
+                                          setPenMode(false);
+                                          setHighlightMode(false);
+                                          setShapeMode(false);
+                                          setDraftHighlight(null);
+                                          setDraftShape(null);
+                                          setDraftTextBox(null);
+                                          setShowSignatureHub(false);
+                                          setSignaturePanelMode("none");
+                                          setPendingSignatureForPlacement(null);
+                                          handleAddStickyNote();
+                                        }}
+                                      >
+                                        <Pin className="h-5 w-5 shrink-0 rotate-[45deg]" />
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        disabled={loading}
+                                        aria-pressed={signatureButtonOn}
+                                        aria-label={`Sign${savedSignatures.length > 0 ? ` (${savedSignatures.length})` : ""}`}
+                                        title={savedSignatures.length > 0 ? `Sign (${savedSignatures.length})` : "Sign"}
+                                        onMouseEnter={(event) => showToolbarTooltip("Sign", event.currentTarget)}
+                                        onMouseLeave={hideToolbarTooltip}
+                                        className={`relative ${toolRailButtonBase} ${signatureButtonOn ? toolRailButtonActive : toolRailButtonInactive}`}
+                                        onClick={() => {
+                                          if (loading) return;
+                                          setSelectMode(false);
+                                          setDeleteMode(false);
+                                          setPenMode(false);
+                                          setShapeMode(false);
+                                          setDraftShape(null);
+                                          setShowSignatureHub(true);
+                                          setSignatureHubStep("gallery");
+                                          setSignaturePanelMode("none");
+                                          setPendingSignatureForPlacement(null);
+                                          setHighlightMode(false);
+                                          setTextMode(false);
+                                        }}
+                                      >
+                                        {signatureButtonOn ? (
+                                          <span className="pointer-events-none absolute -left-2 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-slate-700" />
+                                        ) : null}
+                                        <SignatureIcon className="h-5 w-5 shrink-0" />
+                                        {savedSignatures.length > 0 ? (
+                                          <span className="pointer-events-none absolute -right-1 -top-1 inline-flex min-w-[18px] items-center justify-center rounded-full bg-[#024d7c] px-1 text-[0.65rem] font-bold text-white shadow-sm">
+                                            {savedSignatures.length}
+                                          </span>
+                                        ) : null}
+                                      </button>
+                                    </div>
+                                  </aside>
+					                      <div className="flex min-w-0 flex-1 min-h-0 flex-col overflow-hidden">
+					                        <AnimatePresence initial={false}>
+					                          {showToolOptionsBar ? (
+					                            <motion.div
+					                              key="tool-options-bar"
+					                              initial={{ height: 0, opacity: 0, y: -6 }}
+					                              animate={{ height: 52, opacity: 1, y: 0 }}
+					                              exit={{ height: 0, opacity: 0, y: -6 }}
+					                              transition={{ duration: 0.18, ease: SOFT_EASE }}
+					                              className="relative z-[30] mx-4 mt-3 min-w-0 overflow-hidden rounded-xl border border-slate-300/80 bg-white shadow-[0_8px_18px_rgba(15,23,42,0.05)]"
+					                            >
                               <div className="toolbar-font w-full">
-                                <div className="w-full pl-8 pr-4 py-0.5 lg:pl-10 lg:pr-6">
+                                <div className="w-full px-4 py-[6px] lg:px-5">
                                   <div className="relative h-10">
                                     <div
                                       className={`absolute inset-0 flex w-full items-center gap-3 lg:gap-4 ${
@@ -11977,7 +13008,7 @@ const timer =
                                           </button>
                                         </div>
 
-                                        <div className="mx-1 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
+                                          <div className="mx-1 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
                                       </div>
                                     ) : (
                                         <div
@@ -12412,10 +13443,9 @@ const timer =
                                 </div>
                               </div>
                             </motion.div>
-				              ) : null}
-				                        </AnimatePresence>
-			
-				                        <div className="relative min-w-0 flex-1 min-h-0 overflow-hidden">
+					              ) : null}
+					                        </AnimatePresence>
+					                        <div className="relative min-w-0 flex-1 min-h-0 overflow-hidden">
 				                          <div
 				                            ref={viewerScrollRef}
 				                            className="viewer-scroll relative flex h-full w-full overflow-auto pb-16"
@@ -12434,8 +13464,8 @@ const timer =
 			
 				                      <div className="flex shrink-0 items-stretch border-l border-slate-200">
 				                          {showPageOrderPanel ? (
-				                            <aside className="flex w-[280px] shrink-0 flex-col">
-                              <div className="flex min-h-0 flex-1 flex-col bg-[#f8fafc]">
+				                            <aside className="flex w-[272px] shrink-0 flex-col">
+				                              <div className="flex min-h-0 flex-1 flex-col bg-white">
                                 <div
                                   className="toolbar-font flex h-[45px] items-center justify-between border-b border-slate-200 bg-white px-4"
                                   data-text-toolbar
@@ -12445,44 +13475,49 @@ const timer =
                                       <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-[#024d7c]" aria-hidden />
                                       <span>Loading</span>
                                     </div>
-                                  ) : (
-				                                    <p className="text-sm font-semibold text-slate-600">{pages.length} pages</p>
+				                                  ) : (
+                                    <div className="flex items-center gap-2">
+                                      <p className="text-sm font-semibold text-slate-800">Pages</p>
+                                      <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-2 text-xs font-semibold text-slate-600">
+                                        {pages.length}
+                                      </span>
+                                    </div>
                                   )}
-				                                  <button
-				                                    type="button"
-				                                    onClick={() => setOrganizeMode(true)}
-				                                    disabled={pages.length === 0 || organizeMode}
-				                                    className="rounded-lg px-2.5 py-1.5 text-sm font-semibold text-[#024d7c] transition hover:bg-slate-100 hover:text-[#013d63] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#51bdff]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:opacity-50"
-				                                  >
-				                                    Manage pages
-				                                  </button>
 				                                </div>
 				                                <div
                                     ref={thumbsScrollRef}
-                                    className="thumbs-scroll relative min-h-0 flex-1 overflow-y-auto pl-4 pr-0"
+                                    className="thumbs-scroll relative min-h-0 flex-1 overflow-y-auto overscroll-contain pl-3 pr-1"
                                   >
 				                            <DndContext
 				                              sensors={sensors}
 				                              collisionDetection={closestCenter}
-		                              onDragEnd={handleDragEnd}
+                                      autoScroll={{
+                                        activator: AutoScrollActivator.DraggableRect,
+                                        canScroll: (element) => element === thumbsScrollRef.current,
+                                      }}
+                                      modifiers={[restrictThumbDragToViewport]}
+		                              onDragStart={handleThumbDragStart}
+                                      onDragOver={handleThumbDragOver}
+		                              onDragCancel={handleThumbDragCancel}
+		                              onDragEnd={handleThumbDragEnd}
 		                            >
                                       <SortableContext items={itemsIds} strategy={verticalListSortingStrategy}>
                                         <ul className="flex flex-col py-0">
                                           {pages.length > 0 ? (
 		                                    <li className="group relative flex h-12 items-center justify-center">
-			                                      <div className="pointer-events-none flex w-full items-center justify-center gap-3 px-2 opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
-		                                        <div className="h-0.5 flex-1 bg-[#024d7c]/70" aria-hidden />
+			                                      <div className="pointer-events-none flex w-full items-center justify-center gap-2 px-3 opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+		                                        <div className="h-px flex-1 bg-slate-300" aria-hidden />
 		                                        <button
 		                                          type="button"
 		                                          onClick={() => void handleAddBlankPageBefore(pages[0].id)}
-		                                          className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#024d7c] text-white shadow-sm transition hover:bg-[#013d63] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#51bdff]/40 focus-visible:ring-offset-2"
+		                                          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-[0_4px_12px_rgba(15,23,42,0.08)] transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 focus-visible:ring-offset-2"
 		                                          aria-label="Add blank page"
 		                                        >
 		                                          <Plus className="h-4 w-4" aria-hidden />
 		                                        </button>
-		                                        <div className="h-0.5 flex-1 bg-[#024d7c]/70" aria-hidden />
+		                                        <div className="h-px flex-1 bg-slate-300" aria-hidden />
 		                                      </div>
-			                                      <div className="pointer-events-none absolute left-1/2 top-full z-40 mt-1 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg group-hover:opacity-100 group-focus-within:opacity-100">
+			                                      <div className="pointer-events-none absolute left-1/2 top-full z-40 mt-1 -translate-x-1/2 whitespace-nowrap rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 opacity-0 shadow-[0_10px_24px_rgba(15,23,42,0.12)] transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
 		                                        Add blank page
 		                                      </div>
 		                                    </li>
@@ -12491,11 +13526,12 @@ const timer =
 		                                    <Fragment key={p.id}>
 		                                      <SortableThumb
 		                                        item={p}
-		                                        index={i}
+		                                        index={projectedThumbIndexMap.get(p.id) ?? i}
 		                                        selected={p.id === activePageId}
 		                                        onSelect={() => handleSelectPage(i)}
 		                                        onMoveUp={() => moveThumbPage(i, -1)}
 		                                        onMoveDown={() => moveThumbPage(i, 1)}
+		                                        onRotate={() => handleRotatePage(p.id)}
 		                                        onDelete={() => handleDeletePage(p.id)}
 		                                        disableMoveDown={i === pages.length - 1}
                                             registerThumbNode={registerThumbNode}
@@ -12510,19 +13546,19 @@ const timer =
 		                                      />
 		                                      {i < pages.length - 1 ? (
 		                                        <li className="group relative flex h-12 items-center justify-center">
-			                                          <div className="pointer-events-none flex w-full items-center justify-center gap-3 px-2 opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
-		                                            <div className="h-0.5 flex-1 bg-[#024d7c]/70" aria-hidden />
+			                                          <div className="pointer-events-none flex w-full items-center justify-center gap-2 px-3 opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+		                                            <div className="h-px flex-1 bg-slate-300" aria-hidden />
 		                                            <button
 		                                              type="button"
 		                                              onClick={() => void handleAddBlankPageAfter(p.id)}
-		                                              className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#024d7c] text-white shadow-sm transition hover:bg-[#013d63] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#51bdff]/40 focus-visible:ring-offset-2"
+		                                              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-[0_4px_12px_rgba(15,23,42,0.08)] transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 focus-visible:ring-offset-2"
 		                                              aria-label="Add blank page"
 		                                            >
 		                                              <Plus className="h-4 w-4" aria-hidden />
 		                                            </button>
-		                                            <div className="h-0.5 flex-1 bg-[#024d7c]/70" aria-hidden />
+		                                            <div className="h-px flex-1 bg-slate-300" aria-hidden />
 		                                          </div>
-			                                          <div className="pointer-events-none absolute left-1/2 top-full z-40 mt-1 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg group-hover:opacity-100 group-focus-within:opacity-100">
+			                                          <div className="pointer-events-none absolute left-1/2 top-full z-40 mt-1 -translate-x-1/2 whitespace-nowrap rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 opacity-0 shadow-[0_10px_24px_rgba(15,23,42,0.12)] transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
 		                                            Add blank page
 		                                          </div>
 		                                        </li>
@@ -12531,19 +13567,19 @@ const timer =
 		                                  ))}
 		                                  {pages.length > 0 ? (
 		                                    <li className="group relative flex h-12 items-center justify-center">
-			                                      <div className="pointer-events-none flex w-full items-center justify-center gap-3 px-2 opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
-		                                        <div className="h-0.5 flex-1 bg-[#024d7c]/70" aria-hidden />
+			                                      <div className="pointer-events-none flex w-full items-center justify-center gap-2 px-3 opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+		                                        <div className="h-px flex-1 bg-slate-300" aria-hidden />
 		                                        <button
 		                                          type="button"
 		                                          onClick={() => void handleAddBlankPageAfter(pages[pages.length - 1].id)}
-		                                          className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#024d7c] text-white shadow-sm transition hover:bg-[#013d63] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#51bdff]/40 focus-visible:ring-offset-2"
+		                                          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-[0_4px_12px_rgba(15,23,42,0.08)] transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 focus-visible:ring-offset-2"
 		                                          aria-label="Add blank page"
 		                                        >
 		                                          <Plus className="h-4 w-4" aria-hidden />
 		                                        </button>
-		                                        <div className="h-0.5 flex-1 bg-[#024d7c]/70" aria-hidden />
+		                                        <div className="h-px flex-1 bg-slate-300" aria-hidden />
 		                                      </div>
-			                                      <div className="pointer-events-none absolute left-1/2 bottom-full z-40 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg group-hover:opacity-100 group-focus-within:opacity-100">
+			                                      <div className="pointer-events-none absolute left-1/2 bottom-full z-40 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 opacity-0 shadow-[0_10px_24px_rgba(15,23,42,0.12)] transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
 		                                        Add blank page
 		                                      </div>
 		                                    </li>
@@ -12557,14 +13593,18 @@ const timer =
 					                          ) : null}
 
                           <aside
-                            className={`flex w-10 shrink-0 flex-col bg-white ${showPageOrderPanel ? "border-l border-slate-200" : ""}`}
+                            className={`flex w-12 shrink-0 flex-col bg-white ${showPageOrderPanel ? "border-l border-slate-200" : ""}`}
                           >
 				                            <div className="flex h-[45px] w-full items-center justify-center border-b border-slate-200">
 				                              <div className="group relative">
 				                                <button
 				                                  type="button"
 				                                  onClick={() => setShowPageOrderPanel((prev) => !prev)}
-				                                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60"
+				                                  className={`inline-flex h-9 w-9 items-center justify-center rounded-md transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 ${
+                                                showPageOrderPanel
+                                                  ? "bg-[#F4EEFF] text-[#5B21B6]"
+                                                  : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                                              }`}
 				                                  aria-label={showPageOrderPanel ? "Close sidebar" : "Open sidebar"}
 				                                >
 				                                  {showPageOrderPanel ? (
@@ -12578,6 +13618,89 @@ const timer =
 				                                </div>
 				                              </div>
 				                            </div>
+                                <div className="flex flex-col items-center gap-2 px-1 py-3">
+                                  <button
+                                    type="button"
+                                    aria-label={isBrowserFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                                    className="inline-flex h-8 w-8 items-center justify-center text-slate-700 transition hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 disabled:opacity-40"
+                                    onClick={() => void toggleBrowserFullscreen()}
+                                  >
+                                    {isBrowserFullscreen ? (
+                                      <Shrink className="h-5 w-5" aria-hidden />
+                                    ) : (
+                                      <Expand className="h-5 w-5" aria-hidden />
+                                    )}
+                                  </button>
+                                </div>
+                                <div className="mx-auto h-px w-7 bg-slate-200" aria-hidden />
+                                <div className="flex flex-col items-center gap-2 px-1 py-3">
+                                  <button
+                                    type="button"
+                                    aria-label="Zoom in"
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 disabled:opacity-40"
+                                    onClick={() => setZoomWithScrollPreserved(zoomPercent + ZOOM_STEP_PERCENT)}
+                                    disabled={pages.length === 0 || zoomPercent >= ZOOM_MAX_PERCENT}
+                                  >
+                                    <ZoomIn className="h-5 w-5" aria-hidden />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    aria-label="Zoom out"
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 disabled:opacity-40"
+                                    onClick={() => setZoomWithScrollPreserved(zoomPercent - ZOOM_STEP_PERCENT)}
+                                    disabled={pages.length === 0 || zoomPercent <= ZOOM_MIN_PERCENT}
+                                  >
+                                    <ZoomOut className="h-5 w-5" aria-hidden />
+                                  </button>
+                                </div>
+                                <div className="mx-auto h-px w-7 bg-slate-200" aria-hidden />
+                                <div className="flex flex-col items-center gap-2 px-1 py-3">
+                                  <button
+                                    type="button"
+                                    aria-label="Previous page"
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 disabled:opacity-40"
+                                    onClick={() => handlePageStep(-1)}
+                                    disabled={activePageIndex <= 0}
+                                  >
+                                    <ChevronUp className="h-5 w-5" aria-hidden />
+                                  </button>
+                                  <input
+                                    value={pageNumberDraft}
+                                    onChange={(event) => {
+                                      const next = event.target.value.replace(/[^\d]/g, "");
+                                      setPageNumberDraft(next);
+                                    }}
+                                    onBlur={commitPageNumberDraft}
+                                    onKeyDown={(event) => {
+                                      if (event.key === "Enter") {
+                                        event.currentTarget.blur();
+                                        return;
+                                      }
+                                      if (event.key === "Escape") {
+                                        const idx =
+                                          activePageIndexState >= 0 && activePageIndexState < pages.length
+                                            ? activePageIndexState
+                                            : 0;
+                                        setPageNumberDraft(String(idx + 1));
+                                        event.currentTarget.blur();
+                                      }
+                                    }}
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    disabled={pages.length === 0}
+                                    className="h-8 w-8 rounded-md border border-slate-200 bg-white px-1 text-center text-[12px] font-semibold tabular-nums text-slate-900 shadow-sm outline-none transition focus:border-[#51bdff] focus:ring-2 focus:ring-[#51bdff]/30 disabled:opacity-60"
+                                    aria-label="Page number"
+                                  />
+                                  <button
+                                    type="button"
+                                    aria-label="Next page"
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 disabled:opacity-40"
+                                    onClick={() => handlePageStep(1)}
+                                    disabled={activePageIndex === pages.length - 1 || pages.length === 0}
+                                  >
+                                    <ChevronDown className="h-5 w-5" aria-hidden />
+                                  </button>
+                                </div>
 				                          </aside>
 				                        </div>
 				                    </div>
@@ -13447,100 +14570,6 @@ const timer =
           </div>
         </div>
       ) : null}
-
-	      <div className="shrink-0 border-t border-slate-200 bg-white/85 shadow-[0_-18px_40px_rgba(15,23,42,0.12)] backdrop-blur-md">
-	        <div className="flex w-full justify-end px-4 py-[6.5px] lg:px-8">
-	          <div className="flex flex-wrap items-center justify-end gap-3">
-		            <div className="flex items-center gap-5">
-		              <span className="text-base font-semibold text-slate-800">Zoom</span>
-		              <div className="flex items-center gap-1.5">
-			                <input
-			                  type="range"
-			                  min={ZOOM_MIN_PERCENT}
-			                  max={ZOOM_MAX_PERCENT}
-			                  step={ZOOM_STEP_PERCENT}
-			                  value={zoomPercent}
-			                  onChange={(e) => setZoomWithScrollPreserved(Number(e.target.value))}
-		                  disabled={pages.length === 0}
-		                  className="horizontal-slider w-44 sm:w-72"
-		                />
-		                <span className="w-[52px] text-right text-base font-semibold tabular-nums text-slate-900">
-		                  {zoomLabel}
-		                </span>
-		              </div>
-		            </div>
-
-	            <div className="hidden h-10 w-px bg-slate-200 sm:block" aria-hidden />
-
-		            <div className="flex items-center gap-3">
-		              <button
-		                type="button"
-		                aria-label="Previous page"
-		                className={bottomBarButtonClass}
-	                onClick={() => handlePageStep(-1)}
-	                disabled={activePageIndex <= 0}
-	              >
-			                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-	                  <path
-	                    d="M14 6l-6 6 6 6"
-	                    stroke="currentColor"
-	                    strokeWidth="2"
-	                    strokeLinecap="round"
-	                    strokeLinejoin="round"
-	                  />
-	                </svg>
-	              </button>
-	              <div className="flex items-center gap-2 text-base font-semibold text-slate-900">
-	                <input
-	                  value={pageNumberDraft}
-	                  onChange={(event) => {
-	                    const next = event.target.value.replace(/[^\d]/g, "");
-	                    setPageNumberDraft(next);
-	                  }}
-	                  onBlur={commitPageNumberDraft}
-	                  onKeyDown={(event) => {
-	                    if (event.key === "Enter") {
-	                      event.currentTarget.blur();
-	                      return;
-	                    }
-	                    if (event.key === "Escape") {
-	                      const idx =
-	                        activePageIndexState >= 0 && activePageIndexState < pages.length ? activePageIndexState : 0;
-	                      setPageNumberDraft(String(idx + 1));
-	                      event.currentTarget.blur();
-	                    }
-	                  }}
-	                  inputMode="numeric"
-	                  pattern="[0-9]*"
-	                  disabled={pages.length === 0}
-	                  className="h-10 w-16 rounded-full border border-slate-200 bg-white px-2 text-center text-base font-semibold tabular-nums text-slate-900 shadow-sm outline-none transition focus:border-[#51bdff] focus:ring-2 focus:ring-[#51bdff]/30 disabled:opacity-60"
-	                  aria-label="Page number"
-	                />
-	                <span className="text-slate-400">/</span>
-	                <span className="tabular-nums text-slate-700">{pages.length || 0}</span>
-	              </div>
-	              <button
-	                type="button"
-	                aria-label="Next page"
-	                className={bottomBarButtonClass}
-	                onClick={() => handlePageStep(1)}
-	                disabled={activePageIndex === pages.length - 1 || pages.length === 0}
-	              >
-			                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-	                  <path
-	                    d="M10 6l6 6-6 6"
-	                    stroke="currentColor"
-	                    strokeWidth="2"
-	                    strokeLinecap="round"
-	                    strokeLinejoin="round"
-	                  />
-	                </svg>
-		              </button>
-		            </div>
-
-			          </div>
-			        </div>
-			      </div>
 
       {colorPickerOpen && typeof document !== "undefined"
         ? createPortal(

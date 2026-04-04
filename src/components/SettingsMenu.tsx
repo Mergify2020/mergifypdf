@@ -24,6 +24,7 @@ export default function SettingsMenu({
 }: SettingsMenuProps) {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const { data: session } = useSession();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -110,7 +111,15 @@ export default function SettingsMenu({
   }, [open]);
 
   function handleToggle() {
-    setOpen((prev) => !prev);
+    setOpen((prev) => {
+      const next = !prev;
+      if (!next) {
+        window.requestAnimationFrame(() => {
+          triggerRef.current?.blur();
+        });
+      }
+      return next;
+    });
   }
 
   function handlePricing() {
@@ -184,6 +193,7 @@ export default function SettingsMenu({
       className={`relative ${trigger === "custom" ? "w-full min-w-0" : ""}`}
     >
       <button
+        ref={triggerRef}
         type="button"
         onClick={handleToggle}
         className={
