@@ -1,9 +1,10 @@
 ﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { AlertTriangle, CircleHelp, CreditCard, ExternalLink, Folders, LogOut, PenLine, Settings, User } from "lucide-react";
+import { AlertTriangle, CircleHelp, CreditCard, ExternalLink, Folders, LogOut, Moon, PenLine, Settings, Sparkles, Sun, User } from "lucide-react";
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
 import { getAvatarFallback } from "@/lib/avatarFallback";
 
@@ -31,6 +32,11 @@ export default function SettingsMenu({
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const [hasActivePlan, setHasActivePlan] = useState<boolean | null>(null);
   const [stripeStatus, setStripeStatus] = useState<string | null>(null);
+  const [billingPortalPending, setBillingPortalPending] = useState(false);
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    if (typeof window === "undefined") return "light";
+    return window.localStorage.getItem("theme") === "dark" ? "dark" : "light";
+  });
   const avatarKey = session?.user?.id ?? session?.user?.email ?? null;
   const { avatar } = useAvatarPreference(avatarKey);
   const profileName = (session?.user?.name ?? "").trim();
@@ -45,6 +51,13 @@ export default function SettingsMenu({
   useEffect(() => {
     setAvatarLoadFailed(false);
   }, [avatar]);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    if (theme === "light") {
+      document.body.classList.remove("dark");
+    }
+  }, [theme]);
 
   useEffect(() => {
     const sessionStripeStatus = session?.user?.stripeStatus ?? null;
@@ -129,8 +142,14 @@ export default function SettingsMenu({
 
   async function handleBillingPortal() {
     setOpen(false);
+    setBillingPortalPending(true);
     if (typeof window !== "undefined") {
       window.dispatchEvent(new Event("workspace-billing-portal-start"));
+      await new Promise<void>((resolve) => {
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => resolve());
+        });
+      });
     }
     try {
       const response = await fetch("/api/billing-portal", {
@@ -148,6 +167,7 @@ export default function SettingsMenu({
     } catch {
       // fall through to account page
     }
+    setBillingPortalPending(false);
     if (typeof window !== "undefined") {
       window.dispatchEvent(new Event("workspace-billing-portal-stop"));
     }
@@ -185,60 +205,75 @@ export default function SettingsMenu({
     }
   }
 
+  function applyTheme(nextTheme: "light" | "dark") {
+    document.documentElement.classList.add("theme-transition");
+    document.documentElement.classList.toggle("dark", nextTheme === "dark");
+    if (nextTheme === "light") {
+      document.body.classList.remove("dark");
+    }
+    window.localStorage.setItem("theme", nextTheme);
+    document.cookie = `theme=${nextTheme}; path=/; max-age=31536000`;
+    setTheme(nextTheme);
+    window.setTimeout(() => {
+      document.documentElement.classList.remove("theme-transition");
+    }, 200);
+  }
+
   const shouldShowUpdatePaymentCta = stripeStatus === "past_due" || stripeStatus === "unpaid";
 
   return (
-    <div
-      ref={containerRef}
-      className={`relative ${trigger === "custom" ? "w-full min-w-0" : ""}`}
-    >
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={handleToggle}
-        className={
-          trigger === "custom"
-            ? (triggerClassName ??
-              "inline-flex items-center justify-center rounded-full border border-slate-200 bg-white transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-800 active:scale-[0.99]")
-            : `flex items-center justify-center rounded-full border border-slate-200 bg-white transition hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-800 active:scale-95 ${outerSizeClass} ${triggerClassName ?? ""}`
-        }
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-label={triggerLabel}
-      >
-        {trigger === "custom" ? (
-          triggerContent
-        ) : (
-          <span className="sr-only">{triggerLabel}</span>
-        )}
-        {trigger === "icon" ? (
-          <User className="h-5 w-5 text-slate-700" aria-hidden />
-        ) : trigger === "avatar" && showAvatarImage ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={avatar!}
-            alt="Your avatar"
-            className={`${innerSizeClass} rounded-full object-cover`}
-            onError={() => setAvatarLoadFailed(true)}
-          />
-        ) : trigger === "avatar" ? (
-          <span
-            className={`flex items-center justify-center rounded-full text-xs font-semibold uppercase text-white ${innerSizeClass}`}
-            style={{ backgroundColor: fallback.color }}
-          >
-            {hasProfileInfo ? fallback.initials : ""}
-          </span>
-        ) : null}
-      </button>
-
+    <>
       <div
-        className={
-          "absolute right-0 z-40 mt-3 w-[280px] rounded-xl border border-[#E5E7EB] bg-white p-3 text-left shadow-[0_16px_36px_rgba(15,23,42,0.14)] origin-top-right transition duration-200 ease-out dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[0_20px_44px_rgba(0,0,0,0.5)] " +
-          (open
-            ? "pointer-events-auto opacity-100 translate-y-0 scale-100"
-            : "pointer-events-none opacity-0 translate-y-1 scale-95")
-        }
+        ref={containerRef}
+        className={`relative ${trigger === "custom" ? "w-full min-w-0" : ""}`}
       >
+        <button
+          ref={triggerRef}
+          type="button"
+          onClick={handleToggle}
+          className={
+            trigger === "custom"
+              ? (triggerClassName ??
+                "inline-flex items-center justify-center rounded-full border border-slate-200 bg-white transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-800 active:scale-[0.99]")
+              : `flex items-center justify-center rounded-full border border-slate-200 bg-white transition hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-800 active:scale-95 ${outerSizeClass} ${triggerClassName ?? ""}`
+          }
+          aria-haspopup="menu"
+          aria-expanded={open}
+          aria-label={triggerLabel}
+        >
+          {trigger === "custom" ? (
+            triggerContent
+          ) : (
+            <span className="sr-only">{triggerLabel}</span>
+          )}
+          {trigger === "icon" ? (
+            <User className="h-5 w-5 text-slate-700" aria-hidden />
+          ) : trigger === "avatar" && showAvatarImage ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={avatar!}
+              alt="Your avatar"
+              className={`${innerSizeClass} rounded-full object-cover`}
+              onError={() => setAvatarLoadFailed(true)}
+            />
+          ) : trigger === "avatar" ? (
+            <span
+              className={`flex items-center justify-center rounded-full text-xs font-semibold uppercase text-white ${innerSizeClass}`}
+              style={{ backgroundColor: fallback.color }}
+            >
+              {hasProfileInfo ? fallback.initials : ""}
+            </span>
+          ) : null}
+        </button>
+
+        <div
+          className={
+            "absolute right-0 z-40 mt-3 w-[280px] rounded-xl border border-[#E5E7EB] bg-white p-3 text-left shadow-[0_16px_36px_rgba(15,23,42,0.14)] origin-top-right transition duration-200 ease-out dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[0_20px_44px_rgba(0,0,0,0.5)] " +
+            (open
+              ? "pointer-events-auto opacity-100 translate-y-0 scale-100"
+              : "pointer-events-none opacity-0 translate-y-1 scale-95")
+          }
+        >
         <div className={`space-y-3 text-sm text-slate-700 dark:text-zinc-200 ${open ? "avatar-dropdown-menu" : ""}`}>
             <div className="flex items-center gap-3 px-3 py-2.5">
               {showAvatarImage ? (
@@ -289,9 +324,14 @@ export default function SettingsMenu({
                 <button
                   type="button"
                   onClick={handlePricing}
-                  className="mb-2 flex w-full items-center justify-center rounded-md bg-[#6C47FF] px-3 py-2.5 text-[15px] font-semibold text-white transition hover:bg-[#5B38E6] focus:outline-none focus:ring-2 focus:ring-[#6C47FF]/40 focus:ring-offset-2 focus:ring-offset-white dark:bg-[#6C47FF] dark:hover:bg-[#5B38E6] dark:focus:ring-offset-zinc-900"
+                  className="group relative mb-2 flex w-full items-center justify-center gap-2 overflow-hidden rounded-lg border border-[#CFC4FF] bg-gradient-to-r from-[#8B5CF6] via-[#7C4DFF] to-[#6D5EF7] px-3 py-2.5 text-[15px] font-semibold text-white shadow-[0_6px_14px_rgba(108,71,255,0.16)] transition duration-200 hover:-translate-y-px hover:border-[#B8A6FF] hover:shadow-[0_10px_18px_rgba(108,71,255,0.24)] focus:outline-none focus:ring-2 focus:ring-[#8B5CF6]/35 focus:ring-offset-2 focus:ring-offset-white dark:border-[#6D5EF7]/35 dark:shadow-[0_8px_18px_rgba(76,29,149,0.24)] dark:hover:border-[#8A74FF]/45 dark:hover:shadow-[0_12px_22px_rgba(76,29,149,0.32)] dark:focus:ring-offset-zinc-900"
                 >
-                  Upgrade plan
+                  <span
+                    aria-hidden
+                    className="absolute inset-x-3 top-0 h-px bg-white/45 transition-opacity duration-200 group-hover:opacity-70"
+                  />
+                  <Sparkles className="relative z-10 h-4 w-4 text-white/90" aria-hidden />
+                  <span className="relative z-10">Upgrade plan</span>
                 </button>
               ) : null}
               <button
@@ -345,6 +385,42 @@ export default function SettingsMenu({
             </div>
 
             <div className="border-t border-[#E6EBF2] pt-2 dark:border-zinc-700">
+              <div className="px-3 py-2">
+                <div className="relative grid h-10 w-full grid-cols-2 gap-1 rounded-lg border border-gray-300 bg-white p-1 dark:border-zinc-700 dark:bg-zinc-900">
+                    <span
+                      aria-hidden
+                      className={`absolute inset-y-1 left-1 w-[calc(50%-6px)] rounded-md bg-[#1F2937] shadow-sm transition-transform dark:bg-white ${
+                        theme === "dark" ? "translate-x-[calc(100%+4px)]" : "translate-x-0"
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => applyTheme("light")}
+                      aria-pressed={theme === "light"}
+                      className={`relative z-10 flex min-w-0 items-center justify-center gap-1.5 rounded-md px-1.5 py-2 text-sm font-medium leading-none transition ${
+                        theme === "light"
+                          ? "text-white dark:text-zinc-950"
+                          : "text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                      }`}
+                    >
+                      <Sun className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                      <span className="truncate">Light</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => applyTheme("dark")}
+                      aria-pressed={theme === "dark"}
+                      className={`relative z-10 flex min-w-0 items-center justify-center gap-1.5 rounded-md px-1.5 py-2 text-sm font-medium leading-none transition ${
+                        theme === "dark"
+                          ? "text-white dark:text-zinc-950"
+                          : "text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                      }`}
+                    >
+                      <Moon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                      <span className="truncate">Dark</span>
+                    </button>
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={handleSignOut}
@@ -358,6 +434,26 @@ export default function SettingsMenu({
             </div>
         </div>
       </div>
-    </div>
+      </div>
+      {billingPortalPending && typeof document !== "undefined"
+        ? createPortal(
+          <div className="pointer-events-none fixed inset-0 z-[1200]">
+            <div className="absolute inset-0 bg-white dark:bg-[#0F1117]" />
+            <div className="relative flex min-h-screen items-center justify-center px-6 py-10">
+              <div className="pointer-events-none flex flex-col items-center text-center">
+                <div
+                  className="h-14 w-14 animate-spin rounded-full border-[5px] border-[#D9CCFF] border-t-[#6C47FF]"
+                  aria-hidden
+                />
+                <p className="mt-5 text-[24px] font-semibold tracking-tight text-slate-900 dark:text-zinc-100 sm:text-[28px]">
+                  Opening Billing Portal...
+                </p>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )
+        : null}
+    </>
   );
 }

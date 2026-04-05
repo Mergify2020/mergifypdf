@@ -45,6 +45,7 @@ import {
 	  Pencil,
 	  PencilLine,
 	  RotateCcw,
+	  RotateCw,
 	  Move,
 	  ChevronUp,
   ChevronDown,
@@ -61,8 +62,8 @@ import {
   Pipette,
   PanelRightClose,
   PanelRightOpen,
-  Expand,
-  Shrink,
+  Maximize2,
+  Minimize2,
   ZoomIn,
   ZoomOut,
   Search,
@@ -1630,6 +1631,7 @@ function SortableThumb({
   onSelect,
   onMoveUp,
   onMoveDown,
+  onDuplicate,
   onRotate,
   onDelete,
   disableMoveDown,
@@ -1642,6 +1644,7 @@ function SortableThumb({
   onSelect: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
+  onDuplicate: () => void;
   onRotate: () => void;
   onDelete: () => void;
   disableMoveDown: boolean;
@@ -1653,7 +1656,7 @@ function SortableThumb({
   });
 
   const style = {
-    transform: CSS.Transform.toString(transform ? { ...transform, x: 0 } : null),
+    transform: CSS.Transform.toString(transform ? { ...transform, x: 0, scaleX: 1, scaleY: 1 } : null),
     transition,
     cursor: "default",
   };
@@ -1669,7 +1672,7 @@ function SortableThumb({
   const thumbSrc = item.thumb || TRANSPARENT_PIXEL;
   const thumbVisible = Boolean(item.thumb);
 
-	  return (
+	return (
 	    <li
         ref={(node) => {
           setNodeRef(node);
@@ -1677,7 +1680,7 @@ function SortableThumb({
         }}
         data-thumb-id={item.id}
         style={style}
-        className="flex w-full justify-center"
+        className="group relative flex w-full justify-center"
         {...attributes}
       >
 	      <div
@@ -1690,15 +1693,15 @@ function SortableThumb({
             onSelect();
           }
         }}
-	        className="group relative w-full cursor-pointer select-none"
-          style={{ maxWidth: `${thumbMaxWidth}px` }}
+	        className="relative shrink-0 cursor-pointer select-none"
+          style={{ width: `${thumbMaxWidth}px`, maxWidth: "100%" }}
 	        {...listeners}
 	      >
-	        <div className="relative w-full overflow-visible" style={{ paddingBottom: getAspectPadding(frameWidth, frameHeight) }}>
+	        <div className="relative w-full" style={{ paddingBottom: getAspectPadding(frameWidth, frameHeight) }}>
 	          <div
-	            className={`absolute inset-0 flex items-center justify-center overflow-hidden rounded-none border bg-white shadow-[0_6px_16px_rgba(15,23,42,0.08)] transition ${
+	            className={`absolute inset-0 flex items-center justify-center overflow-hidden rounded-none border bg-white transition ${
 		              selected
-		                ? "border-2 border-[#6D28D9] shadow-[0_8px_20px_rgba(15,23,42,0.10)]"
+		                ? "border-2 border-[#6D28D9]"
 		                : "border-2 border-slate-300 hover:border-slate-400"
 		            }`}
 	          >
@@ -1733,67 +1736,78 @@ function SortableThumb({
               />
             </div>
 	          </div>
-	          <div className="pointer-events-none absolute right-0 top-1/2 z-20 flex translate-x-1/2 -translate-y-1/2 justify-center opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
-	            <div
-                className={`flex flex-col items-center justify-center gap-1 rounded-xl border bg-white/98 px-1.5 py-2 shadow-[0_10px_24px_rgba(15,23,42,0.14)] ${
-                  selected ? "border-[#6D28D9]" : "border-slate-300"
-                }`}
-              >
-	              <button
-	                type="button"
-	                onPointerDown={(event) => event.stopPropagation()}
-	                onClick={(event) => {
-	                  event.stopPropagation();
-	                  onMoveUp();
-	                }}
-	                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-200 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
-	                aria-label="Move page up"
-	                disabled={index === 0}
-	              >
-	                <ChevronUp className="h-4 w-4" aria-hidden />
-	              </button>
-	              <div className="h-px w-5 bg-slate-300" aria-hidden />
-	              <button
-	                type="button"
-	                onPointerDown={(event) => event.stopPropagation()}
-	                onClick={(event) => {
-	                  event.stopPropagation();
-	                  onMoveDown();
-	                }}
-	                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-200 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
-	                aria-label="Move page down"
-	                disabled={disableMoveDown}
-	              >
-	                <ChevronDown className="h-4 w-4" aria-hidden />
-	              </button>
-	              <div className="h-px w-5 bg-slate-300" aria-hidden />
-	              <button
-	                type="button"
-	                onPointerDown={(event) => event.stopPropagation()}
-	                onClick={(event) => {
-	                  event.stopPropagation();
-	                  onDelete();
-	                }}
-	                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-rose-600 transition hover:bg-rose-100 hover:text-rose-700"
-	                aria-label="Delete page"
-	              >
-	                <Trash2 className="h-4 w-4" aria-hidden />
-	              </button>
-	              <div className="h-px w-5 bg-slate-300" aria-hidden />
-	              <button
-	                type="button"
-	                onPointerDown={(event) => event.stopPropagation()}
-	                onClick={(event) => {
-	                  event.stopPropagation();
-	                  onRotate();
-	                }}
-	                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-200 hover:text-slate-950"
-	                aria-label="Rotate page"
-	              >
-	                <RotateCcw className="h-4 w-4" aria-hidden />
-	              </button>
-	            </div>
-	          </div>
+	        </div>
+	      </div>
+	      <div className="pointer-events-none absolute inset-x-0 bottom-3 z-20 flex justify-center opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100">
+	        <div
+            className="flex items-center justify-center gap-1 rounded-xl border border-slate-300/90 bg-white/96 px-2 py-1.5 shadow-[0_8px_18px_rgba(15,23,42,0.10)] backdrop-blur-sm"
+          >
+	          <button
+	            type="button"
+	            onPointerDown={(event) => event.stopPropagation()}
+	            onClick={(event) => {
+	              event.stopPropagation();
+	              onMoveUp();
+	            }}
+	            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
+	            aria-label="Move page up"
+	            disabled={index === 0}
+	          >
+	            <ChevronUp className="h-4 w-4" aria-hidden />
+	          </button>
+	          <div className="h-5 w-px bg-slate-200" aria-hidden />
+	          <button
+	            type="button"
+	            onPointerDown={(event) => event.stopPropagation()}
+	            onClick={(event) => {
+	              event.stopPropagation();
+	              onMoveDown();
+	            }}
+	            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
+	            aria-label="Move page down"
+	            disabled={disableMoveDown}
+	          >
+	            <ChevronDown className="h-4 w-4" aria-hidden />
+	          </button>
+	          <div className="h-5 w-px bg-slate-200" aria-hidden />
+	          <button
+	            type="button"
+	            onPointerDown={(event) => event.stopPropagation()}
+	            onClick={(event) => {
+	              event.stopPropagation();
+	              onRotate();
+	            }}
+	            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-950"
+	            aria-label="Rotate page"
+	          >
+	            <RotateCw className="h-4 w-4" aria-hidden />
+	          </button>
+	          <div className="h-5 w-px bg-slate-200" aria-hidden />
+	          <button
+	            type="button"
+	            onPointerDown={(event) => event.stopPropagation()}
+	            onClick={(event) => {
+	              event.stopPropagation();
+	              onDuplicate();
+	            }}
+	            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-950"
+	            aria-label="Duplicate page"
+	          >
+	            <Copy className="h-4 w-4" aria-hidden />
+	          </button>
+	          <div className="h-5 w-px bg-slate-200" aria-hidden />
+            <button
+              type="button"
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+                onDelete();
+              }}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-rose-600 transition hover:bg-rose-100 hover:text-rose-700"
+              aria-label="Delete page"
+            >
+              <Trash2 className="h-4 w-4" aria-hidden />
+            </button>
 	        </div>
 	      </div>
 	    </li>
@@ -1941,7 +1955,7 @@ function WorkspaceClient() {
   const [activeSearchResultIndex, setActiveSearchResultIndex] = useState(0);
   const [pageActionMenuId, setPageActionMenuId] = useState<string | null>(null);
 		  const [shouldCenterOnChange, setShouldCenterOnChange] = useState(false);
-		  const [zoomPercent, setZoomPercent] = useState(100);
+		  const [zoomPercent, setZoomPercent] = useState(50);
 		  const [baseScale, setBaseScale] = useState(PT_TO_PX);
 		  const [userAdjustedZoom, setUserAdjustedZoom] = useState(false);
 		  // 100% = true document scale (1pt = 1/72in).
@@ -2167,11 +2181,18 @@ const [listType, setListType] = useState<"bullet" | "number" | null>(null);
   const [textTransform, setTextTransform] = useState<"none" | "uppercase">("none");
   const [textAlign, setTextAlign] = useState<"left" | "center" | "right" | "justify">("left");
   const [textSizeInput, setTextSizeInput] = useState<string>(`${DEFAULT_TEXT_SIZE_PT}`);
-  const [toolbarTooltip, setToolbarTooltip] = useState<{ label: string; x: number; y: number; visible: boolean }>({
+  const [toolbarTooltip, setToolbarTooltip] = useState<{
+    label: string;
+    x: number;
+    y: number;
+    visible: boolean;
+    placement: "below" | "right" | "left";
+  }>({
     label: "",
     x: 0,
     y: 0,
     visible: false,
+    placement: "below",
   });
   const toolbarTooltipTargetRef = useRef<HTMLElement | null>(null);
   const toolbarTooltipTimeoutRef = useRef<number | null>(null);
@@ -3773,6 +3794,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   const [projectNameDraft, setProjectNameDraft] = useState("Untitled Project");
   const [projectNameError, setProjectNameError] = useState<string | null>(null);
   const [organizeMode, setOrganizeMode] = useState(false);
+  const [viewerViewportWidth, setViewerViewportWidth] = useState(0);
 
   const addInputRef = useRef<HTMLInputElement>(null);
   const renderedSourcesRef = useRef(0);
@@ -4086,12 +4108,16 @@ const timer =
 	  const toolButtonActive =
 	    "border-transparent bg-[#024d7c] text-white shadow-md shadow-[#012a44]/25 hover:bg-[#013d63] hover:shadow-md";
   const toolRailButtonBase =
-    "relative inline-flex h-9 w-9 items-center justify-center rounded-lg transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#009DFD]/25 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed";
+    "relative flex h-9 w-full items-center justify-center text-slate-600 transition-[color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#009DFD]/25 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed";
   const toolRailButtonInactive =
-    "bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900";
+    "hover:text-slate-900";
   const toolRailButtonActive =
-    "bg-slate-100 text-slate-900 shadow-[inset_0_0_0_1px_rgba(148,163,184,0.18)]";
+    "text-[#5B38E6]";
+  const toolRailInnerBase = "flex h-9 w-9 items-center justify-center";
+  const toolRailInnerInactive = "rounded-lg hover:bg-slate-200";
+  const toolRailInnerActive = "rounded-lg border border-[#E9D5FF] bg-[#F1EBFF] text-[#5B38E6] shadow-[inset_0_0_0_1px_rgba(108,71,255,0.10)]";
   const toolbarLoading = loading || !sourcesHydrated;
+  const searchPopupRightOffset = showPageOrderPanel ? 40 : -232;
   const controlButtonClass =
     "flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,0.08)] transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-40";
   const bottomBarButtonClass =
@@ -4105,6 +4131,10 @@ const timer =
   const textOptionButtonHover = "hover:bg-slate-100 hover:text-slate-900";
   const textOptionButtonActive = "bg-slate-100 text-slate-900 hover:bg-slate-100 hover:text-slate-900";
   const textInputPill = "inline-flex h-9 items-center gap-1 pl-0 pr-2 text-sm font-semibold text-slate-800";
+  const viewerRailButtonClass =
+    "inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-transparent bg-transparent text-slate-600 transition-colors duration-200 ease-out hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 disabled:cursor-default disabled:opacity-40";
+  const studioChromeIconButtonClass =
+    "inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg border border-transparent bg-transparent text-slate-600 transition-colors duration-200 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-40";
   const LineSpacingIcon = ({ className }: { className?: string }) => (
     <svg
       className={className}
@@ -5497,6 +5527,29 @@ const timer =
     const idx = activePageIndexState >= 0 && activePageIndexState < pages.length ? activePageIndexState : 0;
     setPageNumberDraft(String(idx + 1));
   }, [activePageIndexState, pages.length]);
+
+  useEffect(() => {
+    if (!showPageOrderPanel) return;
+    if (!activePageId) return;
+    const container = thumbsScrollRef.current;
+    const node = thumbNodeMapRef.current.get(activePageId);
+    if (!container || !node) return;
+
+    const containerTop = container.scrollTop;
+    const containerBottom = containerTop + container.clientHeight;
+    const nodeTop = node.offsetTop;
+    const nodeBottom = nodeTop + node.offsetHeight;
+
+    if (nodeTop >= containerTop && nodeBottom <= containerBottom) return;
+
+    const centeredTop = nodeTop - (container.clientHeight - node.offsetHeight) / 2;
+    const maxTop = Math.max(0, container.scrollHeight - container.clientHeight);
+    container.scrollTo({
+      top: clamp(centeredTop, 0, maxTop),
+      behavior: "auto",
+    });
+  }, [activePageId, showPageOrderPanel]);
+
   useEffect(() => {
     if (!recentInsertedPageId) return;
     const timer = setTimeout(() => setRecentInsertedPageId(null), 220);
@@ -5610,10 +5663,8 @@ const timer =
     if (activePageIdRef.current !== nextId || activePageIndexRef.current !== closestIndex) {
       activePageIdRef.current = nextId;
       activePageIndexRef.current = closestIndex;
-      startTransition(() => {
-        setActivePageId(nextId);
-        setActivePageIndex(closestIndex);
-      });
+      setActivePageId(nextId);
+      setActivePageIndex(closestIndex);
     }
   }, [setActivePageId, setActivePageIndex]);
 
@@ -6199,14 +6250,17 @@ const timer =
   }
 
   function handleSelectPage(index: number, scrollBehavior: ScrollBehavior = "smooth") {
-    setActivePageIndex(index);
-    pageChangeScrollBehaviorRef.current = scrollBehavior;
-    setShouldCenterOnChange(true);
     const page = pages[index];
     if (page) {
+      // Keep refs in sync immediately so rapid keyboard stepping stays responsive.
+      activePageIndexRef.current = index;
+      activePageIdRef.current = page.id;
       pageNavigationLockRef.current = { until: Date.now() + 700, targetId: page.id };
       setActivePageId(page.id);
     }
+    setActivePageIndex(index);
+    pageChangeScrollBehaviorRef.current = scrollBehavior;
+    setShouldCenterOnChange(true);
   }
 
   async function handleSearchSubmit(queryOverride?: string) {
@@ -6558,6 +6612,10 @@ const timer =
     const fittedWidth = rotated ? contentHeight : contentWidth;
     const fittedHeight = rotated ? contentWidth : contentHeight;
     const displayHeight = fittedHeight;
+    const headerLaneWidth = Math.min(
+      fittedWidth,
+      Math.max(260, (viewerViewportWidth || fittedWidth) - 48),
+    );
     const clipped = false;
     const rotationTransform =
       rotationDegrees === 90
@@ -6570,13 +6628,13 @@ const timer =
     return (
       <div
         key={page.id}
-        className={`mx-auto w-fit ${
+        className={`w-full ${
           recentInsertedPageId === page.id
             ? "opacity-0 scale-[0.98] animate-[page-enter_0.15s_ease-out_forwards]"
             : "opacity-100"
         }`}
       >
-        <div className="mx-auto mb-2 flex items-center" style={{ width: fittedWidth }}>
+        <div className="sticky left-0 z-20 mx-auto mb-2 flex items-center px-6" style={{ width: headerLaneWidth }}>
           <div className="w-24 text-lg font-semibold text-slate-500">#{idx + 1}</div>
           <div className="flex flex-1 justify-center">
             <div className="group relative">
@@ -6592,8 +6650,11 @@ const timer =
                 <Plus className="h-6 w-6" />
                 <span className="sr-only">Add blank page</span>
               </button>
-              <div className="pointer-events-none absolute left-1/2 top-full z-40 mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
-                Add blank page
+              <div className="pointer-events-none absolute left-1/2 top-full z-40 mt-2 -translate-x-1/2 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+                <div className="workspace-tooltip relative">
+                  Add blank page
+                  <span aria-hidden className="workspace-tooltip-arrow-top" />
+                </div>
               </div>
             </div>
           </div>
@@ -6660,65 +6721,64 @@ const timer =
             ) : null}
           </div>
         </div>
-        <div
-          data-page-id={page.id}
-          ref={registerPreviewRef(page.id)}
-          className={`relative bg-white shadow-[0_8px_22px_rgba(15,23,42,0.10)] transition ${
-            idx === activePageIndex ? "shadow-[0_10px_26px_rgba(15,23,42,0.14)]" : ""
-          }`}
-          style={{
-            width: fittedWidth,
-            height: displayHeight,
-            overflow: undefined,
-          }}
-          onClick={(event) => {
-            if (activeDrawingTool || deleteMode) {
-              event.stopPropagation();
-              return;
-            }
-            handleSelectPage(idx);
-          }}
-        >
+        <div className="mx-auto w-fit">
           <div
-            className="absolute inset-0 flex items-start justify-center overflow-visible"
-            style={{ width: "100%", height: "100%" }}
+            data-page-id={page.id}
+            ref={registerPreviewRef(page.id)}
+            className="relative bg-white transition"
+            style={{
+              width: fittedWidth,
+              height: displayHeight,
+              overflow: undefined,
+            }}
+            onClick={(event) => {
+              if (activeDrawingTool || deleteMode) {
+                event.stopPropagation();
+                return;
+              }
+              handleSelectPage(idx);
+            }}
           >
             <div
-	              className="absolute left-0 top-0 bg-white"
-	              style={{
-	                width: contentWidth,
-	                height: contentHeight,
-	                transform: rotationTransform,
-	                transformOrigin: "top left",
-	                cursor: deleteMode
-	                  ? ("url('/icons/eraser.svg') 4 4, auto" as CSSProperties["cursor"])
-	                  : activeDrawingTool === "highlight"
-	                    ? (`url(${HIGHLIGHT_CURSOR}) 4 24, crosshair` as CSSProperties["cursor"])
-	                    : activeDrawingTool === "shape"
-	                      ? ("crosshair" as CSSProperties["cursor"])
-	                    : activeDrawingTool === "pen"
-	                      ? ("crosshair" as CSSProperties["cursor"])
-	                      : activeDrawingTool === "text"
-	                        ? ("text" as CSSProperties["cursor"])
-	                        : undefined,
-	              }}
-              onPointerDown={(event) => {
-                if (deleteMode) {
-                  setIsErasing(true);
-                  event.preventDefault();
-                }
-                handleMarkupPointerDown(page.id, event);
-              }}
-              onPointerMove={(event) => handleMarkupPointerMove(page.id, event)}
-              onPointerUp={() => {
-                setIsErasing(false);
-                handleMarkupPointerUp(page.id);
-              }}
-              onPointerCancel={() => {
-                setIsErasing(false);
-                handleMarkupPointerUp(page.id);
-              }}
+              className="absolute inset-0 flex items-start justify-center overflow-visible"
+              style={{ width: "100%", height: "100%" }}
             >
+              <div
+	                className="absolute left-0 top-0 bg-white"
+	                style={{
+	                  width: contentWidth,
+	                  height: contentHeight,
+	                  transform: rotationTransform,
+	                  transformOrigin: "top left",
+	                  cursor: deleteMode
+	                    ? ("url('/icons/eraser.svg') 4 4, auto" as CSSProperties["cursor"])
+	                    : activeDrawingTool === "highlight"
+	                      ? (`url(${HIGHLIGHT_CURSOR}) 4 24, crosshair` as CSSProperties["cursor"])
+	                      : activeDrawingTool === "shape"
+	                        ? ("crosshair" as CSSProperties["cursor"])
+	                        : activeDrawingTool === "pen"
+	                          ? ("crosshair" as CSSProperties["cursor"])
+	                          : activeDrawingTool === "text"
+	                            ? ("text" as CSSProperties["cursor"])
+	                            : undefined,
+	                }}
+                onPointerDown={(event) => {
+                  if (deleteMode) {
+                    setIsErasing(true);
+                    event.preventDefault();
+                  }
+                  handleMarkupPointerDown(page.id, event);
+                }}
+                onPointerMove={(event) => handleMarkupPointerMove(page.id, event)}
+                onPointerUp={() => {
+                  setIsErasing(false);
+                  handleMarkupPointerUp(page.id);
+                }}
+                onPointerCancel={() => {
+                  setIsErasing(false);
+                  handleMarkupPointerUp(page.id);
+                }}
+              >
               <div className="absolute inset-0 bg-white" aria-hidden />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -7675,6 +7735,7 @@ const timer =
             </div>
           </div>
         </div>
+        </div>
         {idx === pages.length - 1 ? (
           <div className="mx-auto mt-2 flex items-center justify-center" style={{ width: fittedWidth }}>
             <div className="group relative">
@@ -7690,8 +7751,11 @@ const timer =
                 <Plus className="h-6 w-6" />
                 <span className="sr-only">Add blank page</span>
               </button>
-              <div className="pointer-events-none absolute left-1/2 bottom-full z-40 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
-                Add blank page
+              <div className="pointer-events-none absolute left-1/2 bottom-full z-40 mb-2 -translate-x-1/2 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+                <div className="workspace-tooltip relative">
+                  Add blank page
+                  <span aria-hidden className="workspace-tooltip-arrow" />
+                </div>
               </div>
             </div>
           </div>
@@ -8734,14 +8798,20 @@ const timer =
     },
     [activeTextSize, applyFontSizeDeltaToSelection, applyTextSize, focusedTextId]
   );
-  const showToolbarTooltip = useCallback((label: string, target: HTMLElement) => {
+  const showToolbarTooltip = useCallback((label: string, target: HTMLElement, placement: "below" | "right" | "left" = "below") => {
     if (label === "Font" && fontMenuOpen) return;
     if (label === "Align" && alignMenuOpen) return;
     if (label === "Line spacing" && lineSpacingMenuOpen) return;
     if (label === "Line style" && (lineStyleMenuOpen || shapeLineStyleMenuOpen)) return;
     const rect = target.getBoundingClientRect();
     const toolbarRect = target.closest("[data-text-toolbar]")?.getBoundingClientRect();
-    const baseY = toolbarRect ? toolbarRect.bottom - 6 : rect.bottom - 6;
+    const x =
+      placement === "right"
+        ? rect.right + 8
+        : placement === "left"
+          ? rect.left - 8
+          : rect.left + rect.width / 2;
+    const y = placement === "below" ? (toolbarRect ? toolbarRect.bottom + 2 : rect.bottom + 2) : rect.top + rect.height / 2;
     toolbarTooltipTargetRef.current = target;
     if (toolbarTooltipTimeoutRef.current !== null) {
       window.clearTimeout(toolbarTooltipTimeoutRef.current);
@@ -8749,9 +8819,10 @@ const timer =
     toolbarTooltipTimeoutRef.current = window.setTimeout(() => {
       setToolbarTooltip({
         label,
-        x: rect.left + rect.width / 2,
-        y: baseY + 8,
+        x,
+        y,
         visible: true,
+        placement,
       });
       toolbarTooltipTimeoutRef.current = null;
     }, 500);
@@ -8846,7 +8917,16 @@ const timer =
       const rect = target.getBoundingClientRect();
       setToolbarTooltip((prev) =>
         prev.visible
-          ? { ...prev, x: rect.left + rect.width / 2, y: rect.bottom + 8 }
+          ? {
+              ...prev,
+              x:
+                prev.placement === "right"
+                  ? rect.right + 8
+                  : prev.placement === "left"
+                    ? rect.left - 8
+                    : rect.left + rect.width / 2,
+              y: prev.placement === "below" ? rect.bottom + 2 : rect.top + rect.height / 2,
+            }
           : prev
       );
     };
@@ -9056,10 +9136,11 @@ const timer =
       draftHighlight,
     ]);
 
-	  const computeBaseScale = useCallback(() => {
+  const computeBaseScale = useCallback(() => {
 	    const container = previewContainerRef.current;
 	    const pageList = pagesRef.current;
 	    if (!container || pageList.length === 0) return;
+      setViewerViewportWidth((prev) => (prev === container.clientWidth ? prev : container.clientWidth));
 	    const targetIndex = activePageIndexRef.current >= 0 ? activePageIndexRef.current : 0;
 	    const targetPage = pageList[targetIndex] ?? pageList[0];
 	    const naturalWidth = targetPage?.width || 612;
@@ -9069,18 +9150,20 @@ const timer =
 		    const baseWidth = naturalWidth;
 		    const baseHeight = naturalHeight;
 
-		    const fitPadding = 0.98; // breathing room around the page
-		    const horizontalGutter = 72; // ~36px per side
-		    const verticalGutter = 40; // slight top/bottom breathing room
+		    const fitPadding = 0.9; // keep stronger breathing room on first open
+		    const horizontalGutter = 120; // leave more room beside the page
+		    const verticalGutter = 96; // leave clearer room above/below the page
 
 		    const availableWidth = Math.max(container.clientWidth - horizontalGutter, 200);
 		    const availableHeight = Math.max(container.clientHeight - verticalGutter, 200);
 
 		    const documentScale = PT_TO_PX;
-		    // Default zoom: fit-to-width (still leaving side space).
 		    const fitWidthScale = Math.max(0.2, (availableWidth / baseWidth) * fitPadding);
+		    const fitHeightScale = Math.max(0.2, (availableHeight / baseHeight) * fitPadding);
+		    // Default zoom: fit the page within the visible workspace, not just to width.
+		    const fitScale = Math.min(fitWidthScale, fitHeightScale);
 		    const desiredZoomPercent = clamp(
-		      Math.round((fitWidthScale / documentScale) * 100),
+		      Math.round((fitScale / documentScale) * 100),
 		      ZOOM_MIN_PERCENT,
 		      ZOOM_MAX_PERCENT,
 		    );
@@ -9120,6 +9203,10 @@ const timer =
 
   useEffect(() => {
     function handleResize() {
+      const container = previewContainerRef.current;
+      if (container) {
+        setViewerViewportWidth((prev) => (prev === container.clientWidth ? prev : container.clientWidth));
+      }
       if (userAdjustedZoom) return; // keep user-chosen zoom steady across resizes
       computeBaseScale();
     }
@@ -9127,8 +9214,8 @@ const timer =
     return () => window.removeEventListener("resize", handleResize);
   }, [computeBaseScale, userAdjustedZoom]);
 
-	  const setZoomWithScrollPreserved = useCallback(
-	    (nextPercent: number) => {
+  const setZoomWithScrollPreserved = useCallback(
+    (nextPercent: number) => {
 	      const clamped = clamp(nextPercent, ZOOM_MIN_PERCENT, ZOOM_MAX_PERCENT);
 	      const container = previewContainerRef.current;
 	      if (container) {
@@ -9146,9 +9233,76 @@ const timer =
 	      setUserAdjustedZoom(true);
 	      restoreScrollOnNextZoomRef.current = true;
 	      setZoomPercent(clamped);
-	    },
-	    []
-	  );
+    },
+    []
+  );
+
+  useEffect(() => {
+    const handleZoomShortcut = (event: KeyboardEvent) => {
+      if (pages.length === 0) return;
+      if (event.defaultPrevented) return;
+      if (!event.ctrlKey && !event.metaKey) return;
+      if (event.altKey) return;
+
+      const key = event.key;
+      const code = event.code;
+      const isZoomIn =
+        key === "+" || key === "=" || code === "NumpadAdd";
+      const isZoomOut =
+        key === "-" || key === "_" || code === "NumpadSubtract";
+
+      if (!isZoomIn && !isZoomOut) return;
+
+      event.preventDefault();
+      setZoomWithScrollPreserved(
+        zoomPercent + (isZoomIn ? ZOOM_STEP_PERCENT : -ZOOM_STEP_PERCENT),
+      );
+    };
+
+    window.addEventListener("keydown", handleZoomShortcut, { passive: false });
+    return () => {
+      window.removeEventListener("keydown", handleZoomShortcut);
+    };
+  }, [pages.length, setZoomWithScrollPreserved, zoomPercent]);
+
+  useEffect(() => {
+    const handlePageShortcut = (event: KeyboardEvent) => {
+      if (isBrowserFullscreen) return;
+      if (pages.length === 0) return;
+      if (event.defaultPrevented) return;
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+
+      const target = event.target;
+      if (target instanceof HTMLElement) {
+        const tagName = target.tagName;
+        if (
+          target.isContentEditable ||
+          tagName === "INPUT" ||
+          tagName === "TEXTAREA" ||
+          tagName === "SELECT" ||
+          target.closest("[contenteditable='true']")
+        ) {
+          return;
+        }
+      }
+
+      if (event.key === "ArrowUp" || event.key === "ArrowLeft") {
+        event.preventDefault();
+        handlePageStep(-1);
+        return;
+      }
+
+      if (event.key === "ArrowDown" || event.key === "ArrowRight") {
+        event.preventDefault();
+        handlePageStep(1);
+      }
+    };
+
+    window.addEventListener("keydown", handlePageShortcut, { passive: false });
+    return () => {
+      window.removeEventListener("keydown", handlePageShortcut);
+    };
+  }, [activePageId, isBrowserFullscreen, pages]);
 
   useEffect(() => {
     const container = previewContainerRef.current;
@@ -9554,8 +9708,10 @@ const timer =
   function handlePageStep(direction: 1 | -1) {
     if (isLoadingPages) return;
     if (pages.length === 0) return;
-    let currentIndex = pages.findIndex((p) => p.id === activePageId);
-    if (currentIndex === -1) currentIndex = 0;
+    const currentIndex =
+      activePageIndexRef.current >= 0 && activePageIndexRef.current < pages.length
+        ? activePageIndexRef.current
+        : 0;
     const nextIndex = Math.min(
       pages.length - 1,
       Math.max(0, currentIndex + direction)
@@ -10756,6 +10912,7 @@ const timer =
       const target = event.target as Node;
       if (searchPanelRef.current?.contains(target)) return;
       if (searchButtonRef.current?.contains(target)) return;
+      if (target instanceof Element && target.closest("[data-preserve-search-open='true']")) return;
       setSearchOpen(false);
     };
     const handleEscape = (event: KeyboardEvent) => {
@@ -11454,14 +11611,14 @@ const timer =
         startupOverlayVariant === "existing" ? (
           <div className="fixed inset-0 z-[120] flex items-center justify-center bg-white opacity-0 animate-[mpdf-startup-overlay-fade_0.24s_ease-out_forwards]">
             <div className="pointer-events-none flex flex-col items-center text-center">
-              <p className="text-[24px] font-semibold tracking-tight text-slate-900 sm:text-[28px]">
-                Opening workspace...
-              </p>
               <div
-                className="mt-5 h-10 w-10 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700"
+                className="h-10 w-10 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700"
                 aria-hidden
               />
-              <span className="sr-only">Opening workspace</span>
+              <p className="mt-5 text-[24px] font-semibold tracking-tight text-slate-900 sm:text-[28px]">
+                Opening Workspace...
+              </p>
+              <span className="sr-only">Opening Workspace</span>
             </div>
           </div>
         ) : (
@@ -11568,7 +11725,7 @@ const timer =
                       setProjectNameError(null);
                       setProjectNameEditing(true);
                     }}
-                    className="group inline-flex min-w-0 max-w-full items-center justify-center gap-2 text-center text-sm font-semibold text-slate-900 outline-none transition hover:text-slate-950 focus-visible:ring-2 focus-visible:ring-slate-300/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+                    className="group inline-flex min-w-0 max-w-full cursor-pointer items-center justify-center gap-2 text-center text-sm font-semibold text-slate-900 outline-none transition-colors duration-200 hover:text-slate-950 focus-visible:ring-2 focus-visible:ring-slate-300/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
                     aria-label="Edit project name"
                   >
                     <span className="block truncate">{projectName || "Untitled project"}</span>
@@ -11579,43 +11736,120 @@ const timer =
             </div>
 
             <div className="relative z-10 flex shrink-0 items-center gap-2">
+              <div className="relative">
+                <button
+                  ref={searchButtonRef}
+                  type="button"
+                  className={`${studioChromeIconButtonClass} ${
+                    searchOpen ? "border-[#E9D5FF] bg-[#F1EBFF] text-[#5B38E6]" : ""
+                  }`}
+                  onClick={() => setSearchOpen((prev) => !prev)}
+                  disabled={pages.length === 0}
+                  aria-label="Search document"
+                  title="Search document"
+                  aria-pressed={searchOpen}
+                >
+                  <Search className="h-5 w-5" aria-hidden />
+                </button>
+                {searchOpen ? (
+                  <div
+                    className="pointer-events-none absolute top-[calc(100%+16px)] z-30 hidden lg:block"
+                    style={{ right: `${searchPopupRightOffset}px` }}
+                  >
+                    <div
+                      ref={searchPanelRef}
+                      className="pointer-events-auto flex w-[388px] items-center gap-2 rounded-md border border-slate-200/90 bg-white/96 px-3 py-2.5 shadow-[0_10px_24px_rgba(15,23,42,0.12),0_0_0_1px_rgba(15,23,42,0.04)] backdrop-blur"
+                    >
+                      <Search className="h-4 w-4 shrink-0 text-slate-600" aria-hidden />
+                      <div className="min-w-0 flex-1 border-b border-slate-300/90">
+                        <input
+                          ref={searchInputRef}
+                          value={searchQuery}
+                          onChange={(event) => setSearchQuery(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              if (event.shiftKey) {
+                                handleStepSearchResult(-1);
+                              } else if (searchResults.length > 0) {
+                                handleStepSearchResult(1);
+                              } else {
+                                void handleSearchSubmit();
+                              }
+                            }
+                          }}
+                          placeholder="Find in document"
+                          className="min-w-0 w-full bg-transparent pb-1 text-sm font-medium text-slate-900 outline-none placeholder:text-slate-500"
+                        />
+                      </div>
+                      <span className="min-w-[48px] text-right text-xs font-semibold text-slate-600">
+                        {searchBusy
+                          ? "Finding..."
+                          : searchQuery.trim()
+                            ? searchResults.length > 0
+                              ? `${activeSearchResultIndex + 1}/${searchResults.length}`
+                              : "0 results"
+                            : ""}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleStepSearchResult(-1)}
+                        disabled={searchResults.length === 0}
+                        className="inline-flex h-8 w-8 items-center justify-center text-slate-600 transition-colors duration-200 hover:text-slate-900 disabled:cursor-default disabled:opacity-35"
+                        aria-label="Previous result"
+                      >
+                        <ChevronLeft className="h-4 w-4" aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleStepSearchResult(1)}
+                        disabled={searchResults.length === 0}
+                        className="inline-flex h-8 w-8 items-center justify-center text-slate-600 transition-colors duration-200 hover:text-slate-900 disabled:cursor-default disabled:opacity-35"
+                        aria-label="Next result"
+                      >
+                        <ChevronRight className="h-4 w-4" aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSearchOpen(false)}
+                        className="inline-flex h-8 w-8 items-center justify-center text-slate-600 transition-colors duration-200 hover:text-slate-900"
+                        aria-label="Close search"
+                      >
+                        <X className="h-4 w-4" aria-hidden />
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+              <div className="h-5 w-px bg-slate-200" aria-hidden />
               <button
                 type="button"
-                className="inline-flex h-10 items-center justify-center text-sm font-semibold text-slate-700 transition hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-50"
-                onClick={() => setOrganizeMode(true)}
-                disabled={pages.length === 0 || organizeMode}
-              >
-                Manage pages
-              </button>
-              <button
-                type="button"
-                className="inline-flex h-10 w-10 items-center justify-center text-[#024d7c] transition hover:text-[#013d63] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#51bdff]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex h-10 cursor-pointer items-center gap-1.5 text-sm font-semibold tracking-[-0.01em] text-slate-700 transition-colors duration-200 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-40"
                 onClick={handleAddClick}
                 disabled={isLoadingPages}
-                aria-label="Add pages"
-                title="Add pages"
+                aria-label="Add Files"
+                title="Add Files"
               >
-                <FileUp className="h-5 w-5" aria-hidden />
-              </button>
-              <div className="h-5 w-px bg-slate-200" aria-hidden />
-              <button
-                ref={searchButtonRef}
-                type="button"
-                className={`inline-flex h-10 w-10 items-center justify-center transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#51bdff]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-40 ${
-                  searchOpen ? "text-[#7C5CFA]" : "text-[#024d7c] hover:text-[#013d63]"
-                }`}
-                onClick={() => setSearchOpen((prev) => !prev)}
-                disabled={pages.length === 0}
-                aria-label="Search document"
-                title="Search document"
-                aria-pressed={searchOpen}
-              >
-                <Search className="h-5 w-5" aria-hidden />
+                <Plus className="h-4 w-4 shrink-0 stroke-[2.4]" aria-hidden />
+                <span>Add Files</span>
               </button>
               <div className="h-5 w-px bg-slate-200" aria-hidden />
               <button
                 type="button"
-                className="inline-flex h-10 w-10 items-center justify-center text-[#024d7c] transition hover:text-[#013d63] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#51bdff]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-40"
+                className={studioChromeIconButtonClass}
+                onClick={() => void toggleBrowserFullscreen()}
+                aria-label={isBrowserFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                title={isBrowserFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+              >
+                {isBrowserFullscreen ? (
+                  <Minimize2 className="h-5 w-5" aria-hidden />
+                ) : (
+                  <Maximize2 className="h-5 w-5" aria-hidden />
+                )}
+              </button>
+              <button
+                type="button"
+                className={studioChromeIconButtonClass}
                 onClick={() => void handlePrint()}
                 disabled={printDisabled}
                 aria-label={isPrinting ? "Opening printable PDF" : "Print pages"}
@@ -11625,7 +11859,7 @@ const timer =
               </button>
               <button
                 type="button"
-                className="inline-flex h-10 w-10 items-center justify-center text-[#024d7c] transition hover:text-[#013d63] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#51bdff]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-40"
+                className={studioChromeIconButtonClass}
                 onClick={() => handleDownload()}
                 disabled={downloadDisabled}
                 aria-label={busy ? "Building PDF" : "Download pages"}
@@ -11634,75 +11868,11 @@ const timer =
                 <Download className="h-5 w-5" aria-hidden />
               </button>
               <div className="flex w-12 items-center justify-center border-l border-slate-200">
-                <WorkspaceSettingsMenu />
+                <WorkspaceSettingsMenu triggerClassName="cursor-pointer border-transparent bg-transparent text-slate-600 transition-colors duration-200 hover:bg-transparent hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-slate-300/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white" />
               </div>
             </div>
           </div>
 
-          {searchOpen ? (
-            <div className="border-t border-slate-100 bg-white px-4 py-3 lg:px-6">
-              <div
-                ref={searchPanelRef}
-                className="ml-auto flex w-full max-w-md items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-[0_14px_36px_rgba(15,23,42,0.10)]"
-              >
-                <Search className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
-                <input
-                  ref={searchInputRef}
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      if (event.shiftKey) {
-                        handleStepSearchResult(-1);
-                      } else if (searchResults.length > 0) {
-                        handleStepSearchResult(1);
-                      } else {
-                        void handleSearchSubmit();
-                      }
-                    }
-                  }}
-                  placeholder="Find in document"
-                  className="min-w-0 flex-1 bg-transparent text-sm font-medium text-slate-900 outline-none placeholder:text-slate-400"
-                />
-                <span className="min-w-[56px] text-right text-xs font-semibold text-slate-500">
-                  {searchBusy
-                    ? "Finding..."
-                    : searchQuery.trim()
-                      ? searchResults.length > 0
-                        ? `${activeSearchResultIndex + 1}/${searchResults.length}`
-                        : "0 results"
-                      : ""}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => void handleSearchSubmit()}
-                  disabled={searchBusy || searchQuery.trim().length === 0}
-                  className="inline-flex h-8 items-center justify-center rounded-full border border-slate-200 px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Find
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleStepSearchResult(-1)}
-                  disabled={searchResults.length === 0}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                  aria-label="Previous result"
-                >
-                  <ChevronUp className="h-4 w-4" aria-hidden />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleStepSearchResult(1)}
-                  disabled={searchResults.length === 0}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                  aria-label="Next result"
-                >
-                  <ChevronDown className="h-4 w-4" aria-hidden />
-                </button>
-              </div>
-            </div>
-          ) : null}
 
           {projectNameError ? (
             <div className="w-full px-4 pb-3 text-sm text-rose-500 lg:px-6">
@@ -11736,8 +11906,11 @@ const timer =
 	                    >
 	                      <Undo2 className="h-5 w-5" />
 	                    </button>
-	                    <div className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100">
+	                    <div className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                        <div className="workspace-tooltip relative">
 	                      Undo
+                          <span aria-hidden className="workspace-tooltip-arrow-top" />
+                        </div>
 	                    </div>
 	                  </div>
 
@@ -11756,8 +11929,11 @@ const timer =
 	                    >
 	                      <Redo2 className="h-5 w-5" />
 	                    </button>
-	                    <div className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100">
+	                    <div className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                        <div className="workspace-tooltip relative">
 	                      Redo
+                          <span aria-hidden className="workspace-tooltip-arrow-top" />
+                        </div>
 	                    </div>
 	                  </div>
 
@@ -12087,16 +12263,15 @@ const timer =
 			                  className="editor-shell mx-auto flex h-full min-h-0 w-full flex-1 flex-col gap-6 overflow-hidden px-0"
                 >
 				                    <div className="flex h-full min-h-0 w-full items-stretch gap-0 overflow-hidden">
-                                  <aside className="toolbar-font hidden h-fit w-[58px] shrink-0 items-center self-start rounded-xl border border-slate-300/80 bg-white px-2 py-3 shadow-[0_8px_20px_rgba(15,23,42,0.06)] lg:ml-3 lg:mt-3 lg:flex lg:flex-col lg:gap-2">
-                                    <div className="flex flex-col gap-2 border-b border-slate-200/80 pb-2">
+                                  <aside className="toolbar-font hidden h-fit w-[48px] shrink-0 items-center self-start rounded-md border border-slate-300/80 bg-white px-1 py-2 shadow-[0_8px_20px_rgba(15,23,42,0.06)] lg:ml-3 lg:mr-3 lg:mt-3 lg:flex lg:flex-col lg:gap-1">
+                                    <div className="flex flex-col gap-1 border-b border-slate-200/80 pb-1">
                                       <button
                                         type="button"
                                         className={`${toolRailButtonBase} ${toolRailButtonInactive}`}
                                         disabled={loading}
                                         aria-disabled={!hasUndoHistory}
                                         aria-label="Undo"
-                                        title="Undo"
-                                        onMouseEnter={(event) => showToolbarTooltip("Undo", event.currentTarget)}
+                                        onMouseEnter={(event) => showToolbarTooltip("Undo", event.currentTarget, "right")}
                                         onMouseLeave={hideToolbarTooltip}
                                         onClick={() => {
                                           if (loading) return;
@@ -12112,8 +12287,7 @@ const timer =
                                         disabled={loading}
                                         aria-disabled={!hasRedoHistory}
                                         aria-label="Redo"
-                                        title="Redo"
-                                        onMouseEnter={(event) => showToolbarTooltip("Redo", event.currentTarget)}
+                                        onMouseEnter={(event) => showToolbarTooltip("Redo", event.currentTarget, "right")}
                                         onMouseLeave={hideToolbarTooltip}
                                         onClick={() => {
                                           if (loading) return;
@@ -12125,14 +12299,13 @@ const timer =
                                       </button>
                                     </div>
 
-                                    <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
+                                    <div className="flex min-h-0 flex-1 flex-col items-stretch gap-1 overflow-y-auto">
                                       <button
                                         type="button"
                                         disabled={toolbarLoading}
                                         aria-pressed={selectButtonOn}
                                         aria-label="Select"
-                                        title="Select"
-                                        onMouseEnter={(event) => showToolbarTooltip("Select", event.currentTarget)}
+                                        onMouseEnter={(event) => showToolbarTooltip("Select", event.currentTarget, "right")}
                                         onMouseLeave={hideToolbarTooltip}
                                         className={`${toolRailButtonBase} ${
                                           toolbarLoading || selectButtonOn ? toolRailButtonActive : toolRailButtonInactive
@@ -12153,10 +12326,11 @@ const timer =
                                           setPendingSignatureForPlacement(null);
                                         }}
                                       >
-                                        {selectButtonOn ? (
-                                          <span className="pointer-events-none absolute -left-2 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-slate-700" />
-                                        ) : null}
-                                        <MousePointer2 className="h-5 w-5 shrink-0" />
+                                        <span className={`${toolRailInnerBase} ${
+                                          selectButtonOn ? toolRailInnerActive : toolRailInnerInactive
+                                        }`}>
+                                          <MousePointer2 className="h-5 w-5 shrink-0" />
+                                        </span>
                                       </button>
 
                                       <button
@@ -12164,8 +12338,7 @@ const timer =
                                         disabled={highlightButtonDisabled}
                                         aria-pressed={textButtonOn}
                                         aria-label="Text"
-                                        title="Text"
-                                        onMouseEnter={(event) => showToolbarTooltip("Text", event.currentTarget)}
+                                        onMouseEnter={(event) => showToolbarTooltip("Text", event.currentTarget, "right")}
                                         onMouseLeave={hideToolbarTooltip}
                                         className={`${toolRailButtonBase} ${textButtonOn ? toolRailButtonActive : toolRailButtonInactive}`}
                                         onClick={() => {
@@ -12184,18 +12357,18 @@ const timer =
                                           setPendingSignatureForPlacement(null);
                                         }}
                                       >
-                                        {textButtonOn ? (
-                                          <span className="pointer-events-none absolute -left-2 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-slate-700" />
-                                        ) : null}
-                                        <Type className="h-5 w-5 shrink-0" />
+                                        <span className={`${toolRailInnerBase} ${
+                                          textButtonOn ? toolRailInnerActive : toolRailInnerInactive
+                                        }`}>
+                                          <Type className="h-5 w-5 shrink-0" />
+                                        </span>
                                       </button>
 
                                       <button
                                         type="button"
                                         disabled={loading}
                                         aria-label="Image"
-                                        title="Image"
-                                        onMouseEnter={(event) => showToolbarTooltip("Image", event.currentTarget)}
+                                        onMouseEnter={(event) => showToolbarTooltip("Image", event.currentTarget, "right")}
                                         onMouseLeave={hideToolbarTooltip}
                                         className={`${toolRailButtonBase} ${toolRailButtonInactive}`}
                                         onClick={() => {
@@ -12215,7 +12388,9 @@ const timer =
                                           handleOpenImageUpload();
                                         }}
                                       >
-                                        <ImageIcon className="h-5 w-5 shrink-0" />
+                                        <span className={`${toolRailInnerBase} ${toolRailInnerInactive}`}>
+                                          <ImageIcon className="h-5 w-5 shrink-0" />
+                                        </span>
                                       </button>
 
                                       <button
@@ -12223,8 +12398,7 @@ const timer =
                                         disabled={highlightButtonDisabled}
                                         aria-pressed={shapeButtonVisualOn}
                                         aria-label="Shapes"
-                                        title="Shapes"
-                                        onMouseEnter={(event) => showToolbarTooltip("Shapes", event.currentTarget)}
+                                        onMouseEnter={(event) => showToolbarTooltip("Shapes", event.currentTarget, "right")}
                                         onMouseLeave={hideToolbarTooltip}
                                         className={`${toolRailButtonBase} ${shapeButtonVisualOn ? toolRailButtonActive : toolRailButtonInactive}`}
                                         onClick={() => {
@@ -12245,10 +12419,11 @@ const timer =
                                           setPendingSignatureForPlacement(null);
                                         }}
                                       >
-                                        {shapeButtonVisualOn ? (
-                                          <span className="pointer-events-none absolute -left-2 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-slate-700" />
-                                        ) : null}
-                                        <Shapes className="h-5 w-5 shrink-0" />
+                                        <span className={`${toolRailInnerBase} ${
+                                          shapeButtonVisualOn ? toolRailInnerActive : toolRailInnerInactive
+                                        }`}>
+                                          <Shapes className="h-5 w-5 shrink-0" />
+                                        </span>
                                       </button>
 
                                       <button
@@ -12256,8 +12431,7 @@ const timer =
                                         disabled={highlightButtonDisabled}
                                         aria-pressed={drawButtonOn}
                                         aria-label="Draw"
-                                        title="Draw"
-                                        onMouseEnter={(event) => showToolbarTooltip("Draw", event.currentTarget)}
+                                        onMouseEnter={(event) => showToolbarTooltip("Draw", event.currentTarget, "right")}
                                         onMouseLeave={hideToolbarTooltip}
                                         className={`${toolRailButtonBase} ${drawButtonOn ? toolRailButtonActive : toolRailButtonInactive}`}
                                         onClick={() => {
@@ -12276,10 +12450,11 @@ const timer =
                                           setPendingSignatureForPlacement(null);
                                         }}
                                       >
-                                        {drawButtonOn ? (
-                                          <span className="pointer-events-none absolute -left-2 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-slate-700" />
-                                        ) : null}
-                                        <PencilLine className="h-5 w-5 shrink-0" />
+                                        <span className={`${toolRailInnerBase} ${
+                                          drawButtonOn ? toolRailInnerActive : toolRailInnerInactive
+                                        }`}>
+                                          <PencilLine className="h-5 w-5 shrink-0" />
+                                        </span>
                                       </button>
 
                                       <button
@@ -12287,8 +12462,7 @@ const timer =
                                         disabled={highlightButtonDisabled}
                                         aria-pressed={highlightButtonVisualOn}
                                         aria-label="Highlight"
-                                        title="Highlight"
-                                        onMouseEnter={(event) => showToolbarTooltip("Highlight", event.currentTarget)}
+                                        onMouseEnter={(event) => showToolbarTooltip("Highlight", event.currentTarget, "right")}
                                         onMouseLeave={hideToolbarTooltip}
                                         className={`${toolRailButtonBase} ${highlightButtonVisualOn ? toolRailButtonActive : toolRailButtonInactive}`}
                                         onClick={() => {
@@ -12307,10 +12481,11 @@ const timer =
                                           setPendingSignatureForPlacement(null);
                                         }}
                                       >
-                                        {highlightButtonVisualOn ? (
-                                          <span className="pointer-events-none absolute -left-2 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-slate-700" />
-                                        ) : null}
-                                        <Highlighter className="h-5 w-5 shrink-0" />
+                                        <span className={`${toolRailInnerBase} ${
+                                          highlightButtonVisualOn ? toolRailInnerActive : toolRailInnerInactive
+                                        }`}>
+                                          <Highlighter className="h-5 w-5 shrink-0" />
+                                        </span>
                                       </button>
 
                                       <button
@@ -12321,22 +12496,21 @@ const timer =
                                         aria-pressed={deleteMode}
                                         aria-disabled={!hasAnyAnnotations && !deleteMode}
                                         aria-label="Eraser"
-                                        title="Eraser"
-                                        onMouseEnter={(event) => showToolbarTooltip("Eraser", event.currentTarget)}
+                                        onMouseEnter={(event) => showToolbarTooltip("Eraser", event.currentTarget, "right")}
                                         onMouseLeave={hideToolbarTooltip}
                                       >
-                                        {deleteMode ? (
-                                          <span className="pointer-events-none absolute -left-2 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-slate-700" />
-                                        ) : null}
-                                        <Eraser className="h-5 w-5 shrink-0" />
+                                        <span className={`${toolRailInnerBase} ${
+                                          deleteMode ? toolRailInnerActive : toolRailInnerInactive
+                                        }`}>
+                                          <Eraser className="h-5 w-5 shrink-0" />
+                                        </span>
                                       </button>
 
                                       <button
                                         type="button"
                                         disabled={loading}
                                         aria-label="Note"
-                                        title="Note"
-                                        onMouseEnter={(event) => showToolbarTooltip("Note", event.currentTarget)}
+                                        onMouseEnter={(event) => showToolbarTooltip("Note", event.currentTarget, "right")}
                                         onMouseLeave={hideToolbarTooltip}
                                         className={`${toolRailButtonBase} ${toolRailButtonInactive}`}
                                         onClick={() => {
@@ -12356,7 +12530,9 @@ const timer =
                                           handleAddStickyNote();
                                         }}
                                       >
-                                        <Pin className="h-5 w-5 shrink-0 rotate-[45deg]" />
+                                        <span className={`${toolRailInnerBase} ${toolRailInnerInactive}`}>
+                                          <Pin className="h-5 w-5 shrink-0 rotate-[45deg]" />
+                                        </span>
                                       </button>
 
                                       <button
@@ -12364,8 +12540,7 @@ const timer =
                                         disabled={loading}
                                         aria-pressed={signatureButtonOn}
                                         aria-label={`Sign${savedSignatures.length > 0 ? ` (${savedSignatures.length})` : ""}`}
-                                        title={savedSignatures.length > 0 ? `Sign (${savedSignatures.length})` : "Sign"}
-                                        onMouseEnter={(event) => showToolbarTooltip("Sign", event.currentTarget)}
+                                        onMouseEnter={(event) => showToolbarTooltip("Sign", event.currentTarget, "right")}
                                         onMouseLeave={hideToolbarTooltip}
                                         className={`relative ${toolRailButtonBase} ${signatureButtonOn ? toolRailButtonActive : toolRailButtonInactive}`}
                                         onClick={() => {
@@ -12383,10 +12558,11 @@ const timer =
                                           setTextMode(false);
                                         }}
                                       >
-                                        {signatureButtonOn ? (
-                                          <span className="pointer-events-none absolute -left-2 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-slate-700" />
-                                        ) : null}
-                                        <SignatureIcon className="h-5 w-5 shrink-0" />
+                                        <span className={`${toolRailInnerBase} ${
+                                          signatureButtonOn ? toolRailInnerActive : toolRailInnerInactive
+                                        }`}>
+                                          <SignatureIcon className="h-5 w-5 shrink-0" />
+                                        </span>
                                         {savedSignatures.length > 0 ? (
                                           <span className="pointer-events-none absolute -right-1 -top-1 inline-flex min-w-[18px] items-center justify-center rounded-full bg-[#024d7c] px-1 text-[0.65rem] font-bold text-white shadow-sm">
                                             {savedSignatures.length}
@@ -13452,7 +13628,7 @@ const timer =
 				                            style={{ scrollbarGutter: "stable" }}
 				                          >
 				                            {null}
-				                            <div className="relative w-full min-w-0 text-center">
+				                            <div className="relative w-full min-w-0 px-4 text-center">
 				                              <div id="pdf-viewport" className="inline-flex origin-top flex-col gap-8">
 				                                {pages.map((page, index) => renderPreviewPage(page, index))}
 				                                <div className="h-8" aria-hidden />
@@ -13462,9 +13638,9 @@ const timer =
 				                        </div>
 				                      </div>
 			
-				                      <div className="flex shrink-0 items-stretch border-l border-slate-200">
+				                      <div className="flex shrink-0 items-stretch">
 				                          {showPageOrderPanel ? (
-				                            <aside className="flex w-[272px] shrink-0 flex-col">
+				                            <aside className="flex w-[272px] shrink-0 flex-col border-l border-slate-200">
 				                              <div className="flex min-h-0 flex-1 flex-col bg-white">
                                 <div
                                   className="toolbar-font flex h-[45px] items-center justify-between border-b border-slate-200 bg-white px-4"
@@ -13503,23 +13679,21 @@ const timer =
 		                            >
                                       <SortableContext items={itemsIds} strategy={verticalListSortingStrategy}>
                                         <ul className="flex flex-col py-0">
-                                          {pages.length > 0 ? (
+		                                  {pages.length > 0 ? (
 		                                    <li className="group relative flex h-12 items-center justify-center">
-			                                      <div className="pointer-events-none flex w-full items-center justify-center gap-2 px-3 opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
-		                                        <div className="h-px flex-1 bg-slate-300" aria-hidden />
-		                                        <button
-		                                          type="button"
-		                                          onClick={() => void handleAddBlankPageBefore(pages[0].id)}
-		                                          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-[0_4px_12px_rgba(15,23,42,0.08)] transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 focus-visible:ring-offset-2"
-		                                          aria-label="Add blank page"
-		                                        >
-		                                          <Plus className="h-4 w-4" aria-hidden />
-		                                        </button>
-		                                        <div className="h-px flex-1 bg-slate-300" aria-hidden />
-		                                      </div>
-			                                      <div className="pointer-events-none absolute left-1/2 top-full z-40 mt-1 -translate-x-1/2 whitespace-nowrap rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 opacity-0 shadow-[0_10px_24px_rgba(15,23,42,0.12)] transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
-		                                        Add blank page
-		                                      </div>
+			                                      <button
+                                            type="button"
+                                            onClick={() => void handleAddBlankPageBefore(pages[0].id)}
+                                            className="flex w-full items-center justify-center gap-3 px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400 opacity-0 transition duration-150 group-hover:opacity-100 group-focus-within:opacity-100 hover:text-slate-600 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 focus-visible:ring-offset-2"
+                                            aria-label="Add blank page"
+                                          >
+                                            <div className="h-px flex-1 bg-slate-300/80" aria-hidden />
+                                            <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                                              <Plus className="h-3.5 w-3.5" aria-hidden />
+                                              Add Blank Page
+                                            </span>
+                                            <div className="h-px flex-1 bg-slate-300/80" aria-hidden />
+                                          </button>
 		                                    </li>
 		                                  ) : null}
 		                                  {pages.map((p, i) => (
@@ -13531,6 +13705,7 @@ const timer =
 		                                        onSelect={() => handleSelectPage(i)}
 		                                        onMoveUp={() => moveThumbPage(i, -1)}
 		                                        onMoveDown={() => moveThumbPage(i, 1)}
+		                                        onDuplicate={() => void handleDuplicatePage(p)}
 		                                        onRotate={() => handleRotatePage(p.id)}
 		                                        onDelete={() => handleDeletePage(p.id)}
 		                                        disableMoveDown={i === pages.length - 1}
@@ -13546,42 +13721,38 @@ const timer =
 		                                      />
 		                                      {i < pages.length - 1 ? (
 		                                        <li className="group relative flex h-12 items-center justify-center">
-			                                          <div className="pointer-events-none flex w-full items-center justify-center gap-2 px-3 opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
-		                                            <div className="h-px flex-1 bg-slate-300" aria-hidden />
-		                                            <button
-		                                              type="button"
-		                                              onClick={() => void handleAddBlankPageAfter(p.id)}
-		                                              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-[0_4px_12px_rgba(15,23,42,0.08)] transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 focus-visible:ring-offset-2"
-		                                              aria-label="Add blank page"
-		                                            >
-		                                              <Plus className="h-4 w-4" aria-hidden />
-		                                            </button>
-		                                            <div className="h-px flex-1 bg-slate-300" aria-hidden />
-		                                          </div>
-			                                          <div className="pointer-events-none absolute left-1/2 top-full z-40 mt-1 -translate-x-1/2 whitespace-nowrap rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 opacity-0 shadow-[0_10px_24px_rgba(15,23,42,0.12)] transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
-		                                            Add blank page
-		                                          </div>
+			                                          <button
+                                              type="button"
+                                              onClick={() => void handleAddBlankPageAfter(p.id)}
+                                              className="flex w-full items-center justify-center gap-3 px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400 opacity-0 transition duration-150 group-hover:opacity-100 group-focus-within:opacity-100 hover:text-slate-600 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 focus-visible:ring-offset-2"
+                                              aria-label="Add blank page"
+                                            >
+                                              <div className="h-px flex-1 bg-slate-300/80" aria-hidden />
+                                              <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                                                <Plus className="h-3.5 w-3.5" aria-hidden />
+                                                Add Blank Page
+                                              </span>
+                                              <div className="h-px flex-1 bg-slate-300/80" aria-hidden />
+                                            </button>
 		                                        </li>
 		                                      ) : null}
 		                                    </Fragment>
 		                                  ))}
 		                                  {pages.length > 0 ? (
 		                                    <li className="group relative flex h-12 items-center justify-center">
-			                                      <div className="pointer-events-none flex w-full items-center justify-center gap-2 px-3 opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
-		                                        <div className="h-px flex-1 bg-slate-300" aria-hidden />
-		                                        <button
-		                                          type="button"
-		                                          onClick={() => void handleAddBlankPageAfter(pages[pages.length - 1].id)}
-		                                          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-[0_4px_12px_rgba(15,23,42,0.08)] transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 focus-visible:ring-offset-2"
-		                                          aria-label="Add blank page"
-		                                        >
-		                                          <Plus className="h-4 w-4" aria-hidden />
-		                                        </button>
-		                                        <div className="h-px flex-1 bg-slate-300" aria-hidden />
-		                                      </div>
-			                                      <div className="pointer-events-none absolute left-1/2 bottom-full z-40 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 opacity-0 shadow-[0_10px_24px_rgba(15,23,42,0.12)] transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
-		                                        Add blank page
-		                                      </div>
+			                                      <button
+                                            type="button"
+                                            onClick={() => void handleAddBlankPageAfter(pages[pages.length - 1].id)}
+                                            className="flex w-full items-center justify-center gap-3 px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400 opacity-0 transition duration-150 group-hover:opacity-100 group-focus-within:opacity-100 hover:text-slate-600 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 focus-visible:ring-offset-2"
+                                            aria-label="Add blank page"
+                                          >
+                                            <div className="h-px flex-1 bg-slate-300/80" aria-hidden />
+                                            <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                                              <Plus className="h-3.5 w-3.5" aria-hidden />
+                                              Add Blank Page
+                                            </span>
+                                            <div className="h-px flex-1 bg-slate-300/80" aria-hidden />
+                                          </button>
 		                                    </li>
 		                                  ) : null}
 			                                </ul>
@@ -13593,17 +13764,26 @@ const timer =
 					                          ) : null}
 
                           <aside
-                            className={`flex w-12 shrink-0 flex-col bg-white ${showPageOrderPanel ? "border-l border-slate-200" : ""}`}
+                            className="flex w-12 shrink-0 flex-col border-l border-slate-200 bg-white"
                           >
 				                            <div className="flex h-[45px] w-full items-center justify-center border-b border-slate-200">
 				                              <div className="group relative">
 				                                <button
 				                                  type="button"
 				                                  onClick={() => setShowPageOrderPanel((prev) => !prev)}
-				                                  className={`inline-flex h-9 w-9 items-center justify-center rounded-md transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 ${
+                                              data-preserve-search-open="true"
+                                              onMouseEnter={(event) =>
+                                                showToolbarTooltip(
+                                                  showPageOrderPanel ? "Close sidebar" : "Open sidebar",
+                                                  event.currentTarget,
+                                                  "left",
+                                                )
+                                              }
+                                              onMouseLeave={hideToolbarTooltip}
+				                                  className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border transition-[transform,background-color,border-color,box-shadow,color] duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 ${
                                                 showPageOrderPanel
-                                                  ? "bg-[#F4EEFF] text-[#5B21B6]"
-                                                  : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                                                  ? "border-[#E9D5FF] bg-[#F1EBFF] text-[#5B38E6] shadow-[inset_0_0_0_1px_rgba(108,71,255,0.10)]"
+                                                  : "border-transparent bg-transparent text-slate-600 hover:-translate-y-[1px] hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900 hover:shadow-[0_10px_22px_rgba(15,23,42,0.10)]"
                                               }`}
 				                                  aria-label={showPageOrderPanel ? "Close sidebar" : "Open sidebar"}
 				                                >
@@ -13613,31 +13793,15 @@ const timer =
 				                                    <PanelRightOpen className="h-6 w-6" aria-hidden />
 				                                  )}
 				                                </button>
-				                                <div className="pointer-events-none absolute right-0 top-full z-50 mt-2 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100">
-				                                  {showPageOrderPanel ? "Close sidebar" : "Open sidebar"}
-				                                </div>
 				                              </div>
 				                            </div>
                                 <div className="flex flex-col items-center gap-2 px-1 py-3">
                                   <button
                                     type="button"
-                                    aria-label={isBrowserFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-                                    className="inline-flex h-8 w-8 items-center justify-center text-slate-700 transition hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 disabled:opacity-40"
-                                    onClick={() => void toggleBrowserFullscreen()}
-                                  >
-                                    {isBrowserFullscreen ? (
-                                      <Shrink className="h-5 w-5" aria-hidden />
-                                    ) : (
-                                      <Expand className="h-5 w-5" aria-hidden />
-                                    )}
-                                  </button>
-                                </div>
-                                <div className="mx-auto h-px w-7 bg-slate-200" aria-hidden />
-                                <div className="flex flex-col items-center gap-2 px-1 py-3">
-                                  <button
-                                    type="button"
                                     aria-label="Zoom in"
-                                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 disabled:opacity-40"
+                                    className={viewerRailButtonClass}
+                                    onMouseEnter={(event) => showToolbarTooltip("Zoom in (Ctrl +)", event.currentTarget, "left")}
+                                    onMouseLeave={hideToolbarTooltip}
                                     onClick={() => setZoomWithScrollPreserved(zoomPercent + ZOOM_STEP_PERCENT)}
                                     disabled={pages.length === 0 || zoomPercent >= ZOOM_MAX_PERCENT}
                                   >
@@ -13646,7 +13810,9 @@ const timer =
                                   <button
                                     type="button"
                                     aria-label="Zoom out"
-                                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 disabled:opacity-40"
+                                    className={viewerRailButtonClass}
+                                    onMouseEnter={(event) => showToolbarTooltip("Zoom out (Ctrl -)", event.currentTarget, "left")}
+                                    onMouseLeave={hideToolbarTooltip}
                                     onClick={() => setZoomWithScrollPreserved(zoomPercent - ZOOM_STEP_PERCENT)}
                                     disabled={pages.length === 0 || zoomPercent <= ZOOM_MIN_PERCENT}
                                   >
@@ -13658,7 +13824,9 @@ const timer =
                                   <button
                                     type="button"
                                     aria-label="Previous page"
-                                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 disabled:opacity-40"
+                                    className={viewerRailButtonClass}
+                                    onMouseEnter={(event) => showToolbarTooltip("Previous page", event.currentTarget, "left")}
+                                    onMouseLeave={hideToolbarTooltip}
                                     onClick={() => handlePageStep(-1)}
                                     disabled={activePageIndex <= 0}
                                   >
@@ -13688,13 +13856,22 @@ const timer =
                                     inputMode="numeric"
                                     pattern="[0-9]*"
                                     disabled={pages.length === 0}
+                                    onMouseEnter={(event) => showToolbarTooltip("Page number", event.currentTarget, "left")}
+                                    onMouseLeave={hideToolbarTooltip}
+                                    onFocus={(event) => showToolbarTooltip("Page number", event.currentTarget, "left")}
+                                    onBlur={() => {
+                                      hideToolbarTooltip();
+                                      commitPageNumberDraft();
+                                    }}
                                     className="h-8 w-8 rounded-md border border-slate-200 bg-white px-1 text-center text-[12px] font-semibold tabular-nums text-slate-900 shadow-sm outline-none transition focus:border-[#51bdff] focus:ring-2 focus:ring-[#51bdff]/30 disabled:opacity-60"
                                     aria-label="Page number"
                                   />
                                   <button
                                     type="button"
                                     aria-label="Next page"
-                                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 disabled:opacity-40"
+                                    className={viewerRailButtonClass}
+                                    onMouseEnter={(event) => showToolbarTooltip("Next page", event.currentTarget, "left")}
+                                    onMouseLeave={hideToolbarTooltip}
                                     onClick={() => handlePageStep(1)}
                                     disabled={activePageIndex === pages.length - 1 || pages.length === 0}
                                   >
@@ -14863,10 +15040,31 @@ const timer =
       {toolbarTooltip.visible && (!fontMenuOpen || toolbarTooltip.label !== "Font") && typeof document !== "undefined"
         ? createPortal(
             <div
-              className="pointer-events-none fixed z-[10000] whitespace-nowrap rounded-[8px] bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white shadow-lg animate-[workspace-tooltip-enter_160ms_cubic-bezier(0.22,1,0.36,1)]"
-              style={{ left: toolbarTooltip.x, top: toolbarTooltip.y, transform: "translateX(-50%)" }}
+              className="pointer-events-none fixed z-[10000]"
+              style={{
+                left: toolbarTooltip.x,
+                top: toolbarTooltip.y,
+                transform:
+                  toolbarTooltip.placement === "below"
+                    ? "translateX(-50%)"
+                    : toolbarTooltip.placement === "left"
+                      ? "translate(-100%, -50%)"
+                      : "translateY(-50%)",
+              }}
             >
-              {toolbarTooltip.label}
+              <div className="workspace-tooltip relative">
+                {toolbarTooltip.label}
+                <span
+                  aria-hidden
+                  className={
+                    toolbarTooltip.placement === "right"
+                      ? "workspace-tooltip-right-arrow"
+                      : toolbarTooltip.placement === "left"
+                        ? "workspace-tooltip-left-arrow"
+                        : "workspace-tooltip-arrow-top"
+                  }
+                />
+              </div>
             </div>,
             document.body
           )
@@ -14911,13 +15109,14 @@ const timer =
         .viewer-scroll {
           overflow: auto;
         }
-        .thumbs-scroll::-webkit-scrollbar-track {
-          background: #ffffff;
+        body.studio-page .thumbs-scroll::-webkit-scrollbar-track {
+          background:
+            linear-gradient(to right, #cbd5e1 0, #cbd5e1 1px, #ffffff 1px, #ffffff 100%);
         }
-        .thumbs-scroll::-webkit-scrollbar-thumb {
+        body.studio-page .thumbs-scroll::-webkit-scrollbar-thumb {
           border: 3px solid #ffffff;
         }
-        .thumbs-scroll {
+        body.studio-page .thumbs-scroll {
           scrollbar-color: rgba(100, 116, 139, 0.85) #ffffff;
         }
         .tools-scroll::-webkit-scrollbar {
@@ -14998,6 +15197,16 @@ const timer =
         }
         body.studio-page ::-webkit-scrollbar-track {
           background: #ffffff;
+        }
+        body.studio-page .viewer-scroll::-webkit-scrollbar-track {
+          background:
+            linear-gradient(to right, #c5cfdb 0, #c5cfdb 1px, #e3e8ef 1px, #e3e8ef 100%);
+        }
+        body.studio-page .viewer-scroll::-webkit-scrollbar-thumb {
+          border: 3px solid #e3e8ef;
+        }
+        body.studio-page .viewer-scroll {
+          scrollbar-color: rgba(100, 116, 139, 0.85) #e3e8ef;
         }
         body.studio-page ::-webkit-scrollbar-corner {
           background: #ffffff;

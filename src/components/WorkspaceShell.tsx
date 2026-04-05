@@ -1175,10 +1175,7 @@ export default function WorkspaceShell({
         ? "Signature Pro"
         : "Your plan";
   const homeBillingModalBody = "Update your payment details to continue accessing your workspace.";
-  const shellLoadingOpen = billingPortalLoading || homeBootLoading;
-  const shellLoadingLabel = billingPortalLoading
-    ? "Opening billing portal…"
-    : "Loading...";
+  const shellLoadingOpen = homeBootLoading;
 
   const isHomeProjectsPath = (value?: string | null) =>
     value === "/" || (value?.startsWith("/projects") ?? false);
@@ -1933,7 +1930,7 @@ export default function WorkspaceShell({
       const iconWrapperHover = !isActive && !disabled
         ? isLogout
           ? "group-hover:text-red-600 dark:group-hover:text-red-600"
-          : "group-hover:text-[#374151] dark:group-hover:text-zinc-200"
+          : "group-hover:text-[#0F172A] dark:group-hover:text-zinc-100"
         : "";
       const logoutHoverClass = isLogout ? "group-hover:text-red-600 dark:group-hover:text-red-600" : "";
       const iconWrapperClasses = `${iconWrapperBase} ${iconWrapperState} ${iconWrapperHover} ${logoutHoverClass} transition-colors duration-[120ms] ease-out`;
@@ -1946,21 +1943,21 @@ export default function WorkspaceShell({
 
       const targetHref = label === "Projects" ? "/projects/all" : href;
       const itemClasses = homeSidebarLocked
-        ? `group relative flex w-full overflow-visible rounded-xl text-sm font-medium transition-[background-color,color] duration-[120ms] ease-out ${
+        ? `group relative flex w-full overflow-visible rounded-xl text-sm font-medium transition-[background-color,color,transform] duration-[160ms] ease-out ${
             disabled
               ? "cursor-not-allowed text-[#4B5563] dark:text-zinc-500"
               : isActive
                 ? "text-[#6C47FF] dark:text-zinc-100"
-                : "cursor-pointer text-[#4B5563] hover:text-[#374151] dark:text-zinc-400 dark:hover:text-zinc-200"
+                : "cursor-pointer text-[#4B5563] hover:-translate-y-[1px] hover:text-[#374151] dark:text-zinc-400 dark:hover:text-zinc-200"
           } ${isExpanded ? expandedLayoutClasses : collapsedLayoutClasses} ${
             isLogout && logoutConfirmArmed ? "bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-300" : ""
           }`
-        : `group relative flex w-full overflow-visible rounded-xl text-sm font-medium transition-[background-color,color] duration-[120ms] ease-out ${
+        : `group relative flex w-full overflow-visible rounded-xl text-sm font-medium transition-[background-color,color,transform] duration-[160ms] ease-out ${
             disabled
               ? "cursor-not-allowed text-[#4B5563] dark:text-zinc-500"
               : isActive
                 ? "text-[#6C47FF] dark:text-zinc-100"
-                : "cursor-pointer text-[#4B5563] hover:text-[#374151] dark:text-zinc-400 dark:hover:text-zinc-200"
+                : "cursor-pointer text-[#4B5563] hover:-translate-y-[1px] hover:text-[#374151] dark:text-zinc-400 dark:hover:text-zinc-200"
           } ${isExpanded ? expandedLayoutClasses : collapsedLayoutClasses} ${
             isLogout && logoutConfirmArmed ? "bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-300" : ""
           }`;
@@ -1985,10 +1982,10 @@ export default function WorkspaceShell({
             )
           ) : null}
           <span
-            className={`flex items-center ${basePadding} transition-[width] duration-[140ms] ease-out ${
+            className={`flex items-center ${basePadding} transition-[width,background-color,box-shadow] duration-[180ms] ease-out ${
               isActive
                 ? `w-full ${activeRoundedClass} bg-[rgba(108,71,255,0.06)] shadow-inner dark:shadow-none dark:bg-zinc-800/60`
-                : "group-hover:w-full group-hover:rounded-xl group-hover:bg-[rgba(0,0,0,0.04)] dark:group-hover:bg-white/5"
+                : "group-hover:w-full group-hover:rounded-xl group-hover:bg-[rgba(15,23,42,0.08)] group-hover:shadow-[0_10px_22px_rgba(15,23,42,0.08),inset_0_1px_0_rgba(255,255,255,0.45)] dark:group-hover:bg-white/[0.08] dark:group-hover:shadow-[0_10px_24px_rgba(0,0,0,0.26)]"
             } ${isExpanded ? "" : "w-full justify-center"}`}
           >
             <span className={iconWrapperClasses}>
@@ -2251,13 +2248,13 @@ export default function WorkspaceShell({
             }`}
           >
             <div className="pointer-events-none flex flex-col items-center text-center">
-              <p className="text-[24px] font-semibold tracking-tight text-slate-900 sm:text-[28px]">
-                Opening workspace...
-              </p>
               <div
-                className="mt-5 h-14 w-14 animate-spin rounded-full border-[5px] border-[#D9CCFF] border-t-[#6C47FF]"
+                className="h-14 w-14 animate-spin rounded-full border-[5px] border-[#D9CCFF] border-t-[#6C47FF]"
                 aria-hidden
               />
+              <p className="mt-5 text-[24px] font-semibold tracking-tight text-slate-900 sm:text-[28px]">
+                Opening Workspace...
+              </p>
             </div>
           </div>
         </div>
@@ -3089,7 +3086,7 @@ export default function WorkspaceShell({
                       <button
                         type="button"
                         onClick={toggleShellTheme}
-                        className="hidden shrink-0 h-11 w-11 items-center justify-center rounded-full border-[1.5px] border-gray-200 bg-white text-[#1F2A37] shadow-sm transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/15 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] dark:hover:bg-zinc-800 dark:focus-visible:ring-[#2563EB]/30 md:flex"
+                        className="hidden shrink-0 h-11 w-11 items-center justify-center rounded-full border-[1.5px] border-gray-200 bg-white text-[#1F2A37] shadow-sm transition-[transform,background-color,border-color,box-shadow,color] duration-200 hover:-translate-y-[1px] hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950 hover:shadow-[0_12px_24px_rgba(15,23,42,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/15 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] dark:hover:border-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-white dark:hover:shadow-[0_12px_24px_rgba(0,0,0,0.34)] dark:focus-visible:ring-[#2563EB]/30 md:flex"
                         aria-label={shellTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
                         aria-pressed={shellTheme === "dark"}
                       >
@@ -3103,7 +3100,7 @@ export default function WorkspaceShell({
                     <SettingsMenu
                       trigger="custom"
                       triggerLabel="Open profile menu"
-                      triggerClassName="w-full min-w-0 max-w-full overflow-hidden flex h-11 items-center justify-center rounded-full border-[1.5px] border-gray-200 bg-white p-1 shadow-sm transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/15 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F1F4F9] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] dark:hover:bg-zinc-800 dark:focus-visible:ring-[#2563EB]/30 dark:focus-visible:ring-offset-[#222224] md:justify-start md:gap-1.5 md:p-0 md:py-1.5 md:pl-1 md:pr-1.5"
+                      triggerClassName="w-full min-w-0 max-w-full overflow-hidden flex h-11 items-center justify-center rounded-full border-[1.5px] border-gray-200 bg-white p-1 shadow-sm transition-[transform,background-color,border-color,box-shadow] duration-200 hover:-translate-y-[1px] hover:border-slate-300 hover:bg-slate-50 hover:shadow-[0_12px_24px_rgba(15,23,42,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/15 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F1F4F9] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] dark:hover:border-zinc-700 dark:hover:bg-zinc-800 dark:hover:shadow-[0_12px_24px_rgba(0,0,0,0.34)] dark:focus-visible:ring-[#2563EB]/30 dark:focus-visible:ring-offset-[#222224] md:justify-start md:gap-1.5 md:p-0 md:py-1.5 md:pl-1 md:pr-1.5"
                       triggerContent={
                         <>
                           <span className="shrink-0 pointer-events-none">
@@ -3507,10 +3504,26 @@ export default function WorkspaceShell({
           )
         : null}
 
+      {billingPortalLoading ? (
+        <div className="pointer-events-none fixed inset-0 z-[1200]">
+          <div className="absolute inset-0 bg-white dark:bg-[#0F1117]" />
+          <div className="relative flex min-h-screen items-center justify-center px-6 py-10">
+            <div className="pointer-events-none flex flex-col items-center text-center">
+              <div
+                className="h-14 w-14 animate-spin rounded-full border-[5px] border-[#D9CCFF] border-t-[#6C47FF]"
+                aria-hidden
+              />
+              <p className="mt-5 text-[24px] font-semibold tracking-tight text-slate-900 dark:text-zinc-100 sm:text-[28px]">
+                Opening Billing Portal...
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <LoadingOverlay
         open={shellLoadingOpen}
         keepMounted
-        label={shellLoadingLabel}
+        label="Loading..."
         zIndexClassName="z-[1200]"
       />
       {sidebarTooltip && document.body.dataset.modalOpen !== "true"
