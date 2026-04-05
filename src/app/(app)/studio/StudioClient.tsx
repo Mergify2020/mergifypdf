@@ -8899,7 +8899,11 @@ const timer =
       const pdfPage = await pdf.getPage(page.pageIdx + 1);
       const textContent = await pdfPage.getTextContent();
       const text = textContent.items
-        .map((item) => ("str" in item && typeof item.str === "string" ? item.str : ""))
+        .map((item: unknown) => {
+          if (!item || typeof item !== "object" || !("str" in item)) return "";
+          const value = (item as { str?: unknown }).str;
+          return typeof value === "string" ? value : "";
+        })
         .join(" ")
         .replace(/\s+/g, " ")
         .trim()
@@ -13838,7 +13842,6 @@ const timer =
                                       const next = event.target.value.replace(/[^\d]/g, "");
                                       setPageNumberDraft(next);
                                     }}
-                                    onBlur={commitPageNumberDraft}
                                     onKeyDown={(event) => {
                                       if (event.key === "Enter") {
                                         event.currentTarget.blur();

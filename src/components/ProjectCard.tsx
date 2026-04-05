@@ -410,7 +410,7 @@ export default function ProjectCard({
         return;
       }
       const destinationUrl = shouldUsePrintHandoff()
-        ? `/print?src=${encodeURIComponent(target.url)}&title=${encodeURIComponent(project.name || "Document")}`
+        ? `/print?src=${encodeURIComponent(target.url)}&title=${encodeURIComponent(project.title || "Document")}`
         : target.url;
       if (reservedTab) {
         reservedTab.location.href = destinationUrl;
