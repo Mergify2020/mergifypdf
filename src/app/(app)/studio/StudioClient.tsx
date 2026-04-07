@@ -5564,11 +5564,11 @@ const timer =
 
         if (isInitialLoad) {
           const savedOrder = savedPageOrderRef.current;
-          const orderedNewPages =
+          const orderedNewPages: PageItem[] =
             savedOrder.length > 0
               ? savedOrder
                   .map((ref) => newPages.find((page) => page.srcIdx === ref.srcIdx && page.pageIdx === ref.pageIdx))
-                  .filter(Boolean)
+                  .filter((page): page is PageItem => Boolean(page))
               : newPages;
           setPages((prev) => {
             const merged = restoringPreviewCacheRef.current
