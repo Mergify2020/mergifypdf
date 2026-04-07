@@ -386,6 +386,12 @@ const HIGHLIGHT_COLORS = {
   blue: "#9ad9ff",
   pink: "#ffc5f1",
 } as const;
+const HIGHLIGHT_COLOR_LABELS: Record<keyof typeof HIGHLIGHT_COLORS, string> = {
+  yellow: "Yellow",
+  green: "Green",
+  blue: "Blue",
+  pink: "Pink",
+};
 const PEN_COLOR = "#111827";
 
 type HighlightColorKey = keyof typeof HIGHLIGHT_COLORS;
