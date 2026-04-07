@@ -4368,12 +4368,14 @@ const timer =
             setPages((current) =>
               (() => {
                 const currentById = new Map(current.map((page) => [page.id, page]));
-                const orderedById =
+                const orderedById: PageItem[] =
                   orderedIds.length > 0
-                    ? orderedIds.map((id) => currentById.get(id)).filter(Boolean)
+                    ? orderedIds
+                        .map((id) => currentById.get(id))
+                        .filter((page): page is PageItem => Boolean(page))
                     : [];
                 const hasIdMatch = orderedById.length > 0;
-                const ordered =
+                const ordered: PageItem[] =
                   hasIdMatch
                     ? orderedById
                     : orderedPageRefs.length > 0
@@ -4383,7 +4385,7 @@ const timer =
                               (page) => page.srcIdx === ref.srcIdx && page.pageIdx === ref.pageIdx
                             )
                           )
-                          .filter(Boolean)
+                          .filter((page): page is PageItem => Boolean(page))
                       : current;
                 return ordered.map((page) => {
                   const incoming = byId.get(page.id);
