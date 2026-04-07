@@ -2042,6 +2042,7 @@ function WorkspaceClient() {
   const [highlightMode, setHighlightMode] = useState(false);
   const [highlightColor, setHighlightColor] = useState<HighlightColorKey>("yellow");
   const [highlightThickness, setHighlightThickness] = useState(14);
+  const [highlightThicknessInput, setHighlightThicknessInput] = useState("14");
   const [highlightOpacity, setHighlightOpacity] = useState(0.35);
   const [showStartupOverlay, setShowStartupOverlay] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -8798,6 +8799,11 @@ const timer =
   const applyPenOpacity = useCallback((value: number) => {
     const normalized = clamp(value, 0.1, 1);
     setPenOpacity(normalized);
+  }, []);
+  const applyHighlightThickness = useCallback((value: number) => {
+    const normalized = clamp(Math.round(value), MIN_HIGHLIGHT_THICKNESS, MAX_HIGHLIGHT_THICKNESS);
+    setHighlightThickness(normalized);
+    setHighlightThicknessInput(`${normalized}`);
   }, []);
   const applyShapeThickness = useCallback(
     (value: number) => {
