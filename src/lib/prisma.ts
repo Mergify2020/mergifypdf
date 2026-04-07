@@ -6,7 +6,7 @@ const globalForPrisma = globalThis as unknown as {
   prismaDbUnavailableUntil: number | undefined;
 };
 
-const DB_UNAVAILABLE_COOLDOWN_MS = 10_000;
+const DB_UNAVAILABLE_COOLDOWN_MS = 1_500;
 
 export const prisma =
   globalForPrisma.prisma ??

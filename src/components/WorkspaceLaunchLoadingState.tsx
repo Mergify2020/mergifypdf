@@ -110,7 +110,7 @@ export default function WorkspaceLaunchLoadingState({
       className={
         isPanel
           ? "relative flex h-full w-full items-center justify-center px-8 py-10"
-          : "workspace-launch-screen relative min-h-screen overflow-hidden bg-white dark:bg-[#0F1117]"
+          : "workspace-launch-screen relative min-h-screen overflow-hidden bg-white dark:bg-[#252525]"
       }
     >
       <div
@@ -131,12 +131,12 @@ export default function WorkspaceLaunchLoadingState({
           </h2>
 
           <div
-            className={`workspace-launch-progress relative h-[13px] w-full overflow-hidden rounded-full bg-slate-200/95 dark:bg-zinc-800 ${
+            className={`workspace-launch-progress relative h-[13px] w-full overflow-hidden rounded-full bg-slate-200/95 dark:bg-[#323232] ${
               isPanel ? "mt-8 max-w-[360px]" : "mt-11 max-w-[320px] sm:max-w-none"
             }`}
           >
             <div
-              className="workspace-launch-progress-fill relative h-full overflow-hidden rounded-full bg-gradient-to-r from-[#6C47FF] via-[#5676FF] to-[#51BDFF] shadow-[0_0_20px_rgba(81,189,255,0.16)] transition-none"
+              className="workspace-launch-progress-fill relative h-full overflow-hidden rounded-full bg-gradient-to-r from-[#6C47FF] via-[#7A5CFF] to-[#8B6CFF] shadow-[0_0_18px_rgba(108,71,255,0.28)] transition-none"
               style={{ width: progress > 0 ? `${Math.max(12, Math.round(progress * 100))}%` : "0%" }}
             >
               <span

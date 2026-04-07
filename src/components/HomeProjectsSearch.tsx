@@ -89,7 +89,7 @@ export default function HomeProjectsSearch({
   const queryBridge = useWorkspaceHomeQuery();
   const query = queryBridge?.query ?? "";
   const [projectsState, setProjectsState] = useState<SummaryProject[]>(() => {
-    if (typeof window !== "undefined" && ownerKey) {
+    if (typeof window !== "undefined" && ownerKey && !showAllProjects) {
       const cached = getProjectsSummaryCache(ownerKey);
       if (cached) return mapProjectsFromSummary(cached);
     }
@@ -110,6 +110,13 @@ export default function HomeProjectsSearch({
   useEffect(() => {
     if (!ownerKey) {
       setProjectsState(projects);
+      return;
+    }
+
+    if (showAllProjects) {
+      const routeProjectsSummary = mapProjectsToSummary(projects);
+      setProjectsState(projects);
+      setProjectsSummaryCache(ownerKey, routeProjectsSummary);
       return;
     }
 
@@ -218,7 +225,7 @@ export default function HomeProjectsSearch({
     <>
       <section className="mt-0 flex w-full min-h-0 flex-1 flex-col">
         <div
-          className="box-border flex min-h-0 flex-1 flex-col rounded-xl border-[1.5px] border-gray-200 bg-white p-3 transition-[height] duration-300 ease-out shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] md:p-5"
+          className="box-border flex min-h-0 flex-1 flex-col rounded-xl border-[1.5px] border-gray-200 bg-white p-3 transition-[height] duration-300 ease-out shadow-sm dark:border-[#3F3F3F] dark:bg-[#323232] dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] md:p-5"
           style={{ height: "calc(100% - var(--workspace-projects-bottom-gap, 0px))" }}
         >
           <div className="flex flex-row items-center justify-between gap-2 md:gap-4 md:pl-[21px]">
@@ -234,10 +241,10 @@ export default function HomeProjectsSearch({
             <div className="flex min-w-0 shrink items-center justify-end gap-1.5 md:gap-2">
               {showAllProjects ? (
                 <div className="flex min-w-0 items-center gap-1.5 md:gap-2">
-                  <div className="relative inline-flex items-center rounded-full border-2 border-[#E6EBF2] bg-white dark:border-zinc-700 dark:bg-zinc-900">
+                  <div className="relative inline-flex items-center rounded-full border-2 border-[#E6EBF2] bg-white dark:border-[#3F3F3F] dark:bg-[#323232]">
                     <span
                       aria-hidden
-                      className={`pointer-events-none absolute left-0 top-0 h-full w-[48px] rounded-full bg-[#E5E7EB] transition-[width,transform] duration-200 ease-out min-[470px]:w-[68px] dark:bg-[#2A2A31] ${
+                      className={`pointer-events-none absolute left-0 top-0 h-full w-[48px] rounded-full bg-[#E5E7EB] transition-[width,transform] duration-200 ease-out min-[470px]:w-[68px] dark:bg-[#3A3A3A] ${
                         viewMode === "grid"
                           ? "translate-x-0"
                           : "translate-x-[48px] min-[470px]:translate-x-[68px]"
@@ -278,8 +285,8 @@ export default function HomeProjectsSearch({
                       onClick={() => setSortMenuOpen((prev) => !prev)}
                       className={`inline-flex items-center gap-2 rounded-full border-2 px-2.5 py-2 text-xs font-semibold transition min-[410px]:px-3 md:px-4 ${
                         sortMenuOpen
-                          ? "border-[#E6EBF2] bg-[#E5E7EB] text-[#1F2A37] dark:border-zinc-700 dark:bg-[#2A2A31] dark:text-zinc-100"
-                          : "border-[#E6EBF2] bg-white text-[#1F2A37] hover:border-[#D8DEE8] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-zinc-600"
+                          ? "border-[#E6EBF2] bg-[#E5E7EB] text-[#1F2A37] dark:border-[#3F3F3F] dark:bg-[#3A3A3A] dark:text-zinc-100"
+                          : "border-[#E6EBF2] bg-white text-[#1F2A37] hover:border-[#D8DEE8] dark:border-[#3F3F3F] dark:bg-[#323232] dark:text-zinc-100 dark:hover:border-[#4A4A4A]"
                       }`}
                       aria-haspopup="menu"
                       aria-expanded={sortMenuOpen}
@@ -314,7 +321,7 @@ export default function HomeProjectsSearch({
                     {sortMenuOpen ? (
                       <div
                         role="menu"
-                        className="project-actions-menu absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-[#E5E7EB] bg-white text-sm text-[#1F2A37] shadow-[0_16px_36px_rgba(15,23,42,0.14)] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:shadow-[0_20px_44px_rgba(0,0,0,0.5)]"
+                        className="project-actions-menu absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-[#E5E7EB] bg-white text-sm text-[#1F2A37] shadow-[0_16px_36px_rgba(15,23,42,0.14)] dark:border-[#3F3F3F] dark:bg-[#323232] dark:text-zinc-100 dark:shadow-[0_20px_44px_rgba(0,0,0,0.5)]"
                       >
                         <div className="pb-1.5 pt-1.5">
                           {(
@@ -335,8 +342,8 @@ export default function HomeProjectsSearch({
                               }}
                               className={`project-actions-stagger-item mx-2 flex w-[calc(100%-1rem)] items-center justify-between rounded-lg px-2.5 py-2 text-left transition ${
                                 sortOption === key
-                                  ? "bg-[#F8FAFC] dark:bg-zinc-800/60"
-                                  : "hover:bg-[#F8FAFC] dark:hover:bg-zinc-800/60"
+                                  ? "bg-[#F8FAFC] dark:bg-[#3A3A3A]/70"
+                                  : "hover:bg-[#F8FAFC] dark:hover:bg-[#3A3A3A]/60"
                               }`}
                             >
                               <span className="flex min-w-0 items-center gap-2.5 text-slate-900 dark:text-zinc-100">
@@ -371,10 +378,10 @@ export default function HomeProjectsSearch({
                         return next;
                       });
                     }}
-                    className={`inline-flex items-center gap-2 rounded-full border-2 border-[#E6EBF2] px-4 py-2 text-xs font-semibold transition dark:border-zinc-700 ${
+                    className={`inline-flex items-center gap-2 rounded-full border-2 border-[#E6EBF2] px-4 py-2 text-xs font-semibold transition dark:border-[#3A3A3A] ${
                       ownerMenuOpen
-                        ? "bg-[#009DFD] text-white dark:bg-zinc-200 dark:text-zinc-900"
-                        : "bg-white text-[#1F2A37] hover:border-[#D8DEE8] dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-zinc-600"
+                        ? "bg-[#009DFD] text-white dark:bg-[#E5E5E5] dark:text-[#1F1F1F]"
+                        : "bg-white text-[#1F2A37] hover:border-[#D8DEE8] dark:bg-[#323232] dark:text-zinc-100 dark:hover:border-[#4A4A4A]"
                     }`}
                     aria-haspopup="menu"
                     aria-expanded={ownerMenuOpen}
@@ -392,11 +399,11 @@ export default function HomeProjectsSearch({
                   {ownerMenuOpen ? (
                     <div
                       role="menu"
-                      className="absolute right-0 z-50 mt-3 w-[320px] overflow-hidden rounded-3xl border border-[#E6EBF2] bg-white text-sm text-[#1F2A37] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                      className="absolute right-0 z-50 mt-3 w-[320px] overflow-hidden rounded-3xl border border-[#E6EBF2] bg-white text-sm text-[#1F2A37] dark:border-[#3A3A3A] dark:bg-[#323232] dark:text-zinc-100"
                     >
                       <div className="p-4 pb-3">
-                        <div className="flex items-center gap-3 rounded-2xl border border-[#E6EBF2] bg-white px-4 py-3 dark:border-zinc-700 dark:bg-zinc-900/60">
-                          <Search className="h-5 w-5 text-[#009DFD] dark:text-zinc-300" aria-hidden />
+                        <div className="flex items-center gap-3 rounded-2xl border border-[#E6EBF2] bg-white px-4 py-3 dark:border-[#3A3A3A] dark:bg-[#323232]/60">
+                        <Search className="h-5 w-5 text-[#009DFD] dark:text-[#B0B0B0]" aria-hidden />
                           <input
                             type="text"
                             value={ownerSearch}
@@ -414,7 +421,7 @@ export default function HomeProjectsSearch({
                               key: "any",
                               label: "Any owner",
                               leading: (
-                                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-slate-700 dark:bg-zinc-800 dark:text-zinc-200">
+                                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-slate-700 dark:bg-[#2B2B2B] dark:text-zinc-200">
                                   <UserRound className="h-5 w-5" aria-hidden />
                                 </span>
                               ),
@@ -423,7 +430,7 @@ export default function HomeProjectsSearch({
                               key: "shared",
                               label: "Shared with you",
                               leading: (
-                                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-slate-700 dark:bg-zinc-800 dark:text-zinc-200">
+                                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-slate-700 dark:bg-[#2B2B2B] dark:text-zinc-200">
                                   <UsersRound className="h-5 w-5" aria-hidden />
                                 </span>
                               ),
@@ -432,7 +439,7 @@ export default function HomeProjectsSearch({
                               key: "you",
                               label: `${accountName} (You)`,
                               leading: (
-                                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-600 text-sm font-semibold text-white dark:bg-zinc-700">
+                                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-600 text-sm font-semibold text-white dark:bg-[#3A3A3A]">
                                   {accountInitials}
                                 </span>
                               ),
@@ -455,7 +462,7 @@ export default function HomeProjectsSearch({
                               }}
                               className={`mx-3 flex w-[calc(100%-1.5rem)] items-center justify-between rounded-2xl px-3 py-3 text-left transition ${
                                 ownerFilter === option.key
-                                  ? "bg-slate-100 dark:bg-zinc-800/70"
+                                  ? "bg-slate-100 dark:bg-[#2B2B2B]/70"
                                   : "hover:bg-slate-50 dark:hover:bg-zinc-800/60"
                               }`}
                             >
@@ -504,7 +511,7 @@ export default function HomeProjectsSearch({
             <div className="mt-4 flex items-center">
               <Link
                 href="/projects/all"
-                className="inline-flex items-center rounded-full border-2 border-[#E6EBF2] px-4 py-2 text-xs font-semibold text-[#1F2A37] transition hover:border-[#D8DEE8] active:translate-y-[1px] active:scale-[0.98] active:bg-[#2563EB]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#51bdff]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F1F4F9] dark:border-zinc-700 dark:text-zinc-100 dark:hover:border-zinc-600 dark:active:bg-[#2563EB]/20 dark:focus-visible:ring-offset-[#222224]"
+                className="inline-flex items-center rounded-full border-2 border-[#E6EBF2] px-4 py-2 text-xs font-semibold text-[#1F2A37] transition hover:border-[#D8DEE8] active:translate-y-[1px] active:scale-[0.98] active:bg-[#2563EB]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#51bdff]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F1F4F9] dark:border-[#3A3A3A] dark:text-zinc-100 dark:hover:border-[#4A4A4A] dark:active:bg-white/10 dark:focus-visible:ring-offset-[#252525]"
               >
                 View all projects
               </Link>

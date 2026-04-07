@@ -477,7 +477,7 @@ export default function AllProjectsClient() {
               </div>
               </div>
             </div>
-          <div className="projects-grid mt-10 flex w-full flex-wrap justify-start gap-5 [--projects-card-width:clamp(240px,22vw,300px)] sm:gap-6">
+          <div className="projects-grid mt-10 flex w-full flex-wrap justify-start gap-5 [--projects-card-width:clamp(200px,18vw,260px)] sm:gap-6">
               {Array.from({ length: 18 }).map((_, index) => (
                 <div
                   key={index}

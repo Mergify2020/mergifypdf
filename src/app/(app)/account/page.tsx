@@ -281,7 +281,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
         ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
         : pricingIsDelinquent
           ? "bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300"
-          : "bg-slate-100 text-slate-700 dark:bg-zinc-800 dark:text-zinc-300";
+          : "bg-slate-100 text-slate-700 dark:bg-[#2B2B2B] dark:text-zinc-300";
   const pricingStatusLabel =
     accountStripeStatus === "active"
       ? "Active"
@@ -1293,7 +1293,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
   }
 
   return (
-    <main className="w-full bg-slate-100 py-6 text-slate-900 dark:bg-[#222224] dark:text-zinc-100">
+    <main className="w-full bg-slate-100 py-6 text-slate-900 dark:bg-[#252525] dark:text-zinc-100">
       <div className="mx-auto w-full max-w-[var(--shell-content-width)]">
         <div className="mb-5 flex items-center justify-between gap-3">
           <div className="min-w-0 flex items-center gap-3">
@@ -1327,7 +1327,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
             <SettingsMenu
               trigger="custom"
               triggerLabel="Open profile menu"
-              triggerClassName="w-[224px] min-w-[224px] max-w-[224px] overflow-hidden flex h-11 items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white py-1.5 pl-1 pr-1.5 shadow-[12px_0_36px_rgba(15,23,42,0.10)] transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/30 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-100 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_8px_22px_rgba(0,0,0,0.28),0_24px_52px_rgba(0,0,0,0.24)] dark:hover:bg-zinc-800 dark:focus-visible:ring-offset-[#222224]"
+              triggerClassName="w-[224px] min-w-[224px] max-w-[224px] overflow-hidden flex h-11 items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white py-1.5 pl-1 pr-1.5 shadow-[12px_0_36px_rgba(15,23,42,0.10)] transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/30 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-100 dark:border-[#3F3F3F] dark:bg-[#323232] dark:shadow-[0_8px_22px_rgba(0,0,0,0.28),0_24px_52px_rgba(0,0,0,0.24)] dark:hover:bg-[#3A3A3A] dark:focus-visible:ring-offset-[#252525]"
               triggerContent={
                 <>
                   <span className="shrink-0 pointer-events-none">
@@ -1366,7 +1366,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
         </div>
 
         <div className="grid gap-5 lg:grid-cols-[304px_minmax(0,1fr)] lg:items-start">
-          <aside className="self-start rounded-2xl border-[1.5px] border-gray-200 bg-white p-4 shadow-sm lg:sticky lg:top-6 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_8px_22px_rgba(0,0,0,0.28),0_24px_52px_rgba(0,0,0,0.24)]">
+          <aside className="self-start rounded-2xl border-[1.5px] border-gray-200 bg-white p-4 shadow-sm lg:sticky lg:top-6 dark:border-[#3F3F3F] dark:bg-[#323232] dark:shadow-[0_8px_22px_rgba(0,0,0,0.28),0_24px_52px_rgba(0,0,0,0.24)]">
             <p className="px-2 text-xs font-bold uppercase tracking-[0.14em] text-gray-600 dark:text-zinc-400">Settings</p>
             <nav className="mt-3 space-y-1">
               <button
@@ -1376,8 +1376,8 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                 }}
                 className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${
                   activeSettingsTab === "account"
-                    ? "bg-[rgba(108,71,255,0.10)] text-[#5B38E6] dark:bg-zinc-800/60 dark:text-white"
-                    : "text-gray-800 hover:bg-gray-50 hover:text-gray-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                    ? "bg-[rgba(108,71,255,0.10)] text-[#5B38E6] dark:bg-[#2B2B2B]/60 dark:text-white"
+                    : "text-gray-800 hover:bg-gray-50 hover:text-gray-900 dark:text-zinc-300 dark:hover:bg-[#3A3A3A] dark:hover:text-zinc-100"
                 }`}
               >
                 <User
@@ -1393,8 +1393,8 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                 }}
                 className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${
                   activeSettingsTab === "security"
-                    ? "bg-[rgba(108,71,255,0.10)] text-[#5B38E6] dark:bg-zinc-800/60 dark:text-white"
-                    : "text-gray-800 hover:bg-gray-50 hover:text-gray-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                    ? "bg-[rgba(108,71,255,0.10)] text-[#5B38E6] dark:bg-[#2B2B2B]/60 dark:text-white"
+                    : "text-gray-800 hover:bg-gray-50 hover:text-gray-900 dark:text-zinc-300 dark:hover:bg-[#3A3A3A] dark:hover:text-zinc-100"
                 }`}
               >
                 <Lock
@@ -1410,8 +1410,8 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                 }}
                 className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${
                   activeSettingsTab === "pricing"
-                    ? "bg-[rgba(108,71,255,0.10)] text-[#5B38E6] dark:bg-zinc-800/60 dark:text-white"
-                    : "text-gray-800 hover:bg-gray-50 hover:text-gray-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                    ? "bg-[rgba(108,71,255,0.10)] text-[#5B38E6] dark:bg-[#2B2B2B]/60 dark:text-white"
+                    : "text-gray-800 hover:bg-gray-50 hover:text-gray-900 dark:text-zinc-300 dark:hover:bg-[#3A3A3A] dark:hover:text-zinc-100"
                 }`}
               >
                 <span
@@ -1435,7 +1435,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                   void warmBillingPortal();
                 }}
                 disabled={billingPortalLoading}
-                className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-gray-800 transition hover:bg-gray-50 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-60 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-gray-800 transition hover:bg-gray-50 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-60 dark:text-zinc-300 dark:hover:bg-[#3A3A3A] dark:hover:text-zinc-100"
               >
                 <CreditCard className="h-5 w-5 text-gray-600 stroke-[2.2] dark:text-zinc-400" aria-hidden />
                 <span>Billing portal</span>
@@ -1446,7 +1446,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
             </nav>
           </aside>
 
-          <div className="rounded-2xl border-[1.5px] border-gray-200 bg-white p-6 shadow-sm sm:p-7 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_8px_22px_rgba(0,0,0,0.28),0_24px_52px_rgba(0,0,0,0.24)]">
+          <div className="rounded-2xl border-[1.5px] border-gray-200 bg-white p-6 shadow-sm sm:p-7 dark:border-[#3F3F3F] dark:bg-[#323232] dark:shadow-[0_8px_22px_rgba(0,0,0,0.28),0_24px_52px_rgba(0,0,0,0.24)]">
             <h2 className="text-3xl font-semibold tracking-tight text-gray-900 dark:text-zinc-100">
               {activeSettingsTab === "security"
                 ? "Security"
@@ -1457,7 +1457,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
 
           {activeSettingsTab === "account" ? (
           <>
-          <div className="mt-6 border-t border-gray-200 dark:border-zinc-800" />
+          <div className="mt-6 border-t border-gray-200 dark:border-[#3F3F3F]" />
           <section className="mt-6">
         <dl className="mt-4 grid gap-x-6 gap-y-4 md:grid-cols-2">
           <div className="min-w-0">
@@ -1471,7 +1471,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                     if (nameMessage) setNameMessage(null);
                   }}
                   autoComplete="given-name"
-                  className="w-full rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                  className="w-full rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 dark:border-[#3F3F3F] dark:bg-[#2B2B2B] dark:text-zinc-100"
                 />
                 <div className="mt-2 flex items-center gap-2">
                   <button
@@ -1487,7 +1487,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                   <button
                     type="button"
                     onClick={() => cancelNameEditor("first")}
-                    className="rounded-md px-2.5 py-1.5 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 hover:text-gray-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                    className="rounded-md px-2.5 py-1.5 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 hover:text-gray-800 dark:text-zinc-400 dark:hover:bg-[#3A3A3A] dark:hover:text-zinc-200"
                   >
                     Cancel
                   </button>
@@ -1499,7 +1499,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                 <button
                   type="button"
                   onClick={() => openNameEditor("first")}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 px-2.5 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 px-2.5 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200 dark:bg-[#2B2B2B] dark:text-zinc-200 dark:hover:bg-[#3A3A3A]"
                   aria-label="Edit first name"
                 >
                   <PencilLine className="h-3.5 w-3.5" aria-hidden />
@@ -1520,7 +1520,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                     if (nameMessage) setNameMessage(null);
                   }}
                   autoComplete="family-name"
-                  className="w-full rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                  className="w-full rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 dark:border-[#3F3F3F] dark:bg-[#2B2B2B] dark:text-zinc-100"
                 />
                 <div className="mt-2 flex items-center gap-2">
                   <button
@@ -1536,7 +1536,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                   <button
                     type="button"
                     onClick={() => cancelNameEditor("last")}
-                    className="rounded-md px-2.5 py-1.5 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 hover:text-gray-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                    className="rounded-md px-2.5 py-1.5 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 hover:text-gray-800 dark:text-zinc-400 dark:hover:bg-[#3A3A3A] dark:hover:text-zinc-200"
                   >
                     Cancel
                   </button>
@@ -1548,7 +1548,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                 <button
                   type="button"
                   onClick={() => openNameEditor("last")}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 px-2.5 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 px-2.5 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200 dark:bg-[#2B2B2B] dark:text-zinc-200 dark:hover:bg-[#3A3A3A]"
                   aria-label="Edit last name"
                 >
                   <PencilLine className="h-3.5 w-3.5" aria-hidden />
@@ -1558,7 +1558,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
             )}
           </div>
 
-          <div className="col-span-full border-t border-gray-200 pt-4 dark:border-zinc-800" />
+          <div className="col-span-full border-t border-gray-200 pt-4 dark:border-[#3F3F3F]" />
 
           <div className="min-w-0">
             <dt className="text-sm font-medium text-gray-700 dark:text-zinc-300">Email</dt>
@@ -1569,7 +1569,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
         {nameMessage ? <p className="mt-2 text-sm text-rose-600 dark:text-rose-400">{nameMessage}</p> : null}
         </section>
 
-        <section className="mt-8 border-t border-gray-200 pt-6 dark:border-zinc-800">
+        <section className="mt-8 border-t border-gray-200 pt-6 dark:border-[#3F3F3F]">
           <div className="flex items-center gap-2">
             <Mail className="h-4 w-4 text-slate-600 dark:text-zinc-400" aria-hidden />
             <h2 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">Change email</h2>
@@ -1589,10 +1589,10 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                 placeholder="name@example.com"
                 readOnly={emailStep === "verify"}
                 aria-readonly={emailStep === "verify"}
-                className={`w-full rounded-md border bg-white px-3 py-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 focus-visible:ring-offset-0 read-only:cursor-not-allowed read-only:bg-gray-50 read-only:text-gray-500 dark:bg-zinc-800 dark:text-zinc-100 dark:read-only:bg-zinc-800/60 dark:read-only:text-zinc-500 ${
+                className={`w-full rounded-md border bg-white px-3 py-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 focus-visible:ring-offset-0 read-only:cursor-not-allowed read-only:bg-gray-50 read-only:text-gray-500 dark:bg-[#2B2B2B] dark:text-zinc-100 dark:read-only:bg-[#2B2B2B]/60 dark:read-only:text-zinc-500 ${
                   emailStep === "request" && emailRequestSubmitAttempted && !newEmail.trim()
                     ? "border-rose-500 dark:border-rose-500"
-                    : "border-gray-300 dark:border-zinc-700"
+                    : "border-gray-300 dark:border-[#3F3F3F]"
                 }`}
               />
               {emailStep === "request" ? (
@@ -1607,12 +1607,12 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                     onChange={(event) => setConfirmNewEmail(event.target.value)}
                     required
                     placeholder="Re-enter new email address"
-                    className={`w-full rounded-md border bg-white px-3 py-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 focus-visible:ring-offset-0 dark:bg-zinc-800 dark:text-zinc-100 ${
+                    className={`w-full rounded-md border bg-white px-3 py-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 focus-visible:ring-offset-0 dark:bg-[#2B2B2B] dark:text-zinc-100 ${
                       emailRequestSubmitAttempted && !confirmNewEmail.trim()
                         ? "border-transparent ring-2 ring-rose-600/60 dark:ring-rose-500/50"
                         : isEmailConfirmationMismatch
                           ? "border-transparent ring-2 ring-rose-600/60 dark:ring-rose-500/50"
-                          : "border-gray-300 dark:border-zinc-700"
+                          : "border-gray-300 dark:border-[#3F3F3F]"
                     }`}
                   />
                   {isEmailConfirmationMismatch ? (
@@ -1637,7 +1637,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                         }}
                         id={index === 0 ? "account-email-code" : undefined}
                         autoFocus={index === 0}
-                        className="h-11 w-9 rounded-lg border-2 border-slate-300 bg-white text-center text-lg text-slate-900 outline-none transition hover:border-slate-400 focus-visible:border-[#6D6AF4] focus-visible:ring-0 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:border-zinc-500 sm:h-12 sm:w-11"
+                        className="h-11 w-9 rounded-lg border-2 border-slate-300 bg-white text-center text-lg text-slate-900 outline-none transition hover:border-slate-400 focus-visible:border-[#6D6AF4] focus-visible:ring-0 dark:border-[#4A4A4A] dark:bg-[#2B2B2B] dark:text-zinc-100 dark:hover:border-[#4A4A4A] sm:h-12 sm:w-11"
                         type="text"
                         inputMode="numeric"
                         maxLength={1}
@@ -1705,7 +1705,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                       if (emailRequestBusy || emailVerifyBusy || emailResendCooldown > 0) return;
                       void requestEmailCode();
                     }}
-                    className="rounded-md border-2 border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 transition hover:-translate-y-[1px] hover:border-slate-400 hover:shadow-sm disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:border-zinc-500"
+                    className="rounded-md border-2 border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 transition hover:-translate-y-[1px] hover:border-slate-400 hover:shadow-sm disabled:opacity-60 dark:border-[#4A4A4A] dark:bg-[#2B2B2B] dark:text-zinc-100 dark:hover:border-[#4A4A4A]"
                   >
                     {emailRequestBusy
                       ? "Sending..."
@@ -1724,7 +1724,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                       setEmailCodeDigits(Array(6).fill(""));
                       setEmailMessage(null);
                     }}
-                    className="rounded-md px-2 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 hover:text-gray-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                    className="rounded-md px-2 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 hover:text-gray-900 dark:text-zinc-400 dark:hover:bg-[#3A3A3A] dark:hover:text-zinc-200"
                   >
                     Cancel
                   </button>
@@ -1774,14 +1774,14 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
           )}
         </section>
 
-        <section className="mt-8 border-t border-gray-200 pt-6 dark:border-zinc-800">
+        <section className="mt-8 border-t border-gray-200 pt-6 dark:border-[#3F3F3F]">
           <div className="flex items-center gap-2">
             <Sun className="h-4 w-4 text-slate-600 dark:text-zinc-400" aria-hidden />
             <h2 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">Appearance</h2>
           </div>
           <p className="mt-1 text-sm text-gray-600 dark:text-zinc-400">Choose light or dark mode.</p>
           <div className="mt-4 max-w-xs">
-            <div className="relative inline-flex h-11 w-[150px] items-center rounded-lg border border-gray-300 bg-white p-1 dark:border-zinc-700 dark:bg-zinc-900">
+            <div className="relative inline-flex h-11 w-[150px] items-center rounded-lg border border-gray-300 bg-white p-1 dark:border-[#3F3F3F] dark:bg-[#323232]">
               <span
                 aria-hidden
                 className={`absolute top-1 h-[34px] w-[70px] rounded-md bg-[#6C47FF] ${
@@ -1794,7 +1794,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                 className={`relative z-10 w-[70px] rounded-md px-3 py-1.5 text-sm font-medium transition ${
                   theme === "light"
                     ? "text-white"
-                    : "text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    : "text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-[#3A3A3A]"
                 }`}
                 aria-pressed={theme === "light"}
               >
@@ -1806,7 +1806,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                 className={`relative z-10 w-[70px] rounded-md px-3 py-1.5 text-sm font-medium transition ${
                   theme === "dark"
                     ? "text-white"
-                    : "text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    : "text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-[#3A3A3A]"
                 }`}
                 aria-pressed={theme === "dark"}
               >
@@ -1821,9 +1821,9 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
 
         {activeSettingsTab === "pricing" ? (
         <>
-        <div className="mt-6 border-t border-gray-200 dark:border-zinc-800" />
+        <div className="mt-6 border-t border-gray-200 dark:border-[#3F3F3F]" />
         <section className="mt-6 space-y-6">
-          <div className="relative overflow-hidden rounded-3xl border border-indigo-100 bg-gradient-to-br from-white via-[#F7F5FF] to-[#EDF2FF] p-5 shadow-[0_18px_45px_rgba(56,37,149,0.08)] dark:border-indigo-500/25 dark:from-zinc-900 dark:via-zinc-900 dark:to-zinc-950">
+          <div className="relative overflow-hidden rounded-3xl border border-indigo-100 bg-gradient-to-br from-white via-[#F7F5FF] to-[#EDF2FF] p-5 shadow-[0_18px_45px_rgba(56,37,149,0.08)] dark:border-indigo-500/25 dark:from-[#323232] dark:via-[#2B2B2B] dark:to-[#252525]">
             <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-[#6C47FF]/10 blur-3xl dark:bg-[#6C47FF]/20" aria-hidden />
             <div className="relative flex flex-wrap items-start justify-between gap-4">
               <div>
@@ -1837,14 +1837,14 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                 onClick={() => {
                   router.push("/pricing");
                 }}
-                className="inline-flex items-center rounded-full border border-[#6C47FF]/20 bg-white/90 px-4 py-2 text-sm font-semibold text-[#5B38E6] transition hover:border-[#6C47FF]/50 hover:bg-white dark:border-indigo-400/40 dark:bg-zinc-900/70 dark:text-indigo-200"
+                className="inline-flex items-center rounded-full border border-[#6C47FF]/20 bg-white/90 px-4 py-2 text-sm font-semibold text-[#5B38E6] transition hover:border-[#6C47FF]/50 hover:bg-white dark:border-indigo-400/40 dark:bg-[#323232]/70 dark:text-indigo-200"
               >
                 Compare features
               </button>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-900/80">
+          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-[#3F3F3F] dark:bg-[#323232]/80">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="space-y-1">
                 <p className="text-base font-semibold text-gray-900 dark:text-zinc-100">{pricingCurrentPlanLabel}</p>
@@ -1853,7 +1853,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                     {pricingStatusLabel}
                   </span>
                   {pricingTrialStatus?.eligibleForTrial === false && !pricingHasActivePlan && !pricingIsDelinquent ? (
-                    <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600 dark:bg-zinc-800 dark:text-zinc-300">
+                    <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600 dark:bg-[#2B2B2B] dark:text-zinc-300">
                       Trial already used
                     </span>
                   ) : null}
@@ -1892,14 +1892,14 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
           ) : null}
 
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="inline-flex items-center rounded-full border border-gray-300 bg-white p-1 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+            <div className="inline-flex items-center rounded-full border border-gray-300 bg-white p-1 shadow-sm dark:border-[#3F3F3F] dark:bg-[#323232]">
               <button
                 type="button"
                 onClick={() => setPricingBillingPeriod("monthly")}
                 className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
                   pricingBillingPeriod === "monthly"
                     ? "bg-[#6C47FF] text-white"
-                    : "text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    : "text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-[#3A3A3A]"
                 }`}
               >
                 Monthly
@@ -1910,7 +1910,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                 className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
                   pricingBillingPeriod === "annual"
                     ? "bg-[#6C47FF] text-white"
-                    : "text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    : "text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-[#3A3A3A]"
                 }`}
               >
                 Annual
@@ -1940,10 +1940,10 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
               return (
                 <div
                   key={plan.name}
-                  className={`rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:bg-zinc-900/80 ${
+                  className={`rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:bg-[#323232]/80 ${
                     isSignaturePlan
                       ? "border-[#6C47FF]/35 shadow-[0_14px_28px_rgba(76,54,181,0.14)] dark:border-indigo-400/50"
-                      : "border-gray-200 dark:border-zinc-700"
+                      : "border-gray-200 dark:border-[#3F3F3F]"
                   }`}
                 >
                   <div className="mb-4 flex items-start justify-between gap-3">
@@ -2018,7 +2018,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
             <p className="text-sm font-medium text-rose-600 dark:text-rose-400">{pricingMessage}</p>
           ) : null}
 
-          <div className="rounded-2xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-5 shadow-sm dark:border-zinc-700 dark:from-zinc-900 dark:to-zinc-900">
+          <div className="rounded-2xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-5 shadow-sm dark:border-[#3F3F3F] dark:from-[#323232] dark:to-[#323232]">
             <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-gray-700 dark:text-zinc-300">
               Billing snapshot
             </h3>
@@ -2036,7 +2036,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                   <button
                     type="button"
                     onClick={handleCopyBillingId}
-                    className="ml-2 rounded border border-gray-300 px-2 py-0.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-100 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                    className="ml-2 rounded border border-gray-300 px-2 py-0.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-100 dark:border-[#4A4A4A] dark:text-zinc-200 dark:hover:bg-[#3A3A3A]"
                   >
                     Copy
                   </button>
@@ -2053,7 +2053,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
               onClick={() => {
                 void openBillingPortal();
               }}
-              className="mt-4 rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-800 transition hover:bg-gray-100 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              className="mt-4 rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-800 transition hover:bg-gray-100 dark:border-[#4A4A4A] dark:text-zinc-200 dark:hover:bg-[#3A3A3A]"
             >
               Open billing portal
             </button>
@@ -2063,7 +2063,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
         ) : null}
 
         {activeSettingsTab === "security" && canChangePassword && (
-        <section className="mt-8 border-t border-gray-200 pt-6 dark:border-zinc-800">
+        <section className="mt-8 border-t border-gray-200 pt-6 dark:border-[#3F3F3F]">
           <div className="flex items-center gap-2">
             <Lock className="h-4 w-4 text-slate-600 dark:text-zinc-400" aria-hidden />
             <h2 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">Change password</h2>
@@ -2089,10 +2089,10 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                   }}
                   required
                   minLength={8}
-                  className={`w-full rounded-md border bg-white px-3 py-2 text-gray-900 shadow-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 focus-visible:ring-offset-0 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500 ${
+                  className={`w-full rounded-md border bg-white px-3 py-2 text-gray-900 shadow-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 focus-visible:ring-offset-0 dark:bg-[#2B2B2B] dark:text-zinc-100 dark:placeholder:text-zinc-500 ${
                     currentPasswordHasError
                       ? "border-transparent ring-2 ring-rose-600/60 dark:ring-rose-500/50"
-                      : "border-gray-300 dark:border-zinc-700"
+                      : "border-gray-300 dark:border-[#3F3F3F]"
                   }`}
                   placeholder="Enter your current password"
                 />
@@ -2117,12 +2117,12 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                   }}
                   required
                   minLength={8}
-                  className={`w-full rounded-md border bg-white px-3 py-2 text-gray-900 shadow-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 focus-visible:ring-offset-0 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500 ${
+                  className={`w-full rounded-md border bg-white px-3 py-2 text-gray-900 shadow-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 focus-visible:ring-offset-0 dark:bg-[#2B2B2B] dark:text-zinc-100 dark:placeholder:text-zinc-500 ${
                     isNewPasswordMismatch || isNewPasswordRequirementsError
                       ? "border-transparent ring-2 ring-rose-600/60 dark:ring-rose-500/50"
                       : newPasswordHasError
                         ? "border-transparent ring-2 ring-rose-600/60 dark:ring-rose-500/50"
-                        : "border-gray-300 dark:border-zinc-700"
+                        : "border-gray-300 dark:border-[#3F3F3F]"
                   }`}
                   placeholder="Create new password"
                 />
@@ -2147,12 +2147,12 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                   }}
                   required
                   minLength={8}
-                  className={`w-full rounded-md border bg-white px-3 py-2 text-gray-900 shadow-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 focus-visible:ring-offset-0 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500 ${
+                  className={`w-full rounded-md border bg-white px-3 py-2 text-gray-900 shadow-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 focus-visible:ring-offset-0 dark:bg-[#2B2B2B] dark:text-zinc-100 dark:placeholder:text-zinc-500 ${
                     isNewPasswordMismatch || isNewPasswordRequirementsError
                       ? "border-transparent ring-2 ring-rose-600/60 dark:ring-rose-500/50"
                       : confirmPasswordHasError
                         ? "border-transparent ring-2 ring-rose-600/60 dark:ring-rose-500/50"
-                        : "border-gray-300 dark:border-zinc-700"
+                        : "border-gray-300 dark:border-[#3F3F3F]"
                   }`}
                   placeholder="Re-enter your new password"
                 />
@@ -2186,14 +2186,14 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
         )}
 
         {activeSettingsTab === "security" ? (
-        <section className="mt-8 border-t border-gray-200 pt-6 dark:border-zinc-800">
+        <section className="mt-8 border-t border-gray-200 pt-6 dark:border-[#3F3F3F]">
           <div className="flex items-center gap-2">
             <Shield className="h-4 w-4 text-slate-600 dark:text-zinc-400" aria-hidden />
             <h2 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">Security</h2>
           </div>
           <p className="mt-1 text-sm text-gray-600 dark:text-zinc-400">Keep your MergifyPDF account secure.</p>
           <div className="mt-4 space-y-6">
-            <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-800/60">
+            <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-4 dark:border-[#3F3F3F] dark:bg-[#2B2B2B]/60">
               <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-800 dark:text-zinc-100">Two-factor authentication</p>
@@ -2211,7 +2211,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                     <button
                       type="button"
                       onClick={openManageTwoFactor}
-                      className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-800 transition hover:bg-white dark:border-zinc-600 dark:text-zinc-100 dark:hover:bg-zinc-700"
+                      className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-800 transition hover:bg-white dark:border-[#4A4A4A] dark:text-zinc-100 dark:hover:bg-[#3A3A3A]"
                     >
                       Manage
                     </button>
@@ -2228,7 +2228,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
               </div>
             </div>
 
-          <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-800/60">
+          <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-[#3F3F3F] dark:bg-[#2B2B2B]/60">
             <p className="text-sm font-medium text-gray-800 dark:text-zinc-100">Delete account</p>
             <p className="mt-1 text-xs text-gray-600 dark:text-zinc-400">
               Permanently delete your MergifyPDF account and all associated data. This action cannot be
@@ -2244,7 +2244,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
           </div>
 
           {managedByGoogle && (
-            <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-800/60">
+            <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-[#3F3F3F] dark:bg-[#2B2B2B]/60">
               <p className="text-sm font-medium text-gray-800 dark:text-zinc-100">Connected account</p>
               <p className="mt-1 text-xs text-gray-600 dark:text-zinc-400">
                 Your MergifyPDF account is connected to Google for sign-in.
@@ -2252,7 +2252,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
               <button
                 type="button"
                 onClick={() => setDisconnectModalOpen(true)}
-                className="mt-3 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-800 transition hover:bg-white dark:border-zinc-600 dark:text-zinc-100 dark:hover:bg-zinc-700"
+                className="mt-3 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-800 transition hover:bg-white dark:border-[#4A4A4A] dark:text-zinc-100 dark:hover:bg-[#3A3A3A]"
               >
                 Disconnect Google
               </button>

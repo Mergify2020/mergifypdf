@@ -33,10 +33,8 @@ export default function SettingsMenu({
   const [hasActivePlan, setHasActivePlan] = useState<boolean | null>(null);
   const [stripeStatus, setStripeStatus] = useState<string | null>(null);
   const [billingPortalPending, setBillingPortalPending] = useState(false);
-  const [theme, setTheme] = useState<"light" | "dark">(() => {
-    if (typeof window === "undefined") return "light";
-    return window.localStorage.getItem("theme") === "dark" ? "dark" : "light";
-  });
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [themeHydrated, setThemeHydrated] = useState(false);
   const avatarKey = session?.user?.id ?? session?.user?.email ?? null;
   const { avatar } = useAvatarPreference(avatarKey);
   const profileName = (session?.user?.name ?? "").trim();
@@ -51,6 +49,16 @@ export default function SettingsMenu({
   useEffect(() => {
     setAvatarLoadFailed(false);
   }, [avatar]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const htmlHasDark = document.documentElement.classList.contains("dark");
+    const stored = window.localStorage.getItem("theme");
+    if (stored === "dark" || htmlHasDark) {
+      setTheme("dark");
+    }
+    setThemeHydrated(true);
+  }, []);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
@@ -220,6 +228,8 @@ export default function SettingsMenu({
   }
 
   const shouldShowUpdatePaymentCta = stripeStatus === "past_due" || stripeStatus === "unpaid";
+  const customTriggerBase =
+    "inline-flex items-center justify-center rounded-full border border-slate-200 bg-white transition hover:bg-slate-100 focus:outline-none active:scale-[0.99]";
 
   return (
     <>
@@ -233,9 +243,12 @@ export default function SettingsMenu({
           onClick={handleToggle}
           className={
             trigger === "custom"
-              ? (triggerClassName ??
-                "inline-flex items-center justify-center rounded-full border border-slate-200 bg-white transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-800 active:scale-[0.99]")
-              : `flex items-center justify-center rounded-full border border-slate-200 bg-white transition hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-800 active:scale-95 ${outerSizeClass} ${triggerClassName ?? ""}`
+              ? `${triggerClassName ?? customTriggerBase}`
+              : `flex items-center justify-center rounded-full border transition focus:outline-none active:scale-95 ${outerSizeClass} ${
+                  trigger === "avatar"
+                    ? "border-transparent bg-transparent hover:bg-transparent"
+                    : "border-slate-200 bg-white hover:bg-slate-200"
+                } ${triggerClassName ?? ""}`
           }
           aria-haspopup="menu"
           aria-expanded={open}
@@ -268,13 +281,13 @@ export default function SettingsMenu({
 
         <div
           className={
-            "absolute right-0 z-40 mt-3 w-[280px] rounded-xl border border-[#E5E7EB] bg-white p-3 text-left shadow-[0_16px_36px_rgba(15,23,42,0.14)] origin-top-right transition duration-200 ease-out dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[0_20px_44px_rgba(0,0,0,0.5)] " +
+            "absolute right-0 z-40 mt-3 w-[280px] rounded-xl border border-[#E5E7EB] bg-white p-3 text-left shadow-[0_16px_36px_rgba(15,23,42,0.14)] origin-top-right transition duration-200 ease-out dark:border-[#3F3F3F] dark:bg-[#323232] dark:shadow-[0_20px_44px_rgba(0,0,0,0.5)] " +
             (open
               ? "pointer-events-auto opacity-100 translate-y-0 scale-100"
               : "pointer-events-none opacity-0 translate-y-1 scale-95")
           }
         >
-        <div className={`space-y-3 text-sm text-slate-700 dark:text-zinc-200 ${open ? "avatar-dropdown-menu" : ""}`}>
+        <div className={`space-y-3 text-sm text-slate-700 dark:text-zinc-100 ${open ? "avatar-dropdown-menu" : ""}`}>
             <div className="flex items-center gap-3 px-3 py-2.5">
               {showAvatarImage ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -300,7 +313,7 @@ export default function SettingsMenu({
                     </p>
                   ) : null}
                   {profileEmail ? (
-                    <p className="max-w-[190px] truncate text-sm text-[#64748B] dark:text-zinc-400">
+                    <p className="max-w-[190px] truncate text-sm text-[#64748B] dark:text-zinc-300">
                       {profileEmail}
                     </p>
                   ) : null}
@@ -308,7 +321,7 @@ export default function SettingsMenu({
               ) : null}
             </div>
 
-            <div className="border-t border-[#E6EBF2] pt-2 dark:border-zinc-700">
+            <div className="border-t border-[#E6EBF2] pt-2 dark:border-[#3F3F3F]">
               {shouldShowUpdatePaymentCta ? (
                 <button
                   type="button"
@@ -337,7 +350,7 @@ export default function SettingsMenu({
               <button
                 type="button"
                 onClick={handleProjects}
-                className="group flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-[15px] font-medium text-[#1E293B] transition hover:bg-[#F8FAFC] hover:text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/35 focus:ring-offset-2 focus:ring-offset-white dark:text-zinc-100 dark:hover:bg-zinc-800/80 dark:hover:text-zinc-50 dark:focus:ring-offset-zinc-900"
+                className="group flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-[15px] font-medium text-[#1E293B] transition hover:bg-[#F8FAFC] hover:text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/35 focus:ring-offset-2 focus:ring-offset-white dark:text-zinc-100 dark:hover:bg-[#3A3A3A]/70 dark:hover:text-white dark:focus:ring-offset-[#323232]"
               >
                 <Folders className="h-4 w-4 text-current" aria-hidden />
                 <span>All projects</span>
@@ -345,7 +358,7 @@ export default function SettingsMenu({
               <button
                 type="button"
                 onClick={handleSignatures}
-                className="group flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-[15px] font-medium text-[#1E293B] transition hover:bg-[#F8FAFC] hover:text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/35 focus:ring-offset-2 focus:ring-offset-white dark:text-zinc-100 dark:hover:bg-zinc-800/80 dark:hover:text-zinc-50 dark:focus:ring-offset-zinc-900"
+                className="group flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-[15px] font-medium text-[#1E293B] transition hover:bg-[#F8FAFC] hover:text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/35 focus:ring-offset-2 focus:ring-offset-white dark:text-zinc-100 dark:hover:bg-[#3A3A3A]/70 dark:hover:text-white dark:focus:ring-offset-[#323232]"
               >
                 <PenLine className="h-4 w-4 text-current" aria-hidden />
                 <span>Signatures</span>
@@ -353,7 +366,7 @@ export default function SettingsMenu({
               <button
                 type="button"
                 onClick={handleAccountSettings}
-                className="group flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-[15px] font-medium text-[#1E293B] transition hover:bg-[#F8FAFC] hover:text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/35 focus:ring-offset-2 focus:ring-offset-white dark:text-zinc-100 dark:hover:bg-zinc-800/80 dark:hover:text-zinc-50 dark:focus:ring-offset-zinc-900"
+                className="group flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-[15px] font-medium text-[#1E293B] transition hover:bg-[#F8FAFC] hover:text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/35 focus:ring-offset-2 focus:ring-offset-white dark:text-zinc-100 dark:hover:bg-[#3A3A3A]/70 dark:hover:text-white dark:focus:ring-offset-[#323232]"
               >
                 <Settings className="h-4 w-4 text-current" aria-hidden />
                 <span>Account Settings</span>
@@ -363,7 +376,7 @@ export default function SettingsMenu({
                 onClick={() => {
                   void handleBillingPortal();
                 }}
-                className="group flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-[15px] font-medium text-[#1E293B] transition hover:bg-[#F8FAFC] hover:text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/35 focus:ring-offset-2 focus:ring-offset-white dark:text-zinc-100 dark:hover:bg-zinc-800/80 dark:hover:text-zinc-50 dark:focus:ring-offset-zinc-900"
+                className="group flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-[15px] font-medium text-[#1E293B] transition hover:bg-[#F8FAFC] hover:text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/35 focus:ring-offset-2 focus:ring-offset-white dark:text-zinc-100 dark:hover:bg-[#3A3A3A]/70 dark:hover:text-white dark:focus:ring-offset-[#323232]"
               >
                 <CreditCard className="h-4 w-4 text-current" aria-hidden />
                 <span>Billing portal</span>
@@ -384,13 +397,14 @@ export default function SettingsMenu({
               </button>
             </div>
 
-            <div className="border-t border-[#E6EBF2] pt-2 dark:border-zinc-700">
+            <div className="border-t border-[#E6EBF2] pt-2 dark:border-[#3F3F3F]">
               <div className="px-3 py-2">
-                <div className="relative grid h-10 w-full grid-cols-2 gap-1 rounded-lg border border-gray-300 bg-white p-1 dark:border-zinc-700 dark:bg-zinc-900">
+                <div className="relative grid h-10 w-full grid-cols-2 gap-1 rounded-lg border border-gray-300 bg-white p-1 dark:border-[#3F3F3F] dark:bg-[#2B2B2B]">
                     <span
                       aria-hidden
+                      suppressHydrationWarning
                       className={`absolute inset-y-1 left-1 w-[calc(50%-6px)] rounded-md bg-[#1F2937] shadow-sm transition-transform dark:bg-white ${
-                        theme === "dark" ? "translate-x-[calc(100%+4px)]" : "translate-x-0"
+                        themeHydrated && theme === "dark" ? "translate-x-[calc(100%+4px)]" : "translate-x-0"
                       }`}
                     />
                     <button
@@ -400,7 +414,7 @@ export default function SettingsMenu({
                       className={`relative z-10 flex min-w-0 items-center justify-center gap-1.5 rounded-md px-1.5 py-2 text-sm font-medium leading-none transition ${
                         theme === "light"
                           ? "text-white dark:text-zinc-950"
-                          : "text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                          : "text-gray-700 hover:bg-gray-100 dark:text-zinc-200 dark:hover:bg-[#3A3A3A]"
                       }`}
                     >
                       <Sun className="h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -413,7 +427,7 @@ export default function SettingsMenu({
                       className={`relative z-10 flex min-w-0 items-center justify-center gap-1.5 rounded-md px-1.5 py-2 text-sm font-medium leading-none transition ${
                         theme === "dark"
                           ? "text-white dark:text-zinc-950"
-                          : "text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                          : "text-gray-700 hover:bg-gray-100 dark:text-zinc-200 dark:hover:bg-[#3A3A3A]"
                       }`}
                     >
                       <Moon className="h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -426,7 +440,7 @@ export default function SettingsMenu({
                 onClick={handleSignOut}
                 disabled={busy}
                 aria-disabled={busy}
-                className="group flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-[15px] font-medium text-[#B91C1C] transition hover:bg-red-50 hover:text-[#991B1B] active:scale-[0.99] disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-[#DC2626]/30 focus:ring-offset-2 focus:ring-offset-white dark:text-red-400 dark:hover:bg-red-950/30 dark:hover:text-red-300 dark:focus:ring-offset-zinc-900"
+                className="group flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-[15px] font-medium text-[#B91C1C] transition hover:bg-red-50 hover:text-[#991B1B] active:scale-[0.99] disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-[#DC2626]/30 focus:ring-offset-2 focus:ring-offset-white dark:text-red-400 dark:hover:bg-[#3A3A3A]/70 dark:hover:text-red-300 dark:focus:ring-offset-[#323232]"
               >
                 <LogOut className="h-4 w-4 text-current" aria-hidden />
                 <span>{busy ? "Logging out..." : "Log out"}</span>
@@ -438,14 +452,14 @@ export default function SettingsMenu({
       {billingPortalPending && typeof document !== "undefined"
         ? createPortal(
           <div className="pointer-events-none fixed inset-0 z-[1200]">
-            <div className="absolute inset-0 bg-white dark:bg-[#0F1117]" />
+            <div className="absolute inset-0 bg-white dark:bg-[#252525]" />
             <div className="relative flex min-h-screen items-center justify-center px-6 py-10">
               <div className="pointer-events-none flex flex-col items-center text-center">
                 <div
-                  className="h-14 w-14 animate-spin rounded-full border-[5px] border-[#D9CCFF] border-t-[#6C47FF]"
+                  className="h-14 w-14 animate-spin rounded-full border-[5px] border-[#D9CCFF] border-t-[#6C47FF] dark:border-[#3F3F3F] dark:border-t-[#8B6CFF]"
                   aria-hidden
                 />
-                <p className="mt-5 text-[24px] font-semibold tracking-tight text-slate-900 dark:text-zinc-100 sm:text-[28px]">
+                <p className="mt-5 text-[24px] font-semibold tracking-tight text-slate-900 dark:text-[#F5F5F5] sm:text-[28px]">
                   Opening Billing Portal...
                 </p>
               </div>

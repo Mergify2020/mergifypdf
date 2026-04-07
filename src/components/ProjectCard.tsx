@@ -545,12 +545,12 @@ export default function ProjectCard({
     .join(" ");
 
   const checkboxClasses = [
-    "absolute left-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-[10px] border-[3px] text-xs font-semibold shadow-md dark:shadow-none transition-transform transition-opacity duration-150 xl:h-9 xl:w-9",
+    "absolute left-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-[10px] border-[2px] text-xs font-semibold shadow-md dark:shadow-[0_6px_16px_rgba(0,0,0,0.35)] transition-transform transition-opacity duration-150 xl:h-9 xl:w-9",
     isSelected
-        ? "bg-[#6C47FF] border-[#6C47FF] text-white opacity-100 scale-100 dark:bg-[#A78BFA] dark:border-[#A78BFA] dark:text-zinc-900"
+        ? "bg-[#6C47FF] border-[#6C47FF] text-white opacity-100 scale-100"
         : [
           // Always visible on very small screens (no hover), hover-only from sm and up.
-          "bg-white border-slate-300 text-slate-500 shadow-[0_3px_10px_rgba(15,23,42,0.14)] opacity-100 scale-90 dark:bg-zinc-900/95 dark:border-zinc-600 dark:text-zinc-300",
+          "bg-white/95 border-slate-300 text-slate-500 shadow-[0_3px_10px_rgba(15,23,42,0.14)] opacity-100 scale-90 dark:bg-[#323232] dark:border-[#3F3F3F] dark:text-zinc-200 dark:shadow-[0_6px_16px_rgba(0,0,0,0.35)]",
           "sm:opacity-0 sm:scale-90",
           hasSelection ? "sm:!opacity-100 sm:!scale-100" : "",
         ].join(" "),
@@ -558,7 +558,7 @@ export default function ProjectCard({
     .filter(Boolean)
     .join(" ");
   const actionsContainerClasses = [
-    "absolute right-3 top-3 z-10 inline-flex items-center overflow-hidden rounded-[10px] bg-white/95 text-slate-400 shadow-[0_4px_12px_rgba(15,23,42,0.18)] dark:bg-zinc-900/95 dark:text-zinc-200 dark:shadow-none",
+    "absolute right-3 top-3 z-10 inline-flex items-center overflow-hidden rounded-[10px] bg-white/95 text-slate-400 shadow-[0_4px_12px_rgba(15,23,42,0.18)] dark:bg-[#323232] dark:text-zinc-100 dark:shadow-[0_6px_18px_rgba(0,0,0,0.35)] dark:border dark:border-[#3F3F3F]",
     "opacity-100 transition-opacity duration-150",
     "sm:opacity-0",
     menuOpen ? "sm:!opacity-100" : "",
@@ -566,7 +566,7 @@ export default function ProjectCard({
     .filter(Boolean)
     .join(" ");
   const actionButtonBase =
-    "flex h-9 w-9 items-center justify-center text-sm transition hover:bg-slate-100/80 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-zinc-800/80 xl:h-10 xl:w-10";
+    "flex h-9 w-9 items-center justify-center text-sm transition hover:bg-slate-100/80 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-[#3A3A3A]/80 xl:h-10 xl:w-10";
 
   const startRenaming = (event?: { preventDefault: () => void; stopPropagation: () => void }) => {
     event?.preventDefault();
@@ -699,7 +699,7 @@ export default function ProjectCard({
   };
 
   const menuClassName =
-    "project-actions-menu z-[9999] w-56 overflow-hidden rounded-xl border border-[#E5E7EB] bg-white text-sm text-slate-800 shadow-[0_16px_36px_rgba(15,23,42,0.14)] sm:w-64 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:shadow-[0_20px_44px_rgba(0,0,0,0.5)]";
+    "project-actions-menu z-[9999] w-56 overflow-hidden rounded-xl border border-[#E5E7EB] bg-white text-sm text-slate-800 shadow-[0_16px_36px_rgba(15,23,42,0.14)] sm:w-64 dark:border-[#3F3F3F] dark:bg-[#323232] dark:text-zinc-100 dark:shadow-[0_20px_44px_rgba(0,0,0,0.5)]";
 
   const renderMenuPanel = (style: CSSProperties, useFixed: boolean) => (
     <div
@@ -787,7 +787,7 @@ export default function ProjectCard({
               <button
                 type="button"
                 aria-label="Rename project"
-                className="inline-flex h-7 w-7 flex-none items-center justify-center rounded-md text-slate-500 transition hover:bg-[#F8FAFC] hover:text-slate-700 dark:text-zinc-300 dark:hover:bg-zinc-800/70 dark:hover:text-zinc-100"
+              className="inline-flex h-7 w-7 flex-none items-center justify-center rounded-md text-slate-500 transition hover:bg-[#F8FAFC] hover:text-slate-700 dark:text-zinc-300 dark:hover:bg-[#3A3A3A]/70 dark:hover:text-zinc-100"
                 onClick={(event) => {
                   startRenaming(event);
                 }}
@@ -799,11 +799,11 @@ export default function ProjectCard({
         )}
         <p className="mt-1 text-xs font-medium text-slate-500 dark:text-zinc-400">{project.updated}</p>
       </div>
-      <div className="h-px bg-[#E6EBF2] dark:bg-zinc-800" />
+      <div className="h-px bg-[#E6EBF2] dark:bg-[#3A3A3A]" />
       <button
         type="button"
         role="menuitem"
-        className="mx-2 mt-1 flex w-[calc(100%-1rem)] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-slate-900 transition hover:bg-[#F8FAFC] dark:text-zinc-100 dark:hover:bg-zinc-800/70"
+        className="mx-2 mt-1 flex w-[calc(100%-1rem)] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-slate-900 transition hover:bg-[#F8FAFC] dark:text-zinc-100 dark:hover:bg-[#3A3A3A]/70"
         onClick={(event) => {
           event.preventDefault();
           event.stopPropagation();
@@ -818,7 +818,7 @@ export default function ProjectCard({
       <button
         type="button"
         role="menuitem"
-        className="mx-2 flex w-[calc(100%-1rem)] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-slate-900 transition hover:bg-[#F8FAFC] dark:text-zinc-100 dark:hover:bg-zinc-800/70"
+        className="mx-2 flex w-[calc(100%-1rem)] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-slate-900 transition hover:bg-[#F8FAFC] dark:text-zinc-100 dark:hover:bg-[#3A3A3A]/70"
         onClick={(event) => {
           event.preventDefault();
           event.stopPropagation();
@@ -835,7 +835,7 @@ export default function ProjectCard({
         role="menuitem"
         disabled={isPrinting}
         aria-disabled={isPrinting}
-        className="mx-2 flex w-[calc(100%-1rem)] items-center justify-between rounded-lg px-2.5 py-2 text-left text-slate-900 transition hover:bg-[#F8FAFC] disabled:cursor-not-allowed disabled:opacity-60 dark:text-zinc-100 dark:hover:bg-zinc-800/70"
+        className="mx-2 flex w-[calc(100%-1rem)] items-center justify-between rounded-lg px-2.5 py-2 text-left text-slate-900 transition hover:bg-[#F8FAFC] disabled:cursor-not-allowed disabled:opacity-60 dark:text-zinc-100 dark:hover:bg-[#3A3A3A]/70"
         onClick={handlePrint}
       >
         <span className="flex min-w-0 items-center gap-2.5">
@@ -854,7 +854,7 @@ export default function ProjectCard({
         role="menuitem"
         disabled
         aria-disabled="true"
-        className="mx-2 flex w-[calc(100%-1rem)] items-center justify-between rounded-lg px-2.5 py-2 text-left text-slate-500 opacity-55 transition disabled:cursor-not-allowed dark:text-zinc-400"
+        className="mx-2 flex w-[calc(100%-1rem)] items-center justify-between rounded-lg px-2.5 py-2 text-left text-slate-500 opacity-55 transition disabled:cursor-not-allowed dark:text-zinc-300"
       >
         <span className="flex min-w-0 items-center gap-2.5">
           <span className="flex h-5 w-5 items-center justify-center text-current">
@@ -868,7 +868,7 @@ export default function ProjectCard({
         type="button"
         role="menuitem"
         disabled={isCopying}
-        className="mx-2 flex w-[calc(100%-1rem)] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-slate-900 transition hover:bg-[#F8FAFC] disabled:cursor-not-allowed disabled:opacity-60 dark:text-zinc-100 dark:hover:bg-zinc-800/70"
+        className="mx-2 flex w-[calc(100%-1rem)] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-slate-900 transition hover:bg-[#F8FAFC] disabled:cursor-not-allowed disabled:opacity-60 dark:text-zinc-100 dark:hover:bg-[#3A3A3A]/70"
         onClick={(event) => {
           event.preventDefault();
           event.stopPropagation();
@@ -884,11 +884,11 @@ export default function ProjectCard({
         </span>
         <span className="text-[15px] font-medium text-slate-900 dark:text-zinc-100">Make a copy</span>
       </button>
-      <div className="mx-3 mt-1 h-px bg-[#E6EBF2] dark:bg-zinc-800" />
+      <div className="mx-3 mt-1 h-px bg-[#E6EBF2] dark:bg-[#3A3A3A]" />
       <button
         type="button"
         role="menuitem"
-        className="mx-2 mb-1.5 flex w-[calc(100%-1rem)] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-rose-700 transition hover:bg-rose-50 dark:hover:bg-zinc-800/60"
+        className="mx-2 mb-1.5 flex w-[calc(100%-1rem)] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-rose-700 transition hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-500/15"
         onClick={async (event) => {
           event.preventDefault();
           event.stopPropagation();
@@ -1027,7 +1027,7 @@ export default function ProjectCard({
               document.body
             )
           : null}
-        <div className="project-card-preview relative m-[3px] w-[calc(100%-6px)] aspect-square rounded-[10px] bg-[#EEF1F5] border border-[rgba(0,0,0,0.06)] transition-colors dark:border-transparent dark:bg-zinc-800/70">
+        <div className="project-card-preview relative m-[3px] w-[calc(100%-6px)] aspect-square rounded-[10px] bg-[#EEF1F5] border border-[rgba(0,0,0,0.06)] transition-colors dark:border-transparent dark:bg-[#2A2A2A] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.02)]">
           <Link
             href={`/studio?project=${encodeURIComponent(project.id)}`}
             className="absolute inset-0"
@@ -1046,13 +1046,13 @@ export default function ProjectCard({
             }}
           />
           {typeof project.pagesCount === "number" && project.pagesCount > 0 ? (
-            <div className="project-card-pages pointer-events-none absolute bottom-2.5 left-2.5 z-10 hidden rounded-full bg-black/60 px-3.5 py-1 text-[12px] font-semibold text-white opacity-0 shadow-sm dark:shadow-none backdrop-blur-sm transition-opacity dark:bg-zinc-800/80 dark:text-zinc-100 sm:block">
+            <div className="project-card-pages pointer-events-none absolute bottom-2.5 left-2.5 z-10 hidden rounded-full bg-black/60 px-3.5 py-1 text-[12px] font-semibold text-white opacity-0 shadow-sm dark:shadow-none backdrop-blur-sm transition-opacity dark:bg-[#2B2B2B]/80 dark:text-zinc-100 sm:block">
               {project.pagesCount} {project.pagesCount === 1 ? "page" : "pages"}
             </div>
           ) : null}
           <div
             aria-hidden="true"
-            className="project-card-overlay pointer-events-none absolute inset-0 z-[5] bg-black/[0.03] opacity-0 transition-opacity duration-150"
+            className="project-card-overlay pointer-events-none absolute inset-0 z-[5] bg-black/[0.03] opacity-0 transition-opacity duration-150 dark:bg-black/15"
           />
           <div className="flex h-full w-full items-center justify-center p-3 sm:p-4">
             {previewUrl ? (
@@ -1078,7 +1078,7 @@ export default function ProjectCard({
               />
             ) : (
               !previewLoading ? (
-                <div className="flex h-full w-full items-center justify-center text-slate-300 dark:text-zinc-600">
+                <div className="flex h-full w-full items-center justify-center text-slate-300 dark:text-zinc-400">
                   <svg viewBox="0 0 64 64" className="h-10 w-10" aria-hidden="true">
                     <path
                       d="M18 8h20l10 10v34a4 4 0 0 1-4 4H18a4 4 0 0 1-4-4V12a4 4 0 0 1 4-4z"
@@ -1106,7 +1106,7 @@ export default function ProjectCard({
             )}
           </div>
           {previewLoading ? (
-            <span className="pointer-events-none absolute inset-0 z-[6] overflow-hidden rounded-[10px] bg-slate-200/70 dark:bg-zinc-700/50">
+            <span className="pointer-events-none absolute inset-0 z-[6] overflow-hidden rounded-[10px] bg-slate-200/70 dark:bg-[#2B2B2B]/70">
               <span className="absolute inset-0 skeleton-shimmer opacity-90" />
             </span>
           ) : null}

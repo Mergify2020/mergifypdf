@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, startTransition, useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
+import { flushSync } from "react-dom";
 import { createPortal } from "react-dom";
 import { signIn, useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -371,6 +372,11 @@ variants: {
     },
   },
 };
+
+const LINE_STYLE_OPTIONS: { value: LineStyle; label: string }[] = [
+  { value: "solid", label: "Solid" },
+  { value: "dashed", label: "Dashed" },
+];
 
 
 const HIGHLIGHT_COLORS = {
@@ -1622,6 +1628,36 @@ function mergePageList(current: PageItem[], nextPages: PageItem[]) {
   });
 }
 
+function mergePageListPreserveOrder(current: PageItem[], nextPages: PageItem[]) {
+  if (current.length === 0) return nextPages;
+  const nextById = new Map(nextPages.map((page) => [page.id, page]));
+  const preserved = current
+    .filter((page) => nextById.has(page.id))
+    .map((page) => {
+      const next = nextById.get(page.id)!;
+      const rotation = typeof page.rotation === "number" ? page.rotation : next.rotation;
+      const preview = page.preview || next.preview;
+      const thumb = page.thumb || next.thumb;
+      const thumbWidth = page.thumbWidth ?? next.thumbWidth ?? 0;
+      const thumbHeight = page.thumbHeight ?? next.thumbHeight ?? 0;
+      const width = page.width ?? next.width;
+      const height = page.height ?? next.height;
+      return {
+        ...next,
+        rotation,
+        preview,
+        thumb,
+        thumbWidth,
+        thumbHeight,
+        width,
+        height,
+      };
+    });
+  const existingIds = new Set(preserved.map((page) => page.id));
+  const appended = nextPages.filter((page) => !existingIds.has(page.id));
+  return [...preserved, ...appended];
+}
+
 
 /** One sortable thumbnail tile */
 function SortableThumb({
@@ -1699,15 +1735,17 @@ function SortableThumb({
 	      >
 	        <div className="relative w-full" style={{ paddingBottom: getAspectPadding(frameWidth, frameHeight) }}>
 	          <div
-	            className={`absolute inset-0 flex items-center justify-center overflow-hidden rounded-none border bg-white transition ${
+	            className={`absolute inset-0 flex items-center justify-center overflow-hidden rounded-none border bg-white transition-colors duration-100 ease-out dark:border-[#4A4A4A] ${
 		              selected
-		                ? "border-2 border-[#6D28D9]"
-		                : "border-2 border-slate-300 hover:border-slate-400"
+		                ? "border-2 border-[#6C47FF] dark:border-[#8B6CFF]"
+		                : "border-2 border-slate-300 hover:border-slate-400 group-hover:border-slate-400 dark:border-[#4A4A4A] dark:hover:border-[#5B5B65] dark:group-hover:border-[#5B5B65]"
 		            }`}
 	          >
 	            <span
-	              className={`absolute left-0 top-0 z-10 flex h-7 w-7 items-center justify-center rounded-none text-xs font-semibold tabular-nums ${
-	                selected ? "bg-[#6D28D9] text-white" : "bg-slate-200 text-slate-700 group-hover:bg-slate-400 group-hover:text-white"
+	              className={`absolute left-0 top-0 z-10 flex h-7 w-7 items-center justify-center rounded-none text-xs font-semibold tabular-nums transition-colors duration-100 ease-out ${
+	                selected
+	                  ? "bg-[#6C47FF] text-white dark:bg-[#8B6CFF]"
+	                  : "bg-slate-200 text-slate-700 group-hover:bg-slate-400 group-hover:text-white dark:bg-[#4A4A4A] dark:text-zinc-200 dark:group-hover:bg-[#52525B]"
 	              }`}
 	            >
 	              {index + 1}
@@ -1740,7 +1778,7 @@ function SortableThumb({
 	      </div>
 	      <div className="pointer-events-none absolute inset-x-0 bottom-3 z-20 flex justify-center opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100">
 	        <div
-            className="flex items-center justify-center gap-1 rounded-xl border border-slate-300/90 bg-white/96 px-2 py-1.5 shadow-[0_8px_18px_rgba(15,23,42,0.10)] backdrop-blur-sm"
+            className="flex items-center justify-center gap-1 rounded-xl border border-slate-300/90 bg-white/96 px-2 py-1.5 shadow-[0_8px_18px_rgba(15,23,42,0.10)] backdrop-blur-sm dark:border-[#3F3F3F] dark:bg-[#323232]/96 dark:shadow-[0_12px_28px_rgba(0,0,0,0.45)]"
           >
 	          <button
 	            type="button"
@@ -1749,13 +1787,13 @@ function SortableThumb({
 	              event.stopPropagation();
 	              onMoveUp();
 	            }}
-	            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
+	            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-40 dark:text-[#E5E5E5] dark:hover:bg-[#3A3A3A] dark:hover:text-white"
 	            aria-label="Move page up"
 	            disabled={index === 0}
 	          >
 	            <ChevronUp className="h-4 w-4" aria-hidden />
 	          </button>
-	          <div className="h-5 w-px bg-slate-200" aria-hidden />
+	          <div className="h-5 w-px bg-slate-200 dark:bg-[#3A3A3A]" aria-hidden />
 	          <button
 	            type="button"
 	            onPointerDown={(event) => event.stopPropagation()}
@@ -1763,13 +1801,13 @@ function SortableThumb({
 	              event.stopPropagation();
 	              onMoveDown();
 	            }}
-	            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
+	            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-40 dark:text-[#E5E5E5] dark:hover:bg-[#3A3A3A] dark:hover:text-white"
 	            aria-label="Move page down"
 	            disabled={disableMoveDown}
 	          >
 	            <ChevronDown className="h-4 w-4" aria-hidden />
 	          </button>
-	          <div className="h-5 w-px bg-slate-200" aria-hidden />
+	          <div className="h-5 w-px bg-slate-200 dark:bg-[#3A3A3A]" aria-hidden />
 	          <button
 	            type="button"
 	            onPointerDown={(event) => event.stopPropagation()}
@@ -1777,12 +1815,12 @@ function SortableThumb({
 	              event.stopPropagation();
 	              onRotate();
 	            }}
-	            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-950"
+	            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 dark:text-[#E5E5E5] dark:hover:bg-[#3A3A3A] dark:hover:text-white"
 	            aria-label="Rotate page"
 	          >
 	            <RotateCw className="h-4 w-4" aria-hidden />
 	          </button>
-	          <div className="h-5 w-px bg-slate-200" aria-hidden />
+	          <div className="h-5 w-px bg-slate-200 dark:bg-[#3A3A3A]" aria-hidden />
 	          <button
 	            type="button"
 	            onPointerDown={(event) => event.stopPropagation()}
@@ -1790,12 +1828,12 @@ function SortableThumb({
 	              event.stopPropagation();
 	              onDuplicate();
 	            }}
-	            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-950"
+	            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 dark:text-[#E5E5E5] dark:hover:bg-[#3A3A3A] dark:hover:text-white"
 	            aria-label="Duplicate page"
 	          >
 	            <Copy className="h-4 w-4" aria-hidden />
 	          </button>
-	          <div className="h-5 w-px bg-slate-200" aria-hidden />
+	          <div className="h-5 w-px bg-slate-200 dark:bg-[#3A3A3A]" aria-hidden />
             <button
               type="button"
               onPointerDown={(event) => event.stopPropagation()}
@@ -1803,7 +1841,7 @@ function SortableThumb({
                 event.stopPropagation();
                 onDelete();
               }}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-rose-600 transition hover:bg-rose-100 hover:text-rose-700"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-rose-600 transition hover:bg-rose-100 hover:text-rose-700 dark:text-rose-300 dark:hover:bg-rose-500/20 dark:hover:text-rose-200"
               aria-label="Delete page"
             >
               <Trash2 className="h-4 w-4" aria-hidden />
@@ -1954,10 +1992,12 @@ function WorkspaceClient() {
   const [searchResults, setSearchResults] = useState<number[]>([]);
   const [activeSearchResultIndex, setActiveSearchResultIndex] = useState(0);
   const [pageActionMenuId, setPageActionMenuId] = useState<string | null>(null);
+  const [pendingInsertAfterPageId, setPendingInsertAfterPageId] = useState<string | null>(null);
 		  const [shouldCenterOnChange, setShouldCenterOnChange] = useState(false);
 		  const [zoomPercent, setZoomPercent] = useState(50);
 		  const [baseScale, setBaseScale] = useState(PT_TO_PX);
 		  const [userAdjustedZoom, setUserAdjustedZoom] = useState(false);
+  const [toolOptionsCollapsed, setToolOptionsCollapsed] = useState(false);
 		  // 100% = true document scale (1pt = 1/72in).
 		  const zoomMultiplier = clamp(zoomPercent / 100, ZOOM_MIN_PERCENT / 100, MAX_ZOOM_MULTIPLIER);
   const [showPageOrderPanel, setShowPageOrderPanel] = useState(true);
@@ -2038,6 +2078,7 @@ function WorkspaceClient() {
   const existingProjectOverlayHideSentRef = useRef(false);
   const [loadedPreviewIds, setLoadedPreviewIds] = useState<Set<string>>(() => new Set());
   const [loadedThumbIds, setLoadedThumbIds] = useState<Set<string>>(() => new Set());
+  const INSERT_BEFORE_FIRST_ID = "__before_first__";
 
   useEffect(() => {
     if (showStartupOverlay) {
@@ -3822,6 +3863,9 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   const hasHydratedHighlights = useRef(false);
   const hasHydratedSignatures = useRef(false);
   const pendingInsertedPageRef = useRef<{ afterId: string; newId: string } | null>(null);
+  const pendingInsertedSourceRef = useRef<{ afterId: string; sourceIds: string[] } | null>(null);
+  const pendingCloudSaveRef = useRef(false);
+  const savedPageOrderRef = useRef<Array<{ srcIdx: number; pageIdx: number; id?: string }>>([]);
   const lastProjectKeyRef = useRef<string | null>(null);
   const pendingInitialRenderRef = useRef<PageItem[]>([]);
   const restoringPreviewCacheRef = useRef(false);
@@ -4088,53 +4132,53 @@ const timer =
   const MIN_SHAPE_THICKNESS = 1;
   const MAX_SHAPE_THICKNESS = 10;
   const toolSwitchBase = "flex items-center gap-2 px-4 py-2 text-sm font-semibold transition";
-  const toolSwitchActive = "bg-[#024d7c] text-white shadow-sm";
-  const toolSwitchInactive = "bg-white text-slate-700 hover:bg-slate-50";
+  const toolSwitchActive = "bg-[#024d7c] text-white shadow-sm dark:bg-[#4A4A4A]";
+  const toolSwitchInactive = "bg-white text-slate-700 hover:bg-slate-50 dark:bg-[#2A2A31] dark:text-zinc-200 dark:hover:bg-[#34343C]";
   const buttonBase =
     "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition";
   const buttonNeutral =
-    `${buttonBase} border border-slate-200 bg-white text-slate-800 shadow-[0_4px_14px_rgba(15,23,42,0.12)] hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50`;
+    `${buttonBase} border border-slate-200 bg-white text-slate-800 shadow-[0_4px_14px_rgba(15,23,42,0.12)] hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50 dark:border-[#2A2A31] dark:bg-[#1C1C1F] dark:text-zinc-100 dark:hover:border-[#4A4A4A] dark:hover:bg-[#34343C]`;
   const buttonPrimary =
-    `${buttonBase} bg-[#024d7c] text-white shadow-md shadow-[#012a44]/30 hover:-translate-y-0.5 hover:bg-[#013d63]`;
+    `${buttonBase} bg-[#024d7c] text-white shadow-md shadow-[#012a44]/30 hover:-translate-y-0.5 hover:bg-[#013d63] dark:bg-[#4A4A4A] dark:hover:bg-[#4A4A55]`;
   // (definition moved earlier to avoid temporal dead zone)
   const toolButtonBase =
-    "inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#009DFD]/25 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F1F5F9]";
+    "inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#009DFD]/25 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F1F5F9] dark:focus-visible:ring-zinc-500/40 dark:focus-visible:ring-offset-[#222224]";
 	  const toolIconButton =
 	    "justify-center px-1";
 	  const toolButtonInactiveNeutral =
-	    "border-transparent bg-[#F1F5F9] text-[#475569] shadow-none hover:bg-[#E5E7EB] hover:text-[#475569] hover:shadow-[0_1px_2px_rgba(0,0,0,0.06)]";
+	    "border-transparent bg-[#F1F5F9] text-[#475569] shadow-none hover:bg-[#E5E7EB] hover:text-[#475569] hover:shadow-[0_1px_2px_rgba(0,0,0,0.06)] dark:bg-[#2A2A31] dark:text-zinc-200 dark:hover:bg-[#34343C]";
   const toolButtonInactiveBlack =
-    "border-transparent bg-[#F1F5F9] text-[#1f2937] shadow-none hover:bg-[#E5E7EB] hover:text-[#111827] hover:shadow-[0_1px_2px_rgba(0,0,0,0.06)]";
+    "border-transparent bg-[#F1F5F9] text-[#1f2937] shadow-none hover:bg-[#E5E7EB] hover:text-[#111827] hover:shadow-[0_1px_2px_rgba(0,0,0,0.06)] dark:bg-[#2A2A31] dark:text-zinc-100 dark:hover:bg-[#34343C]";
 	  const toolButtonActive =
-	    "border-transparent bg-[#024d7c] text-white shadow-md shadow-[#012a44]/25 hover:bg-[#013d63] hover:shadow-md";
+	    "border-transparent bg-[#024d7c] text-white shadow-md shadow-[#012a44]/25 hover:bg-[#013d63] hover:shadow-md dark:bg-[#4A4A4A] dark:hover:bg-[#4A4A55]";
   const toolRailButtonBase =
-    "relative flex h-9 w-full items-center justify-center text-slate-600 transition-[color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#009DFD]/25 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed";
+    "relative flex h-9 w-full items-center justify-center text-slate-600 transition-[color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#009DFD]/25 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed dark:text-zinc-300 dark:focus-visible:ring-zinc-500/40 dark:focus-visible:ring-offset-[#222224]";
   const toolRailButtonInactive =
-    "hover:text-slate-900";
+    "hover:text-slate-900 dark:hover:text-white";
   const toolRailButtonActive =
-    "text-[#5B38E6]";
+    "text-[#5B38E6] dark:text-white";
   const toolRailInnerBase = "flex h-9 w-9 items-center justify-center";
-  const toolRailInnerInactive = "rounded-lg hover:bg-slate-200";
-  const toolRailInnerActive = "rounded-lg border border-[#E9D5FF] bg-[#F1EBFF] text-[#5B38E6] shadow-[inset_0_0_0_1px_rgba(108,71,255,0.10)]";
+  const toolRailInnerInactive = "rounded-lg hover:bg-slate-200 dark:hover:bg-[#2A2A31]";
+  const toolRailInnerActive = "rounded-lg bg-[#6C47FF] text-white";
   const toolbarLoading = loading || !sourcesHydrated;
   const searchPopupRightOffset = showPageOrderPanel ? 40 : -232;
   const controlButtonClass =
-    "flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,0.08)] transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-40";
+    "flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,0.08)] transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-40 dark:border-[#2A2A31] dark:bg-[#1C1C1F] dark:text-zinc-200 dark:hover:border-[#4A4A4A] dark:hover:text-white";
   const bottomBarButtonClass =
-    "flex h-9 w-9 items-center justify-center rounded-full border border-[#1f2937] bg-[#1f2937] text-white shadow-[0_8px_18px_rgba(15,23,42,0.16)] transition hover:bg-[#111827] hover:shadow-[0_12px_24px_rgba(15,23,42,0.20)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1f2937]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f3f6fb]";
+    "flex h-9 w-9 items-center justify-center rounded-full border border-[#1f2937] bg-[#1f2937] text-white shadow-[0_8px_18px_rgba(15,23,42,0.16)] transition hover:bg-[#111827] hover:shadow-[0_12px_24px_rgba(15,23,42,0.20)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1f2937]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f3f6fb] dark:border-[#4A4A4A] dark:bg-[#2A2A31] dark:hover:bg-[#34343C] dark:focus-visible:ring-zinc-500/40 dark:focus-visible:ring-offset-[#222224]";
   const signatureTabBase =
-    "inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-[0_6px_14px_rgba(15,23,42,0.06)] transition hover:border-[#024d7c]/40 hover:text-[#024d7c]";
+    "inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-[0_6px_14px_rgba(15,23,42,0.06)] transition hover:border-[#024d7c]/40 hover:text-[#024d7c] dark:border-[#2A2A31] dark:bg-[#1C1C1F] dark:text-zinc-200";
   const signatureTabActive = "border-[#024d7c] bg-[#024d7c] text-white shadow-[0_10px_24px_rgba(2,77,124,0.2)]";
   const signatureTabInactive = "";
   const textOptionButtonBase =
-    "inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-800 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60";
-  const textOptionButtonHover = "hover:bg-slate-100 hover:text-slate-900";
-  const textOptionButtonActive = "bg-slate-100 text-slate-900 hover:bg-slate-100 hover:text-slate-900";
-  const textInputPill = "inline-flex h-9 items-center gap-1 pl-0 pr-2 text-sm font-semibold text-slate-800";
+    "inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-800 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 dark:text-zinc-200 dark:focus-visible:ring-zinc-500/50";
+  const textOptionButtonHover = "hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-[#34343C] dark:hover:text-white";
+  const textOptionButtonActive = "bg-slate-100 text-slate-900 hover:bg-slate-100 hover:text-slate-900 dark:bg-[#2A2A31] dark:text-white dark:hover:bg-[#34343C]";
+  const textInputPill = "inline-flex h-9 items-center gap-1 pl-0 pr-2 text-sm font-semibold text-slate-800 dark:text-zinc-200";
   const viewerRailButtonClass =
-    "inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-transparent bg-transparent text-slate-600 transition-colors duration-200 ease-out hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 disabled:cursor-default disabled:opacity-40";
+    "inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-transparent bg-transparent text-slate-600 transition-colors duration-200 ease-out hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 disabled:cursor-default disabled:opacity-40 dark:text-zinc-300 dark:hover:text-white dark:focus-visible:ring-zinc-500/50";
   const studioChromeIconButtonClass =
-    "inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg border border-transparent bg-transparent text-slate-600 transition-colors duration-200 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-40";
+    "inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg border border-transparent bg-transparent text-slate-600 transition-colors duration-200 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-40 dark:text-zinc-300 dark:hover:text-white dark:focus-visible:ring-zinc-500/50 dark:focus-visible:ring-offset-[#222224]";
   const LineSpacingIcon = ({ className }: { className?: string }) => (
     <svg
       className={className}
@@ -4284,6 +4328,25 @@ const timer =
           );
           const thumbLimit =
             pages.length > LARGE_DOC_PAGE_THRESHOLD ? LARGE_DOC_THUMB_LIMIT : pages.length;
+          const orderedIds = data.pages
+            .map((page) => (page && typeof page.id === "string" ? (page.id as string) : ""))
+            .filter(Boolean);
+          const orderedPageRefs = data.pages
+            .filter((page) => page && typeof page === "object")
+            .map((page) => ({
+              id: typeof page.id === "string" ? (page.id as string) : "",
+              srcIdx: typeof page.srcIdx === "number" ? page.srcIdx : null,
+              pageIdx: typeof page.pageIdx === "number" ? page.pageIdx : null,
+              rotation: typeof page.rotation === "number" ? page.rotation : null,
+            }))
+            .filter((page) => typeof page.pageIdx === "number");
+          savedPageOrderRef.current = orderedPageRefs
+            .filter((page) => typeof page.srcIdx === "number" && typeof page.pageIdx === "number")
+            .map((page) => ({
+              srcIdx: page.srcIdx as number,
+              pageIdx: page.pageIdx as number,
+              id: page.id || undefined,
+            }));
           const normalizedPages = data.pages
             .filter((page) => page && typeof page.id === "string")
             .map((page, index) => ({
@@ -4303,20 +4366,48 @@ const timer =
           if (normalizedPages.length > 0) {
             const byId = new Map(normalizedPages.map((page) => [page.id, page]));
             setPages((current) =>
-              current.map((page) => {
-                const incoming = byId.get(page.id);
-                if (!incoming) return page;
-                return {
-                  ...page,
-                  rotation: typeof incoming.rotation === "number" ? incoming.rotation : page.rotation,
-                  preview: incoming.preview || page.preview,
-                  thumb: incoming.thumb || page.thumb,
-                  thumbWidth:
-                    typeof incoming.thumbWidth === "number" ? incoming.thumbWidth : page.thumbWidth,
-                  thumbHeight:
-                    typeof incoming.thumbHeight === "number" ? incoming.thumbHeight : page.thumbHeight,
-                };
-              })
+              (() => {
+                const currentById = new Map(current.map((page) => [page.id, page]));
+                const orderedById =
+                  orderedIds.length > 0
+                    ? orderedIds.map((id) => currentById.get(id)).filter(Boolean)
+                    : [];
+                const hasIdMatch = orderedById.length > 0;
+                const ordered =
+                  hasIdMatch
+                    ? orderedById
+                    : orderedPageRefs.length > 0
+                      ? orderedPageRefs
+                          .map((ref) =>
+                            current.find(
+                              (page) => page.srcIdx === ref.srcIdx && page.pageIdx === ref.pageIdx
+                            )
+                          )
+                          .filter(Boolean)
+                      : current;
+                return ordered.map((page) => {
+                  const incoming = byId.get(page.id);
+                  const ref = orderedPageRefs.find(
+                    (item) => item.srcIdx === page.srcIdx && item.pageIdx === page.pageIdx
+                  );
+                  if (!incoming && !ref) return page;
+                  return {
+                    ...page,
+                    rotation:
+                      typeof incoming?.rotation === "number"
+                        ? incoming.rotation
+                        : typeof ref?.rotation === "number"
+                          ? ref.rotation
+                          : page.rotation,
+                    preview: incoming?.preview || page.preview,
+                    thumb: incoming?.thumb || page.thumb,
+                    thumbWidth:
+                      typeof incoming?.thumbWidth === "number" ? incoming.thumbWidth : page.thumbWidth,
+                    thumbHeight:
+                      typeof incoming?.thumbHeight === "number" ? incoming.thumbHeight : page.thumbHeight,
+                  };
+                });
+              })()
             );
             const targetThumbWidth = getThumbTargetWidth();
             normalizedPages.forEach((page) => {
@@ -5470,8 +5561,17 @@ const timer =
         if (cancelled) return;
 
         if (isInitialLoad) {
+          const savedOrder = savedPageOrderRef.current;
+          const orderedNewPages =
+            savedOrder.length > 0
+              ? savedOrder
+                  .map((ref) => newPages.find((page) => page.srcIdx === ref.srcIdx && page.pageIdx === ref.pageIdx))
+                  .filter(Boolean)
+              : newPages;
           setPages((prev) => {
-            const merged = mergePageList(prev, newPages);
+            const merged = restoringPreviewCacheRef.current
+              ? mergePageListPreserveOrder(prev, orderedNewPages)
+              : mergePageList(prev, orderedNewPages);
             const initialCount = getInitialPreviewRenderCount(
               merged.length,
               merged.length > LARGE_DOC_PAGE_THRESHOLD
@@ -5606,6 +5706,44 @@ const timer =
   }, [pages]);
 
   useEffect(() => {
+    const pending = pendingInsertedSourceRef.current;
+    if (!pending) return;
+
+    const { afterId, sourceIds } = pending;
+    if (sourceIds.length === 0) {
+      pendingInsertedSourceRef.current = null;
+      return;
+    }
+
+    const sourceIdSet = new Set(sourceIds);
+    const allPagesReady = sourceIds.every((sourceId) => pages.some((page) => page.id.startsWith(`${sourceId}::`)));
+    if (!allPagesReady) return;
+
+    const movingPages = pages.filter((page) => sourceIdSet.has(page.id.split("::")[0]));
+    if (movingPages.length === 0) return;
+
+    pendingInsertedSourceRef.current = null;
+    setPages((prev) => {
+      const movingSet = new Set(sourceIds);
+      const moving = prev.filter((page) => movingSet.has(page.id.split("::")[0]));
+      const remaining = prev.filter((page) => !movingSet.has(page.id.split("::")[0]));
+      const targetIndex = remaining.findIndex((page) => page.id === afterId);
+      const next = [...remaining];
+      if (afterId === INSERT_BEFORE_FIRST_ID) {
+        next.unshift(...moving);
+        return next;
+      }
+      if (targetIndex === -1) return prev;
+      next.splice(targetIndex + 1, 0, ...moving);
+      return next;
+    });
+    if (!activePageIdRef.current) {
+      setActivePageId(movingPages[0].id);
+      setShouldCenterOnChange(true);
+    }
+  }, [pages]);
+
+  useEffect(() => {
     if (pages.length === 0) {
       if (sources.length === 0) {
         setHighlights({});
@@ -5648,6 +5786,11 @@ const timer =
     const container = previewContainerRef.current;
     const layout = pageLayoutRef.current;
     if (!container || layout.ids.length === 0) return;
+    const navigationLock = pageNavigationLockRef.current;
+    if (navigationLock) {
+      if (Date.now() < navigationLock.until) return;
+      pageNavigationLockRef.current = null;
+    }
     const viewCenter = container.scrollTop + container.clientHeight / 2;
     let closestIndex = 0;
     let closestDistance = Infinity;
@@ -6187,12 +6330,23 @@ const timer =
 
   /** Add more PDFs (create object URLs and append to sources) */
   function handleAddClick() {
+    setPendingInsertAfterPageId(null);
+    addInputRef.current?.click();
+  }
+
+  function handleInsertFileBeforeFirst() {
+    setPendingInsertAfterPageId(INSERT_BEFORE_FIRST_ID);
+    addInputRef.current?.click();
+  }
+
+  function handleInsertFileBetweenPages(pageId: string) {
+    setPendingInsertAfterPageId(pageId);
     addInputRef.current?.click();
   }
 
   async function processSelectedFiles(list: File[]) {
     if (!list.length) {
-      return;
+      return [];
     }
 
     if (!hasHydratedSources.current) {
@@ -6237,16 +6391,27 @@ const timer =
         return next;
       });
     }
+
+    return created;
   }
 
   async function handleAddChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const list = e.target.files ? Array.from(e.target.files) : [];
+    const input = e.currentTarget;
+    const list = input.files ? Array.from(input.files) : [];
     if (!list.length) {
-      e.currentTarget.value = "";
+      input.value = "";
       return;
     }
-    await processSelectedFiles(list);
-    e.currentTarget.value = "";
+    const created = await processSelectedFiles(list);
+    const insertAfterPageId = pendingInsertAfterPageId;
+    setPendingInsertAfterPageId(null);
+    if (insertAfterPageId && created.length > 0) {
+      pendingInsertedSourceRef.current = {
+        afterId: insertAfterPageId,
+        sourceIds: created.map((source) => source.storageId),
+      };
+    }
+    input.value = "";
   }
 
   function handleSelectPage(index: number, scrollBehavior: ScrollBehavior = "smooth") {
@@ -6256,9 +6421,11 @@ const timer =
       activePageIndexRef.current = index;
       activePageIdRef.current = page.id;
       pageNavigationLockRef.current = { until: Date.now() + 700, targetId: page.id };
-      setActivePageId(page.id);
+      flushSync(() => {
+        setActivePageId(page.id);
+        setActivePageIndex(index);
+      });
     }
-    setActivePageIndex(index);
     pageChangeScrollBehaviorRef.current = scrollBehavior;
     setShouldCenterOnChange(true);
   }
@@ -6635,13 +6802,13 @@ const timer =
         }`}
       >
         <div className="sticky left-0 z-20 mx-auto mb-2 flex items-center px-6" style={{ width: headerLaneWidth }}>
-          <div className="w-24 text-lg font-semibold text-slate-500">#{idx + 1}</div>
+          <div className="w-24 text-lg font-semibold text-slate-500 dark:text-white">#{idx + 1}</div>
           <div className="flex flex-1 justify-center">
             <div className="group relative">
               <button
                 type="button"
                 aria-label="Add blank page"
-                className="inline-flex items-center justify-center rounded-xl p-2 text-slate-600 transition hover:bg-white hover:shadow-sm hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60"
+                className="inline-flex items-center justify-center rounded-xl p-2 text-slate-600 transition hover:bg-white hover:shadow-sm hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 dark:text-white dark:hover:bg-[#34343C] dark:hover:text-white dark:focus-visible:ring-zinc-500/50"
 	                onClick={(event) => {
 	                  event.stopPropagation();
 	                  void handleAddBlankPageBefore(page.id);
@@ -6662,7 +6829,7 @@ const timer =
             <button
               type="button"
               aria-label="Page actions"
-              className="inline-flex items-center justify-center rounded-xl p-2 text-slate-600 transition hover:bg-white hover:shadow-sm hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60"
+              className="inline-flex items-center justify-center rounded-xl p-2 text-slate-600 transition hover:bg-white hover:shadow-sm hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 dark:text-white dark:hover:bg-[#34343C] dark:hover:text-white dark:focus-visible:ring-zinc-500/50"
               onClick={(event) => {
                 event.stopPropagation();
                 setPageActionMenuId((current) => (current === page.id ? null : page.id));
@@ -8460,7 +8627,8 @@ const timer =
 	  const drawButtonOn = penMode && !highlightButtonDisabled && !deleteMode;
 	  const highlightButtonVisualOn = highlightButtonOn && !deleteMode;
 	  const shapeButtonVisualOn = shapeButtonOn && !deleteMode;
-	  const showToolOptionsBar = !highlightButtonDisabled && !selectMode && (shapeMode || highlightMode || penMode || textMode);
+	  const showToolOptionsBar =
+    !highlightButtonDisabled && !selectMode && (shapeMode || highlightMode || penMode || textMode) && !toolOptionsCollapsed;
 	  const activeDrawingTool: (DrawingTool | "shape") | null = highlightActive
 	    ? "highlight"
 	    : selectActive
@@ -9050,18 +9218,17 @@ const timer =
     !!draftHighlight ||
     !!draftShape ||
     !!draftTextBox;
-  const buildCloudProjectData = useCallback(() => {
-    if (!hasWorkspaceData) return null;
-    return {
+  const buildProjectDataFromPages = useCallback(
+    (pagesList: PageItem[]) => ({
       name: projectName,
-      pagesCount: pages.length,
+      pagesCount: pagesList.length,
       sources: sources.map((source) => ({
         id: source.storageId,
         name: source.name,
         size: source.size,
         updatedAt: source.updatedAt,
       })),
-      pages: pages.map((page) => ({
+      pages: pagesList.map((page) => ({
         id: page.id,
         srcIdx: page.srcIdx,
         pageIdx: page.pageIdx,
@@ -9072,30 +9239,33 @@ const timer =
       highlights,
       shapesByPage,
       textAnnotations,
-        textSizePt: textSize,
-        textColor,
-        textUnderline,
-        textTransform,
-        textAlign,
+      textSizePt: textSize,
+      textColor,
+      textUnderline,
+      textTransform,
+      textAlign,
       signaturePlacements,
       savedSignatures,
-    };
-  }, [
-    hasWorkspaceData,
-    pages,
-    projectName,
-    sources,
-    highlights,
-    shapesByPage,
-    textAnnotations,
+    }),
+    [
+      projectName,
+      sources,
+      highlights,
+      shapesByPage,
+      textAnnotations,
       textSize,
       textColor,
       textUnderline,
       textTransform,
       textAlign,
-    signaturePlacements,
-    savedSignatures,
-  ]);
+      signaturePlacements,
+      savedSignatures,
+    ]
+  );
+  const buildCloudProjectData = useCallback(() => {
+    if (!hasWorkspaceData) return null;
+    return buildProjectDataFromPages(pages);
+  }, [buildProjectDataFromPages, hasWorkspaceData, pages]);
 
   useEffect(() => {
     if (!rotationSaveRef.current) return;
@@ -9236,9 +9406,16 @@ const timer =
       }
 	      setUserAdjustedZoom(true);
 	      restoreScrollOnNextZoomRef.current = true;
-	      setZoomPercent(clamped);
+      setZoomPercent(clamped);
     },
     []
+  );
+  const zoomByStep = useCallback(
+    (delta: number) => {
+      setShouldCenterOnChange(true);
+      setZoomWithScrollPreserved(zoomPercent + delta);
+    },
+    [setZoomWithScrollPreserved, zoomPercent]
   );
 
   useEffect(() => {
@@ -9258,9 +9435,8 @@ const timer =
       if (!isZoomIn && !isZoomOut) return;
 
       event.preventDefault();
-      setZoomWithScrollPreserved(
-        zoomPercent + (isZoomIn ? ZOOM_STEP_PERCENT : -ZOOM_STEP_PERCENT),
-      );
+      setShouldCenterOnChange(true);
+      setZoomWithScrollPreserved(zoomPercent + (isZoomIn ? ZOOM_STEP_PERCENT : -ZOOM_STEP_PERCENT));
     };
 
     window.addEventListener("keydown", handleZoomShortcut, { passive: false });
@@ -10241,6 +10417,388 @@ const timer =
     }
   }
 
+  async function buildExportPdfBlob(options?: { preservePageRotation?: boolean }) {
+    const preservePageRotation = options?.preservePageRotation ?? true;
+    // Load each unique source once into a PDFDocument, cache in a map
+    const docCache = new Map<number, PDFDocument>();
+    for (const p of pages) {
+      if (!docCache.has(p.srcIdx)) {
+        const srcUrl = sources[p.srcIdx].url;
+        const ab = await (await fetch(srcUrl)).arrayBuffer();
+        const srcDoc = await PDFDocument.load(new Uint8Array(ab));
+        docCache.set(p.srcIdx, srcDoc);
+      }
+    }
+
+    // Now copy pages in the displayed order
+    const out = await PDFDocument.create();
+    const standardFontCache = new Map<StandardFonts, PDFFont>();
+    let fontkitRegistered = false;
+    async function loadFontBytes(path: string) {
+      const cached = customFontBytesRef.current.get(path);
+      if (cached) return cached;
+      const response = await fetch(path);
+      const arrayBuffer = await response.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      customFontBytesRef.current.set(path, bytes);
+      return bytes;
+    }
+    async function getDownloadFont(variant: TextFontVariant) {
+      const config = TEXT_FONT_OPTIONS[textFont];
+      if (config.pdf.type === "standard") {
+        const fontName = config.pdf.variants[variant];
+        const cached = standardFontCache.get(fontName);
+        if (cached) return cached;
+        const embedded = await out.embedFont(fontName);
+        standardFontCache.set(fontName, embedded);
+        return embedded;
+      }
+      if (!fontkitRegistered) {
+        if (!fontkitModuleRef.current) {
+          const fontkit = await import("fontkit");
+          fontkitModuleRef.current = fontkit as { default?: unknown };
+        }
+        const fontkitInstance = fontkitModuleRef.current.default ?? fontkitModuleRef.current;
+        out.registerFontkit(fontkitInstance as unknown as never);
+        fontkitRegistered = true;
+      }
+      const src = config.pdf.variants[variant];
+      const cacheKey = `${textFont}:${variant}`;
+      const cached = pdfFontCacheRef.current.get(cacheKey);
+      if (cached) return cached;
+      try {
+        const fontBytes = await loadFontBytes(src);
+        const embedded = await out.embedFont(fontBytes);
+        pdfFontCacheRef.current.set(cacheKey, embedded);
+        return embedded;
+      } catch (err) {
+        console.warn("Falling back to standard font for PDF export", err);
+        const fallback = config.pdf.fallback;
+        const fallbackCached = standardFontCache.get(fallback);
+        if (fallbackCached) return fallbackCached;
+        const embeddedFallback = await out.embedFont(fallback);
+        standardFontCache.set(fallback, embeddedFallback);
+        return embeddedFallback;
+      }
+    }
+
+    for (const p of pages) {
+      const srcDoc = docCache.get(p.srcIdx)!;
+      const [copied] = await out.copyPages(srcDoc, [p.pageIdx]);
+      if (preservePageRotation) {
+        copied.setRotation(degrees(p.rotation ?? 0));
+      }
+      const pageHighlights = highlights[p.id] ?? [];
+      const pageShapes = shapesByPage[p.id] ?? [];
+      const pageTexts = textAnnotations[p.id] ?? [];
+      if (pageHighlights.length > 0) {
+        const { width: pageWidth, height: pageHeight } = copied.getSize();
+        pageHighlights.forEach((stroke) => {
+          const colorValue = hexToRgb(stroke.color);
+          if (!colorValue) return;
+          const baseThickness = Math.max(1, stroke.thickness * pageWidth);
+          const tool = stroke.tool === "pencil" ? "pen" : stroke.tool;
+          const cap =
+            tool === "highlight"
+              ? LineCapStyle.Butt
+              : LineCapStyle.Round;
+          const baseOpacity = tool === "highlight" ? (stroke.opacity ?? 0.35) : stroke.opacity ?? 1;
+          const dashed = tool !== "highlight" && stroke.lineStyle === "dashed";
+          const widthFactor = tool === "highlight" ? 1.2 : 1;
+          for (let i = 1; i < stroke.points.length; i++) {
+            const start = stroke.points[i - 1];
+            const end = stroke.points[i];
+            if (end.move) continue;
+            const x1 = start.x * pageWidth;
+            const y1 = pageHeight - start.y * pageHeight;
+            const x2 = end.x * pageWidth;
+            const y2 = pageHeight - end.y * pageHeight;
+
+            copied.drawLine({
+              start: { x: x1, y: y1 },
+              end: { x: x2, y: y2 },
+              thickness: baseThickness * widthFactor,
+              color: rgb(colorValue.r, colorValue.g, colorValue.b),
+              opacity: baseOpacity,
+              lineCap: cap,
+              ...(dashed ? { dashArray: [baseThickness * 2.5, baseThickness * 1.5] } : {}),
+            });
+          }
+        });
+      }
+      if (pageShapes.length > 0) {
+        const { width: pageWidth, height: pageHeight } = copied.getSize();
+        const unitToPdf = (pt: Point) => ({
+          x: pt.x * pageWidth,
+          y: pageHeight - pt.y * pageHeight,
+        });
+        pageShapes.forEach((shape) => {
+          const colorValue = hexToRgb(shape.color);
+          if (!colorValue) return;
+          const fillColorValue = shape.fillColor ? hexToRgb(shape.fillColor) : null;
+          const thickness = Math.max(1, shape.thickness * pageWidth);
+          const allowDashed = shape.type !== "check" && shape.type !== "arrow";
+          const isDashed = allowDashed && shape.lineStyle === "dashed";
+          const dashArray = isDashed ? [thickness * 2.5, thickness * 1.5] : undefined;
+          const start = unitToPdf(shape.start);
+          const end = unitToPdf(shape.end);
+          const minX = Math.min(start.x, end.x);
+          const maxX = Math.max(start.x, end.x);
+          const minY = Math.min(start.y, end.y);
+          const maxY = Math.max(start.y, end.y);
+          const w = Math.max(1, maxX - minX);
+          const h = Math.max(1, maxY - minY);
+          const strokeColor = rgb(colorValue.r, colorValue.g, colorValue.b);
+          const drawLineSegment = (a: { x: number; y: number }, b: { x: number; y: number }) => {
+            copied.drawLine({
+              start: a,
+              end: b,
+              thickness,
+              color: strokeColor,
+              opacity: 1,
+              lineCap: LineCapStyle.Round,
+              ...(dashArray ? { dashArray } : {}),
+            });
+          };
+          const drawArrowHead = (a: { x: number; y: number }, b: { x: number; y: number }) => {
+            const dx = b.x - a.x;
+            const dy = b.y - a.y;
+            const len = Math.max(1e-6, Math.sqrt(dx * dx + dy * dy));
+            const headLen = clamp(len * 0.16, 14, 32);
+            const angle = Math.atan2(dy, dx);
+            const left = angle + (Math.PI * 5) / 6;
+            const right = angle - (Math.PI * 5) / 6;
+            drawLineSegment(b, { x: b.x + Math.cos(left) * headLen, y: b.y + Math.sin(left) * headLen });
+            drawLineSegment(b, { x: b.x + Math.cos(right) * headLen, y: b.y + Math.sin(right) * headLen });
+          };
+          switch (shape.type) {
+            case "line":
+              drawLineSegment(start, end);
+              break;
+            case "arrow":
+              drawLineSegment(start, end);
+              drawArrowHead(start, end);
+              break;
+            case "rect":
+              copied.drawRectangle({
+                x: minX,
+                y: minY,
+                width: w,
+                height: h,
+                ...(fillColorValue
+                  ? { color: rgb(fillColorValue.r, fillColorValue.g, fillColorValue.b) }
+                  : {}),
+                borderWidth: thickness,
+                borderColor: strokeColor,
+                borderOpacity: 1,
+                ...(dashArray ? { borderDashArray: dashArray } : {}),
+                borderLineCap: LineCapStyle.Round,
+              });
+              break;
+            case "ellipse":
+              copied.drawEllipse({
+                x: minX + w / 2,
+                y: minY + h / 2,
+                xScale: w / 2,
+                yScale: h / 2,
+                ...(fillColorValue
+                  ? { color: rgb(fillColorValue.r, fillColorValue.g, fillColorValue.b) }
+                  : {}),
+                borderWidth: thickness,
+                borderColor: strokeColor,
+                borderOpacity: 1,
+                ...(dashArray ? { borderDashArray: dashArray } : {}),
+                borderLineCap: LineCapStyle.Round,
+              });
+              break;
+            case "triangle": {
+              const top = { x: minX + w / 2, y: maxY };
+              const left = { x: minX, y: minY };
+              const right = { x: maxX, y: minY };
+              if (fillColorValue) {
+                copied.drawSvgPath(`M ${top.x} ${top.y} L ${right.x} ${right.y} L ${left.x} ${left.y} Z`, {
+                  color: rgb(fillColorValue.r, fillColorValue.g, fillColorValue.b),
+                  borderColor: strokeColor,
+                  borderWidth: thickness,
+                  borderOpacity: 1,
+                  ...(dashArray ? { borderDashArray: dashArray } : {}),
+                });
+              } else {
+                drawLineSegment(top, right);
+                drawLineSegment(right, left);
+                drawLineSegment(left, top);
+              }
+              break;
+            }
+            case "x":
+              drawLineSegment({ x: minX, y: minY }, { x: maxX, y: maxY });
+              drawLineSegment({ x: maxX, y: minY }, { x: minX, y: maxY });
+              break;
+            case "check": {
+              const p1 = { x: minX + w * 0.0, y: minY + h * 0.62 };
+              const p2 = { x: minX + w * 0.32, y: minY + h * 0.9 };
+              const p3 = { x: minX + w * 1.0, y: minY + h * 0.12 };
+              drawLineSegment(p1, p2);
+              drawLineSegment(p2, p3);
+              break;
+            }
+            default:
+              break;
+          }
+        });
+      }
+      if (pageTexts.length > 0) {
+        const fontCache = new Map<TextFontVariant, PDFFont>();
+        const getFontForVariant = async (variant: TextFontVariant) => {
+          const cached = fontCache.get(variant);
+          if (cached) return cached;
+          const embedded = await getDownloadFont(variant);
+          fontCache.set(variant, embedded);
+          return embedded;
+        };
+        const { width: pageWidth, height: pageHeight } = copied.getSize();
+        const defaultTextColorValue = hexToRgb(textColor) ?? { r: 0.13, g: 0.15, b: 0.18 };
+        const defaultTextColor = rgb(defaultTextColorValue.r, defaultTextColorValue.g, defaultTextColorValue.b);
+        for (const annotation of pageTexts) {
+          const content = annotation.text;
+          if (!content || content === TEXT_PLACEHOLDER) continue;
+          const boxWidth = (annotation.width ?? 0.14) * pageWidth;
+          const padding = Math.min(6, boxWidth * 0.05);
+          const x = annotation.x * pageWidth + padding;
+          const startY = pageHeight - annotation.y * pageHeight - padding;
+          let cursorY = startY;
+          const html = annotation.richTextHtml ?? textToHtml(annotation.text);
+          const baseSize = annotation.textSizePt ?? textSize;
+          const lineSpacing = annotation.lineSpacing ?? DEFAULT_TEXT_LINE_SPACING;
+          const runs = extractRichTextRuns(html, baseSize);
+          const lines = splitRunsIntoLines(runs);
+          const rotation = annotation.rotation ?? 0;
+          const rotationRadians = (rotation * Math.PI) / 180;
+          const variants = new Set<TextFontVariant>();
+          runs.forEach((run) => {
+            variants.add(resolveFontVariant(!!run.bold, !!run.italic));
+          });
+          for (const variant of variants) {
+            await getFontForVariant(variant);
+          }
+          lines.forEach((line, lineIndex) => {
+            if (line.length === 0) {
+              cursorY -= baseSize * lineSpacing;
+              return;
+            }
+            const maxWidth = Math.max(10, boxWidth - padding * 2);
+            const lineHeight = baseSize * lineSpacing;
+            let lineWidth = 0;
+            line.forEach((run) => {
+              const transformed = applyTextTransform(run.text, textTransform);
+              const variant = resolveFontVariant(!!run.bold, !!run.italic);
+              const runFont = fontCache.get(variant);
+              if (runFont) {
+                lineWidth += runFont.widthOfTextAtSize(transformed, run.sizePt);
+              }
+            });
+            const clampedWidth = Math.min(lineWidth, maxWidth);
+            let lineX = x;
+            if (textAlign === "center") {
+              lineX = x + Math.max(0, (maxWidth - clampedWidth) / 2);
+            } else if (textAlign === "right") {
+              lineX = x + Math.max(0, maxWidth - clampedWidth);
+            }
+            const shouldJustify = textAlign === "justify" && lineIndex < lines.length - 1;
+            const spaceCount = shouldJustify
+              ? line.reduce(
+                  (count, run) => count + (applyTextTransform(run.text, textTransform).match(/ /g)?.length ?? 0),
+                  0
+                )
+              : 0;
+            const extraSpace =
+              shouldJustify && spaceCount > 0 ? Math.max(0, maxWidth - lineWidth) / spaceCount : 0;
+            cursorY -= baseSize;
+            let cursorX = lineX;
+            line.forEach((run) => {
+              const transformed = applyTextTransform(run.text, textTransform);
+              const variant = resolveFontVariant(!!run.bold, !!run.italic);
+              const runFont = fontCache.get(variant);
+              if (!runFont) return;
+              const runStartX = cursorX;
+              const runWidth = runFont.widthOfTextAtSize(transformed, run.sizePt);
+              const runSpaceCount = shouldJustify ? (transformed.match(/ /g)?.length ?? 0) : 0;
+              const runWidthAdjusted = runWidth + runSpaceCount * extraSpace;
+              const runColorValue = run.color ? hexToRgb(run.color) : null;
+              const runColor = runColorValue
+                ? rgb(runColorValue.r, runColorValue.g, runColorValue.b)
+                : defaultTextColor;
+              const highlightValue = run.highlightColor ? hexToRgb(run.highlightColor) : null;
+              if (highlightValue) {
+                copied.drawRectangle({
+                  x: runStartX,
+                  y: cursorY - lineHeight * 0.15,
+                  width: runWidthAdjusted,
+                  height: lineHeight,
+                  color: rgb(highlightValue.r, highlightValue.g, highlightValue.b),
+                  rotate: degrees(rotation),
+                });
+              }
+              if (shouldJustify && spaceCount > 0) {
+                const segments = transformed.split(/( )/);
+                segments.forEach((segment) => {
+                  if (segment === " ") {
+                    const spaceWidth = runFont.widthOfTextAtSize(" ", run.sizePt);
+                    cursorX += spaceWidth + extraSpace;
+                  } else if (segment) {
+                    copied.drawText(segment, {
+                      x: cursorX,
+                      y: cursorY,
+                      size: run.sizePt,
+                      font: runFont,
+                      color: runColor,
+                      maxWidth,
+                      rotate: degrees(rotation),
+                    });
+                    cursorX += runFont.widthOfTextAtSize(segment, run.sizePt);
+                  }
+                });
+              } else {
+                copied.drawText(transformed, {
+                  x: cursorX,
+                  y: cursorY,
+                  size: run.sizePt,
+                  font: runFont,
+                  color: runColor,
+                  maxWidth,
+                  rotate: degrees(rotation),
+                });
+                cursorX += runWidth;
+              }
+              if (run.underline) {
+                const lineOrigin = { x: runStartX, y: cursorY };
+                const decorationThickness = Math.max(0.5, lineHeight / 14);
+                const underlineY = cursorY - lineHeight * 0.1;
+                const start = rotatePoint({ x: runStartX, y: underlineY }, lineOrigin, rotationRadians);
+                const end = rotatePoint(
+                  { x: runStartX + runWidthAdjusted, y: underlineY },
+                  lineOrigin,
+                  rotationRadians
+                );
+                copied.drawLine({ start, end, thickness: decorationThickness, color: runColor });
+              }
+            });
+            cursorY -= lineHeight - baseSize;
+          });
+        }
+      }
+      out.addPage(copied);
+    }
+
+    const bytes = await out.save();
+    const ab = (bytes.buffer as ArrayBuffer).slice(
+      bytes.byteOffset,
+      bytes.byteOffset + bytes.byteLength
+    );
+    const view = new Uint8Array(ab);
+    return new Blob([view], { type: "application/pdf" });
+  }
+
   /** Build final PDF respecting order + keep flags */
   async function handlePrint() {
     if (isGuest) {
@@ -10258,23 +10816,12 @@ const timer =
     const reservedTab = openReservedTab();
     setIsPrinting(true);
     try {
-      const res = await fetch(`/api/projects/${encodeURIComponent(printProjectId)}/pdf`, {
-        cache: "no-store",
-      });
-      if (!res.ok) {
-        reservedTab?.close();
-        return;
-      }
-
-      const target = await getPdfAccessTarget(res);
-      if (!target?.url) {
-        reservedTab?.close();
-        return;
-      }
+      const blob = await buildExportPdfBlob({ preservePageRotation: false });
+      const objectUrl = URL.createObjectURL(blob);
 
       const destinationUrl = shouldUsePrintHandoff()
-        ? `/print?src=${encodeURIComponent(target.url)}&title=${encodeURIComponent(projectName || "Document")}`
-        : target.url;
+        ? `/print?src=${encodeURIComponent(objectUrl)}&title=${encodeURIComponent(projectName || "Document")}`
+        : objectUrl;
 
       if (reservedTab) {
         reservedTab.location.href = destinationUrl;
@@ -10282,11 +10829,9 @@ const timer =
         window.location.href = destinationUrl;
       }
 
-      if (target.revoke) {
-        window.setTimeout(() => {
-          URL.revokeObjectURL(target.url);
-        }, 60_000);
-      }
+      window.setTimeout(() => {
+        URL.revokeObjectURL(objectUrl);
+      }, 60_000);
     } finally {
       setIsPrinting(false);
     }
@@ -10320,383 +10865,7 @@ const timer =
     try {
       setBusy(true);
       setError(null);
-
-      // Load each unique source once into a PDFDocument, cache in a map
-      const docCache = new Map<number, PDFDocument>();
-      for (const p of pages) {
-        if (!docCache.has(p.srcIdx)) {
-          const srcUrl = sources[p.srcIdx].url;
-          const ab = await (await fetch(srcUrl)).arrayBuffer();
-          const srcDoc = await PDFDocument.load(new Uint8Array(ab));
-          docCache.set(p.srcIdx, srcDoc);
-        }
-      }
-
-      // Now copy pages in the displayed order
-      const out = await PDFDocument.create();
-      const standardFontCache = new Map<StandardFonts, PDFFont>();
-      let fontkitRegistered = false;
-      async function loadFontBytes(path: string) {
-        const cached = customFontBytesRef.current.get(path);
-        if (cached) return cached;
-        const response = await fetch(path);
-        const arrayBuffer = await response.arrayBuffer();
-        const bytes = new Uint8Array(arrayBuffer);
-        customFontBytesRef.current.set(path, bytes);
-        return bytes;
-      }
-      async function getDownloadFont(variant: TextFontVariant) {
-        const config = TEXT_FONT_OPTIONS[textFont];
-        if (config.pdf.type === "standard") {
-          const fontName = config.pdf.variants[variant];
-          const cached = standardFontCache.get(fontName);
-          if (cached) return cached;
-          const embedded = await out.embedFont(fontName);
-          standardFontCache.set(fontName, embedded);
-          return embedded;
-        }
-        if (!fontkitRegistered) {
-          if (!fontkitModuleRef.current) {
-            const fontkit = await import("fontkit");
-            fontkitModuleRef.current = fontkit as { default?: unknown };
-          }
-          const fontkitInstance = fontkitModuleRef.current.default ?? fontkitModuleRef.current;
-          out.registerFontkit(fontkitInstance as unknown as never);
-          fontkitRegistered = true;
-        }
-        const src = config.pdf.variants[variant];
-        const cacheKey = `${textFont}:${variant}`;
-        const cached = pdfFontCacheRef.current.get(cacheKey);
-        if (cached) return cached;
-        try {
-          const fontBytes = await loadFontBytes(src);
-          const embedded = await out.embedFont(fontBytes);
-          pdfFontCacheRef.current.set(cacheKey, embedded);
-          return embedded;
-        } catch (err) {
-          console.warn("Falling back to standard font for PDF export", err);
-          const fallback = config.pdf.fallback;
-          const fallbackCached = standardFontCache.get(fallback);
-          if (fallbackCached) return fallbackCached;
-          const embeddedFallback = await out.embedFont(fallback);
-          standardFontCache.set(fallback, embeddedFallback);
-          return embeddedFallback;
-        }
-      }
-	      for (const p of pages) {
-	        const srcDoc = docCache.get(p.srcIdx)!;
-	        const [copied] = await out.copyPages(srcDoc, [p.pageIdx]);
-	        copied.setRotation(degrees(p.rotation ?? 0));
-	        const pageHighlights = highlights[p.id] ?? [];
-	        const pageShapes = shapesByPage[p.id] ?? [];
-	        const pageTexts = textAnnotations[p.id] ?? [];
-	          if (pageHighlights.length > 0) {
-          const { width: pageWidth, height: pageHeight } = copied.getSize();
-	            pageHighlights.forEach((stroke) => {
-	              const colorValue = hexToRgb(stroke.color);
-	              if (!colorValue) return;
-	              const baseThickness = Math.max(1, stroke.thickness * pageWidth);
-	              const tool = stroke.tool === "pencil" ? "pen" : stroke.tool;
-	              const cap =
-	                tool === "highlight"
-	                  ? LineCapStyle.Butt
-	                  : LineCapStyle.Round;
-	              const baseOpacity = tool === "highlight" ? (stroke.opacity ?? 0.35) : stroke.opacity ?? 1;
-	              const dashed = tool !== "highlight" && stroke.lineStyle === "dashed";
-	              const widthFactor = tool === "highlight" ? 1.2 : 1;
-	              for (let i = 1; i < stroke.points.length; i++) {
-	                const start = stroke.points[i - 1];
-	                const end = stroke.points[i];
-	                if (end.move) continue;
-	                const x1 = start.x * pageWidth;
-	                const y1 = pageHeight - start.y * pageHeight;
-	                const x2 = end.x * pageWidth;
-	                const y2 = pageHeight - end.y * pageHeight;
-
-	                copied.drawLine({
-	                  start: { x: x1, y: y1 },
-	                  end: { x: x2, y: y2 },
-	                  thickness: baseThickness * widthFactor,
-	                  color: rgb(colorValue.r, colorValue.g, colorValue.b),
-	                  opacity: baseOpacity,
-	                  lineCap: cap,
-	                  ...(dashed ? { dashArray: [baseThickness * 2.5, baseThickness * 1.5] } : {}),
-	                });
-	              }
-	            });
-	          }
-          if (pageShapes.length > 0) {
-            const { width: pageWidth, height: pageHeight } = copied.getSize();
-            const unitToPdf = (pt: Point) => ({
-              x: pt.x * pageWidth,
-              y: pageHeight - pt.y * pageHeight,
-            });
-            pageShapes.forEach((shape) => {
-              const colorValue = hexToRgb(shape.color);
-              if (!colorValue) return;
-              const fillColorValue = shape.fillColor ? hexToRgb(shape.fillColor) : null;
-              const thickness = Math.max(1, shape.thickness * pageWidth);
-              const allowDashed = shape.type !== "check" && shape.type !== "arrow";
-              const isDashed = allowDashed && shape.lineStyle === "dashed";
-              const dashArray = isDashed ? [thickness * 2.5, thickness * 1.5] : undefined;
-              const start = unitToPdf(shape.start);
-              const end = unitToPdf(shape.end);
-              const minX = Math.min(start.x, end.x);
-              const maxX = Math.max(start.x, end.x);
-              const minY = Math.min(start.y, end.y);
-              const maxY = Math.max(start.y, end.y);
-              const w = Math.max(1, maxX - minX);
-              const h = Math.max(1, maxY - minY);
-              const strokeColor = rgb(colorValue.r, colorValue.g, colorValue.b);
-              const drawLineSegment = (a: { x: number; y: number }, b: { x: number; y: number }) => {
-                copied.drawLine({
-                  start: a,
-                  end: b,
-                  thickness,
-                  color: strokeColor,
-                  opacity: 1,
-                  lineCap: LineCapStyle.Round,
-                  ...(dashArray ? { dashArray } : {}),
-                });
-              };
-              const drawArrowHead = (a: { x: number; y: number }, b: { x: number; y: number }) => {
-                const dx = b.x - a.x;
-                const dy = b.y - a.y;
-                const len = Math.max(1e-6, Math.sqrt(dx * dx + dy * dy));
-                const headLen = clamp(len * 0.16, 14, 32);
-                const angle = Math.atan2(dy, dx);
-                const left = angle + (Math.PI * 5) / 6;
-                const right = angle - (Math.PI * 5) / 6;
-                drawLineSegment(b, { x: b.x + Math.cos(left) * headLen, y: b.y + Math.sin(left) * headLen });
-                drawLineSegment(b, { x: b.x + Math.cos(right) * headLen, y: b.y + Math.sin(right) * headLen });
-              };
-	              switch (shape.type) {
-	                case "line":
-	                  drawLineSegment(start, end);
-	                  break;
-	                case "arrow":
-	                  drawLineSegment(start, end);
-	                  drawArrowHead(start, end);
-	                  break;
-	                case "rect":
-	                  copied.drawRectangle({
-	                    x: minX,
-	                    y: minY,
-	                    width: w,
-	                    height: h,
-                      ...(fillColorValue
-                        ? { color: rgb(fillColorValue.r, fillColorValue.g, fillColorValue.b) }
-                        : {}),
-	                    borderWidth: thickness,
-	                    borderColor: strokeColor,
-	                    borderOpacity: 1,
-	                    ...(dashArray ? { borderDashArray: dashArray } : {}),
-	                    borderLineCap: LineCapStyle.Round,
-	                  });
-	                  break;
-	                case "ellipse":
-	                  copied.drawEllipse({
-	                    x: minX + w / 2,
-	                    y: minY + h / 2,
-	                    xScale: w / 2,
-	                    yScale: h / 2,
-                      ...(fillColorValue
-                        ? { color: rgb(fillColorValue.r, fillColorValue.g, fillColorValue.b) }
-                        : {}),
-	                    borderWidth: thickness,
-	                    borderColor: strokeColor,
-	                    borderOpacity: 1,
-	                    ...(dashArray ? { borderDashArray: dashArray } : {}),
-	                    borderLineCap: LineCapStyle.Round,
-	                  });
-	                  break;
-	                case "triangle": {
-	                  const top = { x: minX + w / 2, y: maxY };
-	                  const left = { x: minX, y: minY };
-	                  const right = { x: maxX, y: minY };
-                    if (fillColorValue) {
-                      copied.drawSvgPath(`M ${top.x} ${top.y} L ${right.x} ${right.y} L ${left.x} ${left.y} Z`, {
-                        color: rgb(fillColorValue.r, fillColorValue.g, fillColorValue.b),
-                        borderColor: strokeColor,
-                        borderWidth: thickness,
-                        borderOpacity: 1,
-                        ...(dashArray ? { borderDashArray: dashArray } : {}),
-                      });
-                    } else {
-                      drawLineSegment(top, right);
-                      drawLineSegment(right, left);
-                      drawLineSegment(left, top);
-                    }
-	                  break;
-	                }
-	                case "x":
-	                  drawLineSegment({ x: minX, y: minY }, { x: maxX, y: maxY });
-	                  drawLineSegment({ x: maxX, y: minY }, { x: minX, y: maxY });
-	                  break;
-                case "check": {
-                  const p1 = { x: minX + w * 0.0, y: minY + h * 0.62 };
-                  const p2 = { x: minX + w * 0.32, y: minY + h * 0.9 };
-                  const p3 = { x: minX + w * 1.0, y: minY + h * 0.12 };
-                  drawLineSegment(p1, p2);
-                  drawLineSegment(p2, p3);
-                  break;
-                }
-                default:
-                  break;
-              }
-            });
-          }
-	        if (pageTexts.length > 0) {
-	          const fontCache = new Map<TextFontVariant, PDFFont>();
-	          const getFontForVariant = async (variant: TextFontVariant) => {
-	            const cached = fontCache.get(variant);
-	            if (cached) return cached;
-	            const embedded = await getDownloadFont(variant);
-	            fontCache.set(variant, embedded);
-	            return embedded;
-	          };
-	          const { width: pageWidth, height: pageHeight } = copied.getSize();
-          const defaultTextColorValue = hexToRgb(textColor) ?? { r: 0.13, g: 0.15, b: 0.18 };
-          const defaultTextColor = rgb(defaultTextColorValue.r, defaultTextColorValue.g, defaultTextColorValue.b);
-          for (const annotation of pageTexts) {
-            const content = annotation.text;
-            if (!content || content === TEXT_PLACEHOLDER) continue;
-            const boxWidth = (annotation.width ?? 0.14) * pageWidth;
-            const padding = Math.min(6, boxWidth * 0.05);
-            const x = annotation.x * pageWidth + padding;
-            const startY = pageHeight - annotation.y * pageHeight - padding;
-            let cursorY = startY;
-            const html = annotation.richTextHtml ?? textToHtml(annotation.text);
-            const baseSize = annotation.textSizePt ?? textSize;
-            const lineSpacing = annotation.lineSpacing ?? DEFAULT_TEXT_LINE_SPACING;
-            const runs = extractRichTextRuns(html, baseSize);
-            const lines = splitRunsIntoLines(runs);
-            const rotation = annotation.rotation ?? 0;
-            const rotationRadians = (rotation * Math.PI) / 180;
-            const variants = new Set<TextFontVariant>();
-            runs.forEach((run) => {
-              variants.add(resolveFontVariant(!!run.bold, !!run.italic));
-            });
-            for (const variant of variants) {
-              await getFontForVariant(variant);
-            }
-            lines.forEach((line, lineIndex) => {
-              if (line.length === 0) {
-                cursorY -= baseSize * lineSpacing;
-                return;
-              }
-              const maxWidth = Math.max(10, boxWidth - padding * 2);
-          const lineHeight = baseSize * lineSpacing;
-              let lineWidth = 0;
-              line.forEach((run) => {
-                const transformed = applyTextTransform(run.text, textTransform);
-                const variant = resolveFontVariant(!!run.bold, !!run.italic);
-                const runFont = fontCache.get(variant);
-                if (runFont) {
-                  lineWidth += runFont.widthOfTextAtSize(transformed, run.sizePt);
-                }
-              });
-              const clampedWidth = Math.min(lineWidth, maxWidth);
-              let lineX = x;
-              if (textAlign === "center") {
-                lineX = x + Math.max(0, (maxWidth - clampedWidth) / 2);
-              } else if (textAlign === "right") {
-                lineX = x + Math.max(0, maxWidth - clampedWidth);
-              }
-              const shouldJustify = textAlign === "justify" && lineIndex < lines.length - 1;
-              const spaceCount = shouldJustify
-                ? line.reduce(
-                    (count, run) => count + (applyTextTransform(run.text, textTransform).match(/ /g)?.length ?? 0),
-                    0
-                  )
-                : 0;
-              const extraSpace =
-                shouldJustify && spaceCount > 0 ? Math.max(0, maxWidth - lineWidth) / spaceCount : 0;
-              cursorY -= baseSize;
-              let cursorX = lineX;
-              line.forEach((run) => {
-                const transformed = applyTextTransform(run.text, textTransform);
-                const variant = resolveFontVariant(!!run.bold, !!run.italic);
-                const runFont = fontCache.get(variant);
-                if (!runFont) return;
-                const runStartX = cursorX;
-                const runWidth = runFont.widthOfTextAtSize(transformed, run.sizePt);
-                const runSpaceCount = shouldJustify ? (transformed.match(/ /g)?.length ?? 0) : 0;
-                const runWidthAdjusted = runWidth + runSpaceCount * extraSpace;
-                const runColorValue = run.color ? hexToRgb(run.color) : null;
-                const runColor = runColorValue
-                  ? rgb(runColorValue.r, runColorValue.g, runColorValue.b)
-                  : defaultTextColor;
-                const highlightValue = run.highlightColor ? hexToRgb(run.highlightColor) : null;
-                if (highlightValue) {
-                  copied.drawRectangle({
-                    x: runStartX,
-                    y: cursorY - lineHeight * 0.15,
-                    width: runWidthAdjusted,
-                    height: lineHeight,
-                    color: rgb(highlightValue.r, highlightValue.g, highlightValue.b),
-                    rotate: degrees(rotation),
-                  });
-                }
-                if (shouldJustify && spaceCount > 0) {
-                  const segments = transformed.split(/( )/);
-                  segments.forEach((segment) => {
-                    if (segment === " ") {
-                      const spaceWidth = runFont.widthOfTextAtSize(" ", run.sizePt);
-                      cursorX += spaceWidth + extraSpace;
-                    } else if (segment) {
-                      copied.drawText(segment, {
-                        x: cursorX,
-                        y: cursorY,
-                        size: run.sizePt,
-                        font: runFont,
-                        color: runColor,
-                        maxWidth,
-                        rotate: degrees(rotation),
-                      });
-                      cursorX += runFont.widthOfTextAtSize(segment, run.sizePt);
-                    }
-                  });
-                } else {
-                  copied.drawText(transformed, {
-                    x: cursorX,
-                    y: cursorY,
-                    size: run.sizePt,
-                    font: runFont,
-                    color: runColor,
-                    maxWidth,
-                    rotate: degrees(rotation),
-                  });
-                  cursorX += runWidth;
-                }
-                if (run.underline) {
-                  const lineOrigin = { x: runStartX, y: cursorY };
-                  const decorationThickness = Math.max(0.5, lineHeight / 14);
-                  const underlineY = cursorY - lineHeight * 0.1;
-                  const start = rotatePoint({ x: runStartX, y: underlineY }, lineOrigin, rotationRadians);
-                  const end = rotatePoint(
-                    { x: runStartX + runWidthAdjusted, y: underlineY },
-                    lineOrigin,
-                    rotationRadians
-                  );
-                  copied.drawLine({ start, end, thickness: decorationThickness, color: runColor });
-                }
-              });
-              cursorY -= lineHeight - baseSize;
-            });
-          }
-        }
-        out.addPage(copied);
-      }
-
-      const bytes = await out.save(); // Uint8Array
-      // TS-safe Blob creation
-      const ab = (bytes.buffer as ArrayBuffer).slice(
-        bytes.byteOffset,
-        bytes.byteOffset + bytes.byteLength
-      );
-      const view = new Uint8Array(ab);
-      const blob = new Blob([view], { type: "application/pdf" });
+      const blob = await buildExportPdfBlob({ preservePageRotation: true });
 
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -10893,6 +11062,16 @@ const timer =
   ]);
 
   useEffect(() => {
+    if (!pendingCloudSaveRef.current) return;
+    if (!authSession?.user) return;
+    if (!hasWorkspaceData) return;
+    pendingCloudSaveRef.current = false;
+    const projectData = buildProjectDataFromPages(pagesRef.current);
+    const previewUrl = getProjectCoverPreview(pagesRef.current);
+    void saveProject(projectName, projectData, previewUrl);
+  }, [authSession?.user, buildProjectDataFromPages, hasWorkspaceData, projectName, saveProject]);
+
+  useEffect(() => {
     if (!authSession?.user) return;
     if (!showAuthGate) return;
     if (pendingExportAfterAuth) return;
@@ -10982,7 +11161,35 @@ const timer =
   }
 
 	  function handleDeletePage(pageId: string) {
-	    setPages((prev) => prev.filter((page) => page.id !== pageId));
+	    const current = pagesRef.current;
+	    const index = current.findIndex((page) => page.id === pageId);
+	    if (index === -1) return;
+	    const nextPages = current.filter((page) => page.id !== pageId);
+	    const nextIndex = Math.min(index, Math.max(nextPages.length - 1, 0));
+	    const nextActive = nextPages.length > 0 ? nextPages[nextIndex] : null;
+	    setPages(nextPages);
+	    if (activePageIdRef.current === pageId) {
+	      activePageIdRef.current = nextActive?.id ?? null;
+	      activePageIndexRef.current = nextPages.length > 0 ? nextIndex : 0;
+	      setActivePageId(nextActive?.id ?? null);
+	      setActivePageIndex(nextPages.length > 0 ? nextIndex : 0);
+	      setShouldCenterOnChange(true);
+	    }
+	    if (typeof window !== "undefined" && sources.length > 0) {
+	      persistWorkspacePreviewCache(
+	        projectKey,
+	        sources.map((source) => source.storageId),
+	        nextPages,
+	        nextActive?.id ?? null,
+	      );
+	    }
+	    if (authSession?.user) {
+	      const projectData = buildProjectDataFromPages(nextPages);
+	      const previewUrl = getProjectCoverPreview(nextPages);
+	      void saveProject(projectName, projectData, previewUrl);
+	    } else {
+	      pendingCloudSaveRef.current = true;
+	    }
 	  }
 
 	  function moveThumbPage(fromIndex: number, delta: 1 | -1) {
@@ -11020,6 +11227,11 @@ const timer =
       setDraftHighlight(null);
     }
   }, [highlightMode, penMode]);
+  useEffect(() => {
+    if (shapeMode || highlightMode || penMode || textMode) {
+      setToolOptionsCollapsed(false);
+    }
+  }, [shapeMode, highlightMode, penMode, textMode]);
   const hasAnyHighlights = Object.values(highlights).some((list) => list && list.length > 0);
   const hasAnyShapes = Object.values(shapesByPage).some((list) => list && list.length > 0);
   const hasUndoHistory = highlightHistory.length > 0;
@@ -11609,30 +11821,30 @@ const timer =
       ref={(node) => {
         workspaceFullscreenRef.current = node;
       }}
-      className="flex h-screen flex-col overflow-hidden bg-[#EEF1F4]"
+      className="flex h-screen flex-col overflow-hidden bg-[#EEF1F4] dark:bg-[#252525]"
     >
       {showStartupOverlay ? (
         startupOverlayVariant === "existing" ? (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center bg-white opacity-0 animate-[mpdf-startup-overlay-fade_0.24s_ease-out_forwards]">
+          <div className="fixed inset-0 z-[120] flex items-center justify-center bg-white opacity-0 animate-[mpdf-startup-overlay-fade_0.24s_ease-out_forwards] dark:bg-[#0F1117]">
             <div className="pointer-events-none flex flex-col items-center text-center">
               <div
-                className="h-10 w-10 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700"
+                className="h-10 w-10 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700 dark:border-[#2A2A31] dark:border-t-slate-200"
                 aria-hidden
               />
-              <p className="mt-5 text-[24px] font-semibold tracking-tight text-slate-900 sm:text-[28px]">
+              <p className="mt-5 text-[24px] font-semibold tracking-tight text-slate-900 sm:text-[28px] dark:text-zinc-100">
                 Opening Workspace...
               </p>
               <span className="sr-only">Opening Workspace</span>
             </div>
           </div>
         ) : (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/50 opacity-0 backdrop-blur-sm animate-[mpdf-startup-overlay-fade_0.24s_ease-out_forwards]">
-            <div className="w-full max-w-md rounded-[28px] border border-white/60 bg-white/85 px-8 py-7 text-center opacity-0 shadow-[0_28px_80px_rgba(15,23,42,0.35)] backdrop-blur-xl animate-[page-enter_0.28s_ease-out_forwards]">
-              <p className="text-[15px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+          <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/50 opacity-0 backdrop-blur-sm animate-[mpdf-startup-overlay-fade_0.24s_ease-out_forwards] dark:bg-slate-950/70">
+            <div className="w-full max-w-md rounded-[28px] border border-white/60 bg-white/85 px-8 py-7 text-center opacity-0 shadow-[0_28px_80px_rgba(15,23,42,0.35)] backdrop-blur-xl animate-[page-enter_0.28s_ease-out_forwards] dark:border-[#2A2A31] dark:bg-[#1C1C1F]/90">
+              <p className="text-[15px] font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-zinc-400">
                 MergifyPDF
               </p>
-              <p className="mt-2 text-lg font-semibold text-slate-900">{startupOverlayMessage}</p>
-              <div className="mt-5 h-2.5 w-full overflow-hidden rounded-full bg-slate-200/80">
+              <p className="mt-2 text-lg font-semibold text-slate-900 dark:text-zinc-100">{startupOverlayMessage}</p>
+              <div className="mt-5 h-2.5 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-[#2A2A31]">
                 <div
                   className="relative h-full overflow-hidden rounded-full bg-gradient-to-r from-[#0f172a] via-[#1d4ed8] to-[#38bdf8] transition-[width] duration-200 ease-out"
                   style={{ width: `${Math.round(startupProgress * 100)}%` }}
@@ -11648,8 +11860,8 @@ const timer =
                   />
                 </div>
               </div>
-              <div className="mt-4 flex items-center justify-center gap-2 text-xs font-medium text-slate-500">
-                <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+              <div className="mt-4 flex items-center justify-center gap-2 text-xs font-medium text-slate-500 dark:text-zinc-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-slate-400 dark:bg-[#4A4A55]" />
                 <span>Optimizing previews for speed</span>
               </div>
             </div>
@@ -11657,14 +11869,14 @@ const timer =
         )
       ) : null}
       {isBrowserFullscreen && activePresentationPage ? (
-        <div className="fixed inset-0 z-[110] bg-[#EEF2F7]">
+        <div className="fixed inset-0 z-[110] bg-[#EEF2F7] dark:bg-[#222224]">
           <div className="flex h-full w-full items-center justify-center px-8 py-10">
             <div className="flex h-full w-full items-center justify-center">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={activePresentationPage.preview || TRANSPARENT_PIXEL}
                 alt={`Page ${activePageIndexState + 1}`}
-                className="max-h-full max-w-full object-contain shadow-[0_18px_48px_rgba(15,23,42,0.12)]"
+                className="max-h-full max-w-full object-contain shadow-[0_18px_48px_rgba(15,23,42,0.12)] dark:shadow-[0_24px_60px_rgba(0,0,0,0.5)]"
                 draggable={false}
               />
             </div>
@@ -11674,10 +11886,10 @@ const timer =
           </div>
         </div>
       ) : null}
-      <div className="flex min-h-0 flex-1 flex-col transition-opacity duration-[260ms] ease-out opacity-100">
-      <header className="sticky top-0 z-40 border-b border-slate-200/60 bg-white">
+      <div className="flex min-h-0 flex-1 flex-col transition-opacity duration-[260ms] ease-out opacity-100 dark:bg-[#252525]">
+      <header className="sticky top-0 z-40 border-b border-slate-200/60 bg-white dark:border-[#4A4A4A]/60 dark:bg-[#323232]">
         {/* Top row */}
-        <div className="w-full border-b border-slate-100 bg-white">
+        <div className="w-full border-b border-slate-100 bg-white dark:border-[#4A4A4A]/60 dark:bg-[#323232]">
           <div className="relative flex h-14 w-full items-center justify-between gap-4 pl-4 pr-0 lg:pl-6 lg:pr-0">
             <Link
               href="/"
@@ -11685,7 +11897,22 @@ const timer =
               aria-label="Back to workspace"
               onClickCapture={handleLogoNavigate}
             >
-              <Image src="/logos/home-expanded-sidebar-logo-light-v6.svg" alt="MergifyPDF" width={170} height={40} priority />
+              <Image
+                src="/logos/home-expanded-sidebar-logo-light-v6.svg"
+                alt="MergifyPDF"
+                width={170}
+                height={40}
+                priority
+                className="block dark:hidden"
+              />
+              <Image
+                src="/logos/home-expanded-sidebar-logo-dark-v6.svg"
+                alt="MergifyPDF"
+                width={170}
+                height={40}
+                priority
+                className="hidden dark:block"
+              />
             </Link>
 
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-56">
@@ -11693,7 +11920,7 @@ const timer =
                 {projectNameEditing ? (
                   <div className="relative w-full">
                     <input
-                      className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 pr-10 text-center text-sm font-semibold text-slate-900 shadow-inner outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200/70"
+                      className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 pr-10 text-center text-sm font-semibold text-slate-900 shadow-inner outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200/70 dark:border-[#2A2A31] dark:bg-[#1C1C1F] dark:text-zinc-100 dark:focus:border-[#4A4A4A] dark:focus:ring-zinc-500/40"
                       value={projectNameDraft}
                       onChange={(event) => {
                         setProjectNameDraft(event.target.value);
@@ -11717,7 +11944,7 @@ const timer =
                       autoFocus
                     />
                     <Pencil
-                      className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                      className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-zinc-500"
                       aria-hidden
                     />
                   </div>
@@ -11729,11 +11956,11 @@ const timer =
                       setProjectNameError(null);
                       setProjectNameEditing(true);
                     }}
-                    className="group inline-flex min-w-0 max-w-full cursor-pointer items-center justify-center gap-2 text-center text-sm font-semibold text-slate-900 outline-none transition-colors duration-200 hover:text-slate-950 focus-visible:ring-2 focus-visible:ring-slate-300/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+                    className="group inline-flex min-w-0 max-w-full cursor-pointer items-center justify-center gap-2 text-center text-sm font-semibold text-slate-900 outline-none transition-colors duration-200 hover:text-slate-950 focus-visible:ring-2 focus-visible:ring-slate-300/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-zinc-100 dark:hover:text-white dark:focus-visible:ring-zinc-500/50 dark:focus-visible:ring-offset-[#222224]"
                     aria-label="Edit project name"
                   >
                     <span className="block truncate">{projectName || "Untitled project"}</span>
-                    <Pencil className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:text-slate-600" aria-hidden />
+                    <Pencil className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:text-slate-600 dark:text-zinc-500 dark:group-hover:text-zinc-300" aria-hidden />
                   </button>
                 )}
               </div>
@@ -11745,7 +11972,9 @@ const timer =
                   ref={searchButtonRef}
                   type="button"
                   className={`${studioChromeIconButtonClass} ${
-                    searchOpen ? "border-[#E9D5FF] bg-[#F1EBFF] text-[#5B38E6]" : ""
+                    searchOpen
+                      ? "border-[#E9D5FF] bg-[#F1EBFF] text-[#5B38E6] dark:border-transparent dark:bg-transparent dark:text-zinc-100"
+                      : ""
                   }`}
                   onClick={() => setSearchOpen((prev) => !prev)}
                   disabled={pages.length === 0}
@@ -11762,10 +11991,10 @@ const timer =
                   >
                     <div
                       ref={searchPanelRef}
-                      className="pointer-events-auto flex w-[388px] items-center gap-2 rounded-md border border-slate-200/90 bg-white/96 px-3 py-2.5 shadow-[0_10px_24px_rgba(15,23,42,0.12),0_0_0_1px_rgba(15,23,42,0.04)] backdrop-blur"
+                      className="pointer-events-auto flex w-[388px] items-center gap-2 rounded-md border border-slate-200/90 bg-white/96 px-3 py-2.5 shadow-[0_10px_24px_rgba(15,23,42,0.12),0_0_0_1px_rgba(15,23,42,0.04)] backdrop-blur dark:border-[#3F3F3F] dark:bg-[#323232]/98 dark:shadow-[0_16px_36px_rgba(0,0,0,0.55)]"
                     >
-                      <Search className="h-4 w-4 shrink-0 text-slate-600" aria-hidden />
-                      <div className="min-w-0 flex-1 border-b border-slate-300/90">
+                      <Search className="h-4 w-4 shrink-0 text-slate-600 dark:text-zinc-200" aria-hidden />
+                      <div className="min-w-0 flex-1 border-b border-slate-300/90 dark:border-[#52525B]">
                         <input
                           ref={searchInputRef}
                           value={searchQuery}
@@ -11783,10 +12012,10 @@ const timer =
                             }
                           }}
                           placeholder="Find in document"
-                          className="min-w-0 w-full bg-transparent pb-1 text-sm font-medium text-slate-900 outline-none placeholder:text-slate-500"
+                          className="min-w-0 w-full bg-transparent pb-1 text-sm font-medium text-slate-900 outline-none placeholder:text-slate-500 dark:text-zinc-100 dark:placeholder:text-zinc-500"
                         />
                       </div>
-                      <span className="min-w-[48px] text-right text-xs font-semibold text-slate-600">
+                      <span className="min-w-[48px] text-right text-xs font-semibold text-slate-600 dark:text-zinc-300">
                         {searchBusy
                           ? "Finding..."
                           : searchQuery.trim()
@@ -11799,7 +12028,7 @@ const timer =
                         type="button"
                         onClick={() => handleStepSearchResult(-1)}
                         disabled={searchResults.length === 0}
-                        className="inline-flex h-8 w-8 items-center justify-center text-slate-600 transition-colors duration-200 hover:text-slate-900 disabled:cursor-default disabled:opacity-35"
+                        className="inline-flex h-8 w-8 items-center justify-center text-slate-600 transition-colors duration-200 hover:text-slate-900 disabled:cursor-default disabled:opacity-35 dark:text-zinc-300 dark:hover:text-white"
                         aria-label="Previous result"
                       >
                         <ChevronLeft className="h-4 w-4" aria-hidden />
@@ -11808,7 +12037,7 @@ const timer =
                         type="button"
                         onClick={() => handleStepSearchResult(1)}
                         disabled={searchResults.length === 0}
-                        className="inline-flex h-8 w-8 items-center justify-center text-slate-600 transition-colors duration-200 hover:text-slate-900 disabled:cursor-default disabled:opacity-35"
+                        className="inline-flex h-8 w-8 items-center justify-center text-slate-600 transition-colors duration-200 hover:text-slate-900 disabled:cursor-default disabled:opacity-35 dark:text-zinc-300 dark:hover:text-white"
                         aria-label="Next result"
                       >
                         <ChevronRight className="h-4 w-4" aria-hidden />
@@ -11816,7 +12045,7 @@ const timer =
                       <button
                         type="button"
                         onClick={() => setSearchOpen(false)}
-                        className="inline-flex h-8 w-8 items-center justify-center text-slate-600 transition-colors duration-200 hover:text-slate-900"
+                        className="inline-flex h-8 w-8 items-center justify-center text-slate-600 transition-colors duration-200 hover:text-slate-900 dark:text-zinc-300 dark:hover:text-white"
                         aria-label="Close search"
                       >
                         <X className="h-4 w-4" aria-hidden />
@@ -11825,10 +12054,10 @@ const timer =
                   </div>
                 ) : null}
               </div>
-              <div className="h-5 w-px bg-slate-200" aria-hidden />
+              <div className="h-5 w-px bg-slate-200 dark:bg-[#4A4A4A]" aria-hidden />
               <button
                 type="button"
-                className="inline-flex h-10 cursor-pointer items-center gap-1.5 text-sm font-semibold tracking-[-0.01em] text-slate-700 transition-colors duration-200 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex h-10 cursor-pointer items-center gap-1.5 text-sm font-semibold tracking-[-0.01em] text-slate-700 transition-colors duration-200 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-40 dark:text-zinc-200 dark:hover:text-white dark:focus-visible:ring-zinc-500/50 dark:focus-visible:ring-offset-[#222224]"
                 onClick={handleAddClick}
                 disabled={isLoadingPages}
                 aria-label="Add Files"
@@ -11837,7 +12066,7 @@ const timer =
                 <Plus className="h-4 w-4 shrink-0 stroke-[2.4]" aria-hidden />
                 <span>Add Files</span>
               </button>
-              <div className="h-5 w-px bg-slate-200" aria-hidden />
+              <div className="h-5 w-px bg-slate-200 dark:bg-[#4A4A4A]" aria-hidden />
               <button
                 type="button"
                 className={studioChromeIconButtonClass}
@@ -11871,8 +12100,8 @@ const timer =
               >
                 <Download className="h-5 w-5" aria-hidden />
               </button>
-              <div className="flex w-12 items-center justify-center border-l border-slate-200">
-                <WorkspaceSettingsMenu triggerClassName="cursor-pointer border-transparent bg-transparent text-slate-600 transition-colors duration-200 hover:bg-transparent hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-slate-300/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white" />
+              <div className="flex w-12 items-center justify-center border-l border-slate-200 dark:border-[#4A4A4A]">
+                <WorkspaceSettingsMenu triggerClassName="cursor-pointer border-transparent bg-transparent text-slate-600 transition-colors duration-200 hover:bg-transparent hover:text-slate-900 focus-visible:ring-0 focus-visible:ring-offset-0 dark:text-zinc-300 dark:hover:text-white" />
               </div>
             </div>
           </div>
@@ -11887,14 +12116,14 @@ const timer =
 
         {/* Bottom row (tools) */}
         <div
-          className="toolbar-font relative z-[100] w-full bg-[#F1F5F9] shadow-[0_1px_4px_rgba(15,23,42,0.06)] lg:hidden"
+          className="toolbar-font relative z-[100] w-full bg-[#F1F5F9] shadow-[0_1px_4px_rgba(15,23,42,0.06)] lg:hidden dark:bg-[#222224] dark:shadow-[0_1px_6px_rgba(0,0,0,0.45)]"
           data-text-toolbar
         >
 	          <div className="w-full pl-8 pr-4 py-0.5 lg:pl-10 lg:pr-6">
 	            <div className="relative h-10">
 	              <div className={`absolute inset-0 flex w-full items-center gap-3 lg:gap-4 ${loading ? "pointer-events-none" : ""}`}>
 	                <div className="tools-scroll flex min-w-0 flex-1 overflow-x-auto overflow-y-visible">
-	                  <div className="flex items-center gap-0 rounded-xl bg-[#F1F5F9] pl-0 pr-1.5 py-0">
+	                  <div className="flex items-center gap-0 rounded-xl bg-[#F1F5F9] pl-0 pr-1.5 py-0 dark:bg-[#222224]">
 	                  <div className="group relative">
 	                    <button
 	                      type="button"
@@ -12216,15 +12445,15 @@ const timer =
                     transition={VIEW_TRANSITION}
                     className="w-full"
                   >
-                    <div className="flex flex-col gap-3 text-slate-700 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-col gap-3 text-slate-700 sm:flex-row sm:items-center sm:justify-between dark:text-zinc-200">
                       <div>
-                        <h2 className="text-xl font-semibold">Manage pages</h2>
-                        <p className="text-sm text-slate-300">Drag to reorder. Rotate or delete any page.</p>
+                        <h2 className="text-xl font-semibold text-slate-900 dark:text-zinc-100">Manage pages</h2>
+                        <p className="text-sm text-slate-500 dark:text-zinc-400">Drag to reorder. Rotate or delete any page.</p>
                       </div>
                       <button
                         type="button"
                         onClick={() => setOrganizeMode(false)}
-                        className="rounded-full bg-[#024d7c] px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-[#012a44]/30 transition hover:-translate-y-0.5"
+                        className="rounded-full bg-[#024d7c] px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-[#012a44]/30 transition hover:-translate-y-0.5 dark:bg-[#4A4A4A] dark:hover:bg-[#4A4A55]"
                       >
                         Done managing
                       </button>
@@ -12266,338 +12495,32 @@ const timer =
                   transition={VIEW_TRANSITION}
 			                  className="editor-shell mx-auto flex h-full min-h-0 w-full flex-1 flex-col gap-6 overflow-hidden px-0"
                 >
+
 				                    <div className="flex h-full min-h-0 w-full items-stretch gap-0 overflow-hidden">
-                                  <aside className="toolbar-font hidden h-fit w-[48px] shrink-0 items-center self-start rounded-md border border-slate-300/80 bg-white px-1 py-2 shadow-[0_8px_20px_rgba(15,23,42,0.06)] lg:ml-3 lg:mr-3 lg:mt-3 lg:flex lg:flex-col lg:gap-1">
-                                    <div className="flex flex-col gap-1 border-b border-slate-200/80 pb-1">
-                                      <button
-                                        type="button"
-                                        className={`${toolRailButtonBase} ${toolRailButtonInactive}`}
-                                        disabled={loading}
-                                        aria-disabled={!hasUndoHistory}
-                                        aria-label="Undo"
-                                        onMouseEnter={(event) => showToolbarTooltip("Undo", event.currentTarget, "right")}
-                                        onMouseLeave={hideToolbarTooltip}
-                                        onClick={() => {
-                                          if (loading) return;
-                                          if (!hasUndoHistory) return;
-                                          handleUndoHighlight();
-                                        }}
-                                      >
-                                        <Undo2 className="h-5 w-5 shrink-0" />
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className={`${toolRailButtonBase} ${toolRailButtonInactive}`}
-                                        disabled={loading}
-                                        aria-disabled={!hasRedoHistory}
-                                        aria-label="Redo"
-                                        onMouseEnter={(event) => showToolbarTooltip("Redo", event.currentTarget, "right")}
-                                        onMouseLeave={hideToolbarTooltip}
-                                        onClick={() => {
-                                          if (loading) return;
-                                          if (!hasRedoHistory) return;
-                                          handleRedoHighlight();
-                                        }}
-                                      >
-                                        <Redo2 className="h-5 w-5 shrink-0" />
-                                      </button>
-                                    </div>
-
-                                    <div className="flex min-h-0 flex-1 flex-col items-stretch gap-1 overflow-y-auto">
-                                      <button
-                                        type="button"
-                                        disabled={toolbarLoading}
-                                        aria-pressed={selectButtonOn}
-                                        aria-label="Select"
-                                        onMouseEnter={(event) => showToolbarTooltip("Select", event.currentTarget, "right")}
-                                        onMouseLeave={hideToolbarTooltip}
-                                        className={`${toolRailButtonBase} ${
-                                          toolbarLoading || selectButtonOn ? toolRailButtonActive : toolRailButtonInactive
-                                        }`}
-                                        onClick={() => {
-                                          if (toolbarLoading) return;
-                                          setSelectMode(true);
-                                          setPenMode(false);
-                                          setShapeMode(false);
-                                          setHighlightMode(false);
-                                          setTextMode(false);
-                                          setDeleteMode(false);
-                                          setDraftHighlight(null);
-                                          setDraftShape(null);
-                                          setDraftTextBox(null);
-                                          setShowSignatureHub(false);
-                                          setSignaturePanelMode("none");
-                                          setPendingSignatureForPlacement(null);
-                                        }}
-                                      >
-                                        <span className={`${toolRailInnerBase} ${
-                                          selectButtonOn ? toolRailInnerActive : toolRailInnerInactive
-                                        }`}>
-                                          <MousePointer2 className="h-5 w-5 shrink-0" />
-                                        </span>
-                                      </button>
-
-                                      <button
-                                        type="button"
-                                        disabled={highlightButtonDisabled}
-                                        aria-pressed={textButtonOn}
-                                        aria-label="Text"
-                                        onMouseEnter={(event) => showToolbarTooltip("Text", event.currentTarget, "right")}
-                                        onMouseLeave={hideToolbarTooltip}
-                                        className={`${toolRailButtonBase} ${textButtonOn ? toolRailButtonActive : toolRailButtonInactive}`}
-                                        onClick={() => {
-                                          if (highlightButtonDisabled) return;
-                                          setSelectMode(false);
-                                          setDeleteMode(false);
-                                          setTextMode(true);
-                                          setPenMode(false);
-                                          setHighlightMode(false);
-                                          setShapeMode(false);
-                                          setDraftHighlight(null);
-                                          setDraftShape(null);
-                                          setDraftTextBox(null);
-                                          setShowSignatureHub(false);
-                                          setSignaturePanelMode("none");
-                                          setPendingSignatureForPlacement(null);
-                                        }}
-                                      >
-                                        <span className={`${toolRailInnerBase} ${
-                                          textButtonOn ? toolRailInnerActive : toolRailInnerInactive
-                                        }`}>
-                                          <Type className="h-5 w-5 shrink-0" />
-                                        </span>
-                                      </button>
-
-                                      <button
-                                        type="button"
-                                        disabled={loading}
-                                        aria-label="Image"
-                                        onMouseEnter={(event) => showToolbarTooltip("Image", event.currentTarget, "right")}
-                                        onMouseLeave={hideToolbarTooltip}
-                                        className={`${toolRailButtonBase} ${toolRailButtonInactive}`}
-                                        onClick={() => {
-                                          if (loading) return;
-                                          setSelectMode(false);
-                                          setDeleteMode(false);
-                                          setTextMode(false);
-                                          setPenMode(false);
-                                          setHighlightMode(false);
-                                          setShapeMode(false);
-                                          setDraftHighlight(null);
-                                          setDraftShape(null);
-                                          setDraftTextBox(null);
-                                          setShowSignatureHub(false);
-                                          setSignaturePanelMode("none");
-                                          setPendingSignatureForPlacement(null);
-                                          handleOpenImageUpload();
-                                        }}
-                                      >
-                                        <span className={`${toolRailInnerBase} ${toolRailInnerInactive}`}>
-                                          <ImageIcon className="h-5 w-5 shrink-0" />
-                                        </span>
-                                      </button>
-
-                                      <button
-                                        type="button"
-                                        disabled={highlightButtonDisabled}
-                                        aria-pressed={shapeButtonVisualOn}
-                                        aria-label="Shapes"
-                                        onMouseEnter={(event) => showToolbarTooltip("Shapes", event.currentTarget, "right")}
-                                        onMouseLeave={hideToolbarTooltip}
-                                        className={`${toolRailButtonBase} ${shapeButtonVisualOn ? toolRailButtonActive : toolRailButtonInactive}`}
-                                        onClick={() => {
-                                          if (highlightButtonDisabled) return;
-                                          clearTextFocus();
-                                          setSelectMode(false);
-                                          setDeleteMode(false);
-                                          setShapeMode(true);
-                                          setShapeType(null);
-                                          setPenMode(false);
-                                          setHighlightMode(false);
-                                          setTextMode(false);
-                                          setDraftHighlight(null);
-                                          setDraftShape(null);
-                                          setDraftTextBox(null);
-                                          setShowSignatureHub(false);
-                                          setSignaturePanelMode("none");
-                                          setPendingSignatureForPlacement(null);
-                                        }}
-                                      >
-                                        <span className={`${toolRailInnerBase} ${
-                                          shapeButtonVisualOn ? toolRailInnerActive : toolRailInnerInactive
-                                        }`}>
-                                          <Shapes className="h-5 w-5 shrink-0" />
-                                        </span>
-                                      </button>
-
-                                      <button
-                                        type="button"
-                                        disabled={highlightButtonDisabled}
-                                        aria-pressed={drawButtonOn}
-                                        aria-label="Draw"
-                                        onMouseEnter={(event) => showToolbarTooltip("Draw", event.currentTarget, "right")}
-                                        onMouseLeave={hideToolbarTooltip}
-                                        className={`${toolRailButtonBase} ${drawButtonOn ? toolRailButtonActive : toolRailButtonInactive}`}
-                                        onClick={() => {
-                                          if (highlightButtonDisabled) return;
-                                          setSelectMode(false);
-                                          setDeleteMode(false);
-                                          setPenMode(true);
-                                          setHighlightMode(false);
-                                          setShapeMode(false);
-                                          setTextMode(false);
-                                          setDraftHighlight(null);
-                                          setDraftShape(null);
-                                          setDraftTextBox(null);
-                                          setShowSignatureHub(false);
-                                          setSignaturePanelMode("none");
-                                          setPendingSignatureForPlacement(null);
-                                        }}
-                                      >
-                                        <span className={`${toolRailInnerBase} ${
-                                          drawButtonOn ? toolRailInnerActive : toolRailInnerInactive
-                                        }`}>
-                                          <PencilLine className="h-5 w-5 shrink-0" />
-                                        </span>
-                                      </button>
-
-                                      <button
-                                        type="button"
-                                        disabled={highlightButtonDisabled}
-                                        aria-pressed={highlightButtonVisualOn}
-                                        aria-label="Highlight"
-                                        onMouseEnter={(event) => showToolbarTooltip("Highlight", event.currentTarget, "right")}
-                                        onMouseLeave={hideToolbarTooltip}
-                                        className={`${toolRailButtonBase} ${highlightButtonVisualOn ? toolRailButtonActive : toolRailButtonInactive}`}
-                                        onClick={() => {
-                                          if (highlightButtonDisabled) return;
-                                          setSelectMode(false);
-                                          setDeleteMode(false);
-                                          setHighlightMode(true);
-                                          setPenMode(false);
-                                          setShapeMode(false);
-                                          setTextMode(false);
-                                          setDraftHighlight(null);
-                                          setDraftShape(null);
-                                          setDraftTextBox(null);
-                                          setShowSignatureHub(false);
-                                          setSignaturePanelMode("none");
-                                          setPendingSignatureForPlacement(null);
-                                        }}
-                                      >
-                                        <span className={`${toolRailInnerBase} ${
-                                          highlightButtonVisualOn ? toolRailInnerActive : toolRailInnerInactive
-                                        }`}>
-                                          <Highlighter className="h-5 w-5 shrink-0" />
-                                        </span>
-                                      </button>
-
-                                      <button
-                                        type="button"
-                                        disabled={loading}
-                                        className={`${toolRailButtonBase} ${deleteMode ? toolRailButtonActive : toolRailButtonInactive}`}
-                                        onClick={handleToggleDeleteMode}
-                                        aria-pressed={deleteMode}
-                                        aria-disabled={!hasAnyAnnotations && !deleteMode}
-                                        aria-label="Eraser"
-                                        onMouseEnter={(event) => showToolbarTooltip("Eraser", event.currentTarget, "right")}
-                                        onMouseLeave={hideToolbarTooltip}
-                                      >
-                                        <span className={`${toolRailInnerBase} ${
-                                          deleteMode ? toolRailInnerActive : toolRailInnerInactive
-                                        }`}>
-                                          <Eraser className="h-5 w-5 shrink-0" />
-                                        </span>
-                                      </button>
-
-                                      <button
-                                        type="button"
-                                        disabled={loading}
-                                        aria-label="Note"
-                                        onMouseEnter={(event) => showToolbarTooltip("Note", event.currentTarget, "right")}
-                                        onMouseLeave={hideToolbarTooltip}
-                                        className={`${toolRailButtonBase} ${toolRailButtonInactive}`}
-                                        onClick={() => {
-                                          if (loading) return;
-                                          setSelectMode(false);
-                                          setDeleteMode(false);
-                                          setTextMode(true);
-                                          setPenMode(false);
-                                          setHighlightMode(false);
-                                          setShapeMode(false);
-                                          setDraftHighlight(null);
-                                          setDraftShape(null);
-                                          setDraftTextBox(null);
-                                          setShowSignatureHub(false);
-                                          setSignaturePanelMode("none");
-                                          setPendingSignatureForPlacement(null);
-                                          handleAddStickyNote();
-                                        }}
-                                      >
-                                        <span className={`${toolRailInnerBase} ${toolRailInnerInactive}`}>
-                                          <Pin className="h-5 w-5 shrink-0 rotate-[45deg]" />
-                                        </span>
-                                      </button>
-
-                                      <button
-                                        type="button"
-                                        disabled={loading}
-                                        aria-pressed={signatureButtonOn}
-                                        aria-label={`Sign${savedSignatures.length > 0 ? ` (${savedSignatures.length})` : ""}`}
-                                        onMouseEnter={(event) => showToolbarTooltip("Sign", event.currentTarget, "right")}
-                                        onMouseLeave={hideToolbarTooltip}
-                                        className={`relative ${toolRailButtonBase} ${signatureButtonOn ? toolRailButtonActive : toolRailButtonInactive}`}
-                                        onClick={() => {
-                                          if (loading) return;
-                                          setSelectMode(false);
-                                          setDeleteMode(false);
-                                          setPenMode(false);
-                                          setShapeMode(false);
-                                          setDraftShape(null);
-                                          setShowSignatureHub(true);
-                                          setSignatureHubStep("gallery");
-                                          setSignaturePanelMode("none");
-                                          setPendingSignatureForPlacement(null);
-                                          setHighlightMode(false);
-                                          setTextMode(false);
-                                        }}
-                                      >
-                                        <span className={`${toolRailInnerBase} ${
-                                          signatureButtonOn ? toolRailInnerActive : toolRailInnerInactive
-                                        }`}>
-                                          <SignatureIcon className="h-5 w-5 shrink-0" />
-                                        </span>
-                                        {savedSignatures.length > 0 ? (
-                                          <span className="pointer-events-none absolute -right-1 -top-1 inline-flex min-w-[18px] items-center justify-center rounded-full bg-[#024d7c] px-1 text-[0.65rem] font-bold text-white shadow-sm">
-                                            {savedSignatures.length}
-                                          </span>
-                                        ) : null}
-                                      </button>
-                                    </div>
-                                  </aside>
-					                      <div className="flex min-w-0 flex-1 min-h-0 flex-col overflow-hidden">
-					                        <AnimatePresence initial={false}>
-					                          {showToolOptionsBar ? (
-					                            <motion.div
-					                              key="tool-options-bar"
-					                              initial={{ height: 0, opacity: 0, y: -6 }}
-					                              animate={{ height: 52, opacity: 1, y: 0 }}
-					                              exit={{ height: 0, opacity: 0, y: -6 }}
-					                              transition={{ duration: 0.18, ease: SOFT_EASE }}
-					                              className="relative z-[30] mx-4 mt-3 min-w-0 overflow-hidden rounded-xl border border-slate-300/80 bg-white shadow-[0_8px_18px_rgba(15,23,42,0.05)]"
-					                            >
-                              <div className="toolbar-font w-full">
-                                <div className="w-full px-4 py-[6px] lg:px-5">
-                                  <div className="relative h-10">
+  <div className="relative flex min-w-0 flex-1 flex-col overflow-visible">
+<AnimatePresence initial={false}>
+				                        {showToolOptionsBar ? (
+				                          <motion.div
+				                            key="tool-options-bar"
+				                            layout
+				                            initial={{ height: 0, opacity: 0, y: -8 }}
+				                            animate={{ height: 45, opacity: 1, y: 0 }}
+				                            exit={{ height: 0, opacity: 0, y: -8 }}
+				                            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+				                          className="relative z-[30] flex w-full items-center overflow-hidden border-b border-slate-200 bg-white px-4 pr-4 dark:border-[#4A4A4A] dark:bg-[#323232] lg:pl-[calc(72px+1rem)]"
+				                        >
+                              <div className="toolbar-font inline-flex max-w-full">
+                                <div className="inline-flex max-w-full">
+                                  <div className="relative h-9">
                                     <div
-                                      className={`absolute inset-0 flex w-full items-center gap-3 lg:gap-4 ${
+                                      className={`flex h-9 items-center gap-3 lg:gap-4 ${
                                         loading ? "pointer-events-none" : ""
                                       }`}
                                       data-text-toolbar
                                     >
                                       {shapeMode ? (
                                         <div
-                                          className={`tools-scroll flex min-w-0 items-center gap-2 overflow-x-auto ${
+                                          className={`tools-scroll flex w-fit max-w-full items-center gap-2 overflow-x-auto ${
                                             loading ? "pointer-events-none" : ""
                                           }`}
                                           aria-label="Options"
@@ -12812,10 +12735,8 @@ const timer =
                                                   activeShapeFillColor
                                                     ? { backgroundColor: activeShapeFillColor }
                                                     : {
-                                                        backgroundImage:
-                                                          "linear-gradient(45deg, rgba(148,163,184,0.6) 25%, transparent 25%), linear-gradient(-45deg, rgba(148,163,184,0.6) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, rgba(148,163,184,0.6) 75%), linear-gradient(-45deg, transparent 75%, rgba(148,163,184,0.6) 75%)",
-                                                        backgroundPosition: "0 0, 0 3px, 3px -3px, -3px 0px",
-                                                        backgroundSize: "6px 6px",
+                                                        background:
+                                                          "repeating-linear-gradient(45deg, #E2E8F0 0 4px, #ffffff 4px 8px)",
                                                       }
                                                 }
                                                 aria-hidden
@@ -12825,88 +12746,42 @@ const timer =
 
                                           <div className="mx-1 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
 
-                                          <div className="flex items-center gap-1">
-                                            <div className="relative">
-                                              <button
-                                                type="button"
-                                                ref={shapeLineStyleMenuButtonRef}
-                                                disabled={!shapeLineStyleEligible}
-                                                className={`${textOptionButtonBase} ${textOptionButtonHover} w-auto px-2 flex items-center gap-1 text-slate-800 disabled:cursor-not-allowed disabled:opacity-40`}
-                                                onClick={() => {
-                                                  if (!shapeLineStyleEligible) return;
-                                                  hideToolbarTooltip();
-                                                  setShapeLineStyleMenuOpen((prev) => !prev);
-                                                }}
-                                                onMouseEnter={(event) => showToolbarTooltip("Line style", event.currentTarget)}
-                                                onMouseLeave={hideToolbarTooltip}
-                                                aria-label="Line style"
-                                              >
-                                                <svg className="h-[18px] w-[18px]" viewBox="0 0 18 6" aria-hidden="true">
-                                                  {resolvedShapeLineStyle === "dashed" ? (
-                                                    <>
-                                                      <line x1="1" y1="3" x2="5" y2="3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                                                      <line x1="8" y1="3" x2="12" y2="3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                                                      <line x1="15" y1="3" x2="17" y2="3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                                                    </>
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-xs font-semibold text-slate-600">Style</span>
+                                            <div className="flex items-center gap-1">
+                                              {LINE_STYLE_OPTIONS.map((option) => (
+                                                <button
+                                                  key={option.value}
+                                                  type="button"
+                                                  onClick={() => applyShapeLineStyle(option.value)}
+                                                  aria-pressed={shapeLineStyle === option.value}
+                                                  className={`${textOptionButtonBase} ${
+                                                    shapeLineStyle === option.value
+                                                      ? textOptionButtonActive
+                                                      : textOptionButtonHover
+                                                  }`}
+                                                  onMouseEnter={(event) =>
+                                                    showToolbarTooltip(option.label, event.currentTarget)
+                                                  }
+                                                  onMouseLeave={hideToolbarTooltip}
+                                                  aria-label={option.label}
+                                                >
+                                                  {option.value === "dotted" ? (
+                                                    <span className="flex h-5 w-5 items-center justify-center gap-0.5">
+                                                      <span className="h-1 w-1 rounded-full bg-current" />
+                                                      <span className="h-1 w-1 rounded-full bg-current" />
+                                                      <span className="h-1 w-1 rounded-full bg-current" />
+                                                    </span>
+                                                  ) : option.value === "dashed" ? (
+                                                    <span className="flex h-5 w-5 items-center justify-center gap-1">
+                                                      <span className="h-0.5 w-2 rounded-full bg-current" />
+                                                      <span className="h-0.5 w-2 rounded-full bg-current" />
+                                                    </span>
                                                   ) : (
-                                                    <line x1="1" y1="3" x2="17" y2="3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                                                    <span className="block h-0.5 w-5 rounded-full bg-current" />
                                                   )}
-                                                </svg>
-                                                <svg className="h-2 w-2 text-slate-800" viewBox="0 0 8 5" aria-hidden="true">
-                                                  <path d="M4 5L0 0h8L4 5z" fill="currentColor" />
-                                                </svg>
-                                              </button>
-                                              {shapeLineStyleMenuOpen && shapeLineStyleMenuPosition && typeof document !== "undefined"
-                                                ? createPortal(
-                                                    <div
-                                                      ref={shapeLineStyleMenuRef}
-                                                      className="fixed z-[9999] rounded-lg bg-white p-1 shadow-[0_10px_24px_rgba(15,23,42,0.12)]"
-                                                      style={{
-                                                        left: shapeLineStyleMenuPosition.left,
-                                                        top: shapeLineStyleMenuPosition.top,
-                                                        transform: "translateX(-50%)",
-                                                      }}
-                                                    >
-                                                      <div className="flex flex-col gap-1">
-                                                        {[
-                                                          { value: "solid", label: "Solid" },
-                                                          { value: "dashed", label: "Dashed" },
-                                                        ].map(({ value, label }) => (
-                                                          <button
-                                                            key={value}
-                                                            type="button"
-                                                            className={`flex w-28 items-center gap-2 rounded-md px-2 py-1.5 text-sm font-semibold transition ${
-                                                              resolvedShapeLineStyle === value
-                                                                ? "bg-[#E0F2FE] text-[#024d7c]"
-                                                                : "text-slate-700 hover:bg-slate-50"
-                                                            }`}
-                                                            onMouseEnter={(event) => showToolbarTooltip(label, event.currentTarget)}
-                                                            onMouseLeave={hideToolbarTooltip}
-                                                            onClick={() => {
-                                                              applyShapeLineStyle(value as LineStyle);
-                                                              setShapeLineStyleMenuOpen(false);
-                                                            }}
-                                                            aria-label={`Line style ${label.toLowerCase()}`}
-                                                          >
-                                                            <svg className="h-[18px] w-[18px] text-slate-700" viewBox="0 0 18 6" aria-hidden="true">
-                                                              {value === "dashed" ? (
-                                                                <>
-                                                                  <line x1="1" y1="3" x2="5" y2="3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                                                                  <line x1="8" y1="3" x2="12" y2="3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                                                                  <line x1="15" y1="3" x2="17" y2="3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                                                                </>
-                                                              ) : (
-                                                                <line x1="1" y1="3" x2="17" y2="3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                                                              )}
-                                                            </svg>
-                                                            <span>{label}</span>
-                                                          </button>
-                                                        ))}
-                                                      </div>
-                                                    </div>,
-                                                    document.body,
-                                                  )
-                                                : null}
+                                                </button>
+                                              ))}
                                             </div>
                                           </div>
 
@@ -12914,72 +12789,10 @@ const timer =
                                         </div>
                                       ) : highlightMode ? (
                                         <div
-                                          className={`tools-scroll flex min-w-0 items-center gap-2 overflow-x-auto ${
+                                          className={`tools-scroll flex w-fit max-w-full items-center gap-2 overflow-x-auto ${
                                             loading ? "pointer-events-none" : ""
                                           }`}
-                                          aria-label="Highlight options"
-                                        >
-                                          <div className="flex items-center gap-1.5">
-                                            {highlightColorEntries.map(([key, value]) => (
-                                              <button
-                                                key={key}
-                                                type="button"
-                                                onClick={() => setHighlightColor(key)}
-                                                className={`h-7 w-7 rounded-full border transition ${
-                                                  highlightColor === key
-                                                    ? "border-[#024d7c] ring-2 ring-[#024d7c]/25"
-                                                    : "border-white/30 hover:border-slate-300"
-                                                }`}
-                                                style={{ backgroundColor: value }}
-                                                aria-label={`Use ${key} highlight`}
-                                              />
-                                            ))}
-                                          </div>
-
-                                          <div className="mx-1 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
-
-                                          <div className="flex items-center gap-2">
-                                            <span className="text-xs font-semibold text-slate-600">Thickness</span>
-                                            <input
-                                              type="range"
-                                              min={MIN_HIGHLIGHT_THICKNESS}
-                                              max={MAX_HIGHLIGHT_THICKNESS}
-                                              step={1}
-                                              value={highlightThickness}
-                                              onChange={(event) => setHighlightThickness(Number(event.target.value))}
-                                              className="h-2 w-28 cursor-pointer accent-[#024d7c]"
-                                              aria-label="Highlight thickness"
-                                            />
-                                            <span className="w-12 text-right text-xs font-semibold tabular-nums text-slate-700">
-                                              {Math.round(highlightThickness)}px
-                                            </span>
-                                          </div>
-
-                                          <div className="mx-1 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
-
-                                          <div className="flex items-center gap-2">
-                                            <span className="text-xs font-semibold text-slate-600">Opacity</span>
-                                            <input
-                                              type="range"
-                                              min={0.15}
-                                              max={0.6}
-                                              step={0.05}
-                                              value={highlightOpacity}
-                                              onChange={(event) => setHighlightOpacity(Number(event.target.value))}
-                                              className="h-2 w-24 cursor-pointer accent-[#024d7c]"
-                                              aria-label="Highlight opacity"
-                                            />
-                                            <span className="w-10 text-right text-xs font-semibold tabular-nums text-slate-700">
-                                              {Math.round(highlightOpacity * 100)}%
-                                            </span>
-                                          </div>
-                                        </div>
-                                      ) : penMode ? (
-                                        <div
-                                          className={`tools-scroll flex min-w-0 items-center gap-2 overflow-x-auto overflow-y-visible py-1 ${
-                                            loading ? "pointer-events-none" : ""
-                                          }`}
-                                          aria-label="Draw options"
+                                          aria-label="Options"
                                         >
                                           <div className="mx-1 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
 
@@ -12988,12 +12801,141 @@ const timer =
                                               <button
                                                 type="button"
                                                 className="mr-2 flex h-7 w-7 items-center justify-center rounded text-slate-800 transition hover:bg-slate-100 hover:text-slate-900"
-                                                onClick={() => applyPenThickness(penThickness - 1)}
+                                                onClick={() => applyHighlightThickness(highlightThickness - 1)}
                                                 onMouseEnter={(event) =>
-                                                  showToolbarTooltip("Decrease stroke", event.currentTarget)
+                                                  showToolbarTooltip("Decrease thickness", event.currentTarget)
                                                 }
                                                 onMouseLeave={hideToolbarTooltip}
                                                 aria-label="Decrease thickness"
+                                              >
+                                                <Minus className="h-4 w-4" />
+                                              </button>
+                                              <input
+                                                type="text"
+                                                maxLength={2}
+                                                inputMode="decimal"
+                                                value={highlightThicknessInput}
+                                                onChange={(event) => {
+                                                  const nextValue = event.target.value;
+                                                  setHighlightThicknessInput(nextValue);
+                                                }}
+                                                onKeyDown={(event) => {
+                                                  if (event.key === "Enter") {
+                                                    event.currentTarget.blur();
+                                                  }
+                                                }}
+                                                onBlur={() => {
+                                                  if (!highlightThicknessInput) {
+                                                    const fallback = DEFAULT_HIGHLIGHT_THICKNESS;
+                                                    applyHighlightThickness(fallback);
+                                                    setHighlightThicknessInput(`${fallback}`);
+                                                    return;
+                                                  }
+                                                  const next = Number(highlightThicknessInput);
+                                                  if (Number.isNaN(next)) {
+                                                    setHighlightThicknessInput(`${Math.round(highlightThickness)}`);
+                                                    return;
+                                                  }
+                                                  const normalized = clamp(Math.round(next), MIN_HIGHLIGHT_THICKNESS, MAX_HIGHLIGHT_THICKNESS);
+                                                  applyHighlightThickness(normalized);
+                                                  setHighlightThicknessInput(`${normalized}`);
+                                                }}
+                                                onMouseEnter={(event) => showToolbarTooltip("Thickness", event.currentTarget)}
+                                                onMouseLeave={hideToolbarTooltip}
+                                                className="bg-transparent text-center text-sm font-semibold text-slate-800 outline-none rounded-md"
+                                                style={{
+                                                  border: "1px solid rgba(148, 163, 184, 0.7)",
+                                                  padding: "3px 5px",
+                                                  margin: "-3px -5px",
+                                                  width: "4ch",
+                                                  alignSelf: "center",
+                                                }}
+                                                aria-label="Thickness"
+                                              />
+                                              <button
+                                                type="button"
+                                                className="ml-2 flex h-7 w-7 items-center justify-center rounded text-slate-800 transition hover:bg-slate-100 hover:text-slate-900"
+                                                onClick={() => applyHighlightThickness(highlightThickness + 1)}
+                                                onMouseEnter={(event) =>
+                                                  showToolbarTooltip("Increase thickness", event.currentTarget)
+                                                }
+                                                onMouseLeave={hideToolbarTooltip}
+                                                aria-label="Increase thickness"
+                                              >
+                                                <Plus className="h-4 w-4" />
+                                              </button>
+                                            </div>
+                                          </div>
+
+                                          <div className="mx-1 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
+
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-xs font-semibold text-slate-600">Color</span>
+                                            <div className="flex items-center gap-1">
+                                              {highlightColorEntries.map(([colorKey, color]) => (
+                                                <button
+                                                  key={colorKey}
+                                                  type="button"
+                                                  onClick={() => applyHighlightColor(colorKey)}
+                                                  className={`relative h-6 w-6 rounded-full border transition ${
+                                                    highlightColor === colorKey
+                                                      ? "border-[#024d7c] ring-2 ring-[#024d7c]/30"
+                                                      : "border-slate-200 hover:border-slate-300"
+                                                  }`}
+                                                  style={{ backgroundColor: color }}
+                                                  onMouseEnter={(event) =>
+                                                    showToolbarTooltip(HIGHLIGHT_COLOR_LABELS[colorKey], event.currentTarget)
+                                                  }
+                                                  onMouseLeave={hideToolbarTooltip}
+                                                  aria-label={HIGHLIGHT_COLOR_LABELS[colorKey]}
+                                                >
+                                                  {highlightColor === colorKey ? (
+                                                    <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-900">
+                                                      ✓
+                                                    </span>
+                                                  ) : null}
+                                                </button>
+                                              ))}
+                                              <button
+                                                type="button"
+                                                onClick={() => setHighlightCustomOpen((prev) => !prev)}
+                                                className={`relative h-6 w-6 rounded-full border transition ${
+                                                  highlightCustomOpen
+                                                    ? "border-[#024d7c] ring-2 ring-[#024d7c]/30"
+                                                    : "border-slate-200 hover:border-slate-300"
+                                                }`}
+                                                onMouseEnter={(event) => showToolbarTooltip("Custom color", event.currentTarget)}
+                                                onMouseLeave={hideToolbarTooltip}
+                                                aria-label="Custom color"
+                                              >
+                                                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-700">
+                                                  +
+                                                </span>
+                                              </button>
+                                            </div>
+                                          </div>
+
+                                          <div className="mx-1 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
+                                        </div>
+                                      ) : penMode ? (
+                                        <div
+                                          className={`tools-scroll flex w-fit max-w-full items-center gap-2 overflow-x-auto ${
+                                            loading ? "pointer-events-none" : ""
+                                          }`}
+                                          aria-label="Options"
+                                        >
+                                          <div className="mx-1 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
+
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-xs font-semibold text-slate-600">Size</span>
+                                            <div className="inline-flex items-center gap-0 justify-start">
+                                              <button
+                                                type="button"
+                                                className="mr-2 flex h-7 w-7 items-center justify-center rounded text-slate-800 transition hover:bg-slate-100 hover:text-slate-900"
+                                                onClick={() => applyPenThickness(penThickness - 1)}
+                                                onMouseEnter={(event) => showToolbarTooltip("Decrease size", event.currentTarget)}
+                                                onMouseLeave={hideToolbarTooltip}
+                                                aria-label="Decrease size"
                                               >
                                                 <Minus className="h-4 w-4" />
                                               </button>
@@ -13023,11 +12965,11 @@ const timer =
                                                     setPenThicknessInput(`${Math.round(penThickness)}`);
                                                     return;
                                                   }
-                                                  const normalized = clamp(Math.round(next), 1, 10);
+                                                  const normalized = clamp(next, 1, 10);
                                                   applyPenThickness(normalized);
                                                   setPenThicknessInput(`${normalized}`);
                                                 }}
-                                                onMouseEnter={(event) => showToolbarTooltip("Stroke", event.currentTarget)}
+                                                onMouseEnter={(event) => showToolbarTooltip("Size", event.currentTarget)}
                                                 onMouseLeave={hideToolbarTooltip}
                                                 className="bg-transparent text-center text-sm font-semibold text-slate-800 outline-none rounded-md"
                                                 style={{
@@ -13037,17 +12979,15 @@ const timer =
                                                   width: "4ch",
                                                   alignSelf: "center",
                                                 }}
-                                                aria-label="Stroke thickness"
+                                                aria-label="Size"
                                               />
                                               <button
                                                 type="button"
                                                 className="ml-2 flex h-7 w-7 items-center justify-center rounded text-slate-800 transition hover:bg-slate-100 hover:text-slate-900"
                                                 onClick={() => applyPenThickness(penThickness + 1)}
-                                                onMouseEnter={(event) =>
-                                                  showToolbarTooltip("Increase stroke", event.currentTarget)
-                                                }
+                                                onMouseEnter={(event) => showToolbarTooltip("Increase size", event.currentTarget)}
                                                 onMouseLeave={hideToolbarTooltip}
-                                                aria-label="Increase thickness"
+                                                aria-label="Increase size"
                                               >
                                                 <Plus className="h-4 w-4" />
                                               </button>
@@ -13056,112 +12996,21 @@ const timer =
 
                                           <div className="mx-1 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
 
-                                          <div className="flex items-center">
-                                            <div className="flex items-center gap-2">
-                                              <span className="text-xs font-semibold text-slate-600">Opacity</span>
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-xs font-semibold text-slate-600">Opacity</span>
+                                            <div className="flex w-28 items-center gap-2">
                                               <input
                                                 type="range"
                                                 min={10}
                                                 max={100}
-                                                step={10}
                                                 value={Math.round(penOpacity * 100)}
                                                 onChange={(event) => applyPenOpacity(Number(event.target.value) / 100)}
-                                                className="opacity-slider w-28 cursor-pointer"
-                                                style={{
-                                                  background: `linear-gradient(to right, #024d7c ${Math.round(
-                                                    penOpacity * 100
-                                                  )}%, #e2e8f0 ${Math.round(penOpacity * 100)}%)`,
-                                                }}
-                                                aria-label="Stroke opacity"
+                                                className="h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200"
+                                                aria-label="Opacity"
                                               />
-                                              <span className="w-12 text-right text-xs font-semibold tabular-nums text-slate-700">
+                                              <span className="text-xs font-semibold text-slate-600">
                                                 {Math.round(penOpacity * 100)}%
                                               </span>
-                                            </div>
-                                          </div>
-
-                                          <div className="mx-1 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
-
-                                          <div className="flex items-center gap-1">
-                                            <div className="relative">
-                                              <button
-                                                type="button"
-                                                ref={lineStyleMenuButtonRef}
-                                                className={`${textOptionButtonBase} ${textOptionButtonHover} w-auto px-2 flex items-center gap-1 text-slate-800`}
-                                                onClick={() => {
-                                                  hideToolbarTooltip();
-                                                  setLineStyleMenuOpen((prev) => !prev);
-                                                }}
-                                                onMouseEnter={(event) => showToolbarTooltip("Line style", event.currentTarget)}
-                                                onMouseLeave={hideToolbarTooltip}
-                                                aria-label="Line style"
-                                              >
-                                                <svg className="h-[18px] w-[18px]" viewBox="0 0 18 6" aria-hidden="true">
-                                                  {penLineStyle === "dashed" ? (
-                                                    <>
-                                                      <line x1="1" y1="3" x2="5" y2="3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                                                      <line x1="8" y1="3" x2="12" y2="3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                                                      <line x1="15" y1="3" x2="17" y2="3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                                                    </>
-                                                  ) : (
-                                                    <line x1="1" y1="3" x2="17" y2="3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                                                  )}
-                                                </svg>
-                                                <svg className="h-2 w-2 text-slate-800" viewBox="0 0 8 5" aria-hidden="true">
-                                                  <path d="M4 5L0 0h8L4 5z" fill="currentColor" />
-                                                </svg>
-                                              </button>
-                                              {lineStyleMenuOpen && lineStyleMenuPosition && typeof document !== "undefined"
-                                                ? createPortal(
-                                                    <div
-                                                      ref={lineStyleMenuRef}
-                                                      className="fixed z-[9999] rounded-lg bg-white p-1 shadow-[0_10px_24px_rgba(15,23,42,0.12)]"
-                                                      style={{
-                                                        left: lineStyleMenuPosition.left,
-                                                        top: lineStyleMenuPosition.top,
-                                                        transform: "translateX(-50%)",
-                                                      }}
-                                                    >
-                                                      <div className="flex flex-col gap-1">
-                                                        {[
-                                                          { value: "solid", label: "Solid" },
-                                                          { value: "dashed", label: "Dashed" },
-                                                        ].map(({ value, label }) => (
-                                                          <button
-                                                            key={value}
-                                                            type="button"
-                                                            className={`flex w-28 items-center gap-2 rounded-md px-2 py-1.5 text-sm font-semibold transition ${
-                                                              penLineStyle === value
-                                                                ? "bg-[#E0F2FE] text-[#024d7c]"
-                                                                : "text-slate-700 hover:bg-slate-50"
-                                                            }`}
-                                                            onMouseEnter={(event) => showToolbarTooltip(label, event.currentTarget)}
-                                                            onMouseLeave={hideToolbarTooltip}
-                                                            onClick={() => {
-                                                              setPenLineStyle(value as LineStyle);
-                                                              setLineStyleMenuOpen(false);
-                                                            }}
-                                                            aria-label={`Line style ${label.toLowerCase()}`}
-                                                          >
-                                                            <svg className="h-[18px] w-[18px] text-slate-700" viewBox="0 0 18 6" aria-hidden="true">
-                                                              {value === "dashed" ? (
-                                                                <>
-                                                                  <line x1="1" y1="3" x2="5" y2="3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                                                                  <line x1="8" y1="3" x2="12" y2="3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                                                                  <line x1="15" y1="3" x2="17" y2="3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                                                                </>
-                                                              ) : (
-                                                                <line x1="1" y1="3" x2="17" y2="3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                                                              )}
-                                                            </svg>
-                                                            <span>{label}</span>
-                                                          </button>
-                                                        ))}
-                                                      </div>
-                                                    </div>,
-                                                    document.body,
-                                                  )
-                                                : null}
                                             </div>
                                           </div>
 
@@ -13189,10 +13038,10 @@ const timer =
                                         </div>
 
                                           <div className="mx-1 hidden h-6 w-px bg-slate-300/90 sm:block" aria-hidden />
-                                      </div>
-                                    ) : (
+                                        </div>
+                                      ) : (
                                         <div
-                                          className={`tools-scroll flex min-w-0 items-center gap-0.5 overflow-visible ${
+                                          className={`tools-scroll flex w-fit max-w-full items-center gap-0.5 overflow-visible ${
                                             loading ? "pointer-events-none" : ""
                                           }`}
                                           aria-label="Text options"
@@ -13618,13 +13467,338 @@ const timer =
                                             : null}
                                         </div>
                                       )}
+                                      <button
+                                        type="button"
+                                        onClick={() => setToolOptionsCollapsed(true)}
+                                        className="ml-2 inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+                                        aria-label="Hide tool options"
+                                      >
+                                        <X className="h-4 w-4" aria-hidden />
+                                      </button>
                                     </div>
                                   </div>
                                 </div>
                               </div>
                             </motion.div>
-					              ) : null}
-					                        </AnimatePresence>
+				                        ) : null}
+				                      </AnimatePresence>
+
+                                  
+  <div className="flex min-w-0 flex-1 items-stretch gap-0 overflow-hidden">
+                                  <aside
+                                    className="toolbar-font hidden h-fit w-[48px] shrink-0 items-center self-start rounded-md border border-slate-300/80 bg-white px-1 py-2 shadow-[0_8px_20px_rgba(15,23,42,0.06)] lg:ml-3 lg:mr-3 lg:mt-3 lg:flex lg:flex-col lg:gap-1 lg:z-[10] dark:border-[#4A4A4A]/80 dark:bg-[#323232] dark:shadow-[0_10px_26px_rgba(0,0,0,0.45)]"
+                                  >
+                                    <div className="flex flex-col gap-1 border-b border-slate-200/80 pb-1 dark:border-[#2A2A31]/80">
+                                      <button
+                                        type="button"
+                                        className={`${toolRailButtonBase} ${toolRailButtonInactive}`}
+                                        disabled={loading}
+                                        aria-disabled={!hasUndoHistory}
+                                        aria-label="Undo"
+                                        onMouseEnter={(event) => showToolbarTooltip("Undo", event.currentTarget, "right")}
+                                        onMouseLeave={hideToolbarTooltip}
+                                        onClick={() => {
+                                          if (loading) return;
+                                          if (!hasUndoHistory) return;
+                                          handleUndoHighlight();
+                                        }}
+                                      >
+                                        <Undo2 className="h-5 w-5 shrink-0" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className={`${toolRailButtonBase} ${toolRailButtonInactive}`}
+                                        disabled={loading}
+                                        aria-disabled={!hasRedoHistory}
+                                        aria-label="Redo"
+                                        onMouseEnter={(event) => showToolbarTooltip("Redo", event.currentTarget, "right")}
+                                        onMouseLeave={hideToolbarTooltip}
+                                        onClick={() => {
+                                          if (loading) return;
+                                          if (!hasRedoHistory) return;
+                                          handleRedoHighlight();
+                                        }}
+                                      >
+                                        <Redo2 className="h-5 w-5 shrink-0" />
+                                      </button>
+                                    </div>
+
+                                    <div className="flex min-h-0 flex-1 flex-col items-stretch gap-1 overflow-y-auto">
+                                      <button
+                                        type="button"
+                                        disabled={toolbarLoading}
+                                        aria-pressed={selectButtonOn}
+                                        aria-label="Select"
+                                        onMouseEnter={(event) => showToolbarTooltip("Select", event.currentTarget, "right")}
+                                        onMouseLeave={hideToolbarTooltip}
+                                        className={`${toolRailButtonBase} ${
+                                          toolbarLoading || selectButtonOn ? toolRailButtonActive : toolRailButtonInactive
+                                        }`}
+                                        onClick={() => {
+                                          if (toolbarLoading) return;
+                                          setSelectMode(true);
+                                          setPenMode(false);
+                                          setShapeMode(false);
+                                          setHighlightMode(false);
+                                          setTextMode(false);
+                                          setDeleteMode(false);
+                                          setDraftHighlight(null);
+                                          setDraftShape(null);
+                                          setDraftTextBox(null);
+                                          setShowSignatureHub(false);
+                                          setSignaturePanelMode("none");
+                                          setPendingSignatureForPlacement(null);
+                                        }}
+                                      >
+                                        <span className={`${toolRailInnerBase} ${
+                                          selectButtonOn ? toolRailInnerActive : toolRailInnerInactive
+                                        }`}>
+                                          <MousePointer2 className="h-5 w-5 shrink-0" />
+                                        </span>
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        disabled={highlightButtonDisabled}
+                                        aria-pressed={textButtonOn}
+                                        aria-label="Text"
+                                        onMouseEnter={(event) => showToolbarTooltip("Text", event.currentTarget, "right")}
+                                        onMouseLeave={hideToolbarTooltip}
+                                        className={`${toolRailButtonBase} ${textButtonOn ? toolRailButtonActive : toolRailButtonInactive}`}
+                                        onClick={() => {
+                                          if (highlightButtonDisabled) return;
+                                          setSelectMode(false);
+                                          setDeleteMode(false);
+                                          setTextMode(true);
+                                          setPenMode(false);
+                                          setHighlightMode(false);
+                                          setShapeMode(false);
+                                          setDraftHighlight(null);
+                                          setDraftShape(null);
+                                          setDraftTextBox(null);
+                                          setShowSignatureHub(false);
+                                          setSignaturePanelMode("none");
+                                          setPendingSignatureForPlacement(null);
+                                        }}
+                                      >
+                                        <span className={`${toolRailInnerBase} ${
+                                          textButtonOn ? toolRailInnerActive : toolRailInnerInactive
+                                        }`}>
+                                          <Type className="h-5 w-5 shrink-0" />
+                                        </span>
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        disabled={loading}
+                                        aria-label="Image"
+                                        onMouseEnter={(event) => showToolbarTooltip("Image", event.currentTarget, "right")}
+                                        onMouseLeave={hideToolbarTooltip}
+                                        className={`${toolRailButtonBase} ${toolRailButtonInactive}`}
+                                        onClick={() => {
+                                          if (loading) return;
+                                          setSelectMode(false);
+                                          setDeleteMode(false);
+                                          setTextMode(false);
+                                          setPenMode(false);
+                                          setHighlightMode(false);
+                                          setShapeMode(false);
+                                          setDraftHighlight(null);
+                                          setDraftShape(null);
+                                          setDraftTextBox(null);
+                                          setShowSignatureHub(false);
+                                          setSignaturePanelMode("none");
+                                          setPendingSignatureForPlacement(null);
+                                          handleOpenImageUpload();
+                                        }}
+                                      >
+                                        <span className={`${toolRailInnerBase} ${toolRailInnerInactive}`}>
+                                          <ImageIcon className="h-5 w-5 shrink-0" />
+                                        </span>
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        disabled={highlightButtonDisabled}
+                                        aria-pressed={shapeButtonVisualOn}
+                                        aria-label="Shapes"
+                                        onMouseEnter={(event) => showToolbarTooltip("Shapes", event.currentTarget, "right")}
+                                        onMouseLeave={hideToolbarTooltip}
+                                        className={`${toolRailButtonBase} ${shapeButtonVisualOn ? toolRailButtonActive : toolRailButtonInactive}`}
+                                        onClick={() => {
+                                          if (highlightButtonDisabled) return;
+                                          clearTextFocus();
+                                          setSelectMode(false);
+                                          setDeleteMode(false);
+                                          setShapeMode(true);
+                                          setShapeType(null);
+                                          setPenMode(false);
+                                          setHighlightMode(false);
+                                          setTextMode(false);
+                                          setDraftHighlight(null);
+                                          setDraftShape(null);
+                                          setDraftTextBox(null);
+                                          setShowSignatureHub(false);
+                                          setSignaturePanelMode("none");
+                                          setPendingSignatureForPlacement(null);
+                                        }}
+                                      >
+                                        <span className={`${toolRailInnerBase} ${
+                                          shapeButtonVisualOn ? toolRailInnerActive : toolRailInnerInactive
+                                        }`}>
+                                          <Shapes className="h-5 w-5 shrink-0" />
+                                        </span>
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        disabled={highlightButtonDisabled}
+                                        aria-pressed={drawButtonOn}
+                                        aria-label="Draw"
+                                        onMouseEnter={(event) => showToolbarTooltip("Draw", event.currentTarget, "right")}
+                                        onMouseLeave={hideToolbarTooltip}
+                                        className={`${toolRailButtonBase} ${drawButtonOn ? toolRailButtonActive : toolRailButtonInactive}`}
+                                        onClick={() => {
+                                          if (highlightButtonDisabled) return;
+                                          setSelectMode(false);
+                                          setDeleteMode(false);
+                                          setPenMode(true);
+                                          setHighlightMode(false);
+                                          setShapeMode(false);
+                                          setTextMode(false);
+                                          setDraftHighlight(null);
+                                          setDraftShape(null);
+                                          setDraftTextBox(null);
+                                          setShowSignatureHub(false);
+                                          setSignaturePanelMode("none");
+                                          setPendingSignatureForPlacement(null);
+                                        }}
+                                      >
+                                        <span className={`${toolRailInnerBase} ${
+                                          drawButtonOn ? toolRailInnerActive : toolRailInnerInactive
+                                        }`}>
+                                          <PencilLine className="h-5 w-5 shrink-0" />
+                                        </span>
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        disabled={highlightButtonDisabled}
+                                        aria-pressed={highlightButtonVisualOn}
+                                        aria-label="Highlight"
+                                        onMouseEnter={(event) => showToolbarTooltip("Highlight", event.currentTarget, "right")}
+                                        onMouseLeave={hideToolbarTooltip}
+                                        className={`${toolRailButtonBase} ${highlightButtonVisualOn ? toolRailButtonActive : toolRailButtonInactive}`}
+                                        onClick={() => {
+                                          if (highlightButtonDisabled) return;
+                                          setSelectMode(false);
+                                          setDeleteMode(false);
+                                          setHighlightMode(true);
+                                          setPenMode(false);
+                                          setShapeMode(false);
+                                          setTextMode(false);
+                                          setDraftHighlight(null);
+                                          setDraftShape(null);
+                                          setDraftTextBox(null);
+                                          setShowSignatureHub(false);
+                                          setSignaturePanelMode("none");
+                                          setPendingSignatureForPlacement(null);
+                                        }}
+                                      >
+                                        <span className={`${toolRailInnerBase} ${
+                                          highlightButtonVisualOn ? toolRailInnerActive : toolRailInnerInactive
+                                        }`}>
+                                          <Highlighter className="h-5 w-5 shrink-0" />
+                                        </span>
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        disabled={loading}
+                                        className={`${toolRailButtonBase} ${deleteMode ? toolRailButtonActive : toolRailButtonInactive}`}
+                                        onClick={handleToggleDeleteMode}
+                                        aria-pressed={deleteMode}
+                                        aria-disabled={!hasAnyAnnotations && !deleteMode}
+                                        aria-label="Eraser"
+                                        onMouseEnter={(event) => showToolbarTooltip("Eraser", event.currentTarget, "right")}
+                                        onMouseLeave={hideToolbarTooltip}
+                                      >
+                                        <span className={`${toolRailInnerBase} ${
+                                          deleteMode ? toolRailInnerActive : toolRailInnerInactive
+                                        }`}>
+                                          <Eraser className="h-5 w-5 shrink-0" />
+                                        </span>
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        disabled={loading}
+                                        aria-label="Note"
+                                        onMouseEnter={(event) => showToolbarTooltip("Note", event.currentTarget, "right")}
+                                        onMouseLeave={hideToolbarTooltip}
+                                        className={`${toolRailButtonBase} ${toolRailButtonInactive}`}
+                                        onClick={() => {
+                                          if (loading) return;
+                                          setSelectMode(false);
+                                          setDeleteMode(false);
+                                          setTextMode(true);
+                                          setPenMode(false);
+                                          setHighlightMode(false);
+                                          setShapeMode(false);
+                                          setDraftHighlight(null);
+                                          setDraftShape(null);
+                                          setDraftTextBox(null);
+                                          setShowSignatureHub(false);
+                                          setSignaturePanelMode("none");
+                                          setPendingSignatureForPlacement(null);
+                                          handleAddStickyNote();
+                                        }}
+                                      >
+                                        <span className={`${toolRailInnerBase} ${toolRailInnerInactive}`}>
+                                          <Pin className="h-5 w-5 shrink-0 rotate-[45deg]" />
+                                        </span>
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        disabled={loading}
+                                        aria-pressed={signatureButtonOn}
+                                        aria-label={`Sign${savedSignatures.length > 0 ? ` (${savedSignatures.length})` : ""}`}
+                                        onMouseEnter={(event) => showToolbarTooltip("Sign", event.currentTarget, "right")}
+                                        onMouseLeave={hideToolbarTooltip}
+                                        className={`relative ${toolRailButtonBase} ${signatureButtonOn ? toolRailButtonActive : toolRailButtonInactive}`}
+                                        onClick={() => {
+                                          if (loading) return;
+                                          setSelectMode(false);
+                                          setDeleteMode(false);
+                                          setPenMode(false);
+                                          setShapeMode(false);
+                                          setDraftShape(null);
+                                          setShowSignatureHub(true);
+                                          setSignatureHubStep("gallery");
+                                          setSignaturePanelMode("none");
+                                          setPendingSignatureForPlacement(null);
+                                          setHighlightMode(false);
+                                          setTextMode(false);
+                                        }}
+                                      >
+                                        <span className={`${toolRailInnerBase} ${
+                                          signatureButtonOn ? toolRailInnerActive : toolRailInnerInactive
+                                        }`}>
+                                          <SignatureIcon className="h-5 w-5 shrink-0" />
+                                        </span>
+                                        {savedSignatures.length > 0 ? (
+                                          <span className="pointer-events-none absolute -right-1 -top-1 inline-flex min-w-[18px] items-center justify-center rounded-full bg-[#024d7c] px-1 text-[0.65rem] font-bold text-white shadow-sm">
+                                            {savedSignatures.length}
+                                          </span>
+                                        ) : null}
+                                      </button>
+                                    </div>
+                                  </aside>
+				                    <div className="relative flex min-w-0 flex-1 min-h-0 flex-col overflow-hidden">
+
+				                      
+					                        
 					                        <div className="relative min-w-0 flex-1 min-h-0 overflow-hidden">
 				                          <div
 				                            ref={viewerScrollRef}
@@ -13642,23 +13816,26 @@ const timer =
 				                        </div>
 				                      </div>
 			
-				                      <div className="flex shrink-0 items-stretch">
+				                      
+  </div>
+</div>
+<div className="flex shrink-0 items-stretch">
 				                          {showPageOrderPanel ? (
-				                            <aside className="flex w-[272px] shrink-0 flex-col border-l border-slate-200">
-				                              <div className="flex min-h-0 flex-1 flex-col bg-white">
+				                            <aside className="flex w-[272px] shrink-0 flex-col border-l border-slate-200 dark:border-[#4A4A4A]">
+				                              <div className="flex min-h-0 flex-1 flex-col bg-white dark:bg-[#323232]">
                                 <div
-                                  className="toolbar-font flex h-[45px] items-center justify-between border-b border-slate-200 bg-white px-4"
+                                  className="toolbar-font flex h-[45px] items-center justify-between border-b border-slate-200 bg-white px-4 dark:border-[#4A4A4A] dark:bg-[#323232]"
                                   data-text-toolbar
                                 >
 				                                  {loading && pages.length === 0 ? (
-                                    <div className="flex items-center gap-2 text-sm font-semibold text-slate-600">
-                                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-[#024d7c]" aria-hidden />
+                                    <div className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-zinc-300">
+                                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-[#024d7c] dark:border-[#2A2A31] dark:border-t-slate-200" aria-hidden />
                                       <span>Loading</span>
                                     </div>
 				                                  ) : (
                                     <div className="flex items-center gap-2">
-                                      <p className="text-sm font-semibold text-slate-800">Pages</p>
-                                      <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-2 text-xs font-semibold text-slate-600">
+                                      <p className="text-sm font-medium text-slate-800 dark:text-zinc-100">Pages</p>
+                                      <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-md border border-slate-200 bg-white px-2 text-xs font-medium text-slate-900 shadow-sm dark:border-[#2A2A31] dark:bg-[#1C1C1F] dark:text-zinc-100">
                                         {pages.length}
                                       </span>
                                     </div>
@@ -13685,19 +13862,29 @@ const timer =
                                         <ul className="flex flex-col py-0">
 		                                  {pages.length > 0 ? (
 		                                    <li className="group relative flex h-12 items-center justify-center">
-			                                      <button
-                                            type="button"
-                                            onClick={() => void handleAddBlankPageBefore(pages[0].id)}
-                                            className="flex w-full items-center justify-center gap-3 px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400 opacity-0 transition duration-150 group-hover:opacity-100 group-focus-within:opacity-100 hover:text-slate-600 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 focus-visible:ring-offset-2"
-                                            aria-label="Add blank page"
-                                          >
-                                            <div className="h-px flex-1 bg-slate-300/80" aria-hidden />
-                                            <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-                                              <Plus className="h-3.5 w-3.5" aria-hidden />
-                                              Add Blank Page
-                                            </span>
-                                            <div className="h-px flex-1 bg-slate-300/80" aria-hidden />
-                                          </button>
+			                                      <div className="flex w-full items-center justify-center gap-0 text-[12px] font-bold uppercase tracking-[0.05em] text-slate-500 opacity-0 transition duration-150 group-hover:opacity-100 group-focus-within:opacity-100 dark:text-zinc-400">
+                                              <button
+                                                type="button"
+                                                onPointerDown={(event) => event.stopPropagation()}
+                                                onClick={() => void handleAddBlankPageBefore(pages[0].id)}
+                                                className="flex items-center justify-center gap-1 whitespace-nowrap px-3 py-1.25 transition hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 dark:hover:text-slate-100 dark:focus-visible:ring-zinc-500/50"
+                                                aria-label="Add blank page"
+                                              >
+                                                <Plus className="h-3.5 w-3.5" aria-hidden />
+                                                <span>Blank Page</span>
+                                              </button>
+                                              <div className="mx-2 h-4 w-px bg-slate-300/80 dark:bg-[#4A4A4A]" aria-hidden />
+                                              <button
+                                                type="button"
+                                                onPointerDown={(event) => event.stopPropagation()}
+                                                onClick={handleInsertFileBeforeFirst}
+                                                className="flex items-center justify-center gap-1 whitespace-nowrap px-3 py-1.25 transition hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 dark:hover:text-slate-100 dark:focus-visible:ring-zinc-500/50"
+                                                aria-label="Add file here"
+                                              >
+                                                <UploadCloud className="h-3.5 w-3.5" aria-hidden />
+                                                <span>Add File</span>
+                                              </button>
+                                            </div>
 		                                    </li>
 		                                  ) : null}
 		                                  {pages.map((p, i) => (
@@ -13723,40 +13910,60 @@ const timer =
                                               });
                                             }}
 		                                      />
-		                                      {i < pages.length - 1 ? (
+                                      {i < pages.length - 1 ? (
 		                                        <li className="group relative flex h-12 items-center justify-center">
-			                                          <button
-                                              type="button"
-                                              onClick={() => void handleAddBlankPageAfter(p.id)}
-                                              className="flex w-full items-center justify-center gap-3 px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400 opacity-0 transition duration-150 group-hover:opacity-100 group-focus-within:opacity-100 hover:text-slate-600 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 focus-visible:ring-offset-2"
-                                              aria-label="Add blank page"
-                                            >
-                                              <div className="h-px flex-1 bg-slate-300/80" aria-hidden />
-                                              <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+			                                      <div className="flex w-full items-center justify-center gap-0 text-[12px] font-bold uppercase tracking-[0.05em] text-slate-500 opacity-0 transition duration-150 group-hover:opacity-100 group-focus-within:opacity-100 dark:text-zinc-400">
+                                              <button
+                                                type="button"
+                                                onPointerDown={(event) => event.stopPropagation()}
+                                                onClick={() => void handleAddBlankPageAfter(p.id)}
+                                                className="flex items-center justify-center gap-1 whitespace-nowrap px-3 py-1.25 transition hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 dark:hover:text-slate-100 dark:focus-visible:ring-zinc-500/50"
+                                                aria-label="Add blank page"
+                                              >
                                                 <Plus className="h-3.5 w-3.5" aria-hidden />
-                                                Add Blank Page
-                                              </span>
-                                              <div className="h-px flex-1 bg-slate-300/80" aria-hidden />
-                                            </button>
+                                                <span>Blank Page</span>
+                                              </button>
+                                              <div className="mx-2 h-4 w-px bg-slate-300/80 dark:bg-[#4A4A4A]" aria-hidden />
+                                              <button
+                                                type="button"
+                                                onPointerDown={(event) => event.stopPropagation()}
+                                                onClick={() => handleInsertFileBetweenPages(p.id)}
+                                                className="flex items-center justify-center gap-1 whitespace-nowrap px-3 py-1.25 transition hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 dark:hover:text-slate-100 dark:focus-visible:ring-zinc-500/50"
+                                                aria-label="Add file here"
+                                              >
+                                                <UploadCloud className="h-3.5 w-3.5" aria-hidden />
+                                                <span>Add File</span>
+                                              </button>
+                                            </div>
 		                                        </li>
 		                                      ) : null}
 		                                    </Fragment>
 		                                  ))}
 		                                  {pages.length > 0 ? (
 		                                    <li className="group relative flex h-12 items-center justify-center">
-			                                      <button
-                                            type="button"
-                                            onClick={() => void handleAddBlankPageAfter(pages[pages.length - 1].id)}
-                                            className="flex w-full items-center justify-center gap-3 px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400 opacity-0 transition duration-150 group-hover:opacity-100 group-focus-within:opacity-100 hover:text-slate-600 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 focus-visible:ring-offset-2"
-                                            aria-label="Add blank page"
-                                          >
-                                            <div className="h-px flex-1 bg-slate-300/80" aria-hidden />
-                                            <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-                                              <Plus className="h-3.5 w-3.5" aria-hidden />
-                                              Add Blank Page
-                                            </span>
-                                            <div className="h-px flex-1 bg-slate-300/80" aria-hidden />
-                                          </button>
+			                                      <div className="flex w-full items-center justify-center gap-0 text-[12px] font-bold uppercase tracking-[0.05em] text-slate-500 opacity-0 transition duration-150 group-hover:opacity-100 group-focus-within:opacity-100 dark:text-zinc-400">
+                                              <button
+                                                type="button"
+                                                onPointerDown={(event) => event.stopPropagation()}
+                                                onClick={() => void handleAddBlankPageAfter(pages[pages.length - 1].id)}
+                                                className="flex items-center justify-center gap-1 whitespace-nowrap px-3 py-1.25 transition hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 dark:hover:text-slate-100 dark:focus-visible:ring-zinc-500/50"
+                                                aria-label="Add blank page"
+                                              >
+                                                <Plus className="h-3.5 w-3.5" aria-hidden />
+                                                <span>Blank Page</span>
+                                              </button>
+                                              <div className="mx-2 h-4 w-px bg-slate-300/80 dark:bg-[#4A4A4A]" aria-hidden />
+                                              <button
+                                                type="button"
+                                                onPointerDown={(event) => event.stopPropagation()}
+                                                onClick={() => handleInsertFileBetweenPages(pages[pages.length - 1].id)}
+                                                className="flex items-center justify-center gap-1 whitespace-nowrap px-3 py-1.25 transition hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 dark:hover:text-slate-100 dark:focus-visible:ring-zinc-500/50"
+                                                aria-label="Add file here"
+                                              >
+                                                <UploadCloud className="h-3.5 w-3.5" aria-hidden />
+                                                <span>Add File</span>
+                                              </button>
+                                            </div>
 		                                    </li>
 		                                  ) : null}
 			                                </ul>
@@ -13768,9 +13975,9 @@ const timer =
 					                          ) : null}
 
                           <aside
-                            className="flex w-12 shrink-0 flex-col border-l border-slate-200 bg-white"
+                            className="flex w-12 shrink-0 flex-col border-l border-slate-200 bg-white dark:border-[#4A4A4A] dark:bg-[#323232]"
                           >
-				                            <div className="flex h-[45px] w-full items-center justify-center border-b border-slate-200">
+				                            <div className="flex h-[45px] w-full items-center justify-center border-b border-slate-200 dark:border-[#4A4A4A]">
 				                              <div className="group relative">
 				                                <button
 				                                  type="button"
@@ -13784,10 +13991,10 @@ const timer =
                                                 )
                                               }
                                               onMouseLeave={hideToolbarTooltip}
-				                                  className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border transition-[transform,background-color,border-color,box-shadow,color] duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 ${
+				                                  className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border transition-[transform,background-color,border-color,box-shadow,color] duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 dark:focus-visible:ring-zinc-500/50 ${
                                                 showPageOrderPanel
-                                                  ? "border-[#E9D5FF] bg-[#F1EBFF] text-[#5B38E6] shadow-[inset_0_0_0_1px_rgba(108,71,255,0.10)]"
-                                                  : "border-transparent bg-transparent text-slate-600 hover:-translate-y-[1px] hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900 hover:shadow-[0_10px_22px_rgba(15,23,42,0.10)]"
+                                                  ? "border-transparent bg-[#6C47FF] text-white shadow-none"
+                                                  : "border-transparent bg-transparent text-slate-600 hover:-translate-y-[1px] hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900 hover:shadow-[0_10px_22px_rgba(15,23,42,0.10)] dark:text-zinc-300 dark:hover:border-[#4A4A4A] dark:hover:bg-[#34343C] dark:hover:text-white"
                                               }`}
 				                                  aria-label={showPageOrderPanel ? "Close sidebar" : "Open sidebar"}
 				                                >
@@ -13806,7 +14013,7 @@ const timer =
                                     className={viewerRailButtonClass}
                                     onMouseEnter={(event) => showToolbarTooltip("Zoom in (Ctrl +)", event.currentTarget, "left")}
                                     onMouseLeave={hideToolbarTooltip}
-                                    onClick={() => setZoomWithScrollPreserved(zoomPercent + ZOOM_STEP_PERCENT)}
+                                    onClick={() => zoomByStep(ZOOM_STEP_PERCENT)}
                                     disabled={pages.length === 0 || zoomPercent >= ZOOM_MAX_PERCENT}
                                   >
                                     <ZoomIn className="h-5 w-5" aria-hidden />
@@ -13817,13 +14024,13 @@ const timer =
                                     className={viewerRailButtonClass}
                                     onMouseEnter={(event) => showToolbarTooltip("Zoom out (Ctrl -)", event.currentTarget, "left")}
                                     onMouseLeave={hideToolbarTooltip}
-                                    onClick={() => setZoomWithScrollPreserved(zoomPercent - ZOOM_STEP_PERCENT)}
+                                    onClick={() => zoomByStep(-ZOOM_STEP_PERCENT)}
                                     disabled={pages.length === 0 || zoomPercent <= ZOOM_MIN_PERCENT}
                                   >
                                     <ZoomOut className="h-5 w-5" aria-hidden />
                                   </button>
                                 </div>
-                                <div className="mx-auto h-px w-7 bg-slate-200" aria-hidden />
+                                <div className="mx-auto h-px w-7 bg-slate-200 dark:bg-[#2A2A31]" aria-hidden />
                                 <div className="flex flex-col items-center gap-2 px-1 py-3">
                                   <button
                                     type="button"
@@ -13866,7 +14073,7 @@ const timer =
                                       hideToolbarTooltip();
                                       commitPageNumberDraft();
                                     }}
-                                    className="h-8 w-8 rounded-md border border-slate-200 bg-white px-1 text-center text-[12px] font-semibold tabular-nums text-slate-900 shadow-sm outline-none transition focus:border-[#51bdff] focus:ring-2 focus:ring-[#51bdff]/30 disabled:opacity-60"
+                                    className="h-8 w-8 rounded-md border border-slate-200 bg-white px-1 text-center text-[12px] font-semibold tabular-nums text-slate-900 shadow-sm outline-none transition focus:border-[#51bdff] focus:ring-2 focus:ring-[#51bdff]/30 disabled:opacity-60 dark:border-[#2A2A31] dark:bg-[#1C1C1F] dark:text-zinc-100 dark:focus:border-[#4A4A55] dark:focus:ring-zinc-500/40"
                                     aria-label="Page number"
                                   />
                                   <button
@@ -13893,9 +14100,9 @@ const timer =
                   sourcesHydrated &&
                   pages.length === 0 &&
                   (!projectParam || projectHasSources === false) && (
-	                <div className="rounded-3xl border border-dashed border-slate-200 bg-white/80 p-12 text-center shadow-sm">
-	                  <p className="text-base font-semibold text-gray-800">No pages yet</p>
-	                  <p className="mt-2 text-sm text-gray-500">
+	                <div className="rounded-3xl border border-dashed border-slate-200 bg-white/80 p-12 text-center shadow-sm dark:border-[#2A2A31] dark:bg-[#1C1C1F]/80">
+	                  <p className="text-base font-semibold text-gray-800 dark:text-zinc-100">No pages yet</p>
+	                  <p className="mt-2 text-sm text-gray-500 dark:text-zinc-400">
 	                    Bring your PDFs into the workspace — we&apos;ll show a live preview as soon as they finish uploading.
                   </p>
                   <button
@@ -13924,10 +14131,10 @@ const timer =
       {showSignatureHub ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeSignatureHub} />
-          <div className="relative z-10 w-full max-w-4xl rounded-2xl bg-white p-5 shadow-[0_32px_90px_rgba(5,10,30,0.45)]">
+          <div className="relative z-10 w-full max-w-4xl rounded-2xl bg-white p-5 shadow-[0_32px_90px_rgba(5,10,30,0.45)] dark:bg-[#1C1C1F] dark:shadow-[0_36px_110px_rgba(0,0,0,0.6)]">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-xl font-semibold text-slate-900">
+                <h3 className="text-xl font-semibold text-slate-900 dark:text-zinc-100">
                   {signatureHubStep === "gallery"
                     ? "Sign"
                     : signatureHubStep === "type"
@@ -13940,7 +14147,7 @@ const timer =
                     ? "Draw signature"
                     : "Upload signature"}
                 </h3>
-                <p className="text-sm text-slate-600">
+                <p className="text-sm text-slate-600 dark:text-zinc-300">
                   {signatureHubStep === "gallery"
                     ? "Pick an existing signature or create a new one."
                     : "Save it to drop onto your document instantly."}
@@ -13949,7 +14156,7 @@ const timer =
               <button
                 type="button"
                 onClick={closeSignatureHub}
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-900 dark:border-[#2A2A31] dark:text-zinc-300 dark:hover:border-slate-500 dark:hover:text-white"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -13965,18 +14172,18 @@ const timer =
                       setTypeSignatureText("");
                       setTypedSignatureError(null);
                     }}
-                    className="flex min-h-[120px] items-center justify-center gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-[#024d7c]/50 hover:bg-white"
+                    className="flex min-h-[120px] items-center justify-center gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-[#024d7c]/50 hover:bg-white dark:border-[#2A2A31] dark:bg-[#2A2A31] dark:text-zinc-200 dark:hover:bg-[#34343C]"
                   >
-                    <div className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm dark:border-[#2A2A31] dark:bg-[#1C1C1F]">
                       <Plus className="h-5 w-5 text-[#024d7c]" />
                     </div>
                     <div className="text-left">
-                      <div className="text-base font-semibold text-slate-900">Add signature</div>
-                      <div className="text-xs text-slate-600">Type, draw, or upload a new signature.</div>
+                      <div className="text-base font-semibold text-slate-900 dark:text-zinc-100">Add signature</div>
+                      <div className="text-xs text-slate-600 dark:text-zinc-400">Type, draw, or upload a new signature.</div>
                     </div>
                   </button>
                   {savedSignatures.length === 0 ? (
-                    <div className="flex min-h-[120px] items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm">
+                    <div className="flex min-h-[120px] items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm dark:border-[#2A2A31] dark:bg-[#1C1C1F] dark:text-zinc-300">
                       No saved signatures yet. Add one to get started.
                     </div>
                   ) : null}
@@ -13985,11 +14192,11 @@ const timer =
                     return (
                     <div
                       key={sig.id}
-                      className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-[0_6px_18px_rgba(15,23,42,0.08)]"
+                      className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-[0_6px_18px_rgba(15,23,42,0.08)] dark:border-[#2A2A31] dark:bg-[#1C1C1F]"
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <div className="text-sm font-semibold text-slate-800">{sig.name}</div>
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[0.65rem] font-semibold text-slate-500">
+                        <div className="text-sm font-semibold text-slate-800 dark:text-zinc-100">{sig.name}</div>
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[0.65rem] font-semibold text-slate-500 dark:bg-[#2A2A31] dark:text-zinc-300">
                           {isRecent ? "Recently added" : "Saved"}
                         </span>
                       </div>
@@ -13998,7 +14205,7 @@ const timer =
                         <img
                           src={sig.dataUrl}
                           alt={sig.name}
-                          className="h-16 w-32 rounded-lg border border-slate-100 object-contain bg-white"
+                          className="h-16 w-32 rounded-lg border border-slate-100 object-contain bg-white dark:border-[#2A2A31]"
                         />
                         <div className="flex flex-wrap items-center gap-2 text-xs">
                           <button
@@ -14060,72 +14267,72 @@ const timer =
                       setTypeSignatureText("");
                       setTypedSignatureError(null);
                     }}
-                    className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-[#024d7c]/60 hover:shadow-md"
+                    className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-[#024d7c]/60 hover:shadow-md dark:border-[#2A2A31] dark:bg-[#1C1C1F] dark:text-zinc-200"
                   >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 text-slate-700">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 text-slate-700 dark:bg-[#2A2A31] dark:text-zinc-200">
                       <SignatureIcon className="h-5 w-5" />
                     </div>
                     <div>
-                      <div className="text-sm font-semibold text-slate-900">Type signature</div>
-                      <div className="text-xs text-slate-500">Turn your name into a styled signature.</div>
+                      <div className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Type signature</div>
+                      <div className="text-xs text-slate-500 dark:text-zinc-400">Turn your name into a styled signature.</div>
                     </div>
                   </button>
                   <button
                     type="button"
                     onClick={handleOpenDrawFromHub}
-                    className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-[#024d7c]/60 hover:shadow-md"
+                    className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-[#024d7c]/60 hover:shadow-md dark:border-[#2A2A31] dark:bg-[#1C1C1F] dark:text-zinc-200"
                   >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 text-slate-700">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 text-slate-700 dark:bg-[#2A2A31] dark:text-zinc-200">
                       <Pencil className="h-5 w-5" />
                     </div>
                     <div>
-                      <div className="text-sm font-semibold text-slate-900">Draw signature</div>
-                      <div className="text-xs text-slate-500">Use your mouse or trackpad to draw.</div>
+                      <div className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Draw signature</div>
+                      <div className="text-xs text-slate-500 dark:text-zinc-400">Use your mouse or trackpad to draw.</div>
                     </div>
                   </button>
                   <button
                     type="button"
                     onClick={handleOpenUploadFromHub}
-                    className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-[#024d7c]/60 hover:shadow-md"
+                    className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-[#024d7c]/60 hover:shadow-md dark:border-[#2A2A31] dark:bg-[#1C1C1F] dark:text-zinc-200"
                   >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 text-slate-700">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 text-slate-700 dark:bg-[#2A2A31] dark:text-zinc-200">
                       <UploadCloud className="h-5 w-5" />
                     </div>
                     <div>
-                      <div className="text-sm font-semibold text-slate-900">Upload signature</div>
-                      <div className="text-xs text-slate-500">Upload a scanned signature image.</div>
+                      <div className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Upload signature</div>
+                      <div className="text-xs text-slate-500 dark:text-zinc-400">Upload a scanned signature image.</div>
                     </div>
                   </button>
                   <button
                     type="button"
                     onClick={() => setSignatureHubStep("qr")}
-                    className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-[#024d7c]/60 hover:shadow-md"
+                    className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-[#024d7c]/60 hover:shadow-md dark:border-[#2A2A31] dark:bg-[#1C1C1F] dark:text-zinc-200"
                   >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 text-slate-700">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 text-slate-700 dark:bg-[#2A2A31] dark:text-zinc-200">
                       {/* simple QR-like icon using squares */}
                       <div className="grid h-5 w-5 grid-cols-2 gap-[2px]">
-                        <span className="h-full w-full rounded-sm bg-slate-700" />
-                        <span className="h-full w-full rounded-sm border border-slate-400" />
-                        <span className="h-full w-full rounded-sm border border-slate-400" />
-                        <span className="h-full w-full rounded-sm bg-slate-700" />
+                        <span className="h-full w-full rounded-sm bg-slate-700 dark:bg-slate-200" />
+                        <span className="h-full w-full rounded-sm border border-slate-400 dark:border-[#4A4A55]" />
+                        <span className="h-full w-full rounded-sm border border-slate-400 dark:border-[#4A4A55]" />
+                        <span className="h-full w-full rounded-sm bg-slate-700 dark:bg-slate-200" />
                       </div>
                     </div>
                     <div>
-                      <div className="text-sm font-semibold text-slate-900">QR code</div>
-                      <div className="text-xs text-slate-500">Scan to sign on your phone.</div>
+                      <div className="text-sm font-semibold text-slate-900 dark:text-zinc-100">QR code</div>
+                      <div className="text-xs text-slate-500 dark:text-zinc-400">Scan to sign on your phone.</div>
                     </div>
                   </button>
                   <button
                     type="button"
                     onClick={() => setSignatureHubStep("email")}
-                    className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-[#024d7c]/60 hover:shadow-md sm:col-span-2"
+                    className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-[#024d7c]/60 hover:shadow-md sm:col-span-2 dark:border-[#2A2A31] dark:bg-[#1C1C1F] dark:text-zinc-200"
                   >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 text-slate-700">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 text-slate-700 dark:bg-[#2A2A31] dark:text-zinc-200">
                       <Mail className="h-5 w-5" />
                     </div>
                     <div>
-                      <div className="text-sm font-semibold text-slate-900">Email link</div>
-                      <div className="text-xs text-slate-500">
+                      <div className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Email link</div>
+                      <div className="text-xs text-slate-500 dark:text-zinc-400">
                         Email yourself a link to sign on another device.
                       </div>
                     </div>
@@ -14138,7 +14345,7 @@ const timer =
               <div className="mt-4 space-y-4">
                 <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
                   <div className="flex flex-col gap-2">
-                    <label className="text-sm font-semibold text-slate-800">Type your name</label>
+                    <label className="text-sm font-semibold text-slate-800 dark:text-zinc-200">Type your name</label>
                     <input
                       type="text"
                       value={typeSignatureText}
@@ -14148,11 +14355,11 @@ const timer =
                         setSignatureNameError(null);
                       }}
                       placeholder="e.g. John Smith"
-                      className="h-10 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-900 shadow-inner outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200/70"
+                      className="h-10 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-900 shadow-inner outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200/70 dark:border-[#2A2A31] dark:bg-[#1C1C1F] dark:text-zinc-100 dark:focus:border-[#4A4A4A] dark:focus:ring-zinc-500/40"
                     />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Style</div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-zinc-400">Style</div>
                     <div className="flex flex-wrap gap-2">
                       {TYPED_SIGNATURE_STYLES.map((style) => (
                         <button
@@ -14161,7 +14368,7 @@ const timer =
                           className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
                             typeSignatureStyle === style.id
                               ? "border-[#024d7c] bg-[#024d7c] text-white shadow-sm"
-                              : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                              : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 dark:border-[#2A2A31] dark:bg-[#1C1C1F] dark:text-zinc-200 dark:hover:border-[#4A4A4A]"
                           }`}
                           onClick={() => {
                             setTypeSignatureStyle(style.id);
@@ -14174,9 +14381,9 @@ const timer =
                     </div>
                   </div>
                 </div>
-                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Preview</div>
-                  <div className="mt-2 flex min-h-[140px] items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white px-3 py-2">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 dark:border-[#2A2A31] dark:bg-[#2A2A31]">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-zinc-400">Preview</div>
+                  <div className="mt-2 flex min-h-[140px] items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white px-3 py-2 dark:border-[#2A2A31] dark:bg-[#1C1C1F]">
                     {typedSignaturePreview ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -14185,7 +14392,7 @@ const timer =
                         className="max-h-24 w-full max-w-xl object-contain"
                       />
                     ) : (
-                      <span className="text-sm text-slate-500">Enter a name to preview.</span>
+                      <span className="text-sm text-slate-500 dark:text-zinc-400">Enter a name to preview.</span>
                     )}
                   </div>
                   {(typedSignatureError || signatureNameError) && (
@@ -14197,7 +14404,7 @@ const timer =
                 <div className="flex items-center justify-between">
                   <button
                     type="button"
-                    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300"
+                    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 dark:border-[#2A2A31] dark:bg-[#1C1C1F] dark:text-zinc-200 dark:hover:border-[#4A4A4A]"
                     onClick={() => setSignatureHubStep("gallery")}
                   >
                     Back
@@ -14205,7 +14412,7 @@ const timer =
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300"
+                      className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 dark:border-[#2A2A31] dark:bg-[#1C1C1F] dark:text-zinc-200 dark:hover:border-[#4A4A4A]"
                       onClick={() => setTypeSignatureText("")}
                     >
                       Clear
@@ -15218,6 +15425,43 @@ const timer =
           background-color: rgba(100, 116, 139, 0.85);
           border: 3px solid #ffffff;
           border-radius: 9999px;
+        }
+        html.dark body.studio-page * {
+          scrollbar-color: #5b616b #222224;
+        }
+        html.dark body.studio-page ::-webkit-scrollbar {
+          background: #222224;
+        }
+        html.dark body.studio-page ::-webkit-scrollbar-track {
+          background: #222224;
+        }
+        html.dark body.studio-page .viewer-scroll::-webkit-scrollbar-track {
+          background:
+            linear-gradient(to right, #343434 0, #343434 1px, #2b2b2b 1px, #2b2b2b 100%);
+        }
+        html.dark body.studio-page .viewer-scroll::-webkit-scrollbar-thumb {
+          border: 3px solid #2b2b2b;
+        }
+        html.dark body.studio-page .viewer-scroll {
+          scrollbar-color: #8a8a8a #2b2b2b;
+        }
+        html.dark body.studio-page .thumbs-scroll {
+          scrollbar-color: #5b616b #323232;
+        }
+        html.dark body.studio-page ::-webkit-scrollbar-corner {
+          background: #222224;
+        }
+        html.dark body.studio-page ::-webkit-scrollbar-thumb {
+          background-color: #5b616b;
+          border: 3px solid #222224;
+          border-radius: 9999px;
+        }
+        html.dark body.studio-page .thumbs-scroll::-webkit-scrollbar-track {
+          background:
+            linear-gradient(to right, #3a3a3a 0, #3a3a3a 1px, #323232 1px, #323232 100%);
+        }
+        html.dark body.studio-page .thumbs-scroll::-webkit-scrollbar-thumb {
+          border: 3px solid #323232;
         }
         body.studio-page > header {
           display: none !important;

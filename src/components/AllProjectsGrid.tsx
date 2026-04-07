@@ -211,7 +211,7 @@ export default function AllProjectsGrid({
 
   return (
     <>
-      <div className="projects-grid mt-10 flex w-full flex-wrap justify-start gap-5 [--projects-card-width:clamp(240px,22vw,300px)] sm:gap-6">
+      <div className="projects-grid mt-10 flex w-full flex-wrap justify-start gap-5 [--projects-card-width:clamp(200px,18vw,260px)] sm:gap-6">
         {visibleProjects.map((project) => {
         const isSelected = !!selected[project.id];
         return (

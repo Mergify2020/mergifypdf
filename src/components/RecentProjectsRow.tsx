@@ -304,27 +304,27 @@ export default function RecentProjectsRow({
           priority
         />
         <p className="-mt-5 text-lg font-semibold text-slate-900 dark:text-zinc-100 sm:text-xl">No projects yet</p>
-        <p className="mt-2 max-w-sm text-sm text-slate-600 dark:text-zinc-400 sm:text-base">Start a new project to see it here.</p>
+        <p className="mt-2 max-w-sm text-sm text-slate-600 dark:text-zinc-300 sm:text-base">Start a new project to see it here.</p>
       </div>
     );
   }
 
   if (loading && !projects.length) {
     return (
-      <div className="recent-projects-grid projects-grid mt-2 grid w-full max-w-[1880px] grid-cols-2 items-start gap-4 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 sm:gap-6">
+      <div className="recent-projects-grid projects-grid mt-2 grid w-full max-w-[1880px] items-start gap-4 sm:gap-6">
         {Array.from({ length: 6 }).map((_, index) => (
           <div
             key={`home-loading-project-${index}`}
             className="flex w-full flex-col text-left"
           >
-            <div className="relative rounded-[10px] bg-[#F9FAFC] dark:bg-zinc-900/60">
-              <div className="relative m-[3px] aspect-square w-[calc(100%-6px)] overflow-hidden rounded-[10px] border border-[rgba(0,0,0,0.06)] bg-[#EEF1F5] dark:border-zinc-800 dark:bg-zinc-800/70">
+            <div className="relative rounded-[10px] bg-[#F9FAFC] dark:bg-[#323232]/60">
+              <div className="relative m-[3px] aspect-square w-[calc(100%-6px)] overflow-hidden rounded-[10px] border border-[rgba(0,0,0,0.06)] bg-[#EEF1F5] dark:border-zinc-800 dark:bg-[#2B2B2B]/70">
                 <div className="absolute inset-0 rounded-[10px] skeleton-shimmer opacity-90" />
               </div>
             </div>
             <div className="mt-2 space-y-0.5">
-              <div className="h-4 w-[58%] rounded-full bg-slate-100 dark:bg-zinc-800/70" />
-              <div className="h-3 w-[42%] rounded-full bg-slate-100 dark:bg-zinc-800/70" />
+              <div className="h-4 w-[58%] rounded-full bg-slate-100 dark:bg-[#2B2B2B]/70" />
+              <div className="h-3 w-[42%] rounded-full bg-slate-100 dark:bg-[#2B2B2B]/70" />
             </div>
           </div>
         ))}
@@ -434,13 +434,13 @@ export default function RecentProjectsRow({
       return (
         <div className="mt-2 px-6 py-14">
           <div className="flex flex-col items-center text-center">
-            <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-500 dark:bg-zinc-800 dark:text-zinc-300">
+            <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-500 dark:bg-[#2B2B2B] dark:text-zinc-200">
               <SearchX className="h-5 w-5" aria-hidden />
             </span>
             <p className="mt-4 text-lg font-semibold text-slate-900 dark:text-zinc-100">
               No projects found for &quot;{trimmed}&quot;
             </p>
-            <p className="mt-2 text-sm text-slate-500 dark:text-zinc-400">
+            <p className="mt-2 text-sm text-slate-500 dark:text-zinc-300">
               Try a different name or clear the search.
             </p>
           </div>
@@ -450,13 +450,13 @@ export default function RecentProjectsRow({
     return (
       <div className="mt-2 flex min-h-[320px] items-center justify-center px-6 py-16">
         <div className="flex flex-col items-center text-center">
-          <span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-500 dark:bg-zinc-800 dark:text-zinc-300">
+          <span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-500 dark:bg-[#2B2B2B] dark:text-zinc-200">
             <SearchX className="h-6 w-6" aria-hidden />
           </span>
           <p className="mt-4 text-xl font-semibold text-slate-900 dark:text-zinc-100">
             No projects found for &quot;{trimmed}&quot;
           </p>
-          <p className="mt-2 max-w-md text-sm text-slate-500 dark:text-zinc-400">
+          <p className="mt-2 max-w-md text-sm text-slate-500 dark:text-zinc-300">
             Try a different project name, or clear the search to see everything again.
           </p>
         </div>
@@ -620,9 +620,9 @@ export default function RecentProjectsRow({
   return (
     <>
       {viewMode === "list" && showAllProjects ? (
-        <div className="mt-2 bg-white dark:bg-zinc-900">
+        <div className="mt-2 overflow-hidden rounded-xl border border-[#E6EBF2] bg-white shadow-sm dark:border-[#3F3F3F] dark:bg-[#323232] dark:shadow-[0_1px_0_rgba(255,255,255,0.02)]">
           <div className="md:hidden">
-            <div className="grid grid-cols-[36px_minmax(0,1fr)_40px] items-center gap-x-4 border-b border-[#E6EBF2] px-4 py-3 text-sm font-bold uppercase tracking-[0.08em] text-slate-700 dark:border-zinc-700 dark:text-zinc-200">
+            <div className="grid grid-cols-[36px_minmax(0,1fr)_40px] items-center gap-x-4 border-b border-[#E6EBF2] bg-white px-4 py-3 text-sm font-bold uppercase tracking-[0.08em] text-slate-700 dark:border-[#3C3C3C] dark:bg-[#323232] dark:text-zinc-100">
               <button
                 type="button"
                 onClick={() => {
@@ -648,7 +648,7 @@ export default function RecentProjectsRow({
                 className={`inline-flex h-5 w-5 items-center justify-center rounded-[5px] border-2 transition ${
                   allVisibleSelected
                     ? "border-[#6C47FF] bg-[#6C47FF] text-white"
-                    : "border-slate-300 text-transparent hover:border-slate-400 dark:border-zinc-600"
+                    : "border-slate-300 text-transparent hover:border-slate-400 dark:border-[#4A4A4A]"
                 }`}
                 aria-label={allVisibleSelected ? "Deselect all projects" : "Select all projects"}
                 aria-pressed={allVisibleSelected}
@@ -658,7 +658,7 @@ export default function RecentProjectsRow({
               <span className="text-left">Name</span>
               <span aria-hidden />
             </div>
-            <div className="divide-y divide-[#E6EBF2] dark:divide-zinc-700">
+            <div className="divide-y divide-[#E6EBF2] dark:divide-[#3C3C3C]">
               {mapped.map((project) => {
                 const isSelected = !!selected[project.id];
                 const fileSize = formatFileSize(project.fileSizeBytes);
@@ -674,7 +674,7 @@ export default function RecentProjectsRow({
                   <div
                     key={project.id}
                     className={`relative grid grid-cols-[36px_minmax(0,1fr)_40px] items-start gap-x-4 px-4 py-3 transition ${
-                      isSelected ? "bg-[#F5F3FF] dark:bg-zinc-800/60" : "hover:bg-[#F8FAFC] dark:hover:bg-zinc-800/40"
+                      isSelected ? "bg-[#F5F3FF] dark:bg-[#3A3A3A]" : "hover:bg-[#F8FAFC] dark:hover:bg-[#3A3A3A]/70"
                     }`}
                   >
                     <button
@@ -683,7 +683,7 @@ export default function RecentProjectsRow({
                       className={`mt-1 inline-flex h-5 w-5 items-center justify-center rounded-[5px] border-2 transition ${
                         isSelected
                           ? "border-[#6C47FF] bg-[#6C47FF] text-white"
-                          : "border-slate-300 text-transparent hover:border-slate-400 dark:border-zinc-600"
+                          : "border-slate-300 text-transparent hover:border-slate-400 dark:border-[#4A4A4A]"
                       }`}
                       aria-label={isSelected ? "Deselect project" : "Select project"}
                       aria-pressed={isSelected}
@@ -718,7 +718,7 @@ export default function RecentProjectsRow({
                             setListRenamingId(null);
                             setListRenameDraft("");
                           }}
-                          className="w-full rounded-md border-2 border-[#6C47FF]/55 bg-slate-50/70 px-2 py-1 text-[16px] font-semibold leading-tight text-slate-900 outline-none focus:border-[#6C47FF] focus:ring-0 disabled:opacity-70 dark:border-[#6C47FF]/65 dark:bg-zinc-900/60 dark:text-zinc-100"
+                          className="w-full rounded-md border-2 border-[#6C47FF]/55 bg-slate-50/70 px-2 py-1 text-[16px] font-semibold leading-tight text-slate-900 outline-none focus:border-[#6C47FF] focus:ring-0 disabled:opacity-70 dark:border-[#6C47FF]/65 dark:bg-[#323232]/60 dark:text-zinc-100"
                         />
                         <button
                           type="button"
@@ -730,7 +730,7 @@ export default function RecentProjectsRow({
                           onClick={() => {
                             void submitListRename(project.id);
                           }}
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#6C47FF] transition hover:bg-[#F8FAFC] hover:text-[#5B38E6] disabled:opacity-60 dark:text-[#BBA6FF] dark:hover:bg-zinc-800/70 dark:hover:text-[#CFC4FF]"
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#6C47FF] transition hover:bg-[#F8FAFC] hover:text-[#5B38E6] disabled:opacity-60 dark:text-[#BBA6FF] dark:hover:bg-[#3A3A3A]/70 dark:hover:text-[#CFC4FF]"
                         >
                           <Check className="h-4 w-4" strokeWidth={2.5} aria-hidden />
                         </button>
@@ -747,7 +747,7 @@ export default function RecentProjectsRow({
                         >
                           {project.title}
                         </Link>
-                        <span className="mt-1 flex flex-wrap items-center gap-y-0.5 text-xs text-slate-500 dark:text-zinc-400">
+                        <span className="mt-1 flex flex-wrap items-center gap-y-0.5 text-xs text-slate-500 dark:text-zinc-300">
                           <span className="whitespace-nowrap">{primaryMetaParts.join(" · ")}</span>
                           <span className="whitespace-nowrap before:mx-1 before:content-['·']">
                             {project.updated}
@@ -774,7 +774,7 @@ export default function RecentProjectsRow({
                         className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition ${
                           listMenuOpenId === project.id
                             ? "bg-[#6C47FF] text-white"
-                            : "text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                            : "text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-zinc-300 dark:hover:bg-[#3A3A3A] dark:hover:text-zinc-100"
                         }`}
                         aria-label="Project actions"
                         aria-expanded={listMenuOpenId === project.id}
@@ -786,7 +786,7 @@ export default function RecentProjectsRow({
                         <div
                           role="menu"
                           aria-label="Project actions"
-                          className="project-actions-menu absolute right-[calc(100%+2px)] top-0 z-[120] w-64 overflow-hidden rounded-xl border border-[#E5E7EB] bg-white text-sm text-slate-800 shadow-[0_16px_36px_rgba(15,23,42,0.14)] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:shadow-[0_20px_44px_rgba(0,0,0,0.5)]"
+                          className="project-actions-menu absolute right-[calc(100%+2px)] top-0 z-[120] w-64 overflow-hidden rounded-xl border border-[#E5E7EB] bg-white text-sm text-slate-800 shadow-[0_16px_36px_rgba(15,23,42,0.14)] dark:border-[#3A3A3A] dark:bg-[#323232] dark:text-zinc-100 dark:shadow-[0_20px_44px_rgba(0,0,0,0.5)]"
                           onMouseDown={(event) => {
                             event.stopPropagation();
                           }}
@@ -825,7 +825,7 @@ export default function RecentProjectsRow({
                                     setListMenuRenamingId(null);
                                     setListRenameDraft("");
                                   }}
-                                  className="w-full rounded-md border-2 border-[#6C47FF]/55 bg-slate-50/70 px-2 py-1 text-sm font-semibold leading-tight text-slate-900 outline-none focus:border-[#6C47FF] focus:ring-0 disabled:opacity-70 dark:border-[#6C47FF]/65 dark:bg-zinc-900/60 dark:text-zinc-100"
+                                  className="w-full rounded-md border-2 border-[#6C47FF]/55 bg-slate-50/70 px-2 py-1 text-sm font-semibold leading-tight text-slate-900 outline-none focus:border-[#6C47FF] focus:ring-0 disabled:opacity-70 dark:border-[#6C47FF]/65 dark:bg-[#323232]/60 dark:text-zinc-100"
                                 />
                                 <button
                                   type="button"
@@ -837,7 +837,7 @@ export default function RecentProjectsRow({
                                   onClick={() => {
                                     void submitListRename(project.id);
                                   }}
-                                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#6C47FF] transition hover:bg-[#F8FAFC] hover:text-[#5B38E6] disabled:opacity-60 dark:text-[#BBA6FF] dark:hover:bg-zinc-800/70 dark:hover:text-[#CFC4FF]"
+                                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#6C47FF] transition hover:bg-[#F8FAFC] hover:text-[#5B38E6] disabled:opacity-60 dark:text-[#BBA6FF] dark:hover:bg-[#3A3A3A]/70 dark:hover:text-[#CFC4FF]"
                                 >
                                   <Check className="h-4 w-4" strokeWidth={2.5} aria-hidden />
                                 </button>
@@ -879,7 +879,7 @@ export default function RecentProjectsRow({
                                 <button
                                   type="button"
                                   aria-label="Rename project"
-                                  className="inline-flex h-6 w-6 flex-none items-center justify-center rounded-md text-slate-500 transition hover:bg-[#F8FAFC] hover:text-slate-700 md:opacity-0 md:group-hover/menu-title:opacity-100 md:group-focus-within/menu-title:opacity-100 dark:text-zinc-300 dark:hover:bg-zinc-800/70 dark:hover:text-zinc-100"
+                                  className="inline-flex h-6 w-6 flex-none items-center justify-center rounded-md text-slate-500 transition hover:bg-[#F8FAFC] hover:text-slate-700 md:opacity-0 md:group-hover/menu-title:opacity-100 md:group-focus-within/menu-title:opacity-100 dark:text-zinc-200 dark:hover:bg-[#3A3A3A]/70 dark:hover:text-zinc-100"
                                   onClick={(event) => {
                                     event.preventDefault();
                                     event.stopPropagation();
@@ -891,15 +891,15 @@ export default function RecentProjectsRow({
                                 </button>
                               </div>
                             )}
-                            <p className="mt-1 text-xs font-medium text-slate-500 dark:text-zinc-400">
+                            <p className="mt-1 text-xs font-medium text-slate-500 dark:text-zinc-300">
                               {project.updated}
                             </p>
                           </div>
-                          <div className="h-px bg-[#E6EBF2] dark:bg-zinc-800" />
+                          <div className="h-px bg-[#E6EBF2] dark:bg-[#2B2B2B]" />
                           <button
                             type="button"
                             role="menuitem"
-                            className="mx-2 mt-1 flex w-[calc(100%-1rem)] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-slate-900 transition hover:bg-[#F8FAFC] dark:text-zinc-100 dark:hover:bg-zinc-800/70"
+                            className="mx-2 mt-1 flex w-[calc(100%-1rem)] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-slate-900 transition hover:bg-[#F8FAFC] dark:text-zinc-100 dark:hover:bg-[#3A3A3A]/70"
                             onClick={(event) => {
                               event.preventDefault();
                               event.stopPropagation();
@@ -919,7 +919,7 @@ export default function RecentProjectsRow({
                           <button
                             type="button"
                             role="menuitem"
-                            className="mx-2 flex w-[calc(100%-1rem)] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-slate-900 transition hover:bg-[#F8FAFC] dark:text-zinc-100 dark:hover:bg-zinc-800/70"
+                            className="mx-2 flex w-[calc(100%-1rem)] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-slate-900 transition hover:bg-[#F8FAFC] dark:text-zinc-100 dark:hover:bg-[#3A3A3A]/70"
                             onClick={(event) => {
                               event.preventDefault();
                               event.stopPropagation();
@@ -937,7 +937,7 @@ export default function RecentProjectsRow({
                             role="menuitem"
                             disabled={listMenuPrintingId === project.id}
                             aria-disabled={listMenuPrintingId === project.id}
-                            className="mx-2 flex w-[calc(100%-1rem)] items-center justify-between rounded-lg px-2.5 py-2 text-left text-slate-900 transition hover:bg-[#F8FAFC] disabled:cursor-not-allowed disabled:opacity-60 dark:text-zinc-100 dark:hover:bg-zinc-800/70"
+                            className="mx-2 flex w-[calc(100%-1rem)] items-center justify-between rounded-lg px-2.5 py-2 text-left text-slate-900 transition hover:bg-[#F8FAFC] disabled:cursor-not-allowed disabled:opacity-60 dark:text-zinc-100 dark:hover:bg-[#3A3A3A]/70"
                             onClick={(event) => {
                               event.preventDefault();
                               event.stopPropagation();
@@ -960,7 +960,7 @@ export default function RecentProjectsRow({
                             role="menuitem"
                             disabled
                             aria-disabled="true"
-                            className="mx-2 flex w-[calc(100%-1rem)] items-center justify-between rounded-lg px-2.5 py-2 text-left text-slate-500 opacity-55 transition disabled:cursor-not-allowed dark:text-zinc-400"
+                            className="mx-2 flex w-[calc(100%-1rem)] items-center justify-between rounded-lg px-2.5 py-2 text-left text-slate-500 opacity-55 transition disabled:cursor-not-allowed dark:text-zinc-300"
                           >
                             <span className="flex min-w-0 items-center gap-2.5">
                               <span className="flex h-5 w-5 items-center justify-center text-current">
@@ -974,7 +974,7 @@ export default function RecentProjectsRow({
                             type="button"
                             role="menuitem"
                             disabled={listMenuCopyingId === project.id}
-                            className="mx-2 flex w-[calc(100%-1rem)] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-slate-900 transition hover:bg-[#F8FAFC] disabled:cursor-not-allowed disabled:opacity-60 dark:text-zinc-100 dark:hover:bg-zinc-800/70"
+                            className="mx-2 flex w-[calc(100%-1rem)] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-slate-900 transition hover:bg-[#F8FAFC] disabled:cursor-not-allowed disabled:opacity-60 dark:text-zinc-100 dark:hover:bg-[#3A3A3A]/70"
                             onClick={(event) => {
                               event.preventDefault();
                               event.stopPropagation();
@@ -1017,11 +1017,11 @@ export default function RecentProjectsRow({
                             </span>
                             <span className="text-[15px] font-medium text-slate-900 dark:text-zinc-100">Make a copy</span>
                           </button>
-                          <div className="mx-2 my-1 h-px bg-[#E6EBF2] dark:bg-zinc-800" />
+                          <div className="mx-2 my-1 h-px bg-[#E6EBF2] dark:bg-[#2B2B2B]" />
                           <button
                             type="button"
                             role="menuitem"
-                            className="mx-2 mb-1.5 flex w-[calc(100%-1rem)] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-rose-700 transition hover:bg-rose-50 dark:hover:bg-zinc-800/60"
+                            className="mx-2 mb-1.5 flex w-[calc(100%-1rem)] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-rose-700 transition hover:bg-rose-50 dark:hover:bg-[#3A3A3A]/60"
                             onClick={(event) => {
                               event.preventDefault();
                               event.stopPropagation();
@@ -1063,7 +1063,7 @@ export default function RecentProjectsRow({
             </div>
           </div>
           <div className="hidden md:flex md:max-h-[calc(100vh-280px)] md:flex-col">
-            <div className="z-10 grid grid-cols-[36px_20px_minmax(280px,1fr)_120px_96px_56px] items-center gap-x-3 border-b border-[#E6EBF2] bg-white px-4 py-3 text-sm font-bold uppercase tracking-[0.08em] text-slate-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 xl:grid-cols-[36px_20px_minmax(420px,1fr)_180px_120px_72px] xl:gap-x-5 2xl:grid-cols-[36px_20px_minmax(560px,1fr)_208px_132px_84px] 2xl:gap-x-6">
+            <div className="z-10 grid grid-cols-[36px_20px_minmax(280px,1fr)_120px_96px_56px] items-center gap-x-3 border-b border-[#E6EBF2] bg-white px-4 py-3 text-sm font-bold uppercase tracking-[0.08em] text-slate-700 dark:border-[#3C3C3C] dark:bg-[#323232] dark:text-zinc-100 xl:grid-cols-[36px_20px_minmax(420px,1fr)_180px_120px_72px] xl:gap-x-5 2xl:grid-cols-[36px_20px_minmax(560px,1fr)_208px_132px_84px] 2xl:gap-x-6">
               <button
                 type="button"
                 onClick={() => {
@@ -1089,7 +1089,7 @@ export default function RecentProjectsRow({
                 className={`inline-flex h-5 w-5 items-center justify-center rounded-[5px] border-2 transition ${
                   allVisibleSelected
                     ? "border-[#6C47FF] bg-[#6C47FF] text-white"
-                    : "border-slate-300 text-transparent hover:border-slate-400 dark:border-zinc-600"
+                    : "border-slate-300 text-transparent hover:border-slate-400 dark:border-[#4A4A4A]"
                 }`}
                 aria-label={allVisibleSelected ? "Deselect all projects" : "Select all projects"}
                 aria-pressed={allVisibleSelected}
@@ -1102,14 +1102,14 @@ export default function RecentProjectsRow({
               <span className="block w-full text-center">Pages</span>
               <span className="text-right">Actions</span>
             </div>
-            <div className="min-h-0 overflow-y-auto divide-y divide-[#E6EBF2] dark:divide-zinc-700">
+            <div className="min-h-0 overflow-y-auto divide-y divide-[#E6EBF2] dark:divide-[#3C3C3C]">
               {mapped.map((project) => {
                 const isSelected = !!selected[project.id];
                 return (
                   <div
                     key={project.id}
                     className={`grid grid-cols-[36px_20px_minmax(280px,1fr)_120px_96px_56px] items-center gap-x-3 px-4 py-3 transition xl:grid-cols-[36px_20px_minmax(420px,1fr)_180px_120px_72px] xl:gap-x-5 2xl:grid-cols-[36px_20px_minmax(560px,1fr)_208px_132px_84px] 2xl:gap-x-6 ${
-                      isSelected ? "bg-[#F5F3FF] dark:bg-zinc-800/60" : "hover:bg-[#F8FAFC] dark:hover:bg-zinc-800/40"
+                      isSelected ? "bg-[#F5F3FF] dark:bg-[#3A3A3A]" : "hover:bg-[#F8FAFC] dark:hover:bg-[#3A3A3A]/70"
                     }`}
                   >
                     <button
@@ -1118,7 +1118,7 @@ export default function RecentProjectsRow({
                       className={`inline-flex h-5 w-5 items-center justify-center rounded-[5px] border-2 transition ${
                         isSelected
                           ? "border-[#6C47FF] bg-[#6C47FF] text-white"
-                          : "border-slate-300 text-transparent hover:border-slate-400 dark:border-zinc-600"
+                          : "border-slate-300 text-transparent hover:border-slate-400 dark:border-[#4A4A4A]"
                       }`}
                       aria-label={isSelected ? "Deselect project" : "Select project"}
                       aria-pressed={isSelected}
@@ -1171,7 +1171,7 @@ export default function RecentProjectsRow({
                             setListRenamingId(null);
                             setListRenameDraft("");
                           }}
-                          className="w-full rounded-md border-2 border-[#6C47FF]/55 bg-slate-50/70 px-2 py-1 text-[16px] font-semibold leading-tight text-slate-900 outline-none focus:border-[#6C47FF] focus:ring-0 disabled:opacity-70 dark:border-[#6C47FF]/65 dark:bg-zinc-900/60 dark:text-zinc-100"
+                          className="w-full rounded-md border-2 border-[#6C47FF]/55 bg-slate-50/70 px-2 py-1 text-[16px] font-semibold leading-tight text-slate-900 outline-none focus:border-[#6C47FF] focus:ring-0 disabled:opacity-70 dark:border-[#6C47FF]/65 dark:bg-[#323232]/60 dark:text-zinc-100"
                         />
                         <button
                           type="button"
@@ -1183,7 +1183,7 @@ export default function RecentProjectsRow({
                           onClick={() => {
                             void submitListRename(project.id);
                           }}
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#6C47FF] transition hover:bg-[#F8FAFC] hover:text-[#5B38E6] disabled:opacity-60 dark:text-[#BBA6FF] dark:hover:bg-zinc-800/70 dark:hover:text-[#CFC4FF]"
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#6C47FF] transition hover:bg-[#F8FAFC] hover:text-[#5B38E6] disabled:opacity-60 dark:text-[#BBA6FF] dark:hover:bg-[#3A3A3A]/70 dark:hover:text-[#CFC4FF]"
                         >
                           <Check className="h-4 w-4" strokeWidth={2.5} aria-hidden />
                         </button>
@@ -1209,12 +1209,12 @@ export default function RecentProjectsRow({
                                 setListRenamingId(project.id);
                                 setListRenameDraft(projectNameToEditable(project.title));
                               }}
-                              className="inline-flex h-6 w-6 flex-none items-center justify-center text-slate-500 transition hover:text-slate-700 md:opacity-0 md:group-hover/rename:opacity-100 md:group-focus-within/rename:opacity-100 dark:text-zinc-400 dark:hover:text-zinc-100"
+                              className="inline-flex h-6 w-6 flex-none items-center justify-center text-slate-500 transition hover:text-slate-700 md:opacity-0 md:group-hover/rename:opacity-100 md:group-focus-within/rename:opacity-100 dark:text-zinc-300 dark:hover:text-zinc-100"
                             >
                               <Pencil className="h-4 w-4" aria-hidden />
                             </button>
                           </div>
-                          <span className="mt-0.5 block text-xs text-slate-500 dark:text-zinc-400">
+                          <span className="mt-0.5 block text-xs text-slate-500 dark:text-zinc-300">
                             {formatFileSize(project.fileSizeBytes)
                               ? `PDF · ${formatFileSize(project.fileSizeBytes)}`
                               : "PDF"}
@@ -1222,12 +1222,12 @@ export default function RecentProjectsRow({
                         </div>
                       </div>
                     )}
-                    <span className="truncate text-left text-[15px] text-slate-600 dark:text-zinc-300">
+                    <span className="truncate text-left text-[15px] text-slate-600 dark:text-zinc-200">
                       {formatProjectActivityDate(
                         projects.find((entry) => entry.id === project.id)?.updatedAt ?? project.updated
                       )}
                     </span>
-                    <span className="block w-full text-center text-[15px] text-slate-600 dark:text-zinc-300">
+                    <span className="block w-full text-center text-[15px] text-slate-600 dark:text-zinc-200">
                       {`${project.pagesCount ?? 0} ${(project.pagesCount ?? 0) === 1 ? "page" : "pages"}`}
                     </span>
                     <div className="flex items-center justify-end gap-1">
@@ -1250,7 +1250,7 @@ export default function RecentProjectsRow({
                         className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition ${
                           listMenuOpenId === project.id
                             ? "bg-[#6C47FF] text-white"
-                            : "text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                            : "text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-zinc-300 dark:hover:bg-[#3A3A3A] dark:hover:text-zinc-100"
                         }`}
                         aria-label="Project actions"
                         aria-expanded={listMenuOpenId === project.id}
@@ -1266,7 +1266,7 @@ export default function RecentProjectsRow({
           </div>
         </div>
       ) : (
-        <div className="recent-projects-grid projects-grid mt-2 grid w-full max-w-[1880px] grid-cols-2 items-start gap-4 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 sm:gap-6">
+        <div className="recent-projects-grid projects-grid mt-2 grid w-full max-w-[1880px] items-start gap-4 sm:gap-6">
           {mapped.map((project, index) => {
           const isSelected = !!selected[project.id];
           return (
@@ -1359,12 +1359,12 @@ export default function RecentProjectsRow({
                     : "pointer-events-none translate-y-3 opacity-0"
                 }`}
               >
-                <div className="flex w-[min(440px,calc(100vw-2rem))] min-h-16 items-center justify-between rounded-[18px] border-2 border-slate-300 bg-white px-4 py-2.5 shadow-[0_8px_18px_rgba(15,23,42,0.10),0_18px_36px_rgba(15,23,42,0.12)] dark:border-zinc-700 dark:bg-zinc-900">
+                <div className="flex w-[min(440px,calc(100vw-2rem))] min-h-16 items-center justify-between rounded-[18px] border-2 border-slate-300 bg-white px-4 py-2.5 shadow-[0_8px_18px_rgba(15,23,42,0.10),0_18px_36px_rgba(15,23,42,0.12)] dark:border-[#3A3A3A] dark:bg-[#252525]">
                   <div className="flex items-center gap-2.5">
                     <button
                       type="button"
                       onClick={() => setSelected({})}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-zinc-200 dark:hover:bg-[#3A3A3A] dark:hover:text-zinc-100"
                       aria-label="Clear selection"
                     >
                       <X className="h-5 w-5" aria-hidden />
@@ -1380,7 +1380,7 @@ export default function RecentProjectsRow({
                         void handleBulkDownload();
                       }}
                       disabled={bulkBusy !== null}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 disabled:opacity-50 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 disabled:opacity-50 dark:text-zinc-200 dark:hover:bg-[#3A3A3A] dark:hover:text-zinc-100"
                       aria-label="Download selected projects"
                     >
                       <Download className="h-5 w-5" aria-hidden />
@@ -1389,7 +1389,7 @@ export default function RecentProjectsRow({
                       type="button"
                       onClick={() => setConfirmTrashOpen(true)}
                       disabled={bulkBusy !== null}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-600 transition hover:bg-rose-50 hover:text-rose-700 disabled:opacity-50 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-rose-400"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-600 transition hover:bg-rose-50 hover:text-rose-700 disabled:opacity-50 dark:text-zinc-200 dark:hover:bg-[#3A3A3A] dark:hover:text-rose-400"
                       aria-label="Move selected projects to trash"
                     >
                       <Trash2 className="h-5 w-5" aria-hidden />
@@ -1399,18 +1399,18 @@ export default function RecentProjectsRow({
               </div>
               {confirmTrashOpen ? (
                 <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/25 px-4 backdrop-blur-[2px]">
-                  <div className="w-full max-w-[460px] rounded-2xl bg-white p-6 shadow-[0_20px_52px_rgba(15,23,42,0.24)] dark:bg-zinc-900">
+                  <div className="w-full max-w-[460px] rounded-2xl bg-white p-6 shadow-[0_20px_52px_rgba(15,23,42,0.24)] dark:bg-[#323232]">
                     <h3 className="text-2xl font-semibold leading-tight tracking-[-0.02em] text-slate-900 dark:text-zinc-100">
                       Send {selectedCount} {selectedCount === 1 ? "project" : "projects"} to Trash?
                     </h3>
-                    <p className="mt-4 text-base font-medium text-slate-600 dark:text-zinc-300">
+                    <p className="mt-4 text-base font-medium text-slate-600 dark:text-zinc-200">
                       You can restore them from Trash for 30 days.
                     </p>
                     <div className="mt-7 flex justify-end gap-2.5">
                       <button
                         type="button"
                         onClick={() => setConfirmTrashOpen(false)}
-                        className="rounded-xl border-2 border-slate-300 px-4 py-2 text-base font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                        className="rounded-xl border-2 border-slate-300 px-4 py-2 text-base font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-[#4A4A4A] dark:text-zinc-100 dark:hover:bg-[#3A3A3A]"
                       >
                         Cancel
                       </button>
@@ -1429,7 +1429,7 @@ export default function RecentProjectsRow({
               ) : null}
               {bulkBusy === "trash" ? (
                 <div className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-900/20 px-4 backdrop-blur-[1.5px]">
-                  <div className="flex min-h-[132px] w-full max-w-[440px] flex-col justify-center rounded-2xl border border-slate-200 bg-white px-6 py-7 shadow-[0_20px_52px_rgba(15,23,42,0.24)] dark:border-zinc-700 dark:bg-zinc-900">
+                  <div className="flex min-h-[132px] w-full max-w-[440px] flex-col justify-center rounded-2xl border border-slate-200 bg-white px-6 py-7 shadow-[0_20px_52px_rgba(15,23,42,0.24)] dark:border-[#3A3A3A] dark:bg-[#323232]">
                     <p className="text-center text-xl font-semibold text-slate-900 dark:text-zinc-100">
                       Moving to Trash
                     </p>
@@ -1450,7 +1450,7 @@ export default function RecentProjectsRow({
                       key={activeListMenuProject.id}
                       role="menu"
                       aria-label="Project actions"
-                      className={`project-actions-menu fixed z-[9999] w-64 overflow-hidden rounded-xl border border-[#E5E7EB] bg-white text-sm text-slate-800 shadow-[0_16px_36px_rgba(15,23,42,0.14)] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:shadow-[0_20px_44px_rgba(0,0,0,0.5)] ${
+                      className={`project-actions-menu fixed z-[9999] w-64 overflow-hidden rounded-xl border border-[#E5E7EB] bg-white text-sm text-slate-800 shadow-[0_16px_36px_rgba(15,23,42,0.14)] dark:border-[#3A3A3A] dark:bg-[#323232] dark:text-zinc-100 dark:shadow-[0_20px_44px_rgba(0,0,0,0.5)] ${
                         listMenuAnimateIn ? "dropdown-pop-in" : ""
                       }`}
                       onMouseDown={(event) => {
@@ -1487,7 +1487,7 @@ export default function RecentProjectsRow({
                                 setListMenuRenamingId(null);
                                 setListRenameDraft("");
                               }}
-                              className="w-full rounded-md border-2 border-[#6C47FF]/55 bg-slate-50/70 px-2 py-1 text-sm font-semibold leading-tight text-slate-900 outline-none focus:border-[#6C47FF] focus:ring-0 disabled:opacity-70 dark:border-[#6C47FF]/65 dark:bg-zinc-900/60 dark:text-zinc-100"
+                              className="w-full rounded-md border-2 border-[#6C47FF]/55 bg-slate-50/70 px-2 py-1 text-sm font-semibold leading-tight text-slate-900 outline-none focus:border-[#6C47FF] focus:ring-0 disabled:opacity-70 dark:border-[#6C47FF]/65 dark:bg-[#323232]/60 dark:text-zinc-100"
                             />
                             <button
                               type="button"
@@ -1499,7 +1499,7 @@ export default function RecentProjectsRow({
                               onClick={() => {
                                 void submitListRename(activeListMenuProject.id);
                               }}
-                              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#6C47FF] transition hover:bg-[#F8FAFC] hover:text-[#5B38E6] disabled:opacity-60 dark:text-[#BBA6FF] dark:hover:bg-zinc-800/70 dark:hover:text-[#CFC4FF]"
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#6C47FF] transition hover:bg-[#F8FAFC] hover:text-[#5B38E6] disabled:opacity-60 dark:text-[#BBA6FF] dark:hover:bg-[#3A3A3A]/70 dark:hover:text-[#CFC4FF]"
                             >
                               <Check className="h-4 w-4" strokeWidth={2.5} aria-hidden />
                             </button>
@@ -1541,7 +1541,7 @@ export default function RecentProjectsRow({
                             <button
                               type="button"
                               aria-label="Rename project"
-                              className="inline-flex h-6 w-6 flex-none items-center justify-center rounded-md text-slate-500 transition hover:bg-[#F8FAFC] hover:text-slate-700 md:opacity-0 md:group-hover/menu-title:opacity-100 md:group-focus-within/menu-title:opacity-100 dark:text-zinc-300 dark:hover:bg-zinc-800/70 dark:hover:text-zinc-100"
+                              className="inline-flex h-6 w-6 flex-none items-center justify-center rounded-md text-slate-500 transition hover:bg-[#F8FAFC] hover:text-slate-700 md:opacity-0 md:group-hover/menu-title:opacity-100 md:group-focus-within/menu-title:opacity-100 dark:text-zinc-200 dark:hover:bg-[#3A3A3A]/70 dark:hover:text-zinc-100"
                               onClick={(event) => {
                                 event.preventDefault();
                                 event.stopPropagation();
@@ -1553,15 +1553,15 @@ export default function RecentProjectsRow({
                             </button>
                           </div>
                         )}
-                        <p className="mt-1 text-xs font-medium text-slate-500 dark:text-zinc-400">
+                        <p className="mt-1 text-xs font-medium text-slate-500 dark:text-zinc-300">
                           {activeListMenuProject.updated}
                         </p>
                       </div>
-                      <div className="h-px bg-[#E6EBF2] dark:bg-zinc-800" />
+                      <div className="h-px bg-[#E6EBF2] dark:bg-[#2B2B2B]" />
                       <button
                         type="button"
                         role="menuitem"
-                        className="mx-2 mt-1 flex w-[calc(100%-1rem)] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-slate-900 transition hover:bg-[#F8FAFC] dark:text-zinc-100 dark:hover:bg-zinc-800/70"
+                        className="mx-2 mt-1 flex w-[calc(100%-1rem)] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-slate-900 transition hover:bg-[#F8FAFC] dark:text-zinc-100 dark:hover:bg-[#3A3A3A]/70"
                         onClick={(event) => {
                           event.preventDefault();
                           event.stopPropagation();
@@ -1582,7 +1582,7 @@ export default function RecentProjectsRow({
                       <button
                         type="button"
                         role="menuitem"
-                        className="mx-2 flex w-[calc(100%-1rem)] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-slate-900 transition hover:bg-[#F8FAFC] dark:text-zinc-100 dark:hover:bg-zinc-800/70"
+                        className="mx-2 flex w-[calc(100%-1rem)] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-slate-900 transition hover:bg-[#F8FAFC] dark:text-zinc-100 dark:hover:bg-[#3A3A3A]/70"
                         onClick={(event) => {
                           event.preventDefault();
                           event.stopPropagation();
@@ -1600,7 +1600,7 @@ export default function RecentProjectsRow({
                         role="menuitem"
                         disabled={listMenuPrintingId === activeListMenuProject.id}
                         aria-disabled={listMenuPrintingId === activeListMenuProject.id}
-                        className="mx-2 flex w-[calc(100%-1rem)] items-center justify-between rounded-lg px-2.5 py-2 text-left text-slate-900 transition hover:bg-[#F8FAFC] disabled:cursor-not-allowed disabled:opacity-60 dark:text-zinc-100 dark:hover:bg-zinc-800/70"
+                        className="mx-2 flex w-[calc(100%-1rem)] items-center justify-between rounded-lg px-2.5 py-2 text-left text-slate-900 transition hover:bg-[#F8FAFC] disabled:cursor-not-allowed disabled:opacity-60 dark:text-zinc-100 dark:hover:bg-[#3A3A3A]/70"
                         onClick={(event) => {
                           event.preventDefault();
                           event.stopPropagation();
@@ -1623,7 +1623,7 @@ export default function RecentProjectsRow({
                         role="menuitem"
                         disabled
                         aria-disabled="true"
-                        className="mx-2 flex w-[calc(100%-1rem)] items-center justify-between rounded-lg px-2.5 py-2 text-left text-slate-500 opacity-55 transition disabled:cursor-not-allowed dark:text-zinc-400"
+                        className="mx-2 flex w-[calc(100%-1rem)] items-center justify-between rounded-lg px-2.5 py-2 text-left text-slate-500 opacity-55 transition disabled:cursor-not-allowed dark:text-zinc-300"
                       >
                         <span className="flex min-w-0 items-center gap-2.5">
                           <span className="flex h-5 w-5 items-center justify-center text-current">
@@ -1637,7 +1637,7 @@ export default function RecentProjectsRow({
                         type="button"
                         role="menuitem"
                         disabled={listMenuCopyingId === activeListMenuProject.id}
-                        className="mx-2 flex w-[calc(100%-1rem)] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-slate-900 transition hover:bg-[#F8FAFC] disabled:cursor-not-allowed disabled:opacity-60 dark:text-zinc-100 dark:hover:bg-zinc-800/70"
+                        className="mx-2 flex w-[calc(100%-1rem)] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-slate-900 transition hover:bg-[#F8FAFC] disabled:cursor-not-allowed disabled:opacity-60 dark:text-zinc-100 dark:hover:bg-[#3A3A3A]/70"
                         onClick={(event) => {
                           event.preventDefault();
                           event.stopPropagation();
@@ -1681,11 +1681,11 @@ export default function RecentProjectsRow({
                         </span>
                         <span className="text-[15px] font-medium text-slate-900 dark:text-zinc-100">Make a copy</span>
                       </button>
-                      <div className="mx-2 my-1 h-px bg-[#E6EBF2] dark:bg-zinc-800" />
+                      <div className="mx-2 my-1 h-px bg-[#E6EBF2] dark:bg-[#2B2B2B]" />
                       <button
                         type="button"
                         role="menuitem"
-                        className="mx-2 mb-1.5 flex w-[calc(100%-1rem)] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-rose-700 transition hover:bg-rose-50 dark:hover:bg-zinc-800/60"
+                        className="mx-2 mb-1.5 flex w-[calc(100%-1rem)] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-rose-700 transition hover:bg-rose-50 dark:hover:bg-[#3A3A3A]/60"
                         onClick={(event) => {
                           event.preventDefault();
                           event.stopPropagation();

@@ -33,20 +33,20 @@ export default function LoadingOverlay({
   const resolvedBackdropClassName =
     backdropClassName ??
     (variant === "fullscreen"
-      ? "bg-white dark:bg-[#222224]"
-      : "bg-slate-50/85 dark:bg-slate-950/70");
+      ? "bg-white dark:bg-[#252525]"
+      : "bg-slate-50/85 dark:bg-[#252525]/80");
 
   const resolvedPanelClassName =
     panelClassName ??
     (variant === "fullscreen"
-      ? "bg-transparent border-0 shadow-none px-0 py-0 text-slate-900 dark:text-white"
-      : "rounded-2xl border border-slate-200 bg-white px-8 py-6 text-slate-900 shadow-[0_22px_60px_rgba(15,23,42,0.12)] dark:border-zinc-700/80 dark:bg-zinc-900 dark:text-white dark:shadow-[0_22px_60px_rgba(15,23,42,0.35)]");
+      ? "bg-transparent border-0 shadow-none px-0 py-0 text-slate-900 dark:text-[#F5F5F5]"
+      : "rounded-2xl border border-slate-200 bg-white px-8 py-6 text-slate-900 shadow-[0_22px_60px_rgba(15,23,42,0.12)] dark:border-[#3F3F3F] dark:bg-[#323232] dark:text-[#F5F5F5] dark:shadow-[0_22px_60px_rgba(0,0,0,0.45)]");
 
   const resolvedSpinnerClassName =
     spinnerClassName ??
     (variant === "fullscreen"
-      ? "border-zinc-400 border-t-zinc-900 dark:border-zinc-500 dark:border-t-white"
-      : "border-slate-300 border-t-slate-700 dark:border-zinc-500 dark:border-t-zinc-100");
+      ? "border-zinc-400 border-t-zinc-900 dark:border-[#3F3F3F] dark:border-t-[#F5F5F5]"
+      : "border-slate-300 border-t-slate-700 dark:border-[#3F3F3F] dark:border-t-[#F5F5F5]");
 
   const overlay = (
     <div
