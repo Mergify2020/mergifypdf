@@ -8806,6 +8806,10 @@ const timer =
     setHighlightThickness(normalized);
     setHighlightThicknessInput(`${normalized}`);
   }, []);
+  const applyHighlightColor = useCallback((color: HighlightColorKey) => {
+    setHighlightColor(color);
+    setHighlightCustomOpen(false);
+  }, []);
   const applyShapeThickness = useCallback(
     (value: number) => {
       const normalized = normalizeShapeThickness(value);
