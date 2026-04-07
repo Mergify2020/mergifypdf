@@ -4131,6 +4131,7 @@ const timer =
   }, []);
   const MIN_HIGHLIGHT_THICKNESS = 6;
   const MAX_HIGHLIGHT_THICKNESS = 32;
+  const DEFAULT_HIGHLIGHT_THICKNESS = 14;
   const MIN_SHAPE_THICKNESS = 1;
   const MAX_SHAPE_THICKNESS = 10;
   const toolSwitchBase = "flex items-center gap-2 px-4 py-2 text-sm font-semibold transition";
