@@ -123,7 +123,7 @@ type Point = { x: number; y: number; move?: boolean };
 type DrawingTool = "highlight" | "pen" | "pencil" | "text";
 type HeaderMode = "default" | "pen" | "highlight" | "shapes";
 type ShapeType = "line" | "arrow" | "check" | "x" | "rect" | "ellipse" | "triangle";
-type LineStyle = "solid" | "dashed";
+type LineStyle = "solid" | "dashed" | "dotted";
 type ShapeAnnotation = {
   id: string;
   type: ShapeType;
@@ -376,6 +376,7 @@ variants: {
 const LINE_STYLE_OPTIONS: { value: LineStyle; label: string }[] = [
   { value: "solid", label: "Solid" },
   { value: "dashed", label: "Dashed" },
+  { value: "dotted", label: "Dotted" },
 ];
 
 
