@@ -141,6 +141,25 @@ export async function GET(
     );
   }
 
+  if (mode === "editor") {
+    try {
+      const source = await getR2ObjectBuffer(r2Config, project.pdfKey);
+      return new NextResponse(Buffer.from(source), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `inline; filename="${id}.pdf"`,
+          "Cache-Control": "no-store",
+        },
+      });
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "Unable to load PDF" },
+        { status: 500 }
+      );
+    }
+  }
+
   if (mode === "file" || !hasActivePlan) {
     try {
       const source = await getR2ObjectBuffer(r2Config, project.pdfKey);

@@ -72,6 +72,8 @@ import {
 	  Copy,
   List,
   ListOrdered,
+  Lock,
+  Unlock,
 	  Signature as SignatureIcon,
 	  UploadCloud,
   X,
@@ -187,6 +189,7 @@ type TextAnnotation = {
   width: number;
   height: number;
   rotation?: number;
+  locked?: boolean;
   textSizePt?: number;
   richTextHtml?: string;
   lineSpacing?: number;
@@ -258,6 +261,8 @@ const TYPED_SIGNATURE_STYLES = [
 ] as const;
 
 const PREVIEW_SYNC_DEBOUNCE_MS = 900;
+const ROTATE_CURSOR =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M20 11A8 8 0 1 1 17.66 5.34' fill='none' stroke='%236C47FF' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M20 4v7h-7' fill='none' stroke='%236C47FF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\") 12 12, auto";
 
 type FontOption =
   | {
@@ -487,8 +492,10 @@ function applyTextTransform(value: string, transform: "none" | "uppercase") {
 
 function getInitialPreviewRenderCount(pageCount: number, largeDocMode: boolean) {
   if (pageCount <= 0) return 0;
-  if (!largeDocMode) return Math.min(INITIAL_PREVIEW_RENDER_COUNT, pageCount);
-  return Math.min(LARGE_DOC_INITIAL_RENDER_COUNT, pageCount);
+  if (largeDocMode) return Math.min(2, pageCount);
+  if (pageCount <= 20) return Math.min(6, pageCount);
+  if (pageCount <= 100) return Math.min(3, pageCount);
+  return Math.min(2, pageCount);
 }
 
 function cancelIdleOrTimeout(timerId: ReturnType<typeof setTimeout> | number | null, usesIdleCallback = false) {
@@ -925,6 +932,71 @@ function normalizeCssColor(value: string) {
   return null;
 }
 
+function resolveCaretColor(element: HTMLElement, range: Range, fallback: string) {
+  const startNode =
+    range.startContainer.nodeType === Node.ELEMENT_NODE
+      ? (range.startContainer as HTMLElement)
+      : range.startContainer.parentElement;
+  let colorNode: HTMLElement | null = null;
+  if (startNode && startNode !== element) {
+    colorNode = startNode;
+    while (colorNode && colorNode !== element) {
+      if (colorNode.dataset.textColor || colorNode.style.color) break;
+      colorNode = colorNode.parentElement;
+    }
+  } else {
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+    let lastText: Text | null = null;
+    let current = walker.nextNode();
+    while (current) {
+      if ((current.textContent ?? "").trim()) {
+        lastText = current as Text;
+      }
+      current = walker.nextNode();
+    }
+    if (lastText?.parentElement) {
+      colorNode = lastText.parentElement;
+    }
+  }
+  const colorTarget = colorNode ?? element;
+  const computed = window.getComputedStyle(colorTarget);
+  return normalizeCssColor(computed.color || "") || fallback;
+}
+
+function resolveRangeTextColor(element: HTMLElement, range: Range, fallback: string) {
+  if (range.collapsed) {
+    return resolveCaretColor(element, range, fallback);
+  }
+  const colors = new Set<string>();
+  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+  let current = walker.nextNode();
+  while (current) {
+    if (!range.intersectsNode(current)) {
+      current = walker.nextNode();
+      continue;
+    }
+    const text = current.textContent ?? "";
+    if (!text.trim()) {
+      current = walker.nextNode();
+      continue;
+    }
+    let parent = (current as Text).parentElement;
+    while (parent && parent !== element) {
+      if (parent.dataset.textColor || parent.style.color) break;
+      parent = parent.parentElement;
+    }
+    const colorTarget = parent ?? element;
+    const computed = window.getComputedStyle(colorTarget);
+    const color = normalizeCssColor(computed.color || "");
+    if (color) {
+      colors.add(color);
+    }
+    if (colors.size > 1) return null;
+    current = walker.nextNode();
+  }
+  return colors.size === 1 ? Array.from(colors)[0] : fallback;
+}
+
 function openReservedTab() {
   if (typeof window === "undefined") return null;
   const reserved = window.open("", "_blank");
@@ -1125,6 +1197,19 @@ function createThumbnailDataUrl(canvas: HTMLCanvasElement, maxWidth = THUMB_MAX_
   return toCardPreviewDataUrl(thumbCanvas);
 }
 
+function loadImageFromDataUrl(src: string) {
+  return new Promise<HTMLImageElement>((resolve) => {
+    if (typeof window === "undefined") {
+      resolve({} as HTMLImageElement);
+      return;
+    }
+    const img = new window.Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(img);
+    img.src = src;
+  });
+}
+
 function getAspectPadding(width?: number, height?: number) {
   if (!width || !height || width === 0) {
     return `${DEFAULT_ASPECT_RATIO * 100}%`;
@@ -1135,6 +1220,13 @@ function getAspectPadding(width?: number, height?: number) {
 function normalizeRotation(rotation?: number) {
   const value = rotation ?? 0;
   return ((value % 360) + 360) % 360;
+}
+
+function formatSignedRotation(rotation?: number) {
+  const normalized = normalizeRotation(rotation);
+  const rounded = Math.round(normalized);
+  if (rounded === 360) return 0;
+  return rounded > 180 ? rounded - 360 : rounded;
 }
 
 function normalizeTextSize(value: number) {
@@ -1212,6 +1304,51 @@ function parseLineHeightPx(styleValue: string, fontSizePx: number) {
     return Number.isNaN(parsed) ? fontSizePx * 1.2 : fontSizePx * (parsed / 100);
   }
   return fontSizePx * 1.2;
+}
+
+function measureRequiredTextHeightRatio(
+  element: HTMLElement,
+  containerRect: DOMRect,
+  minRatio = 0.015,
+  paddingBufferPx = 6,
+  minPx = 24
+) {
+  if (!containerRect.height) return minRatio;
+  let contentHeightPx = 0;
+  try {
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    const rects = range.getClientRects();
+    if (rects.length > 0) {
+      contentHeightPx = rects[rects.length - 1].bottom - rects[0].top;
+    }
+  } catch {
+    contentHeightPx = 0;
+  }
+  if (!contentHeightPx) {
+    contentHeightPx = element.scrollHeight;
+  }
+  const style = window.getComputedStyle(element);
+  const paddingY = (Number.parseFloat(style.paddingTop) || 0) + (Number.parseFloat(style.paddingBottom) || 0);
+  const requiredHeightPx = Math.max(minPx, contentHeightPx + paddingY + paddingBufferPx);
+  return clamp(Math.ceil(requiredHeightPx) / containerRect.height, minRatio, 1);
+}
+
+function resolveLineHeightPx(lineHeightValue: string, fontSizePx: number) {
+  if (!lineHeightValue || lineHeightValue === "normal") {
+    return fontSizePx * 1.2;
+  }
+  const parsed = Number.parseFloat(lineHeightValue);
+  if (Number.isNaN(parsed)) {
+    return fontSizePx * 1.2;
+  }
+  if (lineHeightValue.endsWith("px")) {
+    return parsed;
+  }
+  if (lineHeightValue.endsWith("%")) {
+    return fontSizePx * (parsed / 100);
+  }
+  return parsed * fontSizePx;
 }
 
 function extractRichTextRuns(html: string, fallbackSize: number) {
@@ -2221,11 +2358,14 @@ const [textAnnotations, setTextAnnotations] = useState<Record<string, TextAnnota
 const [textBold, setTextBold] = useState(false);
 const [textItalic, setTextItalic] = useState(false);
 const [textUnderline, setTextUnderline] = useState(false);
+const [isCollapsedTextSelection, setIsCollapsedTextSelection] = useState(false);
 const [defaultTextStyles, setDefaultTextStyles] = useState({
   bold: false,
   italic: false,
   underline: false,
 });
+const defaultTextStylesRef = useRef(defaultTextStyles);
+const [defaultListType, setDefaultListType] = useState<"bullet" | "number" | null>(null);
 const [listType, setListType] = useState<"bullet" | "number" | null>(null);
   const [textTransform, setTextTransform] = useState<"none" | "uppercase">("none");
   const [textAlign, setTextAlign] = useState<"left" | "center" | "right" | "justify">("left");
@@ -2325,6 +2465,16 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     pointerId: number;
     startX: number;
     startY: number;
+    handle: "nw" | "ne" | "sw" | "se" | "n" | "s" | "e" | "w";
+  } | null>(null);
+  const [rotatingText, setRotatingText] = useState<{
+    pageId: string;
+    id: string;
+    pointerId: number;
+    centerX: number;
+    centerY: number;
+    baseRotation: number;
+    degrees: number;
   } | null>(null);
   const textResizeCleanupRef = useRef<(() => void) | null>(null);
   const textResizeRafRef = useRef<number | null>(null);
@@ -2364,6 +2514,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     "text" | "shape-border" | "shape-fill" | "pen" | null
   >(null);
   const [colorPickerDraft, setColorPickerDraft] = useState("#111827");
+  const [pickerSelectedColor, setPickerSelectedColor] = useState<string | null>(null);
   const textColorButtonRef = useRef<HTMLButtonElement | null>(null);
   const shapeBorderColorButtonRef = useRef<HTMLButtonElement | null>(null);
   const shapeFillColorButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -2683,7 +2834,37 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       selection.removeAllRanges();
       selection.addRange(range);
 
+      const applyFontSizeToListItems = (targetRange: Range) => {
+        const listItems = new Set<HTMLElement>();
+        const startListItem =
+          targetRange.startContainer.nodeType === Node.ELEMENT_NODE
+            ? (targetRange.startContainer as HTMLElement).closest("li")
+            : targetRange.startContainer.parentElement?.closest("li");
+        const endListItem =
+          targetRange.endContainer.nodeType === Node.ELEMENT_NODE
+            ? (targetRange.endContainer as HTMLElement).closest("li")
+            : targetRange.endContainer.parentElement?.closest("li");
+        if (startListItem) listItems.add(startListItem);
+        if (endListItem) listItems.add(endListItem);
+        const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+        let current = walker.nextNode();
+        while (current) {
+          if (!targetRange.intersectsNode(current)) {
+            current = walker.nextNode();
+            continue;
+          }
+          const listItem = (current as Text).parentElement?.closest("li");
+          if (listItem) listItems.add(listItem);
+          current = walker.nextNode();
+        }
+        listItems.forEach((item) => {
+          item.style.fontSize = `${fontSizeToDisplayPx(sizePt)}px`;
+          item.dataset.fontSizePt = String(sizePt);
+        });
+      };
+
       if (range.collapsed) {
+        applyFontSizeToListItems(range);
         const span = document.createElement("span");
         span.style.fontSize = `${fontSizeToDisplayPx(sizePt)}px`;
         span.dataset.fontSizePt = String(sizePt);
@@ -2694,6 +2875,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         selection.removeAllRanges();
         selection.addRange(range);
       } else {
+        applyFontSizeToListItems(range);
         const span = document.createElement("span");
         span.style.fontSize = `${fontSizeToDisplayPx(sizePt)}px`;
         span.dataset.fontSizePt = String(sizePt);
@@ -2797,12 +2979,59 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     [focusedTextId, findTextAnnotationById, syncTextAnnotationContent, autoExpandTextAnnotation]
   );
 
-  const refreshInlineStyleState = useCallback((element: HTMLElement) => {
+  const refreshInlineStyleState = useCallback((element: HTMLElement, syncTypingStyles = false) => {
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0 || !element.contains(selection.getRangeAt(0).commonAncestorContainer)) {
       return;
     }
     const range = selection.getRangeAt(0);
+    if (!range.collapsed) {
+      const boldStates = new Set<boolean>();
+      const italicStates = new Set<boolean>();
+      const underlineStates = new Set<boolean>();
+      const listStates = new Set<"bullet" | "number" | null>();
+      const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+      let current = walker.nextNode();
+      while (current) {
+        if (!range.intersectsNode(current)) {
+          current = walker.nextNode();
+          continue;
+        }
+        const text = current.textContent ?? "";
+        if (!text.trim()) {
+          current = walker.nextNode();
+          continue;
+        }
+        let node = (current as Text).parentElement;
+        let bold = false;
+        let italic = false;
+        let underline = false;
+        let bullet = false;
+        let number = false;
+        while (node && node !== element) {
+          const style = window.getComputedStyle(node);
+          const weight = style.fontWeight;
+          if (weight === "bold" || Number(weight) >= 600) bold = true;
+          if (style.fontStyle === "italic") italic = true;
+          const deco = (style.textDecorationLine || style.textDecoration || "").toLowerCase();
+          if (deco.includes("underline")) underline = true;
+          if (node.tagName === "UL") bullet = true;
+          if (node.tagName === "OL") number = true;
+          node = node.parentElement;
+        }
+        boldStates.add(bold);
+        italicStates.add(italic);
+        underlineStates.add(underline);
+        listStates.add(bullet ? "bullet" : number ? "number" : null);
+        current = walker.nextNode();
+      }
+      setTextBold(boldStates.size === 1 ? boldStates.has(true) : false);
+      setTextItalic(italicStates.size === 1 ? italicStates.has(true) : false);
+      setTextUnderline(underlineStates.size === 1 ? underlineStates.has(true) : false);
+      const nextListType = listStates.size === 1 ? Array.from(listStates)[0] : null;
+      setListType(nextListType);
+      return;
+    }
     const startNode =
       range.startContainer.nodeType === Node.ELEMENT_NODE
         ? (range.startContainer as HTMLElement)
@@ -2827,7 +3056,15 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     setTextBold(bold);
     setTextItalic(italic);
     setTextUnderline(underline);
-    setListType(bullet ? "bullet" : number ? "number" : null);
+    const nextListType = bullet ? "bullet" : number ? "number" : null;
+    if (syncTypingStyles) {
+      setDefaultTextStyles({
+        bold,
+        italic,
+        underline,
+      });
+    }
+    setListType(nextListType);
   }, []);
   const applyFontSizeDeltaToSelection = useCallback(
     (delta: number) => {
@@ -2962,6 +3199,26 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       if (!range && selectionRangeRef.current && element.contains(selectionRangeRef.current.commonAncestorContainer)) {
         range = selectionRangeRef.current;
       }
+      if (range?.collapsed) {
+        const currentStyles = defaultTextStylesRef.current;
+        const nextStyles = {
+          bold: command === "bold" ? !currentStyles.bold : currentStyles.bold,
+          italic: command === "italic" ? !currentStyles.italic : currentStyles.italic,
+          underline: command === "underline" ? !currentStyles.underline : currentStyles.underline,
+        };
+        defaultTextStylesRef.current = nextStyles;
+        setDefaultTextStyles(nextStyles);
+        setTextBold(nextStyles.bold);
+        setTextItalic(nextStyles.italic);
+        setTextUnderline(nextStyles.underline);
+        setIsCollapsedTextSelection(true);
+        applyDefaultTextStylesToCaret(element, nextStyles);
+        const activeSelection = window.getSelection();
+        if (activeSelection && activeSelection.rangeCount > 0) {
+          selectionRangeRef.current = activeSelection.getRangeAt(0).cloneRange();
+        }
+        return;
+      }
       if (range && selection) {
         selection.removeAllRanges();
         selection.addRange(range);
@@ -2980,16 +3237,23 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     },
     [
       autoExpandTextAnnotation,
+      defaultTextStyles,
       findTextAnnotationById,
       focusedTextId,
-      syncTextAnnotationContent,
       refreshInlineStyleState,
+      syncTextAnnotationContent,
     ]
   );
 
   const applyListCommand = useCallback(
     (type: "bullet" | "number") => {
-      if (!focusedTextId) return;
+      if (!focusedTextId) {
+        const nextListType = defaultListType === type ? null : type;
+        setDefaultListType(nextListType);
+        setListType(nextListType);
+        setIsCollapsedTextSelection(true);
+        return;
+      }
       const element = textNodeRefs.current.get(focusedTextId);
       if (!element) return;
       element.focus();
@@ -3005,6 +3269,12 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         range = selectionRangeRef.current;
       }
       const wasCollapsed = !!range?.collapsed;
+      if (wasCollapsed) {
+        const nextListType = defaultListType === type ? null : type;
+        setDefaultListType(nextListType);
+        setListType(nextListType);
+        setIsCollapsedTextSelection(true);
+      }
       if (range && selection) {
         selection.removeAllRanges();
         selection.addRange(range);
@@ -3040,7 +3310,14 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       }
       refreshInlineStyleState(element);
     },
-    [autoExpandTextAnnotation, findTextAnnotationById, focusedTextId, refreshInlineStyleState, syncTextAnnotationContent]
+    [
+      autoExpandTextAnnotation,
+      defaultListType,
+      findTextAnnotationById,
+      focusedTextId,
+      refreshInlineStyleState,
+      syncTextAnnotationContent,
+    ]
   );
 
   const applyLineSpacing = useCallback(
@@ -3067,6 +3344,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       if (!element || !selection || selection.rangeCount === 0) return;
       const range = selection.getRangeAt(0);
       if (!element.contains(range.commonAncestorContainer)) return;
+      setIsCollapsedTextSelection(range.collapsed);
       selectionRangeRef.current = range.cloneRange();
       const startNode =
         range.startContainer.nodeType === Node.ELEMENT_NODE
@@ -3136,35 +3414,26 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
           setSelectionTextColorMixed(true);
         }
       } else {
-      const colorTarget = colorNode ?? element;
-      const computed = window.getComputedStyle(colorTarget);
-      const color = normalizeCssColor(computed.color || "");
-      setSelectionTextColor(color);
-      setSelectionTextColorMixed(false);
+        const color = resolveCaretColor(element, range, textColor);
+        setSelectionTextColor(color);
+        setSelectionTextColorMixed(false);
+        setTextBold(defaultTextStyles.bold);
+        setTextItalic(defaultTextStyles.italic);
+        setTextUnderline(defaultTextStyles.underline);
+        return;
       }
-      setTextBold(document.queryCommandState("bold"));
-      setTextItalic(document.queryCommandState("italic"));
-      setTextUnderline(document.queryCommandState("underline"));
-      if (startNode) {
-        const listAncestor = startNode.closest("ul, ol");
-        if (listAncestor?.tagName === "UL") {
-          setListType("bullet");
-        } else if (listAncestor?.tagName === "OL") {
-          setListType("number");
-        } else {
-          setListType(null);
-        }
-      } else {
-        setListType(null);
-      }
+      refreshInlineStyleState(element);
     };
     document.addEventListener("selectionchange", handleSelectionChange);
     return () => {
       document.removeEventListener("selectionchange", handleSelectionChange);
     };
-  }, [focusedTextId, textAnnotations, textSize]);
+  }, [defaultTextStyles.bold, defaultTextStyles.italic, defaultTextStyles.underline, focusedTextId, refreshInlineStyleState, textAnnotations, textSize]);
   const applyDefaultTextStylesToCaret = useCallback(
-    (element: HTMLElement) => {
+    (
+      element: HTMLElement,
+      styles: { bold: boolean; italic: boolean; underline: boolean } = defaultTextStyles
+    ) => {
       const selection = window.getSelection();
       if (!selection) return;
       if (selection.rangeCount === 0 || !element.contains(selection.getRangeAt(0).commonAncestorContainer)) {
@@ -3174,6 +3443,8 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         selection.removeAllRanges();
         selection.addRange(range);
       }
+      const activeRange = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+      if (!activeRange || !activeRange.collapsed || !element.contains(activeRange.commonAncestorContainer)) return;
       const ensureCommandState = (command: "bold" | "italic" | "underline", enabled: boolean) => {
         const current = document.queryCommandState(command);
         if (current !== enabled) {
@@ -3181,30 +3452,35 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
           document.execCommand(command);
         }
       };
-      ensureCommandState("bold", defaultTextStyles.bold);
-      ensureCommandState("italic", defaultTextStyles.italic);
-      ensureCommandState("underline", defaultTextStyles.underline);
       let caretColor = textColor;
-      if (selection.rangeCount > 0 && element.contains(selection.getRangeAt(0).commonAncestorContainer)) {
-        const range = selection.getRangeAt(0);
-        const startNode =
-          range.startContainer.nodeType === Node.ELEMENT_NODE
-            ? (range.startContainer as HTMLElement)
-            : range.startContainer.parentElement;
-        let colorNode = startNode;
-        while (colorNode && colorNode !== element) {
-          if (colorNode.dataset.textColor || colorNode.style.color) break;
-          colorNode = colorNode.parentElement;
-        }
-        const colorTarget = colorNode ?? element;
-        const computed = window.getComputedStyle(colorTarget);
-        caretColor = normalizeCssColor(computed.color || "") || textColor;
+      caretColor = resolveCaretColor(element, activeRange, textColor);
+      const marker = document.createElement("span");
+      marker.dataset.typingStyleMarker = "true";
+      marker.style.fontWeight = styles.bold ? "700" : "400";
+      marker.style.fontStyle = styles.italic ? "italic" : "normal";
+      marker.style.textDecoration = styles.underline ? "underline" : "none";
+      marker.style.color = caretColor;
+      let textNode = marker.firstChild;
+      if (!(textNode instanceof Text)) {
+        marker.textContent = "\u200B";
+        textNode = marker.firstChild;
+      } else if (!textNode.textContent) {
+        textNode.textContent = "\u200B";
       }
+      activeRange.insertNode(marker);
+      const nextRange = document.createRange();
+      nextRange.setStart(textNode as Text, (textNode as Text).textContent?.length ?? 1);
+      nextRange.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(nextRange);
       document.execCommand("styleWithCSS", false, "true");
-      document.execCommand("foreColor", false, caretColor);
-      setTextBold(defaultTextStyles.bold);
-      setTextItalic(defaultTextStyles.italic);
-      setTextUnderline(defaultTextStyles.underline);
+      ensureCommandState("bold", styles.bold);
+      ensureCommandState("italic", styles.italic);
+      ensureCommandState("underline", styles.underline);
+      selectionRangeRef.current = nextRange.cloneRange();
+      setTextBold(styles.bold);
+      setTextItalic(styles.italic);
+      setTextUnderline(styles.underline);
       setSelectionTextColor(caretColor);
       setSelectionTextColorMixed(false);
     },
@@ -3260,18 +3536,82 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       startEvent.stopPropagation();
 
       const annotation = textAnnotations[pageId]?.find((a) => a.id === annotationId);
-      if (!annotation) return;
+      if (!annotation || annotation.locked) return;
       const startPoint = getPageNormalizedPoint(pageId, startEvent.clientX, startEvent.clientY);
       if (!startPoint) return;
+      const pageNode = previewNodeMap.current.get(pageId);
+      const pageRect = pageNode?.getBoundingClientRect();
 
       textDragCleanupRef.current?.();
 
-      const offsetX = startPoint.x - annotation.x;
-      const offsetY = startPoint.y - annotation.y;
       const startWidth = annotation.width ?? 0.14;
       const startHeight = annotation.height ?? 0.06;
+      const anchorPoint = {
+        x: clamp(startPoint.x, annotation.x, annotation.x + startWidth),
+        y: clamp(startPoint.y, annotation.y, annotation.y + startHeight),
+      };
+      const offsetX = anchorPoint.x - annotation.x;
+      const offsetY = anchorPoint.y - annotation.y;
       const displayRotation = normalizeRotation(annotation.rotation ?? 0);
       const node = textAnnotationRefs.current.get(annotationId);
+      const editorNode = textNodeRefs.current.get(annotationId) ?? null;
+      const contentInsets = (() => {
+        if (!node || !editorNode || !pageRect || !pageRect.width || !pageRect.height) {
+          return { left: 0, right: 0, top: 0, bottom: 0 };
+        }
+        const wrapperRect = node.getBoundingClientRect();
+        const editorStyle = window.getComputedStyle(editorNode);
+        const fontSizePx = Number.parseFloat(editorStyle.fontSize) || 0;
+        const lineHeightPx = resolveLineHeightPx(editorStyle.lineHeight, fontSizePx);
+        const leadingSlackPx = Math.max(0, lineHeightPx - fontSizePx);
+        const paddingInsets = {
+          left: Math.max(0, (Number.parseFloat(editorStyle.paddingLeft) || 0) / pageRect.width),
+          right: Math.max(0, (Number.parseFloat(editorStyle.paddingRight) || 0) / pageRect.width),
+          top: Math.max(0, (Number.parseFloat(editorStyle.paddingTop) || 0) / pageRect.height),
+          bottom: Math.max(0, (Number.parseFloat(editorStyle.paddingBottom) || 0) / pageRect.height),
+        };
+        let contentRect: DOMRect | null = null;
+        try {
+          const range = document.createRange();
+          range.selectNodeContents(editorNode);
+          const rects = Array.from(range.getClientRects());
+          if (rects.length > 0) {
+            let left = rects[0].left;
+            let right = rects[0].right;
+            let top = rects[0].top;
+            let bottom = rects[0].bottom;
+            for (const rect of rects) {
+              left = Math.min(left, rect.left);
+              right = Math.max(right, rect.right);
+              top = Math.min(top, rect.top);
+              bottom = Math.max(bottom, rect.bottom);
+            }
+            contentRect = new DOMRect(left, top, right - left, bottom - top);
+          }
+        } catch {
+          contentRect = null;
+        }
+        if (!contentRect || !contentRect.width || !contentRect.height) {
+          return paddingInsets;
+        }
+        return {
+          left: Math.max(0, (contentRect.left - wrapperRect.left) / pageRect.width),
+          right: Math.max(0, (wrapperRect.right - contentRect.right) / pageRect.width),
+          top: Math.max(
+            0,
+            (contentRect.top - wrapperRect.top - (Number.parseFloat(editorStyle.paddingTop) || 0) - leadingSlackPx / 2) /
+              pageRect.height
+          ),
+          bottom: Math.max(
+            0,
+            (wrapperRect.bottom -
+              contentRect.bottom -
+              (Number.parseFloat(editorStyle.paddingBottom) || 0) -
+              leadingSlackPx / 2) /
+              pageRect.height
+          ),
+        };
+      })();
       if (node) {
         node.style.willChange = "left, top, transform";
         node.style.transition = "none";
@@ -3289,8 +3629,14 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
           textDragRafRef.current = null;
           const latestPoint = textDragLatestPointRef.current;
           if (!latestPoint) return;
-          const nextX = clamp(latestPoint.x - offsetX, 0, 1 - startWidth);
-          const nextY = clamp(latestPoint.y - offsetY, 0, 1 - startHeight);
+          const unclampedX = latestPoint.x - offsetX;
+          const unclampedY = latestPoint.y - offsetY;
+          const minX = -contentInsets.left;
+          const maxX = 1 - (startWidth - contentInsets.right);
+          const minY = -contentInsets.top;
+          const maxY = 1 - (startHeight - contentInsets.bottom);
+          const nextX = clamp(unclampedX, minX, maxX);
+          const nextY = clamp(unclampedY, minY, maxY);
           textDragLatestPosRef.current = { x: nextX, y: nextY };
           if (node) {
             node.style.left = `${nextX * 100}%`;
@@ -3701,7 +4047,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       startEvent.preventDefault();
       startEvent.stopPropagation();
       const annotation = textAnnotations[pageId]?.find((a) => a.id === annotationId);
-      if (!annotation) return;
+      if (!annotation || annotation.locked) return;
       const startPoint = getPageNormalizedPoint(pageId, startEvent.clientX, startEvent.clientY);
       if (!startPoint) return;
       const pointerId = startEvent.pointerId;
@@ -3711,52 +4057,144 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       const startHeight = annotation.height ?? 0.06;
       const startX = annotation.x;
       const startY = annotation.y;
+      const startCenterX = startX + startWidth / 2;
+      const startCenterY = startY + startHeight / 2;
+      const rotationRadians = ((annotation.rotation ?? 0) * Math.PI) / 180;
       const minWidth = 0.04;
-      const minHeight = 0.015;
-      const fixedRight = startX + startWidth;
-      const fixedBottom = startY + startHeight;
+      const baseMinHeight = 0.015;
       const node = textAnnotationRefs.current.get(annotationId) ?? null;
+      const editorNode = textNodeRefs.current.get(annotationId) ?? null;
+      const containerNode = previewNodeMap.current.get(pageId) ?? null;
+      const getContainerHeight = () => containerNode?.getBoundingClientRect().height ?? 0;
+      const rotateVector = (x: number, y: number, angle: number) => ({
+        x: x * Math.cos(angle) - y * Math.sin(angle),
+        y: x * Math.sin(angle) + y * Math.cos(angle),
+      });
+      const toLocalPoint = (x: number, y: number) => {
+        const dx = x - startCenterX;
+        const dy = y - startCenterY;
+        return rotateVector(dx, dy, -rotationRadians);
+      };
+      const startLocalPoint = toLocalPoint(startPoint.x, startPoint.y);
+      const startBounds = {
+        left: -startWidth / 2,
+        right: startWidth / 2,
+        top: -startHeight / 2,
+        bottom: startHeight / 2,
+      };
+      const measureEditorHeight = () => {
+        const containerHeight = getContainerHeight();
+        if (!editorNode || !containerHeight) return 0;
+        const originalTransform = node?.style.transform ?? "";
+        const originalWillChange = node?.style.willChange ?? "";
+        if (node) {
+          node.style.transform = "none";
+          node.style.willChange = "auto";
+        }
+        let contentHeightPx = 0;
+        try {
+          const range = document.createRange();
+          range.selectNodeContents(editorNode);
+          const rects = range.getClientRects();
+          if (rects.length > 0) {
+            contentHeightPx = rects[rects.length - 1].bottom - rects[0].top;
+          }
+        } catch {
+          contentHeightPx = 0;
+        }
+        if (!contentHeightPx) {
+          contentHeightPx = editorNode.scrollHeight;
+        }
+        const style = window.getComputedStyle(editorNode);
+        const paddingY =
+          (Number.parseFloat(style.paddingTop) || 0) + (Number.parseFloat(style.paddingBottom) || 0);
+        if (node) {
+          node.style.transform = originalTransform;
+          node.style.willChange = originalWillChange;
+        }
+        return Math.max(24, contentHeightPx + paddingY + 6);
+      };
       const handleMove = (event: PointerEvent) => {
         if (event.pointerId !== pointerId) return;
         const point = getPageNormalizedPoint(pageId, event.clientX, event.clientY);
         if (!point) return;
-        let nextX = startX;
-        let nextY = startY;
-        let nextWidth = startWidth;
-        let nextHeight = startHeight;
+        const localPoint = toLocalPoint(point.x, point.y);
+        const deltaLocalX = localPoint.x - startLocalPoint.x;
+        const deltaLocalY = localPoint.y - startLocalPoint.y;
+        let nextLeft = startBounds.left;
+        let nextRight = startBounds.right;
+        let nextTop = startBounds.top;
+        let nextBottom = startBounds.bottom;
         if (corner === "se") {
-          const deltaX = point.x - startPoint.x;
-          const deltaY = point.y - startPoint.y;
-          nextWidth = clamp(startWidth + deltaX, minWidth, 1 - startX);
-          nextHeight = clamp(startHeight + deltaY, minHeight, 1 - startY);
+          nextRight = Math.max(startBounds.left + minWidth, startBounds.right + deltaLocalX);
+          nextBottom = Math.max(startBounds.top + baseMinHeight, startBounds.bottom + deltaLocalY);
         } else if (corner === "nw") {
-          nextX = clamp(point.x, 0, fixedRight - minWidth);
-          nextY = clamp(point.y, 0, fixedBottom - minHeight);
-          nextWidth = clamp(fixedRight - nextX, minWidth, 1);
-          nextHeight = clamp(fixedBottom - nextY, minHeight, 1);
+          nextLeft = Math.min(startBounds.right - minWidth, startBounds.left + deltaLocalX);
+          nextTop = Math.min(startBounds.bottom - baseMinHeight, startBounds.top + deltaLocalY);
         } else if (corner === "ne") {
-          nextY = clamp(point.y, 0, fixedBottom - minHeight);
-          nextWidth = clamp(point.x - startX, minWidth, 1 - startX);
-          nextHeight = clamp(fixedBottom - nextY, minHeight, 1);
+          nextRight = Math.max(startBounds.left + minWidth, startBounds.right + deltaLocalX);
+          nextTop = Math.min(startBounds.bottom - baseMinHeight, startBounds.top + deltaLocalY);
         } else if (corner === "sw") {
-          nextX = clamp(point.x, 0, fixedRight - minWidth);
-          nextWidth = clamp(fixedRight - nextX, minWidth, 1);
-          nextHeight = clamp(point.y - startY, minHeight, 1 - startY);
+          nextLeft = Math.min(startBounds.right - minWidth, startBounds.left + deltaLocalX);
+          nextBottom = Math.max(startBounds.top + baseMinHeight, startBounds.bottom + deltaLocalY);
         } else if (corner === "e") {
-          const deltaX = point.x - startPoint.x;
-          nextWidth = clamp(startWidth + deltaX, minWidth, 1 - startX);
+          nextRight = Math.max(startBounds.left + minWidth, startBounds.right + deltaLocalX);
         } else if (corner === "w") {
-          const nextLeft = clamp(point.x, 0, fixedRight - minWidth);
-          nextX = nextLeft;
-          nextWidth = clamp(fixedRight - nextLeft, minWidth, 1);
+          nextLeft = Math.min(startBounds.right - minWidth, startBounds.left + deltaLocalX);
         } else if (corner === "s") {
-          const deltaY = point.y - startPoint.y;
-          nextHeight = clamp(startHeight + deltaY, minHeight, 1 - startY);
+          nextBottom = Math.max(startBounds.top + baseMinHeight, startBounds.bottom + deltaLocalY);
         } else if (corner === "n") {
-          const nextTop = clamp(point.y, 0, fixedBottom - minHeight);
-          nextY = nextTop;
-          nextHeight = clamp(fixedBottom - nextTop, minHeight, 1);
+          nextTop = Math.min(startBounds.bottom - baseMinHeight, startBounds.top + deltaLocalY);
         }
+        let nextWidth = Math.max(minWidth, nextRight - nextLeft);
+        let nextHeight = Math.max(baseMinHeight, nextBottom - nextTop);
+        const localCenterX = (nextLeft + nextRight) / 2;
+        const localCenterY = (nextTop + nextBottom) / 2;
+        const centerOffset = rotateVector(localCenterX, localCenterY, rotationRadians);
+        let nextX = startCenterX + centerOffset.x - nextWidth / 2;
+        let nextY = startCenterY + centerOffset.y - nextHeight / 2;
+        const autoFitOnWidthChange = corner === "e" || corner === "w";
+        const containerRect = containerNode?.getBoundingClientRect();
+        const containerHeight = containerRect?.height ?? 0;
+        if (!autoFitOnWidthChange && editorNode && containerHeight) {
+          const plainText = editorNode.textContent?.replace(/[\u200b\u2060]/g, "").trim() ?? "";
+          if (!plainText) {
+            const requiredHeight = clamp(24 / containerHeight, baseMinHeight, 1);
+            if (nextHeight < requiredHeight) {
+              nextHeight = requiredHeight;
+              if (corner === "n" || corner === "nw" || corner === "ne") {
+                nextTop = nextBottom - nextHeight;
+              } else {
+                nextBottom = nextTop + nextHeight;
+              }
+              const adjustedLocalCenterX = (nextLeft + nextRight) / 2;
+              const adjustedLocalCenterY = (nextTop + nextBottom) / 2;
+              const adjustedCenterOffset = rotateVector(adjustedLocalCenterX, adjustedLocalCenterY, rotationRadians);
+              nextX = startCenterX + adjustedCenterOffset.x - nextWidth / 2;
+              nextY = startCenterY + adjustedCenterOffset.y - nextHeight / 2;
+            }
+          } else {
+            const requiredHeightPx = measureEditorHeight();
+            if (requiredHeightPx > 0) {
+              const requiredHeight = clamp(Math.ceil(requiredHeightPx) / containerHeight, baseMinHeight, 1);
+              if (nextHeight < requiredHeight) {
+                nextHeight = requiredHeight;
+                if (corner === "n" || corner === "nw" || corner === "ne") {
+                  nextTop = nextBottom - nextHeight;
+                } else {
+                  nextBottom = nextTop + nextHeight;
+                }
+                const adjustedLocalCenterX = (nextLeft + nextRight) / 2;
+                const adjustedLocalCenterY = (nextTop + nextBottom) / 2;
+                const adjustedCenterOffset = rotateVector(adjustedLocalCenterX, adjustedLocalCenterY, rotationRadians);
+                nextX = startCenterX + adjustedCenterOffset.x - nextWidth / 2;
+                nextY = startCenterY + adjustedCenterOffset.y - nextHeight / 2;
+              }
+            }
+          }
+        }
+        nextX = clamp(nextX, 0, 1 - nextWidth);
+        nextY = clamp(nextY, 0, 1 - nextHeight);
         textResizeLatestRef.current = { x: nextX, y: nextY, width: nextWidth, height: nextHeight };
         if (textResizeRafRef.current !== null) return;
         textResizeRafRef.current = window.requestAnimationFrame(() => {
@@ -3772,17 +4210,17 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
           node.style.height = `${latest.height * 100}%`;
           const containerRect = containerNode.getBoundingClientRect();
           if (!containerRect.height) return;
-          const requiredHeight = clamp(node.scrollHeight / containerRect.height, minHeight, 1 - latest.y);
-          if (latest.height < requiredHeight) {
-            let adjustedY = latest.y;
-            if (corner === "n" || corner === "nw" || corner === "ne") {
-              adjustedY = clamp(fixedBottom - requiredHeight, 0, fixedBottom - minHeight);
+          if (autoFitOnWidthChange && editorNode) {
+            const requiredHeightPx = measureEditorHeight();
+            const requiredHeight = clamp(Math.ceil(requiredHeightPx) / containerRect.height, baseMinHeight, 1 - latest.y);
+            const EPS = 0.004;
+            if (requiredHeight > latest.height + EPS) {
+              const adjusted = { ...latest, height: requiredHeight };
+              textResizeLatestRef.current = adjusted;
+              node.style.height = `${requiredHeight * 100}%`;
             }
-            const adjusted = { ...latest, y: adjustedY, height: requiredHeight };
-            textResizeLatestRef.current = adjusted;
-            node.style.top = `${adjustedY * 100}%`;
-            node.style.height = `${requiredHeight * 100}%`;
           }
+          // No auto-height adjustments during resize; rely on minHeight clamp only.
         });
       };
       const handleUp = (event: PointerEvent) => {
@@ -3832,9 +4270,80 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         startX: startPoint.x,
         startY: startPoint.y,
         pointerId,
+        handle: corner,
       });
     },
     [getPageNormalizedPoint, textAnnotations]
+  );
+  const startTextRotate = useCallback(
+    (pageId: string, annotationId: string, startEvent: ReactPointerEvent<HTMLButtonElement>) => {
+      if (startEvent.button !== 0 && startEvent.pointerType !== "touch") return;
+      startEvent.preventDefault();
+      startEvent.stopPropagation();
+
+      const target = previewNodeMap.current.get(pageId);
+      const annotation = textAnnotations[pageId]?.find((a) => a.id === annotationId);
+      if (!target || !annotation || annotation.locked) return;
+      const rect = target.getBoundingClientRect();
+      const width = annotation.width ?? 0.14;
+      const height = annotation.height ?? 0.06;
+      const centerX = rect.left + rect.width * (annotation.x + width / 2);
+      const centerY = rect.top + rect.height * (annotation.y + height / 2);
+      let lastAngle = Math.atan2(startEvent.clientY - centerY, startEvent.clientX - centerX);
+      let accumulatedDelta = 0;
+      const baseRotation = annotation.rotation ?? 0;
+      const pointerId = startEvent.pointerId;
+
+      const handleMove = (event: PointerEvent) => {
+        if (event.pointerId !== pointerId) return;
+        const angle = Math.atan2(event.clientY - centerY, event.clientX - centerX);
+        let delta = angle - lastAngle;
+        if (delta > Math.PI) delta -= Math.PI * 2;
+        if (delta < -Math.PI) delta += Math.PI * 2;
+        accumulatedDelta += delta;
+        lastAngle = angle;
+        const deltaDegrees = (accumulatedDelta * 180) / Math.PI;
+        const nextRotation = baseRotation + deltaDegrees;
+        setRotatingText((current) =>
+          current && current.id === annotationId
+            ? { ...current, degrees: formatSignedRotation(nextRotation) }
+            : current
+        );
+        setTextAnnotations((prev) => {
+          const existing = prev[pageId] ?? [];
+          const updated = existing.map((item) =>
+            item.id === annotationId ? { ...item, rotation: nextRotation } : item
+          );
+          return { ...prev, [pageId]: updated };
+        });
+      };
+
+      const cleanup = () => {
+        window.removeEventListener("pointermove", handleMove);
+        window.removeEventListener("pointerup", handleUp);
+        window.removeEventListener("pointercancel", handleUp);
+        setRotatingText(null);
+      };
+
+      const handleUp = (event: PointerEvent) => {
+        if (event.pointerId !== pointerId) return;
+        cleanup();
+      };
+
+      window.addEventListener("pointermove", handleMove);
+      window.addEventListener("pointerup", handleUp);
+      window.addEventListener("pointercancel", handleUp);
+      setRotatingText({
+        pageId,
+        id: annotationId,
+        pointerId,
+        centerX,
+        centerY,
+        baseRotation,
+        degrees: formatSignedRotation(baseRotation),
+      });
+    },
+    [textAnnotations]
   );
   const [deleteMode, setDeleteMode] = useState(false);
   const [isErasing, setIsErasing] = useState(false);
@@ -4024,43 +4533,6 @@ const timer =
     };
   }, [authSession?.user, currentProjectId, pages, projectParam, coverPreviewUrl]);
   useEffect(() => {
-    if (!authSession?.user) return;
-    const projectId = projectParam ?? currentProjectId ?? null;
-    if (!projectId || pages.length === 0) return;
-    const first = pages[0];
-    if (!first) return;
-    if (!coverPreviewUrl) {
-      const status = pageRenderStatusRef.current.get(first.id);
-      if (status !== "high") return;
-    }
-    const previewUrl = coverPreviewUrl ?? getProjectCoverPreview(pages);
-    if (!previewUrl) return;
-    if (previewUploadRef.current[projectId] === previewUrl) return;
-
-    const uploadPreview = async () => {
-      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ previewUrl }),
-      });
-      if (!res.ok) {
-        throw new Error(`Preview upload failed with status ${res.status}`);
-      }
-      previewUploadRef.current[projectId] = previewUrl;
-    };
-
-    const timer = setTimeout(() => {
-      void uploadPreview().catch((err) => {
-        previewUploadRef.current[projectId] = "";
-        setError("Preview upload failed. Check R2 credentials and network logs.");
-        console.error("Preview upload failed during cloud sync.", err);
-        throw err;
-      });
-    }, PREVIEW_SYNC_DEBOUNCE_MS);
-
-    return () => clearTimeout(timer);
-  }, [authSession?.user, currentProjectId, pages, projectParam]);
-  useEffect(() => {
     if (sources.length > 0) {
       restoringPreviewCacheRef.current = false;
     }
@@ -4181,9 +4653,9 @@ const timer =
   const signatureTabInactive = "";
   const textOptionButtonBase =
     "inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-800 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 dark:text-zinc-200 dark:focus-visible:ring-zinc-500/50";
-  const textOptionButtonHover = "hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-[#34343C] dark:hover:text-white";
-  const textOptionButtonActive = "bg-slate-100 text-slate-900 hover:bg-slate-100 hover:text-slate-900 dark:bg-[#2A2A31] dark:text-white dark:hover:bg-[#34343C]";
-  const textInputPill = "inline-flex h-9 items-center gap-1 pl-0 pr-2 text-sm font-semibold text-slate-800 dark:text-zinc-200";
+  const textOptionButtonHover = "hover:bg-slate-200 hover:text-slate-900 dark:hover:bg-[#2A2A31] dark:hover:text-white";
+  const textOptionButtonActive = "bg-[#6C47FF] text-white hover:bg-[#6C47FF] hover:text-white dark:bg-[#6C47FF] dark:text-white dark:hover:bg-[#6C47FF] dark:hover:text-white";
+  const textInputPill = "inline-flex h-9 items-center gap-1 pl-0 pr-2 text-sm font-medium text-slate-800 dark:text-zinc-200";
   const viewerRailButtonClass =
     "inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-transparent bg-transparent text-slate-600 transition-colors duration-200 ease-out hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 disabled:cursor-default disabled:opacity-40 dark:text-zinc-300 dark:hover:text-white dark:focus-visible:ring-zinc-500/50";
   const studioChromeIconButtonClass =
@@ -4578,148 +5050,150 @@ const timer =
         }
         session?.removeItem(key);
       }
-      if (!raw) {
-        // If this is a saved cloud project, try to hydrate the source list
-        // from the cloud project data (files live in IndexedDB or R2).
-        if (projectId && authSession?.user) {
-          try {
-            const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}`, { cache: "no-store" });
-            if (!res.ok) {
-              throw new Error(`Cloud project fetch failed with status ${res.status}`);
-            }
-            const json = (await res.json().catch(() => null)) as {
-              project?: { data?: unknown; pdfUrl?: string | null };
-            } | null;
-            const cloudData = json?.project?.data;
-            const cloudSources =
-              cloudData && typeof cloudData === "object" && "sources" in cloudData
-                ? (cloudData as { sources?: unknown }).sources
-                : null;
-            const pdfUrl =
-              json?.project?.pdfUrl && typeof json.project.pdfUrl === "string"
-                ? json.project.pdfUrl
-                : null;
-            const useCombinedCloudSource = (
-              nameHint?: string | null,
-              sizeHint?: number | null,
-            ) => {
-              if (!pdfUrl) {
-                throw new Error("Cloud PDF is not available for this project.");
-              }
-              const sameOriginProjectPdfUrl = `/api/projects/${encodeURIComponent(projectId)}/pdf?mode=file`;
-              const combinedStorageId = `cloud-project-${projectId}`;
-              const combinedSource: SourceRef = {
-                storageId: combinedStorageId,
-                url: sameOriginProjectPdfUrl,
-                name: nameHint?.trim() || "Document.pdf",
-                size: typeof sizeHint === "number" && Number.isFinite(sizeHint) ? sizeHint : 0,
-                updatedAt: Date.now(),
-              };
-              if (!cancelled) {
-                setSources([combinedSource]);
-                setError(null);
-              }
-              if (!cancelled) {
-                hasHydratedSources.current = true;
-                setSourcesHydrated(true);
-              }
-            };
-            if (pdfUrl) {
-              setProjectHasSources(true);
-            }
-            if (Array.isArray(cloudSources) && cloudSources.length > 0) {
-              setProjectHasSources(true);
-              const restored: SourceRef[] = [];
-              const missing: string[] = [];
-              for (const entry of cloudSources) {
-                if (!entry || typeof entry !== "object") continue;
-                const id =
-                  "id" in entry && typeof (entry as { id?: unknown }).id === "string"
-                    ? (entry as { id: string }).id
-                    : null;
-                if (!id) continue;
-                const stored = await readFileBlob(id);
-                const blobRecord = stored?.blob instanceof Blob ? stored.blob : null;
-                if (!blobRecord) {
-                  missing.push(id);
-                }
-              }
-              if (missing.length > 0) {
-                const combinedName =
-                  (cloudSources[0] &&
-                  typeof cloudSources[0] === "object" &&
-                  "name" in cloudSources[0] &&
-                  typeof (cloudSources[0] as { name?: unknown }).name === "string"
-                    ? (cloudSources[0] as { name: string }).name
-                    : "Document.pdf") ?? "Document.pdf";
-                const combinedSize =
-                  cloudSources.reduce((total, entry) => {
-                    if (!entry || typeof entry !== "object") return total;
-                    const size =
-                      "size" in entry && typeof (entry as { size?: unknown }).size === "number"
-                        ? (entry as { size: number }).size
-                        : 0;
-                    return total + size;
-                  }, 0);
-                useCombinedCloudSource(combinedName, combinedSize);
-                return;
-              }
-              for (const entry of cloudSources) {
-                if (!entry || typeof entry !== "object") continue;
-                const id =
-                  "id" in entry && typeof (entry as { id?: unknown }).id === "string"
-                    ? (entry as { id: string }).id
-                    : null;
-                if (!id) continue;
-                const name =
-                  ("name" in entry && typeof (entry as { name?: unknown }).name === "string"
-                    ? (entry as { name: string }).name
-                    : null) ?? "Document.pdf";
-                const size =
-                  ("size" in entry && typeof (entry as { size?: unknown }).size === "number"
-                    ? (entry as { size: number }).size
-                    : null) ?? 0;
-                const updatedAt =
-                  ("updatedAt" in entry && typeof (entry as { updatedAt?: unknown }).updatedAt === "number"
-                    ? (entry as { updatedAt: number }).updatedAt
-                    : null) ?? Date.now();
-                let stored = await readFileBlob(id);
-                let blobRecord = stored?.blob instanceof Blob ? stored.blob : null;
-                if (!blobRecord) {
-                  throw new Error("Expected local PDF blob to be available after missing-source fallback.");
-                }
-                const objectUrl = URL.createObjectURL(blobRecord);
-                restored.push({
-                  storageId: id,
-                  url: objectUrl,
-                  name: stored?.name ?? name,
-                  size: stored?.size ?? size ?? blobRecord.size ?? 0,
-                  updatedAt: stored?.updatedAt ?? updatedAt,
-                });
-              }
-              if (!cancelled && restored.length > 0) {
-                setSources(restored);
-                persistSourceMetadata(restored, projectId);
-                setError(null);
-              }
-            }
-            if (pdfUrl && (!Array.isArray(cloudSources) || cloudSources.length === 0)) {
-              useCombinedCloudSource(null, null);
-              return;
-            }
-            if (!pdfUrl && Array.isArray(cloudSources) && cloudSources.length === 0) {
-              setProjectHasSources(false);
-            }
-          } catch (err) {
-            console.error("Cloud project hydration failed.", err);
-            setError("Unable to restore this project from cloud storage. Please re-upload the PDF.");
-            if (!cancelled) {
-              setProjectHasSources(null);
-            }
+      const hydrateFromCloudProject = async () => {
+        if (!projectId || !authSession?.user) return false;
+        try {
+          const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}`, { cache: "no-store" });
+          if (!res.ok) {
+            throw new Error(`Cloud project fetch failed with status ${res.status}`);
           }
-        } else {
-          setProjectHasSources(false);
+          const json = (await res.json().catch(() => null)) as {
+            project?: { data?: unknown; pdfUrl?: string | null };
+          } | null;
+          const cloudData = json?.project?.data;
+          const cloudSources =
+            cloudData && typeof cloudData === "object" && "sources" in cloudData
+              ? (cloudData as { sources?: unknown }).sources
+              : null;
+          const pdfUrl =
+            json?.project?.pdfUrl && typeof json.project.pdfUrl === "string"
+              ? json.project.pdfUrl
+              : null;
+          const useCombinedCloudSource = (nameHint?: string | null, sizeHint?: number | null) => {
+            if (!pdfUrl) {
+              throw new Error("Cloud PDF is not available for this project.");
+            }
+            const sameOriginProjectPdfUrl = `/api/projects/${encodeURIComponent(projectId)}/pdf?mode=editor`;
+            const combinedStorageId = `cloud-project-${projectId}`;
+            const combinedSource: SourceRef = {
+              storageId: combinedStorageId,
+              url: sameOriginProjectPdfUrl,
+              name: nameHint?.trim() || "Document.pdf",
+              size: typeof sizeHint === "number" && Number.isFinite(sizeHint) ? sizeHint : 0,
+              updatedAt: Date.now(),
+            };
+            if (!cancelled) {
+              setSources([combinedSource]);
+              setError(null);
+            }
+            if (!cancelled) {
+              hasHydratedSources.current = true;
+              setSourcesHydrated(true);
+            }
+          };
+          if (pdfUrl) {
+            setProjectHasSources(true);
+          }
+          if (Array.isArray(cloudSources) && cloudSources.length > 0) {
+            setProjectHasSources(true);
+            const restored: SourceRef[] = [];
+            const missing: string[] = [];
+            for (const entry of cloudSources) {
+              if (!entry || typeof entry !== "object") continue;
+              const id =
+                "id" in entry && typeof (entry as { id?: unknown }).id === "string"
+                  ? (entry as { id: string }).id
+                  : null;
+              if (!id) continue;
+              const stored = await readFileBlob(id);
+              const blobRecord = stored?.blob instanceof Blob ? stored.blob : null;
+              if (!blobRecord) {
+                missing.push(id);
+              }
+            }
+            if (missing.length > 0) {
+              const combinedName =
+                (cloudSources[0] &&
+                typeof cloudSources[0] === "object" &&
+                "name" in cloudSources[0] &&
+                typeof (cloudSources[0] as { name?: unknown }).name === "string"
+                  ? (cloudSources[0] as { name: string }).name
+                  : "Document.pdf") ?? "Document.pdf";
+              const combinedSize =
+                cloudSources.reduce((total, entry) => {
+                  if (!entry || typeof entry !== "object") return total;
+                  const size =
+                    "size" in entry && typeof (entry as { size?: unknown }).size === "number"
+                      ? (entry as { size: number }).size
+                      : 0;
+                  return total + size;
+                }, 0);
+              useCombinedCloudSource(combinedName, combinedSize);
+              return true;
+            }
+            for (const entry of cloudSources) {
+              if (!entry || typeof entry !== "object") continue;
+              const id =
+                "id" in entry && typeof (entry as { id?: unknown }).id === "string"
+                  ? (entry as { id: string }).id
+                  : null;
+              if (!id) continue;
+              const name =
+                ("name" in entry && typeof (entry as { name?: unknown }).name === "string"
+                  ? (entry as { name: string }).name
+                  : null) ?? "Document.pdf";
+              const size =
+                ("size" in entry && typeof (entry as { size?: unknown }).size === "number"
+                  ? (entry as { size: number }).size
+                  : null) ?? 0;
+              const updatedAt =
+                ("updatedAt" in entry && typeof (entry as { updatedAt?: unknown }).updatedAt === "number"
+                  ? (entry as { updatedAt: number }).updatedAt
+                  : null) ?? Date.now();
+              let stored = await readFileBlob(id);
+              let blobRecord = stored?.blob instanceof Blob ? stored.blob : null;
+              if (!blobRecord) {
+                throw new Error("Expected local PDF blob to be available after missing-source fallback.");
+              }
+              const objectUrl = URL.createObjectURL(blobRecord);
+              restored.push({
+                storageId: id,
+                url: objectUrl,
+                name: stored?.name ?? name,
+                size: stored?.size ?? size ?? blobRecord.size ?? 0,
+                updatedAt: stored?.updatedAt ?? updatedAt,
+              });
+            }
+            if (!cancelled && restored.length > 0) {
+              setSources(restored);
+              persistSourceMetadata(restored, projectId);
+              setError(null);
+            }
+            return restored.length > 0;
+          }
+          if (pdfUrl && (!Array.isArray(cloudSources) || cloudSources.length === 0)) {
+            useCombinedCloudSource(null, null);
+            return true;
+          }
+          if (!pdfUrl && Array.isArray(cloudSources) && cloudSources.length === 0) {
+            setProjectHasSources(false);
+          }
+        } catch (err) {
+          console.error("Cloud project hydration failed.", err);
+          if (!cancelled) {
+            setProjectHasSources(null);
+          }
         }
+        if (!cancelled) {
+          hasHydratedSources.current = true;
+          setSourcesHydrated(true);
+        }
+        return false;
+      };
+      if (!raw) {
+        const hydratedFromCloud = await hydrateFromCloudProject();
+        if (hydratedFromCloud) return;
+        setProjectHasSources(false);
         if (!cancelled) {
           hasHydratedSources.current = true;
           setSourcesHydrated(true);
@@ -4764,7 +5238,10 @@ const timer =
           } else {
             setProjectHasSources(false);
             local?.removeItem(key);
-            setError("We couldn't restore your previous workspace. Please re-upload your PDFs.");
+            const hydratedFromCloud = await hydrateFromCloudProject();
+            if (!hydratedFromCloud) {
+              setError("No PDFs are stored on this device yet. Please re-upload to continue.");
+            }
           }
         }
       } catch (err) {
@@ -6425,7 +6902,11 @@ const timer =
     input.value = "";
   }
 
-  function handleSelectPage(index: number, scrollBehavior: ScrollBehavior = "smooth") {
+  function handleSelectPage(
+    index: number,
+    scrollBehavior: ScrollBehavior = "smooth",
+    options?: { center?: boolean }
+  ) {
     const page = pages[index];
     if (page) {
       // Keep refs in sync immediately so rapid keyboard stepping stays responsive.
@@ -6438,7 +6919,7 @@ const timer =
       });
     }
     pageChangeScrollBehaviorRef.current = scrollBehavior;
-    setShouldCenterOnChange(true);
+    setShouldCenterOnChange(options?.center ?? true);
   }
 
   async function handleSearchSubmit(queryOverride?: string) {
@@ -6899,22 +7380,22 @@ const timer =
             ) : null}
           </div>
         </div>
-        <div className="mx-auto w-fit">
+        <div className="mx-auto w-fit overflow-visible">
           <div
             data-page-id={page.id}
             ref={registerPreviewRef(page.id)}
-            className="relative bg-white transition"
+            className="relative overflow-visible bg-white transition"
             style={{
               width: fittedWidth,
               height: displayHeight,
-              overflow: undefined,
             }}
             onClick={(event) => {
               if (activeDrawingTool || deleteMode) {
                 event.stopPropagation();
                 return;
               }
-              handleSelectPage(idx);
+              const shouldCenter = idx !== activePageIndexState;
+              handleSelectPage(idx, "smooth", { center: shouldCenter });
             }}
           >
             <div
@@ -7467,23 +7948,36 @@ const timer =
                   </div>
                 );
               })}
-              {pageTexts.map((annotation) => {
+              {pageTexts.map((annotation, annotationIndex) => {
                 const annotationWidth = annotation.width ?? 0.14;
                 const annotationHeight = annotation.height ?? 0.06;
                 const isDraggingThis = draggingText?.id === annotation.id;
                 const isResizingThis = resizingText?.id === annotation.id;
+                const isRotatingThis = rotatingText?.id === annotation.id;
+                const isLocked = annotation.locked ?? false;
                 const rotation = annotation.rotation ?? 0;
                 const displayRotation = normalizeRotation(rotation);
                 const displayFontSize = (annotation.textSizePt ?? textSize) * PT_TO_PX * zoomMultiplier;
                 const lineSpacing = annotation.lineSpacing ?? DEFAULT_TEXT_LINE_SPACING;
                 const annotationHtml = annotation.richTextHtml ?? textToHtml(annotation.text);
-                const showTextActions = focusedTextId === annotation.id && typingTextId !== annotation.id;
-                const showResizeHandles = focusedTextId === annotation.id || isResizingThis;
+                const showTextActions = focusedTextId === annotation.id;
+                const showResizeHandles = focusedTextId === annotation.id && !isLocked && !isDraggingThis;
+                const showTransformActions = showTextActions && !isLocked;
+                const activeResizeHandle = isResizingThis && resizingText ? resizingText.handle : null;
+                const activeEdgeHandle =
+                  activeResizeHandle && ["n", "s", "e", "w"].includes(activeResizeHandle)
+                    ? activeResizeHandle
+                    : null;
                 const boxWidthPx = annotationWidth * contentWidth;
                 const boxHeightPx = annotationHeight * contentHeight;
                 const cornerSize = 12;
                 const showCornerIndicators =
                   showResizeHandles && boxWidthPx >= cornerSize && boxHeightPx >= cornerSize;
+                const edgeHandleMin = 36;
+                const isCompactHeight = boxHeightPx > 0 && boxHeightPx < 40;
+                const showEdgeHorizontalHandles = showCornerIndicators && !isCompactHeight && boxWidthPx >= edgeHandleMin;
+                const showEdgeVerticalHandles = showCornerIndicators && !isCompactHeight && boxHeightPx >= edgeHandleMin;
+                const showRightOnlyHandle = false;
                 return (
                 <div
                   key={annotation.id}
@@ -7495,9 +7989,17 @@ const timer =
                     top: `${annotation.y * 100}%`,
                     width: `${annotationWidth * 100}%`,
                     height: `${annotationHeight * 100}%`,
+                    zIndex:
+                      isDraggingThis || isResizingThis || isRotatingThis
+                        ? 60
+                        : focusedTextId === annotation.id
+                          ? 50
+                          : annotationIndex + 1,
                     transform: `rotate(${displayRotation}deg)`,
                     transformOrigin: "center",
-                    cursor: deleteMode ? ("url('/icons/eraser.svg') 4 4, auto" as CSSProperties["cursor"]) : undefined,
+                    cursor: deleteMode
+                      ? ("url('/icons/eraser.svg') 4 4, auto" as CSSProperties["cursor"])
+                      : undefined,
                   }}
                   onPointerDown={(event) => {
                     event.stopPropagation();
@@ -7516,101 +8018,136 @@ const timer =
                     <div
                       className={`pointer-events-none absolute inset-0 overflow-visible ${
                         focusedTextId === annotation.id || isDraggingThis
-                          ? "border-2 border-[#A3A3A3] shadow-sm"
-                          : "border border-transparent group-hover:border-slate-300"
+                          ? "border-2 border-[#8B5CF6] shadow-sm"
+                          : "border-2 border-transparent group-hover:border-[#8B5CF6]"
                       }`}
                     >
                       {showCornerIndicators ? (
                         <>
-                          <div className="absolute left-0 top-0 h-2 w-2 -translate-x-1/2 -translate-y-1/2">
-                            <span className="absolute left-0 top-0 h-0.5 w-2 bg-[#111111]" />
-                            <span className="absolute left-0 top-0 h-2 w-0.5 bg-[#111111]" />
-                          </div>
-                          <div className="absolute right-0 top-0 h-2 w-2 translate-x-1/2 -translate-y-1/2">
-                            <span className="absolute right-0 top-0 h-0.5 w-2 bg-[#111111]" />
-                            <span className="absolute right-0 top-0 h-2 w-0.5 bg-[#111111]" />
-                          </div>
-                          <div className="absolute bottom-0 left-0 h-2 w-2 -translate-x-1/2 translate-y-1/2">
-                            <span className="absolute left-0 bottom-0 h-0.5 w-2 bg-[#111111]" />
-                            <span className="absolute left-0 bottom-0 h-2 w-0.5 bg-[#111111]" />
-                          </div>
-                          <div className="absolute bottom-0 right-0 h-2 w-2 translate-x-1/2 translate-y-1/2">
-                            <span className="absolute right-0 bottom-0 h-0.5 w-2 bg-[#111111]" />
-                            <span className="absolute right-0 bottom-0 h-2 w-0.5 bg-[#111111]" />
-                          </div>
-                          <div className="absolute left-1/2 top-0 h-0.5 w-3 -translate-x-1/2 -translate-y-[3px] bg-[#111111]" />
-                          <div className="absolute left-1/2 bottom-0 h-0.5 w-3 -translate-x-1/2 translate-y-[3px] bg-[#111111]" />
-                          <div className="absolute left-0 top-1/2 h-3 w-0.5 -translate-x-[3px] -translate-y-1/2 bg-[#111111]" />
-                          <div className="absolute right-0 top-1/2 h-3 w-0.5 translate-x-[3px] -translate-y-1/2 bg-[#111111]" />
+                          {showEdgeHorizontalHandles && (activeEdgeHandle ? ["n", "s"].includes(activeEdgeHandle) : !isResizingThis) ? (
+                            <>
+                              {activeEdgeHandle === "n" ? (
+                                <div className="pointer-events-auto absolute left-1/2 top-0 h-2 w-6 -translate-x-1/2 -translate-y-[4px] rounded-full border border-slate-400 bg-[#8B5CF6] cursor-ns-resize" />
+                              ) : !activeEdgeHandle ? (
+                                <div
+                                  className="pointer-events-auto absolute left-1/2 top-0 h-2 w-6 -translate-x-1/2 -translate-y-[4px] rounded-full bg-white border border-slate-400 cursor-ns-resize hover:border-[#8B5CF6] hover:bg-[#8B5CF6]"
+                                  onPointerDown={(event) => {
+                                    focusTextAnnotation(annotation.id);
+                                    startTextResize(page.id, annotation.id, "n", event);
+                                  }}
+                                />
+                              ) : null}
+                              {activeEdgeHandle === "s" ? (
+                                <div className="pointer-events-auto absolute left-1/2 bottom-0 h-2 w-6 -translate-x-1/2 translate-y-[4px] rounded-full border border-slate-400 bg-[#8B5CF6] cursor-ns-resize" />
+                              ) : !activeEdgeHandle ? (
+                                <div
+                                  className="pointer-events-auto absolute left-1/2 bottom-0 h-2 w-6 -translate-x-1/2 translate-y-[4px] rounded-full bg-white border border-slate-400 cursor-ns-resize hover:border-[#8B5CF6] hover:bg-[#8B5CF6]"
+                                  onPointerDown={(event) => {
+                                    focusTextAnnotation(annotation.id);
+                                    startTextResize(page.id, annotation.id, "s", event);
+                                  }}
+                                />
+                              ) : null}
+                            </>
+                          ) : null}
+                          {showEdgeVerticalHandles && (activeEdgeHandle ? ["e", "w"].includes(activeEdgeHandle) : !isResizingThis) ? (
+                            <>
+                              {activeEdgeHandle === "w" ? (
+                                <div className="pointer-events-auto absolute left-0 top-1/2 h-6 w-2 -translate-x-[4px] -translate-y-1/2 rounded-full border border-slate-400 bg-[#8B5CF6] cursor-ew-resize" />
+                              ) : !activeEdgeHandle ? (
+                                <div
+                                  className="pointer-events-auto absolute left-0 top-1/2 h-6 w-2 -translate-x-[4px] -translate-y-1/2 rounded-full bg-white border border-slate-400 cursor-ew-resize hover:border-[#8B5CF6] hover:bg-[#8B5CF6]"
+                                  onPointerDown={(event) => {
+                                    focusTextAnnotation(annotation.id);
+                                    startTextResize(page.id, annotation.id, "w", event);
+                                  }}
+                                />
+                              ) : null}
+                              {activeEdgeHandle === "e" ? (
+                                <div className="pointer-events-auto absolute right-0 top-1/2 h-6 w-2 translate-x-[4px] -translate-y-1/2 rounded-full border border-slate-400 bg-[#8B5CF6] cursor-ew-resize" />
+                              ) : !activeEdgeHandle ? (
+                                <div
+                                  className="pointer-events-auto absolute right-0 top-1/2 h-6 w-2 translate-x-[4px] -translate-y-1/2 rounded-full bg-white border border-slate-400 cursor-ew-resize hover:border-[#8B5CF6] hover:bg-[#8B5CF6]"
+                                  onPointerDown={(event) => {
+                                    focusTextAnnotation(annotation.id);
+                                    startTextResize(page.id, annotation.id, "e", event);
+                                  }}
+                                />
+                              ) : null}
+                            </>
+                          ) : null}
                         </>
                       ) : null}
                     </div>
                     {showResizeHandles ? (
                       <div className="pointer-events-none absolute inset-0">
-                        <div
-                          className="pointer-events-auto absolute inset-x-0 top-0 h-4 -translate-y-1/2 cursor-ns-resize"
-                          onPointerDown={(event) => {
-                            focusTextAnnotation(annotation.id);
-                            startTextResize(page.id, annotation.id, "n", event);
-                          }}
-                        />
-                        <div
-                          className="pointer-events-auto absolute inset-x-0 bottom-0 h-4 translate-y-1/2 cursor-ns-resize"
-                          onPointerDown={(event) => {
-                            focusTextAnnotation(annotation.id);
-                            startTextResize(page.id, annotation.id, "s", event);
-                          }}
-                        />
-                        <div
-                          className="pointer-events-auto absolute inset-y-0 left-0 w-4 -translate-x-1/2 cursor-ew-resize"
-                          onPointerDown={(event) => {
-                            focusTextAnnotation(annotation.id);
-                            startTextResize(page.id, annotation.id, "w", event);
-                          }}
-                        />
-                        <div
-                          className="pointer-events-auto absolute inset-y-0 right-0 w-4 translate-x-1/2 cursor-ew-resize"
-                          onPointerDown={(event) => {
-                            focusTextAnnotation(annotation.id);
-                            startTextResize(page.id, annotation.id, "e", event);
-                          }}
-                        />
-                      </div>
-                    ) : null}
-                    {showCornerIndicators ? (
-                      <div className="pointer-events-none absolute inset-0">
-                        <div
-                          className="pointer-events-auto absolute left-0 top-0 h-6 w-6 -translate-x-1/2 -translate-y-1/2 cursor-nwse-resize"
-                          onPointerDown={(event) => {
-                            focusTextAnnotation(annotation.id);
-                            startTextResize(page.id, annotation.id, "nw", event);
-                          }}
-                        />
-                        <div
-                          className="pointer-events-auto absolute right-0 top-0 h-6 w-6 translate-x-1/2 -translate-y-1/2 cursor-nesw-resize"
-                          onPointerDown={(event) => {
-                            focusTextAnnotation(annotation.id);
-                            startTextResize(page.id, annotation.id, "ne", event);
-                          }}
-                        />
-                        <div
-                          className="pointer-events-auto absolute left-0 bottom-0 h-6 w-6 -translate-x-1/2 translate-y-1/2 cursor-nesw-resize"
-                          onPointerDown={(event) => {
-                            focusTextAnnotation(annotation.id);
-                            startTextResize(page.id, annotation.id, "sw", event);
-                          }}
-                        />
-                        <div
-                          className="pointer-events-auto absolute right-0 bottom-0 h-6 w-6 translate-x-1/2 translate-y-1/2 cursor-nwse-resize"
-                          onPointerDown={(event) => {
-                            focusTextAnnotation(annotation.id);
-                            startTextResize(page.id, annotation.id, "se", event);
-                          }}
-                        />
+                        {isCompactHeight ? (
+                          activeResizeHandle === "se" ? (
+                            <div
+                              className="pointer-events-auto absolute -right-1.5 -bottom-1.5 h-3.5 w-3.5 rounded-full border border-slate-400 bg-[#8B5CF6] shadow-sm cursor-nwse-resize"
+                            />
+                          ) : !isResizingThis ? (
+                            <div
+                              className="pointer-events-auto absolute -right-1.5 -bottom-1.5 h-3.5 w-3.5 rounded-full border border-slate-400 bg-white shadow-sm cursor-nwse-resize hover:border-[#8B5CF6] hover:bg-[#8B5CF6]"
+                              onPointerDown={(event) => {
+                                focusTextAnnotation(annotation.id);
+                                startTextResize(page.id, annotation.id, "se", event);
+                              }}
+                            />
+                          ) : null
+                        ) : (
+                          <>
+                            {activeResizeHandle === "nw" ? (
+                            <div className="pointer-events-auto absolute -left-1.5 -top-1.5 h-3.5 w-3.5 rounded-full border border-slate-400 bg-[#8B5CF6] shadow-sm cursor-nwse-resize" />
+                            ) : !isResizingThis ? (
+                              <div
+                                className="pointer-events-auto absolute -left-1.5 -top-1.5 h-3.5 w-3.5 rounded-full border border-slate-400 bg-white shadow-sm cursor-nwse-resize hover:border-[#8B5CF6] hover:bg-[#8B5CF6]"
+                                onPointerDown={(event) => {
+                                  focusTextAnnotation(annotation.id);
+                                  startTextResize(page.id, annotation.id, "nw", event);
+                                }}
+                              />
+                            ) : null}
+                            {activeResizeHandle === "ne" ? (
+                              <div className="pointer-events-auto absolute -right-1.5 -top-1.5 h-3.5 w-3.5 rounded-full border border-slate-400 bg-[#8B5CF6] shadow-sm cursor-nesw-resize" />
+                            ) : !isResizingThis ? (
+                              <div
+                                className="pointer-events-auto absolute -right-1.5 -top-1.5 h-3.5 w-3.5 rounded-full border border-slate-400 bg-white shadow-sm cursor-nesw-resize hover:border-[#8B5CF6] hover:bg-[#8B5CF6]"
+                                onPointerDown={(event) => {
+                                  focusTextAnnotation(annotation.id);
+                                  startTextResize(page.id, annotation.id, "ne", event);
+                                }}
+                              />
+                            ) : null}
+                            {activeResizeHandle === "sw" ? (
+                              <div className="pointer-events-auto absolute -left-1.5 -bottom-1.5 h-3.5 w-3.5 rounded-full border border-slate-400 bg-[#8B5CF6] shadow-sm cursor-nesw-resize" />
+                            ) : !isResizingThis ? (
+                              <div
+                                className="pointer-events-auto absolute -left-1.5 -bottom-1.5 h-3.5 w-3.5 rounded-full border border-slate-400 bg-white shadow-sm cursor-nesw-resize hover:border-[#8B5CF6] hover:bg-[#8B5CF6]"
+                                onPointerDown={(event) => {
+                                  focusTextAnnotation(annotation.id);
+                                  startTextResize(page.id, annotation.id, "sw", event);
+                                }}
+                              />
+                            ) : null}
+                            {activeResizeHandle === "se" ? (
+                              <div className="pointer-events-auto absolute -right-1.5 -bottom-1.5 h-3.5 w-3.5 rounded-full border border-slate-400 bg-[#8B5CF6] shadow-sm cursor-nwse-resize" />
+                            ) : !isResizingThis ? (
+                              <div
+                                className="pointer-events-auto absolute -right-1.5 -bottom-1.5 h-3.5 w-3.5 rounded-full border border-slate-400 bg-white shadow-sm cursor-nwse-resize hover:border-[#8B5CF6] hover:bg-[#8B5CF6]"
+                                onPointerDown={(event) => {
+                                  focusTextAnnotation(annotation.id);
+                                  startTextResize(page.id, annotation.id, "se", event);
+                                }}
+                              />
+                            ) : null}
+                          </>
+                        )}
                       </div>
                     ) : null}
                     <div
-                      contentEditable
+                      contentEditable={!isLocked}
+                      aria-readonly={isLocked}
                       suppressContentEditableWarning
                       spellCheck={false}
                       onCopy={(event) => handleCopyOrCut(event, false)}
@@ -7684,6 +8221,16 @@ const timer =
                       onInput={(event) => {
                         noteTextTyping(annotation.id);
                         syncTextAnnotationContent(page.id, annotation.id, event.currentTarget);
+                        const wrapper = textAnnotationRefs.current.get(annotation.id);
+                        const container = previewNodeMap.current.get(page.id);
+                        if (wrapper && container) {
+                          const rect = container.getBoundingClientRect();
+                          const requiredHeight = measureRequiredTextHeightRatio(event.currentTarget, rect, 0.015);
+                          const currentHeight = wrapper.getBoundingClientRect().height / rect.height;
+                          if (requiredHeight > currentHeight + 0.001) {
+                            wrapper.style.height = `${requiredHeight * 100}%`;
+                          }
+                        }
                         if (textAutoExpandRafRef.current !== null) {
                           window.cancelAnimationFrame(textAutoExpandRafRef.current);
                         }
@@ -7752,13 +8299,36 @@ const timer =
                           }
                           if (node) {
                             applyDefaultTextStylesToCaret(node);
+                            if (defaultListType) {
+                              requestAnimationFrame(() => {
+                                const activeNode = textNodeRefs.current.get(annotation.id);
+                                if (!activeNode) return;
+                                activeNode.focus();
+                                document.execCommand("styleWithCSS", false, "true");
+                                document.execCommand(
+                                  defaultListType === "bullet" ? "insertUnorderedList" : "insertOrderedList"
+                                );
+                                syncTextAnnotationContent(page.id, annotation.id, activeNode);
+                                autoExpandTextAnnotation(page.id, annotation.id);
+                                refreshInlineStyleState(activeNode, true);
+                              });
+                            }
                           }
                         } else if (node) {
-                          applyDefaultTextStylesToCaret(node);
+                          requestAnimationFrame(() => {
+                            requestAnimationFrame(() => {
+                              const activeNode = textNodeRefs.current.get(annotation.id);
+                              if (!activeNode) return;
+                              refreshInlineStyleState(activeNode, true);
+                            });
+                          });
                         }
                       }}
                       onBlur={(event) => {
-                        if (document.activeElement && (document.activeElement as Element).closest("[data-text-popover]")) {
+                        if (
+                          document.activeElement &&
+                          (document.activeElement as Element).closest("[data-text-popover], [data-text-actions]")
+                        ) {
                           requestAnimationFrame(() => {
                             const node = textNodeRefs.current.get(annotation.id);
                             node?.focus();
@@ -7776,17 +8346,42 @@ const timer =
                         }
                         const text = event.currentTarget.innerText.replace(/[\u200b\u2060]/g, "").trim();
                         if (!text) {
-                          updateTextAnnotation(page.id, annotation.id, (item) => ({
-                            ...item,
-                            text: TEXT_PLACEHOLDER,
-                            richTextHtml: "",
-                          }));
-                          event.currentTarget.innerHTML = textToHtml(TEXT_PLACEHOLDER);
+                          deleteTextAnnotation(page.id, annotation.id);
+                          return;
                         }
                       }}
-                      onClick={() => {
+                      onClick={(event) => {
+                        event.stopPropagation();
                         setFocusedTextId(annotation.id);
                         setActiveTextContainerId(annotation.id);
+                        requestAnimationFrame(() => {
+                          const activeNode = textNodeRefs.current.get(annotation.id);
+                          if (!activeNode) return;
+                          refreshInlineStyleState(activeNode, true);
+                        });
+                      }}
+                      onMouseUp={() => {
+                        const node = textNodeRefs.current.get(annotation.id);
+                        const selection = window.getSelection();
+                        if (selection && selection.rangeCount > 0) {
+                          const range = selection.getRangeAt(0);
+                          if (node?.contains(range.commonAncestorContainer)) {
+                            selectionRangeRef.current = range.cloneRange();
+                          }
+                        }
+                        if (node) {
+                          refreshInlineStyleState(node, true);
+                        }
+                      }}
+                      onKeyUp={() => {
+                        const node = textNodeRefs.current.get(annotation.id);
+                        const selection = window.getSelection();
+                        if (selection && selection.rangeCount > 0) {
+                          const range = selection.getRangeAt(0);
+                          if (node?.contains(range.commonAncestorContainer)) {
+                            selectionRangeRef.current = range.cloneRange();
+                          }
+                        }
                       }}
                       ref={(node) => {
                         registerTextNode(annotation.id)(node);
@@ -7796,7 +8391,8 @@ const timer =
                           node.innerHTML = annotationHtml;
                         }
                       }}
-                      className={`min-w-[80px] min-h-[24px] rounded-none px-2 py-1 text-[12px] leading-snug transition border border-solid border-transparent outline-none focus:outline-none focus-visible:outline-none whitespace-pre-wrap ${
+                      style={{ wordBreak: "break-all", overflowWrap: "anywhere" }}
+                      className={`min-w-[12px] min-h-[24px] rounded-none px-2 py-1 text-[12px] leading-snug transition border border-solid border-transparent outline-none focus:outline-none focus-visible:outline-none whitespace-pre-wrap break-all ${
                         annotation.text === TEXT_PLACEHOLDER ? "text-slate-400" : "text-slate-900"
                       } ${
                         focusedTextId === annotation.id || isDraggingThis
@@ -7820,57 +8416,101 @@ const timer =
                     />
                     {/* Native strikethrough only; overlay removed */}
                     {showTextActions ? (
-                      isDraggingThis ? (
-                        <div
-                          className="absolute flex h-7 w-7 items-center justify-center rounded-md border border-slate-300 bg-white/85 text-slate-700 shadow-sm"
-                          style={{ left: "50%", top: "-2.5rem", transform: "translateX(-50%)" }}
-                        >
-                          <span className="flex h-6 w-6 items-center justify-center rounded bg-slate-200/80">
-                            <Move className="h-4 w-4" />
-                          </span>
-                        </div>
-                      ) : (
-                        <div
-                          className="absolute flex w-max items-center gap-0.5 rounded-lg border border-slate-300 bg-white/85 px-1 py-0.5 opacity-80 shadow-sm transition-opacity hover:opacity-100"
-                          style={{ left: "50%", top: "-2.5rem", transform: "translateX(-50%)" }}
-                        >
-                          <button
-                            type="button"
-                            className="flex h-7 w-7 items-center justify-center rounded-md text-slate-700 transition hover:bg-slate-200 hover:text-slate-900 active:translate-y-[1px]"
-                            onPointerDown={(event) => {
-                              focusTextAnnotation(annotation.id);
-                              startTextDrag(page.id, annotation.id, event);
-                            }}
+                      isDraggingThis ? null : (
+                        <>
+                          {isRotatingThis ? (
+                            <div
+                              className="pointer-events-none absolute top-[calc(100%+4.5rem)] left-[calc(50%-6rem)] rounded-md border border-[#4A4A4A] bg-[#323232] px-2 py-1 text-[11px] font-semibold tabular-nums text-white shadow-sm"
+                              style={{ transform: `rotate(${-displayRotation}deg)` }}
+                            >
+                              {rotatingText?.degrees ?? displayRotation}°
+                            </div>
+                          ) : null}
+                          <div
+                            data-text-actions
+                            className={`absolute flex w-max items-center gap-0.5 rounded-lg border border-slate-300 bg-white shadow-sm ${
+                              isLocked ? "p-0.5" : "px-1 py-0.5"
+                            }`}
+                            style={{ left: "50%", top: "-3.25rem", transform: `translateX(-50%) rotate(${-displayRotation}deg)` }}
                           >
-                            <Move className="h-4 w-4" />
-                          </button>
-                          <div className="h-4 w-px bg-slate-300/80" />
-                          <button
-                            type="button"
-                            className="flex h-7 w-7 items-center justify-center rounded-md text-slate-700 transition hover:bg-slate-200 hover:text-slate-900 active:translate-y-[1px]"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              duplicateTextAnnotation(page.id, annotation.id);
-                            }}
-                          >
-                            <Copy className="h-4 w-4" />
-                          </button>
-                          <div className="h-4 w-px bg-slate-300/80" />
-                          <button
-                            type="button"
-                            className="flex h-7 w-7 items-center justify-center rounded-md text-rose-600 transition hover:bg-rose-50 hover:text-rose-700 active:translate-y-[1px]"
-                            onMouseDown={(event) => event.stopPropagation()}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              deleteTextAnnotation(page.id, annotation.id);
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
+                            {isLocked ? null : (
+                              <>
+                                <button
+                                  type="button"
+                                  className="flex h-7 w-7 items-center justify-center rounded-md text-slate-700 transition hover:bg-slate-200 hover:text-slate-900 active:translate-y-[1px]"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    duplicateTextAnnotation(page.id, annotation.id);
+                                  }}
+                                >
+                                  <Copy className="h-4 w-4" />
+                                </button>
+                                <div className="h-4 w-px bg-slate-300/80" />
+                              </>
+                            )}
+                            <button
+                              type="button"
+                              className={`flex h-7 w-7 items-center justify-center rounded-md transition active:translate-y-[1px] ${
+                                isLocked
+                                  ? "bg-[#6C47FF] text-white"
+                                  : "text-slate-700 hover:bg-slate-200 hover:text-slate-900"
+                              }`}
+                              onMouseDown={(event) => event.stopPropagation()}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                toggleTextAnnotationLock(page.id, annotation.id);
+                              }}
+                            >
+                              {isLocked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+                            </button>
+                            {isLocked ? null : (
+                              <>
+                                <div className="h-4 w-px bg-slate-300/80" />
+                                <button
+                                  type="button"
+                                  className="flex h-7 w-7 items-center justify-center rounded-md text-slate-700 transition hover:bg-slate-200 hover:text-slate-900 active:translate-y-[1px]"
+                                  onMouseDown={(event) => event.stopPropagation()}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    deleteTextAnnotation(page.id, annotation.id);
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                          {showTransformActions && !isLocked ? (
+                            <div
+                              className="pointer-events-none absolute -bottom-12 left-1/2 flex -translate-x-1/2 items-center gap-2"
+                              style={{ transform: `translateX(-50%) rotate(${-displayRotation}deg)` }}
+                            >
+                              <button
+                                type="button"
+                                className="pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-sm transition hover:bg-white active:translate-y-[1px]"
+                                onPointerDown={(event: ReactPointerEvent<HTMLButtonElement>) => {
+                                  focusTextAnnotation(annotation.id);
+                                  startTextRotate(page.id, annotation.id, event);
+                                }}
+                              >
+                                <RotateCcw className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                className="pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-sm transition hover:bg-white active:translate-y-[1px]"
+                                onPointerDown={(event: ReactPointerEvent<HTMLButtonElement>) => {
+                                  focusTextAnnotation(annotation.id);
+                                  startTextDrag(page.id, annotation.id, event);
+                                }}
+                              >
+                                <Move className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          ) : null}
+                        </>
                       )
                     ) : null}
-                    {showResizeHandles ? (
+                    {showResizeHandles && !isDraggingThis ? (
                       <>
                         <div
                           className="absolute h-4 w-4 cursor-nwse-resize"
@@ -8033,6 +8673,434 @@ const timer =
       }),
     []
   );
+
+  const compositeThumbTimersRef = useRef<Map<string, number>>(new Map());
+
+  const drawPageOverlays = useCallback(
+    async (ctx: CanvasRenderingContext2D, width: number, height: number, pageId: string) => {
+      const scale = width / 1000;
+      const pageHighlights = highlights[pageId] ?? [];
+      const pageShapes = shapesByPage[pageId] ?? [];
+      const pageTexts = textAnnotations[pageId] ?? [];
+      const pageSignatures = signaturePlacements[pageId] ?? [];
+
+      const drawStroke = (stroke: HighlightStroke) => {
+        if (stroke.points.length < 2) return;
+        const tool = stroke.tool === "pencil" ? "pen" : stroke.tool;
+        const isHighlight = tool === "highlight";
+        const baseWidth = Math.max(1, stroke.thickness * width);
+        ctx.save();
+        ctx.strokeStyle = stroke.color;
+        ctx.lineWidth = isHighlight ? baseWidth * 1.2 : baseWidth;
+        ctx.lineCap = isHighlight ? "butt" : "round";
+        ctx.lineJoin = isHighlight ? "miter" : "round";
+        ctx.globalAlpha = isHighlight ? (stroke.opacity ?? 0.35) : (stroke.opacity ?? 1);
+        if (isHighlight) {
+          ctx.globalCompositeOperation = "multiply";
+        }
+        if (!isHighlight && stroke.lineStyle === "dashed") {
+          const dash = Math.max(6, baseWidth * 1.6);
+          const gap = Math.max(4, baseWidth * 1.2);
+          ctx.setLineDash([dash, gap]);
+        }
+        ctx.beginPath();
+        stroke.points.forEach((pt, idx) => {
+          const x = pt.x * width;
+          const y = pt.y * height;
+          if (idx === 0 || pt.move) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+        ctx.restore();
+      };
+
+      const drawShape = (shape: ShapeAnnotation) => {
+        const start = { x: shape.start.x * width, y: shape.start.y * height };
+        const end = { x: shape.end.x * width, y: shape.end.y * height };
+        const minX = Math.min(start.x, end.x);
+        const maxX = Math.max(start.x, end.x);
+        const minY = Math.min(start.y, end.y);
+        const maxY = Math.max(start.y, end.y);
+        const w = Math.max(1, maxX - minX);
+        const h = Math.max(1, maxY - minY);
+        const thickness = Math.max(1, shape.thickness * width);
+        const allowDashed = shape.type !== "check" && shape.type !== "arrow";
+        const isDashed = allowDashed && shape.lineStyle === "dashed";
+        const dash = isDashed ? [thickness * 2.5, thickness * 1.5] : [];
+
+        const drawLineSegment = (a: { x: number; y: number }, b: { x: number; y: number }) => {
+          ctx.beginPath();
+          ctx.moveTo(a.x, a.y);
+          ctx.lineTo(b.x, b.y);
+          ctx.stroke();
+        };
+
+        ctx.save();
+        ctx.lineWidth = thickness;
+        ctx.strokeStyle = shape.color;
+        ctx.fillStyle = shape.fillColor ?? "transparent";
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        if (dash.length > 0) {
+          ctx.setLineDash(dash);
+        }
+
+        switch (shape.type) {
+          case "line":
+            drawLineSegment(start, end);
+            break;
+          case "arrow": {
+            drawLineSegment(start, end);
+            const dx = end.x - start.x;
+            const dy = end.y - start.y;
+            const len = Math.max(1e-6, Math.sqrt(dx * dx + dy * dy));
+            const headLen = clamp(len * 0.16, 14 * scale, 32 * scale);
+            const angle = Math.atan2(dy, dx);
+            const left = angle + (Math.PI * 5) / 6;
+            const right = angle - (Math.PI * 5) / 6;
+            drawLineSegment(end, { x: end.x + Math.cos(left) * headLen, y: end.y + Math.sin(left) * headLen });
+            drawLineSegment(end, { x: end.x + Math.cos(right) * headLen, y: end.y + Math.sin(right) * headLen });
+            break;
+          }
+          case "rect":
+            if (shape.fillColor) {
+              ctx.fillRect(minX, minY, w, h);
+            }
+            ctx.strokeRect(minX, minY, w, h);
+            break;
+          case "ellipse":
+            ctx.beginPath();
+            ctx.ellipse(minX + w / 2, minY + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+            if (shape.fillColor) {
+              ctx.fill();
+            }
+            ctx.stroke();
+            break;
+          case "triangle": {
+            const top = { x: minX + w / 2, y: minY };
+            const left = { x: minX, y: minY + h };
+            const right = { x: minX + w, y: minY + h };
+            ctx.beginPath();
+            ctx.moveTo(top.x, top.y);
+            ctx.lineTo(right.x, right.y);
+            ctx.lineTo(left.x, left.y);
+            ctx.closePath();
+            if (shape.fillColor) {
+              ctx.fill();
+            }
+            ctx.stroke();
+            break;
+          }
+          case "x":
+            drawLineSegment({ x: minX, y: minY }, { x: maxX, y: maxY });
+            drawLineSegment({ x: maxX, y: minY }, { x: minX, y: maxY });
+            break;
+          case "check": {
+            const p1 = { x: minX + w * 0.0, y: minY + h * 0.62 };
+            const p2 = { x: minX + w * 0.32, y: minY + h * 0.9 };
+            const p3 = { x: minX + w * 1.0, y: minY + h * 0.12 };
+            drawLineSegment(p1, p2);
+            drawLineSegment(p2, p3);
+            break;
+          }
+          default:
+            break;
+        }
+        ctx.restore();
+      };
+
+      const drawText = (annotation: TextAnnotation) => {
+        const content = annotation.text;
+        if (!content || content === TEXT_PLACEHOLDER) return;
+        const boxWidth = (annotation.width ?? 0.14) * width;
+        const boxHeight = (annotation.height ?? 0.06) * height;
+        if (boxWidth <= 0 || boxHeight <= 0) return;
+        const boxX = annotation.x * width;
+        const boxY = annotation.y * height;
+        const padding = Math.min(6, boxWidth * 0.05);
+        const baseSize = annotation.textSizePt ?? textSize;
+        const fontSizePx = baseSize * PT_TO_PX;
+        const lineSpacing = annotation.lineSpacing ?? DEFAULT_TEXT_LINE_SPACING;
+        const html = annotation.richTextHtml ?? textToHtml(annotation.text);
+        const runs = extractRichTextRuns(html, baseSize);
+        const lines = splitRunsIntoLines(runs);
+        const fontFamily = TEXT_FONT_OPTIONS[textFont].cssFamily;
+
+        ctx.save();
+        const rotation = normalizeRotation(annotation.rotation ?? 0);
+        const rotationRad = (rotation * Math.PI) / 180;
+        ctx.translate(boxX + boxWidth / 2, boxY + boxHeight / 2);
+        ctx.rotate(rotationRad);
+        ctx.translate(-boxWidth / 2, -boxHeight / 2);
+        ctx.textBaseline = "alphabetic";
+
+        const maxWidth = Math.max(10, boxWidth - padding * 2);
+        let cursorY = padding + fontSizePx;
+        lines.forEach((line, lineIndex) => {
+          if (cursorY > boxHeight - padding) return;
+          if (line.length === 0) {
+            cursorY += fontSizePx * lineSpacing;
+            return;
+          }
+          let lineWidth = 0;
+          line.forEach((run) => {
+            const transformed = applyTextTransform(run.text, textTransform);
+            const weight = run.bold ? 700 : 400;
+            const style = run.italic ? "italic" : "normal";
+            ctx.font = `${style} ${weight} ${run.sizePt * PT_TO_PX}px ${fontFamily}`;
+            lineWidth += ctx.measureText(transformed).width;
+          });
+          const clampedWidth = Math.min(lineWidth, maxWidth);
+          let cursorX = padding;
+          if (textAlign === "center") {
+            cursorX = padding + Math.max(0, (maxWidth - clampedWidth) / 2);
+          } else if (textAlign === "right") {
+            cursorX = padding + Math.max(0, maxWidth - clampedWidth);
+          }
+          const shouldJustify = textAlign === "justify" && lineIndex < lines.length - 1;
+          const spaceCount = shouldJustify
+            ? line.reduce(
+                (count, run) => count + (applyTextTransform(run.text, textTransform).match(/ /g)?.length ?? 0),
+                0
+              )
+            : 0;
+          const extraSpace = shouldJustify && spaceCount > 0 ? Math.max(0, maxWidth - lineWidth) / spaceCount : 0;
+
+          line.forEach((run) => {
+            const transformed = applyTextTransform(run.text, textTransform);
+            const weight = run.bold ? 700 : 400;
+            const style = run.italic ? "italic" : "normal";
+            ctx.font = `${style} ${weight} ${run.sizePt * PT_TO_PX}px ${fontFamily}`;
+            const runWidth = ctx.measureText(transformed).width;
+            const runSpaceCount = shouldJustify ? (transformed.match(/ /g)?.length ?? 0) : 0;
+            const runWidthAdjusted = runWidth + runSpaceCount * extraSpace;
+            if (run.highlightColor) {
+              ctx.save();
+              ctx.fillStyle = run.highlightColor;
+              const lineHeight = fontSizePx * lineSpacing;
+              ctx.fillRect(cursorX, cursorY - lineHeight * 0.85, runWidthAdjusted, lineHeight);
+              ctx.restore();
+            }
+            ctx.fillStyle = run.color ?? textColor;
+            ctx.fillText(transformed, cursorX, cursorY);
+            if (run.underline) {
+              ctx.save();
+              ctx.strokeStyle = run.color ?? textColor;
+              ctx.lineWidth = Math.max(1, run.sizePt * 0.08);
+              ctx.beginPath();
+              ctx.moveTo(cursorX, cursorY + run.sizePt * 0.18);
+              ctx.lineTo(cursorX + runWidthAdjusted, cursorY + run.sizePt * 0.18);
+              ctx.stroke();
+              ctx.restore();
+            }
+            cursorX += runWidthAdjusted;
+          });
+          cursorY += fontSizePx * lineSpacing;
+        });
+        ctx.restore();
+      };
+
+      pageHighlights.forEach(drawStroke);
+      pageShapes.forEach(drawShape);
+
+      for (const signature of pageSignatures) {
+        if (!signature.dataUrl) continue;
+        const sigImg = await loadImageFromDataUrl(signature.dataUrl);
+        if (!sigImg?.naturalWidth || !sigImg.naturalHeight) continue;
+        const boxWidth = signature.width * width;
+        const boxHeight = signature.height * height;
+        const x = signature.x * width;
+        const y = signature.y * height;
+        const rotation = normalizeRotation(signature.rotation ?? 0);
+        ctx.save();
+        ctx.translate(x + boxWidth / 2, y + boxHeight / 2);
+        ctx.rotate((rotation * Math.PI) / 180);
+        ctx.drawImage(sigImg, -boxWidth / 2, -boxHeight / 2, boxWidth, boxHeight);
+        ctx.restore();
+      }
+
+      pageTexts.forEach(drawText);
+    },
+    [
+      highlights,
+      shapesByPage,
+      signaturePlacements,
+      textAlign,
+      textAnnotations,
+      textColor,
+      textFont,
+      textSize,
+      textTransform,
+    ]
+  );
+
+  const renderCompositeThumb = useCallback(
+    async (pageId: string) => {
+      const page = pagesByIdRef.current.get(pageId);
+      if (!page?.preview) return;
+      const img = await loadImageFromDataUrl(page.preview);
+      if (!img?.naturalWidth || !img.naturalHeight) return;
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      const width = canvas.width;
+      const height = canvas.height;
+      await drawPageOverlays(ctx, width, height, pageId);
+
+      const targetThumbWidth = getThumbTargetWidth();
+      const thumbData = createThumbnailDataUrl(canvas, targetThumbWidth);
+      const thumbWidth = canvas.width <= targetThumbWidth ? canvas.width : targetThumbWidth;
+      const thumbHeight =
+        canvas.width <= targetThumbWidth
+          ? canvas.height
+          : Math.floor(canvas.height * (targetThumbWidth / canvas.width));
+
+      setPages((current) => {
+        let changed = false;
+        const next = current.map((item) => {
+          if (item.id !== pageId) return item;
+          if (item.thumb === thumbData && item.thumbWidth === thumbWidth && item.thumbHeight === thumbHeight) {
+            return item;
+          }
+          changed = true;
+          return { ...item, thumb: thumbData, thumbWidth, thumbHeight };
+        });
+        return changed ? next : current;
+      });
+      thumbRenderStatusRef.current.set(pageId, "ready");
+    },
+    [drawPageOverlays]
+  );
+
+  const renderCompositePreviewDataUrl = useCallback(
+    async (pageId: string) => {
+      const page = pagesByIdRef.current.get(pageId);
+      if (!page?.preview) return null;
+      const img = await loadImageFromDataUrl(page.preview);
+      if (!img?.naturalWidth || !img.naturalHeight) return null;
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return null;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      await drawPageOverlays(ctx, canvas.width, canvas.height, pageId);
+      return toCardPreviewDataUrl(canvas);
+    },
+    [drawPageOverlays]
+  );
+
+  useEffect(() => {
+    if (!authSession?.user) return;
+    const projectId = projectParam ?? currentProjectId ?? null;
+    if (!projectId || pages.length === 0) return;
+    const first = pages[0];
+    if (!first) return;
+    if (!coverPreviewUrl) {
+      const status = pageRenderStatusRef.current.get(first.id);
+      if (status !== "high") return;
+    }
+    const hasOverlayEdits =
+      (highlights[first.id]?.length ?? 0) > 0 ||
+      (shapesByPage[first.id]?.length ?? 0) > 0 ||
+      (textAnnotations[first.id]?.length ?? 0) > 0 ||
+      (signaturePlacements[first.id]?.length ?? 0) > 0;
+
+    const uploadPreview = async () => {
+      const basePreviewUrl = coverPreviewUrl ?? getProjectCoverPreview(pages);
+      if (!basePreviewUrl) return;
+      let previewUrl = basePreviewUrl;
+      if (hasOverlayEdits) {
+        const composite = await renderCompositePreviewDataUrl(first.id);
+        if (composite) {
+          previewUrl = composite;
+        }
+      }
+      if (previewUploadRef.current[projectId] === previewUrl) return;
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ previewUrl }),
+      });
+      if (!res.ok) {
+        throw new Error(`Preview upload failed with status ${res.status}`);
+      }
+      previewUploadRef.current[projectId] = previewUrl;
+    };
+
+    const timer = setTimeout(() => {
+      void uploadPreview().catch((err) => {
+        previewUploadRef.current[projectId] = "";
+        setError("Preview upload failed. Check R2 credentials and network logs.");
+        console.error("Preview upload failed during cloud sync.", err);
+        throw err;
+      });
+    }, PREVIEW_SYNC_DEBOUNCE_MS);
+
+    return () => clearTimeout(timer);
+  }, [
+    authSession?.user,
+    currentProjectId,
+    coverPreviewUrl,
+    highlights,
+    pages,
+    projectParam,
+    renderCompositePreviewDataUrl,
+    shapesByPage,
+    signaturePlacements,
+    textAnnotations,
+  ]);
+
+  const scheduleCompositeThumb = useCallback(
+    (pageId: string) => {
+      if (typeof window === "undefined") return;
+      const timers = compositeThumbTimersRef.current;
+      const existing = timers.get(pageId);
+      if (existing) {
+        window.clearTimeout(existing);
+      }
+      const timer = window.setTimeout(() => {
+        timers.delete(pageId);
+        void renderCompositeThumb(pageId);
+      }, 180);
+      timers.set(pageId, timer);
+    },
+    [renderCompositeThumb]
+  );
+
+  const activePagePreview = useMemo(
+    () => pages.find((page) => page.id === activePageId)?.preview ?? null,
+    [activePageId, pages]
+  );
+  const activeHighlights = activePageId ? highlights[activePageId] : null;
+  const activeShapes = activePageId ? shapesByPage[activePageId] : null;
+  const activeTexts = activePageId ? textAnnotations[activePageId] : null;
+  const activeSignatures = activePageId ? signaturePlacements[activePageId] : null;
+
+  useEffect(() => {
+    if (!activePageId || !activePagePreview) return;
+    scheduleCompositeThumb(activePageId);
+  }, [
+    activeHighlights,
+    activePageId,
+    activePagePreview,
+    activeShapes,
+    activeSignatures,
+    activeTexts,
+    scheduleCompositeThumb,
+    textAlign,
+    textColor,
+    textFont,
+    textTransform,
+  ]);
 
   const generateTypedSignatureImage = useCallback(
     async (text: string, styleId: (typeof TYPED_SIGNATURE_STYLES)[number]["id"]) => {
@@ -8434,36 +9502,78 @@ const timer =
   function autoExpandTextAnnotation(pageId: string, id: string) {
     const element = textNodeRefs.current.get(id);
     if (!element) return;
+    const plainText = element.textContent?.replace(/[\u200b\u2060]/g, "").trim() ?? "";
+    if (!plainText) return;
     const node = previewNodeMap.current.get(pageId);
     if (!node) return;
     const containerRect = node.getBoundingClientRect();
     if (!containerRect.height) return;
-    const nextHeight = clamp(element.scrollHeight / containerRect.height, 0.015, 1);
-    const EPSILON = 0.0005;
+    const wrapper = textAnnotationRefs.current.get(id);
+    const originalTransform = wrapper?.style.transform ?? "";
+    const originalWillChange = wrapper?.style.willChange ?? "";
+    if (wrapper) {
+      wrapper.style.transform = "none";
+      wrapper.style.willChange = "auto";
+    }
+    const nextHeight = measureRequiredTextHeightRatio(element, containerRect, 0.015);
+    if (wrapper) {
+      wrapper.style.transform = originalTransform;
+      wrapper.style.willChange = originalWillChange;
+    }
+    const EPSILON = 0.0025;
+    const lastKey = `${pageId}:${id}`;
+    const lastHeight = autoExpandLastHeightRef.current.get(lastKey);
+    if (lastHeight !== undefined && Math.abs(nextHeight - lastHeight) <= EPSILON) {
+      return;
+    }
+    if (autoExpandApplyingRef.current.has(lastKey)) return;
+    autoExpandApplyingRef.current.add(lastKey);
     setTextAnnotations((prev) => {
       const existing = prev[pageId] ?? [];
       const current = existing.find((item) => item.id === id);
-      if (!current) return prev;
+      if (!current) {
+        autoExpandApplyingRef.current.delete(lastKey);
+        return prev;
+      }
       const maxHeight = 1 - current.y;
-      const targetHeight = clamp(nextHeight, 0.015, maxHeight);
+      const targetHeight = clamp(Math.max(nextHeight, current.height ?? 0), 0.015, maxHeight);
       const currentHeight = current.height ?? 0;
-      if (targetHeight <= currentHeight + EPSILON) return prev;
+      if (Math.abs(targetHeight - currentHeight) <= EPSILON) {
+        autoExpandApplyingRef.current.delete(lastKey);
+        return prev;
+      }
+      autoExpandLastHeightRef.current.set(lastKey, targetHeight);
       const updated = existing.map((item) =>
         item.id === id ? { ...item, height: targetHeight } : item
       );
+      queueMicrotask(() => autoExpandApplyingRef.current.delete(lastKey));
       return { ...prev, [pageId]: updated };
     });
   }
 
+  const autoExpandRafRef = useRef<number | null>(null);
+  const autoExpandLastHeightRef = useRef<Map<string, number>>(new Map());
+  const autoExpandApplyingRef = useRef<Set<string>>(new Set());
   useLayoutEffect(() => {
     if (!focusedTextId) return;
+    if (resizingText) return;
+    if (rotatingText) return;
+    if (typingTextId === focusedTextId) return;
     const pageId = Object.keys(textAnnotations).find((id) =>
       textAnnotations[id]?.some((item) => item.id === focusedTextId)
     );
     if (!pageId) return;
-    autoExpandTextAnnotation(pageId, focusedTextId);
+    if (autoExpandRafRef.current !== null) {
+      cancelAnimationFrame(autoExpandRafRef.current);
+    }
+    autoExpandRafRef.current = requestAnimationFrame(() => {
+      autoExpandRafRef.current = null;
+      autoExpandTextAnnotation(pageId, focusedTextId);
+    });
   }, [
     focusedTextId,
+    resizingText,
+    rotatingText,
     textAnnotations,
     activeTextSize,
     textBold,
@@ -8473,6 +9583,16 @@ const timer =
     textTransform,
     textFont,
   ]);
+
+  const toggleTextAnnotationLock = useCallback((pageId: string, id: string) => {
+    setTextAnnotations((prev) => {
+      const existing = prev[pageId] ?? [];
+      const updated = existing.map((item) =>
+        item.id === id ? { ...item, locked: !item.locked } : item
+      );
+      return { ...prev, [pageId]: updated };
+    });
+  }, []);
 
   function deleteTextAnnotation(pageId: string, id: string) {
     setTextAnnotations((prev) => {
@@ -8838,6 +9958,24 @@ const timer =
   const resolvePickerColor = useCallback(
     (target: "text" | "shape-border" | "shape-fill" | "pen") => {
       if (target === "text") {
+        if (focusedTextId) {
+          const element = textNodeRefs.current.get(focusedTextId);
+          const selection = typeof window !== "undefined" ? window.getSelection() : null;
+          let range: Range | null = null;
+          if (selection && selection.rangeCount > 0) {
+            const activeRange = selection.getRangeAt(0);
+            if (element?.contains(activeRange.commonAncestorContainer)) {
+              range = activeRange;
+            }
+          }
+          if (!range && selectionRangeRef.current && element?.contains(selectionRangeRef.current.commonAncestorContainer)) {
+            range = selectionRangeRef.current;
+          }
+          if (element && range) {
+            const resolved = resolveRangeTextColor(element, range, textColor);
+            if (resolved) return resolved;
+          }
+        }
         return selectionTextColorMixed ? textColor : activeTextColor ?? textColor;
       }
       if (target === "shape-border") {
@@ -8848,12 +9986,21 @@ const timer =
       }
       return penColor;
     },
-    [activeShapeBorderColor, activeShapeFillColor, activeTextColor, penColor, selectionTextColorMixed, textColor]
+    [
+      activeShapeBorderColor,
+      activeShapeFillColor,
+      activeTextColor,
+      focusedTextId,
+      penColor,
+      selectionTextColorMixed,
+      textColor,
+    ]
   );
   const openColorPickerFor = useCallback(
     (target: "text" | "shape-border" | "shape-fill" | "pen") => {
       const current = resolvePickerColor(target);
       setColorPickerDraft(current || "#111827");
+      setPickerSelectedColor((current || "#111827").toLowerCase());
       setHighlightCustomOpen(false);
       setColorPickerOpen(target);
     },
@@ -8886,22 +10033,26 @@ const timer =
       if (!colorPickerOpen) return;
       if (colorPickerOpen === "text" && color) {
         applyTextColor(color);
+        setPickerSelectedColor(color.toLowerCase());
         setColorPickerOpen(null);
         restoreTextSelectionSoon();
         return;
       }
       if (colorPickerOpen === "shape-border" && color) {
         applyShapeBorderColor(color);
+        setPickerSelectedColor(color.toLowerCase());
         setColorPickerOpen(null);
         return;
       }
       if (colorPickerOpen === "shape-fill") {
+        setPickerSelectedColor(color ? color.toLowerCase() : null);
         applyShapeFillColor(color);
         setColorPickerOpen(null);
         return;
       }
       if (colorPickerOpen === "pen" && color) {
         setPenColor(color);
+        setPickerSelectedColor(color.toLowerCase());
         setColorPickerOpen(null);
       }
     },
@@ -9663,10 +10814,10 @@ const timer =
       event.preventDefault();
       return;
     }
-    if (
-      !event.target ||
-      !(event.target as HTMLElement).closest("[data-text-annotation], [data-shape-annotation]")
-    ) {
+    const clickedOnAnnotation =
+      !!event.target &&
+      !!(event.target as HTMLElement).closest("[data-text-annotation], [data-shape-annotation]");
+    if (!clickedOnAnnotation) {
       clearTextFocus();
       clearShapeFocus();
     }
@@ -9882,6 +11033,7 @@ const timer =
                 height,
                 text: TEXT_PLACEHOLDER,
                 rotation: 0,
+                locked: false,
                 textSizePt: textSize,
                 lineSpacing: DEFAULT_TEXT_LINE_SPACING,
               },
@@ -11286,6 +12438,10 @@ const timer =
   }, [focusedTextId]);
 
   useEffect(() => {
+    defaultTextStylesRef.current = defaultTextStyles;
+  }, [defaultTextStyles]);
+
+  useEffect(() => {
     textNodeRefs.current.forEach((node) => {
       const spans = node.querySelectorAll<HTMLElement>("[data-font-size-pt]");
       spans.forEach((span) => {
@@ -11423,7 +12579,7 @@ const timer =
     const rect = button.getBoundingClientRect();
     const width = Math.max(224, rect.width);
     const maxLeft = window.innerWidth - width - 8;
-    const left = Math.max(8, Math.min(rect.left + rect.width / 2 - width / 2, maxLeft));
+    const left = Math.max(8, Math.min(rect.left - 2, maxLeft));
     const top = rect.bottom + 8;
     setFontMenuPosition({ left, top, width });
   }, []);
@@ -12522,7 +13678,6 @@ const timer =
 				                        {showToolOptionsBar ? (
 				                          <motion.div
 				                            key="tool-options-bar"
-				                            layout
 				                            initial={{ height: 0, opacity: 0, y: -8 }}
 				                            animate={{ height: 45, opacity: 1, y: 0 }}
 				                            exit={{ height: 0, opacity: 0, y: -8 }}
@@ -12684,7 +13839,7 @@ const timer =
                                                 }}
                                                 onMouseEnter={(event) => showToolbarTooltip("Stroke", event.currentTarget)}
                                                 onMouseLeave={hideToolbarTooltip}
-                                                className="bg-transparent text-center text-sm font-semibold text-slate-800 outline-none rounded-md"
+                                                className="bg-transparent text-center text-sm font-medium text-slate-800 outline-none rounded-md"
                                                 style={{
                                                   border: "1px solid rgba(148, 163, 184, 0.7)",
                                                   padding: "3px 5px",
@@ -13086,7 +14241,7 @@ const timer =
                                         {textFontEntries.find(([key]) => key === textFont)?.[1].label ?? textFont}
                                       </span>
                                       <svg
-                                        className="ml-2 h-2 w-2 text-slate-800"
+                                        className="ml-2 h-2 w-2 text-slate-800 dark:text-zinc-200"
                                         viewBox="0 0 8 5"
                                         aria-hidden="true"
                                       >
@@ -13099,7 +14254,7 @@ const timer =
                                             ? createPortal(
                                                 <div
                                                   ref={fontMenuRef}
-                                                  className="fixed z-[9999] rounded-lg bg-white p-1 shadow-[0_10px_24px_rgba(15,23,42,0.12)]"
+                                                  className="fixed z-[9999] rounded-lg border border-[#4A4A4A] bg-[#323232] p-1 shadow-[0_18px_40px_rgba(0,0,0,0.45)]"
                                                   style={{
                                                     left: fontMenuPosition.left,
                                                     top: fontMenuPosition.top,
@@ -13110,9 +14265,12 @@ const timer =
                                                       <button
                                                         key={key}
                                                         type="button"
-                                                        className={`flex w-full items-center rounded-md px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-100 ${
-                                                          key === textFont ? "bg-blue-100 text-blue-700" : ""
+                                                        className={`flex w-full items-center rounded-md px-3 py-2 text-left text-sm transition ${
+                                                          key === textFont
+                                                            ? "bg-[#6C47FF] text-white shadow-sm"
+                                                            : "text-slate-700 hover:bg-slate-100 dark:text-zinc-200 dark:hover:bg-[#3A3A40]"
                                                         }`}
+                                                        style={{ fontFamily: option.cssFamily }}
                                                         onMouseDown={keepTextEditingActive}
                                                         onClick={() => {
                                                           setTextFont(key);
@@ -13133,7 +14291,7 @@ const timer =
                                             <div className="inline-flex items-center gap-0 justify-start">
                                               <button
                                                 type="button"
-                                                className="mr-2 flex h-7 w-7 items-center justify-center rounded text-slate-800 transition hover:bg-slate-100 hover:text-slate-900"
+                                                className="mr-2 flex h-7 w-7 items-center justify-center rounded text-slate-800 transition hover:bg-slate-100 hover:text-slate-900 dark:text-zinc-200 dark:hover:bg-[#34343C] dark:hover:text-white"
                                                 onMouseDown={keepTextEditingActive}
                                                 onClick={() => stepTextSize(-1)}
                                                 onMouseEnter={(event) => showToolbarTooltip("Decrease font size", event.currentTarget)}
@@ -13201,7 +14359,7 @@ const timer =
                                                 }}
                                                 onMouseEnter={(event) => showToolbarTooltip("Font size", event.currentTarget)}
                                                 onMouseLeave={hideToolbarTooltip}
-                                                className="bg-transparent text-center text-sm font-semibold text-slate-800 outline-none rounded-md"
+                                                className="bg-transparent text-center text-sm font-semibold text-slate-800 outline-none rounded-md dark:text-zinc-200"
                                                 style={{
                                                   border: "1px solid rgba(148, 163, 184, 0.7)",
                                                   padding: "3px 5px",
@@ -13213,7 +14371,7 @@ const timer =
                                               />
                                               <button
                                                 type="button"
-                                                className="ml-2 flex h-7 w-7 items-center justify-center rounded text-slate-800 transition hover:bg-slate-100 hover:text-slate-900"
+                                                className="ml-2 flex h-7 w-7 items-center justify-center rounded text-slate-800 transition hover:bg-slate-100 hover:text-slate-900 dark:text-zinc-200 dark:hover:bg-[#34343C] dark:hover:text-white"
                                                 onMouseDown={keepTextEditingActive}
                                                 onClick={() => stepTextSize(1)}
                                                 onMouseEnter={(event) => showToolbarTooltip("Increase font size", event.currentTarget)}
@@ -13240,7 +14398,7 @@ const timer =
                                             >
                                               <span className="relative flex h-7 w-7 items-center justify-center">
                                                 <svg
-                                                  className="h-4 w-4 text-slate-800"
+                                                  className="h-4 w-4 text-slate-800 dark:text-zinc-200"
                                                   viewBox="0 0 24 24"
                                                   aria-hidden="true"
                                                 >
@@ -13268,12 +14426,12 @@ const timer =
                                           <div className="flex items-center gap-1">
                                             <button
                                               type="button"
-                                              aria-pressed={focusedTextId ? textBold : defaultTextStyles.bold}
+                                              aria-pressed={focusedTextId ? (isCollapsedTextSelection ? defaultTextStyles.bold : textBold) : defaultTextStyles.bold}
                                               className={`${textOptionButtonBase} ${
-                                                (focusedTextId ? textBold : defaultTextStyles.bold)
+                                                (focusedTextId ? (isCollapsedTextSelection ? defaultTextStyles.bold : textBold) : defaultTextStyles.bold)
                                                   ? textOptionButtonActive
                                                   : textOptionButtonHover
-                                              } text-slate-800`}
+                                              }`}
                                               onMouseDown={keepTextEditingActive}
                                               onClick={() => applyInlineCommand("bold")}
                                               onMouseEnter={(event) => showToolbarTooltip("Bold", event.currentTarget)}
@@ -13284,12 +14442,12 @@ const timer =
                                             </button>
                                             <button
                                               type="button"
-                                              aria-pressed={focusedTextId ? textItalic : defaultTextStyles.italic}
+                                              aria-pressed={focusedTextId ? (isCollapsedTextSelection ? defaultTextStyles.italic : textItalic) : defaultTextStyles.italic}
                                               className={`${textOptionButtonBase} ${
-                                                (focusedTextId ? textItalic : defaultTextStyles.italic)
+                                                (focusedTextId ? (isCollapsedTextSelection ? defaultTextStyles.italic : textItalic) : defaultTextStyles.italic)
                                                   ? textOptionButtonActive
                                                   : textOptionButtonHover
-                                              } text-slate-800`}
+                                              }`}
                                               onMouseDown={keepTextEditingActive}
                                               onClick={() => applyInlineCommand("italic")}
                                               onMouseEnter={(event) => showToolbarTooltip("Italic", event.currentTarget)}
@@ -13300,12 +14458,12 @@ const timer =
                                             </button>
                                             <button
                                               type="button"
-                                              aria-pressed={focusedTextId ? textUnderline : defaultTextStyles.underline}
+                                              aria-pressed={focusedTextId ? (isCollapsedTextSelection ? defaultTextStyles.underline : textUnderline) : defaultTextStyles.underline}
                                               className={`${textOptionButtonBase} ${
-                                                (focusedTextId ? textUnderline : defaultTextStyles.underline)
+                                                (focusedTextId ? (isCollapsedTextSelection ? defaultTextStyles.underline : textUnderline) : defaultTextStyles.underline)
                                                   ? textOptionButtonActive
                                                   : textOptionButtonHover
-                                              } text-slate-800`}
+                                              }`}
                                               onMouseDown={keepTextEditingActive}
                                               onClick={() => applyInlineCommand("underline")}
                                               onMouseEnter={(event) => showToolbarTooltip("Underline", event.currentTarget)}
@@ -13323,7 +14481,7 @@ const timer =
                                               <button
                                                 type="button"
                                                 ref={alignMenuButtonRef}
-                                                className={`${textOptionButtonBase} ${textOptionButtonHover} w-auto px-2 flex items-center gap-1 text-slate-800`}
+                                                className={`${textOptionButtonBase} ${textOptionButtonHover} w-auto px-2 flex items-center gap-1 text-slate-800 dark:text-zinc-200`}
                                                 onMouseDown={keepTextEditingActive}
                                                 onClick={() => {
                                                   hideToolbarTooltip();
@@ -13340,7 +14498,7 @@ const timer =
                                                 ) : (
                                                   <AlignRight className="h-[18px] w-[18px]" />
                                                 )}
-                                                <svg className="h-2 w-2 text-slate-800" viewBox="0 0 8 5" aria-hidden="true">
+                                                <svg className="h-2 w-2 text-slate-800 dark:text-zinc-200" viewBox="0 0 8 5" aria-hidden="true">
                                                   <path d="M4 5L0 0h8L4 5z" fill="currentColor" />
                                                 </svg>
                                               </button>
@@ -13348,11 +14506,10 @@ const timer =
                                                 ? createPortal(
                                                     <div
                                                       ref={alignMenuRef}
-                                                      className="fixed z-[9999] rounded-lg bg-white p-1 shadow-[0_10px_24px_rgba(15,23,42,0.12)]"
+                                                      className="fixed z-[9999] rounded-lg border border-[#4A4A4A] bg-[#323232] p-1 shadow-[0_18px_40px_rgba(0,0,0,0.45)]"
                                                       style={{
-                                                        left: alignMenuPosition.left,
+                                                        left: alignMenuPosition.left - 20,
                                                         top: alignMenuPosition.top,
-                                                        transform: "translateX(-50%)",
                                                       }}
                                                     >
                                                       <div className="flex flex-col gap-1">
@@ -13366,8 +14523,8 @@ const timer =
                                                             type="button"
                                                             className={`flex w-24 items-center gap-2 rounded-md px-2 py-1.5 text-sm font-semibold transition ${
                                                               textAlign === value
-                                                                ? "bg-[#E0F2FE] text-[#024d7c]"
-                                                                : "text-slate-700 hover:bg-slate-50"
+                                                                ? "bg-[#6C47FF] text-white"
+                                                                : "text-zinc-200 hover:bg-[#3A3A40]"
                                                             }`}
                                                             onPointerDown={keepTextEditingActive}
                                                             onMouseEnter={(event) => showToolbarTooltip(label, event.currentTarget)}
@@ -13394,7 +14551,7 @@ const timer =
                                                 ref={lineSpacingMenuButtonRef}
                                                 className={`${textOptionButtonBase} ${
                                                   lineSpacingMenuOpen ? textOptionButtonActive : textOptionButtonHover
-                                                } w-auto px-2 flex items-center gap-1 text-slate-800`}
+                                                } w-auto px-2 flex items-center gap-1 text-slate-800 dark:text-zinc-200`}
                                                 onMouseDown={keepTextEditingActive}
                                                 onClick={() => {
                                                   hideToolbarTooltip();
@@ -13405,7 +14562,7 @@ const timer =
                                                 aria-label="Line spacing"
                                               >
                                                 <LineSpacingIcon className="h-[18px] w-[18px]" />
-                                                <svg className="h-2 w-2 text-slate-800" viewBox="0 0 8 5" aria-hidden="true">
+                                                <svg className="h-2 w-2 text-slate-800 dark:text-zinc-200" viewBox="0 0 8 5" aria-hidden="true">
                                                   <path d="M4 5L0 0h8L4 5z" fill="currentColor" />
                                                 </svg>
                                               </button>
@@ -13417,10 +14574,12 @@ const timer =
                                           <div className="flex items-center gap-1">
                                             <button
                                               type="button"
-                                              aria-pressed={listType === "bullet"}
+                                              aria-pressed={(focusedTextId && isCollapsedTextSelection ? defaultListType : listType) === "bullet"}
                                               className={`${textOptionButtonBase} ${
-                                                listType === "bullet" ? textOptionButtonActive : textOptionButtonHover
-                                              } text-slate-800`}
+                                                (focusedTextId && isCollapsedTextSelection ? defaultListType : listType) === "bullet"
+                                                  ? textOptionButtonActive
+                                                  : textOptionButtonHover
+                                              } text-slate-800 dark:text-zinc-200`}
                                               onMouseDown={keepTextEditingActive}
                                               onClick={() => applyListCommand("bullet")}
                                               onMouseEnter={(event) => showToolbarTooltip("Bulleted list", event.currentTarget)}
@@ -13431,10 +14590,12 @@ const timer =
                                             </button>
                                             <button
                                               type="button"
-                                              aria-pressed={listType === "number"}
+                                              aria-pressed={(focusedTextId && isCollapsedTextSelection ? defaultListType : listType) === "number"}
                                               className={`${textOptionButtonBase} ${
-                                                listType === "number" ? textOptionButtonActive : textOptionButtonHover
-                                              } text-slate-800`}
+                                                (focusedTextId && isCollapsedTextSelection ? defaultListType : listType) === "number"
+                                                  ? textOptionButtonActive
+                                                  : textOptionButtonHover
+                                              } text-slate-800 dark:text-zinc-200`}
                                               onMouseDown={keepTextEditingActive}
                                               onClick={() => applyListCommand("number")}
                                               onMouseEnter={(event) => showToolbarTooltip("Numbered list", event.currentTarget)}
@@ -13450,11 +14611,10 @@ const timer =
                                             ? createPortal(
                                                 <div
                                                   ref={lineSpacingMenuRef}
-                                                  className="fixed z-[9999] rounded-lg bg-white p-2 shadow-[0_10px_24px_rgba(15,23,42,0.12)]"
+                                                  className="fixed z-[9999] rounded-lg border border-[#4A4A4A] bg-[#323232] p-2 shadow-[0_18px_40px_rgba(0,0,0,0.45)]"
                                                   style={{
-                                                    left: lineSpacingMenuPosition.left,
+                                                    left: lineSpacingMenuPosition.left - 20,
                                                     top: lineSpacingMenuPosition.top,
-                                                    transform: "translateX(-50%)",
                                                   }}
                                                 >
                                                   <div className="flex flex-col gap-1">
@@ -13468,8 +14628,8 @@ const timer =
                                                         type="button"
                                                         className={`flex w-24 items-center justify-between rounded-md px-2 py-1.5 text-sm font-semibold transition ${
                                                           activeLineSpacing === option.value
-                                                            ? "bg-[#E0F2FE] text-[#024d7c]"
-                                                            : "text-slate-700 hover:bg-slate-50"
+                                                            ? "bg-[#6C47FF] text-white"
+                                                            : "text-zinc-200 hover:bg-[#3A3A40]"
                                                         }`}
                                                         onPointerDown={keepTextEditingActive}
                                                         onClick={() => applyLineSpacing(option.value)}
@@ -13487,14 +14647,6 @@ const timer =
                                             : null}
                                         </div>
                                       )}
-                                      <button
-                                        type="button"
-                                        onClick={() => setToolOptionsCollapsed(true)}
-                                        className="ml-2 inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
-                                        aria-label="Hide tool options"
-                                      >
-                                        <X className="h-4 w-4" aria-hidden />
-                                      </button>
                                     </div>
                                   </div>
                                 </div>
@@ -13826,7 +14978,7 @@ const timer =
 				                            style={{ scrollbarGutter: "stable" }}
 				                          >
 				                            {null}
-				                            <div className="relative w-full min-w-0 px-4 text-center">
+				                            <div className="relative w-full min-w-0 px-4 pt-12 text-center">
 				                              <div id="pdf-viewport" className="inline-flex origin-top flex-col gap-8">
 				                                {pages.map((page, index) => renderPreviewPage(page, index))}
 				                                <div className="h-8" aria-hidden />
@@ -15000,21 +16152,7 @@ const timer =
                       ? "Fill color"
                       : "Stroke color"}
               </div>
-              {!isTextColorPicker ? null : null}
-              {isTextColorPicker ? (
-                <button
-                  type="button"
-                  className="mb-2 mt-0 flex w-full items-center gap-2 rounded-md px-1 py-1.5 text-left text-base font-semibold text-slate-900 transition hover:bg-slate-100"
-                  onMouseDown={handleColorPickerMouseDown}
-                  onClick={() => {
-                    applyColorFromPicker("#111827");
-                    setColorPickerDraft("#111827");
-                  }}
-                >
-                  <DropletOff className="h-5 w-5 text-slate-900" />
-                  <span>None</span>
-                </button>
-              ) : isShapeFillPicker ? (
+              {isShapeFillPicker ? (
                 <button
                   type="button"
                   className="mb-2 mt-0 flex w-full items-center gap-2 rounded-md px-1 py-1.5 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
@@ -15032,9 +16170,7 @@ const timer =
                         return <span key={`empty-${rowIndex}-${valueIndex}`} className="h-6 w-6" aria-hidden />;
                       }
                       const selectedValue = isTextColorPicker
-                        ? selectionTextColorMixed
-                          ? ""
-                          : (activeTextColor ?? textColor).toLowerCase()
+                        ? (pickerSelectedColor ?? colorPickerDraft.toLowerCase())
                         : isShapeBorderPicker
                           ? (resolvedShapeBorderColor ?? "").toLowerCase()
                           : isShapeFillPicker
@@ -15122,29 +16258,57 @@ const timer =
                 </button>
               </div>
               {customTextColors.length ? (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {customTextColors.map((value) => (
-                    <button
-                      key={value}
-                      type="button"
-                      className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 transition hover:border-slate-300"
-                      style={{ backgroundColor: value }}
-                      onMouseDown={handleColorPickerMouseDown}
-                      onClick={() => {
-                        applyColorFromPicker(value);
-                        setColorPickerDraft(value);
-                      }}
-                      aria-label={`Custom ${
-                        isTextColorPicker
-                          ? "text"
-                          : isShapeBorderPicker
-                            ? "border"
-                            : isShapeFillPicker
-                              ? "fill"
-                              : "stroke"
-                      } color ${value}`}
-                    />
-                  ))}
+                <div className="mt-2 grid grid-cols-8 gap-[2px]">
+                  {customTextColors.map((value) => {
+                    const selectedValue = isTextColorPicker
+                      ? (pickerSelectedColor ?? colorPickerDraft.toLowerCase())
+                      : isShapeBorderPicker
+                        ? (resolvedShapeBorderColor ?? "").toLowerCase()
+                        : isShapeFillPicker
+                          ? (resolvedShapeFillColor ?? "").toLowerCase()
+                          : penColor.toLowerCase();
+                    const isSelected = value.toLowerCase() === selectedValue;
+                    const rgb = hexToRgb(value);
+                    const luminance = rgb ? 0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b : 1;
+                    const checkColor = luminance < 0.55 ? "#ffffff" : "#111827";
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        className={`flex h-6 w-6 items-center justify-center rounded-full border transition hover:border-slate-300 ${
+                          isSelected ? "border-slate-300" : "border-slate-200"
+                        }`}
+                        style={{ backgroundColor: value }}
+                        onMouseDown={handleColorPickerMouseDown}
+                        onClick={() => {
+                          applyColorFromPicker(value);
+                          setColorPickerDraft(value);
+                        }}
+                        aria-label={`Custom ${
+                          isTextColorPicker
+                            ? "text"
+                            : isShapeBorderPicker
+                              ? "border"
+                              : isShapeFillPicker
+                                ? "fill"
+                                : "stroke"
+                        } color ${value}`}
+                      >
+                        {isSelected ? (
+                          <svg className="h-4 w-4" viewBox="0 0 20 20" aria-hidden="true">
+                            <path
+                              d="M4.5 10.5l3.2 3.2L15.5 6.9"
+                              fill="none"
+                              stroke={checkColor}
+                              strokeWidth="2.2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        ) : null}
+                      </button>
+                    );
+                  })}
                 </div>
               ) : null}
               {highlightCustomOpen ? (
@@ -15408,8 +16572,8 @@ const timer =
         }
         [data-text-annotation] ul,
         [data-text-annotation] ol {
-          list-style-position: outside;
-          padding-left: 1.4em;
+          list-style-position: inside;
+          padding-left: 0;
           margin: 0.1em 0;
         }
         [data-text-annotation] ul {
@@ -15417,6 +16581,9 @@ const timer =
         }
         [data-text-annotation] ol {
           list-style-type: decimal;
+        }
+        [data-text-annotation] li::marker {
+          font-size: inherit;
         }
         /* Make scrollbar gutters/tracks white across Studio */
         body.studio-page * {
@@ -15466,7 +16633,7 @@ const timer =
           scrollbar-color: #8a8a8a #2b2b2b;
         }
         html.dark body.studio-page .thumbs-scroll {
-          scrollbar-color: #5b616b #323232;
+          scrollbar-color: #8a8a8a #2b2b2b;
         }
         html.dark body.studio-page ::-webkit-scrollbar-corner {
           background: #222224;
@@ -15478,10 +16645,10 @@ const timer =
         }
         html.dark body.studio-page .thumbs-scroll::-webkit-scrollbar-track {
           background:
-            linear-gradient(to right, #3a3a3a 0, #3a3a3a 1px, #323232 1px, #323232 100%);
+            linear-gradient(to right, #343434 0, #343434 1px, #2b2b2b 1px, #2b2b2b 100%);
         }
         html.dark body.studio-page .thumbs-scroll::-webkit-scrollbar-thumb {
-          border: 3px solid #323232;
+          border: 3px solid #2b2b2b;
         }
         body.studio-page > header {
           display: none !important;
