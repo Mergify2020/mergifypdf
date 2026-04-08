@@ -8391,7 +8391,6 @@ const timer =
                           node.innerHTML = annotationHtml;
                         }
                       }}
-                      style={{ wordBreak: "break-all", overflowWrap: "anywhere" }}
                       className={`min-w-[12px] min-h-[24px] rounded-none px-2 py-1 text-[12px] leading-snug transition border border-solid border-transparent outline-none focus:outline-none focus-visible:outline-none whitespace-pre-wrap break-all ${
                         annotation.text === TEXT_PLACEHOLDER ? "text-slate-400" : "text-slate-900"
                       } ${
@@ -8406,7 +8405,7 @@ const timer =
                         backgroundColor: "transparent",
                         overflow: "hidden",
                         overflowWrap: "anywhere",
-                        wordBreak: "break-word",
+                        wordBreak: "break-all",
                         fontFamily: TEXT_FONT_OPTIONS[textFont].cssFamily,
                         fontSize: `${displayFontSize}px`,
                         lineHeight: `${lineSpacing}`,
