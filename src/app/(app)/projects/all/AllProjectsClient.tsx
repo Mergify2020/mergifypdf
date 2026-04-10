@@ -477,22 +477,21 @@ export default function AllProjectsClient() {
               </div>
               </div>
             </div>
-          <div className="projects-grid mt-10 flex w-full flex-wrap justify-start gap-5 [--projects-card-width:clamp(200px,18vw,260px)] sm:gap-6">
-              {Array.from({ length: 18 }).map((_, index) => (
-                <div
-                  key={index}
-                  className="w-[var(--projects-card-width)] flex-[0_0_var(--projects-card-width)] rounded-[10px] bg-white/60 p-3 shadow-sm ring-1 ring-slate-200/60"
-                >
-                  <div className="relative m-[3px] aspect-[1.23/1] w-[calc(100%-6px)] overflow-hidden rounded-[10px] border border-[rgba(0,0,0,0.06)] bg-[#EEF1F5]">
+          <div className="projects-grid mt-10 grid w-full grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 lg:grid-cols-4 xl:grid-cols-5">
+            {Array.from({ length: 18 }).map((_, index) => (
+              <div key={index} className="min-w-0">
+                <div className="relative overflow-hidden rounded-[10px] bg-[#F9FAFC] transition dark:bg-zinc-900">
+                  <div className="relative m-[3px] aspect-square w-[calc(100%-6px)] overflow-hidden rounded-[10px] border border-[rgba(0,0,0,0.06)] bg-[#EEF1F5] dark:border-transparent dark:bg-[#2A2A2A] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.02)]">
                     <div className="absolute inset-0 skeleton-shimmer" />
                   </div>
-                  <div className="mt-4 space-y-2">
+                  <div className="mt-3 space-y-2 px-1 pb-3">
                     <div className="h-4 w-3/4 rounded-full skeleton-shimmer" />
                     <div className="h-3.5 w-1/2 rounded-full skeleton-shimmer" />
                   </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
+          </div>
           </div>
         <ContainerShadowOverlay targetId="all-projects-container" overlayZIndex={45} />
       </main>

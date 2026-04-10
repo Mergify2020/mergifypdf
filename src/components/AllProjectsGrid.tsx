@@ -211,34 +211,31 @@ export default function AllProjectsGrid({
 
   return (
     <>
-      <div className="projects-grid mt-10 flex w-full flex-wrap justify-start gap-5 [--projects-card-width:clamp(200px,18vw,260px)] sm:gap-6">
+      <div className="projects-grid mt-10 grid w-full grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 lg:grid-cols-4 xl:grid-cols-5">
         {visibleProjects.map((project) => {
-        const isSelected = !!selected[project.id];
-        return (
-          <div
-            key={project.id}
-            className="w-[var(--projects-card-width)] flex-[0_0_var(--projects-card-width)]"
-          >
-            <ProjectCard
-              project={project}
-              isSelected={isSelected}
-              hasSelection={hasSelection}
-              starred={project.starred === true}
-              onToggleSelected={toggleSelected}
-              onToggleStar={onProjectStarToggled}
-              onTrashed={(trashedProject) => {
-                setHiddenIds((prev) => ({ ...prev, [trashedProject.id]: true }));
-                onProjectTrashed?.(trashedProject.id);
-                setTrashToast({
-                  ids: [trashedProject.id],
-                  label: buildTrashToastLabel([{ title: trashedProject.title }]),
-                });
-              }}
-              onRenamed={onProjectRenamed}
-              onCopied={onProjectCopied}
-            />
-          </div>
-        );
+          const isSelected = !!selected[project.id];
+          return (
+            <div key={project.id} className="min-w-0">
+              <ProjectCard
+                project={project}
+                isSelected={isSelected}
+                hasSelection={hasSelection}
+                starred={project.starred === true}
+                onToggleSelected={toggleSelected}
+                onToggleStar={onProjectStarToggled}
+                onTrashed={(trashedProject) => {
+                  setHiddenIds((prev) => ({ ...prev, [trashedProject.id]: true }));
+                  onProjectTrashed?.(trashedProject.id);
+                  setTrashToast({
+                    ids: [trashedProject.id],
+                    label: buildTrashToastLabel([{ title: trashedProject.title }]),
+                  });
+                }}
+                onRenamed={onProjectRenamed}
+                onCopied={onProjectCopied}
+              />
+            </div>
+          );
         })}
       </div>
       {mounted

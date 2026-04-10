@@ -550,7 +550,7 @@ export default function ProjectCard({
         ? "bg-[#6C47FF] border-[#6C47FF] text-white opacity-100 scale-100"
         : [
           // Always visible on very small screens (no hover), hover-only from sm and up.
-          "bg-white/95 border-slate-300 text-slate-500 shadow-[0_3px_10px_rgba(15,23,42,0.14)] opacity-100 scale-90 dark:bg-[#323232] dark:border-[#3F3F3F] dark:text-zinc-200 dark:shadow-[0_6px_16px_rgba(0,0,0,0.35)]",
+          "bg-white/95 border-slate-300 text-slate-500 shadow-[0_3px_10px_rgba(15,23,42,0.14)] opacity-100 scale-90 dark:bg-[#2F2F2F] dark:border-[#686868] dark:text-zinc-200 dark:shadow-[0_6px_16px_rgba(0,0,0,0.35)]",
           "sm:opacity-0 sm:scale-90",
           hasSelection ? "sm:!opacity-100 sm:!scale-100" : "",
         ].join(" "),
@@ -558,7 +558,7 @@ export default function ProjectCard({
     .filter(Boolean)
     .join(" ");
   const actionsContainerClasses = [
-    "absolute right-3 top-3 z-10 inline-flex items-center overflow-hidden rounded-[10px] bg-white/95 text-slate-400 shadow-[0_4px_12px_rgba(15,23,42,0.18)] dark:bg-[#323232] dark:text-zinc-100 dark:shadow-[0_6px_18px_rgba(0,0,0,0.35)] dark:border dark:border-[#3F3F3F]",
+    "absolute right-3 top-3 z-10 inline-flex items-center overflow-hidden rounded-[10px] bg-white/95 text-slate-400 shadow-[0_4px_12px_rgba(15,23,42,0.18)] dark:bg-[#2F2F2F] dark:text-zinc-100 dark:shadow-[0_6px_18px_rgba(0,0,0,0.35)] dark:border dark:border-[#525252]",
     "opacity-100 transition-opacity duration-150",
     "sm:opacity-0",
     menuOpen ? "sm:!opacity-100" : "",
@@ -566,7 +566,7 @@ export default function ProjectCard({
     .filter(Boolean)
     .join(" ");
   const actionButtonBase =
-    "flex h-9 w-9 items-center justify-center text-sm transition hover:bg-slate-100/80 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-[#3A3A3A]/80 xl:h-10 xl:w-10";
+    "flex h-9 w-9 items-center justify-center text-sm transition hover:bg-slate-100/80 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-[#393939]/80 xl:h-10 xl:w-10";
 
   const startRenaming = (event?: { preventDefault: () => void; stopPropagation: () => void }) => {
     event?.preventDefault();

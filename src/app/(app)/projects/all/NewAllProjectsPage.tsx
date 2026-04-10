@@ -75,12 +75,12 @@ export default function NewAllProjectsPage() {
             {Array.from({ length: 12 }).map((_, index) => (
               <div
                 key={`all-projects-loading-${index}`}
-                className="animate-pulse rounded-2xl border border-slate-200 bg-white p-3"
+                className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900"
               >
-                <div className="aspect-[1.23/1] rounded-xl bg-slate-100" />
+                <div className="aspect-[1.23/1] rounded-xl bg-slate-100 skeleton-shimmer dark:bg-zinc-800" />
                 <div className="mt-4 space-y-2">
-                  <div className="h-3 w-3/4 rounded-full bg-slate-100" />
-                  <div className="h-3 w-1/2 rounded-full bg-slate-100" />
+                  <div className="h-3 w-3/4 rounded-full bg-slate-100 skeleton-shimmer dark:bg-zinc-800" />
+                  <div className="h-3 w-1/2 rounded-full bg-slate-100 skeleton-shimmer dark:bg-zinc-800" />
                 </div>
               </div>
             ))}

@@ -339,10 +339,6 @@ export default function SettingsMenu({
                   onClick={handlePricing}
                   className="group relative mb-2 flex w-full items-center justify-center gap-2 overflow-hidden rounded-lg border border-[#CFC4FF] bg-gradient-to-r from-[#8B5CF6] via-[#7C4DFF] to-[#6D5EF7] px-3 py-2.5 text-[15px] font-semibold text-white shadow-[0_6px_14px_rgba(108,71,255,0.16)] transition duration-200 hover:-translate-y-px hover:border-[#B8A6FF] hover:shadow-[0_10px_18px_rgba(108,71,255,0.24)] focus:outline-none focus:ring-2 focus:ring-[#8B5CF6]/35 focus:ring-offset-2 focus:ring-offset-white dark:border-[#6D5EF7]/35 dark:shadow-[0_8px_18px_rgba(76,29,149,0.24)] dark:hover:border-[#8A74FF]/45 dark:hover:shadow-[0_12px_22px_rgba(76,29,149,0.32)] dark:focus:ring-offset-zinc-900"
                 >
-                  <span
-                    aria-hidden
-                    className="absolute inset-x-3 top-0 h-px bg-white/45 transition-opacity duration-200 group-hover:opacity-70"
-                  />
                   <Sparkles className="relative z-10 h-4 w-4 text-white/90" aria-hidden />
                   <span className="relative z-10">Upgrade plan</span>
                 </button>
@@ -411,7 +407,7 @@ export default function SettingsMenu({
                       type="button"
                       onClick={() => applyTheme("light")}
                       aria-pressed={theme === "light"}
-                      className={`relative z-10 flex min-w-0 items-center justify-center gap-1.5 rounded-md px-1.5 py-2 text-sm font-medium leading-none transition ${
+                      className={`relative z-10 flex min-w-0 items-center justify-center gap-1.5 rounded-md px-1.5 py-2 text-sm font-medium leading-[1.15] transition ${
                         theme === "light"
                           ? "text-white dark:text-zinc-950"
                           : "text-gray-700 hover:bg-gray-100 dark:text-zinc-200 dark:hover:bg-[#3A3A3A]"
@@ -424,7 +420,7 @@ export default function SettingsMenu({
                       type="button"
                       onClick={() => applyTheme("dark")}
                       aria-pressed={theme === "dark"}
-                      className={`relative z-10 flex min-w-0 items-center justify-center gap-1.5 rounded-md px-1.5 py-2 text-sm font-medium leading-none transition ${
+                      className={`relative z-10 flex min-w-0 items-center justify-center gap-1.5 rounded-md px-1.5 py-2 text-sm font-medium leading-[1.15] transition ${
                         theme === "dark"
                           ? "text-white dark:text-zinc-950"
                           : "text-gray-700 hover:bg-gray-100 dark:text-zinc-200 dark:hover:bg-[#3A3A3A]"

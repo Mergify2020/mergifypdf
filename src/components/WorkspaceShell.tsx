@@ -1184,7 +1184,7 @@ export default function WorkspaceShell({
   const fallbackProjectCardCount = fallbackProjectCountReady
     ? (isAllProjectsRoute ? Math.min(homeRecentProjects.length, 60) : Math.min(homeRecentProjects.length, 9))
     : isAllProjectsRoute
-      ? 8
+      ? 12
       : 6;
 
   const navigateWithContentSwap = (nextPath: string, closeMobile = false): boolean => {
@@ -3053,9 +3053,9 @@ export default function WorkspaceShell({
                           <svg
                             aria-hidden="true"
                             viewBox="0 0 24 24"
-                            className="h-5 w-5"
+                            className="h-5 w-5 text-[#6B7280] dark:text-zinc-400"
                             fill="none"
-                            stroke="#4F46E5"
+                            stroke="currentColor"
                             strokeWidth="2"
                             strokeLinecap="round"
                             strokeLinejoin="round"
@@ -3190,11 +3190,11 @@ export default function WorkspaceShell({
                                       ) : null}
                                     </div>
                                     <div
-                                      className="mt-6 flex-1 overflow-y-hidden overflow-x-hidden"
+                                      className="recent-projects-container mt-6 flex-1 overflow-y-hidden overflow-x-hidden"
                                       style={{ paddingRight: 6, paddingLeft: 6, paddingBottom: 6 }}
                                     >
                                       {fallbackProjectCardCount > 0 ? (
-                                        <div className="recent-projects-grid projects-grid mt-2 grid w-full max-w-[1880px] items-start gap-6 grid-cols-2">
+                                        <div className="recent-projects-grid projects-grid mt-2 grid w-full max-w-[1880px] items-start gap-4 sm:gap-6">
                                           {Array.from({ length: fallbackProjectCardCount }).map((_, index) => (
                                             <div key={`home-refresh-skeleton-${index}`} className="flex w-full flex-col text-left">
                                               <div className="relative rounded-[10px] bg-[#F9FAFC] dark:bg-[#323232]/60">
@@ -3304,15 +3304,19 @@ export default function WorkspaceShell({
             <button
               type="button"
               onClick={openCreateModal}
-              className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1 py-2 text-[11px] font-semibold text-[#4B5563] transition hover:bg-[rgba(0,0,0,0.04)]"
+              className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1 py-2 text-[11px] font-semibold text-[#4B5563] transition hover:bg-[rgba(0,0,0,0.04)] dark:text-white dark:hover:bg-white/5"
             >
-              <span className="flex h-[22px] w-[22px] items-center justify-center rounded-full bg-[#6C47FF] text-white">
+              <span className="flex h-[22px] w-[22px] items-center justify-center rounded-full border-[1.5px] border-[#A8B0BA] bg-transparent text-[#6C757D] dark:border-[1.5px] dark:border-white dark:bg-transparent dark:text-white">
                 <Plus className="h-[14px] w-[14px]" aria-hidden />
               </span>
-              <span className="truncate leading-[1.15]">Create</span>
+              <span className="truncate leading-[1.15] dark:text-white">Create</span>
             </button>
             {mobileBottomDockItems.map((item) => {
               const Icon = item.icon;
+              const activeDockColor = "#7C3AED";
+              const iconClassName = item.active
+                ? "h-[22px] w-[22px]"
+                : "h-[22px] w-[22px] text-[#4B5563] dark:text-white";
               return (
                 <Link
                   key={item.label}
@@ -3325,16 +3329,23 @@ export default function WorkspaceShell({
                   }}
                   className={`flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1 py-2 text-[11px] font-semibold transition ${
                     item.active
-                      ? "text-[#4C34C9]"
-                      : "text-[#4B5563] hover:bg-[rgba(0,0,0,0.04)]"
+                      ? "text-[#7C3AED] dark:text-[#7C3AED]"
+                      : "text-[#4B5563] hover:bg-[rgba(0,0,0,0.04)] dark:text-white dark:hover:bg-white/5"
                   }`}
                 >
                   <Icon
-                    className="h-[22px] w-[22px]"
+                    className={iconClassName}
+                    style={item.active ? { color: activeDockColor } : undefined}
                     aria-hidden
                     weight={item.label === "Signatures" ? "regular" : item.active ? "fill" : "regular"}
                   />
-                  <span className="truncate leading-[1.15]">{item.label}</span>
+                  <span
+                    className={`truncate leading-[1.15] ${
+                      item.active ? "dark:text-[#7C3AED]" : "dark:text-white"
+                    }`}
+                  >
+                    {item.label}
+                  </span>
                 </Link>
               );
             })}
