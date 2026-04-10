@@ -1644,24 +1644,16 @@ export default function WorkspaceShell({
   useEffect(() => {
     if (!createOpen) return;
 
-    function handleClick(event: MouseEvent) {
-      if (!createRef.current?.contains(event.target as Node) && !createBusy) {
-        setCreateOpen(false);
-      }
-    }
-
     function handleKey(event: KeyboardEvent) {
       if (event.key === "Escape" && !createBusy) {
         setCreateOpen(false);
       }
     }
 
-      document.addEventListener("mousedown", handleClick);
-      document.addEventListener("keydown", handleKey);
-      return () => {
-        document.removeEventListener("mousedown", handleClick);
-        document.removeEventListener("keydown", handleKey);
-      };
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("keydown", handleKey);
+    };
   }, [createOpen, createBusy]);
 
   useEffect(() => {
@@ -3397,11 +3389,11 @@ export default function WorkspaceShell({
 
                     <div className="mt-5">
                           <div
-                            className={`flex min-h-[360px] flex-col overflow-hidden rounded-[10px] text-center transition sm:min-h-[400px] ${
+                            className={`group flex min-h-[360px] w-full flex-col overflow-hidden rounded-[10px] text-center transition duration-200 sm:min-h-[400px] ${
                               showCreateFilesError
-                                ? "border-[3px] border-rose-400 bg-rose-50/40 dark:bg-[#323232]/60"
+                                ? "border border-rose-300 bg-gradient-to-b from-rose-50/70 via-white/90 to-white text-rose-600 shadow-[0_0_0_1px_rgba(251,113,133,0.15)] dark:bg-[#323232]/60"
                                 : createDragActive
-                                  ? "border-[3px] border-[#51bdff] bg-sky-50/60 dark:bg-[#323232]/70"
+                                  ? "scale-[1.01] border border-[#3F3F3F] bg-[#323232] shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_0_30px_rgba(0,0,0,0.18)] dark:bg-[#323232]"
                                   : createPendingFiles.length === 0
                                     ? "border-2 border-dashed border-[#D1D5DB] bg-[#F5F5F5] dark:border-[#3A3A3A] dark:bg-[#2B2B2B]/80"
                                     : "bg-transparent dark:bg-transparent"
@@ -3434,7 +3426,7 @@ export default function WorkspaceShell({
                                 </div>
                                 <p
                                   className={`mt-3 text-base font-semibold ${
-                                    showCreateFilesError ? "text-rose-600" : "text-slate-900"
+                                    showCreateFilesError ? "text-rose-600" : "text-slate-900 dark:text-zinc-100"
                                   }`}
                                 >
                                   {createDragActive ? (
@@ -3443,7 +3435,7 @@ export default function WorkspaceShell({
                                     <>
                                       <button
                                         type="button"
-                                        className="cursor-pointer text-[1.05em] font-bold text-slate-900 underline decoration-1 underline-offset-2 transition hover:text-slate-900 disabled:cursor-not-allowed"
+                                        className="cursor-pointer text-[1.05em] font-bold text-slate-900 underline decoration-1 underline-offset-2 transition hover:text-slate-900 disabled:cursor-not-allowed dark:text-zinc-100 dark:hover:text-zinc-100"
                                         onClick={() => createFileInputRef.current?.click()}
                                         disabled={createBusy}
                                       >
@@ -3455,7 +3447,7 @@ export default function WorkspaceShell({
                                   )}
                                 </p>
                                 {!createDragActive ? (
-                                  <p className="mt-2 text-sm text-slate-500">Add up to 12 PDF files.</p>
+                                  <p className="mt-2 text-sm text-slate-500 dark:text-zinc-400">Add up to 12 PDF files.</p>
                                 ) : null}
                               </div>
                             ) : (
@@ -3486,12 +3478,12 @@ export default function WorkspaceShell({
                     </div>
                   </div>
 
-                  <div className="shrink-0 bg-white">
+                  <div className="shrink-0 bg-white dark:bg-[#323232]">
                       <div className="flex min-h-[76px] items-center justify-end gap-3 px-6 py-0 text-sm sm:px-10">
                         <button
                           type="button"
                           onClick={closeCreateModal}
-                          className="px-2 py-2 font-semibold text-slate-500 transition hover:text-slate-900"
+                          className="px-2 py-2 font-semibold text-slate-500 transition hover:text-slate-900 dark:text-zinc-400 dark:hover:text-zinc-100"
                           disabled={createBusy}
                         >
                           Cancel

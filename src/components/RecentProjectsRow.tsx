@@ -464,6 +464,27 @@ export default function RecentProjectsRow({
     );
   }
 
+  if (sortOption === "starred" && !trimmed && filteredProjects.length === 0) {
+    return (
+      <div className="mt-6 flex min-h-[260px] w-full flex-col items-center justify-center px-8 py-12 text-center">
+        <Image
+          src="/noprojectyet.svg"
+          alt=""
+          width={405}
+          height={405}
+          className="mt-[-80px] h-[318px] w-[318px] opacity-90 sm:h-[405px] sm:w-[405px]"
+          priority
+        />
+        <p className="-mt-4 text-lg font-semibold text-slate-900 dark:text-zinc-100 sm:text-xl">
+          No starred projects yet
+        </p>
+        <p className="mt-2 max-w-sm text-sm text-slate-600 dark:text-zinc-300 sm:text-base">
+          Star a project to keep it handy here.
+        </p>
+      </div>
+    );
+  }
+
   const handleBulkDownload = async () => {
     if (!selectedIds.length || bulkBusy) return;
     setBulkBusy("download");

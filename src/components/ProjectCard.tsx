@@ -536,9 +536,9 @@ export default function ProjectCard({
   };
 
   const cardClasses = [
-    "relative overflow-hidden rounded-[10px] bg-[#F9FAFC] transition dark:bg-zinc-900 dark:shadow-[0_8px_18px_rgba(0,0,0,0.22)] dark:ring-0",
+    "relative overflow-hidden rounded-[10px] bg-[#F9FAFC] transition outline outline-0 outline-transparent dark:bg-zinc-900 dark:shadow-[0_8px_18px_rgba(0,0,0,0.22)]",
     isSelected
-      ? "ring-[3px] ring-[#6C47FF] shadow-[0_0_0_4px_rgba(108,71,255,0.18)] dark:ring-[#A78BFA] dark:shadow-none"
+      ? "shadow-[inset_0_0_0_3px_rgba(108,71,255,1)] dark:shadow-[inset_0_0_0_3px_rgba(108,71,255,1)]"
       : "",
   ]
     .filter(Boolean)
@@ -550,7 +550,7 @@ export default function ProjectCard({
         ? "bg-[#6C47FF] border-[#6C47FF] text-white opacity-100 scale-100"
         : [
           // Always visible on very small screens (no hover), hover-only from sm and up.
-          "bg-white/95 border-slate-300 text-slate-500 shadow-[0_3px_10px_rgba(15,23,42,0.14)] opacity-100 scale-90 dark:bg-[#2F2F2F] dark:border-[#686868] dark:text-zinc-200 dark:shadow-[0_6px_16px_rgba(0,0,0,0.35)]",
+          "bg-white/95 border-slate-300 text-slate-500 shadow-[0_3px_10px_rgba(15,23,42,0.14)] opacity-100 scale-90 dark:bg-[#2F2F2F] dark:border-zinc-500 dark:text-zinc-200 dark:shadow-[0_6px_16px_rgba(0,0,0,0.35)]",
           "sm:opacity-0 sm:scale-90",
           hasSelection ? "sm:!opacity-100 sm:!scale-100" : "",
         ].join(" "),
@@ -558,7 +558,7 @@ export default function ProjectCard({
     .filter(Boolean)
     .join(" ");
   const actionsContainerClasses = [
-    "absolute right-3 top-3 z-10 inline-flex items-center overflow-hidden rounded-[10px] bg-white/95 text-slate-400 shadow-[0_4px_12px_rgba(15,23,42,0.18)] dark:bg-[#2F2F2F] dark:text-zinc-100 dark:shadow-[0_6px_18px_rgba(0,0,0,0.35)] dark:border dark:border-[#525252]",
+    "absolute right-3 top-3 z-10 inline-flex items-center overflow-hidden rounded-[10px] bg-white/95 text-slate-400 shadow-[0_4px_12px_rgba(15,23,42,0.18)] dark:bg-[#2F2F2F] dark:text-zinc-300 dark:shadow-[0_6px_18px_rgba(0,0,0,0.35)] dark:border dark:border-zinc-500",
     "opacity-100 transition-opacity duration-150",
     "sm:opacity-0",
     menuOpen ? "sm:!opacity-100" : "",
@@ -566,7 +566,7 @@ export default function ProjectCard({
     .filter(Boolean)
     .join(" ");
   const actionButtonBase =
-    "flex h-9 w-9 items-center justify-center text-sm transition hover:bg-slate-100/80 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-[#393939]/80 xl:h-10 xl:w-10";
+    "flex h-9 w-9 items-center justify-center text-sm transition hover:bg-slate-100/80 disabled:cursor-not-allowed disabled:opacity-60 dark:text-zinc-300 dark:hover:bg-[#393939]/80 dark:hover:text-zinc-100 xl:h-10 xl:w-10";
 
   const startRenaming = (event?: { preventDefault: () => void; stopPropagation: () => void }) => {
     event?.preventDefault();
@@ -701,6 +701,20 @@ export default function ProjectCard({
   const menuClassName =
     "project-actions-menu z-[9999] w-56 overflow-hidden rounded-xl border border-[#E5E7EB] bg-white text-sm text-slate-800 shadow-[0_16px_36px_rgba(15,23,42,0.14)] sm:w-64 dark:border-[#3F3F3F] dark:bg-[#323232] dark:text-zinc-100 dark:shadow-[0_20px_44px_rgba(0,0,0,0.5)]";
 
+  const handleCardClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!hasSelection) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("button,a,input,textarea,select,label")) return;
+    event.preventDefault();
+    onToggleSelected(project.id);
+  };
+
+  const handleSelectModeClick = (event: React.MouseEvent<HTMLElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onToggleSelected(project.id);
+  };
+
   const renderMenuPanel = (style: CSSProperties, useFixed: boolean) => (
     <div
       ref={menuRef}
@@ -772,13 +786,16 @@ export default function ProjectCard({
               }}
               className={`inline-flex h-5 w-5 flex-none items-center justify-center transition ${
                 starred
-                  ? "text-amber-500 dark:text-amber-300"
+                  ? "!text-amber-500 dark:!text-amber-300"
                   : "text-slate-300 hover:text-amber-400 dark:text-zinc-600 dark:hover:text-amber-300"
               }`}
               aria-label={starred ? "Unstar project" : "Star project"}
               aria-pressed={starred}
             >
-              <Star className={`h-4 w-4 ${starred ? "fill-current" : ""}`} aria-hidden />
+              <Star
+                className={`h-4 w-4 ${starred ? "fill-current !text-amber-500 dark:!text-amber-300" : ""}`}
+                aria-hidden
+              />
             </button>
             <div className="min-w-0 flex items-center gap-1.5">
               <p className="truncate text-sm font-semibold text-slate-900 dark:text-zinc-100">
@@ -914,7 +931,11 @@ export default function ProjectCard({
   );
 
   return (
-    <div className="project-card group relative flex flex-col text-left transition" aria-label={project.title}>
+    <div
+      className="project-card group relative flex flex-col text-left transition"
+      aria-label={project.title}
+      onClick={handleCardClick}
+    >
       <div ref={cardRef} className={cardClasses}>
         <button
           type="button"
@@ -937,7 +958,7 @@ export default function ProjectCard({
               <button
                 type="button"
                 className={`${actionButtonBase} ${
-                  starred ? "text-amber-500 dark:text-amber-300" : ""
+                  starred ? "!text-amber-500 dark:!text-amber-300" : ""
                 }`}
                 onClick={(event) => {
                   event.preventDefault();
@@ -953,12 +974,12 @@ export default function ProjectCard({
                 aria-label={starred ? "Unstar project" : "Star project"}
               >
                 <Star
-                  className={`h-6 w-6 ${starred ? "fill-current" : ""}`}
+                  className={`h-6 w-6 ${starred ? "fill-current !text-amber-500 dark:!text-amber-300" : ""}`}
                   strokeWidth={2.4}
                   aria-hidden
                 />
               </button>
-              <div className="h-6 w-px bg-slate-200/80" aria-hidden />
+              <div className="h-6 w-px bg-slate-200/80 dark:bg-zinc-500" aria-hidden />
               <button
                 ref={menuTriggerButtonRef}
                 type="button"
@@ -1028,23 +1049,30 @@ export default function ProjectCard({
             )
           : null}
         <div className="project-card-preview relative m-[3px] w-[calc(100%-6px)] aspect-square rounded-[10px] bg-[#EEF1F5] border border-[rgba(0,0,0,0.06)] transition-colors dark:border-transparent dark:bg-[#2A2A2A] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.02)]">
-          <Link
-            href={`/studio?project=${encodeURIComponent(project.id)}`}
-            className="absolute inset-0"
-            aria-label={`Open ${project.title}`}
-            onClick={(event) => {
-              if (hasSelection) {
+          {hasSelection ? (
+            <button
+              type="button"
+              className="absolute inset-0"
+              aria-label={`Select ${project.title}`}
+              onClick={handleSelectModeClick}
+              onMouseDown={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
-                onToggleSelected(project.id);
-                return;
-              }
-              if (renaming) {
-                event.preventDefault();
-                event.stopPropagation();
-              }
-            }}
-          />
+              }}
+            />
+          ) : (
+            <Link
+              href={`/studio?project=${encodeURIComponent(project.id)}`}
+              className="absolute inset-0"
+              aria-label={`Open ${project.title}`}
+              onClick={(event) => {
+                if (renaming) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                }
+              }}
+            />
+          )}
           {typeof project.pagesCount === "number" && project.pagesCount > 0 ? (
             <div className="project-card-pages pointer-events-none absolute bottom-2.5 left-2.5 z-10 hidden rounded-full bg-black/60 px-3.5 py-1 text-[12px] font-semibold text-white opacity-0 shadow-sm dark:shadow-none backdrop-blur-sm transition-opacity dark:bg-[#2B2B2B]/80 dark:text-zinc-100 sm:block">
               {project.pagesCount} {project.pagesCount === 1 ? "page" : "pages"}

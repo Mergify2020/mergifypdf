@@ -332,7 +332,7 @@ export default function StartProjectButton({ className, variant = "default", ico
             launchExiting ? "pointer-events-none opacity-0 scale-[0.965]" : "opacity-100 scale-100"
           }`}>
             <form
-              className="flex max-h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-2xl bg-white shadow-[0_22px_60px_rgba(15,23,42,0.22),0_0_0_1px_rgba(148,163,184,0.14)] dark:bg-zinc-900 dark:shadow-[0_22px_60px_rgba(0,0,0,0.5)]"
+              className="flex max-h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-2xl bg-white shadow-[0_22px_60px_rgba(15,23,42,0.22),0_0_0_1px_rgba(148,163,184,0.14)] dark:bg-[#323232] dark:shadow-[0_22px_60px_rgba(0,0,0,0.5)]"
               onSubmit={(event) => {
                 event.preventDefault();
                 void handleStart();
@@ -346,11 +346,11 @@ export default function StartProjectButton({ className, variant = "default", ico
                       <div
                         className={`group flex min-h-[360px] w-full flex-col overflow-hidden rounded-[10px] text-center transition duration-200 sm:min-h-[400px] ${
                           showFilesError
-                            ? "border border-rose-300 bg-gradient-to-b from-rose-50/70 via-white/90 to-white text-rose-600 shadow-[0_0_0_1px_rgba(251,113,133,0.15)] dark:bg-zinc-900/60"
+                            ? "border border-rose-300 bg-gradient-to-b from-rose-50/70 via-white/90 to-white text-rose-600 shadow-[0_0_0_1px_rgba(251,113,133,0.15)] dark:bg-[#323232]/60"
                             : dragActive
-                              ? "scale-[1.01] border border-sky-400/80 bg-gradient-to-b from-white/80 via-sky-50/70 to-white shadow-[0_0_0_1px_rgba(56,189,248,0.35),0_0_30px_rgba(56,189,248,0.25)] dark:bg-zinc-900/70"
+                              ? "scale-[1.01] border border-sky-400/80 bg-gradient-to-b from-white/80 via-sky-50/70 to-white shadow-[0_0_0_1px_rgba(56,189,248,0.35),0_0_30px_rgba(56,189,248,0.25)] dark:bg-[#323232]"
                               : pendingFiles.length === 0
-                                ? "border-2 border-dashed border-[#D1D5DB] bg-[#F5F5F5] dark:border-zinc-700 dark:bg-zinc-800/80"
+                                ? "border-2 border-dashed border-[#D1D5DB] bg-[#F5F5F5] dark:border-[#3A3A3A] dark:bg-[#2B2B2B]/80"
                                 : "bg-transparent dark:bg-transparent"
                         } ${launchFileFlash ? "scale-[1.01] brightness-[1.02] shadow-[0_0_0_1px_rgba(108,71,255,0.15),0_18px_40px_rgba(108,71,255,0.12)]" : ""}`}
                         onDragEnter={(event) => {
@@ -444,7 +444,7 @@ export default function StartProjectButton({ className, variant = "default", ico
                 </div>
               </div>
 
-              <div className="shrink-0 bg-white dark:bg-zinc-900">
+              <div className="shrink-0 bg-white dark:bg-[#323232]">
                   <div className="flex min-h-[76px] items-center justify-end gap-3 px-6 py-0 text-sm sm:px-10">
                     <button
                       type="button"

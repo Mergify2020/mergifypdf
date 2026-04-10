@@ -1538,6 +1538,11 @@ header[data-hero="true"] .app-brand-dark {
   }
 
   .workspace-shell-root {
+    position: fixed;
+    top: var(--home-banner-offset, 0px);
+    right: 0;
+    bottom: 0;
+    left: 0;
     --workspace-vh: 100svh;
     --workspace-frame-gutter: 12px;
     --workspace-content-bottom-subtract: calc(var(--workspace-frame-gutter) + 4px);
@@ -1545,6 +1550,7 @@ header[data-hero="true"] .app-brand-dark {
     --workspace-projects-bottom-gap: 6px;
     height: calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset, 0px));
     min-height: calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset, 0px));
+    touch-action: pan-y;
     overflow: hidden;
   }
 

@@ -25,6 +25,7 @@ export default function PendingFilesReorderList({
   const maxFiles = 12;
   const [useTouchReorderControls, setUseTouchReorderControls] = useState(false);
   const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
+  const [pageCountsById, setPageCountsById] = useState<Record<string, number | null>>({});
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [insertIndex, setInsertIndex] = useState<number | null>(null);
   const [dragMoved, setDragMoved] = useState(false);
@@ -44,6 +45,7 @@ export default function PendingFilesReorderList({
   const rowPositionsRef = useRef<Array<{ index: number; top: number; height: number }>>([]);
   const pendingLayoutAnimationRef = useRef<Map<string, number> | null>(null);
   const deleteTimerRef = useRef<number | null>(null);
+  const pageCountsByIdRef = useRef<Record<string, number | null>>({});
   const dragOverlayRef = useRef<typeof dragOverlay>(null);
   const dragIndexRef = useRef<number | null>(null);
   const insertIndexRef = useRef<number | null>(null);
@@ -75,6 +77,7 @@ export default function PendingFilesReorderList({
   liveOrderIndices.forEach((fileIndex, orderIndex) => {
     liveDisplayPositions.set(fileIndex, orderIndex + 1);
   });
+  const canReorder = files.length > 1;
 
   function formatBytes(bytes: number) {
     if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
@@ -191,7 +194,7 @@ export default function PendingFilesReorderList({
     });
     const rafId = window.requestAnimationFrame(() => {
       animations.forEach((node) => {
-        node.style.transition = "transform 180ms cubic-bezier(0.22, 1, 0.36, 1)";
+        node.style.transition = "transform 320ms cubic-bezier(0.16, 1, 0.3, 1)";
         node.style.transform = "translateY(0)";
         const cleanup = () => {
           node.style.transition = "";
@@ -215,8 +218,60 @@ export default function PendingFilesReorderList({
     };
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let cancelled = false;
+
+    const loadPageCount = async (file: File) => {
+      try {
+        const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf");
+        const workerSrc = new URL("pdfjs-dist/legacy/build/pdf.worker.js", import.meta.url).toString();
+        if (pdfjsLib.GlobalWorkerOptions.workerSrc !== workerSrc) {
+          pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+        }
+        const bytes = await file.arrayBuffer();
+        const doc = await pdfjsLib.getDocument({ data: bytes } as never).promise;
+        return doc.numPages;
+      } catch (err) {
+        try {
+          const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf");
+          const bytes = await file.arrayBuffer();
+          const doc = await pdfjsLib.getDocument({ data: bytes, disableWorker: true } as never).promise;
+          return doc.numPages;
+        } catch {
+          console.warn("Failed to read PDF page count", err);
+          return null;
+        }
+      }
+    };
+
+    const run = async () => {
+      const nextCounts: Record<string, number | null> = {};
+      await Promise.all(
+        files.map(async ({ id, file }) => {
+          if (cancelled) return;
+          const cached = pageCountsByIdRef.current[id];
+          if (typeof cached === "number" || cached === null) {
+            nextCounts[id] = cached;
+            return;
+          }
+          nextCounts[id] = await loadPageCount(file);
+        }),
+      );
+      if (!cancelled) {
+        pageCountsByIdRef.current = { ...pageCountsByIdRef.current, ...nextCounts };
+        setPageCountsById(pageCountsByIdRef.current);
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [files]);
+
   function beginReorder(index: number, event: React.PointerEvent<HTMLButtonElement>) {
-    if (busy) return;
+    if (busy || !canReorder) return;
     const row = rowRefs.current[index];
     const listNode = listRef.current;
     const viewportNode = viewportRef.current;
@@ -256,20 +311,20 @@ export default function PendingFilesReorderList({
 
   useEffect(() => {
     if (useTouchReorderControls) return;
-    if (dragIndex === null) return;
+    if (dragIndex === null || !canReorder) return;
     const clampOverlayTop = (top: number, height: number) => {
-      const viewportNode = viewportRef.current;
-      if (!viewportNode) return Math.max(top, 0);
+      const listNode = listRef.current;
+      if (!listNode) return Math.max(top, 0);
       const minTop = 0;
-      const maxTop = viewportNode.clientHeight - height;
+      const maxTop = listNode.scrollHeight - height;
       if (maxTop < minTop) return minTop;
       return Math.min(Math.max(top, minTop), maxTop);
     };
     const getPinnedOverlayTop = (height: number, direction: -1 | 0 | 1) => {
-      const viewportNode = viewportRef.current;
-      if (!viewportNode) return 0;
+      const listNode = listRef.current;
+      if (!listNode) return 0;
       if (direction === -1) return 0;
-      if (direction === 1) return viewportNode.clientHeight - height;
+      if (direction === 1) return Math.max(0, listNode.scrollHeight - height);
       return 0;
     };
     const recomputeRowPositions = (skipIndex: number) => {
@@ -428,14 +483,13 @@ export default function PendingFilesReorderList({
       window.removeEventListener("pointercancel", handleUp);
       if (rafId !== null) window.cancelAnimationFrame(rafId);
     };
-  }, [dragIndex, files, onChange, useTouchReorderControls]);
+  }, [dragIndex, files, onChange, useTouchReorderControls, canReorder]);
 
   return (
     <div className={`flex h-[360px] flex-col gap-4 pt-0 pb-0 text-left sm:h-[400px] ${className ?? ""}`}>
       <div className="overflow-hidden rounded-[10px] border-2 border-dashed border-[#D1D5DB] bg-[#F5F5F5] px-3 py-3 shadow-none sm:px-8 dark:border-zinc-700 dark:bg-zinc-800/80">
         <div className="flex items-center justify-between gap-3">
           <p className="text-[15px] font-medium text-slate-700 dark:text-zinc-300">
-            {useTouchReorderControls ? null : <>Drag and drop, or{" "}</>}
             <button
               type="button"
               className="cursor-pointer text-[1.05em] font-bold text-slate-900 underline decoration-1 underline-offset-2 transition hover:text-slate-900 disabled:cursor-not-allowed dark:text-zinc-100 dark:hover:text-zinc-100"
@@ -447,11 +501,12 @@ export default function PendingFilesReorderList({
             >
               {files.length > 0 ? "Add more files" : "Select files"}
             </button>
+            {useTouchReorderControls ? null : <>{" "}or drag and drop</>}
           </p>
           <span
             ref={limitCounterRef}
             className={`inline-flex shrink-0 items-center text-sm font-semibold ${
-              files.length >= maxFiles ? "text-amber-600 dark:text-amber-400" : "text-slate-500 dark:text-zinc-400"
+              files.length >= maxFiles ? "text-amber-600 dark:text-amber-400" : "text-slate-500 dark:text-zinc-100"
             }`}
           >
             {files.length}/{maxFiles} files
@@ -477,6 +532,7 @@ export default function PendingFilesReorderList({
               const rowPosition = visibleIndexMap.get(index) ?? 0;
               const showSpacer = dragMoved && dragOverlay !== null && effectiveInsertIndex === rowPosition;
               const isDeletingRow = deletingFileId === id;
+              const pageCount = pageCountsById[id];
 
               return (
                 <div
@@ -499,12 +555,12 @@ export default function PendingFilesReorderList({
                     ref={(node) => {
                       rowRefs.current[index] = node;
                     }}
-                    className={`group/file-row flex items-center justify-between gap-3 bg-white px-4 py-3 text-sm text-slate-800 transition-[transform,opacity,filter] duration-180 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                    className={`group/file-row flex items-center justify-between gap-3 bg-white px-4 py-3 text-sm text-slate-800 transition-[transform,opacity,filter] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] ${
                       busy ? "opacity-70" : dragIndex !== null ? "" : "hover:bg-[#F6F2FF]"
                     } ${isDeletingRow ? "translate-x-3 scale-[0.985] opacity-0 blur-[1px]" : ""} dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200`}
                   >
                     <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-                      {useTouchReorderControls ? (
+                      {canReorder && useTouchReorderControls ? (
                         <div className="flex w-8 shrink-0 self-stretch py-0.5">
                           <div className="grid h-full w-8 grid-rows-2 overflow-hidden rounded-md border border-slate-200/80 bg-white dark:border-zinc-700 dark:bg-zinc-900">
                             <button
@@ -527,7 +583,7 @@ export default function PendingFilesReorderList({
                             </button>
                           </div>
                         </div>
-                      ) : (
+                      ) : canReorder ? (
                         <button
                           type="button"
                           onPointerDown={(event) => beginReorder(index, event)}
@@ -539,7 +595,7 @@ export default function PendingFilesReorderList({
                         >
                           <GripVertical className="h-4 w-4" aria-hidden />
                         </button>
-                      )}
+                      ) : null}
                       <span className="w-5 shrink-0 text-center text-sm font-semibold text-slate-500 dark:text-zinc-400 sm:w-6">
                         {liveDisplayPositions.get(index) ?? index + 1}
                       </span>
@@ -549,6 +605,7 @@ export default function PendingFilesReorderList({
                         </span>
                         <span className="block text-xs font-semibold text-slate-900 dark:text-zinc-300">
                           {getFileTypeLabel(file)} - {formatBytes(file.size)}
+                          {typeof pageCount === "number" ? ` · ${pageCount} ${pageCount === 1 ? "page" : "pages"}` : ""}
                         </span>
                       </div>
                     </div>
@@ -605,13 +662,24 @@ export default function PendingFilesReorderList({
                   {draggedDisplayPosition ?? dragOverlay.index + 1}
                 </span>
                 <div className="min-w-0">
-                  <span className="block truncate font-semibold text-slate-900 dark:text-zinc-100">
-                    {files[dragOverlay.index]?.file.name}
-                  </span>
-                  <span className="block text-xs font-semibold text-slate-900 dark:text-zinc-300">
-                    {getFileTypeLabel(files[dragOverlay.index]?.file as File)} -{" "}
-                    {formatBytes(files[dragOverlay.index]?.file.size ?? 0)}
-                  </span>
+                  {(() => {
+                    const draggedFile = files[dragOverlay.index];
+                    const draggedPageCount = draggedFile ? pageCountsById[draggedFile.id] : null;
+                    return (
+                      <>
+                        <span className="block truncate font-semibold text-slate-900 dark:text-zinc-100">
+                          {draggedFile?.file.name}
+                        </span>
+                        <span className="block text-xs font-semibold text-slate-900 dark:text-zinc-300">
+                          {getFileTypeLabel(draggedFile?.file as File)} -{" "}
+                          {formatBytes(draggedFile?.file.size ?? 0)}
+                          {typeof draggedPageCount === "number"
+                            ? ` · ${draggedPageCount} ${draggedPageCount === 1 ? "page" : "pages"}`
+                            : ""}
+                        </span>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
               <span className="h-7 w-7 shrink-0" aria-hidden />
