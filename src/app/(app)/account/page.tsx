@@ -1295,7 +1295,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
   return (
     <main className="w-full bg-slate-100 py-6 text-slate-900 dark:bg-[#252525] dark:text-zinc-100">
       <div className="mx-auto w-full max-w-[var(--shell-content-width)]">
-        <div className="mb-5 flex items-center justify-between gap-3">
+        <div className="mb-6 flex items-center justify-between gap-3">
           <div className="min-w-0 flex items-center gap-3">
             <button
               type="button"
