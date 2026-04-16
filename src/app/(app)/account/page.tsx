@@ -828,9 +828,13 @@ export function AccountSettingsPage({
   }
 
   async function handlePricingPlanSelect(
-    planName: (typeof PRICING_TIERS)[number]["name"],
+    planName: string,
     options?: { skipTrial?: boolean }
   ) {
+    if (planName !== "Essential Plus" && planName !== "Signature Pro") {
+      return;
+    }
+
     const priceId = {
       "Essential Plus": {
         monthly: BILLING_PRICE_IDS.essential_plus.monthly,
