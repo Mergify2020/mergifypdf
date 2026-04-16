@@ -5,49 +5,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Check, CreditCard, ShieldCheck, Download, Lock } from "lucide-react";
 import RevealOnScroll from "@/components/RevealOnScroll";
 import { BILLING_PRICE_IDS } from "@/lib/billingPlans";
-
-const tiers = [
-  {
-    name: "Essential Plus",
-    price: "$12.99 per month",
-    secondaryPrice: "$7.99 per month — Save 20% Compared to Monthly",
-    detail: "Per user / month",
-            accent: "from-[#FFB480] to-[#FF8A4E]",
-            overlay: "from-orange-300/30 to-transparent",
-            button: "bg-[#FF8A4E]",
-            pricePanel: "bg-white",
-            description: "",
-            features: [
-      "Unlimited uploads & projects",
-      "Advanced PDF editing",
-      "Sign your own documents",
-      "Create reusable templates",
-      "Compress & optimize PDFs",
-      "Secure cloud storage",
-      "Fast, reliable processing",
-    ],
-  },
-  {
-    name: "Signature Pro",
-    price: "$19.99 per month",
-    secondaryPrice: "$11.99 per month — Save 20% Compared to Monthly",
-    detail: "Per user / month",
-            accent: "from-[#A9C7FF] via-[#7BA8F4] to-[#4D74C8]",
-            overlay: "from-sky-200/25 to-transparent",
-            button: "bg-[#4D74C8]",
-    description: "",
-            pricePanel: "bg-white",
-            features: [
-              "Everything in Essential Plus",
-      "Unlimited signature requests",
-      "Dedicated signature dashboard",
-      "Multiple signers per document",
-      "Automatic signing reminders",
-      "Real-time signing progress tracking",
-      "Complete signing activity history",
-    ],
-  },
-];
+import PricingTierCards from "@/components/PricingTierCards";
 
 export default function PricingPlans() {
   const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("monthly");
@@ -282,153 +240,23 @@ export default function PricingPlans() {
         </div>
 
         <div className="mx-auto w-full max-w-full md:max-w-4xl">
-          <div id="pricing-plan-cards" className="grid w-full scroll-mt-28 gap-10 md:grid-cols-2">
-          {tiers.map((tier, index) => {
-            const canUseTrial = canUseTrialForPlan(tier.name);
-            let yearlyPrice: string | null = null;
-            let savingsLabel: string | null = null;
-
-            if (tier.secondaryPrice) {
-              const [year, savings] = tier.secondaryPrice.split("—");
-              yearlyPrice = year?.trim() ?? null;
-              const rawSavings = savings?.trim() ?? null;
-              if (rawSavings) {
-                const [mainPart] = rawSavings.split("Compared");
-                savingsLabel = mainPart.trim().toUpperCase();
-              }
+          <PricingTierCards
+            billingPeriod={billingPeriod}
+            canUseTrialForPlan={canUseTrialForPlan}
+            getPrimaryActionLabel={(_, canUseTrial) =>
+              canUseTrial ? "Start 7-day trial" : "Subscribe now"
             }
-            if (billingPeriod === "annual") {
-              savingsLabel = tier.name === "Essential Plus" ? "SAVE 42%" : "SAVE 37%";
-            }
-
-            const showAnnual = billingPeriod === "annual" && yearlyPrice;
-            const displayedPrice = (showAnnual ? yearlyPrice : tier.price) ?? "";
-            const [priceAmount, priceSuffix] = displayedPrice.split(" per ");
-
-            const titleClass =
-              tier.name === "Essential Plus"
-                ? "text-[2.2rem] md:text-[2.1rem] font-bold leading-snug bg-gradient-to-r from-sky-500 to-emerald-400 bg-clip-text text-transparent"
-                : "text-[2.2rem] md:text-[2.1rem] font-bold leading-snug bg-gradient-to-r from-purple-500 to-sky-500 bg-clip-text text-transparent";
-
-            return (
-              <RevealOnScroll key={tier.name} as="div" delayMs={index * 80} className="h-full">
-                <div className="relative flex h-full w-full flex-col overflow-hidden rounded-[12px] border-[3px] border-slate-300 bg-white px-8 pt-4 pb-8 shadow-[0_10px_24px_rgba(15,23,42,0.10)] transition-transform duration-150">
-                {tier.name === "Signature Pro" ? (
-                  <div className="pointer-events-none absolute top-0 right-0 z-20 h-40 w-40 overflow-hidden">
-                    <span className="absolute top-9 right-[-52px] inline-flex w-[238px] rotate-45 items-center justify-center bg-emerald-500 px-7 py-2 text-center text-[13px] leading-none font-bold uppercase tracking-[0.16em] text-white shadow-[0_8px_16px_rgba(16,185,129,0.35)]">
-                      <span className="translate-x-[13px]">Most Popular</span>
-                    </span>
-                  </div>
-                ) : null}
-                <div className="relative z-10 flex h-full flex-col">
-                  <div className="relative z-10 mt-2">
-                    <div className="pt-1">
-                      <h2 className={titleClass}>
-                        {tier.name}
-                      </h2>
-                      <div className="mt-6">
-                        <div className="flex items-center gap-2">
-                          <p
-                            key={displayedPrice}
-                            className="price-swap whitespace-nowrap text-[2.8rem] md:text-[3.1rem] font-normal leading-tight tracking-tight text-slate-900"
-                          >
-                            {priceAmount}
-                          </p>
-                          {priceSuffix ? (
-                            <span key={priceSuffix} className="price-swap text-lg font-medium text-slate-500">
-                              per {priceSuffix}
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className={`mt-0.5 ${billingPeriod === "annual" ? "h-4" : "h-0"}`} />
-                        <div
-                          className={`flex items-center gap-2 transition-all duration-200 ${
-                            billingPeriod === "annual"
-                              ? "mt-0 translate-y-0 opacity-100"
-                              : "pointer-events-none mt-[-10px] translate-y-1 opacity-0"
-                          }`}
-                        >
-                          <p className="text-lg font-medium text-slate-500">Billed annually</p>
-                          {billingPeriod === "annual" && savingsLabel ? (
-                            <span className="rounded-full bg-emerald-100 px-3 py-1.5 text-[12px] font-bold uppercase tracking-wide text-emerald-700">
-                              {savingsLabel}
-                            </span>
-                          ) : null}
-                        </div>
-                        {tier.description ? (
-                          <p className="mt-3 text-sm leading-snug text-slate-700">{tier.description}</p>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={loadingPlan === tier.name}
-                    onClick={() =>
-                      void handleSelectPlan(tier.name, canUseTrial ? undefined : { skipTrial: true })
-                    }
-                    className={`${
-                      billingPeriod === "monthly" ? "mt-2" : "mt-4"
-                    } w-full rounded-[12px] px-4 py-2.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-all duration-150 ${
-                      "bg-[#0F172A] hover:scale-[1.01] hover:bg-[#0B1220]"
-                    } ${loadingPlan === tier.name ? "opacity-70 cursor-not-allowed" : ""}`}
-                  >
-                    {loadingPlan === tier.name ? "Redirecting..." : (
-                      <span className="inline-flex items-center justify-center gap-2">
-                        {canUseTrial ? "Start 7-day trial" : "Subscribe now"}
-                        <span aria-hidden>→</span>
-                      </span>
-                    )}
-                  </button>
-                  <div className="mt-3 flex flex-col items-center gap-2 text-xs font-semibold text-slate-900/80">
-                    {canUseTrial ? (
-                      <button
-                        type="button"
-                        onClick={() => void handleSelectPlan(tier.name, { skipTrial: true })}
-                        className="text-xs font-semibold text-slate-700 underline underline-offset-4 hover:text-slate-900"
-                      >
-                        Pay now
-                      </button>
-                    ) : (
-                      <span className="text-xs font-semibold text-slate-600">Trial already used</span>
-                    )}
-                  </div>
-                  <ul className="mt-6 flex-1 space-y-3 text-sm text-slate-800">
-                    {tier.features.map((feature) => {
-                      const isEverythingInEssentialRow =
-                        tier.name === "Signature Pro" && feature === "Everything in Essential Plus";
-                      return (
-                        <li key={feature} className="flex items-center gap-2">
-                          <span
-                            className={`inline-flex h-5 w-5 flex-none items-center justify-center rounded-full ${
-                              isEverythingInEssentialRow
-                                ? "bg-sky-500"
-                                : tier.name === "Essential Plus"
-                                  ? "bg-sky-500"
-                                  : "bg-indigo-500"
-                            }`}
-                          >
-                            <Check className="h-3 w-3 text-white" strokeWidth={3} aria-hidden="true" />
-                          </span>
-                          <span className="font-semibold text-slate-900">{feature}</span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                  {tier.name === "Signature Pro" ? (
-                    <p className="mt-0 translate-y-[6px] flex w-full items-baseline justify-start gap-1 pl-7 text-xs leading-5 text-slate-500">
-                      <span className="text-rose-500/90" aria-hidden="true">
-                        *
-                      </span>
-                      <span>Signers do not need a paid plan.</span>
-                    </p>
-                  ) : null}
-                </div>
-                </div>
-              </RevealOnScroll>
-            );
-          })}
-          </div>
+            getPrimaryActionOptions={(_, canUseTrial) => (canUseTrial ? undefined : { skipTrial: true })}
+            onPrimaryAction={(tierName, options) => {
+              void handleSelectPlan(tierName, options);
+            }}
+            getSecondaryActionLabel={(_, canUseTrial) => (canUseTrial ? "Pay now" : null)}
+            onSecondaryAction={(tierName) => {
+              void handleSelectPlan(tierName, { skipTrial: true });
+            }}
+            loadingPlan={loadingPlan}
+            className="grid w-full scroll-mt-28 gap-10 md:grid-cols-2"
+          />
         </div>
         <RevealOnScroll as="div" variant="fade" className="mt-5 flex justify-center">
           <div className="inline-flex items-center gap-2 text-sm font-medium text-slate-600">

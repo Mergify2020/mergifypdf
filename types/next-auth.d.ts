@@ -8,6 +8,7 @@ declare module "next-auth" {
       id?: string;
       image?: string | null;
       stripeStatus?: string | null;
+      stripePriceId?: string | null;
       twoFactorEnabled?: boolean;
       twoFactorPassed?: boolean;
     };
@@ -19,6 +20,7 @@ declare module "next-auth/jwt" {
     authType?: "oauth" | "credentials";
     providers?: string[];
     stripeStatus?: string | null;
+    stripePriceId?: string | null;
     twoFactorEnabled?: boolean;
     twoFactorPassed?: boolean;
     twoFactorMethod?: string | null;

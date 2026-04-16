@@ -26,8 +26,10 @@ export async function GET() {
       },
       hasActivePlan: false,
       stripeStatus: null,
+      stripePriceId: null,
       currentPlanTier: null,
       stripeCustomerId: null,
+      stripeCurrentPeriodEnd: null,
     });
   }
 
@@ -39,6 +41,7 @@ export async function GET() {
         stripeStatus: string | null;
         stripePriceId: string | null;
         stripeCustomerId: string | null;
+        stripeCurrentPeriodEnd: Date | null;
       }
     | null = null;
 
@@ -53,6 +56,7 @@ export async function GET() {
           stripeStatus: true,
           stripePriceId: true,
           stripeCustomerId: true,
+          stripeCurrentPeriodEnd: true,
         },
       });
       clearPrismaDatabaseUnavailable();
@@ -81,8 +85,10 @@ export async function GET() {
       },
       hasActivePlan: false,
       stripeStatus: null,
+      stripePriceId: null,
       currentPlanTier: null,
       stripeCustomerId: null,
+      stripeCurrentPeriodEnd: null,
     });
   }
   const hasActivePlan = user?.stripeStatus === "active" || user?.stripeStatus === "trialing";
@@ -106,7 +112,9 @@ export async function GET() {
     },
     hasActivePlan,
     stripeStatus: user?.stripeStatus ?? null,
+    stripePriceId: user?.stripePriceId ?? null,
     currentPlanTier,
     stripeCustomerId: user?.stripeCustomerId ?? null,
+    stripeCurrentPeriodEnd: user?.stripeCurrentPeriodEnd?.toISOString() ?? null,
   });
 }

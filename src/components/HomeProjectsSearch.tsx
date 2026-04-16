@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowDown,
@@ -50,7 +50,6 @@ type OwnerFilter = "any" | "shared" | "you";
 type SortOption = "activity" | "starred" | "az" | "za";
 type ViewMode = "grid" | "list";
 const ALL_PROJECTS_VIEW_MODE_KEY = "mpdf:all-projects-view-mode";
-const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 const mapProjectsFromSummary = (projects: ProjectsSummaryProject[]): SummaryProject[] =>
   projects.map((project) => ({
@@ -89,7 +88,7 @@ export default function HomeProjectsSearch({
   const queryBridge = useWorkspaceHomeQuery();
   const query = queryBridge?.query ?? "";
   const [projectsState, setProjectsState] = useState<SummaryProject[]>(() => {
-    if (typeof window !== "undefined" && ownerKey && !showAllProjects) {
+    if (typeof window !== "undefined" && ownerKey) {
       const cached = getProjectsSummaryCache(ownerKey);
       if (cached) return mapProjectsFromSummary(cached);
     }
@@ -108,24 +107,18 @@ export default function HomeProjectsSearch({
   const recentListRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!ownerKey) {
-      setProjectsState(projects);
-      return;
-    }
+    if (!ownerKey) return;
 
     if (showAllProjects) {
       const routeProjectsSummary = mapProjectsToSummary(projects);
-      setProjectsState(projects);
-      setProjectsSummaryCache(ownerKey, routeProjectsSummary);
+      const cached = getProjectsSummaryCache(ownerKey);
+      if (!cached || routeProjectsSummary.length >= cached.length) {
+        setProjectsSummaryCache(ownerKey, routeProjectsSummary);
+      }
       return;
     }
 
     const cached = getProjectsSummaryCache(ownerKey);
-    if (cached) {
-      setProjectsState(mapProjectsFromSummary(cached));
-    } else {
-      setProjectsState(projects);
-    }
 
     // Seed shared cache from route payload, but avoid shrinking a fuller cached list.
     const routeProjectsSummary = mapProjectsToSummary(projects);
@@ -141,7 +134,7 @@ export default function HomeProjectsSearch({
     return () => {
       unsubscribe();
     };
-  }, [ownerKey, projects]);
+  }, [ownerKey, projects, showAllProjects]);
 
   const accountInitials = useMemo(() => {
     const parts = accountName
@@ -194,15 +187,6 @@ export default function HomeProjectsSearch({
       document.removeEventListener("keydown", handleKey);
     };
   }, [ownerMenuOpen]);
-
-  useIsomorphicLayoutEffect(() => {
-    if (!showAllProjects) return;
-    if (typeof window === "undefined") return;
-    const stored = window.localStorage.getItem(ALL_PROJECTS_VIEW_MODE_KEY);
-    if (stored === "grid" || stored === "list") {
-      setViewMode(stored);
-    }
-  }, [showAllProjects]);
 
   useEffect(() => {
     if (!showAllProjects) return;

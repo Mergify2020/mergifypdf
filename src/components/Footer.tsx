@@ -6,6 +6,10 @@ import RevealOnScroll from "@/components/RevealOnScroll";
 
 type IconProps = React.SVGProps<SVGSVGElement>;
 
+type FooterProps = {
+  reveal?: boolean;
+};
+
 function SocialIcon(props: { label: string; href?: string; name: string; icon: React.ReactNode }) {
   const { label, href = "#", name, icon } = props;
   return (
@@ -64,13 +68,8 @@ function XIcon(props: IconProps) {
   );
 }
 
-export default function Footer() {
-  return (
-    <RevealOnScroll
-      as="footer"
-      variant="fade"
-      className="border-t border-slate-700/40 bg-[#1E2230] text-slate-300"
-    >
+export default function Footer({ reveal = true }: FooterProps) {
+  const footerContent = (
       <div className="mx-auto w-full max-w-[1400px] px-4 pt-12 pb-8 sm:px-6 lg:px-8">
         {/* Top grid */}
         <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-5 lg:gap-10">
@@ -164,6 +163,15 @@ export default function Footer() {
           </div>
         </div>
       </div>
+  );
+
+  if (!reveal) {
+    return <footer className="border-t border-slate-700/40 bg-[#1E2230] text-slate-300">{footerContent}</footer>;
+  }
+
+  return (
+    <RevealOnScroll as="footer" variant="fade" className="border-t border-slate-700/40 bg-[#1E2230] text-slate-300">
+      {footerContent}
     </RevealOnScroll>
   );
 }

@@ -11,6 +11,18 @@ function isLocalHost(host: string): boolean {
   return normalized === "localhost" || normalized === "127.0.0.1" || normalized === "::1";
 }
 
+function isConfiguredDevHost(host: string): boolean {
+  const normalizedHost = host.split(":")[0] ?? "";
+  const nextAuthUrl = process.env.NEXTAUTH_URL?.trim();
+  if (!nextAuthUrl) return false;
+  try {
+    const allowedHost = new URL(nextAuthUrl).hostname.toLowerCase().trim();
+    return allowedHost === normalizedHost;
+  } catch {
+    return false;
+  }
+}
+
 export function guardDevRoute(req: Request): NextResponse | null {
   if (process.env.NODE_ENV === "production") {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -19,7 +31,7 @@ export function guardDevRoute(req: Request): NextResponse | null {
   const configuredSecret = process.env.DEV_ROUTE_SECRET?.trim();
   if (!configuredSecret) {
     const host = getRequestHost(req);
-    if (isLocalHost(host)) return null;
+    if (isLocalHost(host) || isConfiguredDevHost(host)) return null;
     return NextResponse.json(
       { error: "Forbidden: set DEV_ROUTE_SECRET to enable remote dev route access." },
       { status: 403 },

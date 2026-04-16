@@ -26,7 +26,7 @@ export default function SettingsMenu({
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
@@ -37,6 +37,7 @@ export default function SettingsMenu({
   const [themeHydrated, setThemeHydrated] = useState(false);
   const avatarKey = session?.user?.id ?? session?.user?.email ?? null;
   const { avatar } = useAvatarPreference(avatarKey);
+  const showProfileSkeleton = sessionStatus === "loading";
   const profileName = (session?.user?.name ?? "").trim();
   const profileEmail = (session?.user?.email ?? "").trim();
   const hasProfileInfo = Boolean(profileName || profileEmail);
@@ -44,7 +45,7 @@ export default function SettingsMenu({
 
   const outerSizeClass = variant === "pricing" ? "h-12 w-12" : "h-9 w-9";
   const innerSizeClass = variant === "pricing" ? "h-11 w-11" : "h-8 w-8";
-  const showAvatarImage = Boolean(avatar) && !avatarLoadFailed;
+  const showAvatarImage = Boolean(avatar) && !avatarLoadFailed && !showProfileSkeleton;
 
   useEffect(() => {
     setAvatarLoadFailed(false);
@@ -184,7 +185,11 @@ export default function SettingsMenu({
 
   function handleAccountSettings() {
     setOpen(false);
-    router.push("/account");
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("open-account-panel"));
+    } else {
+      router.push("/account");
+    }
   }
 
   function handleProjects() {
@@ -269,6 +274,10 @@ export default function SettingsMenu({
               className={`${innerSizeClass} rounded-full object-cover`}
               onError={() => setAvatarLoadFailed(true)}
             />
+          ) : trigger === "avatar" && showProfileSkeleton ? (
+            <span
+              className={`rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A] ${innerSizeClass}`}
+            />
           ) : trigger === "avatar" ? (
             <span
               className={`flex items-center justify-center rounded-full text-xs font-semibold uppercase text-white ${innerSizeClass}`}
@@ -297,6 +306,8 @@ export default function SettingsMenu({
                   className="h-11 w-11 rounded-md object-cover"
                   onError={() => setAvatarLoadFailed(true)}
                 />
+              ) : showProfileSkeleton ? (
+                <span className="h-11 w-11 rounded-md bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
               ) : (
                 <span
                   className="flex h-11 w-11 items-center justify-center rounded-md text-base font-semibold uppercase text-white"
@@ -305,7 +316,12 @@ export default function SettingsMenu({
                   {hasProfileInfo ? fallback.initials : ""}
                 </span>
               )}
-              {hasProfileInfo ? (
+              {showProfileSkeleton ? (
+                <div className="min-w-0 flex-1 space-y-2">
+                  <div className="h-4 w-32 rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
+                  <div className="h-3.5 w-40 rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
+                </div>
+              ) : hasProfileInfo ? (
                 <div className="min-w-0">
                   {profileName ? (
                     <p className="max-w-[190px] truncate text-base font-semibold text-[#0F172A] dark:text-zinc-100">

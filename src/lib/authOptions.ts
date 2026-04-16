@@ -153,6 +153,12 @@ export const authOptions: NextAuthOptions = {
         ) {
           token.stripeStatus = session.stripeStatus;
         }
+        if (
+          typeof session.stripePriceId === "string"
+          || session.stripePriceId === null
+        ) {
+          token.stripePriceId = session.stripePriceId;
+        }
       }
 
       if (account || !token.providers) {
@@ -194,16 +200,27 @@ export const authOptions: NextAuthOptions = {
         || typeof token.twoFactorEnabled !== "boolean"
         || (typeof token.twoFactorMethod !== "string" && token.twoFactorMethod !== null)
         || (typeof token.stripeStatus !== "string" && token.stripeStatus !== null)
+        || (typeof token.stripePriceId !== "string" && token.stripePriceId !== null)
       );
 
       let dbUser:
-        | { twoFactorEnabled: boolean | null; twoFactorMethod: string | null; stripeStatus: string | null }
+        | {
+            twoFactorEnabled: boolean | null;
+            twoFactorMethod: string | null;
+            stripeStatus: string | null;
+            stripePriceId: string | null;
+          }
         | null = null;
       if (shouldRefreshAuthState && !isPrismaDatabaseCooldownActive()) {
         try {
           dbUser = await prisma.user.findUnique({
             where: { id: userId },
-            select: { twoFactorEnabled: true, twoFactorMethod: true, stripeStatus: true },
+            select: {
+              twoFactorEnabled: true,
+              twoFactorMethod: true,
+              stripeStatus: true,
+              stripePriceId: true,
+            },
           });
           clearPrismaDatabaseUnavailable();
         } catch (error) {
@@ -222,6 +239,8 @@ export const authOptions: NextAuthOptions = {
         ?? (typeof token.twoFactorMethod === "string" ? token.twoFactorMethod : null);
       token.stripeStatus = dbUser?.stripeStatus
         ?? (typeof token.stripeStatus === "string" ? token.stripeStatus : null);
+      token.stripePriceId = dbUser?.stripePriceId
+        ?? (typeof token.stripePriceId === "string" ? token.stripePriceId : null);
 
       if (account) {
         // Fresh sign-in: always reset 2FA pass flag based on whether 2FA is enabled
@@ -262,6 +281,8 @@ export const authOptions: NextAuthOptions = {
         session.user.twoFactorPassed = twoFactorPassed;
         session.user.stripeStatus =
           typeof token.stripeStatus === "string" ? token.stripeStatus : null;
+        session.user.stripePriceId =
+          typeof token.stripePriceId === "string" ? token.stripePriceId : null;
 
       }
       return session;

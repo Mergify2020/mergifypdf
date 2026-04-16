@@ -1,9 +1,12 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, ChevronDown, MoveLeft, PencilLine, User, Mail, Lock, Shield, CreditCard, Star, Smile, Sun } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, CreditCard, ExternalLink, Lock, Mail, MoveLeft, PencilLine, Plus, Send, Shield, Smile, Star, Sun, User } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ComponentType, type SVGProps } from "react";
+import { FileText as PhFileText, Folders as PhFolders, Signature as PhSignature, Trash as PhTrash } from "@phosphor-icons/react";
+import { siInstagram, siTiktok, siX } from "simple-icons";
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
 import { getAvatarFallback } from "@/lib/avatarFallback";
 import {
@@ -11,8 +14,9 @@ import {
   NEW_PASSWORD_REQUIREMENTS_ERROR,
   NEW_PASSWORD_REQUIREMENTS_HINT,
 } from "@/lib/passwordPolicy";
-import { BILLING_PRICE_IDS } from "@/lib/billingPlans";
+import { BILLING_PRICE_IDS, getPlanTierFromPriceId } from "@/lib/billingPlans";
 import SettingsMenu from "@/components/SettingsMenu";
+import PricingTierCards, { PRICING_TIERS } from "@/components/PricingTierCards";
 
 const PREVIEW_STAGE_SIZE = 256; // matches Tailwind h-64
 const MIN_CROP_SIZE = 56;
@@ -30,52 +34,48 @@ type Bounds = { left: number; top: number; right: number; bottom: number };
 type CropHandle = "nw" | "ne" | "sw" | "se";
 type SettingsTab = "account" | "security" | "pricing";
 
-const ACCOUNT_PLAN_OPTIONS = [
-  {
-    name: "Essential Plus",
-    monthlyPrice: "$12.99",
-    annualPrice: "$7.99",
-    annualSavings: "Save 42%",
-    features: [
-      "Unlimited uploads & projects",
-      "Advanced PDF editing",
-      "Create reusable templates",
-      "Secure cloud storage",
-    ],
-  },
-  {
-    name: "Signature Pro",
-    monthlyPrice: "$19.99",
-    annualPrice: "$11.99",
-    annualSavings: "Save 37%",
-    features: [
-      "Everything in Essential Plus",
-      "Unlimited signature requests",
-      "Real-time signing tracking",
-      "Complete signing activity history",
-    ],
-  },
-] as const;
-
-const ACCOUNT_PLAN_PRICE_IDS: Record<
-  (typeof ACCOUNT_PLAN_OPTIONS)[number]["name"],
-  { monthly: string; annual: string }
-> = {
-  "Essential Plus": {
-    monthly: BILLING_PRICE_IDS.essential_plus.monthly,
-    annual: BILLING_PRICE_IDS.essential_plus.annual,
-  },
-  "Signature Pro": {
-    monthly: BILLING_PRICE_IDS.signature_pro.monthly,
-    annual: BILLING_PRICE_IDS.signature_pro.annual,
-  },
-};
 const HANDLE_POSITIONS: Record<CropHandle, string> = {
   nw: "-top-2 -left-2",
   ne: "-top-2 -right-2",
   sw: "-bottom-2 -left-2",
   se: "-bottom-2 -right-2",
 };
+
+type MobileDockItem = {
+  label: string;
+  href: string;
+  icon: ComponentType<{
+    className?: string;
+    weight?: "regular" | "fill";
+    size?: number | string;
+    color?: string;
+  }>;
+  active?: boolean;
+};
+
+function TikTokIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" width={18} height={18} aria-hidden="true" {...props}>
+      <path fill="currentColor" d={siTiktok.path} />
+    </svg>
+  );
+}
+
+function InstagramIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" width={18} height={18} aria-hidden="true" {...props}>
+      <path fill="currentColor" d={siInstagram.path} />
+    </svg>
+  );
+}
+
+function XIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" width={16} height={16} aria-hidden="true" {...props}>
+      <path fill="currentColor" d={siX.path} />
+    </svg>
+  );
+}
 
 function computeBounds(meta: DisplayMeta | null): Bounds {
   if (!meta) {
@@ -148,8 +148,19 @@ function resizeRectByHandle(
   return clampRectToBounds(nextRect, bounds);
 }
 
-function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { activeSettingsTab: SettingsTab }) {
+export function AccountSettingsPage({
+  activeSettingsTab: initialSettingsTab,
+  initialMobileView,
+  embedded = false,
+  onClose,
+}: {
+  activeSettingsTab: SettingsTab;
+  initialMobileView: SettingsTab | null;
+  embedded?: boolean;
+  onClose?: () => void;
+}) {
   const router = useRouter();
+  const pathname = usePathname();
   const { data: session, status: sessionStatus, update: updateSession } = useSession();
   const providers = session?.user?.providers ?? [];
   const hasCredentialsAccess = providers.length === 0 || providers.includes("credentials");
@@ -174,11 +185,14 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
   const [pricingBillingPeriod, setPricingBillingPeriod] = useState<"monthly" | "annual">("monthly");
   const [pricingCheckoutLoading, setPricingCheckoutLoading] = useState<string | null>(null);
   const [pricingMessage, setPricingMessage] = useState<string | null>(null);
-  const [billingIdMessage, setBillingIdMessage] = useState<string | null>(null);
+  const [pricingStatusMounted, setPricingStatusMounted] = useState(false);
+  const [pricingStatusReady, setPricingStatusReady] = useState(false);
   const [pricingTrialStatus, setPricingTrialStatus] = useState<{
     eligibleForTrial: boolean;
     stripeStatus: string | null;
+    stripePriceId?: string | null;
     stripeCustomerId?: string | null;
+    stripeCurrentPeriodEnd?: string | null;
     eligibleForTrialByPlan?: {
       essentialPlus?: boolean;
       signaturePro?: boolean;
@@ -239,11 +253,14 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
   const [disconnectBusy, setDisconnectBusy] = useState(false);
   const [disconnectError, setDisconnectError] = useState<string | null>(null);
   const [activeSettingsTab, setActiveSettingsTab] = useState<SettingsTab>(initialSettingsTab);
+  const [mobileSettingsView, setMobileSettingsView] = useState<SettingsTab | "home">(initialMobileView ?? "home");
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [accountHydrating, setAccountHydrating] = useState(true);
   const [themeHydrated, setThemeHydrated] = useState(false);
   const [suppressAccountLoader, setSuppressAccountLoader] = useState(false);
   const showAvatarImage = Boolean(avatar) && !avatarLoadFailed;
+  const showProfileSkeleton = sessionStatus === "loading";
+  const showNameSkeleton = accountHydrating || sessionStatus === "loading";
   const passwordMessageText = passwordMessage ?? "";
   const isEmailConfirmationMismatch =
     emailStep === "request"
@@ -273,37 +290,87 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
   const accountStripeStatus = pricingTrialStatus?.stripeStatus ?? session?.user?.stripeStatus ?? null;
   const pricingHasActivePlan = accountStripeStatus === "active" || accountStripeStatus === "trialing";
   const pricingIsDelinquent = accountStripeStatus === "past_due" || accountStripeStatus === "unpaid";
+  const isTrialingPlan = accountStripeStatus === "trialing";
+  const pricingStatusLoading = !pricingStatusMounted || !pricingStatusReady;
+  const currentPlanTier = (() => {
+    const tier = getPlanTierFromPriceId(
+      pricingStatusLoading ? null : pricingTrialStatus?.stripePriceId ?? session?.user?.stripePriceId ?? null,
+    );
+    if (tier === "essential_plus") return "Essential Plus";
+    if (tier === "signature_pro") return "Signature Pro";
+    return null;
+  })();
+  const currentPlanPriceId = pricingStatusLoading
+    ? null
+    : pricingTrialStatus?.stripePriceId ?? session?.user?.stripePriceId ?? null;
   const pricingCanUseTrial = pricingTrialStatus?.eligibleForTrial !== false;
-  const pricingStatusTone =
-    accountStripeStatus === "active"
-      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
-      : accountStripeStatus === "trialing"
-        ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
-        : pricingIsDelinquent
-          ? "bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300"
-          : "bg-slate-100 text-slate-700 dark:bg-[#2B2B2B] dark:text-zinc-300";
-  const pricingStatusLabel =
-    accountStripeStatus === "active"
-      ? "Active"
-      : accountStripeStatus === "trialing"
-        ? "Trial"
-        : pricingIsDelinquent
-          ? "Past due"
-          : "No active plan";
-  const pricingCurrentPlanLabel =
-    accountStripeStatus === "trialing"
-      ? "Current plan: Trial"
-      : pricingHasActivePlan
-        ? "Current plan: Active subscription"
-        : pricingIsDelinquent
-          ? "Current plan: Payment issue"
-          : "Current plan: No active plan";
-  const pricingSummaryActionLabel = pricingIsDelinquent
-    ? "Update payment method"
-    : pricingHasActivePlan
-      ? "Manage billing"
-      : "Start free trial";
-  const pricingCanUseTrialForPlan = (planName: (typeof ACCOUNT_PLAN_OPTIONS)[number]["name"]) => {
+  const currentPlanDetails = currentPlanTier
+    ? PRICING_TIERS.find((tier) => tier.name === currentPlanTier) ?? null
+    : null;
+  const currentPlanBillingPeriod = (() => {
+    if (
+      currentPlanPriceId === BILLING_PRICE_IDS.essential_plus.annual ||
+      currentPlanPriceId === BILLING_PRICE_IDS.signature_pro.annual
+    ) {
+      return "annual" as const;
+    }
+    if (
+      currentPlanPriceId === BILLING_PRICE_IDS.essential_plus.monthly ||
+      currentPlanPriceId === BILLING_PRICE_IDS.signature_pro.monthly
+    ) {
+      return "monthly" as const;
+    }
+    return null;
+  })();
+  const currentPlanCycleLabel = (() => {
+    const periodEnd = pricingTrialStatus?.stripeCurrentPeriodEnd;
+    if (!periodEnd) return null;
+    const endDate = new Date(periodEnd);
+    if (Number.isNaN(endDate.getTime())) return null;
+    const formattedEndDate = new Intl.DateTimeFormat("en-US", {
+      month: "long",
+      day: "numeric",
+    }).format(endDate);
+    if (accountStripeStatus === "trialing") {
+      return `Trial ends on ${formattedEndDate}`;
+    }
+    if (accountStripeStatus === "active") {
+      return `Renews on ${formattedEndDate}`;
+    }
+    return null;
+  })();
+  const desktopSettingsMaxWidth = "min(2064px, calc(100vw - 48px))";
+  const mobileDockItems: MobileDockItem[] = [
+    {
+      label: "Projects",
+      href: "/projects/all",
+      icon: PhFolders,
+      active: pathname?.startsWith("/projects") ?? false,
+    },
+    {
+      label: "Signatures",
+      href: "/signature-center",
+      icon: PhSignature,
+      active: pathname?.startsWith("/signature-center") ?? false,
+    },
+    {
+      label: "Templates",
+      href: "/templates",
+      icon: PhFileText,
+      active: pathname?.startsWith("/templates") ?? false,
+    },
+    {
+      label: "Trash",
+      href: "/projects/trash",
+      icon: PhTrash,
+      active: pathname?.startsWith("/projects/trash") ?? false,
+    },
+  ];
+  useEffect(() => {
+    setActiveSettingsTab(initialSettingsTab);
+  }, [initialSettingsTab]);
+
+  const pricingCanUseTrialForPlan = (planName: (typeof PRICING_TIERS)[number]["name"]) => {
     const byPlan = pricingTrialStatus?.eligibleForTrialByPlan;
     if (!byPlan) return pricingCanUseTrial;
     if (planName === "Essential Plus") return byPlan.essentialPlus !== false;
@@ -312,8 +379,8 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
   };
 
   useEffect(() => {
-    setActiveSettingsTab(initialSettingsTab);
-  }, [initialSettingsTab]);
+    setMobileSettingsView(initialMobileView ?? "home");
+  }, [initialMobileView]);
 
   useEffect(() => {
     if (activeSettingsTab === "account") return;
@@ -339,7 +406,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
   }, [router]);
 
   useEffect(() => {
-    if (activeSettingsTab !== "pricing") return;
+    if (!session?.user?.email) return;
     let cancelled = false;
     async function loadPricingStatus() {
       try {
@@ -348,7 +415,9 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
         const data = (await res.json()) as {
           eligibleForTrial?: boolean;
           stripeStatus?: string | null;
+          stripePriceId?: string | null;
           stripeCustomerId?: string | null;
+          stripeCurrentPeriodEnd?: string | null;
           eligibleForTrialByPlan?: {
             essentialPlus?: boolean;
             signaturePro?: boolean;
@@ -358,29 +427,29 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
         setPricingTrialStatus({
           eligibleForTrial: data.eligibleForTrial !== false,
           stripeStatus: typeof data.stripeStatus === "string" ? data.stripeStatus : null,
+          stripePriceId: typeof data.stripePriceId === "string" ? data.stripePriceId : null,
           stripeCustomerId: typeof data.stripeCustomerId === "string" ? data.stripeCustomerId : null,
+          stripeCurrentPeriodEnd:
+            typeof data.stripeCurrentPeriodEnd === "string" ? data.stripeCurrentPeriodEnd : null,
           eligibleForTrialByPlan: data.eligibleForTrialByPlan,
         });
       } catch {
         // no-op
+      } finally {
+        if (!cancelled) {
+          setPricingStatusReady(true);
+        }
       }
     }
     void loadPricingStatus();
     return () => {
       cancelled = true;
     };
-  }, [activeSettingsTab]);
+  }, [session?.user?.email]);
 
-  function handleCopyBillingId() {
-    const billingId = pricingTrialStatus?.stripeCustomerId;
-    if (!billingId) return;
-    if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) return;
-    void navigator.clipboard.writeText(billingId);
-    setBillingIdMessage("Billing ID copied.");
-    window.setTimeout(() => {
-      setBillingIdMessage((current) => (current === "Billing ID copied." ? null : current));
-    }, 1500);
-  }
+  useEffect(() => {
+    setPricingStatusMounted(true);
+  }, []);
 
   useEffect(() => {
     const handlePageShow = () => {
@@ -402,9 +471,15 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
   }, []);
 
   function switchSettingsTab(nextTab: SettingsTab) {
-    if (nextTab === activeSettingsTab) return;
     setActiveSettingsTab(nextTab);
-    if (typeof window !== "undefined") {
+    if (embedded && typeof window !== "undefined") {
+      const nextUrl = new URL(window.location.href);
+      nextUrl.searchParams.set("panel", "account");
+      nextUrl.searchParams.set("settingsView", nextTab);
+      router.replace(`${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`);
+      return;
+    }
+    if (!embedded && typeof window !== "undefined") {
       const nextUrl =
         nextTab === "security"
           ? "/account?view=security"
@@ -413,6 +488,11 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
             : "/account";
       window.history.pushState(window.history.state, "", nextUrl);
     }
+  }
+
+  function openMobileSettingsTab(nextTab: SettingsTab) {
+    setMobileSettingsView(nextTab);
+    switchSettingsTab(nextTab);
   }
 
   useEffect(() => {
@@ -664,12 +744,6 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
 
   async function openBillingPortal() {
     if (billingPortalLoading) return;
-    const accountViewQuery =
-      activeSettingsTab === "security"
-        ? "?view=security"
-        : activeSettingsTab === "pricing"
-          ? "?view=pricing"
-          : "";
     try {
       setBillingPortalLoading(true);
       if (typeof window !== "undefined") {
@@ -688,7 +762,15 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
       const returnUrl =
         typeof window === "undefined"
           ? undefined
-          : `${window.location.origin}/account${accountViewQuery}`;
+          : embedded
+            ? window.location.href
+            : `${window.location.origin}/account${
+                activeSettingsTab === "security"
+                  ? "?view=security"
+                  : activeSettingsTab === "pricing"
+                    ? "?view=pricing"
+                    : ""
+              }`;
       const response = await fetch("/api/billing-portal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -710,12 +792,6 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
 
   async function warmBillingPortal() {
     if (billingPortalLoading) return;
-    const accountViewQuery =
-      activeSettingsTab === "security"
-        ? "?view=security"
-        : activeSettingsTab === "pricing"
-          ? "?view=pricing"
-          : "";
     const now = Date.now();
     if (
       warmedBillingPortalUrl &&
@@ -728,7 +804,15 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
       const returnUrl =
         typeof window === "undefined"
           ? undefined
-          : `${window.location.origin}/account${accountViewQuery}`;
+          : embedded
+            ? window.location.href
+            : `${window.location.origin}/account${
+                activeSettingsTab === "security"
+                  ? "?view=security"
+                  : activeSettingsTab === "pricing"
+                    ? "?view=pricing"
+                    : ""
+              }`;
       const response = await fetch("/api/billing-portal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -744,10 +828,20 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
   }
 
   async function handlePricingPlanSelect(
-    planName: (typeof ACCOUNT_PLAN_OPTIONS)[number]["name"],
+    planName: (typeof PRICING_TIERS)[number]["name"],
     options?: { skipTrial?: boolean }
   ) {
-    const priceId = ACCOUNT_PLAN_PRICE_IDS[planName][pricingBillingPeriod];
+    const priceId = {
+      "Essential Plus": {
+        monthly: BILLING_PRICE_IDS.essential_plus.monthly,
+        annual: BILLING_PRICE_IDS.essential_plus.annual,
+      },
+      "Signature Pro": {
+        monthly: BILLING_PRICE_IDS.signature_pro.monthly,
+        annual: BILLING_PRICE_IDS.signature_pro.annual,
+      },
+    }[planName][pricingBillingPeriod];
+
     if (!priceId) return;
 
     try {
@@ -762,7 +856,9 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
 
       if (res.status === 401) {
         if (typeof window !== "undefined") {
-          window.location.href = "/login?callbackUrl=/account?view=pricing";
+          window.location.href = embedded
+            ? `/login?callbackUrl=${encodeURIComponent(window.location.href)}`
+            : "/login?callbackUrl=/account?view=pricing";
         }
         return;
       }
@@ -1293,82 +1389,262 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
   }
 
   return (
-    <main className="w-full bg-slate-100 py-6 text-slate-900 dark:bg-[#252525] dark:text-zinc-100">
-      <div className="mx-auto w-full max-w-[var(--shell-content-width)]">
-        <div className="mb-6 flex items-center justify-between gap-3">
-          <div className="min-w-0 flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                if (typeof window !== "undefined") {
-                  window.location.assign("/");
-                  return;
-                }
-                router.push("/");
-              }}
-              className="inline-flex h-9 w-9 items-center justify-center text-gray-700 transition hover:text-gray-900 dark:text-zinc-100 dark:hover:text-white"
-              aria-label="Back to home"
-            >
-              <MoveLeft className="h-6 w-6 stroke-[2.75]" aria-hidden />
-            </button>
-            <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-zinc-100">Account settings</h1>
-          </div>
-          <div className="ml-auto flex shrink-0 items-center gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                router.push("/support");
-              }}
-              className="whitespace-nowrap text-base font-medium text-gray-900 transition hover:text-black dark:text-zinc-100 dark:hover:text-white"
-            >
-              Contact us
-            </button>
-            <span className="h-7 w-[1.5px] bg-gray-300 dark:bg-white/30" aria-hidden />
-            <SettingsMenu
-              trigger="custom"
-              triggerLabel="Open profile menu"
-              triggerClassName="w-[224px] min-w-[224px] max-w-[224px] overflow-hidden flex h-11 items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white py-1.5 pl-1 pr-1.5 shadow-[12px_0_36px_rgba(15,23,42,0.10)] transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/30 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-100 dark:border-[#3F3F3F] dark:bg-[#323232] dark:shadow-[0_8px_22px_rgba(0,0,0,0.28),0_24px_52px_rgba(0,0,0,0.24)] dark:hover:bg-[#3A3A3A] dark:focus-visible:ring-offset-[#252525]"
-              triggerContent={
-                <>
-                  <span className="shrink-0 pointer-events-none">
-                    {showAvatarImage ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={avatar!}
-                        alt="Your avatar"
-                        className="h-8 w-8 rounded-full object-cover"
-                        onError={() => setAvatarLoadFailed(true)}
-                      />
+    <main
+      className={`box-border flex w-full flex-col overflow-y-auto overscroll-y-contain bg-white px-4 pt-[calc(3.5rem+env(safe-area-inset-top))] pb-[calc(5rem+env(safe-area-inset-bottom))] scroll-pt-[calc(3.5rem+env(safe-area-inset-top))] scroll-pb-[calc(5rem+env(safe-area-inset-bottom))] text-slate-900 dark:bg-[#252525] dark:text-zinc-100 ${
+        embedded ? "lg:bg-slate-100 lg:px-0 lg:pt-6 lg:pb-0 lg:scroll-pt-0 lg:scroll-pb-0" : "lg:bg-slate-100 lg:overflow-hidden lg:px-0 lg:pt-6 lg:pb-0 lg:scroll-pt-0 lg:scroll-pb-0"
+      }`}
+      style={{ scrollbarGutter: "stable both-edges" }}
+    >
+      <div
+        className={`flex w-full flex-col ${
+          embedded ? "lg:bg-transparent" : "mx-auto max-w-[var(--shell-content-width)]"
+        }`}
+      >
+        <div className="account-settings-home-intro fixed inset-x-0 top-0 z-30 border-b border-gray-300 bg-slate-100 px-4 py-3 dark:border-[#4A4A4A] dark:bg-[#252525] lg:static lg:inset-auto lg:mx-0 lg:mb-6 lg:border-0 lg:bg-transparent lg:px-0 lg:py-0">
+          <div
+            className="mx-auto flex w-full items-center justify-between gap-3 lg:grid lg:grid-cols-[280px_minmax(0,1fr)] lg:items-center lg:justify-start lg:gap-5"
+            style={{ maxWidth: desktopSettingsMaxWidth }}
+          >
+            <div className="min-w-0 flex items-center gap-3 lg:min-w-0">
+              <button
+                type="button"
+                onClick={() => {
+                  if (mobileSettingsView !== "home") {
+                    setMobileSettingsView("home");
+                    if (embedded && typeof window !== "undefined") {
+                      const nextUrl = new URL(window.location.href);
+                      nextUrl.searchParams.set("panel", "account");
+                      nextUrl.searchParams.set("settingsView", "home");
+                      router.replace(`${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`);
+                    } else if (typeof window !== "undefined") {
+                      window.history.pushState(window.history.state, "", "/account");
+                    }
+                    return;
+                  }
+                  if (embedded) {
+                    onClose?.();
+                    return;
+                  }
+                  router.push("/");
+                }}
+                className="inline-flex h-9 w-9 items-center justify-center text-gray-700 transition hover:text-gray-900 dark:text-zinc-100 dark:hover:text-white"
+                aria-label={mobileSettingsView === "home" ? "Back to home" : "Back to settings home"}
+              >
+                <MoveLeft className="h-6 w-6 stroke-[2.75]" aria-hidden />
+              </button>
+                <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-zinc-100">
+                  {mobileSettingsView === "home"
+                    ? "Account settings"
+                    : activeSettingsTab === "security"
+                      ? "Security"
+                      : activeSettingsTab === "pricing"
+                      ? "Plans & pricing"
+                      : "Personal details"}
+              </h1>
+            </div>
+            <div className="hidden shrink-0 items-center gap-3 lg:flex lg:justify-self-end">
+              <button
+                type="button"
+                onClick={() => {
+                  router.push("/support");
+                }}
+                className="whitespace-nowrap text-base font-medium text-gray-900 transition hover:text-black dark:text-zinc-100 dark:hover:text-white"
+              >
+                Contact us
+              </button>
+              <span className="h-7 w-[1.5px] bg-gray-300 dark:bg-white/30" aria-hidden />
+              <SettingsMenu
+                trigger="custom"
+                triggerLabel="Open profile menu"
+                triggerClassName="w-[224px] min-w-[224px] max-w-[224px] overflow-hidden flex h-11 items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white py-1.5 pl-1 pr-1.5 shadow-sm transition-[transform,background-color,border-color,box-shadow] duration-200 hover:-translate-y-[1px] hover:border-slate-300 hover:bg-slate-50 hover:shadow-[0_12px_24px_rgba(15,23,42,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/30 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-100 dark:border-[#3F3F3F] dark:bg-[#323232] dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] dark:hover:border-[#4A4A4A] dark:hover:bg-[#2B2B2B] dark:hover:shadow-[0_12px_24px_rgba(0,0,0,0.34)] dark:focus-visible:ring-offset-[#252525]"
+                triggerContent={
+                  <>
+                    <span className="shrink-0 pointer-events-none">
+                      {showAvatarImage ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={avatar!}
+                          alt="Your avatar"
+                          className="h-8 w-8 rounded-full object-cover"
+                          onError={() => setAvatarLoadFailed(true)}
+                        />
+                      ) : showProfileSkeleton ? (
+                        <span className="flex h-8 w-8 rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
+                      ) : (
+                        <span
+                          className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold uppercase text-white"
+                          style={{ backgroundColor: fallbackAvatar.color }}
+                        >
+                          {fallbackAvatar.initials}
+                        </span>
+                      )}
+                    </span>
+                    {showProfileSkeleton ? (
+                      <span className="flex min-w-0 flex-1 flex-col gap-1 text-left">
+                        <span className="h-3.5 w-28 rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
+                        <span className="h-3 w-36 rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
+                      </span>
                     ) : (
-                      <span
-                        className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold uppercase text-white"
-                        style={{ backgroundColor: fallbackAvatar.color }}
-                      >
-                        {fallbackAvatar.initials}
+                      <span className="flex min-w-0 flex-1 flex-col leading-tight text-left">
+                        <span className="truncate text-[13px] font-semibold text-[#1F2A37] dark:text-zinc-100">
+                          {accountName}
+                        </span>
+                        {accountEmail ? (
+                          <span className="truncate text-[11px] font-medium text-[#64748B] dark:text-zinc-400">
+                            {accountEmail}
+                          </span>
+                        ) : null}
                       </span>
                     )}
-                  </span>
-                  <span className="flex min-w-0 flex-1 flex-col leading-tight text-left">
-                    <span className="truncate text-[13px] font-semibold text-[#1F2A37] dark:text-zinc-100">
-                      {accountName}
-                    </span>
-                    {accountEmail ? (
-                      <span className="truncate text-[11px] font-medium text-[#64748B] dark:text-zinc-400">
-                        {accountEmail}
-                      </span>
-                    ) : null}
-                  </span>
-                  <ChevronDown className="h-4 w-4 shrink-0 text-[#94A3B8] dark:text-zinc-400" aria-hidden="true" />
-                </>
-              }
-            />
+                    <ChevronDown className="h-4 w-4 shrink-0 text-[#94A3B8] dark:text-zinc-400" aria-hidden="true" />
+                  </>
+                }
+              />
+            </div>
           </div>
         </div>
+        {mobileSettingsView === "home" ? (
+          <div className="account-settings-home-intro bg-white pt-2 dark:bg-[#252525] lg:hidden">
+            <div className="-mt-px dark:border-[#4A4A4A]">
+              <button
+                type="button"
+                onClick={() => {
+                  openMobileSettingsTab("account");
+                }}
+                className="account-settings-stagger-item relative flex w-full items-start justify-between border-b border-gray-300 px-4 py-[17px] text-left text-gray-800 transition duration-150 motion-safe:active:scale-[0.99] active:bg-gray-100 active:text-gray-900 last:border-b-0 hover:bg-gray-50 hover:text-gray-900 dark:border-[#4A4A4A] dark:text-zinc-300 dark:active:bg-[#3F3F3F] dark:active:text-zinc-100 dark:hover:bg-[#3A3A3A] dark:hover:text-zinc-100"
+              >
+                <span className="flex items-start gap-3">
+                  <User className="mt-0.5 h-5 w-5 text-gray-600 dark:text-zinc-400" aria-hidden />
+                  <span className="flex flex-col gap-1">
+                    <span className="text-[16px] font-semibold tracking-tight">Personal details</span>
+                    <span className="text-[12.5px] leading-4 text-gray-500 dark:text-zinc-400">
+                      Name, email, and profile info
+                    </span>
+                  </span>
+                </span>
+                <ChevronRight className="mt-1.5 h-4 w-4 text-current opacity-70" aria-hidden />
+              </button>
 
-        <div className="grid gap-5 lg:grid-cols-[304px_minmax(0,1fr)] lg:items-start">
-          <aside className="self-start rounded-2xl border-[1.5px] border-gray-200 bg-white p-4 shadow-sm lg:sticky lg:top-6 dark:border-[#3F3F3F] dark:bg-[#323232] dark:shadow-[0_8px_22px_rgba(0,0,0,0.28),0_24px_52px_rgba(0,0,0,0.24)]">
-            <p className="px-2 text-xs font-bold uppercase tracking-[0.14em] text-gray-600 dark:text-zinc-400">Settings</p>
-            <nav className="mt-3 space-y-1">
+              <button
+                type="button"
+                onClick={() => {
+                  openMobileSettingsTab("security");
+                }}
+                className="account-settings-stagger-item relative flex w-full items-start justify-between border-b border-gray-300 px-4 py-[17px] text-left text-gray-800 transition duration-150 motion-safe:active:scale-[0.99] active:bg-gray-100 active:text-gray-900 last:border-b-0 hover:bg-gray-50 hover:text-gray-900 dark:border-[#4A4A4A] dark:text-zinc-300 dark:active:bg-[#3F3F3F] dark:active:text-zinc-100 dark:hover:bg-[#3A3A3A] dark:hover:text-zinc-100"
+              >
+                <span className="flex items-start gap-3">
+                  <Lock className="mt-0.5 h-5 w-5 stroke-[2.2] text-gray-600 dark:text-zinc-400" aria-hidden />
+                  <span className="flex flex-col gap-1">
+                    <span className="text-[16px] font-semibold tracking-tight">Security</span>
+                    <span className="text-[12.5px] leading-4 text-gray-500 dark:text-zinc-400">
+                      Password and 2FA settings
+                    </span>
+                  </span>
+                </span>
+                <ChevronRight className="mt-1.5 h-4 w-4 text-current opacity-70" aria-hidden />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  openMobileSettingsTab("pricing");
+                }}
+                className="account-settings-stagger-item relative flex w-full items-start justify-between border-b border-gray-300 px-4 py-[17px] text-left text-gray-800 transition duration-150 motion-safe:active:scale-[0.99] active:bg-gray-100 active:text-gray-900 last:border-b-0 hover:bg-gray-50 hover:text-gray-900 dark:border-[#4A4A4A] dark:text-zinc-300 dark:active:bg-[#3F3F3F] dark:active:text-zinc-100 dark:hover:bg-[#3A3A3A] dark:hover:text-zinc-100"
+              >
+                <span className="flex items-start gap-3">
+                  <span className="relative mt-0.5 h-5 w-5 text-gray-600 dark:text-zinc-400" aria-hidden>
+                    <Star className="h-5 w-5 stroke-[2.2]" />
+                    <Smile className="absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 stroke-[2.4]" />
+                  </span>
+                  <span className="flex flex-col gap-1">
+                    <span className="text-[16px] font-semibold tracking-tight">Plans &amp; pricing</span>
+                    <span className="text-[12.5px] leading-4 text-gray-500 dark:text-zinc-400">
+                      View or change your plan
+                    </span>
+                  </span>
+                </span>
+                <ChevronRight className="mt-1.5 h-4 w-4 text-current opacity-70" aria-hidden />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  void openBillingPortal();
+                }}
+                disabled={billingPortalLoading}
+                className="account-settings-stagger-item relative flex w-full items-start justify-between border-b border-gray-300 px-4 py-[17px] text-left text-gray-800 transition duration-150 motion-safe:active:scale-[0.99] active:bg-gray-100 active:text-gray-900 last:border-b-0 hover:bg-gray-50 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#4A4A4A] dark:text-zinc-300 dark:active:bg-[#3F3F3F] dark:active:text-zinc-100 dark:hover:bg-[#3A3A3A] dark:hover:text-zinc-100"
+              >
+                <span className="flex items-start gap-3">
+                  <CreditCard className="mt-0.5 h-5 w-5 text-gray-600 stroke-[2.2] dark:text-zinc-400" aria-hidden />
+                  <span className="flex flex-col gap-1">
+                    <span className="text-[16px] font-semibold tracking-tight">Billing portal</span>
+                    <span className="text-[12.5px] leading-4 text-gray-500 dark:text-zinc-400">
+                      View invoices and billing information
+                    </span>
+                  </span>
+                </span>
+                <ChevronRight className="mt-1.5 h-4 w-4 text-current opacity-70" aria-hidden />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  router.push("/support");
+                }}
+                className="account-settings-stagger-item relative flex w-full items-start justify-between border-b border-gray-300 px-4 py-[17px] text-left text-gray-800 transition duration-150 motion-safe:active:scale-[0.99] active:bg-gray-100 active:text-gray-900 last:border-b-0 hover:bg-gray-50 hover:text-gray-900 dark:border-[#4A4A4A] dark:text-zinc-300 dark:active:bg-[#3F3F3F] dark:active:text-zinc-100 dark:hover:bg-[#3A3A3A] dark:hover:text-zinc-100"
+              >
+                <span className="flex items-start gap-3">
+                  <Send className="mt-0.5 h-5 w-5 text-gray-600 stroke-[2.2] dark:text-zinc-400" aria-hidden />
+                  <span className="flex flex-col gap-1">
+                    <span className="text-[16px] font-semibold tracking-tight">Contact us</span>
+                    <span className="text-[12.5px] leading-4 text-gray-500 dark:text-zinc-400">
+                      Message support for account help
+                    </span>
+                  </span>
+                </span>
+                <ChevronRight className="mt-1.5 h-4 w-4 text-current opacity-70" aria-hidden />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  router.push("/support");
+                }}
+                className="account-settings-stagger-item relative flex w-full items-start justify-between border-b border-gray-300 px-4 py-[17px] text-left text-gray-800 transition duration-150 motion-safe:active:scale-[0.99] active:bg-gray-100 active:text-gray-900 last:border-b-0 hover:bg-gray-50 hover:text-gray-900 dark:border-[#4A4A4A] dark:text-zinc-300 dark:active:bg-[#3F3F3F] dark:active:text-zinc-100 dark:hover:bg-[#3A3A3A] dark:hover:text-zinc-100"
+              >
+                <span className="flex items-start gap-3">
+                  <ExternalLink className="mt-0.5 h-5 w-5 text-gray-600 stroke-[2.2] dark:text-zinc-400" aria-hidden />
+                  <span className="flex flex-col gap-1">
+                    <span className="text-[16px] font-semibold tracking-tight">Help center</span>
+                    <span className="text-[12.5px] leading-4 text-gray-500 dark:text-zinc-400">
+                      Read guides and common answers
+                    </span>
+                  </span>
+                </span>
+                <ChevronRight className="mt-1.5 h-4 w-4 text-current opacity-70" aria-hidden />
+              </button>
+
+              <div className="account-settings-stagger-item mt-3 px-4 pt-2 text-xs font-medium text-gray-500 dark:text-zinc-400">
+                <div className="flex flex-wrap gap-x-4 gap-y-2">
+                  <Link href="/terms" className="transition hover:text-gray-700 dark:hover:text-zinc-200">
+                    Terms of Service
+                  </Link>
+                  <Link href="/privacy" className="transition hover:text-gray-700 dark:hover:text-zinc-200">
+                    Privacy Policy
+                  </Link>
+                </div>
+              </div>
+          </div>
+          </div>
+        ) : null}
+
+        <div
+          className={`lg:mx-auto lg:flex lg:h-full lg:min-h-0 lg:w-full lg:flex-col ${mobileSettingsView === "home" ? "hidden lg:block" : "block"}`}
+          style={{ maxWidth: desktopSettingsMaxWidth }}
+        >
+          <div className="hidden w-full gap-6 lg:grid lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start">
+          <aside className="hidden self-start rounded-2xl border-[1.5px] border-gray-200 bg-white p-4 shadow-sm lg:sticky lg:top-6 lg:block dark:border-[#3F3F3F] dark:bg-[#323232] dark:shadow-[0_8px_22px_rgba(0,0,0,0.28),0_24px_52px_rgba(0,0,0,0.24)]">
+            <nav className="space-y-1">
               <button
                 type="button"
                 onClick={() => {
@@ -1413,8 +1689,8 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                     ? "bg-[rgba(108,71,255,0.10)] text-[#5B38E6] dark:bg-[#2B2B2B]/60 dark:text-white"
                     : "text-gray-800 hover:bg-gray-50 hover:text-gray-900 dark:text-zinc-300 dark:hover:bg-[#3A3A3A] dark:hover:text-zinc-100"
                 }`}
-              >
-                <span
+                >
+                  <span
                   className={`relative h-5 w-5 ${activeSettingsTab === "pricing" ? "text-[#5B38E6] dark:text-white" : "text-gray-600 dark:text-zinc-400"}`}
                   aria-hidden
                 >
@@ -1444,21 +1720,93 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                 <p className="px-3 text-xs font-medium text-rose-600 dark:text-rose-400">{billingPortalError}</p>
               ) : null}
             </nav>
+            <div className="mt-4 border-t border-gray-200 pt-4 dark:border-[#3F3F3F]">
+              <div className="space-y-1.5">
+                <a
+                  href="https://www.tiktok.com/@mergify.pdf"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-gray-800 transition hover:bg-gray-50 hover:text-gray-900 dark:text-zinc-300 dark:hover:bg-[#3A3A3A] dark:hover:text-zinc-100"
+                  aria-label="MergifyPDF on TikTok"
+                >
+                  <span className="h-5 w-5 text-gray-600 dark:text-zinc-400">
+                    <TikTokIcon />
+                  </span>
+                  <span>TikTok</span>
+                </a>
+                <a
+                  href="https://www.instagram.com/mergifypdf/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-gray-800 transition hover:bg-gray-50 hover:text-gray-900 dark:text-zinc-300 dark:hover:bg-[#3A3A3A] dark:hover:text-zinc-100"
+                  aria-label="MergifyPDF on Instagram"
+                >
+                  <span className="h-5 w-5 text-gray-600 dark:text-zinc-400">
+                    <InstagramIcon />
+                  </span>
+                  <span>Instagram</span>
+                </a>
+                <a
+                  href="https://x.com/MergifyPDF"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-gray-800 transition hover:bg-gray-50 hover:text-gray-900 dark:text-zinc-300 dark:hover:bg-[#3A3A3A] dark:hover:text-zinc-100"
+                  aria-label="MergifyPDF on X"
+                >
+                  <span className="h-5 w-5 text-gray-600 dark:text-zinc-400">
+                    <XIcon />
+                  </span>
+                  <span>X</span>
+                </a>
+              </div>
+            </div>
+            <div className="mt-4 border-t border-gray-200 pt-4 dark:border-[#3F3F3F]">
+              <div className="flex flex-col gap-1">
+                <Link
+                  href="/terms"
+                  className="rounded-xl px-3 py-2.5 text-sm font-semibold text-gray-800 transition hover:bg-gray-50 hover:text-gray-900 dark:text-zinc-300 dark:hover:bg-[#3A3A3A] dark:hover:text-zinc-100"
+                >
+                  Terms of Service
+                </Link>
+                <Link
+                  href="/privacy"
+                  className="rounded-xl px-3 py-2.5 text-sm font-semibold text-gray-800 transition hover:bg-gray-50 hover:text-gray-900 dark:text-zinc-300 dark:hover:bg-[#3A3A3A] dark:hover:text-zinc-100"
+                >
+                  Privacy Policy
+                </Link>
+              </div>
+            </div>
           </aside>
 
-          <div className="rounded-2xl border-[1.5px] border-gray-200 bg-white p-6 shadow-sm sm:p-7 dark:border-[#3F3F3F] dark:bg-[#323232] dark:shadow-[0_8px_22px_rgba(0,0,0,0.28),0_24px_52px_rgba(0,0,0,0.24)]">
-            <h2 className="text-3xl font-semibold tracking-tight text-gray-900 dark:text-zinc-100">
-              {activeSettingsTab === "security"
-                ? "Security"
-                : activeSettingsTab === "pricing"
-                  ? "Plans & pricing"
-                  : "Personal details"}
-            </h2>
+          <div
+            key={activeSettingsTab}
+            className="account-settings-content-pane flex w-full flex-col bg-white p-6 dark:bg-[#323232] lg:overflow-y-auto lg:rounded-2xl lg:border-[1.5px] lg:border-gray-200 lg:bg-white lg:dark:border-[#3F3F3F] lg:dark:bg-[#323232] xl:p-7"
+          >
+            {activeSettingsTab === "pricing" ? (
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <h2 className="text-3xl font-semibold tracking-tight text-gray-900 dark:text-zinc-100">
+                  Plans & pricing
+                </h2>
+                <div className="flex flex-col items-start gap-2 text-sm text-gray-600 dark:text-zinc-400 sm:items-end sm:text-right">
+                  {pricingTrialStatus?.stripeCustomerId ? (
+                    <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                      <span className="text-gray-500 dark:text-zinc-500">Billing ID:</span>
+                      <span className="font-mono font-semibold text-gray-900 dark:text-zinc-100">
+                        {pricingTrialStatus.stripeCustomerId}
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            ) : (
+              <h2 className="text-3xl font-semibold tracking-tight text-gray-900 dark:text-zinc-100">
+                {activeSettingsTab === "security" ? "Security" : "Personal details"}
+              </h2>
+            )}
 
           {activeSettingsTab === "account" ? (
           <>
-          <div className="mt-6 border-t border-gray-200 dark:border-[#3F3F3F]" />
-          <section className="mt-6">
+          <section className="pt-6">
         <dl className="mt-4 grid gap-x-6 gap-y-4 md:grid-cols-2">
           <div className="min-w-0">
             <dt className="text-sm font-medium text-gray-700 dark:text-zinc-300">First name</dt>
@@ -1495,16 +1843,25 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
               </div>
             ) : (
               <div className="mt-1 flex items-center justify-between gap-2">
-                <dd className="text-base text-gray-900 dark:text-zinc-100">{firstNameValue || ""}</dd>
-                <button
-                  type="button"
-                  onClick={() => openNameEditor("first")}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 px-2.5 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200 dark:bg-[#2B2B2B] dark:text-zinc-200 dark:hover:bg-[#3A3A3A]"
-                  aria-label="Edit first name"
-                >
-                  <PencilLine className="h-3.5 w-3.5" aria-hidden />
-                  <span>Edit</span>
-                </button>
+                {showNameSkeleton ? (
+                  <div className="flex w-full items-center justify-between gap-2">
+                    <dd className="h-5 w-40 rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
+                    <div className="h-8 w-16 rounded-lg bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
+                  </div>
+                ) : (
+                  <>
+                    <dd className="text-base text-gray-900 dark:text-zinc-100">{firstNameValue || ""}</dd>
+                    <button
+                      type="button"
+                      onClick={() => openNameEditor("first")}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 px-2.5 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200 dark:bg-[#2B2B2B] dark:text-zinc-200 dark:hover:bg-[#3A3A3A]"
+                      aria-label="Edit first name"
+                    >
+                      <PencilLine className="h-3.5 w-3.5" aria-hidden />
+                      <span>Edit</span>
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -1544,16 +1901,25 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
               </div>
             ) : (
               <div className="mt-1 flex items-center justify-between gap-2">
-                <dd className="text-base text-gray-900 dark:text-zinc-100">{lastNameValue || ""}</dd>
-                <button
-                  type="button"
-                  onClick={() => openNameEditor("last")}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 px-2.5 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200 dark:bg-[#2B2B2B] dark:text-zinc-200 dark:hover:bg-[#3A3A3A]"
-                  aria-label="Edit last name"
-                >
-                  <PencilLine className="h-3.5 w-3.5" aria-hidden />
-                  <span>Edit</span>
-                </button>
+                {showNameSkeleton ? (
+                  <div className="flex w-full items-center justify-between gap-2">
+                    <dd className="h-5 w-44 rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
+                    <div className="h-8 w-16 rounded-lg bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
+                  </div>
+                ) : (
+                  <>
+                    <dd className="text-base text-gray-900 dark:text-zinc-100">{lastNameValue || ""}</dd>
+                    <button
+                      type="button"
+                      onClick={() => openNameEditor("last")}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 px-2.5 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200 dark:bg-[#2B2B2B] dark:text-zinc-200 dark:hover:bg-[#3A3A3A]"
+                      aria-label="Edit last name"
+                    >
+                      <PencilLine className="h-3.5 w-3.5" aria-hidden />
+                      <span>Edit</span>
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -1822,66 +2188,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
         {activeSettingsTab === "pricing" ? (
         <>
         <div className="mt-6 border-t border-gray-200 dark:border-[#3F3F3F]" />
-        <section className="mt-6 space-y-6">
-          <div className="relative overflow-hidden rounded-3xl border border-indigo-100 bg-gradient-to-br from-white via-[#F7F5FF] to-[#EDF2FF] p-5 shadow-[0_18px_45px_rgba(56,37,149,0.08)] dark:border-indigo-500/25 dark:from-[#323232] dark:via-[#2B2B2B] dark:to-[#252525]">
-            <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-[#6C47FF]/10 blur-3xl dark:bg-[#6C47FF]/20" aria-hidden />
-            <div className="relative flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#5B38E6] dark:text-indigo-300">Subscription</p>
-                <p className="mt-2 max-w-xl text-sm text-gray-700 dark:text-zinc-300">
-                  Choose the plan that fits your workflow and switch anytime.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  router.push("/pricing");
-                }}
-                className="inline-flex items-center rounded-full border border-[#6C47FF]/20 bg-white/90 px-4 py-2 text-sm font-semibold text-[#5B38E6] transition hover:border-[#6C47FF]/50 hover:bg-white dark:border-indigo-400/40 dark:bg-[#323232]/70 dark:text-indigo-200"
-              >
-                Compare features
-              </button>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-[#3F3F3F] dark:bg-[#323232]/80">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="space-y-1">
-                <p className="text-base font-semibold text-gray-900 dark:text-zinc-100">{pricingCurrentPlanLabel}</p>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${pricingStatusTone}`}>
-                    {pricingStatusLabel}
-                  </span>
-                  {pricingTrialStatus?.eligibleForTrial === false && !pricingHasActivePlan && !pricingIsDelinquent ? (
-                    <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600 dark:bg-[#2B2B2B] dark:text-zinc-300">
-                      Trial already used
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  if (pricingHasActivePlan || pricingIsDelinquent) {
-                    void openBillingPortal();
-                    return;
-                  }
-                  document.getElementById("account-pricing-cards")?.scrollIntoView({
-                    behavior: "smooth",
-                    block: "start",
-                  });
-                }}
-                className={`rounded-lg px-4 py-2 text-sm font-semibold text-white shadow-sm transition ${
-                  pricingIsDelinquent
-                    ? "bg-rose-600 hover:bg-rose-700"
-                    : "bg-[#6C47FF] hover:bg-[#5B38E6]"
-                }`}
-              >
-                {pricingSummaryActionLabel}
-              </button>
-            </div>
-          </div>
-
+        <section className="mt-6 flex min-h-0 flex-1 flex-col gap-6">
           {pricingIsDelinquent ? (
             <div className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-3 text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-300">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
@@ -1891,173 +2198,234 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
             </div>
           ) : null}
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="inline-flex items-center rounded-full border border-gray-300 bg-white p-1 shadow-sm dark:border-[#3F3F3F] dark:bg-[#323232]">
-              <button
-                type="button"
-                onClick={() => setPricingBillingPeriod("monthly")}
-                className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
-                  pricingBillingPeriod === "monthly"
-                    ? "bg-[#6C47FF] text-white"
-                    : "text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-[#3A3A3A]"
-                }`}
-              >
-                Monthly
-              </button>
-              <button
-                type="button"
-                onClick={() => setPricingBillingPeriod("annual")}
-                className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
-                  pricingBillingPeriod === "annual"
-                    ? "bg-[#6C47FF] text-white"
-                    : "text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-[#3A3A3A]"
-                }`}
-              >
-                Annual
-              </button>
-            </div>
-            <p className="text-xs font-medium text-gray-500 dark:text-zinc-400">
-              Annual billing unlocks the lowest monthly equivalent rate.
-            </p>
-          </div>
-
-          <div id="account-pricing-cards" className="grid gap-4 lg:grid-cols-2">
-            {ACCOUNT_PLAN_OPTIONS.map((plan) => {
-              const isAnnual = pricingBillingPeriod === "annual";
-              const displayedPrice = isAnnual ? plan.annualPrice : plan.monthlyPrice;
-              const isLoading = pricingCheckoutLoading === plan.name;
-              const canUseTrialForCurrentPlan = pricingCanUseTrialForPlan(plan.name);
-              const showManageBillingAction = pricingHasActivePlan || pricingIsDelinquent;
-              const isSignaturePlan = plan.name === "Signature Pro";
-              const primaryLabel = showManageBillingAction
-                ? pricingIsDelinquent
-                  ? "Update payment method"
-                  : "Manage billing"
-                : canUseTrialForCurrentPlan
-                  ? "Start 7-day trial"
-                  : "Subscribe now";
-
-              return (
-                <div
-                  key={plan.name}
-                  className={`rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:bg-[#323232]/80 ${
-                    isSignaturePlan
-                      ? "border-[#6C47FF]/35 shadow-[0_14px_28px_rgba(76,54,181,0.14)] dark:border-indigo-400/50"
-                      : "border-gray-200 dark:border-[#3F3F3F]"
-                  }`}
-                >
-                  <div className="mb-4 flex items-start justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-xl font-semibold text-gray-900 dark:text-zinc-100">{plan.name}</h3>
-                        {isSignaturePlan ? (
-                          <span className="rounded-full bg-[#6C47FF]/10 px-2 py-0.5 text-[11px] font-semibold text-[#5B38E6] dark:bg-indigo-500/20 dark:text-indigo-200">
-                            Popular
-                          </span>
+          <div className="flex min-h-0 flex-1 flex-col justify-center gap-6">
+            <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-[#3F3F3F] dark:bg-[#323232]">
+              <div className="h-1 w-full bg-gradient-to-r from-[#5EEAD4] via-[#14B8A6] to-[#5EEAD4] opacity-80 dark:opacity-70" />
+              <div className="relative z-10 grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-center lg:gap-8 lg:p-6">
+                {pricingStatusLoading ? (
+                  <>
+                    <div className="min-w-0 space-y-3 py-2 lg:py-3">
+                      <div className="skeleton-shimmer h-6 w-32 rounded-full bg-slate-200/90 dark:bg-white/10" />
+                      <div className="space-y-3">
+                        <div className="skeleton-shimmer h-9 w-64 rounded-lg bg-slate-200/90 dark:bg-white/10" />
+                        <div className="skeleton-shimmer h-8 w-52 rounded-lg bg-slate-200/90 dark:bg-white/10" />
+                        <div className="skeleton-shimmer h-4 w-72 rounded-lg bg-slate-200/90 dark:bg-white/10" />
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-start gap-2 lg:items-end lg:justify-center">
+                      <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center lg:w-auto lg:justify-end">
+                        <div className="skeleton-shimmer h-10 w-32 rounded-full bg-slate-200/90 dark:bg-white/10" />
+                        <div className="skeleton-shimmer h-10 w-32 rounded-full bg-slate-200/90 dark:bg-white/10" />
+                      </div>
+                      <div className="skeleton-shimmer h-4 w-56 rounded-lg bg-slate-200/90 dark:bg-white/10" />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className={`min-w-0 space-y-3 ${isTrialingPlan ? "py-2 lg:py-3" : "py-1.5 lg:py-2"}`}>
+                      <span className="inline-flex items-center rounded-full bg-emerald-500 px-4 py-1.5 text-[12px] font-semibold leading-none tracking-[0.06em] text-white shadow-sm">
+                        <CheckCircle2 className="mr-2 h-3.5 w-3.5" strokeWidth={2.5} aria-hidden="true" />
+                        {isTrialingPlan ? "Free Trial" : "Your current plan"}
+                      </span>
+                      <div className={isTrialingPlan ? "space-y-1.5" : "space-y-1"}>
+                        <p
+                          className={`text-[28px] font-bold tracking-tight bg-clip-text text-transparent ${
+                            currentPlanDetails?.name === "Signature Pro"
+                              ? "bg-gradient-to-r from-purple-600 via-violet-500 to-fuchsia-500"
+                              : "bg-gradient-to-r from-sky-500 via-cyan-500 to-sky-400"
+                          }`}
+                        >
+                          {currentPlanDetails?.name ?? "No active plan"}
+                        </p>
+                        {currentPlanDetails ? (() => {
+                          const currentPlanPrice =
+                            currentPlanBillingPeriod === "annual"
+                              ? currentPlanDetails.annualPrice
+                              : currentPlanDetails.monthlyPrice;
+                          const [priceAmount, priceSuffix] = currentPlanPrice.split(" per ");
+                          if (isTrialingPlan) {
+                            return (
+                              <div className="space-y-1">
+                                {currentPlanCycleLabel ? (
+                                  <p className="text-[32px] font-semibold leading-none tracking-tight text-gray-900 dark:text-zinc-100">
+                                    {currentPlanCycleLabel}
+                                  </p>
+                                ) : null}
+                                <p className="text-sm font-medium leading-5 text-slate-500 dark:text-zinc-400">
+                                  Then {priceAmount} {priceSuffix ? `per ${priceSuffix}` : null}
+                                </p>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                              <p className="text-[34px] font-semibold leading-none tracking-tight text-gray-900 dark:text-zinc-100">
+                                {priceAmount}
+                              </p>
+                              {priceSuffix ? (
+                                <span className="text-sm font-medium leading-none text-slate-500 dark:text-zinc-400">
+                                  per {priceSuffix}
+                                </span>
+                              ) : null}
+                            </div>
+                          );
+                        })() : null}
+                        {!isTrialingPlan && currentPlanCycleLabel ? (
+                          <p className="mt-1 text-sm font-medium leading-5 tracking-tight text-slate-600 dark:text-zinc-400">
+                            {currentPlanCycleLabel}
+                          </p>
                         ) : null}
                       </div>
-                      <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-zinc-100">
-                        {displayedPrice}
-                        <span className="ml-1 text-sm font-medium text-gray-500 dark:text-zinc-400">
-                          {pricingBillingPeriod === "monthly" ? "per month" : "per month, billed annually"}
-                        </span>
-                      </p>
+                      {!pricingHasActivePlan ? (
+                        <p className="max-w-xl text-sm leading-6 text-gray-600 dark:text-zinc-400">
+                          Manage billing settings or choose a plan below.
+                        </p>
+                      ) : null}
                     </div>
-                    {isAnnual ? (
-                      <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
-                        {plan.annualSavings}
-                      </span>
-                    ) : null}
-                  </div>
-
-                  <ul className="space-y-2 text-sm text-gray-700 dark:text-zinc-300">
-                    {plan.features.map((feature) => (
-                      <li key={feature} className="flex items-start gap-2">
-                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#5B38E6]" aria-hidden />
-                        <span>{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <div className="mt-5 space-y-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (showManageBillingAction) {
-                          void openBillingPortal();
-                          return;
-                        }
-                        void handlePricingPlanSelect(
-                          plan.name,
-                          canUseTrialForCurrentPlan ? undefined : { skipTrial: true },
-                        );
-                      }}
-                      disabled={isLoading}
-                      className="w-full rounded-lg bg-[#6C47FF] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#5B38E6] disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {isLoading ? "Redirecting..." : primaryLabel}
-                    </button>
-                    {!showManageBillingAction && canUseTrialForCurrentPlan ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          void handlePricingPlanSelect(plan.name, { skipTrial: true });
-                        }}
-                        className="w-full text-center text-xs font-semibold text-gray-600 underline underline-offset-4 transition hover:text-gray-900 dark:text-zinc-400 dark:hover:text-zinc-200"
-                      >
-                        Pay now
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {pricingMessage ? (
-            <p className="text-sm font-medium text-rose-600 dark:text-rose-400">{pricingMessage}</p>
-          ) : null}
-
-          <div className="rounded-2xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-5 shadow-sm dark:border-[#3F3F3F] dark:from-[#323232] dark:to-[#323232]">
-            <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-gray-700 dark:text-zinc-300">
-              Billing snapshot
-            </h3>
-            <div className="mt-3 grid gap-3 text-sm text-gray-700 dark:text-zinc-300 sm:grid-cols-2">
-              <p>Billing status: <span className="font-semibold">{pricingStatusLabel}</span></p>
-              <p>Billing cycle: <span className="font-semibold">{pricingBillingPeriod === "monthly" ? "Monthly" : "Annual"}</span></p>
-              <p>Trial eligibility: <span className="font-semibold">{pricingCanUseTrial ? "Available" : "Used"}</span></p>
-              <p>Billing details: <span className="font-semibold">Managed in Stripe portal</span></p>
-              <p className="sm:col-span-2">
-                Billing ID:{" "}
-                <span className="font-mono font-semibold">
-                  {pricingTrialStatus?.stripeCustomerId ?? "Not available"}
-                </span>
-                {pricingTrialStatus?.stripeCustomerId ? (
-                  <button
-                    type="button"
-                    onClick={handleCopyBillingId}
-                    className="ml-2 rounded border border-gray-300 px-2 py-0.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-100 dark:border-[#4A4A4A] dark:text-zinc-200 dark:hover:bg-[#3A3A3A]"
-                  >
-                    Copy
-                  </button>
-                ) : null}
-              </p>
+                    <div className="flex flex-col items-start gap-2 lg:items-end lg:justify-center">
+                      <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center lg:w-auto lg:justify-end">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void openBillingPortal();
+                          }}
+                          className="inline-flex items-center justify-center rounded-full border-2 border-gray-400 bg-white px-4 py-2 text-sm font-semibold text-gray-800 transition hover:bg-gray-100 dark:border-[#5A5A5A] dark:bg-[#2B2B2B] dark:text-zinc-200 dark:hover:bg-[#3A3A3A]"
+                        >
+                          View billing
+                        </button>
+                        {pricingHasActivePlan ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void openBillingPortal();
+                            }}
+                            className="inline-flex items-center justify-center rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/30"
+                          >
+                            {accountStripeStatus === "trialing" ? "Cancel free trial" : "Cancel plan"}
+                          </button>
+                        ) : null}
+                      </div>
+                      {pricingHasActivePlan ? (
+                        <p className="max-w-sm text-xs leading-5 text-gray-500 dark:text-zinc-400 lg:text-right">
+                          <span className="text-rose-500" aria-hidden="true">*</span>{" "}
+                          Your plan remains active until the end of your billing period.
+                        </p>
+                      ) : null}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
-            {billingIdMessage ? (
-              <p className="mt-2 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                {billingIdMessage}
-              </p>
+
+            <div className="text-center">
+              <h3 className="text-3xl font-semibold tracking-tight text-gray-900 dark:text-zinc-100">
+                Everything you need to work with confidence
+              </h3>
+            </div>
+
+            <div className="flex justify-center">
+              <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-100 p-1 text-sm font-semibold shadow-sm dark:border-[#3F3F3F] dark:bg-[#2B2B2B]">
+                <button
+                  type="button"
+                  onClick={() => setPricingBillingPeriod("monthly")}
+                  className={`rounded-md px-5 py-2 whitespace-nowrap transition-all ${
+                    pricingBillingPeriod === "monthly"
+                      ? "bg-white text-slate-900 shadow-sm dark:bg-[#3A3A3A] dark:text-white"
+                      : "text-slate-600 hover:text-slate-900 dark:text-zinc-300 dark:hover:text-zinc-100"
+                  }`}
+                >
+                  Monthly
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPricingBillingPeriod("annual")}
+                  className={`rounded-md px-4 py-2 whitespace-nowrap transition-all ${
+                    pricingBillingPeriod === "annual"
+                      ? "bg-white text-slate-900 shadow-sm dark:bg-[#3A3A3A] dark:text-white"
+                      : "text-slate-600 hover:text-slate-900 dark:text-zinc-300 dark:hover:text-zinc-100"
+                  }`}
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <span>Yearly</span>
+                    <span className="rounded-md bg-purple-500 px-2.5 py-1 text-[11px] font-semibold tracking-tight text-white">
+                      SAVE UP TO 42%
+                    </span>
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            <div id="account-pricing-cards" className="mx-auto w-full max-w-full">
+              {pricingStatusLoading ? (
+                <div className="grid w-full gap-10 md:grid-cols-2">
+                  {PRICING_TIERS.map((tier) => (
+                    <div
+                      key={tier.name}
+                      className="flex h-full min-h-[420px] flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-[#3F3F3F] dark:bg-[#323232]"
+                    >
+                      <div className="skeleton-shimmer h-8 w-40 rounded-lg bg-slate-200/90 dark:bg-white/10" />
+                      <div className="skeleton-shimmer mt-5 h-14 w-52 rounded-lg bg-slate-200/90 dark:bg-white/10" />
+                      <div className="skeleton-shimmer mt-4 h-10 w-full rounded-xl bg-slate-200/90 dark:bg-white/10" />
+                      <div className="mt-6 flex-1 space-y-3">
+                        {tier.features.slice(0, 5).map((feature, index) => (
+                          <div key={`${tier.name}-${feature}-${index}`} className="flex items-start gap-2">
+                            <div className="skeleton-shimmer mt-1 h-4 w-4 rounded-full bg-slate-200/90 dark:bg-white/10" />
+                            <div className="skeleton-shimmer h-4 w-11/12 rounded bg-slate-200/90 dark:bg-white/10" />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <PricingTierCards
+                  billingPeriod={pricingBillingPeriod}
+                  canUseTrialForPlan={pricingCanUseTrialForPlan}
+                  currentPlanTier={currentPlanTier}
+                  currentPlanBillingPeriod={currentPlanBillingPeriod}
+                  getPrimaryActionLabel={(tierName, canUseTrial) =>
+                    currentPlanTier === "Essential Plus" && tierName === "Signature Pro"
+                      ? "Upgrade to Pro"
+                      : currentPlanTier === "Signature Pro" && tierName === "Essential Plus"
+                        ? "Downgrade to Essential Plus"
+                        : canUseTrial
+                          ? "Start 7-day trial"
+                          : "Subscribe now"
+                  }
+                  getPrimaryActionOptions={(_, canUseTrial) => (canUseTrial ? undefined : { skipTrial: true })}
+                  onPrimaryAction={(planName, options) => {
+                    void handlePricingPlanSelect(planName, options);
+                  }}
+                  onPortalAction={() => {
+                    void openBillingPortal();
+                  }}
+                  getSecondaryActionLabel={(_, canUseTrial) => (currentPlanTier ? null : canUseTrial ? "Pay now" : null)}
+                  onSecondaryAction={(planName) => {
+                    void handlePricingPlanSelect(planName, { skipTrial: true });
+                  }}
+                  loadingPlan={pricingCheckoutLoading}
+                  className="grid w-full scroll-mt-28 gap-10 md:grid-cols-2"
+                />
+              )}
+            </div>
+
+            {pricingMessage ? (
+              <p className="text-sm font-medium text-rose-600 dark:text-rose-400">{pricingMessage}</p>
             ) : null}
-            <button
-              type="button"
-              onClick={() => {
-                void openBillingPortal();
-              }}
-              className="mt-4 rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-800 transition hover:bg-gray-100 dark:border-[#4A4A4A] dark:text-zinc-200 dark:hover:bg-[#3A3A3A]"
-            >
-              Open billing portal
-            </button>
           </div>
+
+          <div className="mt-auto flex justify-center pt-1">
+            <div className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 dark:text-zinc-400">
+              <span>Payments powered by</span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/logos/Stripe-Logo-v3.png"
+                alt="Stripe"
+                className="h-5 sm:h-6 w-auto rounded-md opacity-90 transition-opacity hover:opacity-100"
+              />
+            </div>
+          </div>
+
         </section>
         </>
         ) : null}
@@ -2261,6 +2629,8 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
           </div>
         </section>
         ) : null}
+        <div aria-hidden className="h-[calc(5rem+env(safe-area-inset-bottom))] lg:hidden" />
+          </div>
         </div>
       </div>
       </div>
@@ -2560,7 +2930,7 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
                       }}
                     />
                   ) : (
-                    <div className="h-full w-full animate-pulse bg-slate-200" />
+                    <div className="skeleton-shimmer h-full w-full bg-slate-200" />
                   )}
                   {cropRect ? (
                     <div
@@ -2608,6 +2978,51 @@ function AccountSettingsPage({ activeSettingsTab: initialSettingsTab }: { active
         </div>
       ) : null}
 
+      <div className="fixed inset-x-0 bottom-0 z-[75] border-t border-slate-200 bg-white/95 px-2 pt-1 pb-[calc(6px+env(safe-area-inset-bottom))] backdrop-blur dark:border-[#3A3A3A] dark:bg-[#323232]/95 lg:hidden">
+        <div className="mx-auto grid max-w-xl grid-cols-5 items-end gap-1">
+          <button
+            type="button"
+            onClick={() => {
+              window.dispatchEvent(new Event("open-create-project"));
+            }}
+            className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1 py-2 text-[11px] font-semibold text-[#4B5563] transition hover:bg-[rgba(0,0,0,0.04)] dark:text-white dark:hover:bg-white/5"
+          >
+            <span className="flex h-[22px] w-[22px] items-center justify-center rounded-full border-[1.5px] border-[#A8B0BA] bg-transparent text-[#6C757D] dark:border-[1.5px] dark:border-white dark:bg-transparent dark:text-white">
+              <Plus className="h-[14px] w-[14px]" aria-hidden />
+            </span>
+            <span className="truncate leading-[1.15] dark:text-white">Create</span>
+          </button>
+          {mobileDockItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = item.active ?? false;
+            const iconClassName = isActive
+              ? "h-[22px] w-[22px]"
+              : "h-[22px] w-[22px] text-[#4B5563] dark:text-white";
+            return (
+              <Link
+                key={item.label}
+                href={item.href}
+                prefetch
+                className={`flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1 py-2 text-[11px] font-semibold transition ${
+                  isActive
+                    ? "text-[#7C3AED] dark:text-[#7C3AED]"
+                    : "text-[#4B5563] hover:bg-[rgba(0,0,0,0.04)] dark:text-white dark:hover:bg-white/5"
+                }`}
+                >
+                <Icon
+                  className={iconClassName}
+                  aria-hidden
+                  weight={item.label === "Signatures" ? "regular" : isActive ? "fill" : "regular"}
+                  style={isActive ? { color: "#7C3AED" } : undefined}
+                />
+                <span className={`truncate leading-[1.15] ${isActive ? "dark:text-[#7C3AED]" : "dark:text-white"}`}>
+                  {item.label}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
     </main>
   );
 }
@@ -2618,5 +3033,10 @@ export default function AccountPage() {
   const activeSettingsTab: SettingsTab =
     view === "security" ? "security" : view === "pricing" ? "pricing" : "account";
 
-  return <AccountSettingsPage activeSettingsTab={activeSettingsTab} />;
+  return (
+    <AccountSettingsPage
+      activeSettingsTab={activeSettingsTab}
+      initialMobileView={view === "security" || view === "pricing" ? activeSettingsTab : null}
+    />
+  );
 }

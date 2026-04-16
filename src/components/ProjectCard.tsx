@@ -17,22 +17,55 @@ const PREVIEW_CACHE_MAX_AGE_MS = 10 * 60 * 1000;
 const PREVIEW_FETCH_TIMEOUT_MS = 8000;
 const PREVIEW_IMAGE_TIMEOUT_MS = 10000;
 const STARRED_STORAGE_KEY = "mpdf:starred-projects";
+const PREVIEW_STORAGE_KEY_PREFIX = "mpdf:project-preview:";
 const previewMemoryCache = new Map<string, PreviewCacheEntry>();
 
 function readPreviewCache(projectId: string): PreviewCacheEntry | null {
   const now = Date.now();
   const memory = previewMemoryCache.get(projectId);
   if (memory && now - memory.fetchedAt <= PREVIEW_CACHE_MAX_AGE_MS) return memory;
+  if (typeof window !== "undefined") {
+    try {
+      const raw = window.sessionStorage.getItem(`${PREVIEW_STORAGE_KEY_PREFIX}${projectId}`);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as PreviewCacheEntry | null;
+      if (
+        parsed &&
+        typeof parsed.url === "string" &&
+        typeof parsed.fetchedAt === "number" &&
+        now - parsed.fetchedAt <= PREVIEW_CACHE_MAX_AGE_MS
+      ) {
+        previewMemoryCache.set(projectId, parsed);
+        return parsed;
+      }
+    } catch {
+      // ignore storage read errors
+    }
+  }
   return null;
 }
 
 function writePreviewCache(projectId: string, url: string) {
   const entry: PreviewCacheEntry = { url, fetchedAt: Date.now() };
   previewMemoryCache.set(projectId, entry);
+  if (typeof window !== "undefined") {
+    try {
+      window.sessionStorage.setItem(`${PREVIEW_STORAGE_KEY_PREFIX}${projectId}`, JSON.stringify(entry));
+    } catch {
+      // ignore storage write errors
+    }
+  }
 }
 
 function clearPreviewCache(projectId: string) {
   previewMemoryCache.delete(projectId);
+  if (typeof window !== "undefined") {
+    try {
+      window.sessionStorage.removeItem(`${PREVIEW_STORAGE_KEY_PREFIX}${projectId}`);
+    } catch {
+      // ignore storage clear errors
+    }
+  }
 }
 
 function openReservedTab() {
@@ -534,6 +567,21 @@ export default function ProjectCard({
       previewRefreshInFlight.current = false;
     }
   };
+
+  useLayoutEffect(() => {
+    if (!project.hasPreview) {
+      setPreviewUrl(null);
+      setPreviewLoading(false);
+      clearPreviewCache(project.id);
+      return;
+    }
+
+    const cached = readPreviewCache(project.id);
+    if (cached?.url) {
+      setPreviewUrl(cached.url);
+      setPreviewLoading(false);
+    }
+  }, [project.hasPreview, project.id]);
 
   const cardClasses = [
     "relative overflow-hidden rounded-[10px] bg-[#F9FAFC] transition outline outline-0 outline-transparent dark:bg-zinc-900 dark:shadow-[0_8px_18px_rgba(0,0,0,0.22)]",

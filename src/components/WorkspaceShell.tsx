@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   BookOpen,
@@ -64,6 +65,14 @@ import {
   subscribeProjectsSummary,
   type ProjectsSummaryProject,
 } from "@/lib/projectsSummaryCache";
+
+const AccountSettingsPage = dynamic(
+  () => import("@/app/(app)/account/page").then((module) => module.AccountSettingsPage),
+  {
+    ssr: false,
+    loading: () => null,
+  },
+);
 
 const WORKSPACE_META_KEY = "mpdf:files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
@@ -331,6 +340,7 @@ export default function WorkspaceShell({
   const [overlaySidebar, setOverlaySidebar] = useState(false);
   const [phoneViewport, setPhoneViewport] = useState(false);
   const [mobileDockViewport, setMobileDockViewport] = useState(false);
+  const [accountPanelOpen, setAccountPanelOpen] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
@@ -371,12 +381,21 @@ export default function WorkspaceShell({
   const profileName = stableProfile.name || "";
   const profileEmail = stableProfile.email;
   const hasProfileInfo = Boolean(profileName || profileEmail);
+  const showProfileSkeleton = sessionStatus === "loading";
   const fallbackAvatar = getAvatarFallback(avatarKey, profileName || profileEmail || null);
-  const showAvatarImage = Boolean(avatar) && !avatarLoadFailed;
+  const showAvatarImage = Boolean(avatar) && !avatarLoadFailed && !showProfileSkeleton;
   const homeProjectsQueryContext = useMemo(
     () => ({ query: homeProjectsQuery, setQuery: setHomeProjectsQuery }),
     [homeProjectsQuery],
   );
+
+  const openAccountPanel = useCallback(() => {
+    router.push("/account");
+  }, [router]);
+
+  const closeAccountPanel = useCallback(() => {
+    setAccountPanelOpen(false);
+  }, [router]);
 
   useEffect(() => {
     setAvatarLoadFailed(false);
@@ -1160,7 +1179,9 @@ export default function WorkspaceShell({
     ? "bg-[#F1F4F9]"
     : isHomePanel
       ? "bg-[#F1F4F9]"
-      : "bg-slate-100";
+      : isAccountRoute
+        ? "bg-white md:bg-slate-100"
+        : "bg-slate-100";
   const isBillingBannerRoute = isHomePanel || isAccountRoute;
   const homeStripeStatus = homeStripeStatusOverride ?? (session?.user?.stripeStatus ?? null);
   const homeBillingIsDelinquent = homeStripeStatus === "past_due" || homeStripeStatus === "unpaid";
@@ -1258,6 +1279,12 @@ export default function WorkspaceShell({
   }, [router]);
 
   useEffect(() => {
+    if (!accountPanelOpen) return;
+    if (isHomeProjectsPath(pathname) || isAccountRoute) return;
+    setAccountPanelOpen(false);
+  }, [accountPanelOpen, isAccountRoute, pathname]);
+
+  useEffect(() => {
     const leftStudio = wasStudioRouteRef.current && !isStudioRoute;
     wasStudioRouteRef.current = isStudioRoute;
     if (!leftStudio) return;
@@ -1320,17 +1347,6 @@ export default function WorkspaceShell({
       // Keep cached/local session status until auth data arrives to avoid banner pop-in on refresh.
       return;
     }
-    const sessionStripeStatus = session?.user?.stripeStatus ?? null;
-    const shouldFetchBillingMeta =
-      sessionStripeStatus === "past_due" || sessionStripeStatus === "unpaid";
-
-    if (!shouldFetchBillingMeta) {
-      setHomeStripeStatusOverride(undefined);
-      setHomeCurrentPlanTier(null);
-      setHomeBillingMetaReady(true);
-      return;
-    }
-
     let cancelled = false;
     async function reconcileHomeStripeStatus() {
       try {
@@ -1827,30 +1843,30 @@ export default function WorkspaceShell({
     if (typeof window === "undefined") return;
 
     const handler = () => {
-      setExpanded(true);
+      openAccountPanel();
     };
 
     (window as any).addEventListener("open-account-panel", handler);
     return () => {
       (window as any).removeEventListener("open-account-panel", handler);
     };
-  }, []);
+  }, [openAccountPanel]);
 
   useEffect(() => {
-    if (!isAccountRoute || typeof window === "undefined") return;
-    try {
-      const shouldOpen = window.localStorage?.getItem("mpdf:open-account-panel");
-      if (shouldOpen === "1") {
-        setExpanded(true);
-        window.localStorage.removeItem("mpdf:open-account-panel");
-      }
-    } catch {
-      // ignore storage read errors
-    }
-  }, [isAccountRoute]);
+    if (typeof window === "undefined") return;
+    if (!accountPanelOpen) return;
+    if (isHomeProjectsPath(pathname) || isAccountRoute) return;
+    closeAccountPanel();
+  }, [accountPanelOpen, closeAccountPanel, isAccountRoute, pathname]);
 
   const dismissHomeBillingBanner = () => {
     setHomeBillingBannerDismissed(true);
+  };
+
+  const openAccountSettingsPanel = () => {
+    setProfileOpen(false);
+    setMobileOpen(false);
+    openAccountPanel();
   };
 
   const openBillingPortal = async ({ collapseSidebarAfter = true }: { collapseSidebarAfter?: boolean } = {}) => {
@@ -2268,7 +2284,7 @@ export default function WorkspaceShell({
         {
           minHeight: "calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset))",
           "--shell-content-width":
-            isAccountRoute ? "1960px" : "calc(1960px - (var(--shell-sidebar-width) - 80px))",
+            isAccountRoute ? "2064px" : "calc(1960px - (var(--shell-sidebar-width) - 80px))",
           "--shell-left":
             "max(24px, calc((100vw - (var(--shell-content-width) + var(--shell-sidebar-width) + 24px)) / 2))",
           "--shell-sidebar-width": expanded ? "256px" : "80px",
@@ -2511,6 +2527,8 @@ export default function WorkspaceShell({
                             className="h-10 w-10 rounded-full object-cover"
                             onError={() => setAvatarLoadFailed(true)}
                           />
+                        ) : showProfileSkeleton ? (
+                          <span className="h-10 w-10 rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
                         ) : (
                           <span
                             className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold uppercase text-white"
@@ -2520,7 +2538,12 @@ export default function WorkspaceShell({
                           </span>
                         )}
                       </span>
-                      {hasProfileInfo ? (
+                      {showProfileSkeleton ? (
+                        <div className="flex-1 space-y-2">
+                          <div className="h-5 w-36 rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
+                          <div className="h-4 w-48 rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
+                        </div>
+                      ) : hasProfileInfo ? (
                         <div className="flex-1">
                           {profileName ? <p className="text-lg font-semibold text-slate-900">{profileName}</p> : null}
                           {profileEmail ? <p className="text-sm text-slate-500">{profileEmail}</p> : null}
@@ -2534,8 +2557,7 @@ export default function WorkspaceShell({
                             type="button"
                             onClick={() => {
                               setExpanded(true);
-                              setProfileOpen(false);
-                              router.push("/account");
+                              openAccountSettingsPanel();
                             }}
                             className="flex w-full items-center justify-between rounded-2xl bg-slate-100 px-4 py-3.5 text-left text-2xl font-semibold text-slate-800"
                           >
@@ -2602,8 +2624,7 @@ export default function WorkspaceShell({
                           <button
                             type="button"
                             onClick={() => {
-                              setProfileOpen(false);
-                              router.push("/account");
+                              openAccountSettingsPanel();
                             }}
                             className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-2xl font-semibold text-slate-700 transition hover:bg-slate-50"
                           >
@@ -2691,9 +2712,7 @@ export default function WorkspaceShell({
                     <button
                       type="button"
                       onClick={() => {
-                        setExpanded(false);
-                        setProfileOpen(false);
-                        router.push("/account");
+                        openAccountSettingsPanel();
                       }}
                       className="flex w-full items-center gap-3 rounded-2xl bg-slate-100 px-4 py-3.5 text-left text-2xl font-semibold text-slate-800 dark:bg-[#2B2B2B] dark:text-zinc-100"
                     >
@@ -2951,8 +2970,7 @@ export default function WorkspaceShell({
                 <button
                   type="button"
                   onClick={() => {
-                    setMobileOpen(false);
-                    router.push("/account");
+                    openAccountSettingsPanel();
                   }}
                   className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold transition hover:bg-slate-100"
                 >
@@ -3104,6 +3122,8 @@ export default function WorkspaceShell({
                                 className="h-8 w-8 rounded-full object-cover"
                                 onError={() => setAvatarLoadFailed(true)}
                               />
+                            ) : showProfileSkeleton ? (
+                              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
                             ) : (
                               <span
                                 className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold uppercase text-white"
@@ -3113,7 +3133,12 @@ export default function WorkspaceShell({
                               </span>
                             )}
                           </span>
-                          {hasProfileInfo ? (
+                          {showProfileSkeleton ? (
+                            <span className="hidden min-w-0 flex-1 flex-col gap-1.5 text-left md:flex">
+                              <span className="h-3.5 w-24 rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
+                              <span className="h-3 w-32 rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
+                            </span>
+                          ) : hasProfileInfo ? (
                             <span className="hidden min-w-0 flex-1 flex-col leading-tight text-left md:flex">
                               {profileName ? (
                                 <span className="truncate text-[13px] font-semibold text-[#1F2A37] dark:text-zinc-100">
@@ -3566,6 +3591,29 @@ export default function WorkspaceShell({
     </div>
   );
 
+  const accountPanelOverlay =
+    accountPanelOpen && typeof document !== "undefined"
+      ? createPortal(
+          <div className="fixed inset-0 z-[950] bg-slate-100 dark:bg-[#252525]">
+            <button
+              type="button"
+              className="absolute inset-0 cursor-default"
+              aria-label="Close account settings"
+              onClick={closeAccountPanel}
+            />
+            <div className="relative h-full w-full bg-slate-100 dark:bg-[#252525]">
+              <AccountSettingsPage
+                activeSettingsTab="account"
+                initialMobileView="home"
+                embedded
+                onClose={closeAccountPanel}
+              />
+            </div>
+          </div>,
+          document.body,
+        )
+      : null;
+
   const primaryShell = isStudioRoute ? (
     <Suspense fallback={null}>
       <main>{children}</main>
@@ -3579,6 +3627,7 @@ export default function WorkspaceShell({
   return (
     <>
       {primaryShell}
+      {accountPanelOverlay}
       {routeHandoffOverlays}
     </>
   );
