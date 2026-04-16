@@ -131,7 +131,7 @@ export default function PricingTierCards({
                     <div className="pt-0.5">
                       <div className="mb-2 flex items-start justify-between gap-3">
                         <h2 className={titleClass}>{tier.name}</h2>
-                        {tier.featured ? (
+                        {tier.name === "Signature Pro" ? (
                           <span className="mt-2 inline-flex shrink-0 items-center rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600">
                             Most popular
                           </span>
@@ -234,7 +234,7 @@ export default function PricingTierCards({
                       );
                     })}
                   </ul>
-                  {tier.featured ? (
+                  {tier.name === "Signature Pro" ? (
                     <p className="mt-0 flex w-full items-baseline justify-start gap-1 pl-7 text-xs leading-5 text-slate-500">
                       <span className="text-rose-500/90" aria-hidden="true">
                         *
