@@ -3017,7 +3017,6 @@ export function AccountSettingsPage({
                   className={iconClassName}
                   aria-hidden
                   weight={item.label === "Signatures" ? "regular" : isActive ? "fill" : "regular"}
-                  style={isActive ? { color: "#7C3AED" } : undefined}
                 />
                 <span className={`truncate leading-[1.15] ${isActive ? "dark:text-[#7C3AED]" : "dark:text-white"}`}>
                   {item.label}
