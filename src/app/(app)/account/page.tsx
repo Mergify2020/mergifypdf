@@ -155,7 +155,7 @@ export function AccountSettingsPage({
   onClose,
 }: {
   activeSettingsTab: SettingsTab;
-  initialMobileView: SettingsTab | null;
+  initialMobileView: SettingsTab | "home" | null;
   embedded?: boolean;
   onClose?: () => void;
 }) {
