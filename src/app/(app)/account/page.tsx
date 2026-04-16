@@ -370,7 +370,7 @@ export function AccountSettingsPage({
     setActiveSettingsTab(initialSettingsTab);
   }, [initialSettingsTab]);
 
-  const pricingCanUseTrialForPlan = (planName: (typeof PRICING_TIERS)[number]["name"]) => {
+  const pricingCanUseTrialForPlan = (planName: string) => {
     const byPlan = pricingTrialStatus?.eligibleForTrialByPlan;
     if (!byPlan) return pricingCanUseTrial;
     if (planName === "Essential Plus") return byPlan.essentialPlus !== false;
