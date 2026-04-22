@@ -10,6 +10,10 @@ function unauthorized() {
   return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 }
 
+function googleManagedAccount(providers: string[] | undefined) {
+  return Array.isArray(providers) && providers.includes("google") && !providers.includes("credentials");
+}
+
 export async function POST(req: Request) {
   if (!isSameOrigin(req)) {
     return NextResponse.json({ ok: false, error: "Invalid origin" }, { status: 403 });
@@ -24,6 +28,16 @@ export async function POST(req: Request) {
   }
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return unauthorized();
+  if (googleManagedAccount(session.user.providers)) {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "GOOGLE_MANAGED",
+        message: "Two-factor authentication is not available for Google sign-in accounts.",
+      },
+      { status: 403 }
+    );
+  }
 
   const body = await req.json().catch(() => ({} as Record<string, unknown>));
   const rawCode = typeof body.code === "string" ? body.code.trim() : "";

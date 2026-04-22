@@ -13,8 +13,10 @@ export const revalidate = 0;
 
 export default async function AuthLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSessionSafe();
+  const googleManagedAccount =
+    !!session?.user?.providers?.includes("google") && !session.user.providers.includes("credentials");
   const lockedByTwoFactor =
-    !!session?.user?.twoFactorEnabled && session.user.twoFactorPassed !== true;
+    !googleManagedAccount && !!session?.user?.twoFactorEnabled && session.user.twoFactorPassed !== true;
 
   if (session?.user && !lockedByTwoFactor) {
     redirect("/projects");

@@ -8,6 +8,10 @@ function unauthorized() {
   return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 }
 
+function googleManagedAccount(providers: string[] | undefined) {
+  return Array.isArray(providers) && providers.includes("google") && !providers.includes("credentials");
+}
+
 export async function POST(req: Request) {
   if (!isSameOrigin(req)) {
     return NextResponse.json({ ok: false, error: "Invalid origin" }, { status: 403 });
@@ -32,10 +36,14 @@ export async function POST(req: Request) {
       email: true,
       twoFactorEnabled: true,
       twoFactorMethod: true,
+      accounts: {
+        select: { provider: true },
+      },
     },
   });
 
-  if (!user || !user.twoFactorEnabled || user.twoFactorMethod !== "email") {
+  const providers = user?.accounts?.map((account) => account.provider) ?? [];
+  if (!user || googleManagedAccount(providers) || !user.twoFactorEnabled || user.twoFactorMethod !== "email") {
     return NextResponse.json(
       {
         ok: false,

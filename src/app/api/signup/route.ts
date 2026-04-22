@@ -36,20 +36,46 @@ export async function POST(req: Request) {
         );
       }
 
-      if (existing.password && existing.emailVerified) {
-        return NextResponse.json({ error: "Email already in use" }, { status: 409 });
-      }
-
-      const updated = await prisma.user.update({
-        where: { id: existing.id },
-        data: {
-          name: name ?? existing.name ?? null,
-          password: hashed,
-          emailVerified: null,
-        },
+      const deletionRecord = await prisma.accountDeletionRecord.findFirst({
+        where: { email: normalizedEmail },
         select: { id: true },
+        orderBy: { deletedAt: "desc" },
       });
-      userId = updated.id;
+
+      if (deletionRecord) {
+        const updated = await prisma.$transaction(async (tx) => {
+          await tx.session.deleteMany({ where: { userId: existing.id } });
+          await tx.account.deleteMany({ where: { userId: existing.id } });
+          await tx.resetToken.deleteMany({ where: { userId: existing.id } });
+          await tx.project.deleteMany({ where: { userId: existing.id } });
+          await tx.verificationToken.deleteMany({
+            where: { identifier: { contains: existing.id } },
+          });
+          await tx.user.deleteMany({ where: { id: existing.id } });
+          return tx.user.create({
+            data: {
+              email: normalizedEmail,
+              name: name ?? null,
+              password: hashed,
+            },
+            select: { id: true },
+          });
+        });
+        userId = updated.id;
+      } else if (existing.password && existing.emailVerified) {
+        return NextResponse.json({ error: "Email already in use" }, { status: 409 });
+      } else {
+        const updated = await prisma.user.update({
+          where: { id: existing.id },
+          data: {
+            name: name ?? existing.name ?? null,
+            password: hashed,
+            emailVerified: null,
+          },
+          select: { id: true },
+        });
+        userId = updated.id;
+      }
     } else {
       const created = await prisma.user.create({
         data: {

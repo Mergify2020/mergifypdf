@@ -2,14 +2,14 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { signIn } from "next-auth/react";
+import { getSession, signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
   CredentialsSignin: "Invalid email or password.",
-  EMAIL_NOT_VERIFIED: "Please verify your email before logging in. Check your inbox for the 6-digit code.",
+  EMAIL_NOT_VERIFIED: "No account found with that email.",
   OAUTH_ONLY: "This account now uses Google login. Continue with Google instead.",
   AUTH_DB_UNAVAILABLE: "Sign-in is temporarily unavailable. Please try again in a moment.",
   SERVICE_UNAVAILABLE: "Sign-in is temporarily unavailable while the app verifies its database configuration.",
@@ -30,7 +30,7 @@ export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryError = searchParams.get("error");
-  const callbackUrl = searchParams.get("callbackUrl") || "/";
+  const callbackUrl = searchParams.get("callbackUrl") || "/projects/all";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -78,10 +78,20 @@ export default function LoginPage() {
       }
 
       if (res?.url) {
+        const session = await getSession();
+        if (session?.user?.twoFactorEnabled && session.user.twoFactorPassed !== true) {
+          router.replace(`/2fa?callbackUrl=${encodeURIComponent(callbackUrl)}`);
+          return;
+        }
         window.location.assign(res.url);
         return;
       }
 
+      const session = await getSession();
+      if (session?.user?.twoFactorEnabled && session.user.twoFactorPassed !== true) {
+        router.replace(`/2fa?callbackUrl=${encodeURIComponent(callbackUrl)}`);
+        return;
+      }
       window.location.assign(callbackUrl);
     } catch (error) {
       console.error(error);

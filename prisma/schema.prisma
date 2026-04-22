@@ -35,6 +35,22 @@ model User {
   projects      Project[]
 }
 
+model AccountDeletionRecord {
+  id                 String   @id @default(cuid())
+  userId             String?
+  email              String?
+  reason             String
+  reasonDetail       String?
+  stripeCustomerId   String?
+  stripeSubscriptionId String?
+  stripePriceId      String?
+  stripeStatus       String?
+  deletedAt          DateTime @default(now())
+
+  @@index([userId])
+  @@index([deletedAt])
+}
+
 model Account {
   id                String @id @default(cuid())
   userId            String

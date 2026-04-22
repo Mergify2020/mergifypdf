@@ -10,7 +10,9 @@ export default async function TemplatesPage() {
     redirect("/login");
   }
 
-  if (session.user.twoFactorEnabled && !session.user.twoFactorPassed) {
+  const googleManagedAccount =
+    !!session.user.providers?.includes("google") && !session.user.providers.includes("credentials");
+  if (!googleManagedAccount && session.user.twoFactorEnabled && !session.user.twoFactorPassed) {
     redirect("/2fa");
   }
 

@@ -2,7 +2,14 @@
 
 import { usePathname } from "next/navigation";
 
-const AUTH_FOOTER_ROUTES = new Set(["/login", "/register", "/forgot-password", "/reset-password"]);
+const AUTH_FOOTER_ROUTES = new Set([
+  "/login",
+  "/register",
+  "/forgot-password",
+  "/reset-password",
+  "/two-factor",
+  "/2fa",
+]);
 const LOGIN_ROUTE = "/login";
 
 export default function AuthFooter() {

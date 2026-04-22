@@ -7,6 +7,7 @@ import { signOut, useSession } from "next-auth/react";
 import { AlertTriangle, CircleHelp, CreditCard, ExternalLink, Folders, LogOut, Moon, PenLine, Settings, Sparkles, Sun, User } from "lucide-react";
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
 import { getAvatarFallback } from "@/lib/avatarFallback";
+import { getBillingStatusPresentation } from "@/lib/billingPlans";
 
 export type SettingsMenuProps = {
   variant?: "default" | "pricing";
@@ -30,8 +31,8 @@ export default function SettingsMenu({
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
-  const [hasActivePlan, setHasActivePlan] = useState<boolean | null>(null);
   const [stripeStatus, setStripeStatus] = useState<string | null>(null);
+  const [billingStatusLoaded, setBillingStatusLoaded] = useState(false);
   const [billingPortalPending, setBillingPortalPending] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [themeHydrated, setThemeHydrated] = useState(false);
@@ -71,34 +72,37 @@ export default function SettingsMenu({
   useEffect(() => {
     const sessionStripeStatus = session?.user?.stripeStatus ?? null;
     setStripeStatus(sessionStripeStatus);
-    setHasActivePlan(sessionStripeStatus === "active" || sessionStripeStatus === "trialing");
   }, [session?.user?.stripeStatus]);
 
   useEffect(() => {
     let active = true;
 
     async function loadPlanStatus() {
-      if (!open || !session?.user?.email) {
+      if (!session?.user?.email) {
+        if (active) {
+          setBillingStatusLoaded(false);
+          setStripeStatus(session?.user?.stripeStatus ?? null);
+        }
         return;
       }
       try {
         const response = await fetch("/api/account/trial-status");
         if (!response.ok) {
           if (active) {
-            setHasActivePlan(false);
             setStripeStatus(null);
+            setBillingStatusLoaded(true);
           }
           return;
         }
         const data = (await response.json()) as { hasActivePlan?: boolean; stripeStatus?: string | null };
         if (active) {
-          setHasActivePlan(data.hasActivePlan === true);
           setStripeStatus(typeof data.stripeStatus === "string" ? data.stripeStatus : null);
+          setBillingStatusLoaded(true);
         }
       } catch {
         if (active) {
-          setHasActivePlan(false);
           setStripeStatus(null);
+          setBillingStatusLoaded(true);
         }
       }
     }
@@ -107,7 +111,7 @@ export default function SettingsMenu({
     return () => {
       active = false;
     };
-  }, [open, session?.user?.email]);
+  }, [open, session?.user?.email, session?.user?.stripeStatus]);
 
   useEffect(() => {
     if (!open) return;
@@ -232,7 +236,11 @@ export default function SettingsMenu({
     }, 200);
   }
 
-  const shouldShowUpdatePaymentCta = stripeStatus === "past_due" || stripeStatus === "unpaid";
+  const billingPresentationState = getBillingStatusPresentation(stripeStatus);
+  const shouldShowUpdatePaymentCta =
+    billingPresentationState === "past_due" || billingPresentationState === "unpaid";
+  const shouldShowUpgradePlanCta = billingPresentationState === "none";
+  const billingStatusLoading = !billingStatusLoaded && Boolean(session?.user?.email);
   const customTriggerBase =
     "inline-flex items-center justify-center rounded-full border border-slate-200 bg-white transition hover:bg-slate-100 focus:outline-none active:scale-[0.99]";
 
@@ -338,18 +346,20 @@ export default function SettingsMenu({
             </div>
 
             <div className="border-t border-[#E6EBF2] pt-2 dark:border-[#3F3F3F]">
-              {shouldShowUpdatePaymentCta ? (
+              {billingStatusLoading ? (
+                <div className="mb-2 h-[48px] w-full rounded-md bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
+              ) : shouldShowUpdatePaymentCta ? (
                 <button
                   type="button"
                   onClick={() => {
                     void handleBillingPortal();
                   }}
                   className="mb-2 flex w-full items-center justify-center gap-2 rounded-md bg-rose-600 px-3 py-2.5 text-[15px] font-semibold text-white transition hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-500/45 focus:ring-offset-2 focus:ring-offset-white dark:bg-rose-600 dark:hover:bg-rose-700 dark:focus:ring-offset-zinc-900"
-                >
+                  >
                   <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
                   Update payment method
                 </button>
-              ) : hasActivePlan === false ? (
+              ) : shouldShowUpgradePlanCta ? (
                 <button
                   type="button"
                   onClick={handlePricing}

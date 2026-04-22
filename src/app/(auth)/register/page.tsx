@@ -3,13 +3,15 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 
 type Step = "form" | "verify";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const verifyEmailParam = searchParams.get("verifyEmail");
   const [step, setStep] = useState<Step>("form");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -193,6 +195,16 @@ export default function RegisterPage() {
 
     return () => clearInterval(timer);
   }, [step, resendCooldown]);
+
+  useEffect(() => {
+    if (!verifyEmailParam) return;
+    setEmail(verifyEmailParam);
+    setPendingEmail(verifyEmailParam);
+    setStep("verify");
+    setCodeDigits(Array(6).fill(""));
+    setErr(null);
+    setInfo(null);
+  }, [verifyEmailParam]);
 
   return (
     <main
@@ -446,7 +458,7 @@ export default function RegisterPage() {
                   We sent a 6-digit code to{" "}
                   <span className="font-medium">{pendingEmail}</span>. Enter it below.
                 </p>
-                <div className="mx-auto flex w-fit items-center gap-4">
+                <div className="mx-auto flex w-full max-w-[320px] items-center justify-between gap-2 sm:w-fit sm:max-w-none sm:gap-4">
                   {codeDigits.map((digit, index) => (
                     <input
                       key={`code-${index}`}
@@ -454,7 +466,7 @@ export default function RegisterPage() {
                         codeRefs.current[index] = el;
                       }}
                       autoFocus={index === 0}
-                      className="h-16 w-[60px] rounded-lg border-2 border-slate-300 bg-white text-center text-[1.375rem] text-slate-900 outline-none transition focus-visible:border-[#6D6AF4] focus-visible:ring-0 hover:border-slate-400"
+                      className="h-12 w-10 rounded-lg border-2 border-slate-300 bg-white text-center text-xl text-slate-900 outline-none transition focus-visible:border-[#6D6AF4] focus-visible:ring-0 hover:border-slate-400 sm:h-16 sm:w-[60px] sm:text-[1.375rem]"
                       type="text"
                       inputMode="numeric"
                       pattern="\d*"

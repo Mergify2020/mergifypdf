@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { ArrowUpRight, FileSignature, MoreHorizontal } from "lucide-react";
+import { useState } from "react";
+import { ArrowRight, Ban, CheckCircle2, FileSignature, Info } from "lucide-react";
+import { useVisibleSignatureRows } from "./useVisibleSignatureRows";
 
 type Signer = {
   name: string;
@@ -16,131 +17,74 @@ type SignatureRequest = {
   primaryRecipientName: string;
   primaryRecipientEmail: string;
   signers: Signer[];
-  updated: string;
+  sentAt: string;
   state?: "pending" | "completed" | "voided";
   attention?: "you" | "others";
 };
 
-const SKELETON_ROWS = 6;
-
-const FILTERS = ["All", "Pending", "Completed"] as const;
-
-type FilterValue = (typeof FILTERS)[number];
+const INITIAL_REQUESTS: SignatureRequest[] = [
+  {
+    id: "1",
+    documentName: "Vendor Renewal Agreement",
+    projectName: "Pinnacol Renewal 2025",
+    primaryRecipientName: "Pinnacol Ops Team",
+    primaryRecipientEmail: "operations@pinnacolassurance.com",
+    signers: [
+      { name: "Alan Morris", email: "alan@mergifypdf.com", hasSigned: false },
+      { name: "Pinnacol Ops", email: "operations@pinnacolassurance.com", hasSigned: true },
+      { name: "Legal Reviewer", email: "legal@pinnacolassurance.com", hasSigned: false },
+    ],
+    sentAt: "2026-04-20T22:14:09Z",
+    state: "pending",
+    attention: "others",
+  },
+  {
+    id: "2",
+    documentName: "Client Audit Packet",
+    projectName: "Golden Rain FY25",
+    primaryRecipientName: "Golden Rain Finance",
+    primaryRecipientEmail: "finance@goldenrainmasonry.com",
+    signers: [
+      { name: "Finance Lead", email: "finance@goldenrainmasonry.com", hasSigned: true },
+      { name: "Owner Signer", email: "owner@goldenrainmasonry.com", hasSigned: true },
+      { name: "Auditor", email: "audit@goldenrainmasonry.com", hasSigned: false },
+    ],
+    sentAt: "2026-04-19T15:24:00Z",
+    state: "voided",
+  },
+  {
+    id: "3",
+    documentName: "Compliance Addendum",
+    projectName: "MergifyPDF Studio",
+    primaryRecipientName: "MergifyPDF Legal",
+    primaryRecipientEmail: "legal@mergifypdf.com",
+    signers: [
+      { name: "Head of Legal", email: "legal@mergifypdf.com", hasSigned: true },
+      { name: "Operations", email: "ops@mergifypdf.com", hasSigned: true },
+    ],
+    sentAt: "2026-04-18T16:41:00Z",
+    state: "completed",
+  },
+  {
+    id: "4",
+    documentName: "Project T – SOW",
+    projectName: "Project T",
+    primaryRecipientName: "Northbridge Projects",
+    primaryRecipientEmail: "projects@northbridgepartners.co",
+    signers: [
+      { name: "Account Lead", email: "projects@northbridgepartners.co", hasSigned: true },
+      { name: "Client Sponsor", email: "sponsor@northbridgepartners.co", hasSigned: true },
+    ],
+    sentAt: "2026-04-17T19:18:00Z",
+    state: "completed",
+  },
+];
 
 export default function SignatureRequestsTable() {
-  const [requests, setRequests] = useState<SignatureRequest[] | null>(null);
-  const [activeFilter, setActiveFilter] = useState<FilterValue>("All");
-  const [openMenuForId, setOpenMenuForId] = useState<string | null>(null);
+  const requests = INITIAL_REQUESTS;
   const [activeRequest, setActiveRequest] = useState<SignatureRequest | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      // Simulate loading so the skeletons are visible while real data is fetched.
-      await new Promise((resolve) => setTimeout(resolve, 600));
-
-      if (cancelled) return;
-
-      // Placeholder data – replace with real API results when wired up.
-      setRequests([
-        {
-          id: "1",
-          documentName: "Vendor Renewal Agreement",
-          projectName: "Pinnacol Renewal 2025",
-          primaryRecipientName: "Pinnacol Ops Team",
-          primaryRecipientEmail: "operations@pinnacolassurance.com",
-          signers: [
-            { name: "Leticia Silva", email: "leticia@mergifypdf.com", hasSigned: true },
-            { name: "Pinnacol Ops", email: "operations@pinnacolassurance.com", hasSigned: false },
-            { name: "Legal Reviewer", email: "legal@pinnacolassurance.com", hasSigned: false },
-          ],
-          updated: "Today • 3:44 AM",
-          state: "pending",
-          attention: "others",
-        },
-        {
-          id: "2",
-          documentName: "Client Audit Packet",
-          projectName: "Golden Rain FY25",
-          primaryRecipientName: "Golden Rain Finance",
-          primaryRecipientEmail: "finance@goldenrainmasonry.com",
-          signers: [
-            { name: "Finance Lead", email: "finance@goldenrainmasonry.com", hasSigned: true },
-            { name: "Owner Signer", email: "owner@goldenrainmasonry.com", hasSigned: true },
-            { name: "Auditor", email: "audit@goldenrainmasonry.com", hasSigned: false },
-          ],
-          updated: "Yesterday • 9:24 AM",
-          state: "voided",
-        },
-        {
-          id: "3",
-          documentName: "Compliance Addendum",
-          projectName: "MergifyPDF Studio",
-          primaryRecipientName: "MergifyPDF Legal",
-          primaryRecipientEmail: "legal@mergifypdf.com",
-          signers: [
-            { name: "Head of Legal", email: "legal@mergifypdf.com", hasSigned: true },
-            { name: "Operations", email: "ops@mergifypdf.com", hasSigned: true },
-          ],
-          updated: "Tuesday • 10:41 AM",
-          state: "completed",
-        },
-        {
-          id: "4",
-          documentName: "Project T – SOW",
-          projectName: "Project T",
-          primaryRecipientName: "Northbridge Projects",
-          primaryRecipientEmail: "projects@northbridgepartners.co",
-          signers: [
-            { name: "Account Lead", email: "projects@northbridgepartners.co", hasSigned: true },
-            { name: "Client Sponsor", email: "sponsor@northbridgepartners.co", hasSigned: true },
-          ],
-          updated: "Monday • 1:18 PM",
-          state: "completed",
-        },
-        {
-          id: "5",
-          documentName: "Onboarding Packet",
-          projectName: "Acme HR Setup",
-          primaryRecipientName: "Acme HR",
-          primaryRecipientEmail: "hr@acmecorp.com",
-          signers: [
-            { name: "HR Lead", email: "hr@acmecorp.com", hasSigned: false },
-            { name: "New Hire", email: "newhire@acmecorp.com", hasSigned: false },
-          ],
-          updated: "Last week",
-          state: "pending",
-          attention: "you",
-        },
-      ]);
-    }
-
-    load();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const isLoading = !requests;
-
-  const visibleRequests = useMemo(() => {
-    if (!requests) return [];
-    if (activeFilter === "All") return requests;
-
-    return requests.filter((request) => {
-      const { isCompleted, isPending } = getRequestProgress(request);
-      if (activeFilter === "Pending") {
-        return isPending;
-      }
-      if (activeFilter === "Completed") {
-        return isCompleted;
-      }
-      return true;
-    });
-  }, [activeFilter, requests]);
-
+  const [openSignerOrderRequestId, setOpenSignerOrderRequestId] = useState<string | null>(null);
+  const visibleRequestCount = useVisibleSignatureRows();
   function getRequestProgress(request: SignatureRequest) {
     const totalSigners = request.signers.length;
     const signedCount = request.signers.filter((signer) => signer.hasSigned).length;
@@ -152,89 +96,131 @@ export default function SignatureRequestsTable() {
     return { totalSigners, signedCount, isCompleted, isPending, isVoided, nextSigner };
   }
 
-  function renderStatusCell(request: SignatureRequest) {
-    const { isCompleted, isPending, isVoided } = getRequestProgress(request);
-
-    let label = "";
-    let className =
-      "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ";
-
-    if (isVoided) {
-      label = "Voided by Sender";
-      className += "bg-red-100 text-red-800";
-    } else if (isCompleted) {
-      label = "Completed";
-      className += "bg-emerald-100 text-emerald-800";
-    } else if (isPending && request.attention === "you") {
-      label = "Waiting on You";
-      className += "bg-purple-100 text-purple-800";
-    } else {
-      label = "Awaiting Signatures";
-      className += "bg-yellow-100 text-yellow-800";
-    }
-
-    return <span className={className}>{label}</span>;
+  function toggleSignerOrder(requestId: string) {
+    setOpenSignerOrderRequestId((current) => (current === requestId ? null : requestId));
   }
 
-  const showEmptyState = !isLoading && visibleRequests.length === 0;
+  function formatSentOn(sentAt: string) {
+    const date = new Date(sentAt);
+    if (Number.isNaN(date.getTime())) return "";
 
-  return (
-    <section className="mt-2">
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-[#6B7280]">
-          Signature requests
-        </h2>
-        <div className="flex flex-wrap gap-2">
-          <div className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 p-1">
-            {FILTERS.map((filter) => {
-              const isActive = filter === activeFilter;
-              return (
-                <button
-                  key={filter}
-                  type="button"
-                  onClick={() => setActiveFilter(filter)}
-                  className={
-                    "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium transition " +
-                    (isActive
-                      ? "bg-white text-slate-900 shadow-sm"
-                      : "text-slate-500 hover:text-slate-900")
-                  }
-                >
-                  {filter}
-                </button>
-              );
-            })}
-          </div>
+    const dateFormatter = new Intl.DateTimeFormat(undefined, {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+
+    return dateFormatter.format(date);
+  }
+
+  function renderSentOn(request: SignatureRequest) {
+    const { isVoided } = getRequestProgress(request);
+    const formattedSentOn = formatSentOn(request.sentAt);
+    const label = isVoided ? "Voided on" : "Sent on";
+
+    return (
+      <div className="min-w-0 text-[13px] font-medium leading-tight">
+        <div className={`leading-none ${isVoided ? "text-rose-600" : "text-slate-500"}`}>
+          <span className="whitespace-nowrap">{label}</span>
+        </div>
+        <div className={`mt-0.5 leading-none ${isVoided ? "text-rose-600" : "text-slate-500"}`}>
+          <span className="whitespace-nowrap">{formattedSentOn}</span>
         </div>
       </div>
+    );
+  }
 
-      <div className="overflow-hidden rounded-[8px] border border-slate-200 bg-white">
-        <div className="grid grid-cols-[minmax(0,2.1fr)_minmax(0,1.8fr)_minmax(0,1.2fr)_minmax(0,1.1fr)_auto] gap-4 border-b border-slate-100 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]">
-          <span>Document</span>
-          <span>Recipient</span>
-          <span>Status</span>
-          <span className="text-right">Last updated</span>
-          <span className="sr-only">Actions</span>
-        </div>
+  const visibleRequests = requests ?? [];
+  const requestsToShow = visibleRequests.slice(0, Math.min(visibleRequestCount, visibleRequests.length));
 
-        <div className="divide-y divide-slate-100">
-          {isLoading
-            ? Array.from({ length: SKELETON_ROWS }).map((_, index) => (
-                <div
-                  // eslint-disable-next-line react/no-array-index-key
-                  key={index}
-                  className="grid grid-cols-[minmax(0,2.1fr)_minmax(0,1.8fr)_minmax(0,1.2fr)_minmax(0,1.1fr)_auto] gap-4 bg-white px-4 py-3 even:bg-slate-50"
-                >
-                  <div className="h-4 w-3/4 rounded-full bg-slate-100 skeleton-shimmer" />
-                  <div className="h-4 w-5/6 rounded-full bg-slate-100 skeleton-shimmer" />
-                  <div className="h-4 w-1/3 rounded-full bg-slate-100 skeleton-shimmer" />
-                  <div className="ml-auto h-4 w-1/3 rounded-full bg-slate-100 skeleton-shimmer" />
-                  <div className="h-7 w-16 rounded-full bg-slate-100 skeleton-shimmer" />
+  function renderStatusCell(request: SignatureRequest) {
+    const { totalSigners, signedCount, isCompleted, isPending, isVoided, nextSigner } =
+      getRequestProgress(request);
+
+    let className =
+      "inline-flex items-center gap-1.5 whitespace-nowrap text-[13px] font-medium leading-none ";
+
+    if (isVoided) {
+      className += "text-rose-600";
+    } else if (isCompleted) {
+      className += "text-emerald-600";
+    } else if (isPending && request.attention === "you") {
+      className += "text-violet-600";
+    } else {
+      className += "text-amber-600";
+    }
+
+    const progressPercent =
+      totalSigners > 0 ? Math.min(100, Math.max(0, (signedCount / totalSigners) * 100)) : 0;
+    const waitingLabel =
+      request.attention === "you" ? "Waiting for You" : `Waiting for ${nextSigner?.name ?? "Next signer"}`;
+
+    return (
+      <div className="relative min-w-0 space-y-1">
+        {!isPending ? (
+          <span className={`${className} text-[14px]`}>
+            {isCompleted ? (
+              <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden />
+            ) : (
+              <Ban className="h-4 w-4 shrink-0" aria-hidden />
+            )}
+            {isCompleted ? "Completed" : "Voided"}
+          </span>
+        ) : null}
+        {isPending ? (
+          <>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+              <div
+                className="h-full rounded-full bg-[#6A4EE8] transition-[width] duration-300"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+            <div className="relative flex w-full min-w-0 items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => toggleSignerOrder(request.id)}
+                className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+                aria-label={`Show signer order for ${request.documentName}`}
+                aria-expanded={openSignerOrderRequestId === request.id}
+              >
+                <Info className="h-3.5 w-3.5" aria-hidden />
+              </button>
+              <p className="min-w-0 flex-1 truncate text-[13px] leading-tight text-slate-500">
+                {waitingLabel}
+              </p>
+              {openSignerOrderRequestId === request.id ? (
+                <div className="absolute left-0 top-full z-20 mt-2 w-64 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-[0_16px_40px_rgba(15,23,42,0.12)]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    Signing order
+                  </p>
+                  <div className="mt-2 space-y-2">
+                    {request.signers.map((signer, index) => (
+                      <div key={signer.email} className="flex items-center gap-2 text-sm">
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[11px] font-semibold text-slate-700">
+                          {index + 1}
+                        </span>
+                        <span className="min-w-0 truncate text-slate-900">{signer.name}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))
-            : showEmptyState
+              ) : null}
+            </div>
+          </>
+        ) : null}
+      </div>
+    );
+  }
+
+  const showEmptyState = visibleRequests.length === 0;
+
+  return (
+    <section className="mt-0">
+      <div className="xl:hidden">
+        <div className="divide-y divide-slate-100">
+          {showEmptyState
               ? (
-                <div className="flex flex-col items-center gap-3 px-6 py-16 text-center text-sm text-slate-500">
+                <div className="flex flex-col items-center gap-3 py-10 text-center text-sm text-slate-500">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
                     <FileSignature className="h-6 w-6" aria-hidden />
                   </div>
@@ -243,96 +229,128 @@ export default function SignatureRequestsTable() {
                   </p>
                 </div>
                 )
-              : visibleRequests.map((request, index) => {
-                const { isCompleted } = getRequestProgress(request);
+              : requestsToShow.map((request) => {
+                const isSelected = activeRequest?.id === request.id;
 
                 return (
                   <div
                     key={request.id}
-                    className={`grid grid-cols-[minmax(0,2.1fr)_minmax(0,1.8fr)_minmax(0,1.2fr)_minmax(0,1.1fr)_auto] gap-4 px-4 py-3 text-sm text-slate-700 transition-colors ${
-                      index % 2 === 0 ? "bg-white" : "bg-slate-50"
-                    } hover:bg-slate-100`}
+                    className={`flex items-start justify-between gap-3 py-4 ${
+                      isSelected ? "bg-[#F8FAFF]" : ""
+                    }`}
                   >
-                    <div className="min-w-0">
-                      <div className="truncate font-medium text-slate-900">
-                        {request.documentName}
-                      </div>
-                    {request.projectName ? (
-                      <div className="truncate text-xs text-slate-500">
-                        {request.projectName}
-                      </div>
-                    ) : null}
-                    </div>
-                    <div className="truncate text-slate-600">
-                      {request.primaryRecipientName}
-                    </div>
-                    <div>
-                      {renderStatusCell(request)}
-                    </div>
-                    <div className="text-right text-slate-500">
-                      {request.updated}
-                    </div>
-                    <div className="relative flex items-center justify-end">
+                    <div className="min-w-0 flex-1 space-y-1">
                       <button
                         type="button"
-                        onClick={() =>
-                          setOpenMenuForId((current) => (current === request.id ? null : request.id))
-                        }
-                        className="inline-flex items-center justify-center rounded-full border border-slate-200 p-1.5 text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
+                        onClick={() => setActiveRequest(request)}
+                        aria-pressed={isSelected}
+                        className={`block truncate text-left font-semibold text-slate-900 transition hover:text-[#5C3EDB] ${
+                          isSelected ? "text-[#5C3EDB]" : ""
+                        }`}
                       >
-                        <MoreHorizontal className="h-4 w-4" aria-hidden />
+                        {request.documentName}
                       </button>
-                      {openMenuForId === request.id ? (
-                        <div className="absolute right-0 top-9 z-10 w-44 rounded-xl border border-slate-200 bg-white py-1 text-xs shadow-lg">
-                          <button
-                            type="button"
-                            className="flex w-full items-center justify-between px-3 py-1.5 text-left text-slate-700 hover:bg-slate-50"
-                            onClick={() => {
-                              setActiveRequest(request);
-                              setOpenMenuForId(null);
-                            }}
-                          >
-                            <span>View details</span>
-                            <ArrowUpRight className="h-3 w-3" aria-hidden />
-                          </button>
-                          <button
-                            type="button"
-                            className="flex w-full items-center justify-between px-3 py-1.5 text-left text-slate-700 hover:bg-slate-50"
-                            onClick={() => {
-                              console.log("Resend request", request.id);
-                              setOpenMenuForId(null);
-                            }}
-                          >
-                            <span>Resend request</span>
-                          </button>
-                          <button
-                            type="button"
-                            className="flex w-full items-center justify-between px-3 py-1.5 text-left text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                            disabled={!isCompleted}
-                            onClick={() => {
-                              if (!isCompleted) return;
-                              console.log("Download signed PDF", request.id);
-                              setOpenMenuForId(null);
-                            }}
-                          >
-                            <span>Download signed PDF</span>
-                          </button>
-                          <button
-                            type="button"
-                            className="flex w-full items-center justify-between px-3 py-1.5 text-left text-rose-600 hover:bg-rose-50"
-                            onClick={() => {
-                              console.log("Cancel request", request.id);
-                              setOpenMenuForId(null);
-                            }}
-                          >
-                            <span>Cancel request</span>
-                          </button>
-                        </div>
+                      {request.projectName ? (
+                        <div className="truncate text-xs text-slate-500">{request.projectName}</div>
                       ) : null}
+                      <div className="truncate text-xs text-slate-500">
+                        {request.primaryRecipientName}
+                      </div>
+                      <div>{renderStatusCell(request)}</div>
+                      <div className="text-xs text-slate-500">{request.updated}</div>
+                    </div>
+                    <div className="pt-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setActiveRequest(request)}
+                        aria-pressed={isSelected}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+                      >
+                        <ArrowRight className="h-4 w-4 stroke-[2.5]" aria-hidden />
+                      </button>
                     </div>
                   </div>
                 );
               })}
+        </div>
+      </div>
+
+      <div className="hidden xl:block">
+        <div className="overflow-hidden">
+          <div className="divide-y divide-slate-100">
+            {showEmptyState
+                ? (
+                  <div className="flex flex-col items-center gap-3 px-6 py-16 text-center text-sm text-slate-500">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+                      <FileSignature className="h-6 w-6" aria-hidden />
+                    </div>
+                    <p className="max-w-sm text-sm text-slate-600">
+                      No signature requests yet — send your first one.
+                    </p>
+                  </div>
+                  )
+                : requestsToShow.map((request) => {
+                  const isSelected = activeRequest?.id === request.id;
+
+                  return (
+                    <div
+                      key={request.id}
+                      className={`flex flex-col gap-3 px-0 py-4 text-sm text-slate-700 md:grid md:items-start md:gap-8 md:py-3 xl:gap-8 ${
+                        isSelected ? "bg-[#F8FAFF]" : "bg-white"
+                      }`}
+                      style={{ gridTemplateColumns: "var(--sc-requests-grid)" }}
+                    >
+                      <div className="flex items-start justify-between gap-3 md:contents">
+                        <div className="min-w-0">
+                          <button
+                            type="button"
+                            onClick={() => setActiveRequest(request)}
+                            aria-pressed={isSelected}
+                            className={`block max-w-full truncate text-left font-semibold text-slate-900 transition hover:text-[#5C3EDB] ${
+                              isSelected ? "text-[#5C3EDB]" : ""
+                            }`}
+                          >
+                            {request.documentName}
+                          </button>
+                          {request.projectName ? (
+                            <div className="truncate text-xs text-slate-500">
+                              {request.projectName}
+                            </div>
+                          ) : null}
+                        </div>
+                        <div className="md:hidden">
+                          <button
+                            type="button"
+                            onClick={() => setActiveRequest(request)}
+                            aria-pressed={isSelected}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+                          >
+                            <ArrowRight className="h-4 w-4 stroke-[2.5]" aria-hidden />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="md:hidden">{renderStatusCell(request)}</div>
+                      <div className="md:hidden">{renderSentOn(request)}</div>
+                      <div className="hidden min-w-0 md:block">
+                        {renderStatusCell(request)}
+                      </div>
+                      <div className="hidden min-w-0 md:block md:pl-[28px] xl:pl-[32px]">
+                        {renderSentOn(request)}
+                      </div>
+                      <div className="relative hidden items-center justify-end md:flex">
+                        <button
+                          type="button"
+                          onClick={() => setActiveRequest(request)}
+                          aria-pressed={isSelected}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+                        >
+                          <ArrowRight className="h-4 w-4 stroke-[2.5]" aria-hidden />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+          </div>
         </div>
       </div>
       {activeRequest ? (
@@ -343,7 +361,7 @@ export default function SignatureRequestsTable() {
             className="flex-1 bg-black/30"
             onClick={() => setActiveRequest(null)}
           />
-          <aside className="h-full w-full max-w-md border-l border-slate-200 bg-slate-50 shadow-[0_20px_60px_rgba(15,23,42,0.35)]">
+          <aside className="h-full w-full max-w-md border-l border-slate-200 bg-[#fbfbfe] shadow-[0_20px_60px_rgba(15,23,42,0.35)]">
             <div className="flex items-start justify-between border-b border-slate-200 px-5 py-4">
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
@@ -368,7 +386,7 @@ export default function SignatureRequestsTable() {
             </div>
 
             <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-5 py-4 text-sm">
-              <div className="rounded-lg border border-slate-200 bg-white p-3">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                   Overall status
                 </p>
@@ -377,7 +395,7 @@ export default function SignatureRequestsTable() {
                 </div>
               </div>
 
-              <div className="rounded-lg border border-slate-200 bg-white p-3">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                   Signers
                 </p>
@@ -403,20 +421,20 @@ export default function SignatureRequestsTable() {
                 </ul>
               </div>
 
-              <div className="rounded-lg border border-slate-200 bg-white p-3">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                   Actions
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   <button
                     type="button"
-                    className="inline-flex items-center justify-center rounded-full bg-[#6A4EE8] px-4 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-[#5C3EDB]"
+                    className="inline-flex items-center justify-center rounded-full bg-[#6A4EE8] px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-[#5C3EDB]"
                   >
                     Resend request
                   </button>
                   <button
                     type="button"
-                    className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                     onClick={() => {
                       const url = `${window.location.origin}/signature-request/${activeRequest.id}`;
                       if (navigator.clipboard?.writeText) {
@@ -433,7 +451,7 @@ export default function SignatureRequestsTable() {
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                   Document preview
                 </p>
-                <div className="flex h-40 items-center justify-center rounded-md border border-dashed border-slate-200 bg-slate-50 text-xs text-slate-500">
+                <div className="flex h-40 items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-xs text-slate-500">
                   First page thumbnail placeholder
                 </div>
               </div>

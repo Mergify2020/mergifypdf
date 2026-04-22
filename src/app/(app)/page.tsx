@@ -38,7 +38,9 @@ export default async function Home({
   }
 
   if (session?.user) {
-    if (session.user.twoFactorEnabled && !session.user.twoFactorPassed) {
+    const googleManagedAccount =
+      !!session.user.providers?.includes("google") && !session.user.providers.includes("credentials");
+    if (!googleManagedAccount && session.user.twoFactorEnabled && !session.user.twoFactorPassed) {
       redirect("/2fa");
     }
     if (!session.user.id) {

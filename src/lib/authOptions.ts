@@ -67,6 +67,10 @@ function logAuthDbRefreshIssue(scope: "jwt" | "session", error: unknown) {
   console.warn(prefix);
 }
 
+function isGoogleManagedProviders(providers: string[] | undefined) {
+  return Array.isArray(providers) && providers.includes("google") && !providers.includes("credentials");
+}
+
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt", maxAge: SESSION_MAX_AGE, updateAge: 60 * 60 },
@@ -229,14 +233,20 @@ export const authOptions: NextAuthOptions = {
         }
       }
 
-      const twoFactorEnabled = dbUser
-        ? !!dbUser.twoFactorEnabled
-        : typeof token.twoFactorEnabled === "boolean"
-          ? token.twoFactorEnabled
-          : false;
+      const providers = Array.isArray(token.providers) ? token.providers : [];
+      const googleManaged = isGoogleManagedProviders(providers);
+      const twoFactorEnabled = googleManaged
+        ? false
+        : dbUser
+          ? !!dbUser.twoFactorEnabled
+          : typeof token.twoFactorEnabled === "boolean"
+            ? token.twoFactorEnabled
+            : false;
       token.twoFactorEnabled = twoFactorEnabled;
-      token.twoFactorMethod = dbUser?.twoFactorMethod
-        ?? (typeof token.twoFactorMethod === "string" ? token.twoFactorMethod : null);
+      token.twoFactorMethod = googleManaged
+        ? null
+        : dbUser?.twoFactorMethod
+          ?? (typeof token.twoFactorMethod === "string" ? token.twoFactorMethod : null);
       token.stripeStatus = dbUser?.stripeStatus
         ?? (typeof token.stripeStatus === "string" ? token.stripeStatus : null);
       token.stripePriceId = dbUser?.stripePriceId
@@ -244,10 +254,10 @@ export const authOptions: NextAuthOptions = {
 
       if (account) {
         // Fresh sign-in: always reset 2FA pass flag based on whether 2FA is enabled
-        token.twoFactorPassed = !twoFactorEnabled;
+        token.twoFactorPassed = googleManaged ? true : !twoFactorEnabled;
       } else if (typeof token.twoFactorPassed !== "boolean") {
         // Default for existing tokens without this flag yet
-        token.twoFactorPassed = !twoFactorEnabled;
+        token.twoFactorPassed = googleManaged ? true : !twoFactorEnabled;
       }
 
       const nextEmail = profile?.email ?? user?.email ?? (token.email as string | undefined);
@@ -270,10 +280,16 @@ export const authOptions: NextAuthOptions = {
         if (token.sub) session.user.id = token.sub;
         session.user.image = null;
 
-        const twoFactorEnabled =
-          typeof token.twoFactorEnabled === "boolean" ? token.twoFactorEnabled : false;
+        const googleManaged = isGoogleManagedProviders(session.user.providers);
+        const twoFactorEnabled = googleManaged
+          ? false
+          : typeof token.twoFactorEnabled === "boolean"
+            ? token.twoFactorEnabled
+            : false;
         const twoFactorPassed =
-          typeof token.twoFactorPassed === "boolean"
+          googleManaged
+            ? true
+            : typeof token.twoFactorPassed === "boolean"
             ? token.twoFactorPassed
             : !twoFactorEnabled;
 

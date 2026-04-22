@@ -1,22 +1,26 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useState } from "react";
+import Image from "next/image";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 
 export default function TwoFactorPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: session, status } = useSession();
 
-  const [code, setCode] = useState("");
+  const [codeDigits, setCodeDigits] = useState<string[]>(["", "", "", "", "", ""]);
+  const codeRefs = useRef<Array<HTMLInputElement | null>>([]);
   const [info, setInfo] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [sendingCode, setSendingCode] = useState(false);
   const [cooldown, setCooldown] = useState(0);
 
-  const callbackUrl = searchParams.get("callbackUrl") || "/";
+  const callbackUrl = searchParams.get("callbackUrl") || "/projects/all";
+  const codeValue = useMemo(() => codeDigits.join(""), [codeDigits]);
+  const email = session?.user?.email ?? "your email";
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -36,8 +40,20 @@ export default function TwoFactorPage() {
     };
   }, [cooldown]);
 
+  function focusCodeIndex(index: number) {
+    codeRefs.current[index]?.focus();
+  }
+
+  function updateCodeDigit(index: number, value: string) {
+    setCodeDigits((prev) => {
+      const next = [...prev];
+      next[index] = value;
+      return next;
+    });
+  }
+
   async function sendCode(force?: boolean) {
-    setBusy(true);
+    setSendingCode(true);
     setError(null);
     setInfo(null);
     try {
@@ -58,25 +74,22 @@ export default function TwoFactorPage() {
         }
         return;
       }
-      setInfo("We sent a 6-digit code to your email. Enter it below.");
+      setInfo("We sent a 6-digit code to your email.");
       setCooldown(25);
     } catch {
       setError("We couldn’t send your code. Please try again.");
     } finally {
-      setBusy(false);
+      setSendingCode(false);
     }
   }
 
   useEffect(() => {
-    // Automatically send the code on first visit.
-    // Back/forward or reload will reuse an active code, and only an explicit
-    // "Resend code" click below will force a new one.
     void sendCode(false);
   }, []);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (code.trim().length !== 6) {
+    if (codeValue.trim().length !== 6) {
       setError("Enter the 6-digit code.");
       return;
     }
@@ -88,14 +101,14 @@ export default function TwoFactorPage() {
       const res = await fetch("/api/auth/two-factor/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: code.trim() }),
+        body: JSON.stringify({ code: codeValue.trim() }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok || !body?.ok) {
-        const codeName = body?.code as string | undefined;
-        if (codeName === "invalid_code") {
+        const code = body?.code as string | undefined;
+        if (code === "invalid_code") {
           setError("That code doesn’t match. Try again.");
-        } else if (codeName === "expired") {
+        } else if (code === "expired") {
           setError("That code has expired. Request a new one.");
         } else {
           setError(body?.message ?? "Verification failed. Please try again.");
@@ -103,7 +116,7 @@ export default function TwoFactorPage() {
         return;
       }
 
-      router.replace(callbackUrl || "/");
+      router.replace(callbackUrl || "/projects/all");
       router.refresh();
     } catch {
       setError("Verification failed. Please try again.");
@@ -112,113 +125,142 @@ export default function TwoFactorPage() {
     }
   }
 
-  const email = session?.user?.email;
-
-  // Full-screen overlay that sits above the global header so nothing behind it is clickable.
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col bg-white">
-      <header className="flex h-[64px] items-center border-b border-slate-200 bg-white/95 px-4 shadow-sm">
-        <div className="mx-auto flex w-full max-w-7xl items-center justify-between">
-          <button
-            type="button"
-            onClick={() => {
-              // On the 2FA screen, the logo takes you back
-              // to the previous page (typically the login form).
-              router.back();
-            }}
-            className="inline-flex items-center gap-2"
-            aria-label="Back to login"
-          >
-            <img
-              src="/logo-wordmark2.svg"
-              alt="MergifyPDF"
-              className="h-10 w-auto"
-            />
-          </button>
-          <div className="flex items-center gap-3">
-            {/* Pricing pill to match login header */}
-            <Link
-              href="/pricing"
-              className="inline-flex items-center rounded-full border-2 border-slate-300 bg-[#6A4EE8] px-7 py-2 text-xs font-semibold text-white shadow-md transition-all hover:-translate-y-0.5 hover:bg-[#5A3FD8] hover:shadow-lg"
-            >
-              Pricing
-            </Link>
-          </div>
-        </div>
-      </header>
+    <main
+      data-login-page
+      className="relative box-border flex min-h-[calc(100svh-46px)] w-full justify-center overflow-x-hidden bg-transparent px-0 py-0 sm:min-h-[calc(100svh-40px)] sm:py-0 md:items-center"
+    >
+      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+        <Image
+          src="/backgrounds/login-page-background-v5.svg"
+          alt="MergifyPDF login background"
+          fill
+          className="object-cover object-left sm:object-center"
+          priority={false}
+        />
+      </div>
 
-      <main className="relative flex min-h-[calc(100vh-76px)] w-full items-center justify-center overflow-hidden bg-white px-0 py-4 sm:py-6">
-        <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
-          <img
-            src="/Girl-picture.svg"
-            alt="MergifyPDF background"
-            className="h-full w-full object-cover object-left sm:object-center"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-950/70 via-slate-950/40 to-slate-950/10" />
-        </div>
-
-        <div className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-4 lg:px-6">
-          {/* Frosted-glass 2FA card on the left (same positioning as login card) */}
-          <div className="flex w-full flex-1 justify-start">
-            <div
-              className="w-full max-w-md rounded-[26px] border border-white/60 bg-white/85 px-6 py-8 shadow-[0_24px_70px_rgba(15,23,42,0.55)] backdrop-blur-xl sm:px-8 sm:py-9"
-              style={{ backdropFilter: "blur(20px)" }}
-            >
-              <h1 className="text-2xl font-semibold text-slate-900">Two-factor authentication</h1>
-              <p className="mt-1 text-sm text-slate-700">
-                Enter the 6-digit code we sent to{" "}
-                <span className="font-medium">{email ?? "your email"}</span>.
-              </p>
-
-              <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700" htmlFor="twofactor-code">
-                    Verification code
-                  </label>
-                  <input
-                    id="twofactor-code"
-                    type="text"
-                    inputMode="numeric"
-                    pattern="\d{6}"
-                    maxLength={6}
-                    value={code}
-                    onChange={(event) =>
-                      setCode(event.target.value.replace(/\D/g, "").slice(0, 6))
-                    }
-                    className="mt-1 w-full rounded-full border border-white/60 bg-white/85 px-4 py-2.5 text-center text-lg tracking-[6px] text-slate-900 shadow-sm outline-none transition focus-visible:border-[#024d7c] focus-visible:ring-2 focus-visible:ring-[#024d7c]/70"
-                    placeholder="______"
-                    required
-                  />
-                </div>
-
-                {error && <p className="text-sm text-red-600">{error}</p>}
-                {info && <p className="text-sm text-green-700">{info}</p>}
-
-                <button
-                  type="submit"
-                  disabled={busy || code.length !== 6}
-                  className="w-full rounded-full bg-[#024d7c] py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-[#013a60] disabled:opacity-60"
-                >
-                  {busy ? "Verifying..." : "Confirm"}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (cooldown > 0 || busy) return;
-                    void sendCode(true);
-                  }}
-                  disabled={busy || cooldown > 0}
-                  className="w-full rounded-full border border-white/60 bg-white/85 px-4 py-2 text-sm text-slate-900 disabled:opacity-60"
-                >
-                  {cooldown > 0 ? `Resend code in ${cooldown}s` : "Resend code"}
-                </button>
-              </form>
+      <div className="page-fade-in relative z-10 mx-auto flex min-h-[calc(100svh-46px)] w-full max-w-7xl items-center justify-center px-4 py-6 sm:min-h-[calc(100svh-40px)] sm:py-0 lg:px-6">
+        <div className="flex w-full items-center justify-center">
+          <div className="auth-card-animate-left relative h-auto w-full max-w-lg rounded-[5px] border border-white/25 bg-white px-7 py-12 shadow-[0_1px_4px_rgba(15,23,42,0.16)] sm:min-h-[620px] sm:px-9 sm:py-14 sm:shadow-[0_30px_90px_rgba(15,23,42,0.22)]">
+            <div className="mb-4 flex items-center">
+              <Image
+                src="/logos/home-expanded-sidebar-logo-light-v6.svg"
+                alt="MergifyPDF"
+                width={164}
+                height={47}
+                priority
+                loading="eager"
+                className="block"
+                style={{ width: 164, height: 47 }}
+              />
             </div>
+            <h1 className="text-3xl font-semibold text-slate-900">
+              Verify your identity
+            </h1>
+            <p className="mt-2 text-sm text-slate-700">
+              Enter the code we just sent to{" "}
+              <span className="font-medium">{email}</span>.
+            </p>
+
+            <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-700">
+                  Verification code
+                </label>
+                <div className="mx-auto flex w-full max-w-[320px] items-center justify-between gap-2 sm:w-fit sm:max-w-none sm:gap-4">
+                  {codeDigits.map((digit, index) => (
+                    <input
+                      key={`twofactor-code-${index}`}
+                      ref={(el) => {
+                        codeRefs.current[index] = el;
+                      }}
+                      autoFocus={index === 0}
+                      className="h-12 w-10 rounded-lg border-2 border-slate-300 bg-white text-center text-xl text-slate-900 outline-none transition hover:border-slate-400 focus-visible:border-[#6D6AF4] focus-visible:ring-0 sm:h-16 sm:w-[60px] sm:text-[1.375rem]"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="\d*"
+                      maxLength={1}
+                      value={digit}
+                      onChange={(event) => {
+                        const value = event.target.value.replace(/\D/g, "");
+                        if (!value) {
+                          updateCodeDigit(index, "");
+                          return;
+                        }
+                        updateCodeDigit(index, value[0] ?? "");
+                        if (index < 5) {
+                          focusCodeIndex(index + 1);
+                        }
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Backspace" && !digit && index > 0) {
+                          updateCodeDigit(index - 1, "");
+                          focusCodeIndex(index - 1);
+                        }
+                        if (event.key === "ArrowLeft" && index > 0) {
+                          focusCodeIndex(index - 1);
+                        }
+                        if (event.key === "ArrowRight" && index < 5) {
+                          focusCodeIndex(index + 1);
+                        }
+                      }}
+                      onPaste={(event) => {
+                        const pasted = event.clipboardData.getData("text").replace(/\D/g, "");
+                        if (!pasted) return;
+                        event.preventDefault();
+                        const next = [...codeDigits];
+                        for (let i = 0; i < 6; i += 1) {
+                          const targetIndex = index + i;
+                          if (targetIndex > 5) break;
+                          next[targetIndex] = pasted[i] ?? "";
+                        }
+                        setCodeDigits(next);
+                        const lastIndex = Math.min(index + pasted.length - 1, 5);
+                        focusCodeIndex(Math.max(lastIndex, 0));
+                      }}
+                      aria-label={`Digit ${index + 1}`}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {error && <div className="text-sm text-red-600">{error}</div>}
+              {info && <div className="text-sm text-green-700">{info}</div>}
+
+              <button
+                className="w-full rounded-md bg-[#1F2937] py-2.5 text-sm font-semibold text-white transition hover:-translate-y-[1px] hover:bg-[#111827] active:scale-[0.985] active:bg-[#0B1220] active:brightness-95 active:transition active:duration-100 disabled:opacity-60 disabled:hover:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F2937]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+                type="submit"
+                disabled={busy || sendingCode || codeValue.length !== 6}
+              >
+                {sendingCode ? "Sending…" : busy ? "Confirming…" : "Confirm code"}
+              </button>
+
+              <button
+                type="button"
+                className="w-full rounded-md border-2 border-slate-300 bg-white px-4 py-2 text-sm text-slate-800 transition hover:-translate-y-[1px] hover:border-slate-400 hover:shadow-md active:scale-[0.985] active:brightness-95 active:transition active:duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent disabled:opacity-60"
+                onClick={() => {
+                  if (cooldown > 0 || busy || sendingCode) return;
+                  void sendCode(true);
+                }}
+                disabled={busy || sendingCode || cooldown > 0}
+              >
+                {cooldown > 0 ? `Resend code in ${cooldown}s` : "Resend code"}
+              </button>
+
+              <button
+                type="button"
+                className="w-full text-sm font-medium text-slate-600 underline underline-offset-4 transition hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6D6AF4]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+                onClick={() => {
+                  void signOut({ callbackUrl: "/login" });
+                }}
+              >
+                Back to login
+              </button>
+            </form>
           </div>
-          <div className="hidden flex-1 lg:block" />
         </div>
-      </main>
-    </div>
+      </div>
+    </main>
   );
 }

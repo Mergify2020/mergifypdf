@@ -6,13 +6,13 @@
     "node": "20.x"
   },
   "scripts": {
-    "dev": "echo 'Open on other devices: http://10.0.0.163:3000' && NEXTAUTH_URL=http://10.0.0.163:3000 next dev --webpack --hostname 0.0.0.0 --port 3000",
+    "dev": "NEXTAUTH_URL=http://localhost:3000 next dev --webpack --hostname 0.0.0.0 --port 3000",
     "dev:stable": "next dev --webpack",
     "dev:pty": "script -qec 'pnpm exec next dev --turbo' /dev/null",
     "dev:wasm": "NEXT_DISABLE_SWC_NATIVE=1 next dev --webpack",
     "dev:pty:wasm": "script -qec 'NEXT_DISABLE_SWC_NATIVE=1 pnpm exec next dev --webpack' /dev/null",
-    "dev:turbo": "echo 'Open on other devices: http://10.0.0.163:3000' && NEXTAUTH_URL=http://10.0.0.163:3000 next dev --turbo --hostname 0.0.0.0 --port 3000",
-    "dev:webpack": "next dev --webpack",
+    "dev:turbo": "NEXTAUTH_URL=http://localhost:3000 next dev --turbo --hostname 0.0.0.0 --port 3000",
+    "dev:webpack": "NEXTAUTH_URL=http://localhost:3000 next dev --webpack --hostname 0.0.0.0 --port 3000",
     "dev:lan": "echo 'Open on other devices: http://10.0.0.163:3000' && NEXTAUTH_URL=http://10.0.0.163:3000 next dev --webpack --hostname 0.0.0.0 --port 3000",
     "dev:lan:wasm": "echo 'Open on other devices: http://10.0.0.163:3000' && NEXTAUTH_URL=http://10.0.0.163:3000 NEXT_DISABLE_SWC_NATIVE=1 next dev --webpack --hostname 0.0.0.0 --port 3000",
     "dev:lan:turbo": "echo 'Open on other devices: http://10.0.0.163:3000' && NEXTAUTH_URL=http://10.0.0.163:3000 next dev --turbo --hostname 0.0.0.0 --port 3000",

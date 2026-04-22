@@ -1,42 +1,116 @@
-import * as React from "react";
+"use client";
 
-export function TwoFactorSignInEmail({ code, manageAccountUrl }: { code: string; manageAccountUrl: string }) {
+import React from "react";
+
+type Props = {
+  code: string;
+  manageAccountUrl: string;
+};
+
+export function TwoFactorSignInEmail({ code, manageAccountUrl }: Props) {
   return (
-    <div
+    <table
+      role="presentation"
+      width="100%"
+      cellPadding={0}
+      cellSpacing={0}
       style={{
-        fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+        backgroundColor: "#F7F7F9",
+        fontFamily:
+          "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif",
         lineHeight: 1.6,
-        color: "#111827",
+        fontSize: "16px",
+        color: "#1f2937",
       }}
     >
-      <h2 style={{ margin: "0 0 12px" }}>Verify your sign-in</h2>
-      <p>
-        Use the 6-digit code below to confirm it&apos;s really you signing in to your MergifyPDF
-        account:
-      </p>
-      <p
-        style={{
-          display: "inline-block",
-          padding: "12px 20px",
-          borderRadius: "10px",
-          background: "#024d7c",
-          color: "#ffffff",
-          fontSize: "24px",
-          letterSpacing: "6px",
-          fontWeight: 600,
-        }}
-      >
-        {code}
-      </p>
-      <p style={{ marginTop: "18px", color: "#4B5563" }}>
-        This code expires in 10 minutes. If you didn&apos;t try to sign in, you can safely ignore
-        this email.
-      </p>
-      <p style={{ marginTop: "10px" }}>
-        <a href={manageAccountUrl} style={{ color: "#4B5563", fontSize: "13px", textDecoration: "underline" }}>
-          Manage Account
-        </a>
-      </p>
-    </div>
+      <tbody>
+        <tr>
+          <td align="center" style={{ padding: "28px 16px" }}>
+            <table
+              role="presentation"
+              width="560"
+              cellPadding={0}
+              cellSpacing={0}
+              style={{
+                backgroundColor: "#ffffff",
+                borderRadius: "8px",
+                border: "2px solid #e5e7eb",
+              }}
+            >
+              <tbody>
+                <tr>
+                  <td style={{ padding: "28px 30px 24px" }}>
+                    <img
+                      src="https://mergifypdf.com/.well-known/email-logo-expanded-v2.png"
+                      alt="MergifyPDF"
+                      width={160}
+                      style={{ display: "block", marginBottom: "20px", height: "auto" }}
+                    />
+                    <p style={{ margin: "0 0 10px", color: "#1f2937", fontSize: "16px" }}>
+                      Use this code to verify your sign-in:
+                    </p>
+                    <p
+                      style={{
+                        fontSize: "28px",
+                        letterSpacing: "6px",
+                        fontWeight: 700,
+                        margin: "0 0 18px",
+                        color: "#111827",
+                        fontFamily:
+                          "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace",
+                      }}
+                    >
+                      {code}
+                    </p>
+                    <p style={{ margin: "0 0 16px", color: "#4b5563", fontSize: "14px" }}>
+                      This code expires in 10 minutes. Don&apos;t share it with anyone.
+                    </p>
+                    <div style={{ height: 1, backgroundColor: "#e5e7eb", margin: "18px 0 14px" }} />
+                    <p style={{ margin: "0 0 6px", color: "#1f2937", fontWeight: 600 }}>
+                      Need to change 2FA?
+                    </p>
+                    <p style={{ margin: "0 0 18px", color: "#374151", fontSize: "15px" }}>
+                      You can disable 2FA anytime in Security settings.
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <td
+                    style={{
+                      borderTop: "1px solid #e5e7eb",
+                      padding: "14px 30px 18px",
+                      backgroundColor: "#f4f5f7",
+                      borderBottomLeftRadius: "8px",
+                      borderBottomRightRadius: "8px",
+                    }}
+                  >
+                    <div style={{ color: "#6b7280", fontSize: "13px", lineHeight: 1.5 }}>
+                      <a href={manageAccountUrl} style={{ color: "#6b7280", textDecoration: "underline" }}>
+                        Manage Account
+                      </a>
+                      {"  ·  "}
+                      <a href={`${manageAccountUrl}?tab=support`} style={{ color: "#6b7280", textDecoration: "underline" }}>
+                        Support
+                      </a>
+                      {"  ·  "}
+                      <a href={`${manageAccountUrl}?tab=security`} style={{ color: "#6b7280", textDecoration: "underline" }}>
+                        Privacy Policy
+                      </a>
+                      {"  ·  "}
+                      <a href={`${manageAccountUrl}?tab=security`} style={{ color: "#6b7280", textDecoration: "underline" }}>
+                        Terms of Service
+                      </a>
+                    </div>
+                    <div style={{ marginTop: "6px", color: "#9ca3af", fontSize: "12px" }}>
+                      Copyright © 2026 MergifyPDF. All rights reserved.
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </td>
+        </tr>
+      </tbody>
+    </table>
   );
 }

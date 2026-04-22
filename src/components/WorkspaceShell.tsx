@@ -40,6 +40,7 @@ import {
   Signature as PhSignature,
   Trash as PhTrash,
 } from "@phosphor-icons/react";
+import { getBillingStatusPresentation } from "@/lib/billingPlans";
 import { useSession, signOut } from "next-auth/react";
 import StartProjectButton from "@/components/StartProjectButton";
 import {
@@ -1183,8 +1184,11 @@ export default function WorkspaceShell({
         ? "bg-white md:bg-slate-100"
         : "bg-slate-100";
   const isBillingBannerRoute = isHomePanel || isAccountRoute;
-  const homeStripeStatus = homeStripeStatusOverride ?? (session?.user?.stripeStatus ?? null);
-  const homeBillingIsDelinquent = homeStripeStatus === "past_due" || homeStripeStatus === "unpaid";
+  const homeStripeStatus =
+    homeStripeStatusOverride !== undefined ? homeStripeStatusOverride : (session?.user?.stripeStatus ?? null);
+  const homeBillingPresentationState = getBillingStatusPresentation(homeStripeStatus);
+  const homeBillingIsDelinquent =
+    homeBillingPresentationState === "past_due" || homeBillingPresentationState === "unpaid";
   const showHomeBillingBanner = isBillingBannerRoute && homeBillingIsDelinquent && !homeBillingBannerDismissed;
   const renderHomeBillingBanner = false;
   const showHomeBillingModal = showHomeBillingBanner && !billingPortalLoading && homeBillingMetaReady;
@@ -1195,12 +1199,13 @@ export default function WorkspaceShell({
       : homeCurrentPlanTier === "signature_pro"
         ? "Signature Pro"
         : "Your plan";
-  const homeBillingModalBody = "Update your payment details to continue accessing your workspace.";
+  const homeBillingModalBody = "Please update your payment method to restore access.";
   const shellLoadingOpen = homeBootLoading;
 
   const isHomeProjectsPath = (value?: string | null) =>
     value === "/" || (value?.startsWith("/projects") ?? false);
-  const showPersistentHomeProjectsTopBar = pathname === "/" || pathname === "/projects/all";
+  const showPersistentWorkspaceTopBar =
+    pathname === "/" || pathname === "/projects/all" || (pathname?.startsWith("/signature-center") ?? false);
   const isAllProjectsRoute = pathname === "/" || pathname === "/projects/all";
   const fallbackProjectCardCount = fallbackProjectCountReady
     ? (isAllProjectsRoute ? Math.min(homeRecentProjects.length, 60) : Math.min(homeRecentProjects.length, 9))
@@ -2289,8 +2294,8 @@ export default function WorkspaceShell({
             "max(24px, calc((100vw - (var(--shell-content-width) + var(--shell-sidebar-width) + 24px)) / 2))",
           "--shell-sidebar-width": expanded ? "256px" : "80px",
           "--home-banner-offset": homeBillingBannerOccupiesSpace ? "56px" : "0px",
-          "--home-topbar-offset": showPersistentHomeProjectsTopBar ? "68px" : "0px",
-          "--home-right-column-offset": showPersistentHomeProjectsTopBar ? "0px" : "240px",
+          "--home-topbar-offset": showPersistentWorkspaceTopBar ? "68px" : "0px",
+          "--home-right-column-offset": showPersistentWorkspaceTopBar ? "0px" : "240px",
         } as React.CSSProperties
       }
     >
@@ -2384,10 +2389,14 @@ export default function WorkspaceShell({
                   <>
                     <AppHeaderBrand
                       logoLightSrc={
-                        isHomePanel ? "/logos/home-expanded-sidebar-logo-light-v6.svg" : undefined
+                        isHomePanel || isSignaturesPanel
+                          ? "/logos/home-expanded-sidebar-logo-light-v6.svg"
+                          : undefined
                       }
                       logoDarkSrc={
-                        isHomePanel ? "/logos/home-expanded-sidebar-logo-dark-v6.svg" : undefined
+                        isHomePanel || isSignaturesPanel
+                          ? "/logos/home-expanded-sidebar-logo-dark-v6.svg"
+                          : undefined
                       }
                     />
                     <button
@@ -2706,7 +2715,19 @@ export default function WorkspaceShell({
               }`}
             >
               <div className="flex w-full flex-col gap-6">
-                <AppHeaderBrand variant="sidebarPanel" />
+                <AppHeaderBrand
+                  variant="sidebarPanel"
+                  logoLightSrc={
+                    isHomePanel || isSignaturesPanel
+                      ? "/logos/home-expanded-sidebar-logo-light-v6.svg"
+                      : undefined
+                  }
+                  logoDarkSrc={
+                    isHomePanel || isSignaturesPanel
+                      ? "/logos/home-expanded-sidebar-logo-dark-v6.svg"
+                      : undefined
+                  }
+                />
                 {isAccountRoute ? (
                   <div className="space-y-3">
                     <button
@@ -3030,7 +3051,7 @@ export default function WorkspaceShell({
         className={`workspace-main-with-dock flex min-h-0 w-full flex-1 flex-col bg-transparent transition-none 2xl:transition-[padding-left] 2xl:duration-300 2xl:ease-[cubic-bezier(0.22,1,0.36,1)] ${contentOffsetClass}`}
       >
         <WorkspaceHomeQueryProvider value={homeProjectsQueryContext}>
-          {showPersistentHomeProjectsTopBar ? (
+          {showPersistentWorkspaceTopBar ? (
             <div
               className={`relative z-[80] flex w-full ${contentShellWrapperClass} pt-3 md:pt-6`}
             >
@@ -3163,7 +3184,7 @@ export default function WorkspaceShell({
           ) : null}
           <Suspense
             fallback={
-              showPersistentHomeProjectsTopBar ? (
+              showPersistentWorkspaceTopBar ? (
                 <main className="relative z-0 flex-1 lg:z-40">
                   <div
                 className={`flex w-full ${contentShellWrapperClass}`}
@@ -3173,11 +3194,7 @@ export default function WorkspaceShell({
                       style={{ maxWidth: "var(--shell-content-width)" }}
                     >
                       <div
-                        className="box-border w-full bg-[#F1F4F9] pt-3 pb-0 md:pt-6 md:pb-0 transition-[height] duration-300 ease-out dark:bg-[#252525]"
-                        style={{
-                          height:
-                            "calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset, 0px) - var(--home-topbar-offset, 0px) - var(--workspace-content-bottom-subtract, var(--workspace-frame-gutter, 48px)))",
-                        }}
+                        className="box-border w-full bg-[#F1F4F9] pt-3 pb-0 transition-[height] duration-300 ease-out dark:bg-[#252525] md:pt-6 md:pb-0 md:[height:calc(var(--workspace-vh,100dvh)-var(--home-banner-offset,0px)-var(--home-topbar-offset,0px)-var(--workspace-content-bottom-subtract,var(--workspace-frame-gutter,48px)))]"
                       >
                         <div className="h-full min-h-0 w-full">
                           <div

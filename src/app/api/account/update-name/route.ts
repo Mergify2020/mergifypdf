@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
 import { isSameOrigin } from "@/lib/requestGuards";
+import { getStripe } from "@/lib/stripe";
 
 export async function POST(req: Request) {
   if (!isSameOrigin(req)) {
@@ -26,10 +27,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Name is too long." }, { status: 400 });
   }
 
-  await prisma.user.update({
+  const updatedUser = await prisma.user.update({
     where: { id: session.user.id },
     data: { name: fullName.length > 0 ? fullName : null },
+    select: { stripeCustomerId: true },
   });
+
+  if (updatedUser.stripeCustomerId) {
+    try {
+      const stripe = getStripe();
+      await stripe.customers.update(updatedUser.stripeCustomerId, {
+        name: fullName,
+      });
+    } catch (error) {
+      console.error("[account.update-name] Failed to update Stripe customer name", error);
+    }
+  }
 
   return NextResponse.json({ success: true, name: fullName.length > 0 ? fullName : null });
 }

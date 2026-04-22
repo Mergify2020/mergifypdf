@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyTwoFactorSetupCode } from "@/lib/twoFactorVerification";
+import { verifyTwoFactorDisableCode, verifyTwoFactorSetupCode } from "@/lib/twoFactorVerification";
 import { isSameOrigin } from "@/lib/requestGuards";
 import { rateLimit } from "@/lib/rateLimit";
 
@@ -23,6 +23,7 @@ export async function POST(req: Request) {
 
   const userId = session.user.id;
   const body = await req.json().catch(() => ({} as Record<string, unknown>));
+  const action = body.action === "disable" ? "disable" : "enable";
 
   const rawCode = typeof body.code === "string" ? body.code.trim() : "";
   if (!/^\d{6}$/.test(rawCode)) {
@@ -36,7 +37,10 @@ export async function POST(req: Request) {
     );
   }
 
-  const result = await verifyTwoFactorSetupCode(userId, rawCode);
+  const result =
+    action === "disable"
+      ? await verifyTwoFactorDisableCode(userId, rawCode)
+      : await verifyTwoFactorSetupCode(userId, rawCode);
   if (!result.ok) {
     const status = 400;
     if (result.code === "invalid_code") {
@@ -62,16 +66,23 @@ export async function POST(req: Request) {
 
   await prisma.user.update({
     where: { id: userId },
-    data: {
-      twoFactorEnabled: true,
-      twoFactorMethod: "email",
-      twoFactorPhone: null,
-    },
+    data:
+      action === "disable"
+        ? {
+            twoFactorEnabled: false,
+            twoFactorMethod: null,
+            twoFactorPhone: null,
+          }
+        : {
+            twoFactorEnabled: true,
+            twoFactorMethod: "email",
+            twoFactorPhone: null,
+          },
   });
 
   return NextResponse.json({
     ok: true,
-    method: "email",
+    method: action === "disable" ? null : "email",
     phone: null,
   });
 }

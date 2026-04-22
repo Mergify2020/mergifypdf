@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, CreditCard, ExternalLink, Lock, Mail, MoveLeft, PencilLine, Plus, Send, Shield, Smile, Star, Sun, User } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, CreditCard, Eye, EyeOff, ExternalLink, Lock, Mail, MoveLeft, PencilLine, Plus, Send, Shield, Smile, Star, Sun, User } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { useEffect, useRef, useState, type ComponentType, type SVGProps } from "react";
@@ -14,7 +14,7 @@ import {
   NEW_PASSWORD_REQUIREMENTS_ERROR,
   NEW_PASSWORD_REQUIREMENTS_HINT,
 } from "@/lib/passwordPolicy";
-import { BILLING_PRICE_IDS, getPlanTierFromPriceId } from "@/lib/billingPlans";
+import { BILLING_PRICE_IDS, getBillingStatusPresentation, getPlanTierFromPriceId } from "@/lib/billingPlans";
 import SettingsMenu from "@/components/SettingsMenu";
 import PricingTierCards, { PRICING_TIERS } from "@/components/PricingTierCards";
 
@@ -33,6 +33,12 @@ type CropRect = { x: number; y: number; size: number };
 type Bounds = { left: number; top: number; right: number; bottom: number };
 type CropHandle = "nw" | "ne" | "sw" | "se";
 type SettingsTab = "account" | "security" | "pricing";
+type DeleteAccountReason =
+  | "too_expensive"
+  | "missing_features"
+  | "found_another_tool"
+  | "not_using_enough"
+  | "technical_issues";
 
 const HANDLE_POSITIONS: Record<CropHandle, string> = {
   nw: "-top-2 -left-2",
@@ -40,6 +46,17 @@ const HANDLE_POSITIONS: Record<CropHandle, string> = {
   sw: "-bottom-2 -left-2",
   se: "-bottom-2 -right-2",
 };
+
+const DELETE_ACCOUNT_REASONS: Array<{
+  value: DeleteAccountReason;
+  label: string;
+}> = [
+  { value: "too_expensive", label: "Too expensive" },
+  { value: "missing_features", label: "Missing features" },
+  { value: "found_another_tool", label: "Found another tool" },
+  { value: "not_using_enough", label: "Not using it enough" },
+  { value: "technical_issues", label: "Technical issues" },
+];
 
 type MobileDockItem = {
   label: string;
@@ -236,22 +253,32 @@ export function AccountSettingsPage({
   const [cropRect, setCropRect] = useState<CropRect | null>(null);
 
   const [twoFactorMethod, setTwoFactorMethod] = useState<"email" | null>(null);
-  const [twoFactorModalMode, setTwoFactorModalMode] = useState<"enable" | "manage" | null>(null);
-  const [confirmDisable2fa, setConfirmDisable2fa] = useState(false);
+  const [twoFactorModalMode, setTwoFactorModalMode] = useState<"enable" | "disable" | null>(null);
   const [twoFactorStep, setTwoFactorStep] = useState<"select" | "verify">("select");
-  const [twoFactorCode, setTwoFactorCode] = useState("");
+  const [twoFactorCodeDigits, setTwoFactorCodeDigits] = useState(Array(6).fill(""));
   const [twoFactorBusy, setTwoFactorBusy] = useState(false);
   const [twoFactorError, setTwoFactorError] = useState<string | null>(null);
   const [twoFactorMessage, setTwoFactorMessage] = useState<string | null>(null);
+  const [twoFactorResendCooldown, setTwoFactorResendCooldown] = useState(0);
+  const twoFactorCodeRefs = useRef<Array<HTMLInputElement | null>>([]);
 
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteModalMode, setDeleteModalMode] = useState<"checking" | "deleting" | "billing" | "google" | "confirm" | null>(null);
+  const [deleteBillingInfo, setDeleteBillingInfo] = useState<{
+    title: string;
+    message: string;
+  } | null>(null);
+  const [deleteReason, setDeleteReason] = useState<DeleteAccountReason | "">("");
+  const [deleteReasonMenuOpen, setDeleteReasonMenuOpen] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deletePasswordVisible, setDeletePasswordVisible] = useState(false);
+  const [deleteChecking, setDeleteChecking] = useState(false);
+  const [deleteDeleting, setDeleteDeleting] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const deleteCheckRequestRef = useRef<number | null>(null);
+  const deleteReasonMenuRef = useRef<HTMLDivElement | null>(null);
 
-  const [disconnectModalOpen, setDisconnectModalOpen] = useState(false);
-  const [disconnectPassword, setDisconnectPassword] = useState("");
-  const [disconnectBusy, setDisconnectBusy] = useState(false);
-  const [disconnectError, setDisconnectError] = useState<string | null>(null);
   const [activeSettingsTab, setActiveSettingsTab] = useState<SettingsTab>(initialSettingsTab);
   const [mobileSettingsView, setMobileSettingsView] = useState<SettingsTab | "home">(initialMobileView ?? "home");
   const [theme, setTheme] = useState<"light" | "dark">("light");
@@ -285,25 +312,50 @@ export function AccountSettingsPage({
     (passwordSubmitAttempted && !confirmPassword.trim())
     || isNewPasswordMismatch
     || isNewPasswordRequirementsError;
+
+  useEffect(() => {
+    if (!deleteReasonMenuOpen) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as Node | null;
+      if (deleteReasonMenuRef.current && target && !deleteReasonMenuRef.current.contains(target)) {
+        setDeleteReasonMenuOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setDeleteReasonMenuOpen(false);
+      }
+    }
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [deleteReasonMenuOpen]);
+
   const accountPageLoading = sessionStatus === "loading" && !suppressAccountLoader;
   const isNameMissing = !firstNameValue.trim() || !lastNameValue.trim();
-  const accountStripeStatus = pricingTrialStatus?.stripeStatus ?? session?.user?.stripeStatus ?? null;
-  const pricingHasActivePlan = accountStripeStatus === "active" || accountStripeStatus === "trialing";
-  const pricingIsDelinquent = accountStripeStatus === "past_due" || accountStripeStatus === "unpaid";
-  const isTrialingPlan = accountStripeStatus === "trialing";
-  const pricingStatusLoading = !pricingStatusMounted || !pricingStatusReady;
+  const pricingStatusLoaded = pricingStatusMounted && pricingStatusReady;
+  const billingPresentationState = pricingStatusLoaded
+    ? getBillingStatusPresentation(pricingTrialStatus?.stripeStatus ?? null)
+    : "none";
+  const accountStripeStatus = billingPresentationState === "none" ? null : billingPresentationState;
+  const billingHasCurrentPlan = billingPresentationState !== "none";
+  const pricingIsDelinquent = billingPresentationState === "past_due" || billingPresentationState === "unpaid";
+  const isTrialingPlan = billingPresentationState === "trialing";
+  const pricingStatusLoading = !pricingStatusLoaded;
   const currentPlanTier = (() => {
-    const tier = getPlanTierFromPriceId(
-      pricingStatusLoading ? null : pricingTrialStatus?.stripePriceId ?? session?.user?.stripePriceId ?? null,
-    );
+    const tier = getPlanTierFromPriceId(pricingStatusLoaded ? pricingTrialStatus?.stripePriceId ?? null : null);
     if (tier === "essential_plus") return "Essential Plus";
     if (tier === "signature_pro") return "Signature Pro";
     return null;
   })();
-  const currentPlanPriceId = pricingStatusLoading
-    ? null
-    : pricingTrialStatus?.stripePriceId ?? session?.user?.stripePriceId ?? null;
-  const pricingCanUseTrial = pricingTrialStatus?.eligibleForTrial !== false;
+  const currentPlanPriceId = pricingStatusLoaded ? pricingTrialStatus?.stripePriceId ?? null : null;
+  const pricingCanUseTrial = pricingStatusLoaded ? pricingTrialStatus?.eligibleForTrial !== false : false;
   const currentPlanDetails = currentPlanTier
     ? PRICING_TIERS.find((tier) => tier.name === currentPlanTier) ?? null
     : null;
@@ -330,12 +382,16 @@ export function AccountSettingsPage({
     const formattedEndDate = new Intl.DateTimeFormat("en-US", {
       month: "long",
       day: "numeric",
+      year: "numeric",
     }).format(endDate);
-    if (accountStripeStatus === "trialing") {
+    if (billingPresentationState === "trialing") {
       return `Trial ends on ${formattedEndDate}`;
     }
-    if (accountStripeStatus === "active") {
+    if (billingPresentationState === "active") {
       return `Renews on ${formattedEndDate}`;
+    }
+    if (pricingIsDelinquent) {
+      return `Past due since ${formattedEndDate}`;
     }
     return null;
   })();
@@ -569,6 +625,18 @@ export function AccountSettingsPage({
     };
   }, []);
 
+  useEffect(() => {
+    let timer: NodeJS.Timeout | undefined;
+    if (twoFactorResendCooldown > 0) {
+      timer = setInterval(() => {
+        setTwoFactorResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [twoFactorResendCooldown]);
+
   function openNameEditor(field: "first" | "last") {
     if (editingNameField === field) return;
     if (editingNameField === "first") {
@@ -592,6 +660,10 @@ export function AccountSettingsPage({
     let cancelled = false;
     async function loadTwoFactor() {
       if (!session?.user?.id) return;
+      if (managedByGoogle) {
+        setTwoFactorMethod(null);
+        return;
+      }
       try {
         const response = await fetch("/api/account/two-factor");
         const data = await response.json().catch(() => ({}));
@@ -610,7 +682,7 @@ export function AccountSettingsPage({
     return () => {
       cancelled = true;
     };
-  }, [session?.user?.id]);
+  }, [session?.user?.id, managedByGoogle]);
 
   async function requestEmailCode() {
     if (!canManageEmail) {
@@ -757,7 +829,7 @@ export function AccountSettingsPage({
         now - warmedBillingPortalAt < 25_000
       ) {
         window.location.href = warmedBillingPortalUrl;
-        return;
+        return true;
       }
       const returnUrl =
         typeof window === "undefined"
@@ -781,12 +853,14 @@ export function AccountSettingsPage({
         throw new Error(data?.error ?? "Unable to open billing portal.");
       }
       window.location.href = data.url;
+      return true;
     } catch {
       setBillingPortalError("Unable to open billing portal right now.");
       setBillingPortalLoading(false);
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("workspace-billing-portal-stop"));
       }
+      return false;
     }
   }
 
@@ -1179,106 +1253,100 @@ export function AccountSettingsPage({
 
   function resetTwoFactorModalState() {
     setTwoFactorStep("select");
-    setTwoFactorCode("");
+    setTwoFactorCodeDigits(Array(6).fill(""));
     setTwoFactorError(null);
     setTwoFactorMessage(null);
+    setTwoFactorResendCooldown(0);
     setTwoFactorBusy(false);
   }
 
   function openEnableTwoFactor() {
     resetTwoFactorModalState();
     setTwoFactorModalMode("enable");
+    void requestTwoFactorCode("enable");
   }
 
-  function openManageTwoFactor() {
+  function openDisableTwoFactor() {
     if (!twoFactorMethod) {
       openEnableTwoFactor();
       return;
     }
     resetTwoFactorModalState();
-    setTwoFactorModalMode("manage");
+    setTwoFactorModalMode("disable");
+    void requestTwoFactorCode("disable");
   }
 
-  async function handleConfirmEnableTwoFactor() {
-    if (twoFactorModalMode === "manage") {
-      setTwoFactorBusy(true);
-      setTwoFactorError(null);
-      setTwoFactorMessage(null);
-      try {
-        const response = await fetch("/api/account/two-factor", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            method: "email",
-          }),
-        });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok || !data?.ok) {
-          const code = data?.code as string | undefined;
-          if (code === "PHONE_REQUIRED") {
-            setTwoFactorError("Enter a phone number to use SMS verification.");
-          } else if (code === "NOT_ENABLED") {
-            setTwoFactorError("Two-factor authentication is not enabled for this account.");
-          } else {
-            setTwoFactorError(data?.message ?? "Unable to save your 2FA settings.");
-          }
-          return;
+  async function requestTwoFactorCode(mode: "enable" | "disable") {
+    setTwoFactorBusy(true);
+    setTwoFactorError(null);
+    setTwoFactorMessage(null);
+    try {
+      const response = await fetch("/api/account/two-factor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: mode,
+          method: "email",
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data?.ok) {
+        const code = data?.code as string | undefined;
+        if (code === "PHONE_REQUIRED") {
+          setTwoFactorError("Enter a phone number to use SMS verification.");
+        } else if (code === "SMS_NOT_CONFIGURED") {
+          setTwoFactorError("SMS verification isn’t available right now. Choose email instead.");
+        } else if (code === "EMAIL_MISSING") {
+          setTwoFactorError("We could not find an email address for your account.");
+        } else {
+          setTwoFactorError(
+            data?.message ?? "We couldn’t send your verification code. Please try again."
+          );
         }
-
-        setTwoFactorMethod("email");
-
-        resetTwoFactorModalState();
-        setTwoFactorModalMode(null);
-      } catch {
-        setTwoFactorError("Unable to save your 2FA settings. Please try again.");
-      } finally {
-        setTwoFactorBusy(false);
+        return;
       }
-      return;
+      setTwoFactorStep("verify");
+      setTwoFactorCodeDigits(Array(6).fill(""));
+      setTwoFactorMessage(
+        mode === "disable"
+          ? "We sent a 6-digit code to your email. Enter it below to turn off 2FA."
+          : "We sent a 6-digit code to your email. Enter it below to turn on 2FA."
+      );
+      setTwoFactorResendCooldown(25);
+      setTimeout(() => {
+        twoFactorCodeRefs.current[0]?.focus();
+      }, 0);
+    } catch {
+      setTwoFactorError("We couldn’t send your verification code. Please try again.");
+    } finally {
+      setTwoFactorBusy(false);
     }
+  }
 
+  function updateTwoFactorCodeDigit(index: number, value: string) {
+    setTwoFactorCodeDigits((prev) => {
+      const next = [...prev];
+      next[index] = value;
+      return next;
+    });
+  }
+
+  function focusTwoFactorCodeIndex(index: number) {
+    twoFactorCodeRefs.current[index]?.focus();
+  }
+
+  async function handleConfirmTwoFactor() {
     if (twoFactorStep === "select") {
-      setTwoFactorBusy(true);
-      setTwoFactorError(null);
-      setTwoFactorMessage(null);
-      try {
-        const response = await fetch("/api/account/two-factor", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            method: "email",
-          }),
-        });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok || !data?.ok) {
-          const code = data?.code as string | undefined;
-          if (code === "PHONE_REQUIRED") {
-            setTwoFactorError("Enter a phone number to use SMS verification.");
-          } else if (code === "SMS_NOT_CONFIGURED") {
-            setTwoFactorError("SMS verification isn’t available right now. Choose email instead.");
-          } else if (code === "EMAIL_MISSING") {
-            setTwoFactorError("We could not find an email address for your account.");
-          } else {
-            setTwoFactorError(
-              data?.message ?? "We couldn’t send your verification code. Please try again."
-            );
-          }
-          return;
-        }
-        setTwoFactorStep("verify");
-        setTwoFactorCode("");
-        setTwoFactorMessage(
-          "We sent a 6-digit code to your email. Enter it below to turn on 2FA."
-        );
-      } catch {
-        setTwoFactorError("We couldn’t send your verification code. Please try again.");
-      } finally {
-        setTwoFactorBusy(false);
+      if (twoFactorModalMode === "enable") {
+        await requestTwoFactorCode("enable");
+      } else if (twoFactorModalMode === "disable") {
+        await requestTwoFactorCode("disable");
       }
       return;
     }
 
-    if (twoFactorCode.trim().length !== 6) {
+    const code = twoFactorCodeDigits.join("").trim();
+    if (!/^\d{6}$/.test(code)) {
       setTwoFactorError("Enter the 6-digit code.");
       return;
     }
@@ -1291,7 +1359,8 @@ export function AccountSettingsPage({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           method: "email",
-          code: twoFactorCode.trim(),
+          action: twoFactorModalMode,
+          code,
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -1307,15 +1376,28 @@ export function AccountSettingsPage({
         return;
       }
 
-      setTwoFactorMethod("email");
-      try {
-        await updateSession({
-          twoFactorEnabled: true,
-          twoFactorPassed: true,
-          twoFactorMethod: "email",
-        });
-      } catch {
-        // Keep the local UI responsive even if the auth token refresh lags.
+      if (twoFactorModalMode === "disable") {
+        setTwoFactorMethod(null);
+        try {
+          await updateSession({
+            twoFactorEnabled: false,
+            twoFactorPassed: true,
+            twoFactorMethod: null,
+          });
+        } catch {
+          // Keep the local UI responsive even if the auth token refresh lags.
+        }
+      } else {
+        setTwoFactorMethod("email");
+        try {
+          await updateSession({
+            twoFactorEnabled: true,
+            twoFactorPassed: true,
+            twoFactorMethod: "email",
+          });
+        } catch {
+          // Keep the local UI responsive even if the auth token refresh lags.
+        }
       }
       resetTwoFactorModalState();
       setTwoFactorModalMode(null);
@@ -1326,76 +1408,122 @@ export function AccountSettingsPage({
     }
   }
 
-  async function handleConfirmDisableTwoFactor() {
-    setConfirmDisable2fa(false);
-    try {
-      await fetch("/api/account/two-factor", { method: "DELETE" });
-    } catch {
-      // ignore; best-effort
-    }
-    try {
-      await updateSession({
-        twoFactorEnabled: false,
-        twoFactorPassed: true,
-        twoFactorMethod: null,
-      });
-    } catch {
-      // ignore; local state is still updated below
-    }
-    setTwoFactorMethod(null);
-    resetTwoFactorModalState();
-    setTwoFactorModalMode(null);
-  }
-
   async function handleConfirmDeleteAccount() {
     setDeleteError(null);
+    if (!deleteReason) {
+      setDeleteError("Select a reason for deleting your account.");
+      return;
+    }
+    if (!managedByGoogle && deletePassword.trim().length === 0) {
+      setDeleteError("Enter your current password to delete your account.");
+      return;
+    }
     setDeleteBusy(true);
     try {
-      const response = await fetch("/api/account/delete", { method: "POST" });
+      const response = await fetch("/api/account/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          password: managedByGoogle ? "" : deletePassword,
+          reason: deleteReason,
+          reasonDetail: "",
+        }),
+      });
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
         throw new Error(data.error ?? "Unable to delete your account right now.");
       }
-      await signOut({ callbackUrl: "/" });
+      await signOut({ redirect: false });
+      window.location.assign("/login?deleted=1");
     } catch (error) {
+      if (error instanceof Error && /unauthorized/i.test(error.message)) {
+        await signOut({ redirect: false });
+        window.location.assign("/login");
+        return;
+      }
       setDeleteError(
         error instanceof Error ? error.message : "Unable to delete your account right now."
       );
       setDeleteBusy(false);
+      setDeleteModalMode("confirm");
     }
   }
 
-  async function handleConfirmDisconnectGoogle(event: React.FormEvent) {
-    event.preventDefault();
-    if (disconnectPassword.length < 8) return;
-    setDisconnectError(null);
-    setDisconnectBusy(true);
+  async function handleDeleteAccountClick() {
+    const requestId = (deleteCheckRequestRef.current ?? 0) + 1;
+    deleteCheckRequestRef.current = requestId;
+    setDeleteError(null);
+    setDeleteReason("");
+    setDeleteReasonMenuOpen(false);
+    setDeletePassword("");
+    setDeleteModalOpen(true);
+    setDeleteModalMode("checking");
+    setDeleteBillingInfo(null);
+    setDeleteChecking(true);
+    setDeleteDeleting(false);
+
     try {
-      const response = await fetch("/api/account/disconnect-google", {
+      const response = await fetch("/api/account/delete/check", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: disconnectPassword }),
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(data.error ?? "Unable to disconnect Google right now.");
+      if (deleteCheckRequestRef.current !== requestId) {
+        return;
       }
-      setDisconnectBusy(false);
-      setDisconnectModalOpen(false);
-      setDisconnectPassword("");
-      router.refresh();
+      if (!response.ok || !data?.ok) {
+        if (response.status === 401) {
+          await signOut({ redirect: false });
+          window.location.assign("/login");
+          return;
+        }
+        throw new Error(data?.error ?? "Unable to check your subscription right now.");
+      }
+      if (data.requiresBillingAction) {
+        setDeleteBillingInfo({
+          title: typeof data.title === "string" ? data.title : "Cancel your plan first",
+          message:
+            typeof data.message === "string"
+              ? data.message
+              : "Please cancel your subscription or trial in Billing before deleting your account.",
+        });
+        setDeleteModalMode("billing");
+      } else {
+        setDeleteModalMode(managedByGoogle ? "google" : "confirm");
+      }
     } catch (error) {
-      setDisconnectError(
-        error instanceof Error ? error.message : "Unable to disconnect Google right now."
+      if (deleteCheckRequestRef.current !== requestId) {
+        return;
+      }
+      setDeleteError(
+        error instanceof Error ? error.message : "Unable to check your subscription right now."
       );
-      setDisconnectBusy(false);
+      setDeleteModalMode("checking");
+    } finally {
+      if (deleteCheckRequestRef.current === requestId) {
+        setDeleteChecking(false);
+      }
     }
+  }
+
+  function closeDeleteModal() {
+    deleteCheckRequestRef.current = null;
+    setDeleteModalOpen(false);
+    setDeleteModalMode(null);
+    setDeleteBillingInfo(null);
+    setDeleteReasonMenuOpen(false);
+    setDeleteReason("");
+    setDeletePasswordVisible(false);
+    setDeleteError(null);
+    setDeletePassword("");
+    setDeleteChecking(false);
+    setDeleteDeleting(false);
   }
 
   return (
     <main
       className={`box-border flex w-full flex-col overflow-y-auto overscroll-y-contain bg-white px-4 pt-[calc(3.5rem+env(safe-area-inset-top))] pb-[calc(5rem+env(safe-area-inset-bottom))] scroll-pt-[calc(3.5rem+env(safe-area-inset-top))] scroll-pb-[calc(5rem+env(safe-area-inset-bottom))] text-slate-900 dark:bg-[#252525] dark:text-zinc-100 ${
-        embedded ? "lg:bg-slate-100 lg:px-0 lg:pt-6 lg:pb-0 lg:scroll-pt-0 lg:scroll-pb-0" : "lg:bg-slate-100 lg:overflow-hidden lg:px-0 lg:pt-6 lg:pb-0 lg:scroll-pt-0 lg:scroll-pb-0"
+        embedded ? "lg:bg-slate-100 lg:px-0 lg:pt-6 lg:pb-0 lg:scroll-pt-0 lg:scroll-pb-0" : "lg:bg-slate-100 lg:px-0 lg:pt-6 lg:pb-6 lg:overflow-visible lg:scroll-pt-0 lg:scroll-pb-0"
       }`}
       style={{ scrollbarGutter: "stable both-edges" }}
     >
@@ -1656,7 +1784,7 @@ export function AccountSettingsPage({
                 }}
                 className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${
                   activeSettingsTab === "account"
-                    ? "bg-[rgba(108,71,255,0.10)] text-[#5B38E6] dark:bg-[#2B2B2B]/60 dark:text-white"
+                    ? "bg-[rgba(108,71,255,0.10)] text-[#5B38E6] dark:bg-[#2B2B2B] dark:text-white"
                     : "text-gray-800 hover:bg-gray-50 hover:text-gray-900 dark:text-zinc-300 dark:hover:bg-[#3A3A3A] dark:hover:text-zinc-100"
                 }`}
               >
@@ -1673,7 +1801,7 @@ export function AccountSettingsPage({
                 }}
                 className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${
                   activeSettingsTab === "security"
-                    ? "bg-[rgba(108,71,255,0.10)] text-[#5B38E6] dark:bg-[#2B2B2B]/60 dark:text-white"
+                    ? "bg-[rgba(108,71,255,0.10)] text-[#5B38E6] dark:bg-[#2B2B2B] dark:text-white"
                     : "text-gray-800 hover:bg-gray-50 hover:text-gray-900 dark:text-zinc-300 dark:hover:bg-[#3A3A3A] dark:hover:text-zinc-100"
                 }`}
               >
@@ -1690,7 +1818,7 @@ export function AccountSettingsPage({
                 }}
                 className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${
                   activeSettingsTab === "pricing"
-                    ? "bg-[rgba(108,71,255,0.10)] text-[#5B38E6] dark:bg-[#2B2B2B]/60 dark:text-white"
+                    ? "bg-[rgba(108,71,255,0.10)] text-[#5B38E6] dark:bg-[#2B2B2B] dark:text-white"
                     : "text-gray-800 hover:bg-gray-50 hover:text-gray-900 dark:text-zinc-300 dark:hover:bg-[#3A3A3A] dark:hover:text-zinc-100"
                 }`}
                 >
@@ -1784,7 +1912,7 @@ export function AccountSettingsPage({
 
           <div
             key={activeSettingsTab}
-            className="account-settings-content-pane flex w-full flex-col bg-white p-6 dark:bg-[#323232] lg:overflow-y-auto lg:rounded-2xl lg:border-[1.5px] lg:border-gray-200 lg:bg-white lg:dark:border-[#3F3F3F] lg:dark:bg-[#323232] xl:p-7"
+            className="account-settings-content-pane flex w-full flex-col bg-white p-6 dark:bg-[#323232] lg:overflow-y-auto lg:rounded-2xl lg:border-[1.5px] lg:border-gray-200 lg:bg-white lg:shadow-sm lg:dark:border-[#3F3F3F] lg:dark:bg-[#323232] lg:dark:shadow-[0_8px_22px_rgba(0,0,0,0.28),0_24px_52px_rgba(0,0,0,0.24)] xl:p-7"
           >
             {activeSettingsTab === "pricing" ? (
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -2127,16 +2255,16 @@ export function AccountSettingsPage({
             </form>
           </>
           ) : (
-            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
-              <p className="text-sm font-semibold text-amber-900 dark:text-amber-300">
+            <div className="mt-4 rounded-lg border border-[#D8C8FF] bg-[#F3EEFF] px-4 py-3">
+              <p className="text-sm font-semibold text-[#5B38E6] dark:text-violet-300">
                 {managedByGoogle ? "Email managed by Google" : "Email changes unavailable"}
               </p>
               {managedByGoogle ? (
-                <p className="mt-1 text-sm text-amber-800 dark:text-amber-200">
+                <p className="mt-1 text-sm text-[#6C47FF] dark:text-violet-200">
                   Your email is managed by Google and can&apos;t be changed here.
                 </p>
               ) : (
-                <p className="mt-1 text-sm text-amber-800 dark:text-amber-200">
+                <p className="mt-1 text-sm text-[#6C47FF] dark:text-violet-200">
                   Your sign-in method manages your email address. Email changes are not available from this page.
                 </p>
               )}
@@ -2151,7 +2279,7 @@ export function AccountSettingsPage({
           </div>
           <p className="mt-1 text-sm text-gray-600 dark:text-zinc-400">Choose light or dark mode.</p>
           <div className="mt-4 max-w-xs">
-            <div className="relative inline-flex h-11 w-[150px] items-center rounded-lg border border-gray-300 bg-white p-1 dark:border-[#3F3F3F] dark:bg-[#323232]">
+            <div className="relative inline-flex h-11 w-[150px] items-center rounded-lg border border-gray-300 bg-white p-1 dark:border-[#3F3F3F] dark:bg-[#2B2B2B]">
               <span
                 aria-hidden
                 className={`absolute top-1 h-[34px] w-[70px] rounded-md bg-[#6C47FF] ${
@@ -2197,14 +2325,22 @@ export function AccountSettingsPage({
             <div className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-3 text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-300">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
               <p className="text-sm font-medium">
-                We couldn&apos;t process your latest payment. Please update your payment method.
+                We couldn&apos;t process your latest payment. Please update your payment method to restore access.
               </p>
             </div>
           ) : null}
 
           <div className="flex min-h-0 flex-1 flex-col justify-center gap-6">
-            <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-[#3F3F3F] dark:bg-[#323232]">
-              <div className="h-1 w-full bg-gradient-to-r from-[#5EEAD4] via-[#14B8A6] to-[#5EEAD4] opacity-80 dark:opacity-70" />
+            <div className="relative overflow-hidden rounded-2xl border-[1.5px] border-slate-200 bg-white shadow-sm transition-all duration-200 dark:border-[#4B4B4B] dark:bg-[#262626] dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)]">
+              <div
+                className={`h-1 w-full opacity-80 dark:opacity-70 ${
+                  pricingIsDelinquent
+                    ? "bg-gradient-to-r from-rose-500 via-rose-600 to-rose-500"
+                    : billingHasCurrentPlan
+                    ? "bg-gradient-to-r from-[#5EEAD4] via-[#14B8A6] to-[#5EEAD4]"
+                    : "bg-gradient-to-r from-slate-200 via-slate-300 to-slate-200 dark:from-[#4A4A4A] dark:via-[#606060] dark:to-[#4A4A4A]"
+                }`}
+              />
               <div className="relative z-10 grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-center lg:gap-8 lg:p-6">
                 {pricingStatusLoading ? (
                   <>
@@ -2227,16 +2363,28 @@ export function AccountSettingsPage({
                 ) : (
                   <>
                     <div className={`min-w-0 space-y-3 ${isTrialingPlan ? "py-2 lg:py-3" : "py-1.5 lg:py-2"}`}>
-                      <span className="inline-flex items-center rounded-full bg-emerald-500 px-4 py-1.5 text-[12px] font-semibold leading-none tracking-[0.06em] text-white shadow-sm">
-                        <CheckCircle2 className="mr-2 h-3.5 w-3.5" strokeWidth={2.5} aria-hidden="true" />
-                        {isTrialingPlan ? "Free Trial" : "Your current plan"}
-                      </span>
+                      {billingHasCurrentPlan && !pricingIsDelinquent ? (
+                        <span
+                          className={`inline-flex items-center rounded-full px-4 py-1.5 text-[12px] font-semibold leading-none tracking-[0.06em] text-white shadow-sm ${
+                            pricingIsDelinquent ? "bg-rose-500" : "bg-emerald-500"
+                          }`}
+                        >
+                          <CheckCircle2 className="mr-2 h-3.5 w-3.5" strokeWidth={2.5} aria-hidden="true" />
+                          {isTrialingPlan ? "Free Trial" : "Current plan"}
+                        </span>
+                      ) : null}
                       <div className={isTrialingPlan ? "space-y-1.5" : "space-y-1"}>
                         <p
-                          className={`text-[28px] font-bold tracking-tight bg-clip-text text-transparent ${
-                            currentPlanDetails?.name === "Signature Pro"
-                              ? "bg-gradient-to-r from-purple-600 via-violet-500 to-fuchsia-500"
-                              : "bg-gradient-to-r from-sky-500 via-cyan-500 to-sky-400"
+                          className={`text-[28px] font-bold tracking-tight ${
+                            currentPlanDetails
+                              ? pricingIsDelinquent
+                                ? "text-rose-700 dark:text-rose-300"
+                                : `bg-clip-text text-transparent ${
+                                    currentPlanDetails.name === "Signature Pro"
+                                      ? "bg-gradient-to-r from-purple-600 via-violet-500 to-fuchsia-500"
+                                      : "bg-gradient-to-r from-sky-500 via-cyan-500 to-sky-400"
+                                  }`
+                              : "text-slate-900 dark:text-zinc-100"
                           }`}
                         >
                           {currentPlanDetails?.name ?? "No active plan"}
@@ -2251,11 +2399,23 @@ export function AccountSettingsPage({
                             return (
                               <div className="space-y-1">
                                 {currentPlanCycleLabel ? (
-                                  <p className="text-[32px] font-semibold leading-none tracking-tight text-gray-900 dark:text-zinc-100">
+                                  <p
+                                    className={`text-[32px] font-semibold leading-none tracking-tight ${
+                                      pricingIsDelinquent
+                                        ? "text-rose-700 dark:text-rose-200"
+                                        : "text-gray-900 dark:text-zinc-100"
+                                    }`}
+                                  >
                                     {currentPlanCycleLabel}
                                   </p>
                                 ) : null}
-                                <p className="text-sm font-medium leading-5 text-slate-500 dark:text-zinc-400">
+                                <p
+                                  className={`text-sm font-medium leading-5 ${
+                                    pricingIsDelinquent
+                                      ? "text-rose-600 dark:text-rose-300"
+                                      : "text-slate-500 dark:text-zinc-400"
+                                  }`}
+                                >
                                   Then {priceAmount} {priceSuffix ? `per ${priceSuffix}` : null}
                                 </p>
                               </div>
@@ -2263,24 +2423,53 @@ export function AccountSettingsPage({
                           }
                           return (
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                              <p className="text-[34px] font-semibold leading-none tracking-tight text-gray-900 dark:text-zinc-100">
+                              <p
+                                className={`text-[34px] font-semibold leading-none tracking-tight ${
+                                  pricingIsDelinquent
+                                    ? "text-rose-700 dark:text-rose-200"
+                                    : "text-gray-900 dark:text-zinc-100"
+                                }`}
+                              >
                                 {priceAmount}
                               </p>
                               {priceSuffix ? (
-                                <span className="text-sm font-medium leading-none text-slate-500 dark:text-zinc-400">
+                                <span
+                                  className={`text-sm font-medium leading-none ${
+                                    pricingIsDelinquent
+                                      ? "text-rose-600 dark:text-rose-300"
+                                      : "text-slate-500 dark:text-zinc-400"
+                                  }`}
+                                >
                                   per {priceSuffix}
+                                </span>
+                              ) : null}
+                              {currentPlanBillingPeriod === "annual" ? (
+                                <span
+                                  className={`basis-full text-sm font-medium leading-5 ${
+                                    pricingIsDelinquent
+                                      ? "text-rose-600 dark:text-rose-300"
+                                      : "text-slate-500 dark:text-zinc-400"
+                                  }`}
+                                >
+                                  Billed annually
                                 </span>
                               ) : null}
                             </div>
                           );
                         })() : null}
                         {!isTrialingPlan && currentPlanCycleLabel ? (
-                          <p className="mt-1 text-sm font-medium leading-5 tracking-tight text-slate-600 dark:text-zinc-400">
+                          <p
+                            className={`mt-1 text-sm font-medium leading-5 tracking-tight ${
+                              pricingIsDelinquent
+                                ? "text-rose-600 dark:text-rose-300"
+                                : "text-slate-600 dark:text-zinc-400"
+                            }`}
+                          >
                             {currentPlanCycleLabel}
                           </p>
                         ) : null}
                       </div>
-                      {!pricingHasActivePlan ? (
+                      {!billingHasCurrentPlan ? (
                         <p className="max-w-xl text-sm leading-6 text-gray-600 dark:text-zinc-400">
                           Manage billing settings or choose a plan below.
                         </p>
@@ -2297,22 +2486,38 @@ export function AccountSettingsPage({
                         >
                           View billing
                         </button>
-                        {pricingHasActivePlan ? (
+                        {billingHasCurrentPlan ? (
                           <button
                             type="button"
                             onClick={() => {
                               void openBillingPortal();
                             }}
-                            className="inline-flex items-center justify-center rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/30"
+                            className={`inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-white shadow-sm transition focus-visible:outline-none focus-visible:ring-2 ${
+                              pricingIsDelinquent
+                                ? "bg-rose-600 hover:bg-rose-700 focus-visible:ring-rose-500/30"
+                                : "bg-rose-600 hover:bg-rose-700 focus-visible:ring-rose-500/30"
+                            }`}
                           >
-                            {accountStripeStatus === "trialing" ? "Cancel free trial" : "Cancel plan"}
+                            {pricingIsDelinquent
+                              ? "Update payment"
+                              : accountStripeStatus === "trialing"
+                                ? "Cancel free trial"
+                                : "Cancel plan"}
                           </button>
                         ) : null}
                       </div>
-                      {pricingHasActivePlan ? (
-                        <p className="max-w-sm text-xs leading-5 text-gray-500 dark:text-zinc-400 lg:text-right">
+                      {billingHasCurrentPlan ? (
+                        <p
+                          className={`max-w-sm text-xs leading-5 lg:text-right ${
+                            pricingIsDelinquent
+                              ? "text-rose-600 dark:text-rose-300"
+                              : "text-gray-500 dark:text-zinc-400"
+                          }`}
+                        >
                           <span className="text-rose-500" aria-hidden="true">*</span>{" "}
-                          Your plan remains active until the end of your billing period.
+                          {pricingIsDelinquent
+                            ? "Update your payment to restore billing."
+                            : "Your plan remains active until the end of your billing period."}
                         </p>
                       ) : null}
                     </div>
@@ -2350,7 +2555,7 @@ export function AccountSettingsPage({
                   }`}
                 >
                   <span className="inline-flex items-center gap-2">
-                    <span>Yearly</span>
+                    <span>Annual</span>
                     <span className="rounded-md bg-purple-500 px-2.5 py-1 text-[11px] font-semibold tracking-tight text-white">
                       SAVE UP TO 42%
                     </span>
@@ -2365,7 +2570,7 @@ export function AccountSettingsPage({
                   {PRICING_TIERS.map((tier) => (
                     <div
                       key={tier.name}
-                      className="flex h-full min-h-[420px] flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-[#3F3F3F] dark:bg-[#323232]"
+                      className="flex h-full min-h-[420px] flex-col rounded-2xl border-[1.5px] border-slate-200 bg-white p-6 shadow-sm dark:border-[#4B4B4B] dark:bg-[#262626] dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)]"
                     >
                       <div className="skeleton-shimmer h-8 w-40 rounded-lg bg-slate-200/90 dark:bg-white/10" />
                       <div className="skeleton-shimmer mt-5 h-14 w-52 rounded-lg bg-slate-200/90 dark:bg-white/10" />
@@ -2564,72 +2769,80 @@ export function AccountSettingsPage({
             <h2 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">Security</h2>
           </div>
           <p className="mt-1 text-sm text-gray-600 dark:text-zinc-400">Keep your MergifyPDF account secure.</p>
-          <div className="mt-4 space-y-6">
-            <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-4 dark:border-[#3F3F3F] dark:bg-[#2B2B2B]/60">
-              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-800 dark:text-zinc-100">Two-factor authentication</p>
-                  <p className="text-xs text-gray-600 dark:text-zinc-400">
-                    Add an extra layer of protection to your account.
+              <div className="mt-4 space-y-6">
+            <div className="flex flex-col gap-1 rounded-lg border border-gray-200 bg-white p-4 dark:border-[#3F3F3F] dark:bg-[#2B2B2B]/60">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-medium text-gray-800 dark:text-zinc-100">
+                    Two-Factor Authentication
                   </p>
-                  {twoFactorMethod && (
-                    <p className="mt-1 text-xs font-medium text-green-700 dark:text-emerald-400">
-                      2FA enabled · Email verification
+                  {!managedByGoogle && twoFactorMethod && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold leading-none text-white ring-1 ring-inset ring-emerald-700/20 dark:bg-emerald-600 dark:text-white dark:ring-emerald-500/20">
+                      <CheckCircle2 className="h-3 w-3" aria-hidden />
+                      Enabled
+                    </span>
+                  )}
+                </div>
+                {managedByGoogle ? (
+                  <div className="mt-3 rounded-lg border border-[#D8C8FF] bg-[#F3EEFF] px-4 py-3 text-[#5B38E6] dark:border-[#6650D6]/40 dark:bg-[#2D2250]/30 dark:text-[#B8A8FF]">
+                    <p className="text-sm font-medium">2FA unavailable for Google accounts</p>
+                    <p className="mt-1 text-sm leading-6">
+                      This account uses Google sign-in, so 2FA can’t be turned on.
                     </p>
-                  )}
-                </div>
-                <div className="mt-2 sm:mt-0">
-                  {twoFactorMethod ? (
-                    <button
-                      type="button"
-                      onClick={openManageTwoFactor}
-                      className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-800 transition hover:bg-white dark:border-[#4A4A4A] dark:text-zinc-100 dark:hover:bg-[#3A3A3A]"
-                    >
-                      Manage
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={openEnableTwoFactor}
-                      className="rounded-md bg-[#6C47FF] px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-[#5B38E6]"
-                    >
-                      Enable 2FA
-                    </button>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-xs text-gray-600 dark:text-zinc-400">
+                      Require a 6-digit code each time you sign in.
+                    </p>
+                    {twoFactorMethod ? (
+                      <p className="mt-1 text-xs text-gray-600 dark:text-zinc-400">Email verification</p>
+                    ) : null}
+                  </>
+                )}
+              </div>
+              <div className="mt-3">
+                {!managedByGoogle && twoFactorMethod ? (
+                  <button
+                    type="button"
+                    onClick={openDisableTwoFactor}
+                    className="rounded-md bg-[#DC2626] px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-[#B91C1C]"
+                  >
+                    Disable 2FA
+                  </button>
+                ) : !managedByGoogle ? (
+                  <button
+                    type="button"
+                    onClick={openEnableTwoFactor}
+                    className="rounded-md bg-[#6C47FF] px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-[#5B38E6]"
+                  >
+                    Enable 2FA
+                  </button>
+                ) : null}
               </div>
             </div>
 
-          <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-[#3F3F3F] dark:bg-[#2B2B2B]/60">
-            <p className="text-sm font-medium text-gray-800 dark:text-zinc-100">Delete account</p>
-            <p className="mt-1 text-xs text-gray-600 dark:text-zinc-400">
+          <div className="mt-8 border-t border-gray-200 pt-6 dark:border-[#3F3F3F]">
+            <div className="flex items-center gap-2">
+              <PhTrash className="h-4 w-4 text-slate-600 dark:text-zinc-400" aria-hidden />
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">Delete</h2>
+            </div>
+            <p className="mt-1 text-sm text-gray-600 dark:text-zinc-400">
               Permanently delete your MergifyPDF account and all associated data. This action cannot be
               undone.
             </p>
-            <button
-              type="button"
-              onClick={() => setDeleteModalOpen(true)}
-              className="mt-3 rounded-md bg-[#DC2626] px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-[#B91C1C]"
-            >
-              Delete my account
-            </button>
-          </div>
-
-          {managedByGoogle && (
-            <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-[#3F3F3F] dark:bg-[#2B2B2B]/60">
-              <p className="text-sm font-medium text-gray-800 dark:text-zinc-100">Connected account</p>
-              <p className="mt-1 text-xs text-gray-600 dark:text-zinc-400">
-                Your MergifyPDF account is connected to Google for sign-in.
-              </p>
+            <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4 dark:border-[#3F3F3F] dark:bg-[#2B2B2B]/60">
+              <p className="text-sm font-medium text-gray-800 dark:text-zinc-100">Delete account</p>
               <button
                 type="button"
-                onClick={() => setDisconnectModalOpen(true)}
-                className="mt-3 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-800 transition hover:bg-white dark:border-[#4A4A4A] dark:text-zinc-100 dark:hover:bg-[#3A3A3A]"
+                onClick={handleDeleteAccountClick}
+                className="mt-3 rounded-md bg-[#DC2626] px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-[#B91C1C]"
               >
-                Disconnect Google
+                Delete my account
               </button>
             </div>
-          )}
+          </div>
+
           </div>
         </section>
         ) : null}
@@ -2640,258 +2853,424 @@ export function AccountSettingsPage({
       </div>
 
       {twoFactorModalMode && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/60 px-4 py-8">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-            <div className="flex items-start justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900">
-                  {twoFactorModalMode === "enable" ? "Enable 2-factor authentication" : "Manage 2-factor authentication"}
-                </h2>
-                <p className="mt-1 text-sm text-slate-600">
-                  Choose how you&apos;d like to receive your verification codes, then confirm with a 6-digit code.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  resetTwoFactorModalState();
-                  setTwoFactorModalMode(null);
-                }}
-                className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
-                aria-label="Close 2FA dialog"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form
-              className="mt-4 space-y-4"
-              onSubmit={(event) => {
-                event.preventDefault();
-                if (twoFactorModalMode === "enable" || twoFactorModalMode === "manage") {
-                  void handleConfirmEnableTwoFactor();
-                }
-              }}
-            >
-              <fieldset className="space-y-3">
-                <legend className="text-xs font-medium text-slate-700">Verification method</legend>
-                <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm text-slate-800 hover:bg-slate-50">
-                  <input
-                    type="radio"
-                    className="mt-1"
-                    checked
-                    readOnly
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/55 px-4 py-8 backdrop-blur-sm">
+          <div className="w-full max-w-2xl overflow-hidden rounded-2xl border-[1.5px] border-slate-200 bg-white text-slate-900 shadow-[0_22px_60px_rgba(15,23,42,0.22)] dark:border-[#4B4B4B] dark:bg-[#262626] dark:text-zinc-100 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)]">
+            <div className="p-6">
+              <div className="flex items-start gap-4">
+                <div className="flex min-w-0 items-start gap-3">
+                  <Shield
+                    className={`mt-0.5 h-4.5 w-4.5 flex-none ${
+                      twoFactorModalMode === "disable"
+                        ? "text-rose-600 dark:text-rose-400"
+                        : "text-slate-700 dark:text-zinc-200"
+                    }`}
+                    aria-hidden
                   />
-                  <span>
-                    <span className="font-medium">Email verification</span>
-                    <br />
-                    <span className="text-xs text-slate-600">
-                      We&apos;ll email a code when you sign in.
-                    </span>
-                  </span>
-                </label>
-              </fieldset>
-
-              {twoFactorStep === "verify" && (
-                <div className="space-y-1">
-                  <label className="block text-sm font-medium text-slate-700" htmlFor="twofactor-code">
-                    Enter 6-digit code
-                  </label>
-                  <input
-                    id="twofactor-code"
-                    type="text"
-                    inputMode="numeric"
-                    pattern="\d{6}"
-                    maxLength={6}
-                    value={twoFactorCode}
-                    onChange={(event) =>
-                      setTwoFactorCode(event.target.value.replace(/\D/g, "").slice(0, 6))
-                    }
-                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-center text-sm tracking-[6px] shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c]"
-                  />
-                </div>
-              )}
-
-              {twoFactorError && (
-                <p className="text-sm text-rose-600">{twoFactorError}</p>
-              )}
-              {twoFactorMessage && (
-                <p className="text-sm text-green-700">{twoFactorMessage}</p>
-              )}
-
-              <div className="mt-4 flex items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={() => setTwoFactorModalMode(null)}
-                  className="rounded-md px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"
-                >
-                  Cancel
-                </button>
-                <div className="flex items-center gap-3">
-                  {twoFactorModalMode === "manage" && twoFactorMethod && (
-                    <button
-                      type="button"
-                      className="text-sm font-semibold text-rose-600 hover:text-rose-700"
-                      onClick={() => setConfirmDisable2fa(true)}
+                  <div className="min-w-0">
+                    <h2
+                      className={`text-lg font-semibold tracking-tight ${
+                        twoFactorModalMode === "disable"
+                          ? "text-rose-700 dark:text-rose-300"
+                          : "text-slate-900 dark:text-zinc-100"
+                      }`}
                     >
-                      Disable 2FA
-                    </button>
-                  )}
+                      {twoFactorModalMode === "enable"
+                        ? "Enable 2-Factor Authentication"
+                        : "Disable 2-Factor Authentication"}
+                    </h2>
+                  </div>
+                </div>
+              </div>
+
+              <form
+                className="mt-4 space-y-6"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (twoFactorModalMode === "enable" || twoFactorModalMode === "disable") {
+                    void handleConfirmTwoFactor();
+                  }
+                }}
+              >
+                <p className="text-sm leading-6 text-slate-600 dark:text-zinc-400">
+                  {twoFactorModalMode === "disable"
+                    ? "To turn off 2FA, we’ll email you a 6-digit code to confirm this change."
+                    : "We’ll email you a 6-digit code each time you sign in. You can turn this off anytime."}
+                </p>
+
+                {twoFactorStep === "verify" ? (
+                  <div className="space-y-2">
+                    <label
+                      className="block text-sm font-medium text-slate-700 dark:text-zinc-300"
+                      htmlFor="twofactor-code-0"
+                    >
+                      Verify your identity
+                    </label>
+                    {twoFactorMessage ? (
+                      <p className="text-sm text-emerald-700 dark:text-emerald-400">{twoFactorMessage}</p>
+                    ) : null}
+                    <div className="flex gap-3">
+                      {twoFactorCodeDigits.map((digit, index) => (
+                        <input
+                          key={`twofactor-code-${index}`}
+                          ref={(el) => {
+                            twoFactorCodeRefs.current[index] = el;
+                          }}
+                          id={index === 0 ? "twofactor-code-0" : undefined}
+                          autoFocus={index === 0}
+                          className="h-11 w-9 rounded-lg border-2 border-slate-300 bg-white text-center text-lg text-slate-900 outline-none transition hover:border-slate-400 focus-visible:border-[#6D6AF4] focus-visible:ring-0 dark:border-[#4A4A4A] dark:bg-[#2B2B2B] dark:text-zinc-100 dark:hover:border-[#4A4A4A] sm:h-12 sm:w-11"
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={1}
+                          value={digit}
+                          onChange={(event) => {
+                            const value = event.target.value.replace(/\D/g, "");
+                            if (!value) {
+                              updateTwoFactorCodeDigit(index, "");
+                              return;
+                            }
+                            updateTwoFactorCodeDigit(index, value[0]);
+                            if (index < 5) {
+                              focusTwoFactorCodeIndex(index + 1);
+                            }
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === "Backspace" && !digit && index > 0) {
+                              updateTwoFactorCodeDigit(index - 1, "");
+                              focusTwoFactorCodeIndex(index - 1);
+                            }
+                            if (event.key === "ArrowLeft" && index > 0) {
+                              focusTwoFactorCodeIndex(index - 1);
+                            }
+                            if (event.key === "ArrowRight" && index < 5) {
+                              focusTwoFactorCodeIndex(index + 1);
+                            }
+                          }}
+                          onPaste={(event) => {
+                            const pasted = event.clipboardData.getData("text").replace(/\D/g, "");
+                            if (!pasted) return;
+                            event.preventDefault();
+                            const next = [...twoFactorCodeDigits];
+                            for (let i = 0; i < 6; i += 1) {
+                              const targetIndex = index + i;
+                              if (targetIndex > 5) break;
+                              next[targetIndex] = pasted[i] ?? "";
+                            }
+                            setTwoFactorCodeDigits(next);
+                            const lastIndex = Math.min(index + pasted.length - 1, 5);
+                            focusTwoFactorCodeIndex(Math.max(lastIndex, 0));
+                          }}
+                          aria-label={`Digit ${index + 1}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                {twoFactorError ? (
+                  <p className="text-sm text-rose-600 dark:text-rose-400">{twoFactorError}</p>
+                ) : null}
+                <div className="flex items-center gap-3 pt-1">
                   <button
                     type="submit"
-                    className="rounded-md bg-[#024d7c] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#013a60]"
+                    className={`rounded-md px-4 py-2 text-sm font-semibold text-white transition disabled:opacity-60 ${
+                      twoFactorModalMode === "disable"
+                        ? "bg-[#DC2626] hover:bg-[#B91C1C]"
+                        : "bg-[#6C47FF] hover:bg-[#5B38E6]"
+                    }`}
                     disabled={twoFactorBusy}
                   >
                     {twoFactorModalMode === "enable"
-                      ? twoFactorStep === "select"
-                        ? "Send code"
-                        : "Turn on 2FA"
-                      : twoFactorStep === "select"
-                        ? "Save changes"
-                        : "Confirm code"}
+                      ? twoFactorStep === "verify"
+                        ? "Confirm code"
+                        : twoFactorBusy
+                          ? "Sending..."
+                          : "Send code"
+                      : twoFactorStep === "verify"
+                        ? "Turn off 2FA"
+                        : twoFactorBusy
+                          ? "Sending..."
+                          : "Send code"}
+                  </button>
+                  {twoFactorStep === "verify" ? (
+                    <button
+                      type="button"
+                      disabled={twoFactorBusy || twoFactorResendCooldown > 0}
+                      onClick={() => {
+                        if (twoFactorBusy || twoFactorResendCooldown > 0) return;
+                        void requestTwoFactorCode(twoFactorModalMode === "disable" ? "disable" : "enable");
+                      }}
+                      className="rounded-md border-2 border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 transition hover:-translate-y-[1px] hover:border-slate-400 hover:shadow-sm disabled:opacity-60 dark:border-[#4A4A4A] dark:bg-[#2B2B2B] dark:text-zinc-100 dark:hover:border-[#4A4A4A]"
+                    >
+                      {twoFactorBusy
+                        ? "Sending..."
+                        : twoFactorResendCooldown > 0
+                          ? `Resend code in ${twoFactorResendCooldown}s`
+                          : "Resend code"}
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      resetTwoFactorModalState();
+                      setTwoFactorModalMode(null);
+                    }}
+                    className="rounded-md px-2 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 hover:text-gray-900 dark:text-zinc-400 dark:hover:bg-[#3A3A3A] dark:hover:text-zinc-200"
+                  >
+                    Cancel
                   </button>
                 </div>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {confirmDisable2fa && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/60 px-4 py-8">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-            <h2 className="text-lg font-semibold text-slate-900">Turn off 2-factor authentication?</h2>
-            <p className="mt-2 text-sm text-slate-600">
-              Your account will be protected by password only.
-            </p>
-            <div className="mt-5 flex justify-end gap-3">
-              <button
-                type="button"
-                className="rounded-md px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"
-                onClick={() => setConfirmDisable2fa(false)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="rounded-md bg-[#DC2626] px-4 py-2 text-sm font-semibold text-white hover:bg-[#B91C1C]"
-                onClick={handleConfirmDisableTwoFactor}
-              >
-                Disable 2FA
-              </button>
+              </form>
             </div>
           </div>
         </div>
       )}
 
       {deleteModalOpen && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/60 px-4 py-8">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-            <h2 className="text-lg font-semibold text-slate-900">Delete your account?</h2>
-            <p className="mt-2 text-sm text-slate-600">
-              This will permanently delete your MergifyPDF account, documents, and settings. This action
-              cannot be undone.
-            </p>
-            <p className="mt-2 text-xs text-slate-500">
-              You may be asked to confirm your password or a verification code.
-            </p>
-            {deleteError && <p className="mt-3 text-sm text-rose-600">{deleteError}</p>}
-            <div className="mt-5 flex justify-end gap-3">
-              <button
-                type="button"
-                className="rounded-md px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"
-                onClick={() => {
-                  if (deleteBusy) return;
-                  setDeleteModalOpen(false);
-                  setDeleteError(null);
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={deleteBusy}
-                className="rounded-md bg-[#DC2626] px-4 py-2 text-sm font-semibold text-white hover:bg-[#B91C1C] disabled:opacity-60"
-                onClick={handleConfirmDeleteAccount}
-              >
-                {deleteBusy ? "Deleting…" : "Yes, delete my account"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {disconnectModalOpen && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/60 px-4 py-8">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-            <div className="flex items-start justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900">Disconnect Google account?</h2>
-                <p className="mt-2 text-sm text-slate-600">
-                  After disconnecting, you&apos;ll sign in to MergifyPDF with an email and password instead of
-                  Google.
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/55 px-4 py-8 backdrop-blur-sm">
+          <div
+            className="w-full max-w-lg rounded-2xl bg-white p-7 shadow-2xl sm:p-8"
+            aria-busy={deleteChecking || deleteDeleting}
+          >
+            {deleteModalMode === "checking" ? (
+              <>
+                <div className="flex flex-col items-center justify-center px-2 py-2 text-center">
+                  <div
+                    className="h-12 w-12 animate-spin rounded-full border-[5px] border-[#D9CCFF] border-t-[#6C47FF] dark:border-[#3F3F3F] dark:border-t-[#8B6CFF]"
+                    aria-hidden
+                  />
+                  <h2 className="mt-3 text-lg font-semibold text-slate-900">
+                    Checking subscription status...
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-600">This may take a moment.</p>
+                </div>
+                {deleteError && <p className="mt-2 text-sm text-rose-600">{deleteError}</p>}
+                <div className="mt-4 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    className="rounded-md px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"
+                    onClick={() => {
+                      if (deleteBusy) return;
+                      closeDeleteModal();
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            ) : deleteModalMode === "deleting" ? (
+              <>
+                <div className="flex flex-col items-center justify-center px-2 py-3 text-center">
+                  <div
+                    className="h-12 w-12 animate-spin rounded-full border-[5px] border-[#D9CCFF] border-t-[#6C47FF] dark:border-[#3F3F3F] dark:border-t-[#8B6CFF]"
+                    aria-hidden
+                  />
+                  <h2 className="mt-3 text-lg font-semibold text-slate-900">Deleting projects...</h2>
+                  <p className="mt-1 text-sm text-slate-600">
+                    This may take a moment while we remove your files and account data.
+                  </p>
+                </div>
+                {deleteError && <p className="mt-2 text-sm text-rose-600">{deleteError}</p>}
+                <div className="mt-4 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    disabled
+                    className="rounded-md px-3 py-2 text-sm font-semibold text-slate-400"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            ) : deleteModalMode === "billing" ? (
+              <>
+                <h2 className="text-[1.15rem] font-semibold text-slate-900">
+                  {deleteBillingInfo?.title ?? "Cancel your plan first"}
+                </h2>
+                <p className="mt-2 text-[0.95rem] leading-6 text-slate-600">
+                  {deleteBillingInfo?.message ??
+                    "Please cancel your subscription or trial in Billing before deleting your account."}
                 </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setDisconnectModalOpen(false)}
-                className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
-                aria-label="Close disconnect dialog"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleConfirmDisconnectGoogle} className="mt-4 space-y-4">
-              <div className="space-y-1">
-                <label className="block text-xs font-medium text-slate-700">Email</label>
-                <input
-                  type="email"
-                  readOnly
-                  value={email}
-                  className="w-full cursor-not-allowed rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="block text-sm font-medium text-slate-700" htmlFor="disconnect-password">
-                  Create a password
-                </label>
-                <input
-                  id="disconnect-password"
-                  type="password"
-                  value={disconnectPassword}
-                  onChange={(event) => setDisconnectPassword(event.target.value)}
-                  minLength={8}
-                  required
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c]"
-                />
-                <p className="text-xs text-slate-500">
-                  You&apos;ll use this password to sign in after disconnecting.
+                <div className="mt-6 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    className="rounded-md px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"
+                    onClick={() => {
+                      if (deleteBusy) return;
+                      closeDeleteModal();
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={deleteBusy}
+                    className="rounded-md bg-[#6C47FF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#5B38E6] disabled:opacity-60"
+                    onClick={async () => {
+                      if (deleteBusy) return;
+                      const opened = await openBillingPortal();
+                      if (opened) {
+                        closeDeleteModal();
+                      } else {
+                        setDeleteError("Unable to open billing right now. Please try again.");
+                      }
+                    }}
+                  >
+                    Go to billing
+                  </button>
+                </div>
+              </>
+            ) : deleteModalMode === "google" ? (
+              <>
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-4.5 w-4.5 flex-none text-rose-600" aria-hidden />
+                  <h2 className="text-[1.15rem] font-semibold text-slate-900">Delete your account?</h2>
+                </div>
+                <p className="mt-2 text-[0.95rem] leading-6 text-slate-600">
+                  This will permanently delete your MergifyPDF account, documents, and all associated data. This
+                  action cannot be undone.
                 </p>
-              </div>
-              {disconnectError && <p className="text-sm text-rose-600">{disconnectError}</p>}
-              <div className="mt-5 flex justify-end gap-3">
-                <button
-                  type="button"
-                  className="rounded-md px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"
-                  onClick={() => {
-                    if (disconnectBusy) return;
-                    setDisconnectModalOpen(false);
-                    setDisconnectError(null);
-                    setDisconnectPassword("");
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={disconnectBusy || disconnectPassword.length < 8}
-                  className="rounded-md bg-[#024d7c] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#013a60] disabled:opacity-60"
-                >
-                  {disconnectBusy ? "Saving…" : "Save and disconnect"}
-                </button>
-              </div>
-            </form>
+                <div className="mt-6 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    className="rounded-md px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"
+                    onClick={() => {
+                      if (deleteBusy) return;
+                      closeDeleteModal();
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={deleteBusy}
+                    className="rounded-md bg-[#6C47FF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#5B38E6] disabled:opacity-60"
+                    onClick={() => setDeleteModalMode("confirm")}
+                  >
+                    Continue
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-4.5 w-4.5 flex-none text-rose-600" aria-hidden />
+                  <h2 className="text-[1.15rem] font-semibold text-slate-900">
+                    {managedByGoogle ? "Account Deletion" : "Delete your account?"}
+                  </h2>
+                </div>
+                <p className="mt-2 text-[0.95rem] leading-6 text-slate-600">
+                  This will permanently delete your MergifyPDF account, documents, and all associated data. This
+                  action cannot be undone.
+                </p>
+                <div className="mt-5 space-y-2">
+                  <label className="block text-sm font-medium text-slate-700">
+                    Why are you leaving? <span className="text-rose-600">*</span>
+                  </label>
+                  <div ref={deleteReasonMenuRef} className="relative">
+                    <button
+                      type="button"
+                      aria-haspopup="listbox"
+                      aria-expanded={deleteReasonMenuOpen}
+                      onClick={() => setDeleteReasonMenuOpen((open) => !open)}
+                      className={`flex w-full items-center justify-between rounded-md border-2 px-3 py-2 text-left text-sm shadow-sm transition focus-visible:outline-none ${
+                        deleteReasonMenuOpen
+                          ? "border-[#6C47FF] bg-white text-slate-900 focus-visible:border-[#6C47FF]"
+                          : "border-slate-300 bg-white text-slate-900 hover:border-slate-400 focus-visible:border-[#6C47FF]"
+                      }`}
+                    >
+                      <span className="truncate">
+                        {DELETE_ACCOUNT_REASONS.find((reason) => reason.value === deleteReason)?.label ??
+                          "Select a reason"}
+                      </span>
+                      <ChevronDown
+                        className={`h-4 w-4 flex-none text-slate-400 transition ${deleteReasonMenuOpen ? "rotate-180" : ""}`}
+                        aria-hidden
+                      />
+                    </button>
+                    {deleteReasonMenuOpen ? (
+                      <div
+                        role="listbox"
+                        className="absolute z-10 mt-2 w-full overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-[0_20px_45px_rgba(15,23,42,0.12)]"
+                      >
+                        {DELETE_ACCOUNT_REASONS.map((reason) => {
+                          const selected = deleteReason === reason.value;
+                          return (
+                            <button
+                              key={reason.value}
+                              type="button"
+                              role="option"
+                              aria-selected={selected}
+                              onClick={() => {
+                                setDeleteReason(reason.value);
+                                setDeleteReasonMenuOpen(false);
+                              }}
+                              className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition ${
+                                selected
+                                  ? "bg-[rgba(108,71,255,0.10)] text-[#5B38E6]"
+                                  : "text-slate-700 hover:bg-slate-50"
+                              }`}
+                            >
+                              <span>{reason.label}</span>
+                              {selected ? <CheckCircle2 className="h-4 w-4" aria-hidden /> : null}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+                {!managedByGoogle ? (
+                  <div className="mt-5 space-y-2">
+                    <label className="block text-sm font-medium text-slate-700" htmlFor="delete-account-password">
+                      Enter your current password to confirm.
+                    </label>
+                    <div className="relative">
+                      <input
+                        id="delete-account-password"
+                        type={deletePasswordVisible ? "text" : "password"}
+                        value={deletePassword}
+                        onChange={(event) => setDeletePassword(event.target.value)}
+                        className="delete-account-password-field w-full rounded-md border-2 border-slate-300 px-3 py-2 pr-11 text-sm shadow-sm focus-visible:outline-none focus-visible:border-[#6C47FF]"
+                        placeholder="Enter your current password"
+                        autoComplete="current-password"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setDeletePasswordVisible((visible) => !visible)}
+                        className="absolute inset-y-0 right-0 flex items-center justify-center px-3 text-slate-500 transition hover:text-slate-700"
+                        aria-label={deletePasswordVisible ? "Hide password" : "Show password"}
+                      >
+                        {deletePasswordVisible ? <EyeOff className="h-4.5 w-4.5" aria-hidden /> : <Eye className="h-4.5 w-4.5" aria-hidden />}
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+                {deleteError && <p className="mt-3 text-sm text-rose-600">{deleteError}</p>}
+                <div className="mt-6 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    className="rounded-md px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"
+                    onClick={() => {
+                      if (deleteBusy) return;
+                      closeDeleteModal();
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={
+                      deleteBusy
+                      || !deleteReason
+                      || (!managedByGoogle && deletePassword.trim().length === 0)
+                    }
+                    className="rounded-md bg-[#DC2626] px-4 py-2 text-sm font-semibold text-white hover:bg-[#B91C1C] disabled:opacity-60"
+                    onClick={handleConfirmDeleteAccount}
+                  >
+                    {deleteBusy ? "Please wait..." : "Delete account"}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

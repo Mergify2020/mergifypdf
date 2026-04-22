@@ -1,4 +1,5 @@
 export type BillingPlanTier = "essential_plus" | "signature_pro";
+export type BillingStatusPresentation = "none" | "active" | "trialing" | "past_due" | "unpaid";
 
 export const BILLING_PRICE_IDS: Record<BillingPlanTier, { monthly: string; annual: string }> = {
   essential_plus: {
@@ -27,6 +28,20 @@ const PRICE_ID_TO_TIER: Record<string, BillingPlanTier> = Object.entries(BILLING
 export function getPlanTierFromPriceId(priceId: string | null | undefined): BillingPlanTier | null {
   if (!priceId) return null;
   return PRICE_ID_TO_TIER[priceId] ?? null;
+}
+
+export function getBillingStatusPresentation(
+  status: string | null | undefined,
+): BillingStatusPresentation {
+  if (
+    status === "active"
+    || status === "trialing"
+    || status === "past_due"
+    || status === "unpaid"
+  ) {
+    return status;
+  }
+  return "none";
 }
 
 type TrialUsageInput = {

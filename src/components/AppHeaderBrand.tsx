@@ -16,11 +16,8 @@ export default function AppHeaderBrand({
   logoDarkSrc,
 }: Props) {
   const pathname = usePathname();
-  const isSignatureExperience = pathname?.startsWith("/signature-center") ?? false;
   const isStudio = pathname?.startsWith("/studio") ?? false;
-  const isPricingPage = pathname === "/pricing";
   const isAccountSettings = pathname?.startsWith("/account") ?? false;
-  const isProjectsPage = pathname?.startsWith("/projects") ?? false;
   const useHardNav = process.env.NODE_ENV === "development" && isStudio;
 
   const handleBrandClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
@@ -39,32 +36,6 @@ export default function AppHeaderBrand({
   const logoHeight = Math.round(baseHeight * scale);
   const lightLogo = logoLightSrc ?? "/logo-wording.2026.2.svg";
   const darkLogo = logoDarkSrc ?? "/Merg.dark-logo.2026.svg";
-
-  if (isSignatureExperience) {
-    return (
-      useHardNav ? (
-        <a href="/projects/all" className="inline-flex items-center gap-2" aria-label="Back to dashboard">
-          <Image
-            src="/Mergify-Sign.svg"
-            alt="Mergify Sign"
-            width={Math.round(152 * scale)}
-            height={Math.round(32 * scale)}
-            priority
-          />
-        </a>
-      ) : (
-        <Link href="/projects/all" className="inline-flex items-center gap-2" aria-label="Back to dashboard">
-          <Image
-            src="/Mergify-Sign.svg"
-            alt="Mergify Sign"
-            width={Math.round(152 * scale)}
-            height={Math.round(32 * scale)}
-            priority
-          />
-        </Link>
-      )
-    );
-  }
 
   return useHardNav ? (
     <a

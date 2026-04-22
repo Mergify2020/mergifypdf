@@ -588,6 +588,17 @@ main[data-login-page] input[type="password"]::-webkit-credentials-auto-fill-butt
   right: 0;
 }
 
+.delete-account-password-field::-ms-reveal,
+.delete-account-password-field::-ms-clear {
+  display: none;
+}
+
+.delete-account-password-field::-webkit-credentials-auto-fill-button {
+  visibility: hidden;
+  position: absolute;
+  right: 0;
+}
+
 main[data-login-page] input[type="password"]:-webkit-autofill,
 main[data-login-page] input[type="password"]:-webkit-autofill:hover,
 main[data-login-page] input[type="password"]:-webkit-autofill:focus {
@@ -1198,6 +1209,19 @@ html.theme-scroll-reveal:not(.dark) ::-webkit-scrollbar-thumb {
 
 .sidebar-collapsed .workspace-content-shell {
   max-width: 1960px;
+}
+
+.signature-center-layout {
+  --sc-tasks-grid: minmax(0, 1.48fr) minmax(0, 0.98fr) minmax(0, 1fr) auto;
+  --sc-requests-grid: minmax(0, 1.55fr) minmax(0, 1.12fr) minmax(0, 0.82fr) auto;
+  --sc-history-grid: minmax(0, 1.34fr) minmax(0, 1fr) auto;
+}
+
+.sidebar-collapsed .signature-center-layout,
+.sidebar-minimized .signature-center-layout {
+  --sc-tasks-grid: minmax(0, 1.85fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+  --sc-requests-grid: minmax(0, 1.7fr) minmax(0, 1.08fr) minmax(0, 0.82fr) auto;
+  --sc-history-grid: minmax(0, 1.45fr) minmax(0, 1fr) auto;
 }
 
 .workspace-content-swap-out {
