@@ -257,7 +257,6 @@ export default function SignatureRequestsTable() {
                         {request.primaryRecipientName}
                       </div>
                       <div>{renderStatusCell(request)}</div>
-                      <div className="text-xs text-slate-500">{request.updated}</div>
                     </div>
                     <div className="pt-0.5">
                       <button

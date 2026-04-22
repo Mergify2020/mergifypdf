@@ -55,6 +55,7 @@ export async function POST(req: Request) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const userId = session.user.id;
 
   const providers = session.user.providers ?? [];
   const hasCredentialsAccess = providers.length === 0 || providers.includes("credentials");
@@ -72,7 +73,7 @@ export async function POST(req: Request) {
   }
 
   const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
+    where: { id: userId },
     select: {
       email: true,
       password: true,
@@ -111,15 +112,15 @@ export async function POST(req: Request) {
     );
   }
 
-  if (hasCredentialsAccess && !user.password) {
-    return NextResponse.json(
-      { error: "Set a password before deleting your account." },
-      { status: 400 }
-    );
-  }
-
   if (hasCredentialsAccess) {
-    const matches = await bcrypt.compare(password, user.password);
+    const storedPassword = user.password;
+    if (!storedPassword) {
+      return NextResponse.json(
+        { error: "Set a password before deleting your account." },
+        { status: 400 }
+      );
+    }
+    const matches = await bcrypt.compare(password, storedPassword);
     if (!matches) {
       return NextResponse.json({ error: "The password you entered is incorrect." }, { status: 400 });
     }
@@ -127,7 +128,7 @@ export async function POST(req: Request) {
 
   await prisma.accountDeletionRecord.create({
     data: {
-      userId: session.user.id,
+      userId,
       email: user.email,
       reason,
       reasonDetail: null,
@@ -139,7 +140,7 @@ export async function POST(req: Request) {
   });
 
   const projectKeys = await prisma.project.findMany({
-    where: { userId: session.user.id },
+    where: { userId },
     select: {
       pdfKey: true,
       previewKey: true,
@@ -160,7 +161,7 @@ export async function POST(req: Request) {
       }
     } catch (error) {
       console.error("[account/delete] Failed to delete R2 objects before account removal", {
-        userId: session.user.id,
+        userId,
         error,
       });
       return NextResponse.json(
@@ -171,31 +172,31 @@ export async function POST(req: Request) {
   }
 
   await prisma.$transaction(async (tx) => {
-    await tx.session.deleteMany({ where: { userId: session.user.id } });
-    await tx.account.deleteMany({ where: { userId: session.user.id } });
-    await tx.resetToken.deleteMany({ where: { userId: session.user.id } });
-    await tx.project.deleteMany({ where: { userId: session.user.id } });
+    await tx.session.deleteMany({ where: { userId } });
+    await tx.account.deleteMany({ where: { userId } });
+    await tx.resetToken.deleteMany({ where: { userId } });
+    await tx.project.deleteMany({ where: { userId } });
     await tx.verificationToken.deleteMany({
-      where: { identifier: { contains: session.user.id } },
+      where: { identifier: { contains: userId } },
     });
-    await tx.user.deleteMany({ where: { id: session.user.id } });
+    await tx.user.deleteMany({ where: { id: userId } });
   });
 
   const remainingUser = await prisma.user.findUnique({
-    where: { id: session.user.id },
+    where: { id: userId },
     select: { id: true, email: true },
   });
   if (remainingUser) {
     await prisma.$transaction(async (tx) => {
-      await tx.session.deleteMany({ where: { userId: session.user.id } });
-      await tx.account.deleteMany({ where: { userId: session.user.id } });
-      await tx.resetToken.deleteMany({ where: { userId: session.user.id } });
-      await tx.project.deleteMany({ where: { userId: session.user.id } });
+      await tx.session.deleteMany({ where: { userId } });
+      await tx.account.deleteMany({ where: { userId } });
+      await tx.resetToken.deleteMany({ where: { userId } });
+      await tx.project.deleteMany({ where: { userId } });
       await tx.verificationToken.deleteMany({
-        where: { identifier: { contains: session.user.id } },
+        where: { identifier: { contains: userId } },
       });
       await tx.user.update({
-        where: { id: session.user.id },
+        where: { id: userId },
         data: {
           email: null,
           name: null,
@@ -219,7 +220,7 @@ export async function POST(req: Request) {
       });
     });
     console.warn("[account/delete] User row remained after delete; anonymized fallback applied", {
-      userId: session.user.id,
+      userId,
       email: remainingUser.email,
     });
   }
