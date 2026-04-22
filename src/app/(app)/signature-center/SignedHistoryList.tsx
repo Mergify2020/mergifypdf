@@ -88,18 +88,26 @@ const SIGNED_HISTORY: SignedHistoryItem[] = [
 export default function SignedHistoryList() {
   const visibleRowCount = useVisibleSignatureHistoryRows();
   const visibleHistory = SIGNED_HISTORY.slice(0, Math.min(visibleRowCount, SIGNED_HISTORY.length));
+  const mobileVisibleHistory = SIGNED_HISTORY.slice(0, 5);
 
   return (
     <>
-      <section className="md:hidden">
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:hidden md:p-5">
         <div className="flex items-center justify-between gap-3">
           <p className="text-xl font-semibold tracking-tight text-slate-900">
             Signed History
           </p>
+          <Link
+            href="#sent-requests"
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+          >
+            <span>View all history</span>
+            <ArrowRight className="h-4 w-4 shrink-0" strokeWidth={2.5} aria-hidden />
+          </Link>
         </div>
 
         <div className="mt-4 divide-y divide-slate-100">
-          {visibleHistory.map((item) => (
+          {mobileVisibleHistory.map((item) => (
             <div
               key={item.id}
               className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2 py-4"
@@ -111,26 +119,25 @@ export default function SignedHistoryList() {
                 <p className="truncate text-[13px] leading-tight text-slate-500">
                   {item.documentType}
                 </p>
-                <p className="truncate text-[13px] leading-tight text-slate-500">
-                  {item.projectName}
-                </p>
               </div>
-              <div className="flex items-start gap-1 pt-0.5 justify-self-end">
-                <div className="flex flex-col items-start">
+              <div className="flex items-start gap-2 pt-0.5 justify-self-end">
+                <div className="flex flex-col items-end text-right">
                   <span className="inline-flex items-center gap-1.5 text-[14px] font-medium leading-none text-emerald-600">
                     <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden />
                     Signed
                   </span>
                   <p className="text-[13px] leading-tight text-slate-500">{item.signedOn}</p>
                 </div>
-                <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" aria-hidden />
+                <span className="inline-flex h-8 w-8 items-center justify-center text-slate-500">
+                  <ArrowRight className="h-4 w-4 shrink-0 stroke-[2.5]" aria-hidden />
+                </span>
               </div>
             </div>
           ))}
         </div>
       </section>
 
-      <section className="hidden rounded-xl border border-slate-200 bg-white p-5 shadow-sm xl:block xl:self-start">
+      <section className="hidden rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:block xl:self-start">
         <div className="flex items-center justify-between gap-3">
           <p className="text-xl font-semibold tracking-tight text-slate-900">
             Signed History

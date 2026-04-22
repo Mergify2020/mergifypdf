@@ -70,7 +70,7 @@ export default function TasksList({ tasks, nowMs }: TasksListProps) {
 
   return (
     <>
-      <section className="md:hidden">
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:hidden md:p-5">
         <div className="flex items-center justify-between gap-3">
           <p className="text-xl font-semibold tracking-tight text-slate-900">
             Tasks
@@ -84,7 +84,7 @@ export default function TasksList({ tasks, nowMs }: TasksListProps) {
           </Link>
         </div>
 
-        <div className="mt-4 flex flex-col">
+        <div className="mt-4 flex flex-col md:mt-5">
           {visibleTasks.map((task, index) => {
             const isVoidedBySender = task.status === "Voided by sender";
             const showReviewAction = !isVoidedBySender && task.status !== "Completed";

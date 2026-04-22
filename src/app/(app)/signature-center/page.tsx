@@ -83,32 +83,17 @@ export default async function SignatureCenterPage() {
 
                   <main className="flex min-h-0 flex-1 flex-col gap-6 pt-6">
                     <section
-                      className="page-fade-in flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overflow-x-hidden overscroll-contain px-1 py-1 pb-24 md:gap-6 md:pb-1"
+                      className="page-fade-in flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overflow-x-hidden overscroll-contain px-1 py-1 pb-16 md:gap-6 md:pb-1"
                       style={{ animationDelay: "40ms" }}
                     >
-                      <div className="md:hidden">
+                      <div className="md:hidden flex flex-col gap-4">
                         <TasksList tasks={tasks} nowMs={nowMs} />
-
-                        <div className="my-4 h-px bg-slate-200/80" />
-
-                        <section className="py-1">
-                          <p className="text-xl font-semibold tracking-tight text-slate-900">
-                            Sent Requests
-                          </p>
-                          <div className="mt-4">
-                            <SignatureRequestsTable />
-                          </div>
-                        </section>
-
-                        <div className="my-4 h-px bg-slate-200/80" />
-
-                        <section className="py-1">
-                          <SignedHistoryList />
-                        </section>
+                        <SignatureRequestsTable />
+                        <SignedHistoryList />
                       </div>
 
                       <div className="hidden md:block">
-                        <div className="grid min-h-0 gap-4 xl:grid-cols-[minmax(0,1.32fr)_minmax(0,0.68fr)] xl:items-start xl:gap-6">
+                        <div className="grid min-h-0 grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.32fr)_minmax(0,0.68fr)] xl:items-start xl:gap-6">
                           <div className="flex min-h-0 flex-col gap-4">
                             <TasksList tasks={tasks} nowMs={nowMs} />
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PendingWorkspaceFile } from "@/components/useWorkspaceFilePreloader";
 
 type Props = {
@@ -21,6 +21,7 @@ export default function WorkspaceLaunchLoadingState({
   variant = "fullscreen",
 }: Props) {
   const [progress, setProgress] = useState(0);
+  const progressRef = useRef(0);
   const [ellipsisFrame, setEllipsisFrame] = useState(0);
   const ellipsisFrames = ["", ".", "..", "..."];
 
@@ -28,18 +29,14 @@ export default function WorkspaceLaunchLoadingState({
     if (complete) {
       let frameId = 0;
       const start = performance.now();
-      let initialProgress = 0;
-
-      setProgress((current) => {
-        initialProgress = current;
-        return current;
-      });
+      const initialProgress = progressRef.current;
 
       const tick = () => {
         const elapsed = performance.now() - start;
-        const duration = 720;
+        const duration = 360;
         const eased = Math.min(1, elapsed / duration);
         const next = initialProgress + (1 - initialProgress) * (1 - Math.pow(1 - eased, 3));
+        progressRef.current = next;
         setProgress(next);
         if (eased < 1) {
           frameId = window.requestAnimationFrame(tick);
@@ -64,11 +61,12 @@ export default function WorkspaceLaunchLoadingState({
         next = (elapsed / 700) * 0.32;
       } else if (elapsed < 1800) {
         next = 0.32 + ((elapsed - 700) / 1100) * 0.38;
-      } else {
-        const tail = 1 - Math.exp(-(elapsed - 1800) / 1200);
-        next = 0.7 + tail * 0.2;
-      }
-      setProgress(Math.min(next, 0.9));
+        } else {
+          const tail = 1 - Math.exp(-(elapsed - 1800) / 1200);
+          next = 0.7 + tail * 0.2;
+        }
+      progressRef.current = Math.min(next, 0.9);
+      setProgress(progressRef.current);
       frameId = window.requestAnimationFrame(tick);
     };
 
@@ -82,7 +80,7 @@ export default function WorkspaceLaunchLoadingState({
     if (!complete) return;
     const timeoutId = window.setTimeout(() => {
       onCompleteVisualReady?.();
-    }, 860);
+    }, 320);
     return () => {
       window.clearTimeout(timeoutId);
     };

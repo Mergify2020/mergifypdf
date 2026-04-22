@@ -6020,18 +6020,11 @@ const timer =
           import.meta.url,
         ).toString();
 
-        const loadPromises = sources.slice(startIdx).map((src, offset) =>
-          loadPdfSource(src, startIdx + offset, pdfjsLib)
-        );
-        const results = await Promise.all(loadPromises);
-        if (cancelled) return;
-
-        const newPages: PageItem[] = [];
-        results.forEach((result) => {
-          if (!result) return;
+        const makePages = (result: NonNullable<Awaited<ReturnType<typeof loadPdfSource>>>) => {
+          const pagesForSource: PageItem[] = [];
           pdfDocumentCacheRef.current.set(result.srcIdx, result.pdf);
           for (let pageIdx = 0; pageIdx < result.pageCount; pageIdx += 1) {
-            newPages.push({
+            pagesForSource.push({
               id: buildPageId(result.storageId, pageIdx),
               srcIdx: result.srcIdx,
               pageIdx,
@@ -6044,22 +6037,40 @@ const timer =
               height: result.height,
             });
           }
-        });
+          return pagesForSource;
+        };
 
+        const appendPages = (incomingPages: PageItem[]) => {
+          if (incomingPages.length === 0) return;
+          setPages((prev) => {
+            const existing = new Set(prev.map((page) => page.id));
+            const nextPages = incomingPages.filter((page) => !existing.has(page.id));
+            return nextPages.length > 0 ? [...prev, ...nextPages] : prev;
+          });
+        };
+
+        const firstSource = sources[startIdx];
+        if (!firstSource) {
+          if (isInitialLoad) setLoading(false);
+          return;
+        }
+
+        const firstResult = await loadPdfSource(firstSource, startIdx, pdfjsLib);
         if (cancelled) return;
 
+        const firstPages = makePages(firstResult);
         if (isInitialLoad) {
           const savedOrder = savedPageOrderRef.current;
-          const orderedNewPages: PageItem[] =
+          const orderedFirstPages: PageItem[] =
             savedOrder.length > 0
               ? savedOrder
-                  .map((ref) => newPages.find((page) => page.srcIdx === ref.srcIdx && page.pageIdx === ref.pageIdx))
+                  .map((ref) => firstPages.find((page) => page.srcIdx === ref.srcIdx && page.pageIdx === ref.pageIdx))
                   .filter((page): page is PageItem => Boolean(page))
-              : newPages;
+              : firstPages;
           setPages((prev) => {
             const merged = restoringPreviewCacheRef.current
-              ? mergePageListPreserveOrder(prev, orderedNewPages)
-              : mergePageList(prev, orderedNewPages);
+              ? mergePageListPreserveOrder(prev, orderedFirstPages)
+              : mergePageList(prev, orderedFirstPages);
             const initialCount = getInitialPreviewRenderCount(
               merged.length,
               merged.length > LARGE_DOC_PAGE_THRESHOLD
@@ -6067,16 +6078,30 @@ const timer =
             pendingInitialRenderRef.current = merged.slice(0, initialCount);
             return merged;
           });
-        } else if (newPages.length > 0) {
-          setPages((prev) => {
-            const existing = new Set(prev.map((page) => page.id));
-            const appended = newPages.filter((page) => !existing.has(page.id));
-            return appended.length > 0 ? [...prev, ...appended] : prev;
-          });
+        } else {
+          appendPages(firstPages);
         }
 
         renderedSourcesRef.current = sources.length;
         if (isInitialLoad) setLoading(false);
+
+        const remainingSources = sources.slice(startIdx + 1);
+        if (remainingSources.length === 0) return;
+
+        void (async () => {
+          const remainingResults = await Promise.allSettled(
+            remainingSources.map((src, offset) => loadPdfSource(src, startIdx + 1 + offset, pdfjsLib))
+          );
+          if (cancelled) return;
+
+          const remainingPages: PageItem[] = [];
+          remainingResults.forEach((result) => {
+            if (result.status !== "fulfilled" || !result.value) return;
+            remainingPages.push(...makePages(result.value));
+          });
+
+          appendPages(remainingPages);
+        })();
       } catch (e) {
         console.error(e);
         if (!cancelled) setError("Could not render previews (file may be encrypted or corrupted).");

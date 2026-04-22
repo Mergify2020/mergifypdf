@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { ArrowRight, Ban, CheckCircle2, FileSignature, Info } from "lucide-react";
 import { useVisibleSignatureRows } from "./useVisibleSignatureRows";
@@ -130,6 +131,27 @@ export default function SignatureRequestsTable() {
     );
   }
 
+  function renderMobileSettledStatus(request: SignatureRequest) {
+    const { isCompleted, isVoided } = getRequestProgress(request);
+    const formattedSentOn = formatSentOn(request.sentAt);
+    const label = isCompleted ? "Completed" : isVoided ? "Voided" : "Sent";
+    const colorClass = isCompleted ? "text-emerald-600" : "text-rose-600";
+
+    return (
+      <div className="flex flex-col items-end text-right">
+        <span className={`inline-flex items-center gap-1.5 text-[14px] font-medium leading-none ${colorClass}`}>
+          {isCompleted ? (
+            <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden />
+          ) : (
+            <Ban className="h-4 w-4 shrink-0" aria-hidden />
+          )}
+          {label}
+        </span>
+        <p className="text-[13px] leading-tight text-slate-500">{formattedSentOn}</p>
+      </div>
+    );
+  }
+
   const visibleRequests = requests ?? [];
   const requestsToShow = visibleRequests.slice(0, Math.min(visibleRequestCount, visibleRequests.length));
 
@@ -216,8 +238,21 @@ export default function SignatureRequestsTable() {
 
   return (
     <section className="mt-0">
-      <div className="xl:hidden">
-        <div className="divide-y divide-slate-100">
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:hidden md:p-5">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xl font-semibold tracking-tight text-slate-900">
+            Sent Requests
+          </p>
+          <Link
+            href="#sent-requests"
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+          >
+            <span>View all requests</span>
+            <ArrowRight className="h-4 w-4 shrink-0" strokeWidth={2.5} aria-hidden />
+          </Link>
+        </div>
+
+        <div className="mt-4 divide-y divide-slate-100">
           {showEmptyState
               ? (
                 <div className="flex flex-col items-center gap-3 py-10 text-center text-sm text-slate-500">
@@ -253,12 +288,10 @@ export default function SignatureRequestsTable() {
                       {request.projectName ? (
                         <div className="truncate text-xs text-slate-500">{request.projectName}</div>
                       ) : null}
-                      <div className="truncate text-xs text-slate-500">
-                        {request.primaryRecipientName}
-                      </div>
-                      <div>{renderStatusCell(request)}</div>
+                      {getRequestProgress(request).isPending ? <div>{renderStatusCell(request)}</div> : null}
                     </div>
-                    <div className="pt-0.5">
+                    <div className="flex items-start gap-2 pt-0.5">
+                      {!getRequestProgress(request).isPending ? renderMobileSettledStatus(request) : null}
                       <button
                         type="button"
                         onClick={() => setActiveRequest(request)}
@@ -274,7 +307,7 @@ export default function SignatureRequestsTable() {
         </div>
       </div>
 
-      <div className="hidden xl:block">
+      <div className="hidden md:block">
         <div className="overflow-hidden">
           <div className="divide-y divide-slate-100">
             {showEmptyState
