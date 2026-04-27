@@ -21,6 +21,13 @@ import {
   rgb,
   LineCapStyle,
   degrees,
+  pushGraphicsState,
+  popGraphicsState,
+  clip,
+  endPath,
+  rectangle,
+  translate,
+  rotateDegrees,
   StandardFonts,
   type PDFFont,
 } from "pdf-lib";
@@ -193,6 +200,8 @@ type TextAnnotation = {
   textSizePt?: number;
   richTextHtml?: string;
   lineSpacing?: number;
+  textAlign?: "left" | "center" | "right" | "justify";
+  sourceType?: "manual";
 };
 type TextFont =
   | "Inter"
@@ -4771,9 +4780,16 @@ const timer =
 	          });
 	          setShapesByPage(normalized);
 	        }
-	        if (data.textAnnotations) {
-	          setTextAnnotations(data.textAnnotations);
-	        }
+        if (data.textAnnotations) {
+          setTextAnnotations(
+            Object.fromEntries(
+              Object.entries(data.textAnnotations).map(([pageId, list]) => [
+                pageId,
+                list.filter((annotation) => (annotation as { sourceType?: string }).sourceType !== "pdf-text"),
+              ])
+            )
+          );
+        }
         if (typeof data.textSizePt === "number") {
           setTextSize(data.textSizePt);
         } else if (typeof data.textSize === "number") {
@@ -6114,6 +6130,10 @@ const timer =
       cancelled = true;
     };
   }, [sources]);
+
+  useEffect(() => {
+    return;
+  }, [pages]);
 
   useEffect(() => {
     if (pages.length === 0) {
@@ -9526,6 +9546,7 @@ const timer =
   function autoExpandTextAnnotation(pageId: string, id: string) {
     const element = textNodeRefs.current.get(id);
     if (!element) return;
+    const annotationMatch = findTextAnnotationById(id);
     const plainText = element.textContent?.replace(/[\u200b\u2060]/g, "").trim() ?? "";
     if (!plainText) return;
     const node = previewNodeMap.current.get(pageId);
@@ -11060,6 +11081,7 @@ const timer =
                 locked: false,
                 textSizePt: textSize,
                 lineSpacing: DEFAULT_TEXT_LINE_SPACING,
+                sourceType: "manual",
               },
             ],
           };
@@ -11577,6 +11599,7 @@ const timer =
             rotation: 0,
             textSizePt: textSize,
             lineSpacing: DEFAULT_TEXT_LINE_SPACING,
+            sourceType: "manual",
           },
         ],
       };
@@ -11857,8 +11880,13 @@ const timer =
         const defaultTextColor = rgb(defaultTextColorValue.r, defaultTextColorValue.g, defaultTextColorValue.b);
         for (const annotation of pageTexts) {
           const content = annotation.text;
-          if (!content || content === TEXT_PLACEHOLDER) continue;
+          if (!content) continue;
+          if (content === TEXT_PLACEHOLDER) continue;
           const boxWidth = (annotation.width ?? 0.14) * pageWidth;
+          const boxHeight = Math.max(1, (annotation.height ?? 0.06) * pageHeight);
+          const boxLeft = annotation.x * pageWidth;
+          const boxTop = pageHeight - annotation.y * pageHeight;
+          const boxBottom = boxTop - boxHeight;
           const padding = Math.min(6, boxWidth * 0.05);
           const x = annotation.x * pageWidth + padding;
           const startY = pageHeight - annotation.y * pageHeight - padding;
@@ -11869,7 +11897,8 @@ const timer =
           const runs = extractRichTextRuns(html, baseSize);
           const lines = splitRunsIntoLines(runs);
           const rotation = annotation.rotation ?? 0;
-          const rotationRadians = (rotation * Math.PI) / 180;
+          const exportRotation = -rotation;
+          const rotationRadians = (exportRotation * Math.PI) / 180;
           const variants = new Set<TextFontVariant>();
           runs.forEach((run) => {
             variants.add(resolveFontVariant(!!run.bold, !!run.italic));
@@ -11877,6 +11906,17 @@ const timer =
           for (const variant of variants) {
             await getFontForVariant(variant);
           }
+          const boxCenterX = boxLeft + boxWidth / 2;
+          const boxCenterY = boxBottom + boxHeight / 2;
+          copied.pushOperators(
+            pushGraphicsState(),
+            rectangle(0, 0, pageWidth, pageHeight),
+            clip(),
+            endPath(),
+            translate(boxCenterX, boxCenterY),
+            rotateDegrees(exportRotation),
+            translate(-boxCenterX, -boxCenterY)
+          );
           lines.forEach((line, lineIndex) => {
             if (line.length === 0) {
               cursorY -= baseSize * lineSpacing;
@@ -11932,7 +11972,6 @@ const timer =
                   width: runWidthAdjusted,
                   height: lineHeight,
                   color: rgb(highlightValue.r, highlightValue.g, highlightValue.b),
-                  rotate: degrees(rotation),
                 });
               }
               if (shouldJustify && spaceCount > 0) {
@@ -11949,7 +11988,6 @@ const timer =
                       font: runFont,
                       color: runColor,
                       maxWidth,
-                      rotate: degrees(rotation),
                     });
                     cursorX += runFont.widthOfTextAtSize(segment, run.sizePt);
                   }
@@ -11962,25 +12000,23 @@ const timer =
                   font: runFont,
                   color: runColor,
                   maxWidth,
-                  rotate: degrees(rotation),
                 });
                 cursorX += runWidth;
               }
               if (run.underline) {
-                const lineOrigin = { x: runStartX, y: cursorY };
                 const decorationThickness = Math.max(0.5, lineHeight / 14);
                 const underlineY = cursorY - lineHeight * 0.1;
-                const start = rotatePoint({ x: runStartX, y: underlineY }, lineOrigin, rotationRadians);
-                const end = rotatePoint(
-                  { x: runStartX + runWidthAdjusted, y: underlineY },
-                  lineOrigin,
-                  rotationRadians
-                );
-                copied.drawLine({ start, end, thickness: decorationThickness, color: runColor });
+                copied.drawLine({
+                  start: { x: runStartX, y: underlineY },
+                  end: { x: runStartX + runWidthAdjusted, y: underlineY },
+                  thickness: decorationThickness,
+                  color: runColor,
+                });
               }
             });
             cursorY -= lineHeight - baseSize;
           });
+          copied.pushOperators(popGraphicsState());
         }
       }
       out.addPage(copied);

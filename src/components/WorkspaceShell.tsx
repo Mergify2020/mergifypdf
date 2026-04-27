@@ -78,11 +78,11 @@ const AccountSettingsPage = dynamic(
 const WORKSPACE_META_KEY = "mpdf:files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
 const MAX_PENDING_FILES = 12;
-const WORKSPACE_LAUNCH_MIN_MS = 4000;
+const WORKSPACE_LAUNCH_MIN_MS = 1400;
 const WORKSPACE_LAUNCH_HOLD_FOR_TESTING = false;
 const WORKSPACE_LAUNCH_MODAL_EXIT_MS = 180;
 const WORKSPACE_LAUNCH_FILE_FLASH_MS = 130;
-const WORKSPACE_LAUNCH_PANEL_COMPLETE_MS = 980;
+const WORKSPACE_LAUNCH_PANEL_COMPLETE_MS = 420;
 const WORKSPACE_LAUNCH_OVERLAY_COMPLETE_HOLD_MS = 320;
 const WORKSPACE_LAUNCH_OVERLAY_EXIT_MS = 260;
 const WORKSPACE_LAUNCH_OVERLAY_STORAGE_KEY = "mpdf:workspace-launch-overlay";
@@ -90,8 +90,8 @@ const STARTUP_OVERLAY_KEY = "mpdf:startup-overlay";
 const STARTUP_OVERLAY_CONTEXT_KEY = "mpdf:startup-overlay-context";
 const EXISTING_PROJECT_OVERLAY_STORAGE_KEY = "mpdf:existing-project-overlay";
 const EXISTING_PROJECT_OVERLAY_EXIT_MS = 220;
-const EXISTING_PROJECT_OVERLAY_MIN_VISIBLE_MS = 1500;
-const EXISTING_PROJECT_OVERLAY_MAX_WAIT_MS = 4000;
+const EXISTING_PROJECT_OVERLAY_MIN_VISIBLE_MS = 700;
+const EXISTING_PROJECT_OVERLAY_MAX_WAIT_MS = 2200;
 const SIDEBAR_EXPANDED_KEY = "mpdf:sidebar-expanded";
 const STRIPE_STATUS_CACHE_KEY = "mpdf:stripe-status";
 const STRIPE_PLAN_TIER_CACHE_KEY = "mpdf:stripe-plan-tier";
@@ -3184,138 +3184,29 @@ export default function WorkspaceShell({
           ) : null}
           <Suspense
             fallback={
-              showPersistentWorkspaceTopBar ? (
-                <main className="relative z-0 flex-1 lg:z-40">
+              <main className="relative z-0 flex-1 lg:z-40">
+                <div className={`flex w-full ${contentShellWrapperClass}`}>
                   <div
-                className={`flex w-full ${contentShellWrapperClass}`}
-              >
+                    className="workspace-content-shell w-full transition-none 2xl:transition-[max-width] 2xl:duration-300 2xl:ease-[cubic-bezier(0.22,1,0.36,1)]"
+                    style={{ maxWidth: "var(--shell-content-width)" }}
+                  >
                     <div
-                      className="workspace-content-shell w-full transition-none 2xl:transition-[max-width] 2xl:duration-300 2xl:ease-[cubic-bezier(0.22,1,0.36,1)]"
-                      style={{ maxWidth: "var(--shell-content-width)" }}
-                    >
-                      <div
-                        className="box-border w-full bg-[#F1F4F9] pt-3 pb-0 transition-[height] duration-300 ease-out dark:bg-[#252525] md:pt-6 md:pb-0 md:[height:calc(var(--workspace-vh,100dvh)-var(--home-banner-offset,0px)-var(--home-topbar-offset,0px)-var(--workspace-content-bottom-subtract,var(--workspace-frame-gutter,48px)))]"
-                      >
-                        <div className="h-full min-h-0 w-full">
-                          <div
-                            className={`grid h-full w-full min-h-0 gap-[24px] ${
-                              isAllProjectsRoute ? "" : "xl:grid-cols-[minmax(0,1fr)_280px] xl:items-start"
-                            }`}
-                          >
-                            <div className="relative z-40 flex h-full min-h-0 w-full flex-col px-0 pt-0 md:pl-1 md:pr-0">
-                              <div className="flex h-full min-h-0 w-full flex-col">
-                                <section className="mt-0 flex w-full min-h-0 flex-1 flex-col">
-                                  <div
-                                    className="box-border flex min-h-0 flex-1 flex-col rounded-xl border-[1.5px] border-gray-200 bg-white p-4 shadow-sm dark:border-[#3A3A3A] dark:bg-[#323232] dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] sm:p-5"
-                                    style={{
-                                      height:
-                                        "calc(100% - var(--workspace-projects-bottom-gap, 0px))",
-                                    }}
-                                  >
-                                    <div className="flex items-center justify-between gap-4">
-                                      <h2 className="whitespace-nowrap text-lg font-semibold text-[#1F2A37] min-[560px]:text-xl dark:text-zinc-100 md:text-2xl">
-                                        {isAllProjectsRoute ? "All projects" : "Recent projects"}
-                                      </h2>
-                                      {isAllProjectsRoute ? (
-                                        <div className="flex items-center gap-2">
-                                          <div className="h-[34px] w-[110px] rounded-full bg-slate-100 skeleton-shimmer dark:bg-[#2B2B2B]/70" />
-                                          <div className="h-[34px] w-[96px] rounded-full bg-slate-100 skeleton-shimmer dark:bg-[#2B2B2B]/70" />
-                                        </div>
-                                      ) : null}
-                                    </div>
-                                    <div
-                                      className="recent-projects-container mt-6 flex-1 overflow-y-hidden overflow-x-hidden"
-                                      style={{ paddingRight: 6, paddingLeft: 6, paddingBottom: 6 }}
-                                    >
-                                      {fallbackProjectCardCount > 0 ? (
-                                        <div className="recent-projects-grid projects-grid mt-2 grid w-full max-w-[1880px] items-start gap-4 sm:gap-6">
-                                          {Array.from({ length: fallbackProjectCardCount }).map((_, index) => (
-                                            <div key={`home-refresh-skeleton-${index}`} className="flex w-full flex-col text-left">
-                                              <div className="relative rounded-[10px] bg-[#F9FAFC] dark:bg-[#323232]/60">
-                                                <div className="relative m-[3px] aspect-square w-[calc(100%-6px)] overflow-hidden rounded-[10px] border border-[rgba(0,0,0,0.06)] bg-[#EEF1F5] dark:border-[#3A3A3A] dark:bg-[#2B2B2B]/70">
-                                                  <div className="absolute left-3 top-3 h-8 w-8 rounded-[10px] border-[3px] border-slate-200 bg-white shadow-md dark:border-[#3A3A3A] dark:bg-[#323232]" />
-                                                  <div className="absolute right-3 top-3 flex h-8 w-[74px] items-center rounded-[10px] bg-white/95 px-2 shadow-[0_4px_12px_rgba(15,23,42,0.12)] dark:bg-[#323232]/95">
-                                                    <div className="h-5 w-5 rounded-full bg-slate-100 skeleton-shimmer dark:bg-[#2B2B2B]/70" />
-                                                    <div className="ml-2 h-5 w-5 rounded-full bg-slate-100 skeleton-shimmer dark:bg-[#2B2B2B]/70" />
-                                                  </div>
-                                                  <div className="absolute inset-0 rounded-[10px] skeleton-shimmer opacity-90" />
-                                                </div>
-                                              </div>
-                                              <div className="mt-2 space-y-1">
-                                                <div className="h-5 w-[72%] rounded-full bg-slate-100 skeleton-shimmer dark:bg-[#2B2B2B]/70" />
-                                                <div className="h-3.5 w-[48%] rounded-full bg-slate-100 skeleton-shimmer dark:bg-[#2B2B2B]/70" />
-                                              </div>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      ) : null}
-                                    </div>
-                                    {!isAllProjectsRoute ? (
-                                      <div className="mt-4 flex items-center">
-                                        <Link
-                                          href="/projects/all"
-                                          className="inline-flex items-center rounded-full border-2 border-[#E6EBF2] px-4 py-2 text-xs font-semibold text-[#1F2A37] transition hover:border-[#D8DEE8] active:translate-y-[1px] active:scale-[0.98] active:bg-[#2563EB]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#51bdff]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F1F4F9] dark:border-[#3A3A3A] dark:text-zinc-100 dark:hover:border-[#4A4A4A] dark:active:bg-white/10 dark:focus-visible:ring-offset-[#252525]"
-                                        >
-                                          View all projects
-                                        </Link>
-                                      </div>
-                                    ) : null}
-                                  </div>
-                                </section>
-                              </div>
-                            </div>
-                            {!isAllProjectsRoute ? (
-                              <aside
-                                className="relative z-10 hidden w-full min-h-0 overflow-visible xl:block"
-                                style={{ marginTop: "var(--home-right-column-offset, 240px)" }}
-                              >
-                                <div className="flex min-h-0 flex-col gap-[24px] overflow-visible">
-                                  <div className="rounded-xl border-[1.5px] border-gray-200 bg-white px-4 py-4 shadow-sm dark:border-[#3A3A3A] dark:bg-[#323232] dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)]">
-                                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#6B7280] dark:text-zinc-400">
-                                      SIGN DOCUMENTS
-                                    </p>
-                                    <div className="mt-3 space-y-2">
-                                      <div className="h-9 rounded-lg bg-slate-100 dark:bg-[#2B2B2B]/70" />
-                                      <div className="h-9 rounded-lg bg-slate-100 dark:bg-[#2B2B2B]/70" />
-                                      <div className="h-9 rounded-lg bg-slate-100 dark:bg-[#2B2B2B]/70" />
-                                    </div>
-                                  </div>
-                                  <div className="rounded-xl border-[1.5px] border-gray-200 bg-white px-4 py-4 shadow-sm dark:border-[#3A3A3A] dark:bg-[#323232] dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)]">
-                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#6B7280] dark:text-zinc-400">
-                                      Activity
-                                    </p>
-                                    <div className="mt-3 h-24 rounded-xl border border-dashed border-[#E6EBF2] bg-[#F7F9FC] dark:border-[#3A3A3A] dark:bg-[#323232]/60" />
-                                  </div>
-                                </div>
-                              </aside>
-                            ) : null}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                      aria-hidden
+                      className="box-border w-full bg-[#F1F4F9] pt-3 pb-0 dark:bg-[#252525] md:pt-6 md:pb-0"
+                      style={{
+                        height:
+                          "calc(var(--workspace-vh,100dvh) - var(--home-banner-offset,0px) - var(--home-topbar-offset,0px) - var(--workspace-content-bottom-subtract,var(--workspace-frame-gutter,48px)))",
+                      }}
+                    />
                   </div>
-                </main>
-              ) : null
+                </div>
+              </main>
             }
           >
             <main className="relative z-0 flex-1 lg:z-40">
-              <div
-                className={`flex w-full ${
-                  contentShellWrapperClass
-                }`}
-              >
+              <div className={`flex w-full ${contentShellWrapperClass}`}>
                 <div
-                  className={`workspace-content-shell w-full transition-none 2xl:transition-[max-width] 2xl:duration-300 2xl:ease-[cubic-bezier(0.22,1,0.36,1)] ${
-                    contentSwapOut
-                      ? "workspace-content-swap-out"
-                      : contentSwapIn
-                        ? "workspace-content-swap-in"
-                        : workspaceLaunchOverlayOpen
-                          ? workspaceLaunchOverlayExiting
-                            ? "workspace-launch-underlay-reveal"
-                            : "workspace-launch-underlay-prep"
-                          : ""
-                  }`}
+                  className="workspace-content-shell w-full transition-none 2xl:transition-[max-width] 2xl:duration-300 2xl:ease-[cubic-bezier(0.22,1,0.36,1)]"
                   style={{ maxWidth: "var(--shell-content-width)" }}
                   onClickCapture={handleExistingProjectLinkCapture}
                 >

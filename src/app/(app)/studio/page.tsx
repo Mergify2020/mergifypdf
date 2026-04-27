@@ -14,8 +14,6 @@ export default async function StudioPage({
   searchParams?: Promise<StudioSearchParams>;
 }) {
   const resolved = ((await searchParams) ?? {}) as StudioSearchParams;
-  const session = await getServerSessionSafe();
-
   const projectParam = resolved.project;
   const projectId =
     typeof projectParam === "string"
@@ -24,13 +22,16 @@ export default async function StudioPage({
         ? projectParam[0]
         : null;
 
-  if (session?.user && projectId) {
-    const owned = await prisma.project.findFirst({
-      where: { id: projectId, userId: session.user.id },
-      select: { id: true },
-    });
-    if (!owned) {
-      redirect("/projects");
+  if (projectId) {
+    const session = await getServerSessionSafe(250);
+    if (session?.user) {
+      const owned = await prisma.project.findFirst({
+        where: { id: projectId, userId: session.user.id },
+        select: { id: true },
+      });
+      if (!owned) {
+        redirect("/projects");
+      }
     }
   }
 
