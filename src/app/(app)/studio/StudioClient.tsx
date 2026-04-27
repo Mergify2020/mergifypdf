@@ -1850,6 +1850,34 @@ function mergePageListPreserveOrder(current: PageItem[], nextPages: PageItem[]) 
   return [...preserved, ...appended];
 }
 
+function sortPagesBySavedOrder(
+  pages: PageItem[],
+  savedOrder: Array<{ srcIdx: number; pageIdx: number; id?: string }>
+) {
+  if (pages.length === 0 || savedOrder.length === 0) return pages;
+  const orderById = new Map<string, number>();
+  const orderBySourcePage = new Map<string, number>();
+  savedOrder.forEach((ref, index) => {
+    if (ref.id) {
+      orderById.set(ref.id, index);
+    }
+    orderBySourcePage.set(`${ref.srcIdx}:${ref.pageIdx}`, index);
+  });
+  return [...pages]
+    .map((page, index) => {
+      const byId = orderById.get(page.id);
+      const bySourcePage = orderBySourcePage.get(`${page.srcIdx}:${page.pageIdx}`);
+      const orderIndex = typeof byId === "number" ? byId : typeof bySourcePage === "number" ? bySourcePage : null;
+      return {
+        page,
+        index,
+        orderIndex: orderIndex ?? Number.MAX_SAFE_INTEGER,
+      };
+    })
+    .sort((a, b) => a.orderIndex - b.orderIndex || a.index - b.index)
+    .map((entry) => entry.page);
+}
+
 
 /** One sortable thumbnail tile */
 function SortableThumb({
@@ -2269,6 +2297,7 @@ function WorkspaceClient() {
   const startupOverlayShownRef = useRef(false);
   const startupOverlayProjectRef = useRef<string | null>(projectParam);
   const workspaceReadySettledRef = useRef(false);
+  const [workspaceViewportReady, setWorkspaceViewportReady] = useState(false);
   const existingProjectOverlayHideSentRef = useRef(false);
   const [loadedPreviewIds, setLoadedPreviewIds] = useState<Set<string>>(() => new Set());
   const [loadedThumbIds, setLoadedThumbIds] = useState<Set<string>>(() => new Set());
@@ -2285,6 +2314,7 @@ function WorkspaceClient() {
       startupOverlayProjectRef.current = projectParam;
       startupOverlayShownRef.current = false;
       workspaceReadySettledRef.current = false;
+      setWorkspaceViewportReady(false);
       existingProjectOverlayHideSentRef.current = false;
       setShowStartupOverlay(false);
       setLoadedPreviewIds(new Set());
@@ -6108,7 +6138,8 @@ const timer =
           setPages((prev) => {
             const existing = new Set(prev.map((page) => page.id));
             const nextPages = incomingPages.filter((page) => !existing.has(page.id));
-            return nextPages.length > 0 ? [...prev, ...nextPages] : prev;
+            if (nextPages.length === 0) return prev;
+            return sortPagesBySavedOrder([...prev, ...nextPages], savedPageOrderRef.current);
           });
         };
 
@@ -6134,12 +6165,13 @@ const timer =
             const merged = restoringPreviewCacheRef.current
               ? mergePageListPreserveOrder(prev, orderedFirstPages)
               : mergePageList(prev, orderedFirstPages);
+            const orderedMerged = sortPagesBySavedOrder(merged, savedPageOrderRef.current);
             const initialCount = getInitialPreviewRenderCount(
-              merged.length,
-              merged.length > LARGE_DOC_PAGE_THRESHOLD
+              orderedMerged.length,
+              orderedMerged.length > LARGE_DOC_PAGE_THRESHOLD
             );
-            pendingInitialRenderRef.current = merged.slice(0, initialCount);
-            return merged;
+            pendingInitialRenderRef.current = orderedMerged.slice(0, initialCount);
+            return orderedMerged;
           });
         } else {
           appendPages(firstPages);
@@ -6591,7 +6623,7 @@ const timer =
       hasExistingOverlayMarker = false;
     }
     if (!hasExistingOverlayMarker) return;
-    if (!sourcesHydrated || loading || pages.length === 0) return;
+    if (!sourcesHydrated || loading || pages.length === 0 || !workspaceViewportReady) return;
     existingProjectOverlayHideSentRef.current = true;
     const timeoutId = window.setTimeout(() => {
       window.dispatchEvent(new Event("workspace-content-ready"));
@@ -6600,7 +6632,7 @@ const timer =
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [loading, pages.length, sourcesHydrated]);
+  }, [loading, pages.length, sourcesHydrated, workspaceViewportReady]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -6612,7 +6644,7 @@ const timer =
       hasExistingOverlayMarker = false;
     }
     if (!hasExistingOverlayMarker) return;
-    if (!error && (loading || !sourcesHydrated)) return;
+    if (!error && (loading || !sourcesHydrated || !workspaceViewportReady)) return;
     existingProjectOverlayHideSentRef.current = true;
     const timeoutId = window.setTimeout(() => {
       window.dispatchEvent(new Event("workspace-content-ready"));
@@ -6621,7 +6653,7 @@ const timer =
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [error, loading, sourcesHydrated]);
+  }, [error, loading, sourcesHydrated, workspaceViewportReady]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -6638,7 +6670,7 @@ const timer =
       existingProjectOverlayHideSentRef.current = true;
       window.dispatchEvent(new Event("workspace-content-ready"));
       window.dispatchEvent(new Event("workspace-launch-overlay-hide"));
-    }, 5000);
+    }, 12000);
     return () => {
       window.clearTimeout(timeoutId);
     };
@@ -9800,6 +9832,7 @@ const timer =
       const previewRendered = Boolean(
         activePreviewPage?.preview &&
           loadedPreviewIds.has(activePreviewPage.id) &&
+          pageRenderStatusRef.current.get(activePreviewPage.id) === "high" &&
           previewRect &&
           previewRect.width > 120 &&
           previewRect.height > 160,
@@ -9821,6 +9854,7 @@ const timer =
 
       if (stableFrames >= 3) {
         workspaceReadySettledRef.current = true;
+        setWorkspaceViewportReady(true);
         window.setTimeout(() => {
           if (!cancelled) {
             window.dispatchEvent(new Event("workspace-content-ready"));
@@ -13804,7 +13838,9 @@ const timer =
 	                    animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.97 }}
                   transition={VIEW_TRANSITION}
-			                  className="editor-shell mx-auto flex h-full min-h-0 w-full flex-1 flex-col gap-6 overflow-hidden px-0"
+			                  className={`editor-shell mx-auto flex h-full min-h-0 w-full flex-1 flex-col gap-6 overflow-hidden px-0 transition-opacity duration-150 ${
+                        workspaceViewportReady || showStartupOverlay ? "opacity-100" : "opacity-0 pointer-events-none"
+                      }`}
                 >
 
 				                    <div className="flex h-full min-h-0 w-full items-stretch gap-0 overflow-hidden">

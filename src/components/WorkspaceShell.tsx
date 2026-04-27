@@ -328,6 +328,25 @@ export default function WorkspaceShell({
   const contentSwapSafetyRef = useRef<number | null>(null);
   const pendingContentSwapPathRef = useRef<string | null>(null);
   const [billingPortalLoading, setBillingPortalLoading] = useState(false);
+
+  const closeExistingProjectOverlayNow = useCallback(() => {
+    if (existingProjectOverlayHideTimerRef.current !== null) {
+      window.clearTimeout(existingProjectOverlayHideTimerRef.current);
+      existingProjectOverlayHideTimerRef.current = null;
+    }
+    if (existingProjectOverlaySafetyTimerRef.current !== null) {
+      window.clearTimeout(existingProjectOverlaySafetyTimerRef.current);
+      existingProjectOverlaySafetyTimerRef.current = null;
+    }
+    try {
+      window.sessionStorage?.removeItem(EXISTING_PROJECT_OVERLAY_STORAGE_KEY);
+    } catch {
+      // ignore storage write failures
+    }
+    setExistingProjectOverlayOpen(false);
+    setExistingProjectOverlayExiting(false);
+    existingProjectOverlayShownAtRef.current = 0;
+  }, []);
   const [homeStripeStatusOverride, setHomeStripeStatusOverride] = useState<string | null | undefined>(undefined);
   const [homeBillingBannerDismissed, setHomeBillingBannerDismissed] = useState(false);
   const [homeBillingBannerMounted, setHomeBillingBannerMounted] = useState(false);
@@ -1201,7 +1220,7 @@ export default function WorkspaceShell({
     }
     existingProjectOverlaySafetyTimerRef.current = window.setTimeout(() => {
       existingProjectOverlaySafetyTimerRef.current = null;
-      window.dispatchEvent(new Event("workspace-launch-overlay-hide"));
+      closeExistingProjectOverlayNow();
     }, EXISTING_PROJECT_OVERLAY_MAX_WAIT_MS);
     return () => {
       if (existingProjectOverlaySafetyTimerRef.current !== null) {
@@ -1209,7 +1228,7 @@ export default function WorkspaceShell({
         existingProjectOverlaySafetyTimerRef.current = null;
       }
     };
-  }, [existingProjectOverlayExiting, existingProjectOverlayOpen, isStudioRoute]);
+  }, [existingProjectOverlayExiting, existingProjectOverlayOpen, isStudioRoute, closeExistingProjectOverlayNow]);
   useEffect(() => {
     const leftStudio = wasStudioRouteRef.current && !isStudioRoute;
     if (!leftStudio || !existingProjectOverlayOpen) return;
@@ -1351,17 +1370,8 @@ export default function WorkspaceShell({
     const leftStudio = wasStudioRouteRef.current && !isStudioRoute;
     wasStudioRouteRef.current = isStudioRoute;
     if (!leftStudio) return;
-    if (existingProjectOverlayHideTimerRef.current !== null) {
-      window.clearTimeout(existingProjectOverlayHideTimerRef.current);
-      existingProjectOverlayHideTimerRef.current = null;
-    }
-    if (existingProjectOverlaySafetyTimerRef.current !== null) {
-      window.clearTimeout(existingProjectOverlaySafetyTimerRef.current);
-      existingProjectOverlaySafetyTimerRef.current = null;
-    }
-    setExistingProjectOverlayOpen(false);
-    setExistingProjectOverlayExiting(false);
-  }, [isStudioRoute]);
+    closeExistingProjectOverlayNow();
+  }, [isStudioRoute, closeExistingProjectOverlayNow]);
 
   useEffect(() => {
     const pendingPath = pendingContentSwapPathRef.current;
