@@ -413,7 +413,7 @@ body::-webkit-scrollbar-track {
 
 @keyframes workspace-launch-screen-enter {
   0% {
-    opacity: 0;
+    opacity: 1;
   }
   100% {
     opacity: 1;
@@ -434,6 +434,7 @@ body::-webkit-scrollbar-track {
 }
 
 .workspace-launch-screen {
+  opacity: 1;
   animation: workspace-launch-screen-enter 240ms ease-out both;
 }
 
@@ -443,7 +444,7 @@ body::-webkit-scrollbar-track {
 
 @keyframes workspace-handoff-overlay-enter {
   0% {
-    opacity: 0;
+    opacity: 1;
   }
   100% {
     opacity: 1;

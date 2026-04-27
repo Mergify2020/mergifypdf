@@ -108,22 +108,49 @@ export default function HomeProjectsSearch({
 
   useEffect(() => {
     if (!ownerKey) return;
+    const cached = getProjectsSummaryCache(ownerKey);
+    if (cached) {
+      setProjectsState(mapProjectsFromSummary(cached));
+    }
+  }, [ownerKey]);
+
+  useEffect(() => {
+    if (!ownerKey) return;
+
+    const routeProjectsSummary = mapProjectsToSummary(projects);
 
     if (showAllProjects) {
-      const routeProjectsSummary = mapProjectsToSummary(projects);
       const cached = getProjectsSummaryCache(ownerKey);
-      if (!cached || routeProjectsSummary.length >= cached.length) {
+      if (!cached) {
         setProjectsSummaryCache(ownerKey, routeProjectsSummary);
+      } else {
+        const cachedIds = new Set(cached.map((project) => project.id));
+        const hasNewIds = routeProjectsSummary.some((project) => !cachedIds.has(project.id));
+        if (hasNewIds) {
+          const merged = [
+            ...routeProjectsSummary,
+            ...cached.filter((project) => !routeProjectsSummary.some((item) => item.id === project.id)),
+          ];
+          setProjectsSummaryCache(ownerKey, merged);
+        }
       }
-      return;
     }
 
     const cached = getProjectsSummaryCache(ownerKey);
 
     // Seed shared cache from route payload, but avoid shrinking a fuller cached list.
-    const routeProjectsSummary = mapProjectsToSummary(projects);
-    if (!cached || routeProjectsSummary.length >= cached.length) {
+    if (!cached) {
       setProjectsSummaryCache(ownerKey, routeProjectsSummary);
+    } else {
+      const cachedIds = new Set(cached.map((project) => project.id));
+      const hasNewIds = routeProjectsSummary.some((project) => !cachedIds.has(project.id));
+      if (hasNewIds) {
+        const merged = [
+          ...routeProjectsSummary,
+          ...cached.filter((project) => !routeProjectsSummary.some((item) => item.id === project.id)),
+        ];
+        setProjectsSummaryCache(ownerKey, merged);
+      }
     }
 
     const unsubscribe = subscribeProjectsSummary((update) => {

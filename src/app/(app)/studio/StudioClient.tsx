@@ -33,6 +33,11 @@ import {
 } from "pdf-lib";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  getProjectsSummaryCache,
+  setProjectsSummaryCache,
+  type ProjectsSummaryProject,
+} from "@/lib/projectsSummaryCache";
+import {
   Highlighter,
   Minus,
   Plus,
@@ -1031,7 +1036,7 @@ async function getPdfAccessTarget(res: Response) {
   return { url: data.url, revoke: false };
 }
 
-function useProjects(enabled = true) {
+function useProjects(ownerKey: string | null, enabled = true) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const projectParam = typeof window !== "undefined" ? searchParams.get("project") : null;
@@ -1103,6 +1108,23 @@ function useProjects(enabled = true) {
               data,
               updatedAt: Date.now(),
             } as CloudProject);
+          if (ownerKey) {
+            const nextSummary: ProjectsSummaryProject = {
+              id: updated.id,
+              name: updated.name,
+              updatedAt: updated.updatedAt ?? updated.createdAt ?? Date.now(),
+              hasPreview: typeof updated.previewUrl === "string" ? updated.previewUrl.length > 0 : false,
+              hasPdf: true,
+              pagesCount: typeof updated.pagesCount === "number" ? updated.pagesCount : null,
+              rotation: 0,
+            };
+            const existingSummary = getProjectsSummaryCache(ownerKey) ?? [];
+            const nextSummaryList = [
+              nextSummary,
+              ...existingSummary.filter((project) => project.id !== nextSummary.id),
+            ];
+            setProjectsSummaryCache(ownerKey, nextSummaryList);
+          }
           setProjects((prev) =>
             prev.map((project) => (project.id === updated.id ? { ...project, ...updated } : project))
           );
@@ -1127,6 +1149,23 @@ function useProjects(enabled = true) {
               createdAt: Date.now(),
               updatedAt: Date.now(),
             } as CloudProject);
+          if (ownerKey) {
+            const nextSummary: ProjectsSummaryProject = {
+              id: created.id,
+              name: created.name,
+              updatedAt: created.updatedAt ?? created.createdAt ?? Date.now(),
+              hasPreview: typeof created.previewUrl === "string" ? created.previewUrl.length > 0 : false,
+              hasPdf: true,
+              pagesCount: typeof created.pagesCount === "number" ? created.pagesCount : null,
+              rotation: 0,
+            };
+            const existingSummary = getProjectsSummaryCache(ownerKey) ?? [];
+            const nextSummaryList = [
+              nextSummary,
+              ...existingSummary.filter((project) => project.id !== nextSummary.id),
+            ];
+            setProjectsSummaryCache(ownerKey, nextSummaryList);
+          }
           setProjects((prev) => [created, ...prev]);
           setCurrentProjectId(created.id);
           router.replace(`/studio?project=${encodeURIComponent(created.id)}`);
@@ -1139,7 +1178,7 @@ function useProjects(enabled = true) {
       }
       return null;
     },
-    [currentProjectId, router]
+    [currentProjectId, ownerKey, router]
   );
 
   return {
@@ -2113,7 +2152,8 @@ function WorkspaceClient() {
   const isGuest = !authSession?.user;
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { saveProject, savingProject, currentProjectId } = useProjects(Boolean(authSession?.user));
+  const studioOwnerKey = authSession?.user?.id ?? authSession?.user?.email ?? null;
+  const { saveProject, savingProject, currentProjectId } = useProjects(studioOwnerKey, Boolean(authSession?.user));
   const projectParam = searchParams.get("project");
   const projectKey = projectParam ?? currentProjectId ?? "local";
   const [showAuthGate, setShowAuthGate] = useState(false);
@@ -4391,6 +4431,8 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   const pendingInsertedPageRef = useRef<{ afterId: string; newId: string } | null>(null);
   const pendingInsertedSourceRef = useRef<{ afterId: string; sourceIds: string[] } | null>(null);
   const pendingCloudSaveRef = useRef(false);
+  const hasUnsavedWorkspaceChangesRef = useRef(false);
+  const [hasUnsavedWorkspaceChanges, setHasUnsavedWorkspaceChanges] = useState(false);
   const savedPageOrderRef = useRef<Array<{ srcIdx: number; pageIdx: number; id?: string }>>([]);
   const lastProjectKeyRef = useRef<string | null>(null);
   const pendingInitialRenderRef = useRef<PageItem[]>([]);
@@ -4454,6 +4496,11 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     const session = getSessionStorage();
     session?.removeItem(workspaceFilesKey(null));
     session?.removeItem(workspacePreviewCacheKey("local"));
+  }, []);
+  const markWorkspaceDirty = useCallback(() => {
+    if (hasUnsavedWorkspaceChangesRef.current) return;
+    hasUnsavedWorkspaceChangesRef.current = true;
+    setHasUnsavedWorkspaceChanges(true);
   }, []);
   useEffect(() => {
     pagesRef.current = pages;
@@ -7013,6 +7060,7 @@ const timer =
 
   async function handleAddBlankPageAfter(pageId: string) {
     suppressNextAutoZoomRef.current = 2;
+    markWorkspaceDirty();
     const storageId = crypto.randomUUID();
     const doc = await PDFDocument.create();
     doc.addPage([612, 792]);
@@ -7089,6 +7137,7 @@ const timer =
 
   async function handleAddBlankPageBefore(pageId: string) {
     suppressNextAutoZoomRef.current = 2;
+    markWorkspaceDirty();
     const storageId = crypto.randomUUID();
     const doc = await PDFDocument.create();
     doc.addPage([612, 792]);
@@ -7165,6 +7214,7 @@ const timer =
 
   async function handleDuplicatePage(page: PageItem) {
     suppressNextAutoZoomRef.current = 2;
+    markWorkspaceDirty();
     const src = sources[page.srcIdx];
     if (!src) return;
     const stored = await readFileBlob(src.storageId);
@@ -8631,6 +8681,7 @@ const timer =
       if (!stroke || cancel || stroke.points.length < 2) {
         return;
       }
+      markWorkspaceDirty();
       const smoothedRaw = smoothStrokePoints(stroke.points, stroke.tool);
       const smoothed = stroke.tool === "highlight" ? snapHighlightSegments(smoothedRaw) : smoothedRaw;
       const highlight: HighlightStroke = {
@@ -8651,7 +8702,7 @@ const timer =
       setHighlightHistory((prev) => [...prev, { type: "add", pageId: stroke.pageId, highlight: cloneStroke(highlight) }]);
       setRedoHighlightHistory([]);
     },
-    []
+    [markWorkspaceDirty]
   );
 
   useEffect(() => {
@@ -9227,11 +9278,12 @@ const timer =
         naturalHeight: height,
         createdAt: Date.now(),
       };
+      markWorkspaceDirty();
       setSavedSignatures((prev) => [...prev, entry]);
       setSignatureNameError(null);
       return entry;
     },
-    [loadImageDimensions, savedSignatures]
+    [loadImageDimensions, markWorkspaceDirty, savedSignatures]
   );
 
   const closeSignatureHub = useCallback(() => {
@@ -9281,6 +9333,7 @@ const timer =
         rotation: 0,
         status: "draft",
       };
+      markWorkspaceDirty();
       setSignaturePlacements((prev) => {
         const existing = prev[pageId] ?? [];
         return { ...prev, [pageId]: [...existing, placement] };
@@ -9288,7 +9341,7 @@ const timer =
       setActiveSignaturePlacementId(placement.id);
       setPendingSignatureForPlacement(null);
     },
-    [pages]
+    [markWorkspaceDirty, pages]
   );
 
   const applySignatureToActivePage = useCallback(
@@ -9327,6 +9380,7 @@ const timer =
       const offsetY = startPoint.y - placement.y;
       const pointerId = startEvent.pointerId;
       const handleMove = (event: PointerEvent) => {
+        markWorkspaceDirty();
         if (event.pointerId !== pointerId) return;
         const point = getPageNormalizedPoint(pageId, event.clientX, event.clientY);
         if (!point) return;
@@ -9359,7 +9413,7 @@ const timer =
       window.addEventListener("pointercancel", handleUp);
       setSignatureDrag({ pageId, id: placementId, offsetX, offsetY });
     },
-    [getPageNormalizedPoint, signaturePlacements]
+    [getPageNormalizedPoint, markWorkspaceDirty, signaturePlacements]
   );
 
   const startSignatureResize = useCallback(
@@ -9373,6 +9427,7 @@ const timer =
       if (!startPoint) return;
       const pointerId = startEvent.pointerId;
       const handleMove = (event: PointerEvent) => {
+        markWorkspaceDirty();
         if (event.pointerId !== pointerId) return;
         const point = getPageNormalizedPoint(pageId, event.clientX, event.clientY);
         if (!point) return;
@@ -9412,7 +9467,7 @@ const timer =
         startY: startPoint.y,
       });
     },
-    [getPageNormalizedPoint, signaturePlacements]
+    [getPageNormalizedPoint, markWorkspaceDirty, signaturePlacements]
   );
 
   const startSignatureRotate = useCallback(
@@ -9432,6 +9487,7 @@ const timer =
       const pointerId = startEvent.pointerId;
 
       const handleMove = (event: PointerEvent) => {
+        markWorkspaceDirty();
         if (event.pointerId !== pointerId) return;
         const angle = Math.atan2(event.clientY - centerY, event.clientX - centerX);
         let delta = angle - lastAngle;
@@ -9467,7 +9523,7 @@ const timer =
       window.addEventListener("pointercancel", handleUp);
       setSignatureRotate({ pageId, id: placementId, pointerId, centerX, centerY, baseRotation });
     },
-    [signaturePlacements]
+    [markWorkspaceDirty, signaturePlacements]
   );
 
   const addSignatureToPage = useCallback((payload: SignaturePlacement) => {
@@ -9479,6 +9535,7 @@ const timer =
     (pageId: string, placementId: string) => {
       const placement = signaturePlacements[pageId]?.find((p) => p.id === placementId);
       if (!placement) return;
+      markWorkspaceDirty();
       setSignaturePlacements((prev) => {
         const existing = prev[pageId] ?? [];
         const updated: SignaturePlacement[] = existing.map((item) =>
@@ -9489,16 +9546,17 @@ const timer =
       addSignatureToPage(placement);
       setPendingSignatureForPlacement(null);
     },
-    [addSignatureToPage, signaturePlacements]
+    [addSignatureToPage, markWorkspaceDirty, signaturePlacements]
   );
 
   const handleDeleteSignaturePlacement = useCallback((pageId: string, placementId: string) => {
+    markWorkspaceDirty();
     setSignaturePlacements((prev) => {
       const existing = prev[pageId] ?? [];
       return { ...prev, [pageId]: existing.filter((item) => item.id !== placementId) };
     });
     setActiveSignaturePlacementId((prev) => (prev === placementId ? null : prev));
-  }, []);
+  }, [markWorkspaceDirty]);
 
   function registerTextNode(id: string) {
     return (node: HTMLDivElement | null) => {
@@ -9525,6 +9583,7 @@ const timer =
     id: string,
     updater: (annotation: TextAnnotation) => TextAnnotation
   ) {
+    markWorkspaceDirty();
     setTextAnnotations((prev) => {
       const existing = prev[pageId] ?? [];
       const updated = existing.map((item) => (item.id === id ? updater(item) : item));
@@ -9640,6 +9699,7 @@ const timer =
   }, []);
 
   function deleteTextAnnotation(pageId: string, id: string) {
+    markWorkspaceDirty();
     setTextAnnotations((prev) => {
       const existing = prev[pageId] ?? [];
       return { ...prev, [pageId]: existing.filter((item) => item.id !== id) };
@@ -9649,6 +9709,7 @@ const timer =
 
   const duplicateTextAnnotation = useCallback((pageId: string, id: string) => {
     const newId = crypto.randomUUID();
+    markWorkspaceDirty();
     setTextAnnotations((prev) => {
       const existing = prev[pageId] ?? [];
       const current = existing.find((item) => item.id === id);
@@ -9672,10 +9733,11 @@ const timer =
       };
     });
     setFocusedTextId(newId);
-  }, []);
+  }, [markWorkspaceDirty]);
 
   const duplicateShape = useCallback((pageId: string, id: string) => {
     const newId = crypto.randomUUID();
+    markWorkspaceDirty();
     setShapesByPage((prev) => {
       const existing = prev[pageId] ?? [];
       const current = existing.find((shape) => shape.id === id);
@@ -9699,7 +9761,7 @@ const timer =
     });
     setFocusedShapeId(newId);
     setFocusedShapePageId(pageId);
-  }, []);
+  }, [markWorkspaceDirty]);
 
   const itemsIds = useMemo(() => pages.map((p) => p.id), [pages]);
   const projectedThumbOrder = useMemo(() => {
@@ -10496,6 +10558,7 @@ const timer =
   useEffect(() => {
     if (!authSession?.user) return;
     if (!hasWorkspaceData) return;
+    if (!hasUnsavedWorkspaceChanges) return;
     if (draggingText || resizingText || draggingShape || draftHighlight) return;
     const ownerId = authSession.user.id ?? authSession.user.email ?? null;
     if (!ownerId) return;
@@ -10524,6 +10587,7 @@ const timer =
       resizingText,
       draggingShape,
       draftHighlight,
+      hasUnsavedWorkspaceChanges,
     ]);
 
   const computeBaseScale = useCallback(() => {
@@ -10824,6 +10888,7 @@ const timer =
       setDraftShape(null);
       return;
     }
+    markWorkspaceDirty();
     const shape: ShapeAnnotation = {
       id: crypto.randomUUID(),
       type: draftShape.type,
@@ -11062,6 +11127,7 @@ const timer =
           : Math.min(draftTextBox.startY, draftTextBox.currentY);
         const annotationId = crypto.randomUUID();
         const pageIndex = pages.findIndex((p) => p.id === pageId);
+        markWorkspaceDirty();
         setTextAnnotations((prev) => {
           const existing = prev[pageId] ?? [];
           return {
@@ -11620,6 +11686,7 @@ const timer =
     const oldIndex = pages.findIndex((x) => x.id === active.id);
     const newIndex = pages.findIndex((x) => x.id === over.id);
     if (oldIndex < 0 || newIndex < 0) return;
+    markWorkspaceDirty();
     setPages((prev) => arrayMove(prev, oldIndex, newIndex));
   }
 
@@ -12380,6 +12447,7 @@ const timer =
 
   function handleRotatePage(pageId: string) {
     rotationSaveRef.current = true;
+    markWorkspaceDirty();
     setPages((prev) =>
       prev.map((page) =>
         page.id === pageId
@@ -12393,6 +12461,7 @@ const timer =
   }
 
 	  function handleDeletePage(pageId: string) {
+	    markWorkspaceDirty();
 	    const current = pagesRef.current;
 	    const index = current.findIndex((page) => page.id === pageId);
 	    if (index === -1) return;
@@ -12425,6 +12494,7 @@ const timer =
 	  }
 
 	  function moveThumbPage(fromIndex: number, delta: 1 | -1) {
+	    markWorkspaceDirty();
 	    setPages((prev) => {
 	      if (prev.length === 0) return prev;
 	      const toIndex = clamp(fromIndex + delta, 0, prev.length - 1);
@@ -12445,6 +12515,7 @@ const timer =
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!hasWorkspaceData) return;
+    if (!hasUnsavedWorkspaceChanges) return;
     if (!savingProject) return;
     const handler = (event: BeforeUnloadEvent) => {
       event.preventDefault();
@@ -12452,7 +12523,7 @@ const timer =
     };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
-  }, [hasWorkspaceData, savingProject]);
+  }, [hasWorkspaceData, hasUnsavedWorkspaceChanges, savingProject]);
 
   useEffect(() => {
     if (!highlightMode && !penMode) {
@@ -12839,6 +12910,7 @@ const timer =
   }
 
   function handleUndoHighlight() {
+    markWorkspaceDirty();
     setHighlightHistory((prev) => {
       if (prev.length === 0) return prev;
       const last = prev[prev.length - 1];
@@ -12899,6 +12971,7 @@ const timer =
   }
 
   function handleRedoHighlight() {
+    markWorkspaceDirty();
     setRedoHighlightHistory((prev) => {
       if (prev.length === 0) return prev;
       const last = prev[prev.length - 1];
@@ -12960,6 +13033,7 @@ const timer =
 
   function handleClearHighlights() {
     if (!hasAnyAnnotations) return;
+    markWorkspaceDirty();
     setDraftHighlight(null);
     setDraftShape(null);
     setDeleteMode(false);
@@ -12985,6 +13059,7 @@ const timer =
   }
 
   function handleDeleteStroke(pageId: string, strokeId: string) {
+    markWorkspaceDirty();
     let removed: HighlightStroke | null = null;
     setHighlights((map) => {
       const list = map[pageId];
@@ -13061,7 +13136,7 @@ const timer =
     >
       {showStartupOverlay ? (
         startupOverlayVariant === "existing" ? (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center bg-white opacity-0 animate-[mpdf-startup-overlay-fade_0.24s_ease-out_forwards] dark:bg-[#0F1117]">
+          <div className="fixed inset-0 z-[120] flex items-center justify-center bg-white opacity-100 dark:bg-[#0F1117]">
             <div className="pointer-events-none flex flex-col items-center text-center">
               <div
                 className="h-10 w-10 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700 dark:border-[#2A2A31] dark:border-t-slate-200"
@@ -13074,8 +13149,8 @@ const timer =
             </div>
           </div>
         ) : (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/50 opacity-0 backdrop-blur-sm animate-[mpdf-startup-overlay-fade_0.24s_ease-out_forwards] dark:bg-slate-950/70">
-            <div className="w-full max-w-md rounded-[28px] border border-white/60 bg-white/85 px-8 py-7 text-center opacity-0 shadow-[0_28px_80px_rgba(15,23,42,0.35)] backdrop-blur-xl animate-[page-enter_0.28s_ease-out_forwards] dark:border-[#2A2A31] dark:bg-[#1C1C1F]/90">
+          <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/50 opacity-100 backdrop-blur-sm dark:bg-slate-950/70">
+            <div className="w-full max-w-md rounded-[28px] border border-white/60 bg-white/85 px-8 py-7 text-center opacity-100 shadow-[0_28px_80px_rgba(15,23,42,0.35)] backdrop-blur-xl dark:border-[#2A2A31] dark:bg-[#1C1C1F]/90">
               <p className="text-[15px] font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-zinc-400">
                 MergifyPDF
               </p>

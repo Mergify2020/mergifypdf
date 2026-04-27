@@ -122,12 +122,17 @@ export async function refreshProjectsSummary(
     return inFlight;
   }
 
+  const requestStartedAt = Date.now();
   const refreshPromise = (async () => {
   try {
     const res = await fetch("/api/projects?summary=1", { cache: "no-store" });
     if (!res.ok) return existing?.projects ?? null;
     const data = (await res.json()) as { projects?: ProjectsSummaryProject[] };
     if (!Array.isArray(data.projects)) return existing?.projects ?? null;
+    const current = getExistingCacheEntry(ownerKey);
+    if (current && current.fetchedAt > requestStartedAt) {
+      return current.projects;
+    }
     setProjectsSummaryCache(ownerKey, data.projects);
     return data.projects;
   } catch {

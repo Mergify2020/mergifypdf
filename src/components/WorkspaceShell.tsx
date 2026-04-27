@@ -352,6 +352,7 @@ export default function WorkspaceShell({
   const createLaunchFlashTimerRef = useRef<number | null>(null);
   const workspaceLaunchOverlayHideTimerRef = useRef<number | null>(null);
   const workspaceLaunchOverlayCompleteTimerRef = useRef<number | null>(null);
+  const workspaceLaunchOverlaySafetyTimerRef = useRef<number | null>(null);
   const existingProjectOverlayHideTimerRef = useRef<number | null>(null);
   const existingProjectOverlaySafetyTimerRef = useRef<number | null>(null);
   const wasStudioRouteRef = useRef(false);
@@ -434,6 +435,39 @@ export default function WorkspaceShell({
       current || persistedWorkspaceLaunchOverlay.files.length > 0,
     );
   }, []);
+
+  useEffect(() => {
+    if (!workspaceLaunchOverlayOpen) {
+      if (workspaceLaunchOverlaySafetyTimerRef.current !== null) {
+        window.clearTimeout(workspaceLaunchOverlaySafetyTimerRef.current);
+        workspaceLaunchOverlaySafetyTimerRef.current = null;
+      }
+      return;
+    }
+    if (workspaceLaunchOverlaySafetyTimerRef.current !== null) {
+      window.clearTimeout(workspaceLaunchOverlaySafetyTimerRef.current);
+      workspaceLaunchOverlaySafetyTimerRef.current = null;
+    }
+    workspaceLaunchOverlaySafetyTimerRef.current = window.setTimeout(() => {
+      try {
+        window.sessionStorage?.removeItem(WORKSPACE_LAUNCH_OVERLAY_STORAGE_KEY);
+      } catch {
+        // ignore storage write failures
+      }
+      setWorkspaceLaunchOverlayOpen(false);
+      setWorkspaceLaunchOverlayCompleting(false);
+      setWorkspaceLaunchOverlayExiting(false);
+      setWorkspaceLaunchOverlayStartedAtMs(null);
+      setWorkspaceLaunchOverlayFiles([]);
+      workspaceLaunchOverlaySafetyTimerRef.current = null;
+    }, 12000);
+    return () => {
+      if (workspaceLaunchOverlaySafetyTimerRef.current !== null) {
+        window.clearTimeout(workspaceLaunchOverlaySafetyTimerRef.current);
+        workspaceLaunchOverlaySafetyTimerRef.current = null;
+      }
+    };
+  }, [workspaceLaunchOverlayOpen]);
 
   useEffect(() => {
     const nextNameRaw = (session?.user?.name ?? "").trim();
@@ -775,6 +809,9 @@ export default function WorkspaceShell({
       if (workspaceLaunchOverlayCompleteTimerRef.current !== null) {
         window.clearTimeout(workspaceLaunchOverlayCompleteTimerRef.current);
       }
+      if (workspaceLaunchOverlaySafetyTimerRef.current !== null) {
+        window.clearTimeout(workspaceLaunchOverlaySafetyTimerRef.current);
+      }
       if (existingProjectOverlayHideTimerRef.current !== null) {
         window.clearTimeout(existingProjectOverlayHideTimerRef.current);
       }
@@ -845,6 +882,10 @@ export default function WorkspaceShell({
       window.clearTimeout(workspaceLaunchOverlayHideTimerRef.current);
       workspaceLaunchOverlayHideTimerRef.current = null;
     }
+    if (workspaceLaunchOverlaySafetyTimerRef.current !== null) {
+      window.clearTimeout(workspaceLaunchOverlaySafetyTimerRef.current);
+      workspaceLaunchOverlaySafetyTimerRef.current = null;
+    }
     try {
       window.sessionStorage?.setItem(
         WORKSPACE_LAUNCH_OVERLAY_STORAGE_KEY,
@@ -861,6 +902,19 @@ export default function WorkspaceShell({
     setWorkspaceLaunchOverlayCompleting(false);
     setWorkspaceLaunchOverlayExiting(false);
     setWorkspaceLaunchOverlayOpen(true);
+    workspaceLaunchOverlaySafetyTimerRef.current = window.setTimeout(() => {
+      try {
+        window.sessionStorage?.removeItem(WORKSPACE_LAUNCH_OVERLAY_STORAGE_KEY);
+      } catch {
+        // ignore storage write failures
+      }
+      setWorkspaceLaunchOverlayOpen(false);
+      setWorkspaceLaunchOverlayCompleting(false);
+      setWorkspaceLaunchOverlayExiting(false);
+      setWorkspaceLaunchOverlayStartedAtMs(null);
+      setWorkspaceLaunchOverlayFiles([]);
+      workspaceLaunchOverlaySafetyTimerRef.current = null;
+    }, 12000);
   };
 
   const hideWorkspaceLaunchOverlay = () => {
@@ -871,6 +925,10 @@ export default function WorkspaceShell({
     if (workspaceLaunchOverlayHideTimerRef.current !== null) {
       window.clearTimeout(workspaceLaunchOverlayHideTimerRef.current);
       workspaceLaunchOverlayHideTimerRef.current = null;
+    }
+    if (workspaceLaunchOverlaySafetyTimerRef.current !== null) {
+      window.clearTimeout(workspaceLaunchOverlaySafetyTimerRef.current);
+      workspaceLaunchOverlaySafetyTimerRef.current = null;
     }
     setWorkspaceLaunchOverlayCompleting(true);
   };
@@ -895,8 +953,8 @@ export default function WorkspaceShell({
         setWorkspaceLaunchOverlayStartedAtMs(null);
         setWorkspaceLaunchOverlayFiles([]);
         workspaceLaunchOverlayHideTimerRef.current = null;
-      }, WORKSPACE_LAUNCH_OVERLAY_EXIT_MS);
-    }, WORKSPACE_LAUNCH_OVERLAY_COMPLETE_HOLD_MS);
+        }, WORKSPACE_LAUNCH_OVERLAY_EXIT_MS);
+      }, WORKSPACE_LAUNCH_OVERLAY_COMPLETE_HOLD_MS);
   };
 
   useEffect(() => {
