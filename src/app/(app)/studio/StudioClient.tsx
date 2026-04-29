@@ -267,6 +267,17 @@ function getProjectCoverPreview(pages: PageItem[]): string | null {
   return candidate;
 }
 
+function extractProjectRotationFromData(data: unknown): number {
+  if (!data || typeof data !== "object") return 0;
+  const record = data as Record<string, unknown>;
+  const pages = Array.isArray(record.pages) ? record.pages : null;
+  if (!pages || pages.length === 0) return 0;
+  const first = pages[0];
+  if (!first || typeof first !== "object") return 0;
+  const rotation = (first as { rotation?: unknown }).rotation;
+  return typeof rotation === "number" ? normalizeRotation(rotation) : 0;
+}
+
 const TYPED_SIGNATURE_STYLES = [
   { id: "script", label: "Script", fontFamily: "'Segoe Script', 'Comic Sans MS', cursive" },
   { id: "classic", label: "Classic", fontFamily: "'Georgia', 'Times New Roman', serif" },
@@ -1113,10 +1124,13 @@ function useProjects(ownerKey: string | null, enabled = true) {
               id: updated.id,
               name: updated.name,
               updatedAt: updated.updatedAt ?? updated.createdAt ?? Date.now(),
-              hasPreview: typeof updated.previewUrl === "string" ? updated.previewUrl.length > 0 : false,
+              hasPreview:
+                typeof updated.hasPreview === "boolean"
+                  ? updated.hasPreview
+                  : typeof previewUrl === "string" && previewUrl.length > 0,
               hasPdf: true,
               pagesCount: typeof updated.pagesCount === "number" ? updated.pagesCount : null,
-              rotation: 0,
+              rotation: extractProjectRotationFromData(data),
             };
             const existingSummary = getProjectsSummaryCache(ownerKey) ?? [];
             const nextSummaryList = [
@@ -1154,10 +1168,13 @@ function useProjects(ownerKey: string | null, enabled = true) {
               id: created.id,
               name: created.name,
               updatedAt: created.updatedAt ?? created.createdAt ?? Date.now(),
-              hasPreview: typeof created.previewUrl === "string" ? created.previewUrl.length > 0 : false,
+              hasPreview:
+                typeof created.hasPreview === "boolean"
+                  ? created.hasPreview
+                  : typeof previewUrl === "string" && previewUrl.length > 0,
               hasPdf: true,
               pagesCount: typeof created.pagesCount === "number" ? created.pagesCount : null,
-              rotation: 0,
+              rotation: extractProjectRotationFromData(data),
             };
             const existingSummary = getProjectsSummaryCache(ownerKey) ?? [];
             const nextSummaryList = [
@@ -1270,11 +1287,37 @@ function normalizeRotation(rotation?: number) {
   return ((value % 360) + 360) % 360;
 }
 
+function getPageRotationTransform(rotationDegrees: number, contentWidth: number, contentHeight: number) {
+  if (rotationDegrees === 90) {
+    return `translateX(${contentHeight}px) rotate(90deg)`;
+  }
+  if (rotationDegrees === 180) {
+    return `translateX(${contentWidth}px) translateY(${contentHeight}px) rotate(180deg)`;
+  }
+  if (rotationDegrees === 270) {
+    return `translateY(${contentWidth}px) rotate(270deg)`;
+  }
+  return "none";
+}
+
 function formatSignedRotation(rotation?: number) {
   const normalized = normalizeRotation(rotation);
   const rounded = Math.round(normalized);
   if (rounded === 360) return 0;
   return rounded > 180 ? rounded - 360 : rounded;
+}
+
+function snapTextRotation(rotation: number, threshold = 5) {
+  const normalized = normalizeRotation(rotation);
+  const snapTargets = [0, 90, 180, 270, 360];
+  for (const target of snapTargets) {
+    const delta = Math.abs(normalized - target);
+    const wrapDelta = Math.min(delta, 360 - delta);
+    if (wrapDelta <= threshold) {
+      return target === 360 ? 0 : target;
+    }
+  }
+  return normalized;
 }
 
 function normalizeTextSize(value: number) {
@@ -1327,6 +1370,17 @@ function parseFontSize(styleValue: string, fallback: number) {
   return fallback;
 }
 
+function stripInlineFontSizes(element: HTMLElement) {
+  element.querySelectorAll<HTMLElement>("[data-font-size-pt], [style*='font-size']").forEach((node) => {
+    delete node.dataset.fontSizePt;
+    node.style.fontSize = "";
+    const styleAttr = node.getAttribute("style");
+    if (styleAttr && !styleAttr.trim()) {
+      node.removeAttribute("style");
+    }
+  });
+}
+
 function parseLineHeightPx(styleValue: string, fontSizePx: number) {
   if (!styleValue || styleValue === "normal") {
     return fontSizePx * 1.2;
@@ -1359,13 +1413,40 @@ function measureRequiredTextHeightRatio(
   containerRect: DOMRect,
   minRatio = 0.015,
   paddingBufferPx = 6,
-  minPx = 24
+  minPx = 24,
+  measurementHeightPx = containerRect.height
 ) {
-  if (!containerRect.height) return minRatio;
+  if (!measurementHeightPx) return minRatio;
+  const requiredHeightPx = measureTextContentHeightPx(element, minPx, paddingBufferPx);
+  return clamp(Math.ceil(requiredHeightPx) / measurementHeightPx, minRatio, 1);
+}
+
+function measureTextContentHeightPx(element: HTMLElement, minPx = 24, paddingBufferPx = 6) {
+  const measurementElement =
+    typeof document !== "undefined" && document.body
+      ? (() => {
+          const clone = element.cloneNode(true) as HTMLElement;
+          const rect = element.getBoundingClientRect();
+          Object.assign(clone.style, {
+            position: "fixed",
+            left: "-10000px",
+            top: "0",
+            width: `${Math.max(1, rect.width)}px`,
+            height: "auto",
+            minHeight: "0",
+            maxHeight: "none",
+            overflow: "visible",
+            visibility: "hidden",
+            pointerEvents: "none",
+          });
+          document.body.appendChild(clone);
+          return clone;
+        })()
+      : element;
   let contentHeightPx = 0;
   try {
     const range = document.createRange();
-    range.selectNodeContents(element);
+    range.selectNodeContents(measurementElement);
     const rects = range.getClientRects();
     if (rects.length > 0) {
       contentHeightPx = rects[rects.length - 1].bottom - rects[0].top;
@@ -1374,12 +1455,61 @@ function measureRequiredTextHeightRatio(
     contentHeightPx = 0;
   }
   if (!contentHeightPx) {
-    contentHeightPx = element.scrollHeight;
+    contentHeightPx = measurementElement.scrollHeight;
   }
-  const style = window.getComputedStyle(element);
+  const style = window.getComputedStyle(measurementElement);
   const paddingY = (Number.parseFloat(style.paddingTop) || 0) + (Number.parseFloat(style.paddingBottom) || 0);
-  const requiredHeightPx = Math.max(minPx, contentHeightPx + paddingY + paddingBufferPx);
-  return clamp(Math.ceil(requiredHeightPx) / containerRect.height, minRatio, 1);
+  const rangeHeightPx = contentHeightPx + paddingY;
+  const scrollHeightPx = measurementElement.scrollHeight;
+  if (measurementElement !== element) {
+    measurementElement.remove();
+  }
+  return Math.max(minPx, rangeHeightPx, scrollHeightPx) + paddingBufferPx;
+}
+
+function wouldTextInputOverflow(
+  element: HTMLElement,
+  data: string,
+  maxContentPx: number,
+  minPx = 24,
+  paddingBufferPx = 6
+) {
+  if (!data || typeof document === "undefined") return false;
+  const clone = element.cloneNode(true) as HTMLElement;
+  const selection = window.getSelection();
+  if (selection && selection.rangeCount > 0) {
+    const range = selection.getRangeAt(0);
+    if (element.contains(range.commonAncestorContainer)) {
+      const clonedRange = document.createRange();
+      const startPath = getNodePath(element, range.startContainer);
+      const endPath = getNodePath(element, range.endContainer);
+      const cloneStart = resolveNodePath(clone, startPath);
+      const cloneEnd = resolveNodePath(clone, endPath);
+      if (cloneStart && cloneEnd) {
+        clonedRange.setStart(cloneStart, range.startOffset);
+        clonedRange.setEnd(cloneEnd, range.endOffset);
+        clonedRange.deleteContents();
+        clonedRange.insertNode(document.createTextNode(data));
+      }
+    }
+  }
+  return measureTextContentHeightPx(clone, minPx, paddingBufferPx) > maxContentPx + 1;
+}
+
+function getNodePath(root: Node, node: Node) {
+  const path: number[] = [];
+  let current: Node | null = node;
+  while (current && current !== root) {
+    const parent = current.parentNode;
+    if (!parent) return path;
+    path.unshift(Array.prototype.indexOf.call(parent.childNodes, current));
+    current = parent;
+  }
+  return path;
+}
+
+function resolveNodePath(root: Node, path: number[]) {
+  return path.reduce<Node | null>((node, index) => node?.childNodes[index] ?? null, root);
 }
 
 function resolveLineHeightPx(lineHeightValue: string, fontSizePx: number) {
@@ -2434,6 +2564,8 @@ function WorkspaceClient() {
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
 const [highlights, setHighlights] = useState<Record<string, HighlightStroke[]>>({});
 const [textAnnotations, setTextAnnotations] = useState<Record<string, TextAnnotation[]>>({});
+const textAnnotationsRef = useRef<Record<string, TextAnnotation[]>>({});
+textAnnotationsRef.current = textAnnotations;
 const [textBold, setTextBold] = useState(false);
 const [textItalic, setTextItalic] = useState(false);
 const [textUnderline, setTextUnderline] = useState(false);
@@ -2610,6 +2742,12 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     return `mergifypdf:text-colors:${userKey}`;
   }, [authSession?.user?.email, authSession?.user?.name]);
   const [focusedTextId, setFocusedTextId] = useState<string | null>(null);
+  const [focusedTextOverlayRect, setFocusedTextOverlayRect] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null>(null);
   const [activeTextContainerId, setActiveTextContainerId] = useState<string | null>(null);
   const [typingTextId, setTypingTextId] = useState<string | null>(null);
   const typingTextTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -2632,6 +2770,18 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     }
     return textSize;
   }, [focusedTextId, selectionFontSizePt, textAnnotations, textSize]);
+  const defaultTextSizePt = useMemo(() => {
+    const inputSize = Number(textSizeInput);
+    return Number.isFinite(inputSize) ? normalizeTextSize(inputSize) : textSize;
+  }, [textSizeInput, textSize]);
+  const activeTextAlign = useMemo(() => {
+    if (!focusedTextId) return textAlign;
+    for (const list of Object.values(textAnnotations)) {
+      const match = list.find((item) => item.id === focusedTextId);
+      if (match) return match.textAlign ?? textAlign;
+    }
+    return textAlign;
+  }, [focusedTextId, textAlign, textAnnotations]);
   const activeLineSpacing = useMemo(() => {
     if (!focusedTextId) return DEFAULT_TEXT_LINE_SPACING;
     for (const list of Object.values(textAnnotations)) {
@@ -2761,6 +2911,19 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   function focusTextAnnotation(id: string) {
     setFocusedShapeId(null);
     setFocusedShapePageId(null);
+    setSelectMode(false);
+    setDeleteMode(false);
+    setTextMode(true);
+    setPenMode(false);
+    setHighlightMode(false);
+    setShapeMode(false);
+    setToolOptionsCollapsed(false);
+    setDraftHighlight(null);
+    setDraftShape(null);
+    setDraftTextBox(null);
+    setShowSignatureHub(false);
+    setSignaturePanelMode("none");
+    setPendingSignatureForPlacement(null);
     setFocusedTextId(id);
     setActiveTextContainerId(id);
     const node = textNodeRefs.current.get(id);
@@ -2806,14 +2969,21 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   );
 
   const syncTextAnnotationContent = useCallback(
-    (pageId: string, id: string, element: HTMLElement) => {
+    (pageId: string, id: string, element: HTMLElement, options?: { flush?: boolean }) => {
       const html = element.innerHTML.replace(/[\u200b\u2060]/g, "");
       const text = element.innerText.replace(/[\u200b\u2060]/g, "");
-      updateTextAnnotation(pageId, id, (item) => ({
-        ...item,
-                    text: text || "",
-                    richTextHtml: html,
-                  }));
+      const applyContentUpdate = () => {
+        updateTextAnnotation(pageId, id, (item) => ({
+          ...item,
+          text: text || "",
+          richTextHtml: html,
+        }));
+      };
+      if (options?.flush) {
+        flushSync(applyContentUpdate);
+      } else {
+        applyContentUpdate();
+      }
     },
     [updateTextAnnotation]
   );
@@ -3408,7 +3578,10 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         ...item,
         lineSpacing: spacing,
       }));
-      autoExpandTextAnnotation(result.pageId, focusedTextId);
+      autoExpandLastHeightRef.current.delete(`${result.pageId}:${focusedTextId}`);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => autoExpandTextAnnotation(result.pageId, focusedTextId));
+      });
       setLineSpacingMenuOpen(false);
     },
     [autoExpandTextAnnotation, findTextAnnotationById, focusedTextId, updateTextAnnotation]
@@ -3618,8 +3791,6 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       if (!annotation || annotation.locked) return;
       const startPoint = getPageNormalizedPoint(pageId, startEvent.clientX, startEvent.clientY);
       if (!startPoint) return;
-      const pageNode = previewNodeMap.current.get(pageId);
-      const pageRect = pageNode?.getBoundingClientRect();
 
       textDragCleanupRef.current?.();
 
@@ -3631,66 +3802,10 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       };
       const offsetX = anchorPoint.x - annotation.x;
       const offsetY = anchorPoint.y - annotation.y;
-      const displayRotation = normalizeRotation(annotation.rotation ?? 0);
+      const displayRotation = normalizeRotation(
+        (annotation.rotation ?? 0) - (getPageTransformInfo(pageId)?.rotationDegrees ?? 0)
+      );
       const node = textAnnotationRefs.current.get(annotationId);
-      const editorNode = textNodeRefs.current.get(annotationId) ?? null;
-      const contentInsets = (() => {
-        if (!node || !editorNode || !pageRect || !pageRect.width || !pageRect.height) {
-          return { left: 0, right: 0, top: 0, bottom: 0 };
-        }
-        const wrapperRect = node.getBoundingClientRect();
-        const editorStyle = window.getComputedStyle(editorNode);
-        const fontSizePx = Number.parseFloat(editorStyle.fontSize) || 0;
-        const lineHeightPx = resolveLineHeightPx(editorStyle.lineHeight, fontSizePx);
-        const leadingSlackPx = Math.max(0, lineHeightPx - fontSizePx);
-        const paddingInsets = {
-          left: Math.max(0, (Number.parseFloat(editorStyle.paddingLeft) || 0) / pageRect.width),
-          right: Math.max(0, (Number.parseFloat(editorStyle.paddingRight) || 0) / pageRect.width),
-          top: Math.max(0, (Number.parseFloat(editorStyle.paddingTop) || 0) / pageRect.height),
-          bottom: Math.max(0, (Number.parseFloat(editorStyle.paddingBottom) || 0) / pageRect.height),
-        };
-        let contentRect: DOMRect | null = null;
-        try {
-          const range = document.createRange();
-          range.selectNodeContents(editorNode);
-          const rects = Array.from(range.getClientRects());
-          if (rects.length > 0) {
-            let left = rects[0].left;
-            let right = rects[0].right;
-            let top = rects[0].top;
-            let bottom = rects[0].bottom;
-            for (const rect of rects) {
-              left = Math.min(left, rect.left);
-              right = Math.max(right, rect.right);
-              top = Math.min(top, rect.top);
-              bottom = Math.max(bottom, rect.bottom);
-            }
-            contentRect = new DOMRect(left, top, right - left, bottom - top);
-          }
-        } catch {
-          contentRect = null;
-        }
-        if (!contentRect || !contentRect.width || !contentRect.height) {
-          return paddingInsets;
-        }
-        return {
-          left: Math.max(0, (contentRect.left - wrapperRect.left) / pageRect.width),
-          right: Math.max(0, (wrapperRect.right - contentRect.right) / pageRect.width),
-          top: Math.max(
-            0,
-            (contentRect.top - wrapperRect.top - (Number.parseFloat(editorStyle.paddingTop) || 0) - leadingSlackPx / 2) /
-              pageRect.height
-          ),
-          bottom: Math.max(
-            0,
-            (wrapperRect.bottom -
-              contentRect.bottom -
-              (Number.parseFloat(editorStyle.paddingBottom) || 0) -
-              leadingSlackPx / 2) /
-              pageRect.height
-          ),
-        };
-      })();
       if (node) {
         node.style.willChange = "left, top, transform";
         node.style.transition = "none";
@@ -3710,12 +3825,9 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
           if (!latestPoint) return;
           const unclampedX = latestPoint.x - offsetX;
           const unclampedY = latestPoint.y - offsetY;
-          const minX = -contentInsets.left;
-          const maxX = 1 - (startWidth - contentInsets.right);
-          const minY = -contentInsets.top;
-          const maxY = 1 - (startHeight - contentInsets.bottom);
-          const nextX = clamp(unclampedX, minX, maxX);
-          const nextY = clamp(unclampedY, minY, maxY);
+          // Keep the box itself inside the page bounds without shrinking it to fit text content.
+          const nextX = clamp(unclampedX, 0, 1 - startWidth);
+          const nextY = clamp(unclampedY, 0, 1 - startHeight);
           textDragLatestPosRef.current = { x: nextX, y: nextY };
           if (node) {
             node.style.left = `${nextX * 100}%`;
@@ -4138,13 +4250,15 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       const startY = annotation.y;
       const startCenterX = startX + startWidth / 2;
       const startCenterY = startY + startHeight / 2;
-      const rotationRadians = ((annotation.rotation ?? 0) * Math.PI) / 180;
+      const pageRotationDegrees = getPageTransformInfo(pageId)?.rotationDegrees ?? 0;
+      const rotationRadians = (((annotation.rotation ?? 0) - pageRotationDegrees) * Math.PI) / 180;
       const minWidth = 0.04;
       const baseMinHeight = 0.015;
       const node = textAnnotationRefs.current.get(annotationId) ?? null;
       const editorNode = textNodeRefs.current.get(annotationId) ?? null;
       const containerNode = previewNodeMap.current.get(pageId) ?? null;
       const getContainerHeight = () => containerNode?.getBoundingClientRect().height ?? 0;
+      const getPageLocalHeight = () => getPageTransformInfo(pageId)?.contentHeight ?? getContainerHeight();
       const rotateVector = (x: number, y: number, angle: number) => ({
         x: x * Math.cos(angle) - y * Math.sin(angle),
         y: x * Math.sin(angle) + y * Math.cos(angle),
@@ -4162,7 +4276,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         bottom: startHeight / 2,
       };
       const measureEditorHeight = () => {
-        const containerHeight = getContainerHeight();
+        const containerHeight = getPageLocalHeight();
         if (!editorNode || !containerHeight) return 0;
         const originalTransform = node?.style.transform ?? "";
         const originalWillChange = node?.style.willChange ?? "";
@@ -4170,28 +4284,12 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
           node.style.transform = "none";
           node.style.willChange = "auto";
         }
-        let contentHeightPx = 0;
-        try {
-          const range = document.createRange();
-          range.selectNodeContents(editorNode);
-          const rects = range.getClientRects();
-          if (rects.length > 0) {
-            contentHeightPx = rects[rects.length - 1].bottom - rects[0].top;
-          }
-        } catch {
-          contentHeightPx = 0;
-        }
-        if (!contentHeightPx) {
-          contentHeightPx = editorNode.scrollHeight;
-        }
-        const style = window.getComputedStyle(editorNode);
-        const paddingY =
-          (Number.parseFloat(style.paddingTop) || 0) + (Number.parseFloat(style.paddingBottom) || 0);
+        const requiredHeightPx = measureTextContentHeightPx(editorNode);
         if (node) {
           node.style.transform = originalTransform;
           node.style.willChange = originalWillChange;
         }
-        return Math.max(24, contentHeightPx + paddingY + 6);
+        return requiredHeightPx;
       };
       const handleMove = (event: PointerEvent) => {
         if (event.pointerId !== pointerId) return;
@@ -4232,9 +4330,9 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         const centerOffset = rotateVector(localCenterX, localCenterY, rotationRadians);
         let nextX = startCenterX + centerOffset.x - nextWidth / 2;
         let nextY = startCenterY + centerOffset.y - nextHeight / 2;
-        const autoFitOnWidthChange = corner === "e" || corner === "w";
-        const containerRect = containerNode?.getBoundingClientRect();
-        const containerHeight = containerRect?.height ?? 0;
+        const pageIsRotated = pageRotationDegrees % 180 !== 0;
+        const autoFitOnWidthChange = !pageIsRotated && (corner === "e" || corner === "w");
+        const containerHeight = getPageLocalHeight();
         if (!autoFitOnWidthChange && editorNode && containerHeight) {
           const plainText = editorNode.textContent?.replace(/[\u200b\u2060]/g, "").trim() ?? "";
           if (!plainText) {
@@ -4287,11 +4385,10 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
           node.style.top = `${latest.y * 100}%`;
           node.style.width = `${latest.width * 100}%`;
           node.style.height = `${latest.height * 100}%`;
-          const containerRect = containerNode.getBoundingClientRect();
-          if (!containerRect.height) return;
-          if (autoFitOnWidthChange && editorNode) {
+          const containerHeight = getPageLocalHeight();
+          if (containerHeight && autoFitOnWidthChange && editorNode) {
             const requiredHeightPx = measureEditorHeight();
-            const requiredHeight = clamp(Math.ceil(requiredHeightPx) / containerRect.height, baseMinHeight, 1 - latest.y);
+            const requiredHeight = clamp(Math.ceil(requiredHeightPx) / containerHeight, baseMinHeight, 1 - latest.y);
             const EPS = 0.004;
             if (requiredHeight > latest.height + EPS) {
               const adjusted = { ...latest, height: requiredHeight };
@@ -4299,6 +4396,15 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
               node.style.height = `${requiredHeight * 100}%`;
             }
           }
+          const rect = node.getBoundingClientRect();
+          flushSync(() => {
+            setFocusedTextOverlayRect({
+              left: rect.left,
+              top: rect.top,
+              width: rect.width,
+              height: rect.height,
+            });
+          });
           // No auto-height adjustments during resize; rely on minHeight clamp only.
         });
       };
@@ -4360,14 +4466,14 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       startEvent.preventDefault();
       startEvent.stopPropagation();
 
-      const target = previewNodeMap.current.get(pageId);
       const annotation = textAnnotations[pageId]?.find((a) => a.id === annotationId);
-      if (!target || !annotation || annotation.locked) return;
-      const rect = target.getBoundingClientRect();
+      if (!annotation || annotation.locked) return;
       const width = annotation.width ?? 0.14;
       const height = annotation.height ?? 0.06;
-      const centerX = rect.left + rect.width * (annotation.x + width / 2);
-      const centerY = rect.top + rect.height * (annotation.y + height / 2);
+      const centerPoint = getPageScreenPoint(pageId, annotation.x + width / 2, annotation.y + height / 2);
+      if (!centerPoint) return;
+      const centerX = centerPoint.x;
+      const centerY = centerPoint.y;
       let lastAngle = Math.atan2(startEvent.clientY - centerY, startEvent.clientX - centerX);
       let accumulatedDelta = 0;
       const baseRotation = annotation.rotation ?? 0;
@@ -4383,15 +4489,16 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         lastAngle = angle;
         const deltaDegrees = (accumulatedDelta * 180) / Math.PI;
         const nextRotation = baseRotation + deltaDegrees;
+        const snappedRotation = snapTextRotation(nextRotation, 5);
         setRotatingText((current) =>
           current && current.id === annotationId
-            ? { ...current, degrees: formatSignedRotation(nextRotation) }
+            ? { ...current, degrees: formatSignedRotation(snappedRotation) }
             : current
         );
         setTextAnnotations((prev) => {
           const existing = prev[pageId] ?? [];
           const updated = existing.map((item) =>
-            item.id === annotationId ? { ...item, rotation: nextRotation } : item
+            item.id === annotationId ? { ...item, rotation: snappedRotation } : item
           );
           return { ...prev, [pageId]: updated };
         });
@@ -4422,7 +4529,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         degrees: formatSignedRotation(baseRotation),
       });
     },
-    [textAnnotations]
+    [getPageScreenPoint, textAnnotations]
   );
   const [deleteMode, setDeleteMode] = useState(false);
   const [isErasing, setIsErasing] = useState(false);
@@ -4471,6 +4578,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   const backgroundLowResTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const backgroundLowResUsesIdleRef = useRef(false);
   const backgroundLowResIndexRef = useRef(0);
+  const coverPreviewRotationRef = useRef<number | null>(null);
   const scheduleBackgroundLowResRef = useRef<() => void>(() => {});
   const enqueueRenderRef = useRef<
     (task: { pageId: string; srcIdx: number; pageIdx: number; quality: "low" | "high"; priority: number }) => void
@@ -4562,8 +4670,10 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     if (!projectId) return;
     const first = pages[0];
     if (!first) return;
-    if (coverPreviewPageIdRef.current !== first.id) {
+    const firstRotation = normalizeRotation(first.rotation ?? 0);
+    if (coverPreviewPageIdRef.current !== first.id || coverPreviewRotationRef.current !== firstRotation) {
       coverPreviewPageIdRef.current = first.id;
+      coverPreviewRotationRef.current = firstRotation;
       coverPreviewStatusRef.current = "idle";
       setCoverPreviewUrl(null);
     }
@@ -4577,7 +4687,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     const renderCover = async () => {
       try {
         const pdfPage = await pdf.getPage(first.pageIdx + 1);
-        const baseViewport = pdfPage.getViewport({ scale: COVER_PREVIEW_SCALE });
+        const baseViewport = pdfPage.getViewport({ scale: COVER_PREVIEW_SCALE, rotation: firstRotation });
         const targetWidth = Math.floor(baseViewport.width);
         const targetHeight = Math.floor(baseViewport.height);
         const canvas = document.createElement("canvas");
@@ -5162,7 +5272,7 @@ const timer =
             json?.project?.pdfUrl && typeof json.project.pdfUrl === "string"
               ? json.project.pdfUrl
               : null;
-          const useCombinedCloudSource = (nameHint?: string | null, sizeHint?: number | null) => {
+          const setCombinedCloudSource = (nameHint?: string | null, sizeHint?: number | null) => {
             if (!pdfUrl) {
               throw new Error("Cloud PDF is not available for this project.");
             }
@@ -5221,7 +5331,7 @@ const timer =
                       : 0;
                   return total + size;
                 }, 0);
-              useCombinedCloudSource(combinedName, combinedSize);
+              setCombinedCloudSource(combinedName, combinedSize);
               return true;
             }
             for (const entry of cloudSources) {
@@ -5265,7 +5375,7 @@ const timer =
             return restored.length > 0;
           }
           if (pdfUrl && (!Array.isArray(cloudSources) || cloudSources.length === 0)) {
-            useCombinedCloudSource(null, null);
+            setCombinedCloudSource(null, null);
             return true;
           }
           if (!pdfUrl && Array.isArray(cloudSources) && cloudSources.length === 0) {
@@ -7403,14 +7513,7 @@ const timer =
       Math.max(260, (viewerViewportWidth || fittedWidth) - 48),
     );
     const clipped = false;
-    const rotationTransform =
-      rotationDegrees === 90
-        ? `translateX(${contentHeight}px) rotate(90deg)`
-        : rotationDegrees === 180
-          ? `translateX(${contentWidth}px) translateY(${contentHeight}px) rotate(180deg)`
-          : rotationDegrees === 270
-            ? `translateY(${contentWidth}px) rotate(270deg)`
-            : "none";
+    const rotationTransform = getPageRotationTransform(rotationDegrees, contentWidth, contentHeight);
     return (
       <div
         key={page.id}
@@ -7975,6 +8078,7 @@ const timer =
                 const isActive = activeSignaturePlacementId === signature.id;
                 const isDraggingThis = signatureDrag?.id === signature.id;
                 const isResizingThis = signatureResize?.id === signature.id;
+                const displayRotation = normalizeRotation((signature.rotation ?? 0) - rotationDegrees);
                 return (
                   <div
                     key={signature.id}
@@ -7988,7 +8092,7 @@ const timer =
                       top: `${signature.y * 100}%`,
                       width: `${signature.width * 100}%`,
                       height: `${signature.height * 100}%`,
-                      transform: `rotate(${signature.rotation ?? 0}deg)`,
+                      transform: `rotate(${displayRotation}deg)`,
                       transformOrigin: "center",
                       cursor: deleteMode
                         ? ("url('/icons/eraser.svg') 4 4, auto" as CSSProperties["cursor"])
@@ -8083,7 +8187,8 @@ const timer =
                 const isRotatingThis = rotatingText?.id === annotation.id;
                 const isLocked = annotation.locked ?? false;
                 const rotation = annotation.rotation ?? 0;
-                const displayRotation = normalizeRotation(rotation);
+                const displayRotation = normalizeRotation(rotation - rotationDegrees);
+                const annotationTextAlign = annotation.textAlign ?? textAlign;
                 const displayFontSize = (annotation.textSizePt ?? textSize) * PT_TO_PX * zoomMultiplier;
                 const lineSpacing = annotation.lineSpacing ?? DEFAULT_TEXT_LINE_SPACING;
                 const annotationHtml = annotation.richTextHtml ?? textToHtml(annotation.text);
@@ -8095,15 +8200,50 @@ const timer =
                   activeResizeHandle && ["n", "s", "e", "w"].includes(activeResizeHandle)
                     ? activeResizeHandle
                     : null;
-                const boxWidthPx = annotationWidth * contentWidth;
-                const boxHeightPx = annotationHeight * contentHeight;
+                const textTopPoint = getRotatedTextActionPoint(page.id, annotation, "top", annotationWidth, annotationHeight);
+                const textBottomPoint = getRotatedTextActionPoint(
+                  page.id,
+                  annotation,
+                  "bottom",
+                  annotationWidth,
+                  annotationHeight
+                );
+                const textAnnotationRect =
+                  focusedTextId === annotation.id ? focusedTextOverlayRect : null;
+                const liveResizeTopPoint =
+                  isResizingThis && textAnnotationRect
+                    ? { x: textAnnotationRect.left + textAnnotationRect.width / 2, y: textAnnotationRect.top }
+                    : null;
+                const liveResizeBottomPoint =
+                  isResizingThis && textAnnotationRect
+                    ? {
+                        x: textAnnotationRect.left + textAnnotationRect.width / 2,
+                        y: textAnnotationRect.top + textAnnotationRect.height,
+                      }
+                    : null;
+                const textActionTopPoint =
+                  showTextActions && (liveResizeTopPoint ?? textTopPoint)
+                    ? liveResizeTopPoint ?? textTopPoint
+                    : null;
+                const textActionBottomPoint =
+                  showTransformActions && (liveResizeBottomPoint ?? textBottomPoint)
+                    ? liveResizeBottomPoint ?? textBottomPoint
+                    : null;
+                const isQuarterTurn = rotationDegrees % 180 !== 0;
+                const boxWidthPx = annotationWidth * (isQuarterTurn ? contentHeight : contentWidth);
+                const boxHeightPx = annotationHeight * (isQuarterTurn ? contentWidth : contentHeight);
+                const measuredBoxWidthPx = textAnnotationRect?.width ?? boxWidthPx;
+                const measuredBoxHeightPx = textAnnotationRect?.height ?? boxHeightPx;
                 const cornerSize = 12;
+                const resizeHandleHitboxClass = "before:absolute before:-inset-3 before:content-['']";
                 const showCornerIndicators =
-                  showResizeHandles && boxWidthPx >= cornerSize && boxHeightPx >= cornerSize;
+                  showResizeHandles && measuredBoxWidthPx >= cornerSize && measuredBoxHeightPx >= cornerSize;
                 const edgeHandleMin = 36;
-                const isCompactHeight = boxHeightPx > 0 && boxHeightPx < 40;
-                const showEdgeHorizontalHandles = showCornerIndicators && !isCompactHeight && boxWidthPx >= edgeHandleMin;
-                const showEdgeVerticalHandles = showCornerIndicators && !isCompactHeight && boxHeightPx >= edgeHandleMin;
+                const isCompactHeight = measuredBoxHeightPx > 0 && measuredBoxHeightPx < 40;
+                const showEdgeHorizontalHandles =
+                  showCornerIndicators && !isCompactHeight && measuredBoxWidthPx >= edgeHandleMin;
+                const showEdgeVerticalHandles =
+                  showCornerIndicators && !isCompactHeight && measuredBoxHeightPx >= edgeHandleMin;
                 const showRightOnlyHandle = false;
                 return (
                 <div
@@ -8154,10 +8294,10 @@ const timer =
                           {showEdgeHorizontalHandles && (activeEdgeHandle ? ["n", "s"].includes(activeEdgeHandle) : !isResizingThis) ? (
                             <>
                               {activeEdgeHandle === "n" ? (
-                                <div className="pointer-events-auto absolute left-1/2 top-0 h-2 w-6 -translate-x-1/2 -translate-y-[4px] rounded-full border border-slate-400 bg-[#8B5CF6] cursor-ns-resize" />
+                                <div className={`pointer-events-auto absolute left-1/2 top-0 h-2 w-6 -translate-x-1/2 -translate-y-[4px] rounded-full border border-slate-400 bg-[#8B5CF6] cursor-ns-resize ${resizeHandleHitboxClass}`} />
                               ) : !activeEdgeHandle ? (
                                 <div
-                                  className="pointer-events-auto absolute left-1/2 top-0 h-2 w-6 -translate-x-1/2 -translate-y-[4px] rounded-full bg-white border border-slate-400 cursor-ns-resize hover:border-[#8B5CF6] hover:bg-[#8B5CF6]"
+                                  className={`pointer-events-auto absolute left-1/2 top-0 h-2 w-6 -translate-x-1/2 -translate-y-[4px] rounded-full bg-white border border-slate-400 cursor-ns-resize hover:border-[#8B5CF6] hover:bg-[#8B5CF6] ${resizeHandleHitboxClass}`}
                                   onPointerDown={(event) => {
                                     focusTextAnnotation(annotation.id);
                                     startTextResize(page.id, annotation.id, "n", event);
@@ -8165,10 +8305,10 @@ const timer =
                                 />
                               ) : null}
                               {activeEdgeHandle === "s" ? (
-                                <div className="pointer-events-auto absolute left-1/2 bottom-0 h-2 w-6 -translate-x-1/2 translate-y-[4px] rounded-full border border-slate-400 bg-[#8B5CF6] cursor-ns-resize" />
+                                <div className={`pointer-events-auto absolute left-1/2 bottom-0 h-2 w-6 -translate-x-1/2 translate-y-[4px] rounded-full border border-slate-400 bg-[#8B5CF6] cursor-ns-resize ${resizeHandleHitboxClass}`} />
                               ) : !activeEdgeHandle ? (
                                 <div
-                                  className="pointer-events-auto absolute left-1/2 bottom-0 h-2 w-6 -translate-x-1/2 translate-y-[4px] rounded-full bg-white border border-slate-400 cursor-ns-resize hover:border-[#8B5CF6] hover:bg-[#8B5CF6]"
+                                  className={`pointer-events-auto absolute left-1/2 bottom-0 h-2 w-6 -translate-x-1/2 translate-y-[4px] rounded-full bg-white border border-slate-400 cursor-ns-resize hover:border-[#8B5CF6] hover:bg-[#8B5CF6] ${resizeHandleHitboxClass}`}
                                   onPointerDown={(event) => {
                                     focusTextAnnotation(annotation.id);
                                     startTextResize(page.id, annotation.id, "s", event);
@@ -8180,10 +8320,10 @@ const timer =
                           {showEdgeVerticalHandles && (activeEdgeHandle ? ["e", "w"].includes(activeEdgeHandle) : !isResizingThis) ? (
                             <>
                               {activeEdgeHandle === "w" ? (
-                                <div className="pointer-events-auto absolute left-0 top-1/2 h-6 w-2 -translate-x-[4px] -translate-y-1/2 rounded-full border border-slate-400 bg-[#8B5CF6] cursor-ew-resize" />
+                                <div className={`pointer-events-auto absolute left-0 top-1/2 h-6 w-2 -translate-x-[4px] -translate-y-1/2 rounded-full border border-slate-400 bg-[#8B5CF6] cursor-ew-resize ${resizeHandleHitboxClass}`} />
                               ) : !activeEdgeHandle ? (
                                 <div
-                                  className="pointer-events-auto absolute left-0 top-1/2 h-6 w-2 -translate-x-[4px] -translate-y-1/2 rounded-full bg-white border border-slate-400 cursor-ew-resize hover:border-[#8B5CF6] hover:bg-[#8B5CF6]"
+                                  className={`pointer-events-auto absolute left-0 top-1/2 h-6 w-2 -translate-x-[4px] -translate-y-1/2 rounded-full bg-white border border-slate-400 cursor-ew-resize hover:border-[#8B5CF6] hover:bg-[#8B5CF6] ${resizeHandleHitboxClass}`}
                                   onPointerDown={(event) => {
                                     focusTextAnnotation(annotation.id);
                                     startTextResize(page.id, annotation.id, "w", event);
@@ -8191,10 +8331,10 @@ const timer =
                                 />
                               ) : null}
                               {activeEdgeHandle === "e" ? (
-                                <div className="pointer-events-auto absolute right-0 top-1/2 h-6 w-2 translate-x-[4px] -translate-y-1/2 rounded-full border border-slate-400 bg-[#8B5CF6] cursor-ew-resize" />
+                                <div className={`pointer-events-auto absolute right-0 top-1/2 h-6 w-2 translate-x-[4px] -translate-y-1/2 rounded-full border border-slate-400 bg-[#8B5CF6] cursor-ew-resize ${resizeHandleHitboxClass}`} />
                               ) : !activeEdgeHandle ? (
                                 <div
-                                  className="pointer-events-auto absolute right-0 top-1/2 h-6 w-2 translate-x-[4px] -translate-y-1/2 rounded-full bg-white border border-slate-400 cursor-ew-resize hover:border-[#8B5CF6] hover:bg-[#8B5CF6]"
+                                  className={`pointer-events-auto absolute right-0 top-1/2 h-6 w-2 translate-x-[4px] -translate-y-1/2 rounded-full bg-white border border-slate-400 cursor-ew-resize hover:border-[#8B5CF6] hover:bg-[#8B5CF6] ${resizeHandleHitboxClass}`}
                                   onPointerDown={(event) => {
                                     focusTextAnnotation(annotation.id);
                                     startTextResize(page.id, annotation.id, "e", event);
@@ -8211,11 +8351,11 @@ const timer =
                         {isCompactHeight ? (
                           activeResizeHandle === "se" ? (
                             <div
-                              className="pointer-events-auto absolute -right-1.5 -bottom-1.5 h-3.5 w-3.5 rounded-full border border-slate-400 bg-[#8B5CF6] shadow-sm cursor-nwse-resize"
+                              className={`pointer-events-auto absolute -right-1.5 -bottom-1.5 h-3.5 w-3.5 rounded-full border border-slate-400 bg-[#8B5CF6] shadow-sm cursor-nwse-resize ${resizeHandleHitboxClass}`}
                             />
                           ) : !isResizingThis ? (
                             <div
-                              className="pointer-events-auto absolute -right-1.5 -bottom-1.5 h-3.5 w-3.5 rounded-full border border-slate-400 bg-white shadow-sm cursor-nwse-resize hover:border-[#8B5CF6] hover:bg-[#8B5CF6]"
+                              className={`pointer-events-auto absolute -right-1.5 -bottom-1.5 h-3.5 w-3.5 rounded-full border border-slate-400 bg-white shadow-sm cursor-nwse-resize hover:border-[#8B5CF6] hover:bg-[#8B5CF6] ${resizeHandleHitboxClass}`}
                               onPointerDown={(event) => {
                                 focusTextAnnotation(annotation.id);
                                 startTextResize(page.id, annotation.id, "se", event);
@@ -8225,10 +8365,10 @@ const timer =
                         ) : (
                           <>
                             {activeResizeHandle === "nw" ? (
-                            <div className="pointer-events-auto absolute -left-1.5 -top-1.5 h-3.5 w-3.5 rounded-full border border-slate-400 bg-[#8B5CF6] shadow-sm cursor-nwse-resize" />
+                            <div className={`pointer-events-auto absolute -left-1.5 -top-1.5 h-3.5 w-3.5 rounded-full border border-slate-400 bg-[#8B5CF6] shadow-sm cursor-nwse-resize ${resizeHandleHitboxClass}`} />
                             ) : !isResizingThis ? (
                               <div
-                                className="pointer-events-auto absolute -left-1.5 -top-1.5 h-3.5 w-3.5 rounded-full border border-slate-400 bg-white shadow-sm cursor-nwse-resize hover:border-[#8B5CF6] hover:bg-[#8B5CF6]"
+                                className={`pointer-events-auto absolute -left-1.5 -top-1.5 h-3.5 w-3.5 rounded-full border border-slate-400 bg-white shadow-sm cursor-nwse-resize hover:border-[#8B5CF6] hover:bg-[#8B5CF6] ${resizeHandleHitboxClass}`}
                                 onPointerDown={(event) => {
                                   focusTextAnnotation(annotation.id);
                                   startTextResize(page.id, annotation.id, "nw", event);
@@ -8236,10 +8376,10 @@ const timer =
                               />
                             ) : null}
                             {activeResizeHandle === "ne" ? (
-                              <div className="pointer-events-auto absolute -right-1.5 -top-1.5 h-3.5 w-3.5 rounded-full border border-slate-400 bg-[#8B5CF6] shadow-sm cursor-nesw-resize" />
+                              <div className={`pointer-events-auto absolute -right-1.5 -top-1.5 h-3.5 w-3.5 rounded-full border border-slate-400 bg-[#8B5CF6] shadow-sm cursor-nesw-resize ${resizeHandleHitboxClass}`} />
                             ) : !isResizingThis ? (
                               <div
-                                className="pointer-events-auto absolute -right-1.5 -top-1.5 h-3.5 w-3.5 rounded-full border border-slate-400 bg-white shadow-sm cursor-nesw-resize hover:border-[#8B5CF6] hover:bg-[#8B5CF6]"
+                                className={`pointer-events-auto absolute -right-1.5 -top-1.5 h-3.5 w-3.5 rounded-full border border-slate-400 bg-white shadow-sm cursor-nesw-resize hover:border-[#8B5CF6] hover:bg-[#8B5CF6] ${resizeHandleHitboxClass}`}
                                 onPointerDown={(event) => {
                                   focusTextAnnotation(annotation.id);
                                   startTextResize(page.id, annotation.id, "ne", event);
@@ -8247,10 +8387,10 @@ const timer =
                               />
                             ) : null}
                             {activeResizeHandle === "sw" ? (
-                              <div className="pointer-events-auto absolute -left-1.5 -bottom-1.5 h-3.5 w-3.5 rounded-full border border-slate-400 bg-[#8B5CF6] shadow-sm cursor-nesw-resize" />
+                              <div className={`pointer-events-auto absolute -left-1.5 -bottom-1.5 h-3.5 w-3.5 rounded-full border border-slate-400 bg-[#8B5CF6] shadow-sm cursor-nesw-resize ${resizeHandleHitboxClass}`} />
                             ) : !isResizingThis ? (
                               <div
-                                className="pointer-events-auto absolute -left-1.5 -bottom-1.5 h-3.5 w-3.5 rounded-full border border-slate-400 bg-white shadow-sm cursor-nesw-resize hover:border-[#8B5CF6] hover:bg-[#8B5CF6]"
+                                className={`pointer-events-auto absolute -left-1.5 -bottom-1.5 h-3.5 w-3.5 rounded-full border border-slate-400 bg-white shadow-sm cursor-nesw-resize hover:border-[#8B5CF6] hover:bg-[#8B5CF6] ${resizeHandleHitboxClass}`}
                                 onPointerDown={(event) => {
                                   focusTextAnnotation(annotation.id);
                                   startTextResize(page.id, annotation.id, "sw", event);
@@ -8258,10 +8398,10 @@ const timer =
                               />
                             ) : null}
                             {activeResizeHandle === "se" ? (
-                              <div className="pointer-events-auto absolute -right-1.5 -bottom-1.5 h-3.5 w-3.5 rounded-full border border-slate-400 bg-[#8B5CF6] shadow-sm cursor-nwse-resize" />
+                              <div className={`pointer-events-auto absolute -right-1.5 -bottom-1.5 h-3.5 w-3.5 rounded-full border border-slate-400 bg-[#8B5CF6] shadow-sm cursor-nwse-resize ${resizeHandleHitboxClass}`} />
                             ) : !isResizingThis ? (
                               <div
-                                className="pointer-events-auto absolute -right-1.5 -bottom-1.5 h-3.5 w-3.5 rounded-full border border-slate-400 bg-white shadow-sm cursor-nwse-resize hover:border-[#8B5CF6] hover:bg-[#8B5CF6]"
+                                className={`pointer-events-auto absolute -right-1.5 -bottom-1.5 h-3.5 w-3.5 rounded-full border border-slate-400 bg-white shadow-sm cursor-nwse-resize hover:border-[#8B5CF6] hover:bg-[#8B5CF6] ${resizeHandleHitboxClass}`}
                                 onPointerDown={(event) => {
                                   focusTextAnnotation(annotation.id);
                                   startTextResize(page.id, annotation.id, "se", event);
@@ -8280,6 +8420,32 @@ const timer =
                       onCopy={(event) => handleCopyOrCut(event, false)}
                       onCut={(event) => handleCopyOrCut(event, true)}
                       onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          const container = previewNodeMap.current.get(page.id);
+                          if (!container) return;
+                          const rect = container.getBoundingClientRect();
+                          const boxRotation = normalizeRotation((annotation.rotation ?? 0) - rotationDegrees);
+                          const useWidthGrowth = boxRotation % 180 !== 0;
+                          const measurementDimension = useWidthGrowth ? rect.width : rect.height;
+                          if (!measurementDimension) return;
+                          const maxSize = useWidthGrowth ? 1 - annotation.x : 1 - annotation.y;
+                          const maxContentPx = maxSize * measurementDimension;
+                          const currentBoxRect = event.currentTarget.parentElement?.getBoundingClientRect();
+                          const currentContentPx = useWidthGrowth
+                            ? currentBoxRect?.width ?? (annotation.width ?? 0) * measurementDimension
+                            : currentBoxRect?.height ?? (annotation.height ?? 0) * measurementDimension;
+                          const isAtPageCap = currentContentPx >= maxContentPx - 2;
+                          if (!isAtPageCap) return;
+                          const style = window.getComputedStyle(event.currentTarget);
+                          const fontSizePx = Number.parseFloat(style.fontSize) || displayFontSize;
+                          const lineHeightPx = resolveLineHeightPx(style.lineHeight, fontSizePx);
+                          const requiredHeightPx = measureTextContentHeightPx(event.currentTarget);
+                          if (requiredHeightPx + lineHeightPx > maxContentPx + 1) {
+                            event.preventDefault();
+                            event.currentTarget.scrollTop = 0;
+                          }
+                          return;
+                        }
                         if (event.key !== "Backspace") return;
                         const selection = window.getSelection();
                         if (!selection || selection.rangeCount === 0) return;
@@ -8345,6 +8511,43 @@ const timer =
                         selectionRangeRef.current = nextRange.cloneRange();
                         setListType(null);
                       }}
+                      onBeforeInput={(event) => {
+                        const inputType = (event.nativeEvent as InputEvent).inputType;
+                        const isLineBreakInput = inputType === "insertParagraph" || inputType === "insertLineBreak";
+                        const isTextInput = inputType === "insertText" || inputType === "insertCompositionText";
+                        if (!isLineBreakInput && !isTextInput) return;
+                        const container = previewNodeMap.current.get(page.id);
+                        if (!container) return;
+                        const rect = container.getBoundingClientRect();
+                        const boxRotation = normalizeRotation((annotation.rotation ?? 0) - rotationDegrees);
+                        const useWidthGrowth = boxRotation % 180 !== 0;
+                        const measurementDimension = useWidthGrowth ? rect.width : rect.height;
+                        if (!measurementDimension) return;
+                        const maxSize = useWidthGrowth ? 1 - annotation.x : 1 - annotation.y;
+                        const maxContentPx = maxSize * measurementDimension;
+                        const currentBoxRect = event.currentTarget.parentElement?.getBoundingClientRect();
+                        const currentContentPx = useWidthGrowth
+                          ? currentBoxRect?.width ?? (annotation.width ?? 0) * measurementDimension
+                          : currentBoxRect?.height ?? (annotation.height ?? 0) * measurementDimension;
+                        const isAtPageCap = currentContentPx >= maxContentPx - 2;
+                        if (!isAtPageCap) return;
+                        if (isTextInput) {
+                          const insertedText = (event.nativeEvent as InputEvent).data ?? "";
+                          if (wouldTextInputOverflow(event.currentTarget, insertedText, maxContentPx)) {
+                            event.preventDefault();
+                            event.currentTarget.scrollTop = 0;
+                          }
+                          return;
+                        }
+                        const style = window.getComputedStyle(event.currentTarget);
+                        const fontSizePx = Number.parseFloat(style.fontSize) || displayFontSize;
+                        const lineHeightPx = resolveLineHeightPx(style.lineHeight, fontSizePx);
+                        const requiredHeightPx = measureTextContentHeightPx(event.currentTarget);
+                        if (requiredHeightPx + lineHeightPx > maxContentPx + 1) {
+                          event.preventDefault();
+                          event.currentTarget.scrollTop = 0;
+                        }
+                      }}
                       onInput={(event) => {
                         noteTextTyping(annotation.id);
                         syncTextAnnotationContent(page.id, annotation.id, event.currentTarget);
@@ -8352,10 +8555,31 @@ const timer =
                         const container = previewNodeMap.current.get(page.id);
                         if (wrapper && container) {
                           const rect = container.getBoundingClientRect();
-                          const requiredHeight = measureRequiredTextHeightRatio(event.currentTarget, rect, 0.015);
-                          const currentHeight = wrapper.getBoundingClientRect().height / rect.height;
-                          if (requiredHeight > currentHeight + 0.001) {
-                            wrapper.style.height = `${requiredHeight * 100}%`;
+                          const boxRotation = normalizeRotation((annotation.rotation ?? 0) - rotationDegrees);
+                          const useWidthGrowth = boxRotation % 180 !== 0;
+                          const measurementDimension = useWidthGrowth
+                            ? getPageTransformInfo(page.id)?.contentWidth ?? rect.width
+                            : getPageTransformInfo(page.id)?.contentHeight ?? rect.height;
+                          const requiredSize = measureRequiredTextHeightRatio(
+                            event.currentTarget,
+                            rect,
+                            0.015,
+                            6,
+                            24,
+                            measurementDimension
+                          );
+                          const currentSize = useWidthGrowth ? annotation.width ?? 0 : annotation.height ?? 0;
+                          const maxSize = useWidthGrowth ? 1 - annotation.x : 1 - annotation.y;
+                          const targetSize = clamp(requiredSize, 0.015, maxSize);
+                          if (targetSize > currentSize + 0.001) {
+                            if (useWidthGrowth) {
+                              wrapper.style.width = `${targetSize * 100}%`;
+                            } else {
+                              wrapper.style.height = `${targetSize * 100}%`;
+                            }
+                          }
+                          if (requiredSize > targetSize + 0.001) {
+                            event.currentTarget.scrollTop = 0;
                           }
                         }
                         if (textAutoExpandRafRef.current !== null) {
@@ -8473,9 +8697,16 @@ const timer =
                         }
                         const text = event.currentTarget.innerText.replace(/[\u200b\u2060]/g, "").trim();
                         if (!text) {
-                          deleteTextAnnotation(page.id, annotation.id);
+                          flushSync(() => {
+                            deleteTextAnnotation(page.id, annotation.id);
+                          });
+                          saveWorkspaceNow();
                           return;
                         }
+                        syncTextAnnotationContent(page.id, annotation.id, event.currentTarget, { flush: true });
+                        normalizeStrikeMarkup(event.currentTarget);
+                        normalizeLineHeightMarkup(event.currentTarget);
+                        saveWorkspaceNow();
                       }}
                       onClick={(event) => {
                         event.stopPropagation();
@@ -8537,109 +8768,124 @@ const timer =
                         fontSize: `${displayFontSize}px`,
                         lineHeight: `${lineSpacing}`,
                         textTransform,
-                        textAlign: textAlign,
+                        textAlign: annotationTextAlign,
                       }}
                     />
                     {/* Native strikethrough only; overlay removed */}
-                    {showTextActions ? (
-                      isDraggingThis ? null : (
-                        <>
-                          {isRotatingThis ? (
-                            <div
-                              className="pointer-events-none absolute top-[calc(100%+4.5rem)] left-[calc(50%-6rem)] rounded-md border border-[#4A4A4A] bg-[#323232] px-2 py-1 text-[11px] font-semibold tabular-nums text-white shadow-sm"
-                              style={{ transform: `rotate(${-displayRotation}deg)` }}
-                            >
-                              {rotatingText?.degrees ?? displayRotation}°
-                            </div>
-                          ) : null}
-                          <div
-                            data-text-actions
-                            className={`absolute flex w-max items-center gap-0.5 rounded-lg border border-slate-300 bg-white shadow-sm ${
-                              isLocked ? "p-0.5" : "px-1 py-0.5"
-                            }`}
-                            style={{ left: "50%", top: "-3.25rem", transform: `translateX(-50%) rotate(${-displayRotation}deg)` }}
-                          >
-                            {isLocked ? null : (
-                              <>
+                    {typeof document !== "undefined" && (textActionTopPoint || textActionBottomPoint) && !isDraggingThis
+                      ? createPortal(
+                          <div className="pointer-events-none fixed inset-0 z-[60]">
+                            {isRotatingThis && textActionTopPoint ? (
+                              <div
+                                className="pointer-events-none absolute rounded-md border border-[#4A4A4A] bg-[#323232] px-2 py-1 text-[11px] font-semibold tabular-nums text-white shadow-sm"
+                                style={{
+                                  left: textActionTopPoint.x,
+                                  top: textActionTopPoint.y,
+                                  transform: "translate(-50%, calc(-100% - 4.5rem))",
+                                }}
+                              >
+                                {rotatingText?.degrees ?? displayRotation}°
+                              </div>
+                            ) : null}
+                            {textActionTopPoint ? (
+                              <div
+                                data-text-actions
+                                className={`pointer-events-auto absolute flex w-max items-center gap-0.5 rounded-lg border border-slate-300 bg-white shadow-sm ${
+                                  isLocked ? "p-0.5" : "px-1 py-0.5"
+                                }`}
+                                style={{
+                                  left: textActionTopPoint.x,
+                                  top: textActionTopPoint.y,
+                                  transform: "translate(-50%, calc(-100% - 1rem))",
+                                }}
+                              >
+                                {isLocked ? null : (
+                                  <>
+                                    <button
+                                      type="button"
+                                      className="flex h-7 w-7 items-center justify-center rounded-md text-slate-700 transition hover:bg-slate-200 hover:text-slate-900 active:translate-y-[1px]"
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        duplicateTextAnnotation(page.id, annotation.id);
+                                      }}
+                                    >
+                                      <Copy className="h-4 w-4" />
+                                    </button>
+                                    <div className="h-4 w-px bg-slate-300/80" />
+                                  </>
+                                )}
                                 <button
                                   type="button"
-                                  className="flex h-7 w-7 items-center justify-center rounded-md text-slate-700 transition hover:bg-slate-200 hover:text-slate-900 active:translate-y-[1px]"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    duplicateTextAnnotation(page.id, annotation.id);
-                                  }}
-                                >
-                                  <Copy className="h-4 w-4" />
-                                </button>
-                                <div className="h-4 w-px bg-slate-300/80" />
-                              </>
-                            )}
-                            <button
-                              type="button"
-                              className={`flex h-7 w-7 items-center justify-center rounded-md transition active:translate-y-[1px] ${
-                                isLocked
-                                  ? "bg-[#6C47FF] text-white"
-                                  : "text-slate-700 hover:bg-slate-200 hover:text-slate-900"
-                              }`}
-                              onMouseDown={(event) => event.stopPropagation()}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                toggleTextAnnotationLock(page.id, annotation.id);
-                              }}
-                            >
-                              {isLocked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
-                            </button>
-                            {isLocked ? null : (
-                              <>
-                                <div className="h-4 w-px bg-slate-300/80" />
-                                <button
-                                  type="button"
-                                  className="flex h-7 w-7 items-center justify-center rounded-md text-slate-700 transition hover:bg-slate-200 hover:text-slate-900 active:translate-y-[1px]"
+                                  className={`flex h-7 w-7 items-center justify-center rounded-md transition active:translate-y-[1px] ${
+                                    isLocked
+                                      ? "bg-[#6C47FF] text-white"
+                                      : "text-slate-700 hover:bg-slate-200 hover:text-slate-900"
+                                  }`}
                                   onMouseDown={(event) => event.stopPropagation()}
                                   onClick={(event) => {
                                     event.stopPropagation();
-                                    deleteTextAnnotation(page.id, annotation.id);
+                                    toggleTextAnnotationLock(page.id, annotation.id);
                                   }}
                                 >
-                                  <Trash2 className="h-4 w-4" />
+                                  {isLocked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
                                 </button>
-                              </>
-                            )}
-                          </div>
-                          {showTransformActions && !isLocked ? (
-                            <div
-                              className="pointer-events-none absolute -bottom-12 left-1/2 flex -translate-x-1/2 items-center gap-2"
-                              style={{ transform: `translateX(-50%) rotate(${-displayRotation}deg)` }}
-                            >
-                              <button
-                                type="button"
-                                className="pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-sm transition hover:bg-white active:translate-y-[1px]"
-                                onPointerDown={(event: ReactPointerEvent<HTMLButtonElement>) => {
-                                  focusTextAnnotation(annotation.id);
-                                  startTextRotate(page.id, annotation.id, event);
+                                {isLocked ? null : (
+                                  <>
+                                    <div className="h-4 w-px bg-slate-300/80" />
+                                    <button
+                                      type="button"
+                                      className="flex h-7 w-7 items-center justify-center rounded-md text-slate-700 transition hover:bg-slate-200 hover:text-slate-900 active:translate-y-[1px]"
+                                      onMouseDown={(event) => event.stopPropagation()}
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        deleteTextAnnotation(page.id, annotation.id);
+                                      }}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            ) : null}
+                            {showTransformActions && !isLocked && textActionBottomPoint ? (
+                              <div
+                                className="pointer-events-auto absolute flex items-center gap-2"
+                                style={{
+                                  left: textActionBottomPoint.x,
+                                  top: textActionBottomPoint.y,
+                                  transform: "translate(-50%, 0.4rem)",
                                 }}
                               >
-                                <RotateCcw className="h-3.5 w-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                className="pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-sm transition hover:bg-white active:translate-y-[1px]"
-                                onPointerDown={(event: ReactPointerEvent<HTMLButtonElement>) => {
-                                  focusTextAnnotation(annotation.id);
-                                  startTextDrag(page.id, annotation.id, event);
-                                }}
-                              >
-                                <Move className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          ) : null}
-                        </>
-                      )
-                    ) : null}
+                                <button
+                                  type="button"
+                                  className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-sm transition hover:bg-white active:translate-y-[1px]"
+                                  onPointerDown={(event: ReactPointerEvent<HTMLButtonElement>) => {
+                                    focusTextAnnotation(annotation.id);
+                                    startTextRotate(page.id, annotation.id, event);
+                                  }}
+                                >
+                                  <RotateCcw className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-sm transition hover:bg-white active:translate-y-[1px]"
+                                  onPointerDown={(event: ReactPointerEvent<HTMLButtonElement>) => {
+                                    focusTextAnnotation(annotation.id);
+                                    startTextDrag(page.id, annotation.id, event);
+                                  }}
+                                >
+                                  <Move className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            ) : null}
+                          </div>,
+                          document.body
+                        )
+                      : null}
                     {showResizeHandles && !isDraggingThis ? (
                       <>
                         <div
-                          className="absolute h-4 w-4 cursor-nwse-resize"
+                          className="absolute z-30 h-4 w-4 cursor-nwse-resize touch-none pointer-events-auto"
                           style={{ left: "0%", top: "0%", transform: "translate(-50%, -50%)" }}
                           onPointerDown={(event) => {
                             focusTextAnnotation(annotation.id);
@@ -8647,7 +8893,7 @@ const timer =
                           }}
                         />
                         <div
-                          className="absolute h-4 w-4 cursor-nesw-resize"
+                          className="absolute z-30 h-4 w-4 cursor-nesw-resize touch-none pointer-events-auto"
                           style={{ left: "100%", top: "0%", transform: "translate(50%, -50%)" }}
                           onPointerDown={(event) => {
                             focusTextAnnotation(annotation.id);
@@ -8655,7 +8901,7 @@ const timer =
                           }}
                         />
                         <div
-                          className="absolute h-4 w-4 cursor-nesw-resize"
+                          className="absolute z-30 h-4 w-4 cursor-nesw-resize touch-none pointer-events-auto"
                           style={{ left: "0%", top: "100%", transform: "translate(-50%, 50%)" }}
                           onPointerDown={(event) => {
                             focusTextAnnotation(annotation.id);
@@ -8663,7 +8909,7 @@ const timer =
                           }}
                         />
                         <div
-                          className="absolute h-4 w-4 cursor-nwse-resize"
+                          className="absolute z-30 h-4 w-4 cursor-nwse-resize touch-none pointer-events-auto"
                           style={{ left: "100%", top: "100%", transform: "translate(50%, 50%)" }}
                           onPointerDown={(event) => {
                             focusTextAnnotation(annotation.id);
@@ -8758,27 +9004,6 @@ const timer =
     }
   }, [deleteMode]);
 
-  function getPointerPoint(
-    event: { clientX: number; clientY: number; currentTarget: HTMLDivElement },
-    options?: { clampToBounds?: boolean; requireInside?: boolean }
-  ) {
-    const rect = event.currentTarget.getBoundingClientRect();
-    if (!rect.width || !rect.height) return null;
-    const clampToBounds = options?.clampToBounds ?? true;
-    const requireInside = options?.requireInside ?? clampToBounds;
-    const xRaw = (event.clientX - rect.left) / rect.width;
-    const yRaw = (event.clientY - rect.top) / rect.height;
-    const inside = !(xRaw < 0 || xRaw > 1 || yRaw < 0 || yRaw > 1);
-    if (requireInside && !inside) return null;
-    return {
-      x: clampToBounds ? clamp(xRaw, 0, 1) : xRaw,
-      y: clampToBounds ? clamp(yRaw, 0, 1) : yRaw,
-      inside,
-      rectWidth: rect.width,
-      rectHeight: rect.height,
-    };
-  }
-
   function getActiveTool(): DrawingTool | null {
     if (highlightMode) return "highlight";
     if (textMode) return "text";
@@ -8806,6 +9031,7 @@ const timer =
   const drawPageOverlays = useCallback(
     async (ctx: CanvasRenderingContext2D, width: number, height: number, pageId: string) => {
       const scale = width / 1000;
+      const pageRotationDegrees = normalizeRotation(pagesRef.current.find((page) => page.id === pageId)?.rotation ?? 0);
       const pageHighlights = highlights[pageId] ?? [];
       const pageShapes = shapesByPage[pageId] ?? [];
       const pageTexts = textAnnotations[pageId] ?? [];
@@ -8952,9 +9178,10 @@ const timer =
         const runs = extractRichTextRuns(html, baseSize);
         const lines = splitRunsIntoLines(runs);
         const fontFamily = TEXT_FONT_OPTIONS[textFont].cssFamily;
+        const annotationTextAlign = annotation.textAlign ?? textAlign;
 
         ctx.save();
-        const rotation = normalizeRotation(annotation.rotation ?? 0);
+        const rotation = normalizeRotation((annotation.rotation ?? 0) - pageRotationDegrees);
         const rotationRad = (rotation * Math.PI) / 180;
         ctx.translate(boxX + boxWidth / 2, boxY + boxHeight / 2);
         ctx.rotate(rotationRad);
@@ -8979,12 +9206,12 @@ const timer =
           });
           const clampedWidth = Math.min(lineWidth, maxWidth);
           let cursorX = padding;
-          if (textAlign === "center") {
+          if (annotationTextAlign === "center") {
             cursorX = padding + Math.max(0, (maxWidth - clampedWidth) / 2);
-          } else if (textAlign === "right") {
+          } else if (annotationTextAlign === "right") {
             cursorX = padding + Math.max(0, maxWidth - clampedWidth);
           }
-          const shouldJustify = textAlign === "justify" && lineIndex < lines.length - 1;
+          const shouldJustify = annotationTextAlign === "justify" && lineIndex < lines.length - 1;
           const spaceCount = shouldJustify
             ? line.reduce(
                 (count, run) => count + (applyTextTransform(run.text, textTransform).match(/ /g)?.length ?? 0),
@@ -9125,66 +9352,45 @@ const timer =
     [drawPageOverlays]
   );
 
-  useEffect(() => {
-    if (!authSession?.user) return;
-    const projectId = projectParam ?? currentProjectId ?? null;
-    if (!projectId || pages.length === 0) return;
-    const first = pages[0];
-    if (!first) return;
-    if (!coverPreviewUrl) {
-      const status = pageRenderStatusRef.current.get(first.id);
-      if (status !== "high") return;
+  const resolveProjectCoverPreview = useCallback(async (pagesInput?: PageItem[]) => {
+    const sourcePages = pagesInput ?? pagesRef.current;
+    const first = sourcePages[0];
+    if (!first) return null;
+    const firstRotation = normalizeRotation(first.rotation ?? 0);
+    if (
+      coverPreviewUrl &&
+      coverPreviewPageIdRef.current === first.id &&
+      coverPreviewRotationRef.current === firstRotation
+    ) {
+      return coverPreviewUrl;
     }
-    const hasOverlayEdits =
-      (highlights[first.id]?.length ?? 0) > 0 ||
-      (shapesByPage[first.id]?.length ?? 0) > 0 ||
-      (textAnnotations[first.id]?.length ?? 0) > 0 ||
-      (signaturePlacements[first.id]?.length ?? 0) > 0;
-
-    const uploadPreview = async () => {
-      const basePreviewUrl = coverPreviewUrl ?? getProjectCoverPreview(pages);
-      if (!basePreviewUrl) return;
-      let previewUrl = basePreviewUrl;
-      if (hasOverlayEdits) {
-        const composite = await renderCompositePreviewDataUrl(first.id);
-        if (composite) {
-          previewUrl = composite;
-        }
-      }
-      if (previewUploadRef.current[projectId] === previewUrl) return;
-      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ previewUrl }),
-      });
-      if (!res.ok) {
-        throw new Error(`Preview upload failed with status ${res.status}`);
-      }
-      previewUploadRef.current[projectId] = previewUrl;
-    };
-
-    const timer = setTimeout(() => {
-      void uploadPreview().catch((err) => {
-        previewUploadRef.current[projectId] = "";
-        setError("Preview upload failed. Check R2 credentials and network logs.");
-        console.error("Preview upload failed during cloud sync.", err);
-        throw err;
-      });
-    }, PREVIEW_SYNC_DEBOUNCE_MS);
-
-    return () => clearTimeout(timer);
-  }, [
-    authSession?.user,
-    currentProjectId,
-    coverPreviewUrl,
-    highlights,
-    pages,
-    projectParam,
-    renderCompositePreviewDataUrl,
-    shapesByPage,
-    signaturePlacements,
-    textAnnotations,
-  ]);
+    const pdf = pdfDocumentCacheRef.current.get(first.srcIdx);
+    if (!pdf) return getProjectCoverPreview(sourcePages);
+    try {
+      const pdfPage = await pdf.getPage(first.pageIdx + 1);
+      const baseViewport = pdfPage.getViewport({ scale: COVER_PREVIEW_SCALE, rotation: firstRotation });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.floor(baseViewport.width));
+      canvas.height = Math.max(1, Math.floor(baseViewport.height));
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return getProjectCoverPreview(sourcePages);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      await pdfPage.render({
+        canvasContext: ctx,
+        viewport: baseViewport,
+        transform: undefined,
+      }).promise;
+      const dataUrl = toCoverPreviewDataUrl(canvas);
+      setCoverPreviewUrl(dataUrl);
+      coverPreviewPageIdRef.current = first.id;
+      coverPreviewRotationRef.current = firstRotation;
+      coverPreviewStatusRef.current = "ready";
+      return dataUrl;
+    } catch {
+      return getProjectCoverPreview(sourcePages);
+    }
+  }, [coverPreviewUrl]);
 
   const scheduleCompositeThumb = useCallback(
     (pageId: string) => {
@@ -9388,15 +9594,94 @@ const timer =
     [activePageId, beginSignaturePlacement, pages, placeSignatureAtPoint]
   );
 
-  function getPageNormalizedPoint(pageId: string, clientX: number, clientY: number) {
-    const node = previewNodeMap.current.get(pageId);
-    if (!node) return null;
-    const rect = node.getBoundingClientRect();
-    if (!rect.width || !rect.height) return null;
+  const getPageTransformInfo = useCallback(
+    (pageId: string) => {
+      const page = pagesRef.current.find((item) => item.id === pageId);
+      const node = previewNodeMap.current.get(pageId);
+      if (!page || !node) return null;
+      const rect = node.getBoundingClientRect();
+      if (!rect.width || !rect.height) return null;
+      const naturalWidth = page.width || 612;
+      const naturalHeight = page.height || naturalWidth * DEFAULT_ASPECT_RATIO;
+      const effectiveScale = baseScale * zoomMultiplier;
+      const contentWidth = naturalWidth * effectiveScale;
+      const contentHeight = naturalHeight * effectiveScale;
+      const rotationDegrees = normalizeRotation(page.rotation);
+      const rotationTransform = getPageRotationTransform(rotationDegrees, contentWidth, contentHeight);
+      const rotationMatrix = new DOMMatrix(rotationTransform);
+      const inverseRotationMatrix = rotationMatrix.inverse();
+      return {
+        rect,
+        contentWidth,
+        contentHeight,
+        rotationDegrees,
+        rotationMatrix,
+        inverseRotationMatrix,
+      };
+    },
+    [baseScale, zoomMultiplier]
+  );
+
+  function getPagePoint(
+    pageId: string,
+    clientX: number,
+    clientY: number,
+    options?: { clampToBounds?: boolean; requireInside?: boolean }
+  ) {
+    const info = getPageTransformInfo(pageId);
+    if (!info) return null;
+    const clampToBounds = options?.clampToBounds ?? true;
+    const requireInside = options?.requireInside ?? clampToBounds;
+    const xRaw = clientX - info.rect.left;
+    const yRaw = clientY - info.rect.top;
+    const inside = !(xRaw < 0 || xRaw > info.rect.width || yRaw < 0 || yRaw > info.rect.height);
+    if (requireInside && !inside) return null;
+    const localPoint = new DOMPoint(xRaw, yRaw).matrixTransform(info.inverseRotationMatrix);
     return {
-      x: clamp((clientX - rect.left) / rect.width, 0, 1),
-      y: clamp((clientY - rect.top) / rect.height, 0, 1),
+      x: clampToBounds ? clamp(localPoint.x / info.contentWidth, 0, 1) : localPoint.x / info.contentWidth,
+      y: clampToBounds ? clamp(localPoint.y / info.contentHeight, 0, 1) : localPoint.y / info.contentHeight,
+      inside,
+      rectWidth: info.contentWidth,
+      rectHeight: info.contentHeight,
     };
+  }
+
+  function getPageNormalizedPoint(pageId: string, clientX: number, clientY: number) {
+    const point = getPagePoint(pageId, clientX, clientY, { clampToBounds: true, requireInside: true });
+    if (!point) return null;
+    return point;
+  }
+
+  function getPageScreenPoint(pageId: string, pageX: number, pageY: number) {
+    const info = getPageTransformInfo(pageId);
+    if (!info) return null;
+    const localPoint = new DOMPoint(pageX * info.contentWidth, pageY * info.contentHeight);
+    const screenPoint = localPoint.matrixTransform(info.rotationMatrix);
+    return {
+      x: info.rect.left + screenPoint.x,
+      y: info.rect.top + screenPoint.y,
+    };
+  }
+
+  function getRotatedTextActionPoint(
+    pageId: string,
+    annotation: TextAnnotation,
+    edge: "top" | "bottom",
+    width: number,
+    height: number
+  ) {
+    const info = getPageTransformInfo(pageId);
+    if (!info) return null;
+    const displayRotation = normalizeRotation((annotation.rotation ?? 0) - info.rotationDegrees);
+    const radians = (displayRotation * Math.PI) / 180;
+    const centerX = annotation.x + width / 2;
+    const centerY = annotation.y + height / 2;
+    const offsetY = edge === "top" ? -height / 2 : height / 2;
+    const rotatedPagePoint = {
+      x: centerX - offsetY * Math.sin(radians),
+      y: centerY + offsetY * Math.cos(radians),
+    };
+    return getPageScreenPoint(pageId, rotatedPagePoint.x, rotatedPagePoint.y);
   }
 
   const startSignatureDrag = useCallback(
@@ -9507,12 +9792,12 @@ const timer =
       if (startEvent.button !== 0 && startEvent.pointerType !== "touch") return;
       startEvent.preventDefault();
       startEvent.stopPropagation();
-      const target = previewNodeMap.current.get(pageId);
       const placement = signaturePlacements[pageId]?.find((p) => p.id === placementId);
-      if (!target || !placement) return;
-      const rect = target.getBoundingClientRect();
-      const centerX = rect.left + rect.width * (placement.x + placement.width / 2);
-      const centerY = rect.top + rect.height * (placement.y + placement.height / 2);
+      if (!placement) return;
+      const centerPoint = getPageScreenPoint(pageId, placement.x + placement.width / 2, placement.y + placement.height / 2);
+      if (!centerPoint) return;
+      const centerX = centerPoint.x;
+      const centerY = centerPoint.y;
       let lastAngle = Math.atan2(startEvent.clientY - centerY, startEvent.clientX - centerX);
       let accumulatedDelta = 0;
       const baseRotation = placement.rotation ?? 0;
@@ -9555,7 +9840,7 @@ const timer =
       window.addEventListener("pointercancel", handleUp);
       setSignatureRotate({ pageId, id: placementId, pointerId, centerX, centerY, baseRotation });
     },
-    [markWorkspaceDirty, signaturePlacements]
+    [getPageScreenPoint, markWorkspaceDirty, signaturePlacements]
   );
 
   const addSignatureToPage = useCallback((payload: SignaturePlacement) => {
@@ -9637,29 +9922,37 @@ const timer =
   function autoExpandTextAnnotation(pageId: string, id: string) {
     const element = textNodeRefs.current.get(id);
     if (!element) return;
-    const annotationMatch = findTextAnnotationById(id);
     const plainText = element.textContent?.replace(/[\u200b\u2060]/g, "").trim() ?? "";
     if (!plainText) return;
+    const match = findTextAnnotationById(id);
+    if (!match) return;
     const node = previewNodeMap.current.get(pageId);
     if (!node) return;
     const containerRect = node.getBoundingClientRect();
     if (!containerRect.height) return;
     const wrapper = textAnnotationRefs.current.get(id);
+    const displayRotation = normalizeRotation(
+      (match.annotation.rotation ?? 0) - (getPageTransformInfo(pageId)?.rotationDegrees ?? 0)
+    );
+    const useWidthGrowth = displayRotation % 180 !== 0;
     const originalTransform = wrapper?.style.transform ?? "";
     const originalWillChange = wrapper?.style.willChange ?? "";
     if (wrapper) {
       wrapper.style.transform = "none";
       wrapper.style.willChange = "auto";
     }
-    const nextHeight = measureRequiredTextHeightRatio(element, containerRect, 0.015);
+    const measurementDimension = useWidthGrowth
+      ? getPageTransformInfo(pageId)?.contentWidth ?? containerRect.width
+      : getPageTransformInfo(pageId)?.contentHeight ?? containerRect.height;
+    const nextSize = measureRequiredTextHeightRatio(element, containerRect, 0.015, 6, 24, measurementDimension);
     if (wrapper) {
       wrapper.style.transform = originalTransform;
       wrapper.style.willChange = originalWillChange;
     }
     const EPSILON = 0.0025;
     const lastKey = `${pageId}:${id}`;
-    const lastHeight = autoExpandLastHeightRef.current.get(lastKey);
-    if (lastHeight !== undefined && Math.abs(nextHeight - lastHeight) <= EPSILON) {
+    const lastSize = autoExpandLastHeightRef.current.get(lastKey);
+    if (lastSize !== undefined && Math.abs(nextSize - lastSize) <= EPSILON) {
       return;
     }
     if (autoExpandApplyingRef.current.has(lastKey)) return;
@@ -9671,16 +9964,20 @@ const timer =
         autoExpandApplyingRef.current.delete(lastKey);
         return prev;
       }
-      const maxHeight = 1 - current.y;
-      const targetHeight = clamp(Math.max(nextHeight, current.height ?? 0), 0.015, maxHeight);
-      const currentHeight = current.height ?? 0;
-      if (Math.abs(targetHeight - currentHeight) <= EPSILON) {
+      const maxSize = useWidthGrowth ? 1 - current.x : 1 - current.y;
+      const currentSize = useWidthGrowth ? current.width ?? 0 : current.height ?? 0;
+      const targetSize = clamp(Math.max(nextSize, currentSize), 0.015, maxSize);
+      if (Math.abs(targetSize - currentSize) <= EPSILON) {
         autoExpandApplyingRef.current.delete(lastKey);
         return prev;
       }
-      autoExpandLastHeightRef.current.set(lastKey, targetHeight);
+      autoExpandLastHeightRef.current.set(lastKey, targetSize);
       const updated = existing.map((item) =>
-        item.id === id ? { ...item, height: targetHeight } : item
+        item.id === id
+          ? useWidthGrowth
+            ? { ...item, width: targetSize }
+            : { ...item, height: targetSize }
+          : item
       );
       queueMicrotask(() => autoExpandApplyingRef.current.delete(lastKey));
       return { ...prev, [pageId]: updated };
@@ -9716,6 +10013,7 @@ const timer =
     textItalic,
     textUnderline,
     textAlign,
+    activeLineSpacing,
     textTransform,
     textFont,
   ]);
@@ -9991,6 +10289,35 @@ const timer =
     (next: number) => {
       const normalized = normalizeTextSize(next);
       setTextSize(normalized);
+      if (focusedTextId) {
+        const element = textNodeRefs.current.get(focusedTextId);
+        const selection = window.getSelection();
+        let range: Range | null = null;
+        if (element && selection && selection.rangeCount > 0) {
+          const activeRange = selection.getRangeAt(0);
+          if (element.contains(activeRange.commonAncestorContainer)) {
+            range = activeRange;
+          }
+        }
+        if (!range && element && selectionRangeRef.current && element.contains(selectionRangeRef.current.commonAncestorContainer)) {
+          range = selectionRangeRef.current;
+        }
+        if (element && (!range || range.collapsed)) {
+          const result = findTextAnnotationById(focusedTextId);
+          if (result) {
+            stripInlineFontSizes(element);
+            updateTextAnnotation(result.pageId, focusedTextId, (item) => ({
+              ...item,
+              textSizePt: normalized,
+              richTextHtml: element.innerHTML.replace(/[\u200b\u2060]/g, ""),
+            }));
+            autoExpandTextAnnotation(result.pageId, focusedTextId);
+            setPendingTextSizePt(null);
+            setSelectionFontSizePt(normalized);
+            return;
+          }
+        }
+      }
       const applied = applyFontSizeToSelection(normalized);
       if (!applied) {
         setPendingTextSizePt(normalized);
@@ -9999,7 +10326,7 @@ const timer =
       }
       if (focusedTextId) setSelectionFontSizePt(normalized);
     },
-    [applyFontSizeToSelection, focusedTextId]
+    [applyFontSizeToSelection, autoExpandTextAnnotation, findTextAnnotationById, focusedTextId, updateTextAnnotation]
   );
   const applyTextColor = useCallback(
     (color: string) => {
@@ -10316,11 +10643,21 @@ const timer =
   }, []);
   const applyTextAlignment = useCallback(
     (nextAlign: "left" | "center" | "right" | "justify") => {
-      setTextAlign(nextAlign);
+      if (focusedTextId) {
+        const result = findTextAnnotationById(focusedTextId);
+        if (result) {
+          updateTextAnnotation(result.pageId, focusedTextId, (item) => ({
+            ...item,
+            textAlign: nextAlign,
+          }));
+        }
+      } else {
+        setTextAlign(nextAlign);
+      }
       setAlignMenuOpen(false);
       hideToolbarTooltip();
     },
-    [hideToolbarTooltip]
+    [findTextAnnotationById, focusedTextId, hideToolbarTooltip, updateTextAnnotation]
   );
   const getPdfDocumentForSearch = useCallback(
     async (srcIdx: number) => {
@@ -10531,7 +10868,7 @@ const timer =
     !!draftShape ||
     !!draftTextBox;
   const buildProjectDataFromPages = useCallback(
-    (pagesList: PageItem[]) => ({
+    (pagesList: PageItem[], options?: { textAnnotations?: Record<string, TextAnnotation[]> }) => ({
       name: projectName,
       pagesCount: pagesList.length,
       sources: sources.map((source) => ({
@@ -10550,7 +10887,7 @@ const timer =
       })),
       highlights,
       shapesByPage,
-      textAnnotations,
+      textAnnotations: options?.textAnnotations ?? textAnnotations,
       textSizePt: textSize,
       textColor,
       textUnderline,
@@ -10579,15 +10916,38 @@ const timer =
     return buildProjectDataFromPages(pages);
   }, [buildProjectDataFromPages, hasWorkspaceData, pages]);
 
+  const saveWorkspaceNow = useCallback(() => {
+    if (!authSession?.user) {
+      pendingCloudSaveRef.current = true;
+      return;
+    }
+    const projectData = hasWorkspaceData
+      ? buildProjectDataFromPages(pages, { textAnnotations: textAnnotationsRef.current })
+      : null;
+    if (!projectData) return;
+    void resolveProjectCoverPreview().then((previewUrl) => {
+      void saveProject(projectName, projectData, previewUrl);
+    });
+  }, [
+    authSession?.user,
+    buildProjectDataFromPages,
+    hasWorkspaceData,
+    pages,
+    projectName,
+    resolveProjectCoverPreview,
+    saveProject,
+  ]);
+
   useEffect(() => {
     if (!rotationSaveRef.current) return;
     rotationSaveRef.current = false;
     if (!authSession?.user) return;
     const projectData = buildCloudProjectData();
     if (!projectData) return;
-    const previewUrl = getProjectCoverPreview(pagesRef.current);
-    void saveProject(projectName, projectData, previewUrl);
-  }, [authSession?.user, buildCloudProjectData, projectName, saveProject, pages]);
+    void resolveProjectCoverPreview().then((previewUrl) => {
+      void saveProject(projectName, projectData, previewUrl);
+    });
+  }, [authSession?.user, buildCloudProjectData, projectName, resolveProjectCoverPreview, saveProject, pages]);
 
   useEffect(() => {
     if (!authSession?.user) return;
@@ -10601,9 +10961,11 @@ const timer =
     const timer = setTimeout(() => {
       const projectData = buildCloudProjectData();
       if (!projectData || cancelled) return;
-      const previewUrl = getProjectCoverPreview(pagesRef.current);
-      void saveProject(projectName, projectData, previewUrl).then((saved) => {
-        if (!saved || cancelled) return;
+      void resolveProjectCoverPreview().then((previewUrl) => {
+        if (cancelled) return;
+        void saveProject(projectName, projectData, previewUrl).then((saved) => {
+          if (!saved || cancelled) return;
+        });
       });
     }, 1500);
 
@@ -10622,6 +10984,7 @@ const timer =
       draggingShape,
       draftHighlight,
       hasUnsavedWorkspaceChanges,
+      resolveProjectCoverPreview,
     ]);
 
   const computeBaseScale = useCallback(() => {
@@ -10890,7 +11253,10 @@ const timer =
 
   function handleShapePointerDown(pageId: string, event: ReactPointerEvent<HTMLDivElement>) {
     if (!shapeType) return;
-    const point = getPointerPoint(event, { requireInside: true, clampToBounds: true });
+    const point = getPagePoint(pageId, event.clientX, event.clientY, {
+      requireInside: true,
+      clampToBounds: true,
+    });
     if (!point) return;
     const lineStyle = shapeType === "check" || shapeType === "arrow" ? "solid" : shapeLineStyle;
     event.currentTarget.setPointerCapture?.(event.pointerId);
@@ -10909,7 +11275,10 @@ const timer =
 
   function handleShapePointerMove(pageId: string, event: ReactPointerEvent<HTMLDivElement>) {
     if (!draftShape || draftShape.pageId !== pageId) return;
-    const point = getPointerPoint(event, { requireInside: false, clampToBounds: true });
+    const point = getPagePoint(pageId, event.clientX, event.clientY, {
+      requireInside: false,
+      clampToBounds: true,
+    });
     if (!point) return;
     setDraftShape((prev) => (prev && prev.pageId === pageId ? { ...prev, end: { x: point.x, y: point.y } } : prev));
     event.preventDefault();
@@ -10951,7 +11320,10 @@ const timer =
 
   function handleMarkupPointerDown(pageId: string, event: ReactPointerEvent<HTMLDivElement>) {
     if (pendingSignatureForPlacement) {
-      const point = getPointerPoint(event, { requireInside: true, clampToBounds: true });
+      const point = getPagePoint(pageId, event.clientX, event.clientY, {
+        requireInside: true,
+        clampToBounds: true,
+      });
       if (point) {
         placeSignatureAtPoint(pendingSignatureForPlacement, pageId, point);
       }
@@ -10972,7 +11344,10 @@ const timer =
     }
     const tool = getActiveTool();
     if (!tool) return;
-    const point = getPointerPoint(event, { requireInside: true, clampToBounds: true });
+    const point = getPagePoint(pageId, event.clientX, event.clientY, {
+      requireInside: true,
+      clampToBounds: true,
+    });
     if (!point) return;
     if (tool === "text") {
       setDraftTextBox({
@@ -11034,13 +11409,19 @@ const timer =
     }
     if (getActiveTool() === "text") {
       if (!draftTextBox || draftTextBox.pageId !== pageId) return;
-      const point = getPointerPoint(event, { requireInside: true, clampToBounds: true });
+      const point = getPagePoint(pageId, event.clientX, event.clientY, {
+        requireInside: true,
+        clampToBounds: true,
+      });
       if (!point) return;
       setDraftTextBox((prev) => (prev ? { ...prev, currentX: point.x, currentY: point.y } : prev));
       event.preventDefault();
       return;
     }
-    const point = getPointerPoint(event, { clampToBounds: false, requireInside: false });
+    const point = getPagePoint(pageId, event.clientX, event.clientY, {
+      clampToBounds: false,
+      requireInside: false,
+    });
     if (!point) return;
     if (!point.inside) {
       lastOutsideRawRef.current = { x: point.x, y: point.y };
@@ -11179,7 +11560,8 @@ const timer =
                 text: TEXT_PLACEHOLDER,
                 rotation: 0,
                 locked: false,
-                textSizePt: textSize,
+                textSizePt: defaultTextSizePt,
+                textAlign,
                 lineSpacing: DEFAULT_TEXT_LINE_SPACING,
                 sourceType: "manual",
               },
@@ -11697,7 +12079,8 @@ const timer =
             height,
             text: TEXT_PLACEHOLDER,
             rotation: 0,
-            textSizePt: textSize,
+            textSizePt: defaultTextSizePt,
+            textAlign,
             lineSpacing: DEFAULT_TEXT_LINE_SPACING,
             sourceType: "manual",
           },
@@ -11705,7 +12088,7 @@ const timer =
       };
     });
     setFocusedTextId(annotationId);
-  }, [activePageId, pages]);
+  }, [activePageId, defaultTextSizePt, pages]);
 
   useEffect(() => {
     if (!showDrawModal) return;
@@ -11730,7 +12113,7 @@ const timer =
     }
     const projectData = buildCloudProjectData();
     if (!projectData) return;
-    const previewUrl = getProjectCoverPreview(pagesRef.current);
+    const previewUrl = await resolveProjectCoverPreview();
     const saved = await saveProject(projectName, projectData, previewUrl);
     const ownerId = authSession.user.id ?? authSession.user.email ?? null;
     if (saved && ownerId) {
@@ -11805,6 +12188,7 @@ const timer =
     for (const p of pages) {
       const srcDoc = docCache.get(p.srcIdx)!;
       const [copied] = await out.copyPages(srcDoc, [p.pageIdx]);
+      const pageRotationDegrees = preservePageRotation ? normalizeRotation(p.rotation ?? 0) : 0;
       if (preservePageRotation) {
         copied.setRotation(degrees(p.rotation ?? 0));
       }
@@ -11998,8 +12382,9 @@ const timer =
           const runs = extractRichTextRuns(html, baseSize);
           const lines = splitRunsIntoLines(runs);
           const rotation = annotation.rotation ?? 0;
-          const exportRotation = -rotation;
+          const exportRotation = -(normalizeRotation(rotation - pageRotationDegrees));
           const rotationRadians = (exportRotation * Math.PI) / 180;
+          const annotationTextAlign = annotation.textAlign ?? textAlign;
           const variants = new Set<TextFontVariant>();
           runs.forEach((run) => {
             variants.add(resolveFontVariant(!!run.bold, !!run.italic));
@@ -12036,12 +12421,12 @@ const timer =
             });
             const clampedWidth = Math.min(lineWidth, maxWidth);
             let lineX = x;
-            if (textAlign === "center") {
+            if (annotationTextAlign === "center") {
               lineX = x + Math.max(0, (maxWidth - clampedWidth) / 2);
-            } else if (textAlign === "right") {
+            } else if (annotationTextAlign === "right") {
               lineX = x + Math.max(0, maxWidth - clampedWidth);
             }
-            const shouldJustify = textAlign === "justify" && lineIndex < lines.length - 1;
+            const shouldJustify = annotationTextAlign === "justify" && lineIndex < lines.length - 1;
             const spaceCount = shouldJustify
               ? line.reduce(
                   (count, run) => count + (applyTextTransform(run.text, textTransform).match(/ /g)?.length ?? 0),
@@ -12188,10 +12573,11 @@ const timer =
       const projectData = buildCloudProjectData();
       if (projectData) {
         const ownerId = authSession.user.id ?? authSession.user.email ?? null;
-        const previewUrl = getProjectCoverPreview(pagesRef.current);
-        void saveProject(projectName, projectData, previewUrl).then((saved) => {
-          if (saved && ownerId) {
-          }
+        void resolveProjectCoverPreview().then((previewUrl) => {
+          void saveProject(projectName, projectData, previewUrl).then((saved) => {
+            if (saved && ownerId) {
+            }
+          });
         });
       }
     }
@@ -12368,7 +12754,7 @@ const timer =
         claimInFlightRef.current = false;
         return;
       }
-      const previewUrl = getProjectCoverPreview(pagesRef.current);
+      const previewUrl = await resolveProjectCoverPreview();
       const saved = await saveProject(projectName, projectData, previewUrl);
       if (!saved) {
         setAuthError("We couldn't save your project. Please try again.");
@@ -12391,6 +12777,7 @@ const timer =
     handleDownload,
     pendingExportAfterAuth,
     projectName,
+    resolveProjectCoverPreview,
     saveProject,
   ]);
 
@@ -12400,9 +12787,10 @@ const timer =
     if (!hasWorkspaceData) return;
     pendingCloudSaveRef.current = false;
     const projectData = buildProjectDataFromPages(pagesRef.current);
-    const previewUrl = getProjectCoverPreview(pagesRef.current);
-    void saveProject(projectName, projectData, previewUrl);
-  }, [authSession?.user, buildProjectDataFromPages, hasWorkspaceData, projectName, saveProject]);
+    void resolveProjectCoverPreview().then((previewUrl) => {
+      void saveProject(projectName, projectData, previewUrl);
+    });
+  }, [authSession?.user, buildProjectDataFromPages, hasWorkspaceData, projectName, resolveProjectCoverPreview, saveProject]);
 
   useEffect(() => {
     if (!authSession?.user) return;
@@ -12482,16 +12870,25 @@ const timer =
   function handleRotatePage(pageId: string) {
     rotationSaveRef.current = true;
     markWorkspaceDirty();
-    setPages((prev) =>
-      prev.map((page) =>
+    setPages((prev) => {
+      const nextPages = prev.map((page) =>
         page.id === pageId
           ? {
               ...page,
               rotation: normalizeRotation((page.rotation ?? 0) + 90),
             }
           : page
-      )
-    );
+      );
+      if (authSession?.user) {
+        const projectData = buildProjectDataFromPages(nextPages);
+        void resolveProjectCoverPreview(nextPages).then((previewUrl) => {
+          void saveProject(projectName, projectData, previewUrl);
+        });
+      } else {
+        pendingCloudSaveRef.current = true;
+      }
+      return nextPages;
+    });
   }
 
 	  function handleDeletePage(pageId: string) {
@@ -12520,8 +12917,9 @@ const timer =
 	    }
 	    if (authSession?.user) {
 	      const projectData = buildProjectDataFromPages(nextPages);
-	      const previewUrl = getProjectCoverPreview(nextPages);
-	      void saveProject(projectName, projectData, previewUrl);
+	      void resolveProjectCoverPreview(nextPages).then((previewUrl) => {
+	        void saveProject(projectName, projectData, previewUrl);
+	      });
 	    } else {
 	      pendingCloudSaveRef.current = true;
 	    }
@@ -12597,6 +12995,67 @@ const timer =
       node.focus();
     }
   }, [focusedTextId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!focusedTextId) {
+      setFocusedTextOverlayRect(null);
+      return;
+    }
+
+    const updateFocusedTextOverlayRect = () => {
+      const wrapperNode = textAnnotationRefs.current.get(focusedTextId);
+      if (!wrapperNode) {
+        setFocusedTextOverlayRect(null);
+        return;
+      }
+      const rect = wrapperNode.getBoundingClientRect();
+      setFocusedTextOverlayRect({
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        height: rect.height,
+      });
+    };
+
+    let rafId: number | null = null;
+    const scheduleUpdate = () => {
+      if (rafId !== null) return;
+      rafId = window.requestAnimationFrame(() => {
+        rafId = null;
+        updateFocusedTextOverlayRect();
+      });
+    };
+
+    const tick = () => {
+      updateFocusedTextOverlayRect();
+      rafId = window.requestAnimationFrame(tick);
+    };
+
+    tick();
+
+    const node = textAnnotationRefs.current.get(focusedTextId) ?? null;
+    const observer =
+      typeof ResizeObserver !== "undefined" && node
+        ? new ResizeObserver(() => {
+            scheduleUpdate();
+          })
+        : null;
+    if (observer && node) {
+      observer.observe(node);
+    }
+
+    window.addEventListener("scroll", scheduleUpdate, true);
+    window.addEventListener("resize", scheduleUpdate);
+    return () => {
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId);
+      }
+      observer?.disconnect();
+      window.removeEventListener("scroll", scheduleUpdate, true);
+      window.removeEventListener("resize", scheduleUpdate);
+    };
+  }, [focusedTextId, resizingText, typingTextId]);
 
   useEffect(() => {
     focusedTextIdRef.current = focusedTextId;
@@ -14662,9 +15121,9 @@ const timer =
                                                 onMouseLeave={hideToolbarTooltip}
                                                 aria-label="Text alignment"
                                               >
-                                                {textAlign === "left" ? (
+                                                {activeTextAlign === "left" ? (
                                                   <AlignLeft className="h-[18px] w-[18px]" />
-                                                ) : textAlign === "center" ? (
+                                                ) : activeTextAlign === "center" ? (
                                                   <AlignCenter className="h-[18px] w-[18px]" />
                                                 ) : (
                                                   <AlignRight className="h-[18px] w-[18px]" />
@@ -14693,7 +15152,7 @@ const timer =
                                                             key={value}
                                                             type="button"
                                                             className={`flex w-24 items-center gap-2 rounded-md px-2 py-1.5 text-sm font-semibold transition ${
-                                                              textAlign === value
+                                                              activeTextAlign === value
                                                                 ? "bg-[#6C47FF] text-white"
                                                                 : "text-zinc-200 hover:bg-[#3A3A40]"
                                                             }`}
@@ -14701,7 +15160,7 @@ const timer =
                                                             onMouseEnter={(event) => showToolbarTooltip(label, event.currentTarget)}
                                                             onMouseLeave={hideToolbarTooltip}
                                                             onClick={() => {
-                                                              applyTextAlignment(value as typeof textAlign);
+                                                              applyTextAlignment(value as typeof activeTextAlign);
                                                               restoreTextSelectionSoon();
                                                             }}
                                                             aria-label={`Align ${label.toLowerCase()}`}
@@ -14723,9 +15182,14 @@ const timer =
                                                 className={`${textOptionButtonBase} ${
                                                   lineSpacingMenuOpen ? textOptionButtonActive : textOptionButtonHover
                                                 } w-auto px-2 flex items-center gap-1 text-slate-800 dark:text-zinc-200`}
-                                                onMouseDown={keepTextEditingActive}
-                                                onClick={() => {
+                                                onMouseDown={(event) => {
+                                                  keepTextEditingActive(event);
                                                   hideToolbarTooltip();
+                                                  const rect = event.currentTarget.getBoundingClientRect();
+                                                  setLineSpacingMenuPosition({
+                                                    left: rect.left + rect.width / 2,
+                                                    top: rect.bottom + 8,
+                                                  });
                                                   setLineSpacingMenuOpen((prev) => !prev);
                                                 }}
                                                 onMouseEnter={(event) => showToolbarTooltip("Line spacing", event.currentTarget)}
@@ -16602,7 +17066,12 @@ const timer =
           )
         : null}
 
-      {toolbarTooltip.visible && (!fontMenuOpen || toolbarTooltip.label !== "Font") && typeof document !== "undefined"
+      {toolbarTooltip.visible &&
+      (!fontMenuOpen || toolbarTooltip.label !== "Font") &&
+      (!alignMenuOpen || toolbarTooltip.label !== "Align") &&
+      (!lineSpacingMenuOpen || toolbarTooltip.label !== "Line spacing") &&
+      (!(lineStyleMenuOpen || shapeLineStyleMenuOpen) || toolbarTooltip.label !== "Line style") &&
+      typeof document !== "undefined"
         ? createPortal(
             <div
               className="pointer-events-none fixed z-[10000]"

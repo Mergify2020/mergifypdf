@@ -11,6 +11,7 @@ import { projectNameToEditable, sanitizeProjectName } from "@/lib/projectName";
 type PreviewCacheEntry = {
   url: string;
   fetchedAt: number;
+  rotation: number;
 };
 
 const PREVIEW_CACHE_MAX_AGE_MS = 10 * 60 * 1000;
@@ -20,10 +21,10 @@ const STARRED_STORAGE_KEY = "mpdf:starred-projects";
 const PREVIEW_STORAGE_KEY_PREFIX = "mpdf:project-preview:";
 const previewMemoryCache = new Map<string, PreviewCacheEntry>();
 
-function readPreviewCache(projectId: string): PreviewCacheEntry | null {
+function readPreviewCache(projectId: string, rotation: number): PreviewCacheEntry | null {
   const now = Date.now();
   const memory = previewMemoryCache.get(projectId);
-  if (memory && now - memory.fetchedAt <= PREVIEW_CACHE_MAX_AGE_MS) return memory;
+  if (memory && memory.rotation === rotation && now - memory.fetchedAt <= PREVIEW_CACHE_MAX_AGE_MS) return memory;
   if (typeof window !== "undefined") {
     try {
       const raw = window.sessionStorage.getItem(`${PREVIEW_STORAGE_KEY_PREFIX}${projectId}`);
@@ -33,6 +34,8 @@ function readPreviewCache(projectId: string): PreviewCacheEntry | null {
         parsed &&
         typeof parsed.url === "string" &&
         typeof parsed.fetchedAt === "number" &&
+        typeof parsed.rotation === "number" &&
+        parsed.rotation === rotation &&
         now - parsed.fetchedAt <= PREVIEW_CACHE_MAX_AGE_MS
       ) {
         previewMemoryCache.set(projectId, parsed);
@@ -45,8 +48,8 @@ function readPreviewCache(projectId: string): PreviewCacheEntry | null {
   return null;
 }
 
-function writePreviewCache(projectId: string, url: string) {
-  const entry: PreviewCacheEntry = { url, fetchedAt: Date.now() };
+function writePreviewCache(projectId: string, url: string, rotation: number) {
+  const entry: PreviewCacheEntry = { url, fetchedAt: Date.now(), rotation };
   previewMemoryCache.set(projectId, entry);
   if (typeof window !== "undefined") {
     try {
@@ -508,7 +511,8 @@ export default function ProjectCard({
       return;
     }
 
-    const cached = readPreviewCache(project.id);
+    const rotation = project.rotation ?? 0;
+    const cached = readPreviewCache(project.id, rotation);
     if (cached?.url) {
       setPreviewUrl(cached.url);
       setPreviewLoading(false);
@@ -523,7 +527,7 @@ export default function ProjectCard({
         const url = await fetchPreviewUrl(controller.signal);
         if (cancelled) return;
         lastFailedPreviewRef.current = null;
-        writePreviewCache(project.id, url);
+        writePreviewCache(project.id, url, rotation);
         setPreviewUrl(url);
       } catch {
         if (!cancelled && !cached?.url) setPreviewLoading(false);
@@ -535,7 +539,7 @@ export default function ProjectCard({
       cancelled = true;
       controller.abort();
     };
-  }, [project.hasPreview, project.id]);
+  }, [project.hasPreview, project.id, project.rotation]);
 
   useEffect(() => {
     if (!previewLoading || !previewUrl) return;
@@ -557,7 +561,7 @@ export default function ProjectCard({
     try {
       const url = await fetchPreviewUrl();
       lastFailedPreviewRef.current = null;
-      writePreviewCache(project.id, url);
+      writePreviewCache(project.id, url, project.rotation ?? 0);
       setPreviewUrl(url);
     } catch {
       clearPreviewCache(project.id);
@@ -576,12 +580,12 @@ export default function ProjectCard({
       return;
     }
 
-    const cached = readPreviewCache(project.id);
+    const cached = readPreviewCache(project.id, project.rotation ?? 0);
     if (cached?.url) {
       setPreviewUrl(cached.url);
       setPreviewLoading(false);
     }
-  }, [project.hasPreview, project.id]);
+  }, [project.hasPreview, project.id, project.rotation]);
 
   const cardClasses = [
     "relative overflow-hidden rounded-[10px] bg-[#F9FAFC] transition outline outline-0 outline-transparent dark:bg-zinc-900 dark:shadow-[0_8px_18px_rgba(0,0,0,0.22)]",
