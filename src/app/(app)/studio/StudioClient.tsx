@@ -254,6 +254,8 @@ type CloudProject = {
   createdAt?: string | number;
   updatedAt?: string | number;
   previewUrl?: string | null;
+  hasPreview?: boolean;
+  hasPdf?: boolean;
   pagesCount?: number | null;
 };
 
