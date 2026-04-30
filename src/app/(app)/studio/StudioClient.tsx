@@ -1502,7 +1502,7 @@ function getNodePath(root: Node, node: Node) {
   const path: number[] = [];
   let current: Node | null = node;
   while (current && current !== root) {
-    const parent = current.parentNode;
+    const parent: Node | null = current.parentNode;
     if (!parent) return path;
     path.unshift(Array.prototype.indexOf.call(parent.childNodes, current));
     current = parent;
