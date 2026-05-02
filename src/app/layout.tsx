@@ -36,14 +36,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const cookieStore = await cookies();
   const themeCookie = cookieStore.get?.("theme")?.value;
   const themeClass = themeCookie === "dark" ? "dark" : undefined;
+  const themeColor = themeCookie === "dark" ? "#222224" : "#ffffff";
+  const colorScheme = themeCookie === "dark" ? "dark light" : "light dark";
 
   return (
     <html lang="en" className={themeClass} suppressHydrationWarning>
       <head>
-        {/* Force light UI */}
-        <meta name="color-scheme" content="light" />
-        <meta name="supported-color-schemes" content="light" />
-        <meta name="theme-color" content="#ffffff" />
+        {/* Set the initial theme metadata before hydration */}
+        <meta name="color-scheme" content={colorScheme} />
+        <meta name="supported-color-schemes" content={colorScheme} />
+        <meta name="theme-color" content={themeColor} />
 
         <Script
           id="theme-init"
@@ -81,7 +83,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         />
       </head>
 
-      <body className="min-h-screen bg-white text-gray-900 dark:bg-[#222224] dark:text-zinc-100">
+      <body className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
         <Providers>{children}</Providers>
       </body>
     </html>

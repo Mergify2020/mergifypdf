@@ -1383,6 +1383,15 @@ function stripInlineFontSizes(element: HTMLElement) {
   });
 }
 
+function stripEditorOnlyMarkup(element: HTMLElement) {
+  element.querySelectorAll<HTMLElement>("[data-typing-style-marker]").forEach((node) => {
+    node.removeAttribute("data-typing-style-marker");
+  });
+  element.querySelectorAll<HTMLElement>("[data-selection-marker]").forEach((node) => {
+    node.remove();
+  });
+}
+
 function parseLineHeightPx(styleValue: string, fontSizePx: number) {
   if (!styleValue || styleValue === "normal") {
     return fontSizePx * 1.2;
@@ -1416,24 +1425,36 @@ function measureRequiredTextHeightRatio(
   minRatio = 0.015,
   paddingBufferPx = 6,
   minPx = 24,
-  measurementHeightPx = containerRect.height
+  measurementHeightPx = containerRect.height,
+  options?: { trimTrailingBlankBlocks?: boolean }
 ) {
   if (!measurementHeightPx) return minRatio;
-  const requiredHeightPx = measureTextContentHeightPx(element, minPx, paddingBufferPx);
+  const requiredHeightPx = measureTextContentHeightPx(element, minPx, paddingBufferPx, options);
   return clamp(Math.ceil(requiredHeightPx) / measurementHeightPx, minRatio, 1);
 }
 
-function measureTextContentHeightPx(element: HTMLElement, minPx = 24, paddingBufferPx = 6) {
+function measureTextContentHeightPx(
+  element: HTMLElement,
+  minPx = 24,
+  paddingBufferPx = 6,
+  options?: { trimTrailingBlankBlocks?: boolean }
+) {
   const measurementElement =
     typeof document !== "undefined" && document.body
       ? (() => {
           const clone = element.cloneNode(true) as HTMLElement;
           const rect = element.getBoundingClientRect();
+          const style = window.getComputedStyle(element);
+          const paddingLeft = Number.parseFloat(style.paddingLeft) || 0;
+          const paddingRight = Number.parseFloat(style.paddingRight) || 0;
+          const borderLeft = Number.parseFloat(style.borderLeftWidth) || 0;
+          const borderRight = Number.parseFloat(style.borderRightWidth) || 0;
+          const contentWidth = Math.max(1, rect.width - paddingLeft - paddingRight - borderLeft - borderRight);
           Object.assign(clone.style, {
             position: "fixed",
             left: "-10000px",
             top: "0",
-            width: `${Math.max(1, rect.width)}px`,
+            width: `${contentWidth}px`,
             height: "auto",
             minHeight: "0",
             maxHeight: "none",
@@ -1445,6 +1466,9 @@ function measureTextContentHeightPx(element: HTMLElement, minPx = 24, paddingBuf
           return clone;
         })()
       : element;
+  if (measurementElement !== element && options?.trimTrailingBlankBlocks) {
+    trimTrailingBlankBlocks(measurementElement);
+  }
   let contentHeightPx = 0;
   try {
     const range = document.createRange();
@@ -1467,6 +1491,48 @@ function measureTextContentHeightPx(element: HTMLElement, minPx = 24, paddingBuf
     measurementElement.remove();
   }
   return Math.max(minPx, rangeHeightPx, scrollHeightPx) + paddingBufferPx;
+}
+
+function trimTrailingBlankBlocks(element: HTMLElement) {
+  const isMeaningfulNode = (node: Node): boolean => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return (node.textContent ?? "").replace(/[\u200b\u2060]/g, "").trim().length > 0;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) {
+      return false;
+    }
+    const el = node as HTMLElement;
+    if (el.tagName === "BR") return false;
+    if (el.tagName === "IMG" || el.tagName === "SVG" || el.tagName === "CANVAS") return true;
+    for (const child of Array.from(el.childNodes)) {
+      if (isMeaningfulNode(child)) return true;
+    }
+    return false;
+  };
+
+  const trimNode = (node: Node): boolean => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return isMeaningfulNode(node);
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) {
+      return false;
+    }
+    const el = node as HTMLElement;
+    const children = Array.from(el.childNodes);
+    for (let index = children.length - 1; index >= 0; index -= 1) {
+      const child = children[index];
+      if (trimNode(child)) {
+        break;
+      }
+      child.remove();
+    }
+    return isMeaningfulNode(el);
+  };
+
+  trimNode(element);
+  while (element.lastChild && !isMeaningfulNode(element.lastChild)) {
+    element.lastChild.remove();
+  }
 }
 
 function wouldTextInputOverflow(
@@ -2889,7 +2955,6 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         node.removeAttribute("style");
       }
     });
-    element.style.lineHeight = "";
   }, []);
 
   const getLineSpacingForTextId = useCallback(
@@ -2972,8 +3037,10 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
 
   const syncTextAnnotationContent = useCallback(
     (pageId: string, id: string, element: HTMLElement, options?: { flush?: boolean }) => {
-      const html = element.innerHTML.replace(/[\u200b\u2060]/g, "");
-      const text = element.innerText.replace(/[\u200b\u2060]/g, "");
+      const clone = element.cloneNode(true) as HTMLElement;
+      stripEditorOnlyMarkup(clone);
+      const html = clone.innerHTML.replace(/[\u200b\u2060]/g, "");
+      const text = clone.innerText.replace(/[\u200b\u2060]/g, "");
       const applyContentUpdate = () => {
         updateTextAnnotation(pageId, id, (item) => ({
           ...item,
@@ -3632,6 +3699,16 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       if (resolvedSize !== null) {
         setSelectionFontSizePt(normalizeTextSize(resolvedSize));
       }
+      const collapsedListContainer = range.startContainer.nodeType === Node.ELEMENT_NODE
+        ? (range.startContainer as HTMLElement)
+        : range.startContainer.parentElement;
+      const collapsedListNode = collapsedListContainer?.closest("ul, ol");
+      if (range.collapsed) {
+        const nextListType =
+          collapsedListNode?.tagName === "UL" ? "bullet" : collapsedListNode?.tagName === "OL" ? "number" : null;
+        setListType(nextListType);
+        setDefaultListType(nextListType);
+      }
       if (!range.collapsed) {
         const colors = new Set<string>();
         const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
@@ -3791,7 +3868,10 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
 
       const annotation = textAnnotations[pageId]?.find((a) => a.id === annotationId);
       if (!annotation || annotation.locked) return;
-      const startPoint = getPageNormalizedPoint(pageId, startEvent.clientX, startEvent.clientY);
+      const startPoint = getPagePoint(pageId, startEvent.clientX, startEvent.clientY, {
+        clampToBounds: true,
+        requireInside: false,
+      });
       if (!startPoint) return;
 
       textDragCleanupRef.current?.();
@@ -4277,20 +4357,42 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         top: -startHeight / 2,
         bottom: startHeight / 2,
       };
-      const measureEditorHeight = () => {
-        const containerHeight = getPageLocalHeight();
-        if (!editorNode || !containerHeight) return 0;
-        const originalTransform = node?.style.transform ?? "";
-        const originalWillChange = node?.style.willChange ?? "";
-        if (node) {
-          node.style.transform = "none";
-          node.style.willChange = "auto";
-        }
-        const requiredHeightPx = measureTextContentHeightPx(editorNode);
-        if (node) {
-          node.style.transform = originalTransform;
-          node.style.willChange = originalWillChange;
-        }
+      const measureEditorHeight = (targetWidth: number | null = null) => {
+        if (!editorNode || !containerNode) return 0;
+        const containerRect = containerNode.getBoundingClientRect();
+        if (!containerRect.width || !containerRect.height) return 0;
+        const measurementElement = editorNode.cloneNode(true) as HTMLElement;
+        const editorStyle = window.getComputedStyle(editorNode);
+        const paddingLeft = Number.parseFloat(editorStyle.paddingLeft) || 0;
+        const paddingRight = Number.parseFloat(editorStyle.paddingRight) || 0;
+        const borderLeft = Number.parseFloat(editorStyle.borderLeftWidth) || 0;
+        const borderRight = Number.parseFloat(editorStyle.borderRightWidth) || 0;
+        const widthPx =
+          targetWidth !== null
+            ? Math.max(1, targetWidth * containerRect.width - paddingLeft - paddingRight - borderLeft - borderRight)
+            : Math.max(
+                1,
+                editorNode.getBoundingClientRect().width - paddingLeft - paddingRight - borderLeft - borderRight
+              );
+        Object.assign(measurementElement.style, {
+          position: "fixed",
+          left: "-10000px",
+          top: "0",
+          width: `${widthPx}px`,
+          height: "auto",
+          minHeight: "0",
+          maxHeight: "none",
+          overflow: "visible",
+          visibility: "hidden",
+          pointerEvents: "none",
+          transform: "none",
+          willChange: "auto",
+        });
+        document.body.appendChild(measurementElement);
+        const fontSizePx = Number.parseFloat(editorStyle.fontSize) || 12;
+        const lineHeightPx = resolveLineHeightPx(editorStyle.lineHeight, fontSizePx);
+        const requiredHeightPx = measureTextContentHeightPx(measurementElement, 24, 0) + Math.max(1, Math.ceil(lineHeightPx * 0.2));
+        measurementElement.remove();
         return requiredHeightPx;
       };
       const handleMove = (event: PointerEvent) => {
@@ -4325,51 +4427,30 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         } else if (corner === "n") {
           nextTop = Math.min(startBounds.bottom - baseMinHeight, startBounds.top + deltaLocalY);
         }
-        let nextWidth = Math.max(minWidth, nextRight - nextLeft);
+        const nextWidth = Math.max(minWidth, nextRight - nextLeft);
         let nextHeight = Math.max(baseMinHeight, nextBottom - nextTop);
         const localCenterX = (nextLeft + nextRight) / 2;
         const localCenterY = (nextTop + nextBottom) / 2;
         const centerOffset = rotateVector(localCenterX, localCenterY, rotationRadians);
         let nextX = startCenterX + centerOffset.x - nextWidth / 2;
         let nextY = startCenterY + centerOffset.y - nextHeight / 2;
-        const pageIsRotated = pageRotationDegrees % 180 !== 0;
-        const autoFitOnWidthChange = !pageIsRotated && (corner === "e" || corner === "w");
         const containerHeight = getPageLocalHeight();
-        if (!autoFitOnWidthChange && editorNode && containerHeight) {
+        if (editorNode && containerHeight) {
           const plainText = editorNode.textContent?.replace(/[\u200b\u2060]/g, "").trim() ?? "";
-          if (!plainText) {
-            const requiredHeight = clamp(24 / containerHeight, baseMinHeight, 1);
-            if (nextHeight < requiredHeight) {
-              nextHeight = requiredHeight;
-              if (corner === "n" || corner === "nw" || corner === "ne") {
-                nextTop = nextBottom - nextHeight;
-              } else {
-                nextBottom = nextTop + nextHeight;
-              }
-              const adjustedLocalCenterX = (nextLeft + nextRight) / 2;
-              const adjustedLocalCenterY = (nextTop + nextBottom) / 2;
-              const adjustedCenterOffset = rotateVector(adjustedLocalCenterX, adjustedLocalCenterY, rotationRadians);
-              nextX = startCenterX + adjustedCenterOffset.x - nextWidth / 2;
-              nextY = startCenterY + adjustedCenterOffset.y - nextHeight / 2;
+          const requiredHeightPx = plainText ? measureEditorHeight(nextWidth) : 24;
+          const requiredHeight = clamp(Math.ceil(requiredHeightPx) / containerHeight, baseMinHeight, 1);
+          if (nextHeight < requiredHeight) {
+            nextHeight = requiredHeight;
+            if (corner === "n" || corner === "nw" || corner === "ne") {
+              nextTop = nextBottom - nextHeight;
+            } else {
+              nextBottom = nextTop + nextHeight;
             }
-          } else {
-            const requiredHeightPx = measureEditorHeight();
-            if (requiredHeightPx > 0) {
-              const requiredHeight = clamp(Math.ceil(requiredHeightPx) / containerHeight, baseMinHeight, 1);
-              if (nextHeight < requiredHeight) {
-                nextHeight = requiredHeight;
-                if (corner === "n" || corner === "nw" || corner === "ne") {
-                  nextTop = nextBottom - nextHeight;
-                } else {
-                  nextBottom = nextTop + nextHeight;
-                }
-                const adjustedLocalCenterX = (nextLeft + nextRight) / 2;
-                const adjustedLocalCenterY = (nextTop + nextBottom) / 2;
-                const adjustedCenterOffset = rotateVector(adjustedLocalCenterX, adjustedLocalCenterY, rotationRadians);
-                nextX = startCenterX + adjustedCenterOffset.x - nextWidth / 2;
-                nextY = startCenterY + adjustedCenterOffset.y - nextHeight / 2;
-              }
-            }
+            const adjustedLocalCenterX = (nextLeft + nextRight) / 2;
+            const adjustedLocalCenterY = (nextTop + nextBottom) / 2;
+            const adjustedCenterOffset = rotateVector(adjustedLocalCenterX, adjustedLocalCenterY, rotationRadians);
+            nextX = startCenterX + adjustedCenterOffset.x - nextWidth / 2;
+            nextY = startCenterY + adjustedCenterOffset.y - nextHeight / 2;
           }
         }
         nextX = clamp(nextX, 0, 1 - nextWidth);
@@ -4387,27 +4468,14 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
           node.style.top = `${latest.y * 100}%`;
           node.style.width = `${latest.width * 100}%`;
           node.style.height = `${latest.height * 100}%`;
-          const containerHeight = getPageLocalHeight();
-          if (containerHeight && autoFitOnWidthChange && editorNode) {
-            const requiredHeightPx = measureEditorHeight();
-            const requiredHeight = clamp(Math.ceil(requiredHeightPx) / containerHeight, baseMinHeight, 1 - latest.y);
-            const EPS = 0.004;
-            if (requiredHeight > latest.height + EPS) {
-              const adjusted = { ...latest, height: requiredHeight };
-              textResizeLatestRef.current = adjusted;
-              node.style.height = `${requiredHeight * 100}%`;
-            }
-          }
           const rect = node.getBoundingClientRect();
-          flushSync(() => {
-            setFocusedTextOverlayRect({
-              left: rect.left,
-              top: rect.top,
-              width: rect.width,
-              height: rect.height,
-            });
+          setFocusedTextOverlayRect({
+            left: rect.left,
+            top: rect.top,
+            width: rect.width,
+            height: rect.height,
           });
-          // No auto-height adjustments during resize; rely on minHeight clamp only.
+          // Keep resize stable while dragging; content reflow is handled after the resize ends.
         });
       };
       const handleUp = (event: PointerEvent) => {
@@ -4851,6 +4919,7 @@ const timer =
   const signatureTabInactive = "";
   const textOptionButtonBase =
     "inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-800 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 dark:text-zinc-200 dark:focus-visible:ring-zinc-500/50";
+  const instantTextOptionButtonBase = `${textOptionButtonBase} transition-none`;
   const textOptionButtonHover = "hover:bg-slate-200 hover:text-slate-900 dark:hover:bg-[#2A2A31] dark:hover:text-white";
   const textOptionButtonActive = "bg-[#6C47FF] text-white hover:bg-[#6C47FF] hover:text-white dark:bg-[#6C47FF] dark:text-white dark:hover:bg-[#6C47FF] dark:hover:text-white";
   const textInputPill = "inline-flex h-9 items-center gap-1 pl-0 pr-2 text-sm font-medium text-slate-800 dark:text-zinc-200";
@@ -5849,15 +5918,8 @@ const timer =
         scheduleBackgroundLowRes();
       }
     };
-    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
-      backgroundLowResUsesIdleRef.current = true;
-      backgroundLowResTimerRef.current = (window as any).requestIdleCallback(run, {
-        timeout: BACKGROUND_LOW_RES_IDLE_TIMEOUT,
-      });
-    } else {
-      backgroundLowResUsesIdleRef.current = false;
-      backgroundLowResTimerRef.current = setTimeout(() => run(), BACKGROUND_LOW_RES_IDLE_TIMEOUT);
-    }
+    backgroundLowResUsesIdleRef.current = false;
+    backgroundLowResTimerRef.current = globalThis.setTimeout(() => run(), BACKGROUND_LOW_RES_IDLE_TIMEOUT);
   }, []);
   scheduleBackgroundLowResRef.current = scheduleBackgroundLowRes;
 
@@ -8470,6 +8532,7 @@ const timer =
                           selection.removeAllRanges();
                           selection.addRange(nextRange);
                           selectionRangeRef.current = nextRange.cloneRange();
+                          setDefaultListType(null);
                           setListType(null);
                           return;
                         }
@@ -8511,6 +8574,7 @@ const timer =
                         selection.removeAllRanges();
                         selection.addRange(nextRange);
                         selectionRangeRef.current = nextRange.cloneRange();
+                        setDefaultListType(null);
                         setListType(null);
                       }}
                       onBeforeInput={(event) => {
@@ -8551,6 +8615,11 @@ const timer =
                         }
                       }}
                       onInput={(event) => {
+                        const inputType = (event.nativeEvent as InputEvent | undefined)?.inputType;
+                        const isLineBreakInput = inputType === "insertParagraph" || inputType === "insertLineBreak";
+                        if (isLineBreakInput) {
+                          event.currentTarget.scrollTop = 0;
+                        }
                         noteTextTyping(annotation.id);
                         syncTextAnnotationContent(page.id, annotation.id, event.currentTarget);
                         const wrapper = textAnnotationRefs.current.get(annotation.id);
@@ -8566,7 +8635,7 @@ const timer =
                             event.currentTarget,
                             rect,
                             0.015,
-                            6,
+                            2,
                             24,
                             measurementDimension
                           );
@@ -8589,7 +8658,17 @@ const timer =
                         }
                         textAutoExpandRafRef.current = window.requestAnimationFrame(() => {
                           textAutoExpandRafRef.current = null;
-                          autoExpandTextAnnotation(page.id, annotation.id);
+                          if (isLineBreakInput) {
+                            window.requestAnimationFrame(() => {
+                              autoExpandTextAnnotation(page.id, annotation.id);
+                            });
+                          } else {
+                            autoExpandTextAnnotation(page.id, annotation.id);
+                          }
+                          if (isLineBreakInput) {
+                            const node = textNodeRefs.current.get(annotation.id);
+                            node?.scrollTo({ top: 0 });
+                          }
                         });
                         normalizeStrikeMarkup(event.currentTarget);
                         const selection = window.getSelection();
@@ -8697,18 +8776,25 @@ const timer =
                         if (activeTextContainerId === annotation.id) {
                           setActiveTextContainerId(null);
                         }
+                        stripEditorOnlyMarkup(event.currentTarget);
                         const text = event.currentTarget.innerText.replace(/[\u200b\u2060]/g, "").trim();
                         if (!text) {
-                          flushSync(() => {
-                            deleteTextAnnotation(page.id, annotation.id);
-                          });
+                          deleteTextAnnotation(page.id, annotation.id);
                           saveWorkspaceNow();
                           return;
                         }
-                        syncTextAnnotationContent(page.id, annotation.id, event.currentTarget, { flush: true });
+                        stripInlineFontSizes(event.currentTarget);
                         normalizeStrikeMarkup(event.currentTarget);
                         normalizeLineHeightMarkup(event.currentTarget);
-                        saveWorkspaceNow();
+                        syncTextAnnotationContent(page.id, annotation.id, event.currentTarget);
+                        autoExpandTextAnnotation(page.id, annotation.id);
+                        event.currentTarget.scrollTop = 0;
+                        event.currentTarget.scrollLeft = 0;
+                        requestAnimationFrame(() => {
+                          requestAnimationFrame(() => {
+                            saveWorkspaceNow();
+                          });
+                        });
                       }}
                       onClick={(event) => {
                         event.stopPropagation();
@@ -8749,6 +8835,11 @@ const timer =
                         const isActive = focusedTextId === annotation.id || typingTextId === annotation.id;
                         if (!isActive && node.innerHTML !== annotationHtml) {
                           node.innerHTML = annotationHtml;
+                        }
+                        if (!isActive) {
+                          normalizeLineHeightMarkup(node);
+                          node.scrollTop = 0;
+                          node.scrollLeft = 0;
                         }
                       }}
                       className={`min-w-[12px] min-h-[24px] rounded-none px-2 py-1 text-[12px] leading-snug transition border border-solid border-transparent outline-none focus:outline-none focus-visible:outline-none whitespace-pre-wrap break-all ${
@@ -9946,7 +10037,7 @@ const timer =
     const measurementDimension = useWidthGrowth
       ? getPageTransformInfo(pageId)?.contentWidth ?? containerRect.width
       : getPageTransformInfo(pageId)?.contentHeight ?? containerRect.height;
-    const nextSize = measureRequiredTextHeightRatio(element, containerRect, 0.015, 6, 24, measurementDimension);
+    const nextSize = measureRequiredTextHeightRatio(element, containerRect, 0.015, 2, 24, measurementDimension);
     if (wrapper) {
       wrapper.style.transform = originalTransform;
       wrapper.style.willChange = originalWillChange;
@@ -9989,36 +10080,6 @@ const timer =
   const autoExpandRafRef = useRef<number | null>(null);
   const autoExpandLastHeightRef = useRef<Map<string, number>>(new Map());
   const autoExpandApplyingRef = useRef<Set<string>>(new Set());
-  useLayoutEffect(() => {
-    if (!focusedTextId) return;
-    if (resizingText) return;
-    if (rotatingText) return;
-    if (typingTextId === focusedTextId) return;
-    const pageId = Object.keys(textAnnotations).find((id) =>
-      textAnnotations[id]?.some((item) => item.id === focusedTextId)
-    );
-    if (!pageId) return;
-    if (autoExpandRafRef.current !== null) {
-      cancelAnimationFrame(autoExpandRafRef.current);
-    }
-    autoExpandRafRef.current = requestAnimationFrame(() => {
-      autoExpandRafRef.current = null;
-      autoExpandTextAnnotation(pageId, focusedTextId);
-    });
-  }, [
-    focusedTextId,
-    resizingText,
-    rotatingText,
-    textAnnotations,
-    activeTextSize,
-    textBold,
-    textItalic,
-    textUnderline,
-    textAlign,
-    activeLineSpacing,
-    textTransform,
-    textFont,
-  ]);
 
   const toggleTextAnnotationLock = useCallback((pageId: string, id: string) => {
     setTextAnnotations((prev) => {
@@ -10190,6 +10251,7 @@ const timer =
   const highlightActive = highlightButtonOn && !deleteMode;
   const selectActive = selectButtonOn && !deleteMode;
   const textActive = textButtonOn && !deleteMode;
+  const activeListType = focusedTextId ? listType ?? defaultListType : defaultListType;
   const mobileCaptureLink = useMemo(
     () => (typeof window !== "undefined" ? `${window.location.origin}/sign-on-mobile` : "https://mergifypdf.com/sign-on-mobile"),
     []
@@ -11537,10 +11599,10 @@ const timer =
           ? Math.min(TEXT_DEFAULT_HEIGHT_PX / draftTextBox.rectHeight, 1)
           : Math.max(heightDelta, 0.03);
         const x = isClick
-          ? clamp(draftTextBox.startX, 0, 1 - width)
+          ? clamp(draftTextBox.startX - width / 2, 0, 1 - width)
           : Math.min(draftTextBox.startX, draftTextBox.currentX);
         const y = isClick
-          ? clamp(draftTextBox.startY, 0, 1 - height)
+          ? clamp(draftTextBox.startY - height / 2, 0, 1 - height)
           : Math.min(draftTextBox.startY, draftTextBox.currentY);
         const annotationId = crypto.randomUUID();
         const pageIndex = pages.findIndex((p) => p.id === pageId);
@@ -13631,7 +13693,7 @@ const timer =
     >
       {showStartupOverlay ? (
         startupOverlayVariant === "existing" ? (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center bg-white opacity-100 dark:bg-[#0F1117]">
+          <div className="fixed inset-0 z-[120] flex items-center justify-center bg-[var(--background)] opacity-100">
             <div className="pointer-events-none flex flex-col items-center text-center">
               <div
                 className="h-10 w-10 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700 dark:border-[#2A2A31] dark:border-t-slate-200"
@@ -15211,9 +15273,9 @@ const timer =
                                           <div className="flex items-center gap-1">
                                             <button
                                               type="button"
-                                              aria-pressed={(focusedTextId && isCollapsedTextSelection ? defaultListType : listType) === "bullet"}
-                                              className={`${textOptionButtonBase} ${
-                                                (focusedTextId && isCollapsedTextSelection ? defaultListType : listType) === "bullet"
+                                              aria-pressed={activeListType === "bullet"}
+                                              className={`${instantTextOptionButtonBase} ${
+                                                activeListType === "bullet"
                                                   ? textOptionButtonActive
                                                   : textOptionButtonHover
                                               } text-slate-800 dark:text-zinc-200`}
@@ -15227,9 +15289,9 @@ const timer =
                                             </button>
                                             <button
                                               type="button"
-                                              aria-pressed={(focusedTextId && isCollapsedTextSelection ? defaultListType : listType) === "number"}
-                                              className={`${textOptionButtonBase} ${
-                                                (focusedTextId && isCollapsedTextSelection ? defaultListType : listType) === "number"
+                                              aria-pressed={activeListType === "number"}
+                                              className={`${instantTextOptionButtonBase} ${
+                                                activeListType === "number"
                                                   ? textOptionButtonActive
                                                   : textOptionButtonHover
                                               } text-slate-800 dark:text-zinc-200`}

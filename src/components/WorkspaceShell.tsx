@@ -2302,7 +2302,7 @@ export default function WorkspaceShell({
             workspaceLaunchOverlayExiting ? "workspace-handoff-overlay-exit" : "workspace-handoff-overlay-enter"
           }`}
         >
-          <div className="workspace-handoff-overlay-backdrop absolute inset-0 bg-white dark:bg-[#252525]" />
+          <div className="workspace-handoff-overlay-backdrop absolute inset-0 bg-[var(--background)]" />
           <div className={`relative min-h-screen ${workspaceLaunchOverlayExiting ? "workspace-handoff-content-exit" : ""}`}>
             <WorkspaceLaunchLoadingState
               files={workspaceLaunchOverlayFiles}
@@ -2322,7 +2322,7 @@ export default function WorkspaceShell({
             existingProjectOverlayExiting ? "workspace-handoff-overlay-exit" : "workspace-handoff-overlay-enter"
           }`}
         >
-          <div className="workspace-handoff-overlay-backdrop absolute inset-0 bg-white dark:bg-[#252525]" />
+          <div className="workspace-handoff-overlay-backdrop absolute inset-0 bg-[var(--background)]" />
           <div
             className={`relative flex min-h-screen items-center justify-center px-6 py-10 ${
               existingProjectOverlayExiting ? "workspace-handoff-content-exit" : ""
@@ -3510,7 +3510,7 @@ export default function WorkspaceShell({
 
       {billingPortalLoading ? (
         <div className="pointer-events-none fixed inset-0 z-[1200]">
-          <div className="absolute inset-0 bg-white dark:bg-[#252525]" />
+          <div className="absolute inset-0 bg-[var(--background)]" />
           <div className="relative flex min-h-screen items-center justify-center px-6 py-10">
             <div className="pointer-events-none flex flex-col items-center text-center">
               <div
@@ -3570,14 +3570,14 @@ export default function WorkspaceShell({
   const accountPanelOverlay =
     accountPanelOpen && typeof document !== "undefined"
       ? createPortal(
-          <div className="fixed inset-0 z-[950] bg-slate-100 dark:bg-[#252525]">
+          <div className="fixed inset-0 z-[950] bg-[var(--background)]">
             <button
               type="button"
               className="absolute inset-0 cursor-default"
               aria-label="Close account settings"
               onClick={closeAccountPanel}
             />
-            <div className="relative h-full w-full bg-slate-100 dark:bg-[#252525]">
+            <div className="relative h-full w-full bg-[var(--background)]">
               <AccountSettingsPage
                 activeSettingsTab="account"
                 initialMobileView="home"

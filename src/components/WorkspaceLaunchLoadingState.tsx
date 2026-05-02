@@ -108,7 +108,7 @@ export default function WorkspaceLaunchLoadingState({
       className={
         isPanel
           ? "relative flex h-full w-full items-center justify-center px-8 py-10"
-          : "workspace-launch-screen relative min-h-screen overflow-hidden bg-white dark:bg-[#252525]"
+          : "workspace-launch-screen relative min-h-screen overflow-hidden bg-[var(--background)]"
       }
     >
       <div
