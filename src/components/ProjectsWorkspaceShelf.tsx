@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowUpRight, Clock } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
@@ -10,6 +11,7 @@ import {
   subscribeProjectsSummary,
   type ProjectsSummaryProject,
 } from "@/lib/projectsSummaryCache";
+import { beginExistingWorkspaceOpenHandoff, shouldHandleWorkspaceOpenClick } from "@/lib/workspaceOpenHandoff";
 type ResumeSnapshot = { fileName: string; lastEditedLabel: string };
 
 function formatLastEdited(timestamp: number) {
@@ -33,18 +35,18 @@ function formatLastEdited(timestamp: number) {
 export default function ProjectsWorkspaceShelf() {
   const [snapshot, setSnapshot] = useState<ResumeSnapshot | null>(null);
   const { data: session } = useSession();
+  const router = useRouter();
+  const ownerId = session?.user?.id ?? null;
+  const displaySnapshot = ownerId ? snapshot : null;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const ownerId = session?.user?.id ?? null;
     if (!ownerId) {
-      setSnapshot(null);
       return;
     }
 
     let cancelled = false;
-    setSnapshot(null);
 
     const applySnapshot = (projects: ProjectsSummaryProject[] | null) => {
       if (cancelled) return;
@@ -84,9 +86,18 @@ export default function ProjectsWorkspaceShelf() {
       cancelled = true;
       unsubscribe();
     };
-  }, [session?.user?.id]);
+  }, [ownerId]);
 
-  if (!snapshot) {
+  const openWorkspace = () => {
+    beginExistingWorkspaceOpenHandoff();
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        router.push("/studio");
+      });
+    });
+  };
+
+  if (!displaySnapshot) {
     return (
       <div className="rounded-[10px] border border-slate-200 bg-white p-6 text-slate-900 shadow-[0_4px_12px_rgba(15,23,42,0.04)] transition-all duration-150 hover:-translate-y-0.5 hover:shadow-lg">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -103,6 +114,11 @@ export default function ProjectsWorkspaceShelf() {
           <Link
             href="/studio"
             className="btn-primary px-5 py-2.5"
+            onClick={(event) => {
+              if (!shouldHandleWorkspaceOpenClick(event)) return;
+              event.preventDefault();
+              openWorkspace();
+            }}
           >
             Launch workspace
             <ArrowUpRight className="ml-2 h-4 w-4" />
@@ -122,11 +138,11 @@ export default function ProjectsWorkspaceShelf() {
           </p>
           <div className="space-y-2">
             <p className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
-              {snapshot.fileName}
+              {displaySnapshot.fileName}
             </p>
             <div className="inline-flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-4 py-1.5 text-xs font-medium text-slate-500">
               <Clock className="h-4 w-4 text-[var(--color-primary)]" />
-              Updated {snapshot.lastEditedLabel}
+              Updated {displaySnapshot.lastEditedLabel}
             </div>
             <div className="mt-2 h-1 w-2/5 overflow-hidden rounded-full bg-[var(--color-primary-light)]">
               <div

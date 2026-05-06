@@ -10,8 +10,11 @@ import {
 } from "@/lib/projectName";
 import { useWorkspaceFilePreloader, type PendingWorkspaceFile } from "@/components/useWorkspaceFilePreloader";
 import PendingFilesReorderList from "@/components/PendingFilesReorderList";
-import WorkspaceLaunchLoadingState from "@/components/WorkspaceLaunchLoadingState";
 import { uploadProjectPreviewFromFile } from "@/lib/projectPreview";
+import {
+  beginWorkspaceOpenHandoff,
+  WORKSPACE_OPEN_IN_PROGRESS_STORAGE_KEY,
+} from "@/lib/workspaceOpenHandoff";
 
 const WORKSPACE_META_KEY = "mpdf:files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
@@ -52,6 +55,7 @@ async function resetWorkspaceStorage() {
     window.sessionStorage?.removeItem(STARTUP_OVERLAY_KEY);
     window.sessionStorage?.removeItem(STARTUP_OVERLAY_CONTEXT_KEY);
     window.sessionStorage?.removeItem(EXISTING_PROJECT_OVERLAY_STORAGE_KEY);
+    window.sessionStorage?.removeItem(WORKSPACE_OPEN_IN_PROGRESS_STORAGE_KEY);
   } catch {
     // ignore
   }
@@ -76,23 +80,15 @@ export default function StartProjectButton({ className, variant = "default", ico
   const [limitFlashSignal, setLimitFlashSignal] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [launchReadyForTesting, setLaunchReadyForTesting] = useState(false);
-  const [launchStartedAtMs, setLaunchStartedAtMs] = useState<number | null>(null);
   const [showValidation, setShowValidation] = useState(false);
   const [launchExiting, setLaunchExiting] = useState(false);
-  const [showLaunchLoader, setShowLaunchLoader] = useState(false);
   const [launchFileFlash, setLaunchFileFlash] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const dragDepthRef = useRef(0);
-  const launchLoaderTimerRef = useRef<number | null>(null);
   const launchFlashTimerRef = useRef<number | null>(null);
 
   const resetLaunchTransition = () => {
-    if (launchLoaderTimerRef.current !== null) {
-      window.clearTimeout(launchLoaderTimerRef.current);
-      launchLoaderTimerRef.current = null;
-    }
     if (launchFlashTimerRef.current !== null) {
       window.clearTimeout(launchFlashTimerRef.current);
       launchFlashTimerRef.current = null;
@@ -141,7 +137,6 @@ export default function StartProjectButton({ className, variant = "default", ico
 
   useEffect(() => {
     return () => {
-      if (launchLoaderTimerRef.current !== null) window.clearTimeout(launchLoaderTimerRef.current);
       if (launchFlashTimerRef.current !== null) window.clearTimeout(launchFlashTimerRef.current);
     };
   }, []);
@@ -191,7 +186,6 @@ export default function StartProjectButton({ className, variant = "default", ico
     setError(null);
     setLimitFlashSignal(0);
     setPendingFiles([]);
-    setLaunchReadyForTesting(false);
     resetLaunchTransition();
     setShowValidation(false);
     setOpen(true);
@@ -205,7 +199,6 @@ export default function StartProjectButton({ className, variant = "default", ico
 
   async function handleStart() {
     const startedAt = Date.now();
-    setLaunchStartedAtMs(startedAt);
     setShowValidation(true);
     if (missingFiles) {
       setError(null);
@@ -224,11 +217,10 @@ export default function StartProjectButton({ className, variant = "default", ico
       setLaunchFileFlash(false);
       launchFlashTimerRef.current = null;
     }, WORKSPACE_LAUNCH_FILE_FLASH_MS);
-    setShowLaunchLoader(true);
     setBusy(true);
-    setLaunchReadyForTesting(false);
+    beginWorkspaceOpenHandoff(pendingFiles, startedAt);
     await resetWorkspaceStorage();
-      try {
+    try {
       const res = await fetch("/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -237,7 +229,6 @@ export default function StartProjectButton({ className, variant = "default", ico
       if (!res.ok) {
         setError("Could not create that project. Please try again.");
         setBusy(false);
-        setLaunchReadyForTesting(false);
         resetLaunchTransition();
         return;
       }
@@ -246,7 +237,6 @@ export default function StartProjectButton({ className, variant = "default", ico
       if (!id) {
         setError("Could not create that project. Please try again.");
         setBusy(false);
-        setLaunchReadyForTesting(false);
         resetLaunchTransition();
         return;
       }
@@ -263,21 +253,14 @@ export default function StartProjectButton({ className, variant = "default", ico
       if (elapsed < WORKSPACE_LAUNCH_MIN_MS) {
         await new Promise((resolve) => setTimeout(resolve, WORKSPACE_LAUNCH_MIN_MS - elapsed));
       }
-      setLaunchReadyForTesting(true);
       await new Promise((resolve) => setTimeout(resolve, WORKSPACE_LAUNCH_PANEL_COMPLETE_MS));
       if (WORKSPACE_LAUNCH_HOLD_FOR_TESTING) {
         return;
       }
-      window.dispatchEvent(
-        new CustomEvent("workspace-launch-overlay-show", {
-          detail: { files: pendingFiles, startedAtMs: startedAt },
-        }),
-      );
       router.push(`/studio?project=${encodeURIComponent(id)}`);
     } catch {
       setError("Could not create that project. Please try again.");
       setBusy(false);
-      setLaunchReadyForTesting(false);
       resetLaunchTransition();
       window.dispatchEvent(new Event("workspace-launch-overlay-hide"));
     }
@@ -307,21 +290,6 @@ export default function StartProjectButton({ className, variant = "default", ico
       {open
         ? createPortal(
         <>
-        <div
-          className={`fixed inset-0 z-[1100] transition-[opacity,transform,filter] duration-[260ms] ease-[cubic-bezier(0.22,1,0.36,1)] ${
-            showLaunchLoader
-              ? "opacity-100 scale-100 blur-0"
-              : "pointer-events-none opacity-0 scale-[1.01] blur-[2px]"
-          }`}
-        >
-          {showLaunchLoader ? (
-            <WorkspaceLaunchLoadingState
-              files={pendingFiles}
-              complete={launchReadyForTesting}
-              startedAtMs={launchStartedAtMs}
-            />
-          ) : null}
-        </div>
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
           <div
             className={`absolute inset-0 bg-black/40 transition-opacity duration-[${WORKSPACE_LAUNCH_MODAL_EXIT_MS}ms] ease-out dark:bg-black/55 dark:backdrop-blur-sm ${

@@ -1,12 +1,18 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronRight, Star, MoreHorizontal, ExternalLink, Copy, Trash2, Pencil, Loader2, Printer } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { refreshProjectsSummary } from "@/lib/projectsSummaryCache";
 import { projectNameToEditable, sanitizeProjectName } from "@/lib/projectName";
+import {
+  beginExistingWorkspaceOpenHandoff,
+  preloadExistingWorkspaceProject,
+  shouldHandleWorkspaceOpenClick,
+} from "@/lib/workspaceOpenHandoff";
 
 type PreviewCacheEntry = {
   url: string;
@@ -159,6 +165,7 @@ export default function ProjectCard({
   onTrashed,
 }: ProjectCardProps & { onTrashed?: (project: Project) => void }) {
   const { data: session } = useSession();
+  const router = useRouter();
   const ownerKey = session?.user?.id ?? null;
   const [localStarred, setLocalStarred] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -196,6 +203,16 @@ export default function ProjectCard({
     ? project.updated.slice("Edited ".length)
     : project.updated;
   const mobileMenuWidth = 224;
+
+  const openProject = async (projectId: string) => {
+    beginExistingWorkspaceOpenHandoff(projectId);
+    await preloadExistingWorkspaceProject(projectId);
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        router.push(`/studio?project=${encodeURIComponent(projectId)}`);
+      });
+    });
+  };
 
   function isMobileViewport() {
     return typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
@@ -1091,7 +1108,12 @@ export default function ProjectCard({
                   <Link
                     href={`/studio?project=${encodeURIComponent(copyToast.id)}`}
                     className="shrink-0 rounded-md border-2 border-white/25 px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-white/10"
-                    onClick={() => setCopyToast(null)}
+                    onClick={(event) => {
+                      if (!shouldHandleWorkspaceOpenClick(event)) return;
+                      event.preventDefault();
+                      setCopyToast(null);
+                      openProject(copyToast.id);
+                    }}
                   >
                     Open
                   </Link>
@@ -1121,7 +1143,11 @@ export default function ProjectCard({
                 if (renaming) {
                   event.preventDefault();
                   event.stopPropagation();
+                  return;
                 }
+                if (!shouldHandleWorkspaceOpenClick(event)) return;
+                event.preventDefault();
+                openProject(project.id);
               }}
             />
           )}

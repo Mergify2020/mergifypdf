@@ -1,8 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { formatProjectLastEdited } from "@/lib/formatProjectLastEdited";
 import HomePdfPreview from "@/components/HomePdfPreview";
+import {
+  beginExistingWorkspaceOpenHandoff,
+  preloadExistingWorkspaceProject,
+  shouldHandleWorkspaceOpenClick,
+} from "@/lib/workspaceOpenHandoff";
 
 type ApiProject = {
   id: string;
@@ -24,6 +30,7 @@ type ProjectCard = {
 export default function NewAllProjectsPage() {
   const [projects, setProjects] = useState<ProjectCard[]>([]);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     let cancelled = false;
@@ -61,12 +68,12 @@ export default function NewAllProjectsPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#F9FAFC] px-3 pb-10 pt-10 sm:px-4 sm:pt-12 lg:px-6 lg:pt-14">
+    <div className="min-h-screen bg-[#F1F4F9] px-3 pb-10 pt-10 text-slate-900 dark:bg-[#222224] dark:text-zinc-100 sm:px-4 sm:pt-12 lg:px-6 lg:pt-14">
       <div className="mx-auto w-full max-w-7xl">
-        <h1 className="mt-2 text-center text-3xl font-semibold text-slate-900 sm:mt-4 sm:text-4xl">
+        <h1 className="mt-2 text-center text-3xl font-semibold text-slate-900 dark:text-zinc-100 sm:mt-4 sm:text-4xl">
           All Projects
         </h1>
-        <p className="mt-2 text-center text-sm text-slate-500">
+        <p className="mt-2 text-center text-sm text-slate-500 dark:text-zinc-400">
           Browse your recent work and jump back into any project.
         </p>
 
@@ -95,7 +102,7 @@ export default function NewAllProjectsPage() {
         ) : (
           <div className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 sm:gap-6 lg:gap-8">
             {projects.map((project) => (
-              <ProjectCardView key={project.id} project={project} />
+              <ProjectCardView key={project.id} project={project} router={router} />
             ))}
           </div>
         )}
@@ -104,22 +111,42 @@ export default function NewAllProjectsPage() {
   );
 }
 
-function ProjectCardView({ project }: { project: ProjectCard }) {
+function ProjectCardView({
+  project,
+  router,
+}: {
+  project: ProjectCard;
+  router: ReturnType<typeof useRouter>;
+}) {
   const pdfUrl = project.pdfUrl ?? null;
   const rotation = project.rotation ?? 0;
+  const openProject = async () => {
+    beginExistingWorkspaceOpenHandoff(project.id);
+    await preloadExistingWorkspaceProject(project.id);
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        router.push(`/studio?project=${encodeURIComponent(project.id)}`);
+      });
+    });
+  };
 
   return (
     <a
       href={`/studio?project=${encodeURIComponent(project.id)}`}
-      className="group flex flex-col rounded-2xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+      className="group flex flex-col rounded-2xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-zinc-600"
       aria-label={project.title}
+      onClick={(event) => {
+        if (!shouldHandleWorkspaceOpenClick(event)) return;
+        event.preventDefault();
+        openProject();
+      }}
     >
-      <div className="relative aspect-[1.23/1] bg-[#EEF1F5]">
+      <div className="relative aspect-[1.23/1] bg-[#EEF1F5] dark:bg-[#222224]">
         <HomePdfPreview pdfUrl={pdfUrl} rotation={rotation} />
       </div>
       <div className="mt-4 space-y-1">
-        <p className="truncate text-sm font-semibold text-slate-900">{project.title}</p>
-        <p className="text-xs text-slate-500">{project.updatedLabel}</p>
+        <p className="truncate text-sm font-semibold text-slate-900 dark:text-zinc-100">{project.title}</p>
+        <p className="text-xs text-slate-500 dark:text-zinc-400">{project.updatedLabel}</p>
       </div>
     </a>
   );

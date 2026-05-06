@@ -47,6 +47,12 @@ import {
   PROJECT_NAME_STORAGE_KEY,
   deriveProjectNameFromFilename,
 } from "@/lib/projectName";
+import { PENDING_UPLOAD_STORAGE_KEY } from "@/lib/pendingUpload";
+import {
+  WORKSPACE_OPEN_IN_PROGRESS_STORAGE_KEY,
+  readExistingWorkspaceProjectId,
+  preloadExistingWorkspaceProject,
+} from "@/lib/workspaceOpenHandoff";
 import AppHeaderBrand from "./AppHeaderBrand";
 import SettingsMenu from "./SettingsMenu";
 import HeroHeader from "./HeroHeader";
@@ -128,6 +134,7 @@ async function resetWorkspaceStorage() {
     window.sessionStorage?.removeItem(STARTUP_OVERLAY_KEY);
     window.sessionStorage?.removeItem(STARTUP_OVERLAY_CONTEXT_KEY);
     window.sessionStorage?.removeItem(EXISTING_PROJECT_OVERLAY_STORAGE_KEY);
+    window.sessionStorage?.removeItem(WORKSPACE_OPEN_IN_PROGRESS_STORAGE_KEY);
   } catch {
     // ignore
   }
@@ -340,6 +347,8 @@ export default function WorkspaceShell({
     }
     try {
       window.sessionStorage?.removeItem(EXISTING_PROJECT_OVERLAY_STORAGE_KEY);
+      window.sessionStorage?.removeItem(WORKSPACE_OPEN_IN_PROGRESS_STORAGE_KEY);
+      window.sessionStorage?.removeItem("mpdf:existing-project-id");
     } catch {
       // ignore storage write failures
     }
@@ -470,6 +479,7 @@ export default function WorkspaceShell({
     workspaceLaunchOverlaySafetyTimerRef.current = window.setTimeout(() => {
       try {
         window.sessionStorage?.removeItem(WORKSPACE_LAUNCH_OVERLAY_STORAGE_KEY);
+        window.sessionStorage?.removeItem(WORKSPACE_OPEN_IN_PROGRESS_STORAGE_KEY);
       } catch {
         // ignore storage write failures
       }
@@ -651,6 +661,11 @@ export default function WorkspaceShell({
         window.clearTimeout(manualLoadingSafetyRef.current);
         manualLoadingSafetyRef.current = null;
       }
+      try {
+        window.sessionStorage?.removeItem(WORKSPACE_OPEN_IN_PROGRESS_STORAGE_KEY);
+      } catch {
+        // ignore storage write failures
+      }
       if (showTimer !== null) window.clearTimeout(showTimer);
       const shownAt = homeBootShownAtRef.current;
       if (!homeBootVisibleRef.current || shownAt <= 0) {
@@ -690,7 +705,11 @@ export default function WorkspaceShell({
     if (typeof window === "undefined") return;
     if (workspaceLaunchOverlayOpen) return;
     try {
+      window.sessionStorage?.setItem(WORKSPACE_OPEN_IN_PROGRESS_STORAGE_KEY, "1");
       window.sessionStorage?.setItem(EXISTING_PROJECT_OVERLAY_STORAGE_KEY, "1");
+      window.sessionStorage?.removeItem(STARTUP_OVERLAY_KEY);
+      window.sessionStorage?.removeItem(STARTUP_OVERLAY_CONTEXT_KEY);
+      window.sessionStorage?.removeItem(PENDING_UPLOAD_STORAGE_KEY);
     } catch {
       // ignore storage write failures
     }
@@ -872,6 +891,7 @@ export default function WorkspaceShell({
         existingProjectOverlayHideTimerRef.current = window.setTimeout(() => {
           try {
             window.sessionStorage?.removeItem(EXISTING_PROJECT_OVERLAY_STORAGE_KEY);
+            window.sessionStorage?.removeItem("mpdf:existing-project-id");
           } catch {
             // ignore storage write failures
           }
@@ -885,12 +905,24 @@ export default function WorkspaceShell({
           }
         }, EXISTING_PROJECT_OVERLAY_EXIT_MS);
       }, remainingVisible);
+      try {
+        window.sessionStorage?.removeItem(WORKSPACE_OPEN_IN_PROGRESS_STORAGE_KEY);
+      } catch {
+        // ignore storage write failures
+      }
     };
     window.addEventListener("workspace-launch-overlay-hide", handleHide);
     return () => {
       window.removeEventListener("workspace-launch-overlay-hide", handleHide);
     };
   }, [existingProjectOverlayExiting, existingProjectOverlayOpen]);
+
+  useEffect(() => {
+    const projectId = readExistingWorkspaceProjectId();
+    if (!projectId) return;
+    router.prefetch(`/studio?project=${encodeURIComponent(projectId)}`);
+    void preloadExistingWorkspaceProject(projectId);
+  }, [router, preloadExistingWorkspaceProject]);
 
   const showWorkspaceLaunchOverlay = (files: PendingWorkspaceFile[], startedAtMs: number | null = null) => {
     if (workspaceLaunchOverlayCompleteTimerRef.current !== null) {
@@ -906,6 +938,7 @@ export default function WorkspaceShell({
       workspaceLaunchOverlaySafetyTimerRef.current = null;
     }
     try {
+      window.sessionStorage?.setItem(WORKSPACE_OPEN_IN_PROGRESS_STORAGE_KEY, "1");
       window.sessionStorage?.setItem(
         WORKSPACE_LAUNCH_OVERLAY_STORAGE_KEY,
         JSON.stringify({
@@ -963,6 +996,7 @@ export default function WorkspaceShell({
       workspaceLaunchOverlayHideTimerRef.current = window.setTimeout(() => {
         try {
           window.sessionStorage?.removeItem(WORKSPACE_LAUNCH_OVERLAY_STORAGE_KEY);
+          window.sessionStorage?.removeItem(WORKSPACE_OPEN_IN_PROGRESS_STORAGE_KEY);
         } catch {
           // ignore storage write failures
         }
@@ -981,16 +1015,24 @@ export default function WorkspaceShell({
       const detail = (event as CustomEvent<{ files?: PendingWorkspaceFile[]; startedAtMs?: number | null }>).detail;
       showWorkspaceLaunchOverlay(detail?.files ?? [], detail?.startedAtMs ?? null);
     };
+    const handleExistingShow = (event: Event) => {
+      const detail = (event as CustomEvent<{ startedAtMs?: number | null; projectId?: string | null }>).detail;
+      const projectId = detail?.projectId ?? readExistingWorkspaceProjectId();
+      markExistingProjectStartupOverlay();
+      void preloadExistingWorkspaceProject(projectId);
+    };
     const handleHide = () => {
       hideWorkspaceLaunchOverlay();
     };
     window.addEventListener("workspace-launch-overlay-show", handleShow as EventListener);
+    window.addEventListener("workspace-existing-overlay-show", handleExistingShow);
     window.addEventListener("workspace-launch-overlay-hide", handleHide);
     return () => {
       window.removeEventListener("workspace-launch-overlay-show", handleShow as EventListener);
+      window.removeEventListener("workspace-existing-overlay-show", handleExistingShow);
       window.removeEventListener("workspace-launch-overlay-hide", handleHide);
     };
-  }, []);
+  }, [hideWorkspaceLaunchOverlay, preloadExistingWorkspaceProject, showWorkspaceLaunchOverlay]);
 
   const createId = () =>
     typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -1166,27 +1208,6 @@ export default function WorkspaceShell({
   const isSignaturesPanel = panelKey === "signatures";
   const isTemplatesPanel = panelKey === "templates";
   useEffect(() => {
-    if (isStudioRoute || !workspaceLaunchOverlayOpen) return;
-    if (workspaceLaunchOverlayCompleteTimerRef.current !== null) {
-      window.clearTimeout(workspaceLaunchOverlayCompleteTimerRef.current);
-      workspaceLaunchOverlayCompleteTimerRef.current = null;
-    }
-    if (workspaceLaunchOverlayHideTimerRef.current !== null) {
-      window.clearTimeout(workspaceLaunchOverlayHideTimerRef.current);
-      workspaceLaunchOverlayHideTimerRef.current = null;
-    }
-    try {
-      window.sessionStorage?.removeItem(WORKSPACE_LAUNCH_OVERLAY_STORAGE_KEY);
-    } catch {
-      // ignore storage write failures
-    }
-    setWorkspaceLaunchOverlayOpen(false);
-    setWorkspaceLaunchOverlayCompleting(false);
-    setWorkspaceLaunchOverlayExiting(false);
-    setWorkspaceLaunchOverlayStartedAtMs(null);
-    setWorkspaceLaunchOverlayFiles([]);
-  }, [isStudioRoute, workspaceLaunchOverlayOpen]);
-  useEffect(() => {
     if (typeof window === "undefined") return;
     if (!isStudioRoute) return;
     try {
@@ -1194,6 +1215,7 @@ export default function WorkspaceShell({
     } catch {
       return;
     }
+    if (workspaceLaunchOverlayOpen) return;
     if (existingProjectOverlayHideTimerRef.current !== null) {
       window.clearTimeout(existingProjectOverlayHideTimerRef.current);
       existingProjectOverlayHideTimerRef.current = null;
@@ -1236,15 +1258,17 @@ export default function WorkspaceShell({
       window.clearTimeout(existingProjectOverlayHideTimerRef.current);
       existingProjectOverlayHideTimerRef.current = null;
     }
-    if (existingProjectOverlaySafetyTimerRef.current !== null) {
-      window.clearTimeout(existingProjectOverlaySafetyTimerRef.current);
-      existingProjectOverlaySafetyTimerRef.current = null;
-    }
-    try {
-      window.sessionStorage?.removeItem(EXISTING_PROJECT_OVERLAY_STORAGE_KEY);
-    } catch {
-      // ignore storage write failures
-    }
+      if (existingProjectOverlaySafetyTimerRef.current !== null) {
+        window.clearTimeout(existingProjectOverlaySafetyTimerRef.current);
+        existingProjectOverlaySafetyTimerRef.current = null;
+      }
+        try {
+          window.sessionStorage?.removeItem(EXISTING_PROJECT_OVERLAY_STORAGE_KEY);
+          window.sessionStorage?.removeItem(WORKSPACE_OPEN_IN_PROGRESS_STORAGE_KEY);
+          window.sessionStorage?.removeItem("mpdf:existing-project-id");
+        } catch {
+          // ignore storage write failures
+        }
     setExistingProjectOverlayOpen(false);
     setExistingProjectOverlayExiting(false);
     existingProjectOverlayShownAtRef.current = 0;
@@ -1255,6 +1279,8 @@ export default function WorkspaceShell({
     (pathname?.startsWith("/signature-center") ?? false);
   const workspaceBackgroundClass = useUnifiedWorkspaceBackground
     ? "bg-[#F1F4F9]"
+    : isStudioRoute
+      ? "bg-[var(--background)]"
     : isHomePanel
       ? "bg-[#F1F4F9]"
       : isAccountRoute
@@ -2333,9 +2359,10 @@ export default function WorkspaceShell({
                 className="h-14 w-14 animate-spin rounded-full border-[5px] border-[#D9CCFF] border-t-[#6C47FF] dark:border-[#3F3F3F] dark:border-t-[#8B6CFF]"
                 aria-hidden
               />
-              <p className="mt-5 text-[24px] font-semibold tracking-tight text-slate-900 dark:text-[#F5F5F5] sm:text-[28px]">
+              <p className="mt-5 text-[24px] font-semibold tracking-tight text-slate-900 sm:text-[28px] dark:text-zinc-100">
                 Opening Workspace...
               </p>
+              <span className="sr-only">Opening Workspace</span>
             </div>
           </div>
         </div>
@@ -3591,7 +3618,24 @@ export default function WorkspaceShell({
       : null;
 
   const primaryShell = isStudioRoute ? (
-    <Suspense fallback={null}>
+    <Suspense
+      fallback={
+        workspaceLaunchOverlayOpen ? null : (
+          <div className="fixed inset-0 z-[1280] flex items-center justify-center bg-[var(--background)] px-6 py-10">
+            <div className="pointer-events-none flex flex-col items-center text-center">
+              <div
+                className="h-14 w-14 animate-spin rounded-full border-[5px] border-[#D9CCFF] border-t-[#6C47FF] dark:border-[#3F3F3F] dark:border-t-[#8B6CFF]"
+                aria-hidden
+              />
+              <p className="mt-5 text-[24px] font-semibold tracking-tight text-slate-900 sm:text-[28px] dark:text-zinc-100">
+                Opening Workspace...
+              </p>
+              <span className="sr-only">Opening Workspace</span>
+            </div>
+          </div>
+        )
+      }
+    >
       <main>{children}</main>
     </Suspense>
   ) : isPricingRoute ? (

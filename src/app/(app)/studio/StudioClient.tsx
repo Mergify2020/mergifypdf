@@ -32,6 +32,7 @@ import {
   type PDFFont,
 } from "pdf-lib";
 import { AnimatePresence, motion } from "framer-motion";
+import { WORKSPACE_OPEN_IN_PROGRESS_STORAGE_KEY } from "@/lib/workspaceOpenHandoff";
 import {
   getProjectsSummaryCache,
   setProjectsSummaryCache,
@@ -471,6 +472,7 @@ const MIN_STARTUP_OVERLAY_MS = 4000;
 const STARTUP_OVERLAY_FULL_HOLD_MS = 1000;
 const STARTUP_OVERLAY_KEY = "mpdf:startup-overlay";
 const STARTUP_OVERLAY_CONTEXT_KEY = "mpdf:startup-overlay-context";
+const WORKSPACE_LAUNCH_OVERLAY_STORAGE_KEY = "mpdf:workspace-launch-overlay";
 const EXISTING_PROJECT_OVERLAY_STORAGE_KEY = "mpdf:existing-project-overlay";
 const WORKSPACE_PREVIEW_CACHE_KEY = "mpdf:preview-cache";
 const PREVIEW_CACHE_VERSION = 1;
@@ -1309,17 +1311,24 @@ function formatSignedRotation(rotation?: number) {
   return rounded > 180 ? rounded - 360 : rounded;
 }
 
-function snapTextRotation(rotation: number, threshold = 5) {
+function getSnapTextRotationTarget(rotation: number, threshold = 3) {
   const normalized = normalizeRotation(rotation);
-  const snapTargets = [0, 90, 180, 270, 360];
+  const snapTargets = [0, 45, 90, 180, 270, 360];
+  let bestTarget: number | null = null;
+  let bestDelta = Number.POSITIVE_INFINITY;
   for (const target of snapTargets) {
     const delta = Math.abs(normalized - target);
     const wrapDelta = Math.min(delta, 360 - delta);
-    if (wrapDelta <= threshold) {
-      return target === 360 ? 0 : target;
+    if (wrapDelta < bestDelta) {
+      bestDelta = wrapDelta;
+      bestTarget = target === 360 ? 0 : target;
     }
   }
-  return normalized;
+  return bestTarget != null && bestDelta <= threshold ? bestTarget : null;
+}
+
+function snapTextRotation(rotation: number, threshold = 3) {
+  return getSnapTextRotationTarget(rotation, threshold) ?? normalizeRotation(rotation);
 }
 
 function normalizeTextSize(value: number) {
@@ -2153,7 +2162,7 @@ function SortableThumb({
 	      >
 	        <div className="relative w-full" style={{ paddingBottom: getAspectPadding(frameWidth, frameHeight) }}>
 	          <div
-	            className={`absolute inset-0 flex items-center justify-center overflow-hidden rounded-none border bg-white transition-colors duration-100 ease-out dark:border-[#4A4A4A] ${
+	            className={`absolute inset-0 flex items-center justify-center overflow-hidden rounded-none border bg-[#EEF2F7] transition-colors duration-100 ease-out dark:border-[#4A4A4A] dark:bg-[#222224] ${
 		              selected
 		                ? "border-2 border-[#6C47FF] dark:border-[#8B6CFF]"
 		                : "border-2 border-slate-300 hover:border-slate-400 group-hover:border-slate-400 dark:border-[#4A4A4A] dark:hover:border-[#5B5B65] dark:group-hover:border-[#5B5B65]"
@@ -2318,14 +2327,14 @@ function SortableOrganizeTile({
             }`}
           >
             <div
-              className={`relative h-full w-full bg-white border border-[rgba(148,163,184,0.5)] ${
+              className={`relative h-full w-full bg-[#EEF2F7] border border-[rgba(148,163,184,0.5)] dark:bg-[#222224] ${
                 isDragging
                   ? "shadow-[0_8px_26px_rgba(15,23,42,0.24),_0_24px_60px_rgba(15,23,42,0.30)]"
                   : "shadow-[0_6px_20px_rgba(15,23,42,0.18),_0_18px_45px_rgba(15,23,42,0.22)] group-hover:outline group-hover:outline-[rgba(37,99,235,0.35)] group-hover:outline-1 group-hover:outline-offset-2 group-hover:shadow-[0_6px_20px_rgba(15,23,42,0.21),_0_18px_45px_rgba(15,23,42,0.25)]"
               } transition-shadow duration-200 ease-out`}
               style={{ transform: `rotate(${rotationDegrees}deg) scale(${scaleFix})`, transformOrigin: "center" }}
             >
-              <div className="absolute inset-0 bg-white" aria-hidden />
+              <div className="absolute inset-0 bg-[#EEF2F7] dark:bg-[#222224]" aria-hidden />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={item.preview || TRANSPARENT_PIXEL}
@@ -2465,9 +2474,23 @@ function WorkspaceClient() {
   const [showStartupOverlay, setShowStartupOverlay] = useState(() => {
     if (typeof window === "undefined") return false;
     try {
+      if (window.sessionStorage?.getItem(WORKSPACE_OPEN_IN_PROGRESS_STORAGE_KEY)) {
+        return false;
+      }
       return (
         Boolean(window.sessionStorage?.getItem(STARTUP_OVERLAY_KEY)) &&
         window.sessionStorage?.getItem(STARTUP_OVERLAY_CONTEXT_KEY) === "new"
+      );
+    } catch {
+      return false;
+    }
+  });
+  const [hasPersistentHandoffOverlay, setHasPersistentHandoffOverlay] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return Boolean(
+        window.sessionStorage?.getItem(WORKSPACE_LAUNCH_OVERLAY_STORAGE_KEY) ||
+          window.sessionStorage?.getItem(EXISTING_PROJECT_OVERLAY_STORAGE_KEY),
       );
     } catch {
       return false;
@@ -2496,6 +2519,16 @@ function WorkspaceClient() {
   const startupOverlayProjectRef = useRef<string | null>(projectParam);
   const workspaceReadySettledRef = useRef(false);
   const [workspaceViewportReady, setWorkspaceViewportReady] = useState(false);
+  const [workspaceContentPainted, setWorkspaceContentPainted] = useState(false);
+  const [showExistingProjectWorkspace, setShowExistingProjectWorkspace] = useState(() => Boolean(projectParam));
+  const [hasWorkspaceOpenInProgress] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return Boolean(window.sessionStorage?.getItem(WORKSPACE_OPEN_IN_PROGRESS_STORAGE_KEY));
+    } catch {
+      return false;
+    }
+  });
   const existingProjectOverlayHideSentRef = useRef(false);
   const [loadedPreviewIds, setLoadedPreviewIds] = useState<Set<string>>(() => new Set());
   const [loadedThumbIds, setLoadedThumbIds] = useState<Set<string>>(() => new Set());
@@ -2508,18 +2541,56 @@ function WorkspaceClient() {
   }, [showStartupOverlay]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      setHasPersistentHandoffOverlay(
+        Boolean(
+          window.sessionStorage?.getItem(WORKSPACE_LAUNCH_OVERLAY_STORAGE_KEY) ||
+            window.sessionStorage?.getItem(EXISTING_PROJECT_OVERLAY_STORAGE_KEY),
+        ),
+      );
+    } catch {
+      setHasPersistentHandoffOverlay(false);
+    }
+  }, []);
+
+  useLayoutEffect(() => {
     if (startupOverlayProjectRef.current !== projectParam) {
       startupOverlayProjectRef.current = projectParam;
       startupOverlayShownRef.current = false;
       workspaceReadySettledRef.current = false;
       setWorkspaceViewportReady(false);
+      setWorkspaceContentPainted(false);
       existingProjectOverlayHideSentRef.current = false;
       setShowStartupOverlay(false);
+      setShowExistingProjectWorkspace(Boolean(projectParam));
+      setLoading(Boolean(projectParam));
+      setSources([]);
+      setPages([]);
+      setProjectHasSources(null);
+      setSourcesHydrated(false);
+      setError(null);
+      setActivePageId(null);
+      setActivePageIndex(0);
+      setPageNumberDraft("");
+      setThumbDragState(null);
       setLoadedPreviewIds(new Set());
       setLoadedThumbIds(new Set());
       startupOverlayActiveRef.current = false;
     }
   }, [projectParam]);
+
+  useEffect(() => {
+    if (projectParam) return;
+    setShowExistingProjectWorkspace(false);
+  }, [projectParam]);
+
+  useEffect(() => {
+    if (pages.length === 0) return;
+    setShowExistingProjectWorkspace(false);
+  }, [pages.length]);
+
+  const shouldShowStartupOverlay = showStartupOverlay && !hasPersistentHandoffOverlay && !hasWorkspaceOpenInProgress;
 
   useEffect(() => {
     setLoadedPreviewIds((prev) => {
@@ -2754,6 +2825,12 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     centerY: number;
     baseRotation: number;
     degrees: number;
+    side: "bottom" | "left" | "right";
+  } | null>(null);
+  const [settledTextRotatePlacement, setSettledTextRotatePlacement] = useState<{
+    pageId: string;
+    id: string;
+    side: "bottom" | "left" | "right";
   } | null>(null);
   const textResizeCleanupRef = useRef<(() => void) | null>(null);
   const textResizeRafRef = useRef<number | null>(null);
@@ -4540,14 +4617,22 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       if (!annotation || annotation.locked) return;
       const width = annotation.width ?? 0.14;
       const height = annotation.height ?? 0.06;
+      const startRotationDegrees = normalizeRotation(
+        (annotation.rotation ?? 0) - (getPageTransformInfo(pageId)?.rotationDegrees ?? 0)
+      );
       const centerPoint = getPageScreenPoint(pageId, annotation.x + width / 2, annotation.y + height / 2);
       if (!centerPoint) return;
       const centerX = centerPoint.x;
       const centerY = centerPoint.y;
       let lastAngle = Math.atan2(startEvent.clientY - centerY, startEvent.clientX - centerX);
-      let accumulatedDelta = 0;
+      let liveRotation = annotation.rotation ?? 0;
+      let snapTarget: number | null = null;
       const baseRotation = annotation.rotation ?? 0;
       const pointerId = startEvent.pointerId;
+      const MAX_ROTATE_STEP_DEGREES = 10;
+      const SNAP_IN_DEGREES = 2.5;
+      const SNAP_OUT_DEGREES = 1.5;
+      const initialSide: "bottom" | "left" = startRotationDegrees > 135 && startRotationDegrees < 225 ? "left" : "bottom";
 
       const handleMove = (event: PointerEvent) => {
         if (event.pointerId !== pointerId) return;
@@ -4555,20 +4640,36 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         let delta = angle - lastAngle;
         if (delta > Math.PI) delta -= Math.PI * 2;
         if (delta < -Math.PI) delta += Math.PI * 2;
-        accumulatedDelta += delta;
         lastAngle = angle;
-        const deltaDegrees = (accumulatedDelta * 180) / Math.PI;
-        const nextRotation = baseRotation + deltaDegrees;
-        const snappedRotation = snapTextRotation(nextRotation, 5);
+        const deltaDegrees = clamp((delta * 180) / Math.PI, -MAX_ROTATE_STEP_DEGREES, MAX_ROTATE_STEP_DEGREES);
+        liveRotation = normalizeRotation(liveRotation + deltaDegrees);
+        if (snapTarget != null) {
+          const snappedDelta = Math.min(
+            Math.abs(liveRotation - snapTarget),
+            360 - Math.abs(liveRotation - snapTarget)
+          );
+          if (snappedDelta > SNAP_OUT_DEGREES) {
+            snapTarget = null;
+          } else {
+            liveRotation = snapTarget;
+          }
+        }
+        if (snapTarget == null) {
+          const nearestSnapTarget = getSnapTextRotationTarget(liveRotation, SNAP_IN_DEGREES);
+          if (nearestSnapTarget != null) {
+            snapTarget = nearestSnapTarget;
+            liveRotation = nearestSnapTarget;
+          }
+        }
         setRotatingText((current) =>
           current && current.id === annotationId
-            ? { ...current, degrees: formatSignedRotation(snappedRotation) }
+            ? { ...current, degrees: formatSignedRotation(liveRotation) }
             : current
         );
         setTextAnnotations((prev) => {
           const existing = prev[pageId] ?? [];
           const updated = existing.map((item) =>
-            item.id === annotationId ? { ...item, rotation: snappedRotation } : item
+            item.id === annotationId ? { ...item, rotation: liveRotation } : item
           );
           return { ...prev, [pageId]: updated };
         });
@@ -4583,6 +4684,19 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
 
       const handleUp = (event: PointerEvent) => {
         if (event.pointerId !== pointerId) return;
+        const snappedRotation = snapTextRotation(liveRotation, SNAP_IN_DEGREES);
+        const finalDisplayRotation = normalizeRotation(
+          snappedRotation - (getPageTransformInfo(pageId)?.rotationDegrees ?? 0)
+        );
+        const finalSide = finalDisplayRotation > 135 && finalDisplayRotation < 225 ? "left" : "bottom";
+        setTextAnnotations((prev) => {
+          const existing = prev[pageId] ?? [];
+          const updated = existing.map((item) =>
+            item.id === annotationId ? { ...item, rotation: snappedRotation } : item
+          );
+          return { ...prev, [pageId]: updated };
+        });
+        setSettledTextRotatePlacement({ pageId, id: annotationId, side: finalSide });
         cleanup();
       };
 
@@ -4597,7 +4711,9 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         centerY,
         baseRotation,
         degrees: formatSignedRotation(baseRotation),
+        side: initialSide,
       });
+      setSettledTextRotatePlacement(null);
     },
     [getPageScreenPoint, textAnnotations]
   );
@@ -4615,6 +4731,17 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const viewerScrollRef = previewContainerRef;
   const workspaceFullscreenRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (typeof document === "undefined" || !rotatingText) return;
+    const workspaceNode = workspaceFullscreenRef.current ?? document.body;
+    const previousCursor = workspaceNode.style.cursor;
+    document.body.classList.add("studio-rotating-text");
+    workspaceNode.style.cursor = "grabbing";
+    return () => {
+      document.body.classList.remove("studio-rotating-text");
+      workspaceNode.style.cursor = previousCursor;
+    };
+  }, [rotatingText]);
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
   const searchButtonRef = useRef<HTMLButtonElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -6221,33 +6348,16 @@ const timer =
       pdfjsLib: typeof import("pdfjs-dist") & { GlobalWorkerOptions: { workerSrc: string } },
     ) {
       let pdf: any | null = null;
-      const sourceUrl = src.url;
-
-      if (sourceUrl) {
-        try {
-          pdf = await pdfjsLib.getDocument({ url: sourceUrl } as any).promise;
-        } catch (err) {
-          console.warn("pdfjs getDocument failed, retrying without worker", err);
-          try {
-            pdf = await pdfjsLib.getDocument({ url: sourceUrl, disableWorker: true } as any).promise;
-          } catch (innerErr) {
-            console.warn("pdfjs getDocument failed with url source, falling back to bytes", innerErr);
-          }
-        }
-      }
-
-      if (!pdf) {
-        const stored = await readFileBlob(src.storageId);
-        const blob = stored?.blob instanceof Blob ? stored.blob : null;
-        const bytes = blob
-          ? new Uint8Array(await blob.arrayBuffer())
-          : new Uint8Array(await (await fetch(src.url)).arrayBuffer());
-        try {
-          pdf = await pdfjsLib.getDocument({ data: bytes } as any).promise;
-        } catch (err) {
-          console.warn("pdfjs getDocument failed, retrying without worker", err);
-          pdf = await pdfjsLib.getDocument({ data: bytes, disableWorker: true } as any).promise;
-        }
+      const stored = await readFileBlob(src.storageId);
+      const blob = stored?.blob instanceof Blob ? stored.blob : null;
+      const bytes = blob
+        ? new Uint8Array(await blob.arrayBuffer())
+        : new Uint8Array(await (await fetch(src.url)).arrayBuffer());
+      try {
+        pdf = await pdfjsLib.getDocument({ data: bytes } as any).promise;
+      } catch (err) {
+        console.warn("pdfjs getDocument failed, retrying without worker", err);
+        pdf = await pdfjsLib.getDocument({ data: bytes, disableWorker: true } as any).promise;
       }
       if (!pdf) {
         throw new Error("Unable to load PDF source");
@@ -6797,7 +6907,7 @@ const timer =
       hasExistingOverlayMarker = false;
     }
     if (!hasExistingOverlayMarker) return;
-    if (!sourcesHydrated || loading || pages.length === 0 || !workspaceViewportReady) return;
+    if (!sourcesHydrated || !workspaceViewportReady) return;
     existingProjectOverlayHideSentRef.current = true;
     const timeoutId = window.setTimeout(() => {
       window.dispatchEvent(new Event("workspace-content-ready"));
@@ -6806,7 +6916,7 @@ const timer =
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [loading, pages.length, sourcesHydrated, workspaceViewportReady]);
+  }, [sourcesHydrated, workspaceViewportReady]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -6853,6 +6963,17 @@ const timer =
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (startupOverlayShownRef.current) return;
+    if (hasWorkspaceOpenInProgress) {
+      try {
+        window.sessionStorage?.removeItem(STARTUP_OVERLAY_KEY);
+        window.sessionStorage?.removeItem(STARTUP_OVERLAY_CONTEXT_KEY);
+      } catch {
+        // ignore storage write failures
+      }
+      setShowStartupOverlay(false);
+      startupOverlayActiveRef.current = false;
+      return;
+    }
 
     const startOverlay = (variant: "new" | "existing") => {
       startupOverlayActiveRef.current = true;
@@ -7678,7 +7799,7 @@ const timer =
           <div
             data-page-id={page.id}
             ref={registerPreviewRef(page.id)}
-            className="relative overflow-visible bg-white transition"
+            className="relative overflow-visible bg-[#EEF2F7] transition dark:bg-[#222224]"
             style={{
               width: fittedWidth,
               height: displayHeight,
@@ -7697,7 +7818,7 @@ const timer =
               style={{ width: "100%", height: "100%" }}
             >
               <div
-	                className="absolute left-0 top-0 bg-white"
+	                className="absolute left-0 top-0 bg-[#EEF2F7] dark:bg-[#222224]"
 	                style={{
 	                  width: contentWidth,
 	                  height: contentHeight,
@@ -7732,7 +7853,7 @@ const timer =
                   handleMarkupPointerUp(page.id);
                 }}
               >
-              <div className="absolute inset-0 bg-white" aria-hidden />
+              <div className="absolute inset-0 bg-[#EEF2F7] dark:bg-[#222224]" aria-hidden />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={page.preview || TRANSPARENT_PIXEL}
@@ -8258,41 +8379,125 @@ const timer =
                 const annotationHtml = annotation.richTextHtml ?? textToHtml(annotation.text);
                 const showTextActions = focusedTextId === annotation.id;
                 const showResizeHandles = focusedTextId === annotation.id && !isLocked && !isDraggingThis;
-                const showTransformActions = showTextActions && !isLocked;
                 const activeResizeHandle = isResizingThis && resizingText ? resizingText.handle : null;
                 const activeEdgeHandle =
                   activeResizeHandle && ["n", "s", "e", "w"].includes(activeResizeHandle)
                     ? activeResizeHandle
                     : null;
-                const textTopPoint = getRotatedTextActionPoint(page.id, annotation, "top", annotationWidth, annotationHeight);
-                const textBottomPoint = getRotatedTextActionPoint(
-                  page.id,
-                  annotation,
-                  "bottom",
-                  annotationWidth,
-                  annotationHeight
-                );
-                const textAnnotationRect =
-                  focusedTextId === annotation.id ? focusedTextOverlayRect : null;
-                const liveResizeTopPoint =
-                  isResizingThis && textAnnotationRect
-                    ? { x: textAnnotationRect.left + textAnnotationRect.width / 2, y: textAnnotationRect.top }
+                const liveTextAnnotationRect =
+                  focusedTextId === annotation.id
+                    ? textAnnotationRefs.current.get(annotation.id)?.getBoundingClientRect() ?? null
                     : null;
-                const liveResizeBottomPoint =
-                  isResizingThis && textAnnotationRect
-                    ? {
-                        x: textAnnotationRect.left + textAnnotationRect.width / 2,
-                        y: textAnnotationRect.top + textAnnotationRect.height,
-                      }
+                const textAnnotationRect = liveTextAnnotationRect ?? (focusedTextId === annotation.id ? focusedTextOverlayRect : null);
+                const textToolbarAnchor = textAnnotationRect
+                  ? {
+                      x: textAnnotationRect.left + textAnnotationRect.width / 2,
+                      y: textAnnotationRect.top,
+                    }
+                  : null;
+                const topToolbarGap = displayRotation > 90 && displayRotation < 270 ? "1.5rem" : "0.4rem";
+                const textToolbarTransform = textAnnotationRect && textAnnotationRect.top < 56
+                  ? `translate(-50%, ${topToolbarGap})`
+                  : `translate(-50%, calc(-100% - ${topToolbarGap}))`;
+                const textRotateHandleSizePx = 28;
+                const textRotateHandleGapPx = 16;
+                const textActionsToolbarRect =
+                  typeof document !== "undefined"
+                    ? (document.querySelector("[data-text-actions]") as HTMLElement | null)?.getBoundingClientRect() ??
+                      null
                     : null;
-                const textActionTopPoint =
-                  showTextActions && (liveResizeTopPoint ?? textTopPoint)
-                    ? liveResizeTopPoint ?? textTopPoint
+                const pageTransformInfo = getPageTransformInfo(page.id);
+                const textBoxCenter = textAnnotationRect
+                  ? {
+                      x: textAnnotationRect.left + textAnnotationRect.width / 2,
+                      y: textAnnotationRect.top + textAnnotationRect.height / 2,
+                    }
+                  : getPageScreenPoint(page.id, annotation.x + annotationWidth / 2, annotation.y + annotationHeight / 2);
+                const textBoxWidthPx = annotationWidth * (rotationDegrees % 180 !== 0
+                  ? pageTransformInfo?.contentHeight ?? 0
+                  : pageTransformInfo?.contentWidth ?? 0);
+                const textBoxHeightPx = annotationHeight * (rotationDegrees % 180 !== 0
+                  ? pageTransformInfo?.contentWidth ?? 0
+                  : pageTransformInfo?.contentHeight ?? 0);
+                const rotatedTextHandlePlacement =
+                  textBoxCenter && textBoxWidthPx > 0 && textBoxHeightPx > 0
+                    ? (() => {
+                        const angleRad = (displayRotation * Math.PI) / 180;
+                        const handleOffsetForSide = (side: "bottom" | "left" | "right") =>
+                          side === "bottom"
+                            ? textBoxHeightPx / 2 + textRotateHandleGapPx + textRotateHandleSizePx / 2
+                            : textBoxWidthPx / 2 + textRotateHandleGapPx + textRotateHandleSizePx / 2;
+                        const sideToDirection = (side: "bottom" | "left" | "right") => {
+                          if (side === "bottom") {
+                            return { x: -Math.sin(angleRad), y: Math.cos(angleRad) };
+                          }
+                          if (side === "left") {
+                            return { x: -Math.cos(angleRad), y: -Math.sin(angleRad) };
+                          }
+                          return { x: Math.cos(angleRad), y: Math.sin(angleRad) };
+                        };
+                        const buildPlacement = (side: "bottom" | "left" | "right") => {
+                          const direction = sideToDirection(side);
+                          const offset = handleOffsetForSide(side);
+                          return {
+                            side,
+                            anchor: {
+                              x: textBoxCenter.x + direction.x * offset,
+                              y: textBoxCenter.y + direction.y * offset,
+                            },
+                            direction,
+                          };
+                        };
+                        const candidateRect = (anchor: { x: number; y: number }) => ({
+                          left: anchor.x - textRotateHandleSizePx / 2,
+                          top: anchor.y - textRotateHandleSizePx / 2,
+                          right: anchor.x + textRotateHandleSizePx / 2,
+                          bottom: anchor.y + textRotateHandleSizePx / 2,
+                        });
+                        const overlapsToolbar = (anchor: { x: number; y: number }) => {
+                          if (!textActionsToolbarRect) return false;
+                          const rect = candidateRect(anchor);
+                          const paddedToolbarRect = {
+                            left: textActionsToolbarRect.left - 8,
+                            top: textActionsToolbarRect.top - 8,
+                            right: textActionsToolbarRect.right + 8,
+                            bottom: textActionsToolbarRect.bottom + 8,
+                          };
+                          return (
+                            rect.left < paddedToolbarRect.right &&
+                            rect.right > paddedToolbarRect.left &&
+                            rect.top < paddedToolbarRect.bottom &&
+                            rect.bottom > paddedToolbarRect.top
+                          );
+                        };
+                        const upsideDownZone = displayRotation > 135 && displayRotation < 225;
+                        const activeDragSide = rotatingText?.id === annotation.id ? rotatingText.side : null;
+                        const settledSide =
+                          settledTextRotatePlacement?.id === annotation.id ? settledTextRotatePlacement.side : null;
+                        if (activeDragSide) {
+                          return buildPlacement(activeDragSide);
+                        }
+                        if (settledSide) {
+                          return buildPlacement(settledSide);
+                        }
+                        if (!upsideDownZone) {
+                          return buildPlacement("bottom");
+                        }
+                        const leftPlacement = buildPlacement("left");
+                        if (!overlapsToolbar(leftPlacement.anchor)) return leftPlacement;
+                        const rightPlacement = buildPlacement("right");
+                        if (!overlapsToolbar(rightPlacement.anchor)) return rightPlacement;
+                        return leftPlacement;
+                      })()
                     : null;
-                const textActionBottomPoint =
-                  showTransformActions && (liveResizeBottomPoint ?? textBottomPoint)
-                    ? liveResizeBottomPoint ?? textBottomPoint
-                    : null;
+                const activeTextToolbarBottomAnchor = showTextActions
+                  ? rotatedTextHandlePlacement?.anchor ??
+                    getTextRotateHandlePoint(textAnnotationRect, "bottom", textRotateHandleGapPx, textRotateHandleSizePx, textActionsToolbarRect) ??
+                    getTextRotateHandlePoint(textAnnotationRect, "right", textRotateHandleGapPx, textRotateHandleSizePx, textActionsToolbarRect) ??
+                    getTextRotateHandlePoint(textAnnotationRect, "left", textRotateHandleGapPx, textRotateHandleSizePx, textActionsToolbarRect) ??
+                    textToolbarAnchor
+                  : null;
+                const rotatingTextLabelOffsetPx = textRotateHandleSizePx / 2 + 14;
                 const isQuarterTurn = rotationDegrees % 180 !== 0;
                 const boxWidthPx = annotationWidth * (isQuarterTurn ? contentHeight : contentWidth);
                 const boxHeightPx = annotationHeight * (isQuarterTurn ? contentWidth : contentHeight);
@@ -8330,6 +8535,8 @@ const timer =
                     transformOrigin: "center",
                     cursor: deleteMode
                       ? ("url('/icons/eraser.svg') 4 4, auto" as CSSProperties["cursor"])
+                      : isRotatingThis
+                        ? ("grabbing" as CSSProperties["cursor"])
                       : undefined,
                   }}
                   onPointerDown={(event) => {
@@ -8865,112 +9072,118 @@ const timer =
                       }}
                     />
                     {/* Native strikethrough only; overlay removed */}
-                    {typeof document !== "undefined" && (textActionTopPoint || textActionBottomPoint) && !isDraggingThis
+                    {typeof document !== "undefined" && textToolbarAnchor && !isDraggingThis && !isRotatingThis
                       ? createPortal(
                           <div className="pointer-events-none fixed inset-0 z-[60]">
-                            {isRotatingThis && textActionTopPoint ? (
-                              <div
-                                className="pointer-events-none absolute rounded-md border border-[#4A4A4A] bg-[#323232] px-2 py-1 text-[11px] font-semibold tabular-nums text-white shadow-sm"
-                                style={{
-                                  left: textActionTopPoint.x,
-                                  top: textActionTopPoint.y,
-                                  transform: "translate(-50%, calc(-100% - 4.5rem))",
-                                }}
-                              >
-                                {rotatingText?.degrees ?? displayRotation}°
-                              </div>
-                            ) : null}
-                            {textActionTopPoint ? (
-                              <div
-                                data-text-actions
-                                className={`pointer-events-auto absolute flex w-max items-center gap-0.5 rounded-lg border border-slate-300 bg-white shadow-sm ${
-                                  isLocked ? "p-0.5" : "px-1 py-0.5"
+                            <div
+                              data-text-actions
+                              className="pointer-events-auto absolute flex w-max items-center gap-0.5 rounded-lg border border-slate-300 bg-white p-0.5 shadow-sm"
+                              style={{
+                                left: textToolbarAnchor.x,
+                                top: textToolbarAnchor.y,
+                                transform: textToolbarTransform,
+                              }}
+                            >
+                              {isLocked ? null : (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="flex h-8 w-8 items-center justify-center rounded-md text-slate-700 transition-none hover:border-[#7C5CFF] hover:bg-[#7C5CFF] hover:text-white active:translate-y-[1px]"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      duplicateTextAnnotation(page.id, annotation.id);
+                                    }}
+                                  >
+                                    <Copy className="h-4 w-4" />
+                                  </button>
+                                  <div className="h-4 w-px bg-slate-300/80" />
+                                </>
+                              )}
+                              <button
+                                type="button"
+                                className={`flex h-8 w-8 items-center justify-center rounded-md transition-none active:translate-y-[1px] ${
+                                  isLocked
+                                    ? "bg-[#6C47FF] text-white hover:bg-[#7C5CFF]"
+                                    : "text-slate-700 hover:border-[#7C5CFF] hover:bg-[#7C5CFF] hover:text-white"
                                 }`}
-                                style={{
-                                  left: textActionTopPoint.x,
-                                  top: textActionTopPoint.y,
-                                  transform: "translate(-50%, calc(-100% - 1rem))",
+                                onMouseDown={(event) => event.stopPropagation()}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  toggleTextAnnotationLock(page.id, annotation.id);
                                 }}
                               >
-                                {isLocked ? null : (
-                                  <>
-                                    <button
-                                      type="button"
-                                      className="flex h-7 w-7 items-center justify-center rounded-md text-slate-700 transition hover:bg-slate-200 hover:text-slate-900 active:translate-y-[1px]"
-                                      onClick={(event) => {
-                                        event.stopPropagation();
-                                        duplicateTextAnnotation(page.id, annotation.id);
-                                      }}
-                                    >
-                                      <Copy className="h-4 w-4" />
-                                    </button>
-                                    <div className="h-4 w-px bg-slate-300/80" />
-                                  </>
-                                )}
-                                <button
-                                  type="button"
-                                  className={`flex h-7 w-7 items-center justify-center rounded-md transition active:translate-y-[1px] ${
-                                    isLocked
-                                      ? "bg-[#6C47FF] text-white"
-                                      : "text-slate-700 hover:bg-slate-200 hover:text-slate-900"
-                                  }`}
-                                  onMouseDown={(event) => event.stopPropagation()}
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    toggleTextAnnotationLock(page.id, annotation.id);
-                                  }}
-                                >
-                                  {isLocked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
-                                </button>
-                                {isLocked ? null : (
-                                  <>
-                                    <div className="h-4 w-px bg-slate-300/80" />
-                                    <button
-                                      type="button"
-                                      className="flex h-7 w-7 items-center justify-center rounded-md text-slate-700 transition hover:bg-slate-200 hover:text-slate-900 active:translate-y-[1px]"
-                                      onMouseDown={(event) => event.stopPropagation()}
-                                      onClick={(event) => {
-                                        event.stopPropagation();
-                                        deleteTextAnnotation(page.id, annotation.id);
-                                      }}
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </button>
-                                  </>
+                                {isLocked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+                              </button>
+                              {isLocked ? null : (
+                                <>
+                                  <div className="h-4 w-px bg-slate-300/80" />
+                                  <button
+                                    type="button"
+                                    className="flex h-8 w-8 items-center justify-center rounded-md text-slate-700 transition-none hover:border-[#7C5CFF] hover:bg-[#7C5CFF] hover:text-white active:translate-y-[1px]"
+                                    onPointerDown={(event: ReactPointerEvent<HTMLButtonElement>) => {
+                                      event.stopPropagation();
+                                      focusTextAnnotation(annotation.id);
+                                      startTextDrag(page.id, annotation.id, event);
+                                    }}
+                                  >
+                                    <Move className="h-4 w-4" />
+                                  </button>
+                                  <div className="h-4 w-px bg-slate-300/80" />
+                                  <button
+                                    type="button"
+                                    className="flex h-8 w-8 items-center justify-center rounded-md text-slate-700 transition-none hover:border-[#7C5CFF] hover:bg-[#7C5CFF] hover:text-white active:translate-y-[1px]"
+                                    onMouseDown={(event) => event.stopPropagation()}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      deleteTextAnnotation(page.id, annotation.id);
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>,
+                          document.body
+                        )
+                      : null}
+                    {typeof document !== "undefined" && showTextActions && activeTextToolbarBottomAnchor && !isDraggingThis && !isLocked
+                      ? createPortal(
+                          <div className="pointer-events-none fixed inset-0 z-[60]">
+                            <div
+                              className="pointer-events-auto absolute flex items-center"
+                              style={{
+                                left: activeTextToolbarBottomAnchor.x,
+                                top: activeTextToolbarBottomAnchor.y,
+                                transform: "translate(-50%, -50%)",
+                              }}
+                            >
+                              <div className="relative flex h-7 w-7 items-center justify-center overflow-visible">
+                                {isRotatingThis ? (
+                                  <div
+                                    className="pointer-events-none absolute left-1/2 top-1/2 whitespace-nowrap rounded-md border border-[#4A4A4A] bg-[#323232] px-2 py-1 text-[11px] font-semibold tabular-nums text-white shadow-sm"
+                                    style={{
+                                      transform: rotatedTextHandlePlacement
+                                        ? `translate(calc(-50% + ${rotatedTextHandlePlacement.direction.x * rotatingTextLabelOffsetPx}px), calc(-50% + ${rotatedTextHandlePlacement.direction.y * rotatingTextLabelOffsetPx}px))`
+                                        : "translate(-50%, -50%)",
+                                    }}
+                                  >
+                                    {rotatingText?.degrees ?? displayRotation}°
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className="flex h-8 w-8 cursor-grab items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-sm transition-none hover:border-[#7C5CFF] hover:bg-[#7C5CFF] hover:text-white active:cursor-grabbing active:translate-y-[1px]"
+                                    onPointerDown={(event: ReactPointerEvent<HTMLButtonElement>) => {
+                                      focusTextAnnotation(annotation.id);
+                                      startTextRotate(page.id, annotation.id, event);
+                                    }}
+                                  >
+                                    <RotateCcw className="h-3.5 w-3.5" />
+                                  </button>
                                 )}
                               </div>
-                            ) : null}
-                            {showTransformActions && !isLocked && textActionBottomPoint ? (
-                              <div
-                                className="pointer-events-auto absolute flex items-center gap-2"
-                                style={{
-                                  left: textActionBottomPoint.x,
-                                  top: textActionBottomPoint.y,
-                                  transform: "translate(-50%, 0.4rem)",
-                                }}
-                              >
-                                <button
-                                  type="button"
-                                  className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-sm transition hover:bg-white active:translate-y-[1px]"
-                                  onPointerDown={(event: ReactPointerEvent<HTMLButtonElement>) => {
-                                    focusTextAnnotation(annotation.id);
-                                    startTextRotate(page.id, annotation.id, event);
-                                  }}
-                                >
-                                  <RotateCcw className="h-3.5 w-3.5" />
-                                </button>
-                                <button
-                                  type="button"
-                                  className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-sm transition hover:bg-white active:translate-y-[1px]"
-                                  onPointerDown={(event: ReactPointerEvent<HTMLButtonElement>) => {
-                                    focusTextAnnotation(annotation.id);
-                                    startTextDrag(page.id, annotation.id, event);
-                                  }}
-                                >
-                                  <Move className="h-3.5 w-3.5" />
-                                </button>
-                              </div>
-                            ) : null}
+                            </div>
                           </div>,
                           document.body
                         )
@@ -9025,7 +9238,7 @@ const timer =
               <button
                 type="button"
                 aria-label="Add blank page"
-                className="inline-flex items-center justify-center rounded-xl p-2 text-slate-600 transition hover:bg-white hover:shadow-sm hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60"
+                className="inline-flex items-center justify-center rounded-xl p-2 text-slate-600 transition hover:bg-white hover:shadow-sm hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 dark:text-white dark:hover:bg-[#34343C] dark:hover:text-white dark:focus-visible:ring-zinc-500/50"
                 onClick={(event) => {
                   event.stopPropagation();
                   void handleAddBlankPageAfter(page.id);
@@ -9756,25 +9969,53 @@ const timer =
     };
   }
 
-  function getRotatedTextActionPoint(
-    pageId: string,
-    annotation: TextAnnotation,
-    edge: "top" | "bottom",
-    width: number,
-    height: number
+  function getTextRotateHandlePoint(
+    textRect: { left: number; top: number; width: number; height: number } | null,
+    placement: "bottom" | "left" | "right" | "top",
+    gapPx: number,
+    handleSizePx: number,
+    avoidRect: DOMRect | null = null
   ) {
-    const info = getPageTransformInfo(pageId);
-    if (!info) return null;
-    const displayRotation = normalizeRotation((annotation.rotation ?? 0) - info.rotationDegrees);
-    const radians = (displayRotation * Math.PI) / 180;
-    const centerX = annotation.x + width / 2;
-    const centerY = annotation.y + height / 2;
-    const offsetY = edge === "top" ? -height / 2 : height / 2;
-    const rotatedPagePoint = {
-      x: centerX - offsetY * Math.sin(radians),
-      y: centerY + offsetY * Math.cos(radians),
+    if (!textRect) return null;
+    const halfSize = handleSizePx / 2;
+    const right = textRect.left + textRect.width;
+    const bottom = textRect.top + textRect.height;
+    const centerX = textRect.left + textRect.width / 2;
+    const centerY = textRect.top + textRect.height / 2;
+    const point =
+      placement === "bottom"
+        ? { x: centerX, y: bottom + gapPx }
+        : placement === "top"
+          ? { x: centerX, y: textRect.top - gapPx }
+          : placement === "right"
+            ? { x: right + gapPx, y: centerY }
+            : { x: textRect.left - gapPx, y: centerY };
+
+    if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return null;
+
+    const candidateRect = {
+      left: point.x - halfSize,
+      top: point.y - halfSize,
+      right: point.x + halfSize,
+      bottom: point.y + halfSize,
     };
-    return getPageScreenPoint(pageId, rotatedPagePoint.x, rotatedPagePoint.y);
+
+    if (avoidRect) {
+      const paddedAvoidRect = {
+        left: avoidRect.left - 8,
+        top: avoidRect.top - 8,
+        right: avoidRect.right + 8,
+        bottom: avoidRect.bottom + 8,
+      };
+      const intersects =
+        candidateRect.left < paddedAvoidRect.right &&
+        candidateRect.right > paddedAvoidRect.left &&
+        candidateRect.top < paddedAvoidRect.bottom &&
+        candidateRect.bottom > paddedAvoidRect.top;
+      if (intersects) return null;
+    }
+
+    return point;
   }
 
   const startSignatureDrag = useCallback(
@@ -10219,7 +10460,6 @@ const timer =
         window.setTimeout(() => {
           if (!cancelled) {
             window.dispatchEvent(new Event("workspace-content-ready"));
-            window.dispatchEvent(new Event("workspace-launch-overlay-hide"));
           }
         }, 220);
         return;
@@ -10236,6 +10476,26 @@ const timer =
       }
     };
   }, [activePageIndexState, loadedPreviewIds, loadedThumbIds, loading, pages, sourcesHydrated]);
+
+  useEffect(() => {
+    if (!workspaceViewportReady || loading || !sourcesHydrated || pages.length === 0) {
+      setWorkspaceContentPainted(false);
+      return;
+    }
+    let cancelled = false;
+    let firstFrame = 0;
+    let secondFrame = 0;
+    firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        if (!cancelled) setWorkspaceContentPainted(true);
+      });
+    });
+    return () => {
+      cancelled = true;
+      if (firstFrame) window.cancelAnimationFrame(firstFrame);
+      if (secondFrame) window.cancelAnimationFrame(secondFrame);
+    };
+  }, [loading, pages.length, sourcesHydrated, workspaceViewportReady]);
   const highlightButtonDisabled = pages.length === 0 || loading;
   const highlightColorEntries = Object.entries(
     HIGHLIGHT_COLORS
@@ -13082,21 +13342,13 @@ const timer =
       });
     };
 
-    let rafId: number | null = null;
+    let rafId: number | null = window.requestAnimationFrame(updateFocusedTextOverlayRect);
     const scheduleUpdate = () => {
-      if (rafId !== null) return;
-      rafId = window.requestAnimationFrame(() => {
-        rafId = null;
-        updateFocusedTextOverlayRect();
-      });
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId);
+      }
+      rafId = window.requestAnimationFrame(updateFocusedTextOverlayRect);
     };
-
-    const tick = () => {
-      updateFocusedTextOverlayRect();
-      rafId = window.requestAnimationFrame(tick);
-    };
-
-    tick();
 
     const node = textAnnotationRefs.current.get(focusedTextId) ?? null;
     const observer =
@@ -13689,53 +13941,8 @@ const timer =
       ref={(node) => {
         workspaceFullscreenRef.current = node;
       }}
-      className="flex h-screen flex-col overflow-hidden bg-[#EEF1F4] dark:bg-[#252525]"
+      className="flex h-screen flex-col overflow-hidden bg-[#EEF2F7] dark:bg-[#222224]"
     >
-      {showStartupOverlay ? (
-        startupOverlayVariant === "existing" ? (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center bg-[var(--background)] opacity-100">
-            <div className="pointer-events-none flex flex-col items-center text-center">
-              <div
-                className="h-10 w-10 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700 dark:border-[#2A2A31] dark:border-t-slate-200"
-                aria-hidden
-              />
-              <p className="mt-5 text-[24px] font-semibold tracking-tight text-slate-900 sm:text-[28px] dark:text-zinc-100">
-                Opening Workspace...
-              </p>
-              <span className="sr-only">Opening Workspace</span>
-            </div>
-          </div>
-        ) : (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/50 opacity-100 backdrop-blur-sm dark:bg-slate-950/70">
-            <div className="w-full max-w-md rounded-[28px] border border-white/60 bg-white/85 px-8 py-7 text-center opacity-100 shadow-[0_28px_80px_rgba(15,23,42,0.35)] backdrop-blur-xl dark:border-[#2A2A31] dark:bg-[#1C1C1F]/90">
-              <p className="text-[15px] font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-zinc-400">
-                MergifyPDF
-              </p>
-              <p className="mt-2 text-lg font-semibold text-slate-900 dark:text-zinc-100">{startupOverlayMessage}</p>
-              <div className="mt-5 h-2.5 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-[#2A2A31]">
-                <div
-                  className="relative h-full overflow-hidden rounded-full bg-gradient-to-r from-[#0f172a] via-[#1d4ed8] to-[#38bdf8] transition-[width] duration-200 ease-out"
-                  style={{ width: `${Math.round(startupProgress * 100)}%` }}
-                >
-                  <div
-                    className="absolute inset-0 opacity-70"
-                    style={{
-                      backgroundImage:
-                        "linear-gradient(120deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.12) 45%, rgba(255,255,255,0.35) 70%, rgba(255,255,255,0.12) 100%)",
-                      backgroundSize: "220% 100%",
-                      animation: "mpdf-water 2.8s ease-in-out infinite",
-                    }}
-                  />
-                </div>
-              </div>
-              <div className="mt-4 flex items-center justify-center gap-2 text-xs font-medium text-slate-500 dark:text-zinc-400">
-                <span className="h-1.5 w-1.5 rounded-full bg-slate-400 dark:bg-[#4A4A55]" />
-                <span>Optimizing previews for speed</span>
-              </div>
-            </div>
-          </div>
-        )
-      ) : null}
       {isBrowserFullscreen && activePresentationPage ? (
         <div className="fixed inset-0 z-[110] bg-[#EEF2F7] dark:bg-[#222224]">
           <div className="flex h-full w-full items-center justify-center px-8 py-10">
@@ -13754,7 +13961,7 @@ const timer =
           </div>
         </div>
       ) : null}
-      <div className="flex min-h-0 flex-1 flex-col transition-opacity duration-[260ms] ease-out opacity-100 dark:bg-[#252525]">
+      <div className="flex min-h-0 flex-1 flex-col transition-opacity duration-[260ms] ease-out bg-[#EEF2F7] dark:bg-[#222224]">
       <header className="sticky top-0 z-40 border-b border-slate-200/60 bg-white dark:border-[#4A4A4A]/60 dark:bg-[#323232]">
         {/* Top row */}
         <div className="w-full border-b border-slate-100 bg-white dark:border-[#4A4A4A]/60 dark:bg-[#323232]">
@@ -14296,13 +14503,25 @@ const timer =
 
 	      <div className="flex-1 min-h-0 overflow-hidden">
 	          <div className="flex h-full min-h-0 flex-col gap-6 overflow-hidden">
-            {error && (
-              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">
-                {error}
-              </div>
-            )}
-
 	            <div className="relative flex-1 min-h-0 overflow-hidden">
+              {error ? (
+                <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center p-6">
+                  <div className="pointer-events-auto max-w-lg rounded-3xl bg-[#E53935] px-6 py-6 text-center text-white shadow-xl shadow-red-950/20">
+                    <p className="text-lg font-semibold">Failed to load project</p>
+                    <p className="mt-2 text-sm leading-6 text-white/95">
+                      Please retry to load the previews again.
+                    </p>
+                    <p className="mt-3 text-xs leading-5 text-white/80">{error}</p>
+                    <button
+                      type="button"
+                      onClick={() => window.location.reload()}
+                      className="mt-5 inline-flex items-center justify-center rounded-full bg-white px-5 py-2 text-sm font-semibold text-[#E53935] transition hover:bg-white/90"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                </div>
+              ) : null}
               <AnimatePresence mode="wait">
                 {organizeMode && !loading && pages.length > 0 ? (
 	                  <motion.div
@@ -14354,7 +14573,7 @@ const timer =
                   </motion.div>
                 ) : null}
 
-	                {!organizeMode && (pages.length > 0 || loading) ? (
+	                {!organizeMode && (pages.length > 0 || loading || showExistingProjectWorkspace) ? (
 	                  <motion.div
 	                    key="preview-view"
 	                    initial={{ opacity: 0.95, scale: 0.97 }}
@@ -14362,7 +14581,7 @@ const timer =
                     exit={{ opacity: 0, scale: 0.97 }}
                   transition={VIEW_TRANSITION}
 			                  className={`editor-shell mx-auto flex h-full min-h-0 w-full flex-1 flex-col gap-6 overflow-hidden px-0 transition-opacity duration-150 ${
-                        workspaceViewportReady || showStartupOverlay ? "opacity-100" : "opacity-0 pointer-events-none"
+                        "opacity-100"
                       }`}
                 >
 
@@ -15967,7 +16186,7 @@ const timer =
               </AnimatePresence>
 
 	              {!loading &&
-                  !showStartupOverlay &&
+                  !shouldShowStartupOverlay &&
                   sourcesHydrated &&
                   pages.length === 0 &&
                   (!projectParam || projectHasSources === false) && (
@@ -17288,6 +17507,16 @@ const timer =
         }
         [data-text-annotation] li::marker {
           font-size: inherit;
+        }
+        body.studio-rotating-text [data-text-annotation],
+        body.studio-rotating-text [data-text-annotation] *,
+        body.studio-rotating-text [data-text-annotation] [contenteditable='true'],
+        body.studio-rotating-text [data-page-id] div[style] {
+          cursor: grabbing !important;
+        }
+        body.studio-rotating-text [data-text-annotation] [contenteditable='true'] {
+          pointer-events: none !important;
+          caret-color: transparent !important;
         }
         /* Make scrollbar gutters/tracks white across Studio */
         body.studio-page * {

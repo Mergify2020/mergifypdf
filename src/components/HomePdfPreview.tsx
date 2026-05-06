@@ -23,12 +23,17 @@ export default function HomePdfPreview({
     if (!ctx) return;
 
     let cancelled = false;
-    setLoading(true);
-    ctx.fillStyle = "#ffffff";
+    const startLoadingId = window.requestAnimationFrame(() => {
+      if (!cancelled) setLoading(true);
+    });
+    ctx.fillStyle = "#222224";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     if (!pdfUrl) {
-      setLoading(false);
+      window.requestAnimationFrame(() => {
+        if (!cancelled) setLoading(false);
+      });
+      window.cancelAnimationFrame(startLoadingId);
       return;
     }
 
@@ -72,6 +77,7 @@ export default function HomePdfPreview({
 
     return () => {
       cancelled = true;
+      window.cancelAnimationFrame(startLoadingId);
     };
   }, [pdfUrl, rotation]);
 
@@ -79,7 +85,7 @@ export default function HomePdfPreview({
     <div className="flex h-full w-full items-center justify-center">
       <div className="flex flex-col items-center justify-center gap-2">
         <div
-          className="relative flex items-center justify-center bg-white"
+          className="relative flex items-center justify-center bg-white dark:bg-[#222224]"
           style={{ width: PREVIEW_MAX_WIDTH, height: PREVIEW_MAX_HEIGHT }}
         >
           <canvas
@@ -87,7 +93,7 @@ export default function HomePdfPreview({
             className="block"
             style={{ visibility: loading ? "hidden" : "visible" }}
           />
-          {loading ? <div className="absolute inset-0 bg-white" /> : null}
+          {loading ? <div className="absolute inset-0 bg-white dark:bg-[#222224]" /> : null}
         </div>
       </div>
     </div>

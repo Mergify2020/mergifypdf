@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import Image from "next/image";
@@ -10,6 +11,11 @@ import { matchesSearch } from "@/lib/search";
 import { formatProjectActivityDate, formatProjectLastEdited } from "@/lib/formatProjectLastEdited";
 import { formatFileSize } from "@/lib/formatFileSize";
 import { projectNameToDisplay, projectNameToEditable, sanitizeProjectName } from "@/lib/projectName";
+import {
+  beginExistingWorkspaceOpenHandoff,
+  preloadExistingWorkspaceProject,
+  shouldHandleWorkspaceOpenClick,
+} from "@/lib/workspaceOpenHandoff";
 
 type SummaryProject = {
   id: string;
@@ -166,12 +172,23 @@ export default function RecentProjectsRow({
   const trashToastTouchStartY = useRef<number | null>(null);
   const copyToastTouchStartY = useRef<number | null>(null);
   const loading = false;
+  const router = useRouter();
 
   const closeListMenu = () => {
     setListMenuOpenId(null);
     setListMenuPosition(null);
     setListMenuRenamingId(null);
     setListMenuAnimateIn(false);
+  };
+
+  const openProject = async (projectId: string) => {
+    beginExistingWorkspaceOpenHandoff(projectId);
+    await preloadExistingWorkspaceProject(projectId);
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        router.push(`/studio?project=${encodeURIComponent(projectId)}`);
+      });
+    });
   };
 
   useEffect(() => {
@@ -765,6 +782,11 @@ export default function RecentProjectsRow({
                               ? "[animation:rename-text-flash_1400ms_ease-out_forwards]"
                               : ""
                           }`}
+                          onClick={(event) => {
+                            if (!shouldHandleWorkspaceOpenClick(event)) return;
+                            event.preventDefault();
+                            openProject(project.id);
+                          }}
                         >
                           {project.title}
                         </Link>
@@ -1220,6 +1242,11 @@ export default function RecentProjectsRow({
                                   ? "[animation:rename-text-flash_1400ms_ease-out_forwards]"
                                   : ""
                               }`}
+                              onClick={(event) => {
+                                if (!shouldHandleWorkspaceOpenClick(event)) return;
+                                event.preventDefault();
+                                openProject(project.id);
+                              }}
                             >
                               {project.title}
                             </Link>
@@ -1786,7 +1813,12 @@ export default function RecentProjectsRow({
                     <Link
                       href={`/studio?project=${encodeURIComponent(copyToast.id)}`}
                       className="shrink-0 rounded-md border-2 border-white/25 px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-white/10"
-                      onClick={() => setCopyToast(null)}
+                      onClick={(event) => {
+                        if (!shouldHandleWorkspaceOpenClick(event)) return;
+                        event.preventDefault();
+                        setCopyToast(null);
+                        openProject(copyToast.id);
+                      }}
                     >
                       Open
                     </Link>
