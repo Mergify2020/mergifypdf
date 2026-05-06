@@ -261,7 +261,7 @@ export async function preloadExistingWorkspaceProject(projectId: string | null) 
     const cloudSourceMeta =
       Array.isArray(cloudSources)
         ? cloudSources
-            .map((entry) => {
+            .map((entry): StoredSourceMeta | null => {
               if (!entry || typeof entry !== "object") return null;
               const id =
                 "id" in entry && typeof (entry as { id?: unknown }).id === "string"
@@ -270,21 +270,18 @@ export async function preloadExistingWorkspaceProject(projectId: string | null) 
               if (!id) return null;
               return {
                 id,
-                name:
-                  "name" in entry && typeof (entry as { name?: unknown }).name === "string"
-                    ? (entry as { name: string }).name
-                    : undefined,
-                size:
-                  "size" in entry && typeof (entry as { size?: unknown }).size === "number"
-                    ? (entry as { size: number }).size
-                    : undefined,
-                updatedAt:
-                  "updatedAt" in entry && typeof (entry as { updatedAt?: unknown }).updatedAt === "number"
-                    ? (entry as { updatedAt: number }).updatedAt
-                    : undefined,
-              } satisfies StoredSourceMeta;
+                ...(("name" in entry && typeof (entry as { name?: unknown }).name === "string"
+                  ? { name: (entry as { name: string }).name }
+                  : {}) as Pick<StoredSourceMeta, "name">),
+                ...(("size" in entry && typeof (entry as { size?: unknown }).size === "number"
+                  ? { size: (entry as { size: number }).size }
+                  : {}) as Pick<StoredSourceMeta, "size">),
+                ...(("updatedAt" in entry && typeof (entry as { updatedAt?: unknown }).updatedAt === "number"
+                  ? { updatedAt: (entry as { updatedAt: number }).updatedAt }
+                  : {}) as Pick<StoredSourceMeta, "updatedAt">),
+              };
             })
-            .filter((item): item is StoredSourceMeta => Boolean(item))
+            .filter((item): item is StoredSourceMeta => item !== null)
         : [];
 
     if (Array.isArray(cloudSources) && cloudSources.length > 0) {
