@@ -2530,6 +2530,36 @@ function WorkspaceClient() {
     }
   });
   const existingProjectOverlayHideSentRef = useRef(false);
+  const dispatchWorkspaceReadyAfterPaint = useCallback((includeHide: boolean) => {
+    let cancelled = false;
+    let firstFrame = 0;
+    let secondFrame = 0;
+    const fallbackId = window.setTimeout(() => {
+      if (cancelled) return;
+      window.dispatchEvent(new Event("workspace-content-ready"));
+      if (includeHide) {
+        window.dispatchEvent(new Event("workspace-launch-overlay-hide"));
+      }
+    }, 1000);
+
+    firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        if (cancelled) return;
+        window.clearTimeout(fallbackId);
+        window.dispatchEvent(new Event("workspace-content-ready"));
+        if (includeHide) {
+          window.dispatchEvent(new Event("workspace-launch-overlay-hide"));
+        }
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(fallbackId);
+      if (firstFrame) window.cancelAnimationFrame(firstFrame);
+      if (secondFrame) window.cancelAnimationFrame(secondFrame);
+    };
+  }, []);
   const [loadedPreviewIds, setLoadedPreviewIds] = useState<Set<string>>(() => new Set());
   const [loadedThumbIds, setLoadedThumbIds] = useState<Set<string>>(() => new Set());
   const INSERT_BEFORE_FIRST_ID = "__before_first__";
@@ -5332,6 +5362,23 @@ const timer =
     previewSyncRef.current.add(projectId);
 
     const ensurePreview = async () => {
+      const waitForLocalSource = async () => {
+        for (let attempt = 0; attempt < 30; attempt += 1) {
+          const source = sources[0];
+          if (source?.storageId) {
+            try {
+              const stored = await readFileBlob(source.storageId);
+              const blob = stored?.blob instanceof Blob ? stored.blob : null;
+              if (blob) return blob;
+            } catch {
+              // keep waiting for the preload to finish
+            }
+          }
+          await new Promise((resolve) => setTimeout(resolve, 150));
+        }
+        return null;
+      };
+
       try {
         const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}`, { cache: "no-store" });
         if (cancelled) return;
@@ -5348,14 +5395,13 @@ const timer =
           return;
         }
 
-        const source = sources[0];
-        if (!source?.storageId) {
-          throw new Error("No local source available to upload PDF.");
-        }
-        const stored = await readFileBlob(source.storageId);
-        const blob = stored?.blob instanceof Blob ? stored.blob : null;
+        const blob = await waitForLocalSource();
         if (!blob) {
-          throw new Error("Local PDF blob not found in storage.");
+          console.info("No local source blob available yet; will retry on the next workspace sync.", {
+            projectId,
+          });
+          previewSyncRef.current.delete(projectId);
+          return;
         }
 
         const initRes = await fetch(`/api/projects/${encodeURIComponent(projectId)}/pdf-upload`, {
@@ -5393,7 +5439,6 @@ const timer =
         previewSyncRef.current.delete(projectId);
         setError("PDF upload failed in production. Check R2 credentials and network logs.");
         console.error("PDF upload failed during cloud sync.", err);
-        throw err;
       }
     };
 
@@ -5499,6 +5544,19 @@ const timer =
             setProjectHasSources(true);
             const restored: SourceRef[] = [];
             const missing: string[] = [];
+            const waitForStoredBlob = async (id: string) => {
+              for (let attempt = 0; attempt < 20; attempt += 1) {
+                try {
+                  const stored = await readFileBlob(id);
+                  const blobRecord = stored?.blob instanceof Blob ? stored.blob : null;
+                  if (blobRecord) return { stored, blobRecord };
+                } catch {
+                  // keep trying while IndexedDB catches up after the route swap
+                }
+                await new Promise((resolve) => setTimeout(resolve, 120));
+              }
+              return null;
+            };
             for (const entry of cloudSources) {
               if (!entry || typeof entry !== "object") continue;
               const id =
@@ -5551,23 +5609,31 @@ const timer =
                 ("updatedAt" in entry && typeof (entry as { updatedAt?: unknown }).updatedAt === "number"
                   ? (entry as { updatedAt: number }).updatedAt
                   : null) ?? Date.now();
-              let stored = await readFileBlob(id);
-              let blobRecord = stored?.blob instanceof Blob ? stored.blob : null;
+              let stored = await waitForStoredBlob(id);
+              let blobRecord = stored?.blobRecord ?? null;
               if (!blobRecord) {
-                throw new Error("Expected local PDF blob to be available after missing-source fallback.");
+                console.info("Waiting for stored PDF blob after existing-project hydration.", {
+                  projectId,
+                  sourceId: id,
+                });
+                missing.push(id);
+                continue;
               }
               const objectUrl = URL.createObjectURL(blobRecord);
               restored.push({
                 storageId: id,
                 url: objectUrl,
-                name: stored?.name ?? name,
-                size: stored?.size ?? size ?? blobRecord.size ?? 0,
-                updatedAt: stored?.updatedAt ?? updatedAt,
+                name: stored?.stored?.name ?? name,
+                size: stored?.stored?.size ?? size ?? blobRecord.size ?? 0,
+                updatedAt: stored?.stored?.updatedAt ?? updatedAt,
               });
             }
             if (!cancelled && restored.length > 0) {
               setSources(restored);
               persistSourceMetadata(restored, projectId);
+              setError(null);
+            } else if (!cancelled && missing.length > 0) {
+              setProjectHasSources(null);
               setError(null);
             }
             return restored.length > 0;
@@ -6909,14 +6975,8 @@ const timer =
     if (!hasExistingOverlayMarker) return;
     if (!sourcesHydrated || !workspaceViewportReady) return;
     existingProjectOverlayHideSentRef.current = true;
-    const timeoutId = window.setTimeout(() => {
-      window.dispatchEvent(new Event("workspace-content-ready"));
-      window.dispatchEvent(new Event("workspace-launch-overlay-hide"));
-    }, 180);
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [sourcesHydrated, workspaceViewportReady]);
+    return dispatchWorkspaceReadyAfterPaint(true);
+  }, [dispatchWorkspaceReadyAfterPaint, sourcesHydrated, workspaceViewportReady]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -6930,14 +6990,8 @@ const timer =
     if (!hasExistingOverlayMarker) return;
     if (!error && (loading || !sourcesHydrated || !workspaceViewportReady)) return;
     existingProjectOverlayHideSentRef.current = true;
-    const timeoutId = window.setTimeout(() => {
-      window.dispatchEvent(new Event("workspace-content-ready"));
-      window.dispatchEvent(new Event("workspace-launch-overlay-hide"));
-    }, error ? 120 : 260);
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [error, loading, sourcesHydrated, workspaceViewportReady]);
+    return dispatchWorkspaceReadyAfterPaint(true);
+  }, [dispatchWorkspaceReadyAfterPaint, error, loading, sourcesHydrated, workspaceViewportReady]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -6952,13 +7006,12 @@ const timer =
     const timeoutId = window.setTimeout(() => {
       if (existingProjectOverlayHideSentRef.current) return;
       existingProjectOverlayHideSentRef.current = true;
-      window.dispatchEvent(new Event("workspace-content-ready"));
-      window.dispatchEvent(new Event("workspace-launch-overlay-hide"));
+      dispatchWorkspaceReadyAfterPaint(true);
     }, 12000);
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [projectParam]);
+  }, [dispatchWorkspaceReadyAfterPaint, projectParam]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -9158,7 +9211,7 @@ const timer =
                                 transform: "translate(-50%, -50%)",
                               }}
                             >
-                              <div className="relative flex h-7 w-7 items-center justify-center overflow-visible">
+                              <div className="relative flex h-8 w-8 items-center justify-center overflow-visible">
                                 {isRotatingThis ? (
                                   <div
                                     className="pointer-events-none absolute left-1/2 top-1/2 whitespace-nowrap rounded-md border border-[#4A4A4A] bg-[#323232] px-2 py-1 text-[11px] font-semibold tabular-nums text-white shadow-sm"
@@ -10350,7 +10403,7 @@ const timer =
       if (!current) return prev;
       const width = current.width ?? 0.14;
       const height = current.height ?? 0.06;
-      const offset = 0.015;
+      const offset = 0.03;
       const nextX = clamp(current.x + offset, 0, 1 - width);
       const nextY = clamp(current.y + offset, 0, 1 - height);
       return {
@@ -10366,7 +10419,15 @@ const timer =
         ],
       };
     });
-    setFocusedTextId(newId);
+    if (typeof window !== "undefined") {
+      window.requestAnimationFrame(() => {
+        setFocusedTextId(newId);
+        setActiveTextContainerId(newId);
+      });
+    } else {
+      setFocusedTextId(newId);
+      setActiveTextContainerId(newId);
+    }
   }, [markWorkspaceDirty]);
 
   const duplicateShape = useCallback((pageId: string, id: string) => {

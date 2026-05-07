@@ -290,7 +290,7 @@ export default function PendingFilesReorderList({
       .filter((idx) => idx < index).length;
     const overlay = {
       index,
-      top: rect.top - listRect.top + listNode.scrollTop,
+      top: rect.top - listRect.top,
       width: rect.width,
       height: rect.height,
       offset: event.clientY - rect.top,
@@ -316,16 +316,9 @@ export default function PendingFilesReorderList({
       const listNode = listRef.current;
       if (!listNode) return Math.max(top, 0);
       const minTop = 0;
-      const maxTop = listNode.scrollHeight - height;
+      const maxTop = listNode.clientHeight - height;
       if (maxTop < minTop) return minTop;
       return Math.min(Math.max(top, minTop), maxTop);
-    };
-    const getPinnedOverlayTop = (height: number, direction: -1 | 0 | 1) => {
-      const listNode = listRef.current;
-      if (!listNode) return 0;
-      if (direction === -1) return 0;
-      if (direction === 1) return Math.max(0, listNode.scrollHeight - height);
-      return 0;
     };
     const recomputeRowPositions = (skipIndex: number) => {
       rowPositionsRef.current = rowRefs.current
@@ -410,10 +403,7 @@ export default function PendingFilesReorderList({
         setScrollbarWidth(Math.max(0, listNode.offsetWidth - listNode.clientWidth));
       }
       const rawTop = event.clientY - listMetricsRef.current.top - overlay.offset;
-      const nextTop =
-        autoScrollRef.current.direction === 0
-          ? clampOverlayTop(rawTop, overlay.height)
-          : getPinnedOverlayTop(overlay.height, autoScrollRef.current.direction);
+      const nextTop = clampOverlayTop(rawTop, overlay.height);
       const nextOverlay = { ...overlay, top: nextTop };
       dragOverlayRef.current = nextOverlay;
       setDragOverlay(nextOverlay);
@@ -454,21 +444,12 @@ export default function PendingFilesReorderList({
         listNode.scrollTop = Math.min(maxScrollRef.current, Math.max(0, listNode.scrollTop + dir * 6));
         if (listNode.scrollTop === 0 && dir === -1) autoScrollRef.current.direction = 0;
         if (listNode.scrollTop === maxScrollRef.current && dir === 1) autoScrollRef.current.direction = 0;
-        const delta = listNode.scrollTop - prevScroll;
         listMetricsRef.current.scrollTop = listNode.scrollTop;
-        if (delta !== 0 && dragOverlayRef.current) {
-          const updated = {
-            ...dragOverlayRef.current,
-            top:
-              autoScrollRef.current.direction === 0
-                ? clampOverlayTop(dragOverlayRef.current.top + delta, dragOverlayRef.current.height)
-                : getPinnedOverlayTop(dragOverlayRef.current.height, autoScrollRef.current.direction),
-          };
+        if (listNode.scrollTop !== prevScroll && dragOverlayRef.current) {
+          const updated = dragOverlayRef.current;
           dragOverlayRef.current = updated;
-          setDragOverlay(updated);
           recomputeRowPositions(dragIndexRef.current ?? 0);
-          const overlayTopViewport = listMetricsRef.current.top + updated.top;
-          computeInsertIndex(overlayTopViewport, updated.height);
+          computeInsertIndex(listMetricsRef.current.top + updated.top, updated.height);
         }
       }
       rafId = window.requestAnimationFrame(tick);
@@ -487,7 +468,7 @@ export default function PendingFilesReorderList({
 
   return (
     <div className={`flex h-[360px] flex-col gap-4 pt-0 pb-0 text-left sm:h-[400px] ${className ?? ""}`}>
-      <div className="overflow-hidden rounded-[10px] border-2 border-dashed border-[#D1D5DB] bg-[#F5F5F5] px-3 py-3 shadow-none sm:px-8 dark:border-zinc-700 dark:bg-zinc-800/80">
+      <div className="overflow-hidden rounded-[10px] border-2 border-dashed border-[#D1D5DB] bg-[#F5F5F5] px-3 py-3 shadow-none sm:px-8 dark:border-zinc-700 dark:bg-[#2B2B2B]/80">
         <div className="flex items-center justify-between gap-3">
           <p className="text-[15px] font-medium text-slate-700 dark:text-zinc-300">
             <button
@@ -514,12 +495,12 @@ export default function PendingFilesReorderList({
         </div>
       </div>
 
-      <div ref={viewportRef} className="relative min-h-0 flex-1 overflow-hidden rounded-[10px] bg-white shadow-none dark:bg-zinc-900">
+      <div ref={viewportRef} className="relative min-h-0 flex-1 overflow-hidden rounded-[10px] bg-[#F5F5F5] shadow-none dark:bg-[#2B2B2B]/80">
         <div
           className="pointer-events-none absolute inset-0 z-20 rounded-[10px] border-2 border-solid border-[#D1D5DB] dark:border-zinc-700"
           aria-hidden
         />
-        <div ref={listRef} className="upload-list-scroll absolute inset-0 z-0 overflow-y-auto bg-white dark:bg-zinc-900">
+        <div ref={listRef} className="upload-list-scroll absolute inset-0 z-0 overflow-y-auto bg-[#F5F5F5] dark:bg-[#2B2B2B]/80">
           {(() => {
             const visibleIndexMap = new Map<number, number>();
             visibleIndices.forEach((idx, position) => {
@@ -547,7 +528,7 @@ export default function PendingFilesReorderList({
                 >
                   {showSpacer ? (
                     <div
-                      className="border-y border-[#D1D5DB] bg-[#F6F2FF]/55 dark:border-zinc-700 dark:bg-zinc-800/60"
+                      className="border-b border-[#D1D5DB] bg-[#E2E2E2] dark:border-zinc-700 dark:bg-[#2B2B2B]/80"
                       style={{ height: dragOverlay?.height ?? 40 }}
                     />
                   ) : null}
@@ -555,9 +536,9 @@ export default function PendingFilesReorderList({
                     ref={(node) => {
                       rowRefs.current[index] = node;
                     }}
-                    className={`group/file-row flex items-center justify-between gap-3 bg-white px-4 py-3 text-sm text-slate-800 transition-[transform,opacity,filter] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                    className={`group/file-row flex items-center justify-between gap-3 bg-[#F5F5F5] px-4 py-3 text-sm text-slate-800 transition-[transform,opacity,filter] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] ${
                       busy ? "opacity-70" : dragIndex !== null ? "" : "hover:bg-[#F6F2FF]"
-                    } ${isDeletingRow ? "translate-x-3 scale-[0.985] opacity-0 blur-[1px]" : ""} dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200`}
+                    } ${isDeletingRow ? "translate-x-3 scale-[0.985] opacity-0 blur-[1px]" : ""} dark:border-zinc-800 dark:bg-[#2B2B2B]/80 dark:text-zinc-200`}
                   >
                     <div className="flex min-w-0 items-center gap-3 sm:gap-4">
                       {canReorder && useTouchReorderControls ? (
@@ -614,9 +595,11 @@ export default function PendingFilesReorderList({
                         type="button"
                         onClick={() => handleDeleteFile(id)}
                         className={`rounded-full p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 ${
-                          useTouchReorderControls
-                            ? ""
-                            : "opacity-0 group-hover/file-row:opacity-100 group-focus-within/file-row:opacity-100"
+                          dragIndex !== null
+                            ? "pointer-events-none opacity-0"
+                            : useTouchReorderControls
+                              ? ""
+                              : "opacity-0 group-hover/file-row:opacity-100 group-focus-within/file-row:opacity-100"
                         }`}
                         aria-label={`Remove ${file.name}`}
                         disabled={busy || deletingFileId !== null}
@@ -633,7 +616,7 @@ export default function PendingFilesReorderList({
               dragMoved && dragOverlay && effectiveInsertIndex === visibleIndices.length ? (
                 <div
                   key="drag-tail-spacer"
-                  className="border-y border-[#D1D5DB] bg-[#F6F2FF]/55 dark:border-zinc-700 dark:bg-zinc-800/60"
+                  className="border-b border-[#D1D5DB] bg-[#E2E2E2] dark:border-zinc-700 dark:bg-[#2B2B2B]/80"
                   style={{ height: dragOverlay.height }}
                 />
               ) : null;
@@ -647,18 +630,19 @@ export default function PendingFilesReorderList({
             className="pointer-events-none absolute left-0 z-10"
             style={{
               top: dragOverlay.top,
-              right: scrollbarWidth,
+              left: 1,
+              right: scrollbarWidth + 1,
             }}
           >
             <div
-              className="flex items-center justify-between gap-3 border-2 border-[#A98BFF] bg-[#F6F2FF] px-4 py-3 shadow-[0_14px_35px_rgba(15,23,42,0.18)] dark:border-[#7b67c5] dark:bg-zinc-900"
+              className="flex items-center justify-between gap-3 border-b border-[#7C5CFF] bg-[#F6F2FF] px-4 py-3 text-sm text-slate-800 shadow-[0_14px_35px_rgba(15,23,42,0.18)] ring-1 ring-inset ring-[#A98BFF] dark:border-[#A98BFF] dark:bg-[#46308F] dark:text-zinc-200 dark:ring-[#8F75E8]"
               style={{ height: dragOverlay.height, boxSizing: "border-box" }}
             >
-              <div className="flex min-w-0 items-center gap-3">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-200/80 bg-slate-50 text-slate-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+              <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border-2 border-[#7C5CFF] bg-white text-[#7C5CFF] dark:border-[#A98BFF] dark:bg-[#5B46A6] dark:text-white">
                   <GripVertical className="h-4 w-4" aria-hidden />
                 </span>
-                <span className="shrink-0 text-sm font-semibold text-[#5B38E6] dark:text-[#C4B5FD]">
+                <span className="w-5 shrink-0 text-center text-sm font-semibold text-[#5B38E6] dark:text-white sm:w-6">
                   {draggedDisplayPosition ?? dragOverlay.index + 1}
                 </span>
                 <div className="min-w-0">
@@ -667,10 +651,10 @@ export default function PendingFilesReorderList({
                     const draggedPageCount = draggedFile ? pageCountsById[draggedFile.id] : null;
                     return (
                       <>
-                        <span className="block truncate font-semibold text-slate-900 dark:text-zinc-100">
+                        <span className="block truncate font-semibold text-slate-900 dark:text-white">
                           {draggedFile?.file.name}
                         </span>
-                        <span className="block text-xs font-semibold text-slate-900 dark:text-zinc-300">
+                        <span className="block text-xs font-semibold text-slate-900 dark:text-white/85">
                           {getFileTypeLabel(draggedFile?.file as File)} -{" "}
                           {formatBytes(draggedFile?.file.size ?? 0)}
                           {typeof draggedPageCount === "number"
@@ -682,7 +666,14 @@ export default function PendingFilesReorderList({
                   })()}
                 </div>
               </div>
-              <span className="h-7 w-7 shrink-0" aria-hidden />
+              <button
+                type="button"
+                tabIndex={-1}
+                aria-hidden="true"
+                className="rounded-full p-1 opacity-0 pointer-events-none"
+              >
+                <Trash2 className="h-5 w-5" aria-hidden />
+              </button>
             </div>
           </div>
         ) : null}

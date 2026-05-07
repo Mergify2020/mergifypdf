@@ -73,7 +73,24 @@ export async function POST(
     return NextResponse.json({ success: true });
   }
 
-  const formData = await req.formData();
+  if (!contentType.includes("multipart/form-data")) {
+    return NextResponse.json(
+      { error: "Expected multipart form data or JSON confirmation" },
+      { status: 400 }
+    );
+  }
+
+  let formData: FormData;
+  try {
+    formData = await req.formData();
+  } catch (err) {
+    console.warn("Failed to parse PDF upload body as FormData.", {
+      projectId: id,
+      contentType,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return NextResponse.json({ error: "Invalid multipart upload body" }, { status: 400 });
+  }
   const file = formData.get("file");
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "Missing PDF file" }, { status: 400 });

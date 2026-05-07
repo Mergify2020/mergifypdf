@@ -8,6 +8,7 @@ type Props = {
   complete?: boolean;
   headlineOverride?: string;
   startedAtMs?: number | null;
+  initialProgress?: number | null;
   onCompleteVisualReady?: () => void;
   variant?: "fullscreen" | "panel";
 };
@@ -17,37 +18,35 @@ export default function WorkspaceLaunchLoadingState({
   complete = false,
   headlineOverride,
   startedAtMs = null,
+  initialProgress = null,
   onCompleteVisualReady,
   variant = "fullscreen",
 }: Props) {
-  const [progress, setProgress] = useState(0);
-  const progressRef = useRef(0);
+  const normalizedInitialProgress =
+    typeof initialProgress === "number" && Number.isFinite(initialProgress)
+      ? Math.min(Math.max(initialProgress, 0), 0.9)
+      : 0;
+  const [progress, setProgress] = useState(normalizedInitialProgress);
+  const progressRef = useRef(normalizedInitialProgress);
+  const completeRef = useRef(complete);
+  const completeStartedAtRef = useRef<number | null>(null);
+  const completeStartProgressRef = useRef(normalizedInitialProgress);
+  const completeVisualReadySentRef = useRef(false);
+  const completeHoldTimerRef = useRef<number | null>(null);
   const [ellipsisFrame, setEllipsisFrame] = useState(0);
   const ellipsisFrames = ["", ".", "..", "..."];
+  const PRE_COMPLETE_MAX_PROGRESS = 0.82;
+  const COMPLETE_HOLD_MS = 1000;
 
   useEffect(() => {
-    if (complete) {
-      let frameId = 0;
-      const start = performance.now();
-      const initialProgress = progressRef.current;
-
-      const tick = () => {
-        const elapsed = performance.now() - start;
-        const duration = 360;
-        const eased = Math.min(1, elapsed / duration);
-        const next = initialProgress + (1 - initialProgress) * (1 - Math.pow(1 - eased, 3));
-        progressRef.current = next;
-        setProgress(next);
-        if (eased < 1) {
-          frameId = window.requestAnimationFrame(tick);
-        }
-      };
-
-      frameId = window.requestAnimationFrame(tick);
-      return () => {
-        window.cancelAnimationFrame(frameId);
-      };
+    completeRef.current = complete;
+    if (!complete) {
+      completeStartedAtRef.current = null;
+      completeStartProgressRef.current = progressRef.current;
     }
+  }, [complete]);
+
+  useEffect(() => {
     let frameId = 0;
     const localStart = performance.now();
 
@@ -56,16 +55,27 @@ export default function WorkspaceLaunchLoadingState({
         typeof startedAtMs === "number" && Number.isFinite(startedAtMs)
           ? Math.max(0, Date.now() - startedAtMs)
           : performance.now() - localStart;
-      let next = 0;
-      if (elapsed < 700) {
-        next = (elapsed / 700) * 0.32;
-      } else if (elapsed < 1800) {
-        next = 0.32 + ((elapsed - 700) / 1100) * 0.38;
+      let next = progressRef.current;
+      if (!completeRef.current) {
+        if (elapsed < 700) {
+          next = (elapsed / 700) * 0.32;
+        } else if (elapsed < 1800) {
+          next = 0.32 + ((elapsed - 700) / 1100) * 0.38;
         } else {
           const tail = 1 - Math.exp(-(elapsed - 1800) / 1200);
-          next = 0.7 + tail * 0.2;
+          next = 0.7 + tail * 0.12;
         }
-      progressRef.current = Math.min(next, 0.9);
+        next = Math.min(next, PRE_COMPLETE_MAX_PROGRESS);
+      } else {
+        if (completeStartedAtRef.current === null) {
+          completeStartedAtRef.current = performance.now();
+          completeStartProgressRef.current = progressRef.current;
+        }
+        const completeElapsed = performance.now() - completeStartedAtRef.current;
+        const eased = Math.min(1, completeElapsed / 900);
+        next = completeStartProgressRef.current + (1 - completeStartProgressRef.current) * (1 - Math.pow(1 - eased, 3));
+      }
+      progressRef.current = next;
       setProgress(progressRef.current);
       frameId = window.requestAnimationFrame(tick);
     };
@@ -74,17 +84,36 @@ export default function WorkspaceLaunchLoadingState({
     return () => {
       window.cancelAnimationFrame(frameId);
     };
-  }, [complete, files, startedAtMs]);
+  }, [files, startedAtMs]);
 
   useEffect(() => {
-    if (!complete) return;
-    const timeoutId = window.setTimeout(() => {
-      onCompleteVisualReady?.();
-    }, 320);
+    if (!complete) {
+      completeVisualReadySentRef.current = false;
+      if (completeHoldTimerRef.current !== null) {
+        window.clearTimeout(completeHoldTimerRef.current);
+        completeHoldTimerRef.current = null;
+      }
+      return;
+    }
+    if (completeVisualReadySentRef.current || progress < 0.999) return;
+    completeVisualReadySentRef.current = true;
+    if (completeHoldTimerRef.current !== null) {
+      window.clearTimeout(completeHoldTimerRef.current);
+    }
+    const frameId = window.requestAnimationFrame(() => {
+      completeHoldTimerRef.current = window.setTimeout(() => {
+        onCompleteVisualReady?.();
+        completeHoldTimerRef.current = null;
+      }, COMPLETE_HOLD_MS);
+    });
     return () => {
-      window.clearTimeout(timeoutId);
+      window.cancelAnimationFrame(frameId);
+      if (completeHoldTimerRef.current !== null) {
+        window.clearTimeout(completeHoldTimerRef.current);
+        completeHoldTimerRef.current = null;
+      }
     };
-  }, [complete, onCompleteVisualReady]);
+  }, [complete, progress, onCompleteVisualReady]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -106,9 +135,9 @@ export default function WorkspaceLaunchLoadingState({
   return (
     <div
       className={
-        isPanel
+          isPanel
           ? "relative flex h-full w-full items-center justify-center px-8 py-10"
-          : "workspace-launch-screen relative min-h-screen overflow-hidden bg-[var(--background)]"
+          : "workspace-launch-screen relative min-h-screen overflow-hidden bg-[#F1F4F9] dark:bg-[#222224]"
       }
     >
       <div
@@ -137,14 +166,6 @@ export default function WorkspaceLaunchLoadingState({
               className="workspace-launch-progress-fill relative h-full overflow-hidden rounded-full bg-gradient-to-r from-[#6C47FF] via-[#7A5CFF] to-[#8B6CFF] shadow-[0_0_18px_rgba(108,71,255,0.28)] transition-none"
               style={{ width: progress > 0 ? `${Math.max(12, Math.round(progress * 100))}%` : "0%" }}
             >
-              <span
-                aria-hidden
-                className="workspace-launch-progress-motion absolute inset-0 rounded-full"
-              />
-              <span
-                aria-hidden
-                className="workspace-launch-progress-edge absolute inset-y-0 right-0 w-10 rounded-full"
-              />
             </div>
           </div>
         </div>

@@ -33,7 +33,7 @@ export default function LoadingOverlay({
   const resolvedBackdropClassName =
     backdropClassName ??
     (variant === "fullscreen"
-      ? "bg-[var(--background)]"
+      ? "bg-[#F1F4F9] dark:bg-[#222224]"
       : "bg-slate-50/85 dark:bg-[#252525]/80");
 
   const resolvedPanelClassName =

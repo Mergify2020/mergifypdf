@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   BookOpen,
@@ -89,6 +89,8 @@ const WORKSPACE_LAUNCH_HOLD_FOR_TESTING = false;
 const WORKSPACE_LAUNCH_MODAL_EXIT_MS = 180;
 const WORKSPACE_LAUNCH_FILE_FLASH_MS = 130;
 const WORKSPACE_LAUNCH_PANEL_COMPLETE_MS = 420;
+const WORKSPACE_LAUNCH_PRE_COMPLETE_MAX_PROGRESS = 0.82;
+const WORKSPACE_LAUNCH_FALLBACK_COMPLETE_MS = 8500;
 const WORKSPACE_LAUNCH_OVERLAY_COMPLETE_HOLD_MS = 320;
 const WORKSPACE_LAUNCH_OVERLAY_EXIT_MS = 260;
 const WORKSPACE_LAUNCH_OVERLAY_STORAGE_KEY = "mpdf:workspace-launch-overlay";
@@ -102,6 +104,7 @@ const SIDEBAR_EXPANDED_KEY = "mpdf:sidebar-expanded";
 const STRIPE_STATUS_CACHE_KEY = "mpdf:stripe-status";
 const STRIPE_PLAN_TIER_CACHE_KEY = "mpdf:stripe-plan-tier";
 const PROFILE_DISPLAY_CACHE_KEY = "mpdf:profile-display";
+const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 function isPlaceholderProfileName(value: string): boolean {
   const normalized = value.trim().toLowerCase();
@@ -250,6 +253,20 @@ function bootLoaderShowDelayMs(): number {
   return 240;
 }
 
+function getWorkspaceLaunchProgress(elapsedMs: number): number {
+  const safeElapsed = Math.max(0, elapsedMs);
+  let next = 0;
+  if (safeElapsed < 700) {
+    next = (safeElapsed / 700) * 0.32;
+  } else if (safeElapsed < 1800) {
+    next = 0.32 + ((safeElapsed - 700) / 1100) * 0.38;
+  } else {
+    const tail = 1 - Math.exp(-(safeElapsed - 1800) / 1200);
+    next = 0.7 + tail * 0.12;
+  }
+  return Math.min(next, WORKSPACE_LAUNCH_PRE_COMPLETE_MAX_PROGRESS);
+}
+
 type PersistedWorkspaceLaunchOverlay = {
   files: PendingWorkspaceFile[];
   startedAtMs: number | null;
@@ -299,6 +316,9 @@ export default function WorkspaceShell({
   const [workspaceLaunchOverlayFiles, setWorkspaceLaunchOverlayFiles] = useState<PendingWorkspaceFile[]>([]);
   const [workspaceLaunchOverlayOpen, setWorkspaceLaunchOverlayOpen] = useState(false);
   const [workspaceLaunchOverlayStartedAtMs, setWorkspaceLaunchOverlayStartedAtMs] = useState<number | null>(null);
+  const [workspaceLaunchOverlayInitialProgress, setWorkspaceLaunchOverlayInitialProgress] = useState<number | null>(
+    null,
+  );
   const [workspaceLaunchOverlayCompleting, setWorkspaceLaunchOverlayCompleting] = useState(false);
   const [workspaceLaunchOverlayExiting, setWorkspaceLaunchOverlayExiting] = useState(false);
   const [existingProjectOverlayOpen, setExistingProjectOverlayOpen] = useState(false);
@@ -329,7 +349,16 @@ export default function WorkspaceShell({
   const [contentSwapIn, setContentSwapIn] = useState(false);
   const [homeProjectsQuery, setHomeProjectsQuery] = useState("");
   const [mobileSearchExpanded, setMobileSearchExpanded] = useState(false);
-  const [shellTheme, setShellTheme] = useState<"light" | "dark">("light");
+  const [shellTheme, setShellTheme] = useState<"light" | "dark">(() => {
+    if (typeof window === "undefined") return "light";
+    try {
+      const stored = window.localStorage.getItem("theme");
+      if (stored === "dark" || stored === "light") return stored;
+      return document.documentElement.classList.contains("dark") ? "dark" : "light";
+    } catch {
+      return document.documentElement.classList.contains("dark") ? "dark" : "light";
+    }
+  });
   const contentSwapTimerRef = useRef<number | null>(null);
   const contentSettleTimerRef = useRef<number | null>(null);
   const contentSwapSafetyRef = useRef<number | null>(null);
@@ -378,8 +407,10 @@ export default function WorkspaceShell({
   const createFileInputRef = useRef<HTMLInputElement | null>(null);
   const createLaunchLoaderTimerRef = useRef<number | null>(null);
   const createLaunchFlashTimerRef = useRef<number | null>(null);
+  const createLaunchVisualReadyResolveRef = useRef<(() => void) | null>(null);
   const workspaceLaunchOverlayHideTimerRef = useRef<number | null>(null);
   const workspaceLaunchOverlayCompleteTimerRef = useRef<number | null>(null);
+  const workspaceLaunchOverlayFallbackTimerRef = useRef<number | null>(null);
   const workspaceLaunchOverlaySafetyTimerRef = useRef<number | null>(null);
   const existingProjectOverlayHideTimerRef = useRef<number | null>(null);
   const existingProjectOverlaySafetyTimerRef = useRef<number | null>(null);
@@ -470,6 +501,7 @@ export default function WorkspaceShell({
         window.clearTimeout(workspaceLaunchOverlaySafetyTimerRef.current);
         workspaceLaunchOverlaySafetyTimerRef.current = null;
       }
+      setWorkspaceLaunchOverlayInitialProgress(null);
       return;
     }
     if (workspaceLaunchOverlaySafetyTimerRef.current !== null) {
@@ -523,10 +555,15 @@ export default function WorkspaceShell({
     }
   }, [stableProfile]);
 
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     if (typeof window === "undefined") return;
     const stored = window.localStorage.getItem("theme");
-    const initialTheme = stored === "dark" ? "dark" : "light";
+    const initialTheme =
+      stored === "dark" || stored === "light"
+        ? stored
+        : document.documentElement.classList.contains("dark")
+          ? "dark"
+          : "light";
     document.documentElement.classList.toggle("dark", initialTheme === "dark");
     document.body.classList.remove("dark");
     setShellTheme(initialTheme);
@@ -924,10 +961,18 @@ export default function WorkspaceShell({
     void preloadExistingWorkspaceProject(projectId);
   }, [router, preloadExistingWorkspaceProject]);
 
-  const showWorkspaceLaunchOverlay = (files: PendingWorkspaceFile[], startedAtMs: number | null = null) => {
+  const showWorkspaceLaunchOverlay = (
+    files: PendingWorkspaceFile[],
+    startedAtMs: number | null = null,
+    initialProgress: number | null = null,
+  ) => {
     if (workspaceLaunchOverlayCompleteTimerRef.current !== null) {
       window.clearTimeout(workspaceLaunchOverlayCompleteTimerRef.current);
       workspaceLaunchOverlayCompleteTimerRef.current = null;
+    }
+    if (workspaceLaunchOverlayFallbackTimerRef.current !== null) {
+      window.clearTimeout(workspaceLaunchOverlayFallbackTimerRef.current);
+      workspaceLaunchOverlayFallbackTimerRef.current = null;
     }
     if (workspaceLaunchOverlayHideTimerRef.current !== null) {
       window.clearTimeout(workspaceLaunchOverlayHideTimerRef.current);
@@ -951,9 +996,18 @@ export default function WorkspaceShell({
     }
     setWorkspaceLaunchOverlayFiles(files);
     setWorkspaceLaunchOverlayStartedAtMs(startedAtMs);
+    setWorkspaceLaunchOverlayInitialProgress(
+      typeof initialProgress === "number" && Number.isFinite(initialProgress)
+        ? Math.min(Math.max(initialProgress, 0), WORKSPACE_LAUNCH_PRE_COMPLETE_MAX_PROGRESS)
+        : null,
+    );
     setWorkspaceLaunchOverlayCompleting(false);
     setWorkspaceLaunchOverlayExiting(false);
     setWorkspaceLaunchOverlayOpen(true);
+    workspaceLaunchOverlayFallbackTimerRef.current = window.setTimeout(() => {
+      workspaceLaunchOverlayFallbackTimerRef.current = null;
+      setWorkspaceLaunchOverlayCompleting(true);
+    }, WORKSPACE_LAUNCH_FALLBACK_COMPLETE_MS);
     workspaceLaunchOverlaySafetyTimerRef.current = window.setTimeout(() => {
       try {
         window.sessionStorage?.removeItem(WORKSPACE_LAUNCH_OVERLAY_STORAGE_KEY);
@@ -964,7 +1018,12 @@ export default function WorkspaceShell({
       setWorkspaceLaunchOverlayCompleting(false);
       setWorkspaceLaunchOverlayExiting(false);
       setWorkspaceLaunchOverlayStartedAtMs(null);
+      setWorkspaceLaunchOverlayInitialProgress(null);
       setWorkspaceLaunchOverlayFiles([]);
+      if (workspaceLaunchOverlayFallbackTimerRef.current !== null) {
+        window.clearTimeout(workspaceLaunchOverlayFallbackTimerRef.current);
+        workspaceLaunchOverlayFallbackTimerRef.current = null;
+      }
       workspaceLaunchOverlaySafetyTimerRef.current = null;
     }, 12000);
   };
@@ -981,6 +1040,10 @@ export default function WorkspaceShell({
     if (workspaceLaunchOverlaySafetyTimerRef.current !== null) {
       window.clearTimeout(workspaceLaunchOverlaySafetyTimerRef.current);
       workspaceLaunchOverlaySafetyTimerRef.current = null;
+    }
+    if (workspaceLaunchOverlayFallbackTimerRef.current !== null) {
+      window.clearTimeout(workspaceLaunchOverlayFallbackTimerRef.current);
+      workspaceLaunchOverlayFallbackTimerRef.current = null;
     }
     setWorkspaceLaunchOverlayCompleting(true);
   };
@@ -1004,7 +1067,12 @@ export default function WorkspaceShell({
         setWorkspaceLaunchOverlayCompleting(false);
         setWorkspaceLaunchOverlayExiting(false);
         setWorkspaceLaunchOverlayStartedAtMs(null);
+        setWorkspaceLaunchOverlayInitialProgress(null);
         setWorkspaceLaunchOverlayFiles([]);
+        if (workspaceLaunchOverlayFallbackTimerRef.current !== null) {
+          window.clearTimeout(workspaceLaunchOverlayFallbackTimerRef.current);
+          workspaceLaunchOverlayFallbackTimerRef.current = null;
+        }
         workspaceLaunchOverlayHideTimerRef.current = null;
         }, WORKSPACE_LAUNCH_OVERLAY_EXIT_MS);
       }, WORKSPACE_LAUNCH_OVERLAY_COMPLETE_HOLD_MS);
@@ -1014,6 +1082,14 @@ export default function WorkspaceShell({
     const handleShow = (event: Event) => {
       const detail = (event as CustomEvent<{ files?: PendingWorkspaceFile[]; startedAtMs?: number | null }>).detail;
       showWorkspaceLaunchOverlay(detail?.files ?? [], detail?.startedAtMs ?? null);
+    };
+    const handleWorkspaceContentReady = () => {
+      if (!workspaceLaunchOverlayOpen || workspaceLaunchOverlayExiting) return;
+      if (workspaceLaunchOverlayFallbackTimerRef.current !== null) {
+        window.clearTimeout(workspaceLaunchOverlayFallbackTimerRef.current);
+        workspaceLaunchOverlayFallbackTimerRef.current = null;
+      }
+      setWorkspaceLaunchOverlayCompleting(true);
     };
     const handleExistingShow = (event: Event) => {
       const detail = (event as CustomEvent<{ startedAtMs?: number | null; projectId?: string | null }>).detail;
@@ -1025,14 +1101,22 @@ export default function WorkspaceShell({
       hideWorkspaceLaunchOverlay();
     };
     window.addEventListener("workspace-launch-overlay-show", handleShow as EventListener);
+    window.addEventListener("workspace-content-ready", handleWorkspaceContentReady);
     window.addEventListener("workspace-existing-overlay-show", handleExistingShow);
     window.addEventListener("workspace-launch-overlay-hide", handleHide);
     return () => {
       window.removeEventListener("workspace-launch-overlay-show", handleShow as EventListener);
+      window.removeEventListener("workspace-content-ready", handleWorkspaceContentReady);
       window.removeEventListener("workspace-existing-overlay-show", handleExistingShow);
       window.removeEventListener("workspace-launch-overlay-hide", handleHide);
     };
-  }, [hideWorkspaceLaunchOverlay, preloadExistingWorkspaceProject, showWorkspaceLaunchOverlay]);
+  }, [
+    hideWorkspaceLaunchOverlay,
+    preloadExistingWorkspaceProject,
+    showWorkspaceLaunchOverlay,
+      workspaceLaunchOverlayExiting,
+      workspaceLaunchOverlayOpen,
+    ]);
 
   const createId = () =>
     typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -1079,6 +1163,7 @@ export default function WorkspaceShell({
       window.clearTimeout(createLaunchFlashTimerRef.current);
       createLaunchFlashTimerRef.current = null;
     }
+    createLaunchVisualReadyResolveRef.current = null;
     setCreateLaunchExiting(false);
     setCreateLaunchFileFlash(false);
     setCreateLaunchStartedAtMs(null);
@@ -1162,17 +1247,16 @@ export default function WorkspaceShell({
       if (elapsed < WORKSPACE_LAUNCH_MIN_MS) {
         await new Promise((resolve) => setTimeout(resolve, WORKSPACE_LAUNCH_MIN_MS - elapsed));
       }
-      setCreateLaunchReadyForTesting(true);
-      await new Promise((resolve) => setTimeout(resolve, WORKSPACE_LAUNCH_PANEL_COMPLETE_MS));
       if (WORKSPACE_LAUNCH_HOLD_FOR_TESTING) {
         return;
       }
-      showWorkspaceLaunchOverlay(createPendingFiles, startedAt);
+      showWorkspaceLaunchOverlay(createPendingFiles, startedAt, getWorkspaceLaunchProgress(Date.now() - startedAt));
       router.push(`/studio?project=${encodeURIComponent(id)}`);
     } catch {
       setCreateError("Could not create that project. Please try again.");
       setCreateBusy(false);
       setCreateLaunchReadyForTesting(false);
+      createLaunchVisualReadyResolveRef.current = null;
       resetCreateLaunchTransition();
       hideWorkspaceLaunchOverlay();
     }
@@ -1278,11 +1362,11 @@ export default function WorkspaceShell({
     (pathname?.startsWith("/projects") ?? false) ||
     (pathname?.startsWith("/signature-center") ?? false);
   const workspaceBackgroundClass = useUnifiedWorkspaceBackground
-    ? "bg-[#F1F4F9]"
+    ? "bg-[#F1F4F9] dark:bg-[#222224]"
     : isStudioRoute
-      ? "bg-[var(--background)]"
+      ? "bg-[#F3F6FB] dark:bg-[#1f1f22]"
     : isHomePanel
-      ? "bg-[#F1F4F9]"
+      ? "bg-[#F1F4F9] dark:bg-[#222224]"
       : isAccountRoute
         ? "bg-white md:bg-slate-100"
         : "bg-slate-100";
@@ -2328,12 +2412,13 @@ export default function WorkspaceShell({
             workspaceLaunchOverlayExiting ? "workspace-handoff-overlay-exit" : "workspace-handoff-overlay-enter"
           }`}
         >
-          <div className="workspace-handoff-overlay-backdrop absolute inset-0 bg-[var(--background)]" />
+          <div className="workspace-handoff-overlay-backdrop absolute inset-0 bg-[#F1F4F9] dark:bg-[#222224]" />
           <div className={`relative min-h-screen ${workspaceLaunchOverlayExiting ? "workspace-handoff-content-exit" : ""}`}>
             <WorkspaceLaunchLoadingState
               files={workspaceLaunchOverlayFiles}
               complete={workspaceLaunchOverlayCompleting || workspaceLaunchOverlayExiting}
               startedAtMs={workspaceLaunchOverlayStartedAtMs}
+              initialProgress={workspaceLaunchOverlayInitialProgress}
               onCompleteVisualReady={beginWorkspaceLaunchOverlayExit}
               headlineOverride={
                 workspaceLaunchOverlayFiles.length > 0 ? undefined : "Preparing your workspace"
@@ -2348,7 +2433,7 @@ export default function WorkspaceShell({
             existingProjectOverlayExiting ? "workspace-handoff-overlay-exit" : "workspace-handoff-overlay-enter"
           }`}
         >
-          <div className="workspace-handoff-overlay-backdrop absolute inset-0 bg-[var(--background)]" />
+          <div className="workspace-handoff-overlay-backdrop absolute inset-0 bg-[#F1F4F9] dark:bg-[#222224]" />
           <div
             className={`relative flex min-h-screen items-center justify-center px-6 py-10 ${
               existingProjectOverlayExiting ? "workspace-handoff-content-exit" : ""
@@ -3388,6 +3473,10 @@ export default function WorkspaceShell({
                   files={createPendingFiles}
                   complete={createLaunchReadyForTesting}
                   startedAtMs={createLaunchStartedAtMs}
+                  onCompleteVisualReady={() => {
+                    createLaunchVisualReadyResolveRef.current?.();
+                    createLaunchVisualReadyResolveRef.current = null;
+                  }}
                 />
               ) : null}
             </div>
@@ -3537,7 +3626,7 @@ export default function WorkspaceShell({
 
       {billingPortalLoading ? (
         <div className="pointer-events-none fixed inset-0 z-[1200]">
-          <div className="absolute inset-0 bg-[var(--background)]" />
+          <div className="absolute inset-0 bg-[#F1F4F9] dark:bg-[#222224]" />
           <div className="relative flex min-h-screen items-center justify-center px-6 py-10">
             <div className="pointer-events-none flex flex-col items-center text-center">
               <div
@@ -3597,14 +3686,14 @@ export default function WorkspaceShell({
   const accountPanelOverlay =
     accountPanelOpen && typeof document !== "undefined"
       ? createPortal(
-          <div className="fixed inset-0 z-[950] bg-[var(--background)]">
+          <div className="fixed inset-0 z-[950] bg-[#F1F4F9] dark:bg-[#222224]">
             <button
               type="button"
               className="absolute inset-0 cursor-default"
               aria-label="Close account settings"
               onClick={closeAccountPanel}
             />
-            <div className="relative h-full w-full bg-[var(--background)]">
+            <div className="relative h-full w-full bg-[#F1F4F9] dark:bg-[#222224]">
               <AccountSettingsPage
                 activeSettingsTab="account"
                 initialMobileView="home"
@@ -3621,7 +3710,7 @@ export default function WorkspaceShell({
     <Suspense
       fallback={
         workspaceLaunchOverlayOpen ? null : (
-          <div className="fixed inset-0 z-[1280] flex items-center justify-center bg-[var(--background)] px-6 py-10">
+          <div className="fixed inset-0 z-[1280] flex items-center justify-center bg-[#F1F4F9] dark:bg-[#222224] px-6 py-10">
             <div className="pointer-events-none flex flex-col items-center text-center">
               <div
                 className="h-14 w-14 animate-spin rounded-full border-[5px] border-[#D9CCFF] border-t-[#6C47FF] dark:border-[#3F3F3F] dark:border-t-[#8B6CFF]"
