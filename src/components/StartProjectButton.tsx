@@ -22,11 +22,11 @@ const STARTUP_OVERLAY_KEY = "mpdf:startup-overlay";
 const STARTUP_OVERLAY_CONTEXT_KEY = "mpdf:startup-overlay-context";
 const EXISTING_PROJECT_OVERLAY_STORAGE_KEY = "mpdf:existing-project-overlay";
 const MAX_PENDING_FILES = 12;
-const WORKSPACE_LAUNCH_MIN_MS = 4000;
+const WORKSPACE_LAUNCH_MIN_MS = 900;
 const WORKSPACE_LAUNCH_HOLD_FOR_TESTING = false;
 const WORKSPACE_LAUNCH_MODAL_EXIT_MS = 180;
 const WORKSPACE_LAUNCH_FILE_FLASH_MS = 130;
-const WORKSPACE_LAUNCH_PANEL_COMPLETE_MS = 980;
+const WORKSPACE_LAUNCH_PANEL_COMPLETE_MS = 0;
 
 type Props = {
   className?: string;
@@ -242,18 +242,18 @@ export default function StartProjectButton({ className, variant = "default", ico
       }
       void uploadProjectPreviewFromFile(pendingFiles[0]?.file, id);
       if (pendingFiles.length === 1) {
-        try {
-          await uploadProjectPdfFromFile(pendingFiles[0]?.file, id);
-        } catch {
+        void uploadProjectPdfFromFile(pendingFiles[0]?.file, id).catch(() => {
           // fall back to studio-side sync if immediate cloud upload fails
-        }
+        });
       }
       queuePreload(pendingFiles, id);
       const elapsed = Date.now() - startedAt;
       if (elapsed < WORKSPACE_LAUNCH_MIN_MS) {
         await new Promise((resolve) => setTimeout(resolve, WORKSPACE_LAUNCH_MIN_MS - elapsed));
       }
-      await new Promise((resolve) => setTimeout(resolve, WORKSPACE_LAUNCH_PANEL_COMPLETE_MS));
+      if (WORKSPACE_LAUNCH_PANEL_COMPLETE_MS > 0) {
+        await new Promise((resolve) => setTimeout(resolve, WORKSPACE_LAUNCH_PANEL_COMPLETE_MS));
+      }
       if (WORKSPACE_LAUNCH_HOLD_FOR_TESTING) {
         return;
       }

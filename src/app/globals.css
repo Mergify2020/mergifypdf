@@ -463,19 +463,6 @@ body::-webkit-scrollbar-track {
   }
 }
 
-@keyframes workspace-handoff-backdrop-lift {
-  0% {
-    opacity: 1;
-    transform: translateY(0);
-    clip-path: inset(0 0 0 0);
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(-12px);
-    clip-path: inset(0 0 100% 0);
-  }
-}
-
 @keyframes workspace-handoff-content-exit {
   0% {
     opacity: 1;
@@ -495,10 +482,6 @@ body::-webkit-scrollbar-track {
 
 .workspace-handoff-overlay-exit {
   animation: workspace-handoff-overlay-exit 280ms ease-out both;
-}
-
-.workspace-handoff-overlay-exit .workspace-handoff-overlay-backdrop {
-  animation: workspace-handoff-backdrop-lift 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .workspace-handoff-content-exit {

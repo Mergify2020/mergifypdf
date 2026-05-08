@@ -33,7 +33,7 @@ export default function LoadingOverlay({
   const resolvedBackdropClassName =
     backdropClassName ??
     (variant === "fullscreen"
-      ? "bg-[#F1F4F9] dark:bg-[#222224]"
+      ? "bg-[var(--app-surface)]"
       : "bg-slate-50/85 dark:bg-[#252525]/80");
 
   const resolvedPanelClassName =
@@ -45,7 +45,7 @@ export default function LoadingOverlay({
   const resolvedSpinnerClassName =
     spinnerClassName ??
     (variant === "fullscreen"
-      ? "border-zinc-400 border-t-zinc-900 dark:border-[#3F3F3F] dark:border-t-[#F5F5F5]"
+      ? "border-4"
       : "border-slate-300 border-t-slate-700 dark:border-[#3F3F3F] dark:border-t-[#F5F5F5]");
 
   const overlay = (
@@ -58,15 +58,15 @@ export default function LoadingOverlay({
     >
       <div className={`absolute inset-0 z-0 ${resolvedBackdropClassName}`} />
       <div
-        className={`relative z-10 flex flex-col items-center ${resolvedPanelClassName}`}
+        className={`no-theme-transition relative z-10 flex flex-col items-center ${resolvedPanelClassName}`}
         role={isVisible ? "status" : undefined}
         aria-live={isVisible ? "polite" : undefined}
       >
         <div
-          className={`${spinnerSizeClass} animate-spin rounded-full ${resolvedSpinnerClassName}`}
+          className={`${spinnerSizeClass} animate-spin rounded-full border-[color:var(--spinner-track)] border-t-[color:var(--spinner-head)] ${resolvedSpinnerClassName} no-theme-transition`}
           aria-hidden
         />
-        <p className={`${labelSizeClass} ${labelClassName ?? ""}`}>{label}</p>
+        <p className={`${labelSizeClass} ${labelClassName ?? ""} text-[var(--app-foreground)] no-theme-transition`}>{label}</p>
       </div>
     </div>
   );

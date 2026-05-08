@@ -84,14 +84,14 @@ const AccountSettingsPage = dynamic(
 const WORKSPACE_META_KEY = "mpdf:files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
 const MAX_PENDING_FILES = 12;
-const WORKSPACE_LAUNCH_MIN_MS = 1400;
+const WORKSPACE_LAUNCH_MIN_MS = 900;
 const WORKSPACE_LAUNCH_HOLD_FOR_TESTING = false;
 const WORKSPACE_LAUNCH_MODAL_EXIT_MS = 180;
 const WORKSPACE_LAUNCH_FILE_FLASH_MS = 130;
-const WORKSPACE_LAUNCH_PANEL_COMPLETE_MS = 420;
+const WORKSPACE_LAUNCH_PANEL_COMPLETE_MS = 0;
 const WORKSPACE_LAUNCH_PRE_COMPLETE_MAX_PROGRESS = 0.82;
-const WORKSPACE_LAUNCH_FALLBACK_COMPLETE_MS = 8500;
-const WORKSPACE_LAUNCH_OVERLAY_COMPLETE_HOLD_MS = 320;
+const WORKSPACE_LAUNCH_FALLBACK_COMPLETE_MS = 3500;
+const WORKSPACE_LAUNCH_OVERLAY_COMPLETE_HOLD_MS = 120;
 const WORKSPACE_LAUNCH_OVERLAY_EXIT_MS = 260;
 const WORKSPACE_LAUNCH_OVERLAY_STORAGE_KEY = "mpdf:workspace-launch-overlay";
 const STARTUP_OVERLAY_KEY = "mpdf:startup-overlay";
@@ -349,16 +349,7 @@ export default function WorkspaceShell({
   const [contentSwapIn, setContentSwapIn] = useState(false);
   const [homeProjectsQuery, setHomeProjectsQuery] = useState("");
   const [mobileSearchExpanded, setMobileSearchExpanded] = useState(false);
-  const [shellTheme, setShellTheme] = useState<"light" | "dark">(() => {
-    if (typeof window === "undefined") return "light";
-    try {
-      const stored = window.localStorage.getItem("theme");
-      if (stored === "dark" || stored === "light") return stored;
-      return document.documentElement.classList.contains("dark") ? "dark" : "light";
-    } catch {
-      return document.documentElement.classList.contains("dark") ? "dark" : "light";
-    }
-  });
+  const [shellTheme, setShellTheme] = useState<"light" | "dark">("light");
   const contentSwapTimerRef = useRef<number | null>(null);
   const contentSettleTimerRef = useRef<number | null>(null);
   const contentSwapSafetyRef = useRef<number | null>(null);
@@ -567,6 +558,16 @@ export default function WorkspaceShell({
     document.documentElement.classList.toggle("dark", initialTheme === "dark");
     document.body.classList.remove("dark");
     setShellTheme(initialTheme);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem("theme");
+    if (stored === "dark" || stored === "light") {
+      setShellTheme(stored);
+      return;
+    }
+    setShellTheme(document.documentElement.classList.contains("dark") ? "dark" : "light");
   }, []);
 
   useEffect(() => {
@@ -1085,6 +1086,14 @@ export default function WorkspaceShell({
     };
     const handleWorkspaceContentReady = () => {
       if (!workspaceLaunchOverlayOpen || workspaceLaunchOverlayExiting) return;
+      if (workspaceLaunchOverlayFiles.length === 0) return;
+      if (workspaceLaunchOverlayFallbackTimerRef.current !== null) {
+        window.clearTimeout(workspaceLaunchOverlayFallbackTimerRef.current);
+        workspaceLaunchOverlayFallbackTimerRef.current = null;
+      }
+    };
+    const handleWorkspaceContentPainted = () => {
+      if (!workspaceLaunchOverlayOpen || workspaceLaunchOverlayExiting) return;
       if (workspaceLaunchOverlayFallbackTimerRef.current !== null) {
         window.clearTimeout(workspaceLaunchOverlayFallbackTimerRef.current);
         workspaceLaunchOverlayFallbackTimerRef.current = null;
@@ -1102,11 +1111,13 @@ export default function WorkspaceShell({
     };
     window.addEventListener("workspace-launch-overlay-show", handleShow as EventListener);
     window.addEventListener("workspace-content-ready", handleWorkspaceContentReady);
+    window.addEventListener("workspace-content-painted", handleWorkspaceContentPainted);
     window.addEventListener("workspace-existing-overlay-show", handleExistingShow);
     window.addEventListener("workspace-launch-overlay-hide", handleHide);
     return () => {
       window.removeEventListener("workspace-launch-overlay-show", handleShow as EventListener);
       window.removeEventListener("workspace-content-ready", handleWorkspaceContentReady);
+      window.removeEventListener("workspace-content-painted", handleWorkspaceContentPainted);
       window.removeEventListener("workspace-existing-overlay-show", handleExistingShow);
       window.removeEventListener("workspace-launch-overlay-hide", handleHide);
     };
@@ -1236,11 +1247,9 @@ export default function WorkspaceShell({
       }
       void uploadProjectPreviewFromFile(createPendingFiles[0]?.file, id);
       if (createPendingFiles.length === 1) {
-        try {
-          await uploadProjectPdfFromFile(createPendingFiles[0]?.file, id);
-        } catch {
+        void uploadProjectPdfFromFile(createPendingFiles[0]?.file, id).catch(() => {
           // fall back to studio-side sync if immediate cloud upload fails
-        }
+        });
       }
       queuePreload(createPendingFiles, id);
       const elapsed = Date.now() - startedAt;
@@ -1362,14 +1371,20 @@ export default function WorkspaceShell({
     (pathname?.startsWith("/projects") ?? false) ||
     (pathname?.startsWith("/signature-center") ?? false);
   const workspaceBackgroundClass = useUnifiedWorkspaceBackground
-    ? "bg-[#F1F4F9] dark:bg-[#222224]"
+    ? "bg-[var(--app-surface)]"
     : isStudioRoute
-      ? "bg-[#F3F6FB] dark:bg-[#1f1f22]"
+      ? "bg-[var(--app-surface)]"
     : isHomePanel
-      ? "bg-[#F1F4F9] dark:bg-[#222224]"
+      ? "bg-[var(--app-surface)]"
       : isAccountRoute
         ? "bg-white md:bg-slate-100"
         : "bg-slate-100";
+  const workspaceLaunchUnderlayClass =
+    existingProjectOverlayOpen
+      ? existingProjectOverlayExiting
+        ? "workspace-launch-underlay-reveal"
+        : "workspace-launch-underlay-prep"
+      : "";
   const isBillingBannerRoute = isHomePanel || isAccountRoute;
   const homeStripeStatus =
     homeStripeStatusOverride !== undefined ? homeStripeStatusOverride : (session?.user?.stripeStatus ?? null);
@@ -2412,7 +2427,7 @@ export default function WorkspaceShell({
             workspaceLaunchOverlayExiting ? "workspace-handoff-overlay-exit" : "workspace-handoff-overlay-enter"
           }`}
         >
-          <div className="workspace-handoff-overlay-backdrop absolute inset-0 bg-[#F1F4F9] dark:bg-[#222224]" />
+          <div className="workspace-handoff-overlay-backdrop absolute inset-0 bg-[var(--app-surface)]" />
           <div className={`relative min-h-screen ${workspaceLaunchOverlayExiting ? "workspace-handoff-content-exit" : ""}`}>
             <WorkspaceLaunchLoadingState
               files={workspaceLaunchOverlayFiles}
@@ -2433,7 +2448,7 @@ export default function WorkspaceShell({
             existingProjectOverlayExiting ? "workspace-handoff-overlay-exit" : "workspace-handoff-overlay-enter"
           }`}
         >
-          <div className="workspace-handoff-overlay-backdrop absolute inset-0 bg-[#F1F4F9] dark:bg-[#222224]" />
+          <div className="workspace-handoff-overlay-backdrop absolute inset-0 bg-[var(--app-surface)]" />
           <div
             className={`relative flex min-h-screen items-center justify-center px-6 py-10 ${
               existingProjectOverlayExiting ? "workspace-handoff-content-exit" : ""
@@ -2441,10 +2456,10 @@ export default function WorkspaceShell({
           >
             <div className="pointer-events-none flex flex-col items-center text-center">
               <div
-                className="h-14 w-14 animate-spin rounded-full border-[5px] border-[#D9CCFF] border-t-[#6C47FF] dark:border-[#3F3F3F] dark:border-t-[#8B6CFF]"
+                className="no-theme-transition h-14 w-14 animate-spin rounded-full border-[5px] border-[color:var(--spinner-track)] border-t-[color:var(--spinner-head)]"
                 aria-hidden
               />
-              <p className="mt-5 text-[24px] font-semibold tracking-tight text-slate-900 sm:text-[28px] dark:text-zinc-100">
+              <p className="no-theme-transition mt-5 text-[24px] font-semibold tracking-tight text-[var(--app-foreground)] sm:text-[28px]">
                 Opening Workspace...
               </p>
               <span className="sr-only">Opening Workspace</span>
@@ -2464,7 +2479,7 @@ export default function WorkspaceShell({
       />
     ) : null}
     <div
-      className={`workspace-shell-root relative z-10 flex pt-0 ${homeBillingBannerExiting ? "transition-[padding-top,min-height] duration-300 ease-out" : "transition-none"} md:pt-[var(--home-banner-offset)] ${workspaceBackgroundClass} ${sidebarCompact ? "sidebar-collapsed" : ""} ${expanded ? "" : "sidebar-minimized"} dark:bg-[#252525]`}
+      className={`workspace-shell-root relative z-10 flex pt-0 ${workspaceLaunchUnderlayClass} ${homeBillingBannerExiting ? "transition-[padding-top,min-height] duration-300 ease-out" : "transition-none"} md:pt-[var(--home-banner-offset)] ${workspaceBackgroundClass} ${sidebarCompact ? "sidebar-collapsed" : ""} ${expanded ? "" : "sidebar-minimized"} dark:bg-[#252525]`}
       style={
         {
           minHeight: "calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset))",
@@ -3372,7 +3387,7 @@ export default function WorkspaceShell({
                   >
                     <div
                       aria-hidden
-                      className="box-border w-full bg-[#F1F4F9] pt-3 pb-0 dark:bg-[#252525] md:pt-6 md:pb-0"
+                      className="box-border w-full bg-[var(--app-surface)] pt-3 pb-0 md:pt-6 md:pb-0"
                       style={{
                         height:
                           "calc(var(--workspace-vh,100dvh) - var(--home-banner-offset,0px) - var(--home-topbar-offset,0px) - var(--workspace-content-bottom-subtract,var(--workspace-frame-gutter,48px)))",
@@ -3626,7 +3641,7 @@ export default function WorkspaceShell({
 
       {billingPortalLoading ? (
         <div className="pointer-events-none fixed inset-0 z-[1200]">
-          <div className="absolute inset-0 bg-[#F1F4F9] dark:bg-[#222224]" />
+          <div className="absolute inset-0 bg-[var(--app-surface)]" />
           <div className="relative flex min-h-screen items-center justify-center px-6 py-10">
             <div className="pointer-events-none flex flex-col items-center text-center">
               <div
@@ -3686,14 +3701,14 @@ export default function WorkspaceShell({
   const accountPanelOverlay =
     accountPanelOpen && typeof document !== "undefined"
       ? createPortal(
-          <div className="fixed inset-0 z-[950] bg-[#F1F4F9] dark:bg-[#222224]">
+          <div className="fixed inset-0 z-[950] bg-[var(--app-surface)]">
             <button
               type="button"
               className="absolute inset-0 cursor-default"
               aria-label="Close account settings"
               onClick={closeAccountPanel}
             />
-            <div className="relative h-full w-full bg-[#F1F4F9] dark:bg-[#222224]">
+            <div className="relative h-full w-full bg-[var(--app-surface)]">
               <AccountSettingsPage
                 activeSettingsTab="account"
                 initialMobileView="home"
@@ -3710,7 +3725,7 @@ export default function WorkspaceShell({
     <Suspense
       fallback={
         workspaceLaunchOverlayOpen ? null : (
-          <div className="fixed inset-0 z-[1280] flex items-center justify-center bg-[#F1F4F9] dark:bg-[#222224] px-6 py-10">
+          <div className="fixed inset-0 z-[1280] flex items-center justify-center bg-[var(--app-surface)] px-6 py-10">
             <div className="pointer-events-none flex flex-col items-center text-center">
               <div
                 className="h-14 w-14 animate-spin rounded-full border-[5px] border-[#D9CCFF] border-t-[#6C47FF] dark:border-[#3F3F3F] dark:border-t-[#8B6CFF]"

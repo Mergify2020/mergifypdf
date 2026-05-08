@@ -2438,7 +2438,6 @@ function WorkspaceClient() {
   const fullscreenWheelLockRef = useRef<number>(0);
   const pageLayoutRef = useRef<{ ids: string[]; centers: number[] }>({ ids: [], centers: [] });
   const pageLayoutRafRef = useRef<number | null>(null);
-  const scrollUpdateRafRef = useRef<number | null>(null);
   const activePageIdRef = useRef<string | null>(null);
   const activePageIndexRef = useRef(0);
   const suppressNextAutoZoomRef = useRef(0);
@@ -6823,20 +6822,12 @@ const timer =
     const container = previewContainerRef.current;
     if (!container || pages.length === 0) return;
     const handleScroll = () => {
-      if (scrollUpdateRafRef.current !== null) return;
-      scrollUpdateRafRef.current = window.requestAnimationFrame(() => {
-        scrollUpdateRafRef.current = null;
-        updateActivePageFromScroll();
-      });
+      updateActivePageFromScroll();
     };
     container.addEventListener("scroll", handleScroll, { passive: true });
     handleScroll();
     return () => {
       container.removeEventListener("scroll", handleScroll);
-      if (scrollUpdateRafRef.current !== null) {
-        window.cancelAnimationFrame(scrollUpdateRafRef.current);
-        scrollUpdateRafRef.current = null;
-      }
     };
   }, [pages.length, updateActivePageFromScroll]);
 
@@ -10548,7 +10539,10 @@ const timer =
     let secondFrame = 0;
     firstFrame = window.requestAnimationFrame(() => {
       secondFrame = window.requestAnimationFrame(() => {
-        if (!cancelled) setWorkspaceContentPainted(true);
+        if (!cancelled) {
+          setWorkspaceContentPainted(true);
+          window.dispatchEvent(new Event("workspace-content-painted"));
+        }
       });
     });
     return () => {
@@ -14002,10 +13996,10 @@ const timer =
       ref={(node) => {
         workspaceFullscreenRef.current = node;
       }}
-      className="flex h-screen flex-col overflow-hidden bg-[#EEF2F7] dark:bg-[#222224]"
+      className="flex h-screen flex-col overflow-hidden bg-[var(--app-surface)]"
     >
       {isBrowserFullscreen && activePresentationPage ? (
-        <div className="fixed inset-0 z-[110] bg-[#EEF2F7] dark:bg-[#222224]">
+        <div className="fixed inset-0 z-[110] bg-[var(--app-surface)]">
           <div className="flex h-full w-full items-center justify-center px-8 py-10">
             <div className="flex h-full w-full items-center justify-center">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -14022,10 +14016,10 @@ const timer =
           </div>
         </div>
       ) : null}
-      <div className="flex min-h-0 flex-1 flex-col transition-opacity duration-[260ms] ease-out bg-[#EEF2F7] dark:bg-[#222224]">
-      <header className="sticky top-0 z-40 border-b border-slate-200/60 bg-white dark:border-[#4A4A4A]/60 dark:bg-[#323232]">
+      <div className="flex min-h-0 flex-1 flex-col bg-[var(--app-surface)] transition-opacity duration-[260ms] ease-out">
+      <header className="sticky top-0 z-40 border-b border-slate-200/60 bg-[var(--app-surface)] dark:border-[#4A4A4A]/60">
         {/* Top row */}
-        <div className="w-full border-b border-slate-100 bg-white dark:border-[#4A4A4A]/60 dark:bg-[#323232]">
+        <div className="w-full border-b border-slate-100 bg-[var(--app-surface)] dark:border-[#4A4A4A]/60">
           <div className="relative flex h-14 w-full items-center justify-between gap-4 pl-4 pr-0 lg:pl-6 lg:pr-0">
             <Link
               href="/"
@@ -15973,9 +15967,9 @@ const timer =
 <div className="flex shrink-0 items-stretch">
 				                          {showPageOrderPanel ? (
 				                            <aside className="flex w-[272px] shrink-0 flex-col border-l border-slate-200 dark:border-[#4A4A4A]">
-				                              <div className="flex min-h-0 flex-1 flex-col bg-white dark:bg-[#323232]">
+				                              <div className="flex min-h-0 flex-1 flex-col bg-[var(--app-surface)]">
                                 <div
-                                  className="toolbar-font flex h-[45px] items-center justify-between border-b border-slate-200 bg-white px-4 dark:border-[#4A4A4A] dark:bg-[#323232]"
+                                  className="toolbar-font flex h-[45px] items-center justify-between border-b border-slate-200 bg-[var(--app-surface)] px-4 dark:border-[#4A4A4A]"
                                   data-text-toolbar
                                 >
 				                                  {loading && pages.length === 0 ? (
@@ -15986,7 +15980,7 @@ const timer =
 				                                  ) : (
                                     <div className="flex items-center gap-2">
                                       <p className="text-sm font-medium text-slate-800 dark:text-zinc-100">Pages</p>
-                                      <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-md border border-slate-200 bg-white px-2 text-xs font-medium text-slate-900 shadow-sm dark:border-[#2A2A31] dark:bg-[#1C1C1F] dark:text-zinc-100">
+                                      <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-md border border-slate-200 bg-[var(--app-surface)] px-2 text-xs font-medium text-slate-900 shadow-sm dark:border-[#2A2A31] dark:text-zinc-100">
                                         {pages.length}
                                       </span>
                                     </div>

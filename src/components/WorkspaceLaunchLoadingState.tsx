@@ -36,7 +36,7 @@ export default function WorkspaceLaunchLoadingState({
   const [ellipsisFrame, setEllipsisFrame] = useState(0);
   const ellipsisFrames = ["", ".", "..", "..."];
   const PRE_COMPLETE_MAX_PROGRESS = 0.82;
-  const COMPLETE_HOLD_MS = 1000;
+  const COMPLETE_HOLD_MS = 250;
 
   useEffect(() => {
     completeRef.current = complete;
@@ -135,9 +135,9 @@ export default function WorkspaceLaunchLoadingState({
   return (
     <div
       className={
-          isPanel
+        isPanel
           ? "relative flex h-full w-full items-center justify-center px-8 py-10"
-          : "workspace-launch-screen relative min-h-screen overflow-hidden bg-[#F1F4F9] dark:bg-[#222224]"
+          : "workspace-launch-screen relative min-h-screen overflow-hidden bg-[var(--app-surface)]"
       }
     >
       <div
@@ -149,7 +149,7 @@ export default function WorkspaceLaunchLoadingState({
       >
         <div className={`mx-auto flex w-full max-w-[560px] flex-col items-center text-center ${isPanel ? "" : ""}`}>
           <h2
-            className={`whitespace-nowrap font-semibold tracking-tight text-slate-900 dark:text-zinc-100 ${
+            className={`no-theme-transition whitespace-nowrap font-semibold tracking-tight text-[var(--app-foreground)] ${
               isPanel ? "text-[20px] sm:text-[26px]" : "text-[21px] sm:text-[32px]"
             }`}
           >
