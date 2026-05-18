@@ -34,13 +34,13 @@ export default function LoadingOverlay({
     backdropClassName ??
     (variant === "fullscreen"
       ? "bg-[var(--app-surface)]"
-      : "bg-slate-50/85 dark:bg-[#252525]/80");
+      : "bg-[var(--app-surface)]/90");
 
   const resolvedPanelClassName =
     panelClassName ??
     (variant === "fullscreen"
       ? "bg-transparent border-0 shadow-none px-0 py-0 text-slate-900 dark:text-[#F5F5F5]"
-      : "rounded-2xl border border-slate-200 bg-white px-8 py-6 text-slate-900 shadow-[0_22px_60px_rgba(15,23,42,0.12)] dark:border-[#3F3F3F] dark:bg-[#323232] dark:text-[#F5F5F5] dark:shadow-[0_22px_60px_rgba(0,0,0,0.45)]");
+      : "rounded-2xl border border-slate-200 bg-[var(--app-surface)] px-8 py-6 text-slate-900 shadow-[0_22px_60px_rgba(15,23,42,0.12)] dark:border-[#3F3F3F] dark:bg-[#323232] dark:text-[#F5F5F5] dark:shadow-[0_22px_60px_rgba(0,0,0,0.45)]");
 
   const resolvedSpinnerClassName =
     spinnerClassName ??

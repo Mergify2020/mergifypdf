@@ -108,17 +108,17 @@ export async function GET(
   }
 
   let signedPdfUrl: string | null = null;
-  let signedPreviewUrl: string | null = null;
+  let previewUrl: string | null = null;
   if (project.pdfKey || project.previewKey) {
     let r2Config;
     try {
       r2Config = getR2Config();
-      } catch (err) {
-        console.error("R2 config missing when signing project URLs.", {
-          projectId: id,
-          env: process.env.NODE_ENV,
-          error: err,
-        });
+    } catch (err) {
+      console.error("R2 config missing when signing project URLs.", {
+        projectId: id,
+        env: process.env.NODE_ENV,
+        error: err,
+      });
       return NextResponse.json(
         { error: err instanceof Error ? err.message : "R2 storage is not configured" },
         { status: 500 }
@@ -128,7 +128,7 @@ export async function GET(
       signedPdfUrl = await createSignedR2Url(r2Config, project.pdfKey);
     }
     if (project.previewKey) {
-      signedPreviewUrl = await createSignedR2Url(r2Config, project.previewKey);
+      previewUrl = `/api/projects/${id}/preview`;
     }
   }
 
@@ -154,7 +154,7 @@ export async function GET(
             hasPdf: !!updated.pdfKey,
             hasPreview: !!updated.previewKey,
             pdfUrl: signedPdfUrl,
-            previewUrl: signedPreviewUrl,
+            previewUrl,
           },
         },
         {
@@ -174,7 +174,7 @@ export async function GET(
         hasPdf: !!project.pdfKey,
         hasPreview: !!project.previewKey,
         pdfUrl: signedPdfUrl,
-        previewUrl: signedPreviewUrl,
+        previewUrl,
       },
     },
     {

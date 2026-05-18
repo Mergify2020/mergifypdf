@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronRight, Star, MoreHorizontal, ExternalLink, Copy, Trash2, Pencil, Loader2, Printer } from "lucide-react";
 import { useSession } from "next-auth/react";
@@ -23,9 +23,43 @@ type PreviewCacheEntry = {
 const PREVIEW_CACHE_MAX_AGE_MS = 10 * 60 * 1000;
 const PREVIEW_FETCH_TIMEOUT_MS = 8000;
 const PREVIEW_IMAGE_TIMEOUT_MS = 10000;
+const PREVIEW_FETCH_CONCURRENCY = 4;
 const STARRED_STORAGE_KEY = "mpdf:starred-projects";
 const PREVIEW_STORAGE_KEY_PREFIX = "mpdf:project-preview:";
 const previewMemoryCache = new Map<string, PreviewCacheEntry>();
+const previewFetchInFlight = new Map<string, Promise<string>>();
+const previewFetchQueue: Array<() => void> = [];
+let activePreviewFetches = 0;
+
+function debugProjectPreview(event: string, detail: Record<string, unknown>) {
+  if (process.env.NODE_ENV === "production") return;
+  console.info(`[project-preview:${event}]`, detail);
+}
+
+function runQueuedPreviewFetch<T>(task: () => Promise<T>, signal?: AbortSignal) {
+  return new Promise<T>((resolve, reject) => {
+    const run = () => {
+      if (signal?.aborted) {
+        reject(new DOMException("Preview request aborted before start.", "AbortError"));
+        return;
+      }
+      activePreviewFetches += 1;
+      task()
+        .then(resolve, reject)
+        .finally(() => {
+          activePreviewFetches = Math.max(0, activePreviewFetches - 1);
+          previewFetchQueue.shift()?.();
+        });
+    };
+
+    if (activePreviewFetches < PREVIEW_FETCH_CONCURRENCY) {
+      run();
+      return;
+    }
+
+    previewFetchQueue.push(run);
+  });
+}
 
 function readPreviewCache(projectId: string, rotation: number): PreviewCacheEntry | null {
   const now = Date.now();
@@ -119,6 +153,7 @@ type Project = {
   id: string;
   title: string;
   updated: string;
+  previewUrl?: string | null;
   pdfUrl?: string | null;
   pagesCount?: number;
   rotation?: number | null;
@@ -183,9 +218,10 @@ export default function ProjectCard({
   const cardRef = useRef<HTMLDivElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const menuTriggerButtonRef = useRef<HTMLButtonElement | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(project.previewUrl ?? null);
   const [previewLoading, setPreviewLoading] = useState(Boolean(project.hasPreview));
   const previewRefreshInFlight = useRef(false);
+  const workspaceWarmupStartedRef = useRef<Set<string>>(new Set());
   const lastFailedPreviewRef = useRef<string | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [isCopying, setIsCopying] = useState(false);
@@ -204,14 +240,18 @@ export default function ProjectCard({
     : project.updated;
   const mobileMenuWidth = 224;
 
-  const openProject = async (projectId: string) => {
+  const openProject = (projectId: string) => {
     beginExistingWorkspaceOpenHandoff(projectId);
-    await preloadExistingWorkspaceProject(projectId);
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        router.push(`/studio?project=${encodeURIComponent(projectId)}`);
-      });
-    });
+    void preloadExistingWorkspaceProject(projectId);
+    void router.prefetch(`/studio?project=${encodeURIComponent(projectId)}`);
+    router.push(`/studio?project=${encodeURIComponent(projectId)}`);
+  };
+
+  const warmProjectOpen = (projectId: string) => {
+    if (workspaceWarmupStartedRef.current.has(projectId)) return;
+    workspaceWarmupStartedRef.current.add(projectId);
+    void preloadExistingWorkspaceProject(projectId);
+    void router.prefetch(`/studio?project=${encodeURIComponent(projectId)}`);
   };
 
   function isMobileViewport() {
@@ -494,31 +534,56 @@ export default function ProjectCard({
     };
   }, [renameJustSaved]);
 
-  const fetchPreviewUrl = async (signal?: AbortSignal) => {
-    const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => {
-      controller.abort();
-    }, PREVIEW_FETCH_TIMEOUT_MS);
-    const handleAbort = () => {
-      controller.abort();
-    };
-    signal?.addEventListener("abort", handleAbort, { once: true });
-    const res = await fetch(`/api/projects/${encodeURIComponent(project.id)}/preview`, {
-      signal: controller.signal,
-      cache: "no-store",
-    }).finally(() => {
-      window.clearTimeout(timeoutId);
-      signal?.removeEventListener("abort", handleAbort);
+  const fetchPreviewUrl = useCallback(async (signal?: AbortSignal) => {
+    const existing = previewFetchInFlight.get(project.id);
+    if (existing) {
+      debugProjectPreview("dedupe", { projectId: project.id });
+      return existing;
+    }
+
+    const startedAt = performance.now();
+    const request = runQueuedPreviewFetch(async () => {
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => {
+        controller.abort();
+      }, PREVIEW_FETCH_TIMEOUT_MS);
+      const handleAbort = () => {
+        controller.abort();
+      };
+      signal?.addEventListener("abort", handleAbort, { once: true });
+      try {
+        debugProjectPreview("miss", { projectId: project.id, queued: activePreviewFetches >= PREVIEW_FETCH_CONCURRENCY });
+        const res = await fetch(`/api/projects/${encodeURIComponent(project.id)}/preview`, {
+          signal: controller.signal,
+          cache: "no-store",
+        });
+        debugProjectPreview("done", {
+          projectId: project.id,
+          status: res.status,
+          durationMs: Math.round(performance.now() - startedAt),
+        });
+        if (!res.ok) {
+          throw new Error(`Preview fetch failed with status ${res.status}`);
+        }
+        return res.url;
+      } catch (error) {
+        debugProjectPreview("error", {
+          projectId: project.id,
+          durationMs: Math.round(performance.now() - startedAt),
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw error;
+      } finally {
+        window.clearTimeout(timeoutId);
+        signal?.removeEventListener("abort", handleAbort);
+      }
+    }, signal).finally(() => {
+      previewFetchInFlight.delete(project.id);
     });
-    if (!res.ok) {
-      throw new Error(`Preview fetch failed with status ${res.status}`);
-    }
-    const data = (await res.json().catch(() => null)) as { url?: string } | null;
-    if (!data?.url) {
-      throw new Error("Preview fetch returned an invalid payload.");
-    }
-    return data.url;
-  };
+
+    previewFetchInFlight.set(project.id, request);
+    return request;
+  }, [project.id]);
 
   useEffect(() => {
     if (!project.hasPreview) {
@@ -528,9 +593,16 @@ export default function ProjectCard({
       return;
     }
 
+    if (project.previewUrl) {
+      setPreviewUrl(project.previewUrl);
+      setPreviewLoading(true);
+      return;
+    }
+
     const rotation = project.rotation ?? 0;
     const cached = readPreviewCache(project.id, rotation);
     if (cached?.url) {
+      debugProjectPreview("cache-hit", { projectId: project.id });
       setPreviewUrl(cached.url);
       setPreviewLoading(false);
     } else {
@@ -546,9 +618,14 @@ export default function ProjectCard({
         lastFailedPreviewRef.current = null;
         writePreviewCache(project.id, url, rotation);
         setPreviewUrl(url);
-      } catch {
+      } catch (error) {
         if (!cancelled && !cached?.url) setPreviewLoading(false);
-        // fail silently
+        if (!cancelled) {
+          debugProjectPreview("load-error", {
+            projectId: project.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
       }
     };
     void load();
@@ -556,7 +633,7 @@ export default function ProjectCard({
       cancelled = true;
       controller.abort();
     };
-  }, [project.hasPreview, project.id, project.rotation]);
+  }, [fetchPreviewUrl, project.hasPreview, project.id, project.previewUrl, project.rotation]);
 
   useEffect(() => {
     if (!previewLoading || !previewUrl) return;
@@ -627,8 +704,8 @@ export default function ProjectCard({
     .filter(Boolean)
     .join(" ");
   const actionsContainerClasses = [
-    "absolute right-3 top-3 z-10 inline-flex items-center overflow-hidden rounded-[10px] bg-white/95 text-slate-400 shadow-[0_4px_12px_rgba(15,23,42,0.18)] dark:bg-[#2F2F2F] dark:text-zinc-300 dark:shadow-[0_6px_18px_rgba(0,0,0,0.35)] dark:border dark:border-zinc-500",
-    "opacity-100 transition-opacity duration-150",
+    "absolute right-3 top-3 z-10 inline-flex items-center overflow-hidden rounded-[10px] border border-slate-200 bg-white/95 text-slate-400 shadow-[0_4px_12px_rgba(15,23,42,0.18)] dark:border-zinc-500 dark:bg-[#2F2F2F] dark:text-zinc-300 dark:shadow-[0_6px_18px_rgba(0,0,0,0.35)]",
+    "opacity-100 transition-[opacity,border-width,border-color,background-color,box-shadow,color] duration-150",
     "sm:opacity-0",
     menuOpen ? "sm:!opacity-100" : "",
   ]
@@ -1114,6 +1191,9 @@ export default function ProjectCard({
                       setCopyToast(null);
                       openProject(copyToast.id);
                     }}
+                    onFocus={() => warmProjectOpen(copyToast.id)}
+                    onMouseEnter={() => warmProjectOpen(copyToast.id)}
+                    onTouchStart={() => warmProjectOpen(copyToast.id)}
                   >
                     Open
                   </Link>
@@ -1139,6 +1219,9 @@ export default function ProjectCard({
               href={`/studio?project=${encodeURIComponent(project.id)}`}
               className="absolute inset-0"
               aria-label={`Open ${project.title}`}
+              onFocus={() => warmProjectOpen(project.id)}
+              onMouseEnter={() => warmProjectOpen(project.id)}
+              onTouchStart={() => warmProjectOpen(project.id)}
               onClick={(event) => {
                 if (renaming) {
                   event.preventDefault();
@@ -1212,7 +1295,10 @@ export default function ProjectCard({
             )}
           </div>
           {previewLoading ? (
-            <span className="pointer-events-none absolute inset-0 z-[6] overflow-hidden rounded-[10px] bg-slate-200/70 dark:bg-[#2B2B2B]/70">
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-[3px] z-[6] overflow-hidden rounded-[10px] bg-slate-200/70 dark:bg-[#2B2B2B]/70"
+            >
               <span className="absolute inset-0 skeleton-shimmer opacity-90" />
             </span>
           ) : null}
@@ -1221,6 +1307,9 @@ export default function ProjectCard({
               href={`/studio?project=${encodeURIComponent(project.id)}`}
               className="project-card-resume absolute bottom-2.5 right-2.5 hidden rounded-full bg-[#6C47FF] px-3.5 py-1 text-[12px] font-semibold text-white shadow-sm transition-colors hover:bg-[#5B38E6] sm:inline-flex"
               aria-label={`Resume ${project.title}`}
+              onFocus={() => warmProjectOpen(project.id)}
+              onMouseEnter={() => warmProjectOpen(project.id)}
+              onTouchStart={() => warmProjectOpen(project.id)}
             >
               Resume
             </Link>

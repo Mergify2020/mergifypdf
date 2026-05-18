@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, startTransition, useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
+import { Fragment, memo, startTransition, useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
 import { flushSync } from "react-dom";
 import { createPortal } from "react-dom";
 import { signIn, useSession } from "next-auth/react";
@@ -463,23 +463,22 @@ const TEXT_SIZE_MAX_PT = 96;
 const DEFAULT_TEXT_SIZE_PT = 11;
 const DEFAULT_TEXT_SIZE_PX = DEFAULT_TEXT_SIZE_PT * PT_TO_PX;
 const DEFAULT_TEXT_LINE_SPACING = 1.0;
-const INITIAL_PREVIEW_RENDER_COUNT = 20;
 const LOW_RES_PREVIEW_SCALE = PREVIEW_BASE_SCALE * 0.5;
-const MAX_PARALLEL_PREVIEW_RENDERS = 6;
-const MAX_PARALLEL_LOW_PREVIEW_RENDERS = 3;
-const MAX_PARALLEL_THUMB_RENDERS = 6;
-const MIN_STARTUP_OVERLAY_MS = 4000;
-const STARTUP_OVERLAY_FULL_HOLD_MS = 1000;
+const MAX_PARALLEL_PREVIEW_RENDERS = 3;
+const MAX_PARALLEL_LOW_PREVIEW_RENDERS = 1;
+const MAX_PARALLEL_THUMB_RENDERS = 2;
+const MIN_STARTUP_OVERLAY_MS = 1200;
+const STARTUP_OVERLAY_FULL_HOLD_MS = 350;
 const STARTUP_OVERLAY_KEY = "mpdf:startup-overlay";
 const STARTUP_OVERLAY_CONTEXT_KEY = "mpdf:startup-overlay-context";
 const WORKSPACE_LAUNCH_OVERLAY_STORAGE_KEY = "mpdf:workspace-launch-overlay";
 const EXISTING_PROJECT_OVERLAY_STORAGE_KEY = "mpdf:existing-project-overlay";
 const WORKSPACE_PREVIEW_CACHE_KEY = "mpdf:preview-cache";
 const PREVIEW_CACHE_VERSION = 1;
-const PREVIEW_CACHE_NEAR_RANGE = 2;
-const BACKGROUND_LOW_RES_BATCH = 3;
+const PREVIEW_CACHE_NEAR_RANGE = 1;
+const BACKGROUND_LOW_RES_BATCH = 1;
 const BACKGROUND_LOW_RES_PRIORITY = 5;
-const BACKGROUND_LOW_RES_IDLE_TIMEOUT = 220;
+const BACKGROUND_LOW_RES_IDLE_TIMEOUT = 500;
 const THUMB_MAX_WIDTH = 240;
 const PREVIEW_IMAGE_QUALITY = 0.98;
 const TRANSPARENT_PIXEL =
@@ -497,8 +496,8 @@ const ZOOM_STEP_PERCENT = 25;
 const MAX_ZOOM_MULTIPLIER = ZOOM_MAX_PERCENT / 100;
 const VIEW_TRANSITION = { duration: 0.2, ease: SOFT_EASE };
 const LARGE_DOC_PAGE_THRESHOLD = 80;
-const LARGE_DOC_INITIAL_RENDER_COUNT = 8;
-const LARGE_DOC_RENDER_CHUNK = 20;
+const LARGE_DOC_INITIAL_RENDER_COUNT = 4;
+const LARGE_DOC_RENDER_CHUNK = 12;
 const LARGE_DOC_THUMB_LIMIT = 50;
 const STARTUP_OVERLAY_PREVIEW_TARGET = 8;
 const GRID_VARIANTS = {
@@ -519,12 +518,9 @@ function applyTextTransform(value: string, transform: "none" | "uppercase") {
   return value;
 }
 
-function getInitialPreviewRenderCount(pageCount: number, largeDocMode: boolean) {
+function getInitialPreviewRenderCount(pageCount: number) {
   if (pageCount <= 0) return 0;
-  if (largeDocMode) return Math.min(2, pageCount);
-  if (pageCount <= 20) return Math.min(6, pageCount);
-  if (pageCount <= 100) return Math.min(3, pageCount);
-  return Math.min(2, pageCount);
+  return Math.min(1, pageCount);
 }
 
 function cancelIdleOrTimeout(timerId: ReturnType<typeof setTimeout> | number | null, usesIdleCallback = false) {
@@ -723,12 +719,57 @@ function readWorkspacePreviewCache(projectKey: string, expectedSourceIds: string
   }
 }
 
+function readProjectPageString(page: unknown, field: string) {
+  if (!page || typeof page !== "object") return "";
+  const value = (page as Record<string, unknown>)[field];
+  return typeof value === "string" ? value : "";
+}
+
+function readProjectPageNumber(page: unknown, field: string, fallback = 0) {
+  if (!page || typeof page !== "object") return fallback;
+  const value = (page as Record<string, unknown>)[field];
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function buildCloudProjectPreviewPages(
+  sourceIds: string[],
+  pages: unknown,
+  coverPreviewUrl: string | null,
+): PageItem[] {
+  if (sourceIds.length === 0 || !Array.isArray(pages) || pages.length === 0) return [];
+  return pages
+    .map((page, index): PageItem | null => {
+      if (!page || typeof page !== "object") return null;
+      const srcIdx = readProjectPageNumber(page, "srcIdx", 0);
+      const sourceId = sourceIds[srcIdx] ?? sourceIds[0];
+      if (!sourceId) return null;
+      const pageIdx = readProjectPageNumber(page, "pageIdx", index);
+      const preview = readProjectPageString(page, "preview") || (index === 0 ? coverPreviewUrl ?? "" : "");
+      const thumb = readProjectPageString(page, "thumb") || (index === 0 ? preview : "");
+      return {
+        id: buildPageId(sourceId, pageIdx),
+        srcIdx,
+        pageIdx,
+        rotation: readProjectPageNumber(page, "rotation", 0),
+        width: readProjectPageNumber(page, "width", 612),
+        height: readProjectPageNumber(page, "height", 792),
+        thumb,
+        thumbWidth: readProjectPageNumber(page, "thumbWidth", 0),
+        thumbHeight: readProjectPageNumber(page, "thumbHeight", 0),
+        preview,
+      };
+    })
+    .filter((page): page is PageItem => Boolean(page));
+}
+
+function debugStudioLoad(event: string, detail: Record<string, unknown>) {
+  if (process.env.NODE_ENV === "production") return;
+  console.info(`[studio-load:${event}]`, detail);
+}
+
 function buildPreviewCachePages(pages: PageItem[], activePageId: string | null) {
   const previewIds = new Set<string>();
-  const initialCount = getInitialPreviewRenderCount(
-    pages.length,
-    pages.length > LARGE_DOC_PAGE_THRESHOLD
-  );
+  const initialCount = getInitialPreviewRenderCount(pages.length);
   for (let i = 0; i < initialCount; i += 1) {
     previewIds.add(pages[i].id);
   }
@@ -814,6 +855,13 @@ function dataURLToBlob(dataUrl: string): Blob {
 
 function buildPageId(sourceId: string, pageIdx: number) {
   return `${sourceId}::${pageIdx}`;
+}
+
+function createUniqueId(prefix = "id") {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function getDevicePixelRatio() {
@@ -1158,10 +1206,7 @@ function useProjects(ownerKey: string | null, enabled = true) {
           const created =
             json?.project ??
             ({
-              id:
-                typeof crypto !== "undefined" && "randomUUID" in crypto
-                  ? crypto.randomUUID()
-                  : `${Date.now()}`,
+              id: createUniqueId("project"),
               name: trimmedName,
               data,
               createdAt: Date.now(),
@@ -2205,7 +2250,7 @@ function SortableThumb({
 	      </div>
 	      <div className="pointer-events-none absolute inset-x-0 bottom-3 z-20 flex justify-center opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100">
 	        <div
-            className="flex items-center justify-center gap-1 rounded-xl border border-slate-300/90 bg-white/96 px-2 py-1.5 shadow-[0_8px_18px_rgba(15,23,42,0.10)] backdrop-blur-sm dark:border-[#3F3F3F] dark:bg-[#323232]/96 dark:shadow-[0_12px_28px_rgba(0,0,0,0.45)]"
+            className="flex items-center justify-center gap-1 rounded-xl border-2 border-slate-300/90 bg-white/96 px-2 py-1.5 shadow-[0_8px_18px_rgba(15,23,42,0.10)] backdrop-blur-sm dark:border-[#3F3F3F] dark:bg-[#323232]/96 dark:shadow-[0_12px_28px_rgba(0,0,0,0.45)]"
           >
 	          <button
 	            type="button"
@@ -2214,13 +2259,13 @@ function SortableThumb({
 	              event.stopPropagation();
 	              onMoveUp();
 	            }}
-	            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-40 dark:text-[#E5E5E5] dark:hover:bg-[#3A3A3A] dark:hover:text-white"
+	            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-40 dark:text-[#E5E5E5] dark:hover:bg-[#3A3A3A] dark:hover:text-white"
 	            aria-label="Move page up"
 	            disabled={index === 0}
 	          >
 	            <ChevronUp className="h-4 w-4" aria-hidden />
 	          </button>
-	          <div className="h-5 w-px bg-slate-200 dark:bg-[#3A3A3A]" aria-hidden />
+	          <div className="h-5 w-0.5 bg-slate-200 dark:bg-[#3A3A3A]" aria-hidden />
 	          <button
 	            type="button"
 	            onPointerDown={(event) => event.stopPropagation()}
@@ -2228,13 +2273,13 @@ function SortableThumb({
 	              event.stopPropagation();
 	              onMoveDown();
 	            }}
-	            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-40 dark:text-[#E5E5E5] dark:hover:bg-[#3A3A3A] dark:hover:text-white"
+	            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-40 dark:text-[#E5E5E5] dark:hover:bg-[#3A3A3A] dark:hover:text-white"
 	            aria-label="Move page down"
 	            disabled={disableMoveDown}
 	          >
 	            <ChevronDown className="h-4 w-4" aria-hidden />
 	          </button>
-	          <div className="h-5 w-px bg-slate-200 dark:bg-[#3A3A3A]" aria-hidden />
+	          <div className="h-5 w-0.5 bg-slate-200 dark:bg-[#3A3A3A]" aria-hidden />
 	          <button
 	            type="button"
 	            onPointerDown={(event) => event.stopPropagation()}
@@ -2242,12 +2287,12 @@ function SortableThumb({
 	              event.stopPropagation();
 	              onRotate();
 	            }}
-	            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 dark:text-[#E5E5E5] dark:hover:bg-[#3A3A3A] dark:hover:text-white"
+	            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 dark:text-[#E5E5E5] dark:hover:bg-[#3A3A3A] dark:hover:text-white"
 	            aria-label="Rotate page"
 	          >
 	            <RotateCw className="h-4 w-4" aria-hidden />
 	          </button>
-	          <div className="h-5 w-px bg-slate-200 dark:bg-[#3A3A3A]" aria-hidden />
+	          <div className="h-5 w-0.5 bg-slate-200 dark:bg-[#3A3A3A]" aria-hidden />
 	          <button
 	            type="button"
 	            onPointerDown={(event) => event.stopPropagation()}
@@ -2255,12 +2300,12 @@ function SortableThumb({
 	              event.stopPropagation();
 	              onDuplicate();
 	            }}
-	            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 dark:text-[#E5E5E5] dark:hover:bg-[#3A3A3A] dark:hover:text-white"
+	            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 dark:text-[#E5E5E5] dark:hover:bg-[#3A3A3A] dark:hover:text-white"
 	            aria-label="Duplicate page"
 	          >
 	            <Copy className="h-4 w-4" aria-hidden />
 	          </button>
-	          <div className="h-5 w-px bg-slate-200 dark:bg-[#3A3A3A]" aria-hidden />
+	          <div className="h-5 w-0.5 bg-slate-200 dark:bg-[#3A3A3A]" aria-hidden />
             <button
               type="button"
               onPointerDown={(event) => event.stopPropagation()}
@@ -2268,7 +2313,7 @@ function SortableThumb({
                 event.stopPropagation();
                 onDelete();
               }}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-rose-600 transition hover:bg-rose-100 hover:text-rose-700 dark:text-rose-300 dark:hover:bg-rose-500/20 dark:hover:text-rose-200"
+              className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-rose-600 transition hover:bg-rose-100 hover:text-rose-700 dark:text-rose-300 dark:hover:bg-rose-500/20 dark:hover:text-rose-200"
               aria-label="Delete page"
             >
               <Trash2 className="h-4 w-4" aria-hidden />
@@ -2278,6 +2323,24 @@ function SortableThumb({
 	    </li>
 	  );
 }
+
+const MemoSortableThumb = memo(
+  SortableThumb,
+  (prevProps, nextProps) =>
+    prevProps.selected === nextProps.selected &&
+    prevProps.index === nextProps.index &&
+    prevProps.disableMoveDown === nextProps.disableMoveDown &&
+    prevProps.item.id === nextProps.item.id &&
+    prevProps.item.srcIdx === nextProps.item.srcIdx &&
+    prevProps.item.pageIdx === nextProps.item.pageIdx &&
+    prevProps.item.rotation === nextProps.item.rotation &&
+    prevProps.item.thumb === nextProps.item.thumb &&
+    prevProps.item.thumbWidth === nextProps.item.thumbWidth &&
+    prevProps.item.thumbHeight === nextProps.item.thumbHeight &&
+    prevProps.item.preview === nextProps.item.preview &&
+    prevProps.item.width === nextProps.item.width &&
+    prevProps.item.height === nextProps.item.height
+);
 
 function SortableOrganizeTile({
   item,
@@ -2391,6 +2454,7 @@ function WorkspaceClient() {
   const { saveProject, savingProject, currentProjectId } = useProjects(studioOwnerKey, Boolean(authSession?.user));
   const projectParam = searchParams.get("project");
   const projectKey = projectParam ?? currentProjectId ?? "local";
+  const isDevEnvironment = process.env.NODE_ENV !== "production";
   const [showAuthGate, setShowAuthGate] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
   const [authStep, setAuthStep] = useState<"form" | "verify">("form");
@@ -2419,6 +2483,7 @@ function WorkspaceClient() {
   const [searchBusy, setSearchBusy] = useState(false);
   const [searchResults, setSearchResults] = useState<number[]>([]);
   const [activeSearchResultIndex, setActiveSearchResultIndex] = useState(0);
+  const [suppressAddBlankPageTooltip, setSuppressAddBlankPageTooltip] = useState(false);
   const [pageActionMenuId, setPageActionMenuId] = useState<string | null>(null);
   const [pendingInsertAfterPageId, setPendingInsertAfterPageId] = useState<string | null>(null);
 		  const [shouldCenterOnChange, setShouldCenterOnChange] = useState(false);
@@ -2516,9 +2581,6 @@ function WorkspaceClient() {
   const startupProgressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startupOverlayShownRef = useRef(false);
   const startupOverlayProjectRef = useRef<string | null>(projectParam);
-  const workspaceReadySettledRef = useRef(false);
-  const [workspaceViewportReady, setWorkspaceViewportReady] = useState(false);
-  const [workspaceContentPainted, setWorkspaceContentPainted] = useState(false);
   const [showExistingProjectWorkspace, setShowExistingProjectWorkspace] = useState(() => Boolean(projectParam));
   const [hasWorkspaceOpenInProgress] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -2529,36 +2591,6 @@ function WorkspaceClient() {
     }
   });
   const existingProjectOverlayHideSentRef = useRef(false);
-  const dispatchWorkspaceReadyAfterPaint = useCallback((includeHide: boolean) => {
-    let cancelled = false;
-    let firstFrame = 0;
-    let secondFrame = 0;
-    const fallbackId = window.setTimeout(() => {
-      if (cancelled) return;
-      window.dispatchEvent(new Event("workspace-content-ready"));
-      if (includeHide) {
-        window.dispatchEvent(new Event("workspace-launch-overlay-hide"));
-      }
-    }, 1000);
-
-    firstFrame = window.requestAnimationFrame(() => {
-      secondFrame = window.requestAnimationFrame(() => {
-        if (cancelled) return;
-        window.clearTimeout(fallbackId);
-        window.dispatchEvent(new Event("workspace-content-ready"));
-        if (includeHide) {
-          window.dispatchEvent(new Event("workspace-launch-overlay-hide"));
-        }
-      });
-    });
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(fallbackId);
-      if (firstFrame) window.cancelAnimationFrame(firstFrame);
-      if (secondFrame) window.cancelAnimationFrame(secondFrame);
-    };
-  }, []);
   const [loadedPreviewIds, setLoadedPreviewIds] = useState<Set<string>>(() => new Set());
   const [loadedThumbIds, setLoadedThumbIds] = useState<Set<string>>(() => new Set());
   const INSERT_BEFORE_FIRST_ID = "__before_first__";
@@ -2587,9 +2619,6 @@ function WorkspaceClient() {
     if (startupOverlayProjectRef.current !== projectParam) {
       startupOverlayProjectRef.current = projectParam;
       startupOverlayShownRef.current = false;
-      workspaceReadySettledRef.current = false;
-      setWorkspaceViewportReady(false);
-      setWorkspaceContentPainted(false);
       existingProjectOverlayHideSentRef.current = false;
       setShowStartupOverlay(false);
       setShowExistingProjectWorkspace(Boolean(projectParam));
@@ -4003,7 +4032,10 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
 
       const handleMove = (event: PointerEvent) => {
         if (event.pointerId !== pointerId) return;
-        const point = getPageNormalizedPoint(pageId, event.clientX, event.clientY);
+        const point = getPagePoint(pageId, event.clientX, event.clientY, {
+          clampToBounds: false,
+          requireInside: false,
+        });
         if (!point) return;
         textDragLatestPointRef.current = point;
         if (textDragRafRef.current !== null) return;
@@ -4013,13 +4045,11 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
           if (!latestPoint) return;
           const unclampedX = latestPoint.x - offsetX;
           const unclampedY = latestPoint.y - offsetY;
-          // Keep the box itself inside the page bounds without shrinking it to fit text content.
-          const nextX = clamp(unclampedX, 0, 1 - startWidth);
-          const nextY = clamp(unclampedY, 0, 1 - startHeight);
-          textDragLatestPosRef.current = { x: nextX, y: nextY };
+          // Let the box move freely; we decide on drop whether it still touches the page.
+          textDragLatestPosRef.current = { x: unclampedX, y: unclampedY };
           if (node) {
-            node.style.left = `${nextX * 100}%`;
-            node.style.top = `${nextY * 100}%`;
+            node.style.left = `${unclampedX * 100}%`;
+            node.style.top = `${unclampedY * 100}%`;
             node.style.transform = `rotate(${displayRotation}deg)`;
           }
         });
@@ -4041,25 +4071,41 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       function handleUp() {
         const latest = textDragLatestPosRef.current;
         if (latest) {
-          setTextAnnotations((prev) => {
-            const existing = prev[pageId] ?? [];
-            const updated = existing.map((item) =>
-              item.id === annotationId ? { ...item, x: latest.x, y: latest.y } : item
-            );
-            return { ...prev, [pageId]: updated };
-          });
-          if (node) {
-            node.style.left = `${latest.x * 100}%`;
-            node.style.top = `${latest.y * 100}%`;
-            node.style.transform = `rotate(${displayRotation}deg)`;
-            node.style.transition = "none";
-            node.style.willChange = "";
-            window.requestAnimationFrame(() => {
-              window.requestAnimationFrame(() => {
-                if (!node) return;
-                node.style.transition = "";
-              });
+          const previewNode = previewNodeMap.current.get(pageId);
+          const previewRect = previewNode?.getBoundingClientRect() ?? null;
+          const nodeRect = node?.getBoundingClientRect() ?? null;
+          const touchesPreview =
+            !previewRect ||
+            !nodeRect ||
+            (nodeRect.right >= previewRect.left &&
+              nodeRect.left <= previewRect.right &&
+              nodeRect.bottom >= previewRect.top &&
+              nodeRect.top <= previewRect.bottom);
+
+          if (touchesPreview) {
+            markWorkspaceDirty();
+            setTextAnnotations((prev) => {
+              const existing = prev[pageId] ?? [];
+              const updated = existing.map((item) =>
+                item.id === annotationId ? { ...item, x: latest.x, y: latest.y } : item
+              );
+              return { ...prev, [pageId]: updated };
             });
+            if (node) {
+              node.style.left = `${latest.x * 100}%`;
+              node.style.top = `${latest.y * 100}%`;
+              node.style.transform = `rotate(${displayRotation}deg)`;
+              node.style.transition = "none";
+              node.style.willChange = "";
+              window.requestAnimationFrame(() => {
+                window.requestAnimationFrame(() => {
+                  if (!node) return;
+                  node.style.transition = "";
+                });
+              });
+            }
+          } else {
+            deleteTextAnnotation(pageId, annotationId);
           }
         }
         setDraggingText(null);
@@ -4074,7 +4120,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
       textDragLatestPosRef.current = { x: annotation.x, y: annotation.y };
       setDraggingText({ pageId, id: annotationId, offsetX, offsetY });
     },
-    [getPageNormalizedPoint, textAnnotations]
+    [deleteTextAnnotation, getPagePoint, markWorkspaceDirty, textAnnotations]
   );
 
   const startShapeDrag = useCallback(
@@ -4788,6 +4834,17 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   const hasHydratedSources = useRef(false);
   const [sourcesHydrated, setSourcesHydrated] = useState(false);
   const [projectHasSources, setProjectHasSources] = useState<boolean | null>(null);
+  useEffect(() => {
+    debugStudioLoad("state", {
+      projectId: projectParam ?? currentProjectId ?? null,
+      loading,
+      sources: sources.length,
+      pages: pages.length,
+      sourcesHydrated,
+      projectHasSources,
+      error: error ?? null,
+    });
+  }, [currentProjectId, error, loading, pages.length, projectHasSources, projectParam, sources.length, sourcesHydrated]);
   const objectUrlCacheRef = useRef<Map<string, string>>(new Map());
   const hasHydratedHighlights = useRef(false);
   const hasHydratedSignatures = useRef(false);
@@ -4825,10 +4882,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         if (existing && existing.mode === "guest" && typeof existing.id === "string") {
           next = { ...existing };
         } else {
-          const id =
-            typeof crypto !== "undefined" && "randomUUID" in crypto
-              ? crypto.randomUUID()
-              : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+          const id = createUniqueId("guest-project");
           next = {
             id,
             createdAt: Date.now(),
@@ -4861,11 +4915,11 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     session?.removeItem(workspaceFilesKey(null));
     session?.removeItem(workspacePreviewCacheKey("local"));
   }, []);
-  const markWorkspaceDirty = useCallback(() => {
+  function markWorkspaceDirty() {
     if (hasUnsavedWorkspaceChangesRef.current) return;
     hasUnsavedWorkspaceChangesRef.current = true;
     setHasUnsavedWorkspaceChanges(true);
-  }, []);
+  }
   useEffect(() => {
     pagesRef.current = pages;
     pagesByIdRef.current = new Map(pages.map((page) => [page.id, page]));
@@ -4988,6 +5042,7 @@ const timer =
   }, [projectKey, sources.length]);
   useEffect(() => {
     activePageIndexRef.current = activePageIndexState;
+    backgroundLowResIndexRef.current = activePageIndexState;
   }, [activePageIndexState]);
   useEffect(() => {
     if (lastProjectKeyRef.current === projectKey) return;
@@ -5233,12 +5288,9 @@ const timer =
           setSavedSignatures(data.savedSignatures);
         }
         if (Array.isArray(data.pages) && data.pages.length > 0) {
-          const initialPreviewCount = getInitialPreviewRenderCount(
-            pages.length,
-            pages.length > LARGE_DOC_PAGE_THRESHOLD,
-          );
+          const initialPreviewCount = getInitialPreviewRenderCount(data.pages.length);
           const thumbLimit =
-            pages.length > LARGE_DOC_PAGE_THRESHOLD ? LARGE_DOC_THUMB_LIMIT : pages.length;
+            data.pages.length > LARGE_DOC_PAGE_THRESHOLD ? LARGE_DOC_THUMB_LIMIT : data.pages.length;
           const orderedIds = data.pages
             .map((page) => (page && typeof page.id === "string" ? (page.id as string) : ""))
             .filter(Boolean);
@@ -5353,6 +5405,7 @@ const timer =
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!authSession?.user) return;
+    if (isDevEnvironment) return;
     const projectId = projectParam ?? currentProjectId ?? null;
     if (!projectId) return;
     if (previewSyncRef.current.has(projectId)) return;
@@ -5362,7 +5415,9 @@ const timer =
 
     const ensurePreview = async () => {
       const waitForLocalSource = async () => {
-        for (let attempt = 0; attempt < 30; attempt += 1) {
+        const maxAttempts = isDevEnvironment ? 1 : 30;
+        const delayMs = isDevEnvironment ? 0 : 150;
+        for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
           const source = sources[0];
           if (source?.storageId) {
             try {
@@ -5373,7 +5428,9 @@ const timer =
               // keep waiting for the preload to finish
             }
           }
-          await new Promise((resolve) => setTimeout(resolve, 150));
+          if (delayMs > 0) {
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
+          }
         }
         return null;
       };
@@ -5481,12 +5538,10 @@ const timer =
       const projectId = storageProjectId;
       const key = workspaceFilesKey(projectId);
       let raw: string | null = null;
-      let fromSession = false;
       if (local) raw = local.getItem(key);
       if (!raw && session) {
         raw = session.getItem(key);
         if (raw && local) {
-          fromSession = true;
           try {
             local.setItem(key, raw);
           } catch {
@@ -5497,15 +5552,26 @@ const timer =
       }
       const hydrateFromCloudProject = async () => {
         if (!projectId || !authSession?.user) return false;
+        const fetchStartedAt = performance.now();
         try {
+          debugStudioLoad("project-fetch-start", { projectId });
           const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}`, { cache: "no-store" });
+          debugStudioLoad("project-fetch-end", {
+            projectId,
+            status: res.status,
+            durationMs: Math.round(performance.now() - fetchStartedAt),
+          });
           if (!res.ok) {
             throw new Error(`Cloud project fetch failed with status ${res.status}`);
           }
           const json = (await res.json().catch(() => null)) as {
-            project?: { data?: unknown; pdfUrl?: string | null };
+            project?: { data?: unknown; pdfUrl?: string | null; previewUrl?: string | null };
           } | null;
           const cloudData = json?.project?.data;
+          const cloudPages =
+            cloudData && typeof cloudData === "object" && "pages" in cloudData
+              ? (cloudData as { pages?: unknown }).pages
+              : null;
           const cloudSources =
             cloudData && typeof cloudData === "object" && "sources" in cloudData
               ? (cloudData as { sources?: unknown }).sources
@@ -5514,6 +5580,27 @@ const timer =
             json?.project?.pdfUrl && typeof json.project.pdfUrl === "string"
               ? json.project.pdfUrl
               : null;
+          const projectPreviewUrl =
+            json?.project && "previewUrl" in json.project && typeof json.project.previewUrl === "string"
+              ? json.project.previewUrl
+              : null;
+          const paintCloudPages = (sourceIds: string[], options?: { force?: boolean }) => {
+            if (cancelled) return;
+            if (!options?.force && pagesRef.current.length > 0) return;
+            const previewPages = buildCloudProjectPreviewPages(sourceIds, cloudPages, projectPreviewUrl);
+            if (previewPages.length === 0) return;
+            restoringPreviewCacheRef.current = !options?.force;
+            setPages(sortPagesBySavedOrder(previewPages, savedPageOrderRef.current));
+            const targetThumbWidth = getThumbTargetWidth();
+            previewPages.forEach((page) => {
+              if (page.preview) {
+                pageRenderStatusRef.current.set(page.id, "low");
+              }
+              if (page.thumb && (page.thumbWidth ?? 0) >= targetThumbWidth) {
+                thumbRenderStatusRef.current.set(page.id, "ready");
+              }
+            });
+          };
           const setCombinedCloudSource = (nameHint?: string | null, sizeHint?: number | null) => {
             if (!pdfUrl) {
               throw new Error("Cloud PDF is not available for this project.");
@@ -5527,6 +5614,7 @@ const timer =
               size: typeof sizeHint === "number" && Number.isFinite(sizeHint) ? sizeHint : 0,
               updatedAt: Date.now(),
             };
+            paintCloudPages([combinedStorageId], { force: true });
             if (!cancelled) {
               setSources([combinedSource]);
               setError(null);
@@ -5541,101 +5629,25 @@ const timer =
           }
           if (Array.isArray(cloudSources) && cloudSources.length > 0) {
             setProjectHasSources(true);
-            const restored: SourceRef[] = [];
-            const missing: string[] = [];
-            const waitForStoredBlob = async (id: string) => {
-              for (let attempt = 0; attempt < 20; attempt += 1) {
-                try {
-                  const stored = await readFileBlob(id);
-                  const blobRecord = stored?.blob instanceof Blob ? stored.blob : null;
-                  if (blobRecord) return { stored, blobRecord };
-                } catch {
-                  // keep trying while IndexedDB catches up after the route swap
-                }
-                await new Promise((resolve) => setTimeout(resolve, 120));
-              }
-              return null;
-            };
-            for (const entry of cloudSources) {
-              if (!entry || typeof entry !== "object") continue;
-              const id =
-                "id" in entry && typeof (entry as { id?: unknown }).id === "string"
-                  ? (entry as { id: string }).id
-                  : null;
-              if (!id) continue;
-              const stored = await readFileBlob(id);
-              const blobRecord = stored?.blob instanceof Blob ? stored.blob : null;
-              if (!blobRecord) {
-                missing.push(id);
-              }
-            }
-            if (missing.length > 0) {
-              const combinedName =
-                (cloudSources[0] &&
-                typeof cloudSources[0] === "object" &&
-                "name" in cloudSources[0] &&
-                typeof (cloudSources[0] as { name?: unknown }).name === "string"
-                  ? (cloudSources[0] as { name: string }).name
-                  : "Document.pdf") ?? "Document.pdf";
-              const combinedSize =
-                cloudSources.reduce((total, entry) => {
-                  if (!entry || typeof entry !== "object") return total;
-                  const size =
-                    "size" in entry && typeof (entry as { size?: unknown }).size === "number"
-                      ? (entry as { size: number }).size
-                      : 0;
-                  return total + size;
-                }, 0);
-              setCombinedCloudSource(combinedName, combinedSize);
-              return true;
-            }
-            for (const entry of cloudSources) {
-              if (!entry || typeof entry !== "object") continue;
-              const id =
-                "id" in entry && typeof (entry as { id?: unknown }).id === "string"
-                  ? (entry as { id: string }).id
-                  : null;
-              if (!id) continue;
-              const name =
-                ("name" in entry && typeof (entry as { name?: unknown }).name === "string"
-                  ? (entry as { name: string }).name
-                  : null) ?? "Document.pdf";
+            const combinedStorageId = `cloud-project-${projectId}`;
+            paintCloudPages([combinedStorageId], { force: true });
+            const combinedName =
+              (cloudSources[0] &&
+              typeof cloudSources[0] === "object" &&
+              "name" in cloudSources[0] &&
+              typeof (cloudSources[0] as { name?: unknown }).name === "string"
+                ? (cloudSources[0] as { name: string }).name
+                : "Document.pdf") ?? "Document.pdf";
+            const combinedSize = cloudSources.reduce((total, entry) => {
+              if (!entry || typeof entry !== "object") return total;
               const size =
-                ("size" in entry && typeof (entry as { size?: unknown }).size === "number"
+                "size" in entry && typeof (entry as { size?: unknown }).size === "number"
                   ? (entry as { size: number }).size
-                  : null) ?? 0;
-              const updatedAt =
-                ("updatedAt" in entry && typeof (entry as { updatedAt?: unknown }).updatedAt === "number"
-                  ? (entry as { updatedAt: number }).updatedAt
-                  : null) ?? Date.now();
-              let stored = await waitForStoredBlob(id);
-              let blobRecord = stored?.blobRecord ?? null;
-              if (!blobRecord) {
-                console.info("Waiting for stored PDF blob after existing-project hydration.", {
-                  projectId,
-                  sourceId: id,
-                });
-                missing.push(id);
-                continue;
-              }
-              const objectUrl = URL.createObjectURL(blobRecord);
-              restored.push({
-                storageId: id,
-                url: objectUrl,
-                name: stored?.stored?.name ?? name,
-                size: stored?.stored?.size ?? size ?? blobRecord.size ?? 0,
-                updatedAt: stored?.stored?.updatedAt ?? updatedAt,
-              });
-            }
-            if (!cancelled && restored.length > 0) {
-              setSources(restored);
-              persistSourceMetadata(restored, projectId);
-              setError(null);
-            } else if (!cancelled && missing.length > 0) {
-              setProjectHasSources(null);
-              setError(null);
-            }
-            return restored.length > 0;
+                  : 0;
+              return total + size;
+            }, 0);
+            setCombinedCloudSource(combinedName, combinedSize);
+            return true;
           }
           if (pdfUrl && (!Array.isArray(cloudSources) || cloudSources.length === 0)) {
             setCombinedCloudSource(null, null);
@@ -5645,6 +5657,11 @@ const timer =
             setProjectHasSources(false);
           }
         } catch (err) {
+          debugStudioLoad("project-fetch-error", {
+            projectId,
+            durationMs: Math.round(performance.now() - fetchStartedAt),
+            error: err instanceof Error ? err.message : String(err),
+          });
           console.error("Cloud project hydration failed.", err);
           if (!cancelled) {
             setProjectHasSources(null);
@@ -5728,7 +5745,7 @@ const timer =
     return () => {
       cancelled = true;
     };
-  }, [authSession?.user, currentProjectId, projectParam]);
+  }, [authSession?.user, currentProjectId, isDevEnvironment, projectKey, projectParam]);
 
   /** Persist source metadata whenever it changes (after hydration) */
   useEffect(() => {
@@ -6374,8 +6391,8 @@ const timer =
     pendingInitialRenderRef.current = [];
     window.requestAnimationFrame(() => {
       initialPages.forEach((page) => {
-        enqueueRender({ pageId: page.id, srcIdx: page.srcIdx, pageIdx: page.pageIdx, quality: "low", priority: 200 });
-        enqueueRender({ pageId: page.id, srcIdx: page.srcIdx, pageIdx: page.pageIdx, quality: "high", priority: 150 });
+        enqueueRender({ pageId: page.id, srcIdx: page.srcIdx, pageIdx: page.pageIdx, quality: "low", priority: 90 });
+        enqueueRender({ pageId: page.id, srcIdx: page.srcIdx, pageIdx: page.pageIdx, quality: "high", priority: 80 });
       });
     });
   }, [enqueueRender, pages.length]);
@@ -6415,9 +6432,38 @@ const timer =
       let pdf: any | null = null;
       const stored = await readFileBlob(src.storageId);
       const blob = stored?.blob instanceof Blob ? stored.blob : null;
+      const fetchPdfBytes = async () => {
+        const startedAt = performance.now();
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), 20_000);
+        try {
+          debugStudioLoad("pdf-fetch-start", { projectId: projectParam ?? currentProjectId ?? null, sourceId: src.storageId });
+          const response = await fetch(src.url, { signal: controller.signal });
+          debugStudioLoad("pdf-fetch-end", {
+            projectId: projectParam ?? currentProjectId ?? null,
+            sourceId: src.storageId,
+            status: response.status,
+            durationMs: Math.round(performance.now() - startedAt),
+          });
+          if (!response.ok) {
+            throw new Error(`PDF fetch failed with status ${response.status}`);
+          }
+          return response.arrayBuffer();
+        } catch (error) {
+          debugStudioLoad("pdf-fetch-error", {
+            projectId: projectParam ?? currentProjectId ?? null,
+            sourceId: src.storageId,
+            durationMs: Math.round(performance.now() - startedAt),
+            error: error instanceof Error ? error.message : String(error),
+          });
+          throw error;
+        } finally {
+          window.clearTimeout(timeoutId);
+        }
+      };
       const bytes = blob
         ? new Uint8Array(await blob.arrayBuffer())
-        : new Uint8Array(await (await fetch(src.url)).arrayBuffer());
+        : new Uint8Array(await fetchPdfBytes());
       try {
         pdf = await pdfjsLib.getDocument({ data: bytes } as any).promise;
       } catch (err) {
@@ -6515,10 +6561,7 @@ const timer =
               ? mergePageListPreserveOrder(prev, orderedFirstPages)
               : mergePageList(prev, orderedFirstPages);
             const orderedMerged = sortPagesBySavedOrder(merged, savedPageOrderRef.current);
-            const initialCount = getInitialPreviewRenderCount(
-              orderedMerged.length,
-              orderedMerged.length > LARGE_DOC_PAGE_THRESHOLD
-            );
+            const initialCount = getInitialPreviewRenderCount(orderedMerged.length);
             pendingInitialRenderRef.current = orderedMerged.slice(0, initialCount);
             return orderedMerged;
           });
@@ -6902,7 +6945,7 @@ const timer =
     candidates.forEach((id) => {
       const page = pagesByIdRef.current.get(id);
       if (!page) return;
-      enqueueRender({ pageId: page.id, srcIdx: page.srcIdx, pageIdx: page.pageIdx, quality: "low", priority: 70 });
+      enqueueRender({ pageId: page.id, srcIdx: page.srcIdx, pageIdx: page.pageIdx, quality: "low", priority: 180 });
     });
   }, [enqueueRender, nearPageIds, pages.length]);
 
@@ -6920,7 +6963,7 @@ const timer =
     candidates.forEach((id) => {
       const page = pagesByIdRef.current.get(id);
       if (!page) return;
-      enqueueRender({ pageId: page.id, srcIdx: page.srcIdx, pageIdx: page.pageIdx, quality: "high", priority: 120 });
+      enqueueRender({ pageId: page.id, srcIdx: page.srcIdx, pageIdx: page.pageIdx, quality: "high", priority: 260 });
     });
   }, [activePageIndexState, enqueueRender, pages, visiblePageIds]);
 
@@ -6929,80 +6972,50 @@ const timer =
     const pageList = pagesRef.current;
     window.requestAnimationFrame(() => {
       const limit = largeDocMode ? Math.min(LARGE_DOC_THUMB_LIMIT, pageList.length) : pageList.length;
-      const thumbTargets = new Set<PageItem>();
-      for (let index = 0; index < limit; index += 1) {
-        const page = pageList[index];
-        if (page) thumbTargets.add(page);
+      const orderedThumbIds: string[] = [];
+      const seen = new Set<string>();
+      const addThumbId = (id: string | null | undefined) => {
+        if (!id || seen.has(id)) return;
+        seen.add(id);
+        orderedThumbIds.push(id);
+      };
+      visiblePageIds.forEach(addThumbId);
+      nearPageIds.forEach(addThumbId);
+      const activeIndex =
+        activePageIndexState >= 0 && activePageIndexState < pageList.length ? activePageIndexState : 0;
+      for (let offset = -3; offset <= 3; offset += 1) {
+        const idx = activeIndex + offset;
+        const page = pageList[idx];
+        addThumbId(page?.id);
       }
-      if (largeDocMode) {
-        const activeIndex =
-          activePageIndexState >= 0 && activePageIndexState < pageList.length ? activePageIndexState : 0;
-        for (let offset = -3; offset <= 3; offset += 1) {
-          const idx = activeIndex + offset;
-          const page = pageList[idx];
-          if (page) thumbTargets.add(page);
-        }
+      for (let index = 0; index < pageList.length && orderedThumbIds.length < limit; index += 1) {
+        addThumbId(pageList[index]?.id);
       }
-      Array.from(thumbTargets).forEach((page, index) => {
+      orderedThumbIds.slice(0, limit).forEach((id, index) => {
+        const page = pagesByIdRef.current.get(id);
+        if (!page) return;
         enqueueThumbRender({
           pageId: page.id,
           srcIdx: page.srcIdx,
           pageIdx: page.pageIdx,
-          priority: Math.max(20, 160 - Math.min(index, 120)),
+          priority: Math.max(20, 240 - Math.min(index, 180)),
         });
       });
     });
-  }, [activePageIndexState, enqueueThumbRender, largeDocMode, pages.length]);
+  }, [activePageIndexState, enqueueThumbRender, largeDocMode, nearPageIds, pages.length, visiblePageIds]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
     if (existingProjectOverlayHideSentRef.current) return;
-    let hasExistingOverlayMarker = false;
-    try {
-      hasExistingOverlayMarker = Boolean(window.sessionStorage?.getItem(EXISTING_PROJECT_OVERLAY_STORAGE_KEY));
-    } catch {
-      hasExistingOverlayMarker = false;
-    }
-    if (!hasExistingOverlayMarker) return;
-    if (!sourcesHydrated || !workspaceViewportReady) return;
+    if (typeof window === "undefined") return;
+    if (!projectParam) return;
     existingProjectOverlayHideSentRef.current = true;
-    return dispatchWorkspaceReadyAfterPaint(true);
-  }, [dispatchWorkspaceReadyAfterPaint, sourcesHydrated, workspaceViewportReady]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (existingProjectOverlayHideSentRef.current) return;
-    let hasExistingOverlayMarker = false;
-    try {
-      hasExistingOverlayMarker = Boolean(window.sessionStorage?.getItem(EXISTING_PROJECT_OVERLAY_STORAGE_KEY));
-    } catch {
-      hasExistingOverlayMarker = false;
-    }
-    if (!hasExistingOverlayMarker) return;
-    if (!error && (loading || !sourcesHydrated || !workspaceViewportReady)) return;
-    existingProjectOverlayHideSentRef.current = true;
-    return dispatchWorkspaceReadyAfterPaint(true);
-  }, [dispatchWorkspaceReadyAfterPaint, error, loading, sourcesHydrated, workspaceViewportReady]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (existingProjectOverlayHideSentRef.current) return;
-    let hasExistingOverlayMarker = false;
-    try {
-      hasExistingOverlayMarker = Boolean(window.sessionStorage?.getItem(EXISTING_PROJECT_OVERLAY_STORAGE_KEY));
-    } catch {
-      hasExistingOverlayMarker = false;
-    }
-    if (!hasExistingOverlayMarker) return;
-    const timeoutId = window.setTimeout(() => {
-      if (existingProjectOverlayHideSentRef.current) return;
-      existingProjectOverlayHideSentRef.current = true;
-      dispatchWorkspaceReadyAfterPaint(true);
-    }, 12000);
+    const frameId = window.requestAnimationFrame(() => {
+      window.dispatchEvent(new Event("workspace-content-ready"));
+    });
     return () => {
-      window.clearTimeout(timeoutId);
+      window.cancelAnimationFrame(frameId);
     };
-  }, [dispatchWorkspaceReadyAfterPaint, projectParam]);
+  }, [projectParam]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -7311,7 +7324,7 @@ const timer =
     let hadPersistError = false;
 
     for (const file of accepted) {
-      const storageId = crypto.randomUUID();
+      const storageId = createUniqueId("page");
       const objectUrl = URL.createObjectURL(file);
       try {
         await storeFileBlob(storageId, file, file.name, file.size);
@@ -7430,9 +7443,11 @@ const timer =
   }
 
   async function handleAddBlankPageAfter(pageId: string) {
+    hideToolbarTooltip();
+    setSuppressAddBlankPageTooltip(true);
     suppressNextAutoZoomRef.current = 2;
     markWorkspaceDirty();
-    const storageId = crypto.randomUUID();
+    const storageId = createUniqueId("page");
     const doc = await PDFDocument.create();
     doc.addPage([612, 792]);
     const bytes = await doc.save();
@@ -7507,9 +7522,11 @@ const timer =
   }
 
   async function handleAddBlankPageBefore(pageId: string) {
+    hideToolbarTooltip();
+    setSuppressAddBlankPageTooltip(true);
     suppressNextAutoZoomRef.current = 2;
     markWorkspaceDirty();
-    const storageId = crypto.randomUUID();
+    const storageId = createUniqueId("page");
     const doc = await PDFDocument.create();
     doc.addPage([612, 792]);
     const bytes = await doc.save();
@@ -7597,7 +7614,7 @@ const timer =
     const [copied] = await out.copyPages(sourceDoc, [page.pageIdx]);
     out.addPage(copied);
     const bytes = await out.save();
-    const storageId = crypto.randomUUID();
+    const storageId = createUniqueId("page");
     const blob = new Blob([bytes as unknown as BlobPart], { type: "application/pdf" });
     const name = `Page ${page.pageIdx + 1}.pdf`;
     await storeFileBlob(storageId, blob, name, blob.size);
@@ -7768,7 +7785,11 @@ const timer =
                 <Plus className="h-6 w-6" />
                 <span className="sr-only">Add blank page</span>
               </button>
-              <div className="pointer-events-none absolute left-1/2 top-full z-40 mt-2 -translate-x-1/2 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+              <div
+                className={`pointer-events-none absolute left-1/2 top-full z-40 mt-2 -translate-x-1/2 opacity-0 transition-opacity duration-150 ${
+                  suppressAddBlankPageTooltip ? "" : "group-hover:opacity-100 group-focus-within:opacity-100"
+                }`}
+              >
                 <div className="workspace-tooltip relative">
                   Add blank page
                   <span aria-hidden className="workspace-tooltip-arrow-top" />
@@ -9291,7 +9312,11 @@ const timer =
                 <Plus className="h-6 w-6" />
                 <span className="sr-only">Add blank page</span>
               </button>
-              <div className="pointer-events-none absolute left-1/2 bottom-full z-40 mb-2 -translate-x-1/2 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+              <div
+                className={`pointer-events-none absolute left-1/2 bottom-full z-40 mb-2 -translate-x-1/2 opacity-0 transition-opacity duration-150 ${
+                  suppressAddBlankPageTooltip ? "" : "group-hover:opacity-100 group-focus-within:opacity-100"
+                }`}
+              >
                 <div className="workspace-tooltip relative">
                   Add blank page
                   <span aria-hidden className="workspace-tooltip-arrow" />
@@ -9313,7 +9338,7 @@ const timer =
       const smoothedRaw = smoothStrokePoints(stroke.points, stroke.tool);
       const smoothed = stroke.tool === "highlight" ? snapHighlightSegments(smoothedRaw) : smoothedRaw;
       const highlight: HighlightStroke = {
-        id: crypto.randomUUID(),
+        id: createUniqueId("annotation"),
         tool: stroke.tool,
         points: smoothed.map((pt) => ({ ...pt })),
         color: stroke.color,
@@ -9859,7 +9884,7 @@ const timer =
       }
       const { width, height } = await loadImageDimensions(dataUrl);
       const entry: SavedSignature = {
-        id: crypto.randomUUID(),
+        id: createUniqueId("shape"),
         name: finalName,
         dataUrl,
         naturalWidth: width,
@@ -9908,7 +9933,7 @@ const timer =
       const x = clamp(point.x - width / 2, 0, 1 - width);
       const y = clamp(point.y - height / 2, 0, 1 - height);
       const placement: SignaturePlacement = {
-        id: crypto.randomUUID(),
+        id: createUniqueId("text"),
         signatureId: signature.id,
         name: signature.name,
         dataUrl: signature.dataUrl,
@@ -10386,7 +10411,7 @@ const timer =
   }
 
   const duplicateTextAnnotation = useCallback((pageId: string, id: string) => {
-    const newId = crypto.randomUUID();
+    const newId = createUniqueId("page");
     markWorkspaceDirty();
     setTextAnnotations((prev) => {
       const existing = prev[pageId] ?? [];
@@ -10422,7 +10447,7 @@ const timer =
   }, [markWorkspaceDirty]);
 
   const duplicateShape = useCallback((pageId: string, id: string) => {
-    const newId = crypto.randomUUID();
+    const newId = createUniqueId("page");
     markWorkspaceDirty();
     setShapesByPage((prev) => {
       const existing = prev[pageId] ?? [];
@@ -10466,91 +10491,6 @@ const timer =
   const printProjectId = projectParam ?? currentProjectId ?? null;
   const printDisabled = isPrinting || busy || isLoadingPages || !printProjectId;
 	  const activePageIndex = activePageIndexState >= 0 && activePageIndexState < pages.length ? activePageIndexState : -1;
-  useEffect(() => {
-    if (workspaceReadySettledRef.current) return;
-    if (!sourcesHydrated || loading || pages.length === 0) return;
-    let cancelled = false;
-    let frameId = 0;
-    let stableFrames = 0;
-
-    const tick = () => {
-      if (cancelled) return;
-      const activePreviewPage =
-        activePageIndexState >= 0 && activePageIndexState < pages.length ? pages[activePageIndexState] : pages[0];
-      const firstThumbPage = pages[0];
-      const previewNode = activePreviewPage ? previewNodeMap.current.get(activePreviewPage.id) : null;
-      const thumbNode = firstThumbPage ? thumbNodeMapRef.current.get(firstThumbPage.id) : null;
-      const previewRect = previewNode?.getBoundingClientRect();
-      const thumbRect = thumbNode?.getBoundingClientRect();
-
-      const previewRendered = Boolean(
-        activePreviewPage?.preview &&
-          loadedPreviewIds.has(activePreviewPage.id) &&
-          pageRenderStatusRef.current.get(activePreviewPage.id) === "high" &&
-          previewRect &&
-          previewRect.width > 120 &&
-          previewRect.height > 160,
-      );
-      const thumbRendered = Boolean(
-        firstThumbPage?.thumb &&
-          loadedThumbIds.has(firstThumbPage.id) &&
-          (
-            !thumbNode ||
-            (thumbRect && thumbRect.width > 28 && thumbRect.height > 40)
-          ),
-      );
-
-      if (previewRendered && thumbRendered) {
-        stableFrames += 1;
-      } else {
-        stableFrames = 0;
-      }
-
-      if (stableFrames >= 3) {
-        workspaceReadySettledRef.current = true;
-        setWorkspaceViewportReady(true);
-        window.setTimeout(() => {
-          if (!cancelled) {
-            window.dispatchEvent(new Event("workspace-content-ready"));
-          }
-        }, 220);
-        return;
-      }
-
-      frameId = window.requestAnimationFrame(tick);
-    };
-
-    frameId = window.requestAnimationFrame(tick);
-    return () => {
-      cancelled = true;
-      if (frameId) {
-        window.cancelAnimationFrame(frameId);
-      }
-    };
-  }, [activePageIndexState, loadedPreviewIds, loadedThumbIds, loading, pages, sourcesHydrated]);
-
-  useEffect(() => {
-    if (!workspaceViewportReady || loading || !sourcesHydrated || pages.length === 0) {
-      setWorkspaceContentPainted(false);
-      return;
-    }
-    let cancelled = false;
-    let firstFrame = 0;
-    let secondFrame = 0;
-    firstFrame = window.requestAnimationFrame(() => {
-      secondFrame = window.requestAnimationFrame(() => {
-        if (!cancelled) {
-          setWorkspaceContentPainted(true);
-          window.dispatchEvent(new Event("workspace-content-painted"));
-        }
-      });
-    });
-    return () => {
-      cancelled = true;
-      if (firstFrame) window.cancelAnimationFrame(firstFrame);
-      if (secondFrame) window.cancelAnimationFrame(secondFrame);
-    };
-  }, [loading, pages.length, sourcesHydrated, workspaceViewportReady]);
   const highlightButtonDisabled = pages.length === 0 || loading;
   const highlightColorEntries = Object.entries(
     HIGHLIGHT_COLORS
@@ -11020,6 +10960,13 @@ const timer =
     }
     setToolbarTooltip((prev) => (prev.visible ? { ...prev, visible: false } : prev));
   }, []);
+  useEffect(() => {
+    if (!suppressAddBlankPageTooltip) return;
+    const timer = window.setTimeout(() => {
+      setSuppressAddBlankPageTooltip(false);
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [suppressAddBlankPageTooltip]);
   const applyTextAlignment = useCallback(
     (nextAlign: "left" | "center" | "right" | "justify") => {
       if (focusedTextId) {
@@ -11672,7 +11619,7 @@ const timer =
     }
     markWorkspaceDirty();
     const shape: ShapeAnnotation = {
-      id: crypto.randomUUID(),
+      id: createUniqueId("signature"),
       type: draftShape.type,
       pageId,
       start: { ...draftShape.start },
@@ -11919,7 +11866,7 @@ const timer =
         const y = isClick
           ? clamp(draftTextBox.startY - height / 2, 0, 1 - height)
           : Math.min(draftTextBox.startY, draftTextBox.currentY);
-        const annotationId = crypto.randomUUID();
+        const annotationId = createUniqueId("note");
         const pageIndex = pages.findIndex((p) => p.id === pageId);
         markWorkspaceDirty();
         setTextAnnotations((prev) => {
@@ -12216,8 +12163,7 @@ const timer =
       return;
     }
     const { width, height } = await loadImageDimensions(imageUploadPreview);
-    const imageId =
-      typeof crypto !== "undefined" && "randomUUID" in crypto ? `image-${crypto.randomUUID()}` : `image-${Date.now()}`;
+    const imageId = createUniqueId("image");
     const signatureLike: SavedSignature = {
       id: imageId,
       name: imageUploadName.trim() || `Image ${imagePlacementCount + 1}`,
@@ -12441,7 +12387,7 @@ const timer =
     const height = 0.14;
     const x = clamp(0.5 - width / 2, 0, 1 - width);
     const y = clamp(0.5 - height / 2, 0, 1 - height);
-    const annotationId = crypto.randomUUID();
+    const annotationId = createUniqueId("text");
     setTextAnnotations((prev) => {
       const existing = prev[pageId] ?? [];
       return {
@@ -14017,9 +13963,9 @@ const timer =
         </div>
       ) : null}
       <div className="flex min-h-0 flex-1 flex-col bg-[var(--app-surface)] transition-opacity duration-[260ms] ease-out">
-      <header className="sticky top-0 z-40 border-b border-slate-200/60 bg-[var(--app-surface)] dark:border-[#4A4A4A]/60">
+      <header className="sticky top-0 z-40 border-b border-slate-200/60 bg-white dark:border-[#4A4A4A]/60 dark:bg-[#323232]">
         {/* Top row */}
-        <div className="w-full border-b border-slate-100 bg-[var(--app-surface)] dark:border-[#4A4A4A]/60">
+        <div className="w-full border-b border-slate-100 bg-white dark:border-[#4A4A4A]/60 dark:bg-[#323232]">
           <div className="relative flex h-14 w-full items-center justify-between gap-4 pl-4 pr-0 lg:pl-6 lg:pr-0">
             <Link
               href="/"
@@ -15966,10 +15912,10 @@ const timer =
 </div>
 <div className="flex shrink-0 items-stretch">
 				                          {showPageOrderPanel ? (
-				                            <aside className="flex w-[272px] shrink-0 flex-col border-l border-slate-200 dark:border-[#4A4A4A]">
-				                              <div className="flex min-h-0 flex-1 flex-col bg-[var(--app-surface)]">
+                            <aside className="flex w-[272px] shrink-0 flex-col border-l border-slate-200 dark:border-[#4A4A4A]">
+                              <div className="flex min-h-0 flex-1 flex-col bg-white dark:bg-[#323232]">
                                 <div
-                                  className="toolbar-font flex h-[45px] items-center justify-between border-b border-slate-200 bg-[var(--app-surface)] px-4 dark:border-[#4A4A4A]"
+                                  className="toolbar-font flex h-[45px] items-center justify-between border-b border-slate-200 bg-white px-4 dark:border-[#4A4A4A] dark:bg-[#323232]"
                                   data-text-toolbar
                                 >
 				                                  {loading && pages.length === 0 ? (
@@ -15979,8 +15925,8 @@ const timer =
                                     </div>
 				                                  ) : (
                                     <div className="flex items-center gap-2">
-                                      <p className="text-sm font-medium text-slate-800 dark:text-zinc-100">Pages</p>
-                                      <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-md border border-slate-200 bg-[var(--app-surface)] px-2 text-xs font-medium text-slate-900 shadow-sm dark:border-[#2A2A31] dark:text-zinc-100">
+                                      <p className="text-sm font-medium text-slate-800 dark:text-zinc-100">Page count</p>
+                                      <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-md border-2 border-slate-200 bg-white px-2 text-xs font-medium text-slate-900 dark:border-[#4A4A4A] dark:bg-[#323232] dark:text-zinc-100">
                                         {pages.length}
                                       </span>
                                     </div>
@@ -16034,7 +15980,7 @@ const timer =
 		                                  ) : null}
 		                                  {pages.map((p, i) => (
 		                                    <Fragment key={p.id}>
-		                                      <SortableThumb
+		                                      <MemoSortableThumb
 		                                        item={p}
 		                                        index={projectedThumbIndexMap.get(p.id) ?? i}
 		                                        selected={p.id === activePageId}
@@ -16122,7 +16068,7 @@ const timer =
                           <aside
                             className="flex w-12 shrink-0 flex-col border-l border-slate-200 bg-white dark:border-[#4A4A4A] dark:bg-[#323232]"
                           >
-				                            <div className="flex h-[45px] w-full items-center justify-center border-b border-slate-200 dark:border-[#4A4A4A]">
+                            <div className="flex h-[45px] w-full items-center justify-center border-b border-slate-200 bg-white dark:border-[#4A4A4A] dark:bg-[#323232]">
 				                              <div className="group relative">
 				                                <button
 				                                  type="button"
@@ -16218,7 +16164,7 @@ const timer =
                                       hideToolbarTooltip();
                                       commitPageNumberDraft();
                                     }}
-                                    className="h-8 w-8 rounded-md border border-slate-200 bg-white px-1 text-center text-[12px] font-semibold tabular-nums text-slate-900 shadow-sm outline-none transition focus:border-[#51bdff] focus:ring-2 focus:ring-[#51bdff]/30 disabled:opacity-60 dark:border-[#2A2A31] dark:bg-[#1C1C1F] dark:text-zinc-100 dark:focus:border-[#4A4A55] dark:focus:ring-zinc-500/40"
+                                    className="h-8 w-8 rounded-md border-2 border-slate-200 bg-white px-1 text-center text-[12px] font-semibold tabular-nums text-slate-900 shadow-sm outline-none transition focus:border-2 focus:border-[#6C47FF] focus:ring-0 disabled:opacity-60 dark:border-[#2A2A31] dark:bg-[#1C1C1F] dark:text-zinc-100 dark:focus:border-[#8B6CFF] dark:focus:ring-0"
                                     aria-label="Page number"
                                   />
                                   <button

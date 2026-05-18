@@ -175,7 +175,7 @@ async function AllProjectsContent() {
         name: project.name ?? "Untitled project",
         updatedAt: project.updatedAt,
         pagesCount: project.pagesCount ?? 0,
-        previewUrl: null,
+        previewUrl: project.previewKey ? `/api/projects/${project.id}/preview` : null,
         pdfUrl: null,
         hasPreview: !!project.previewKey,
         fileSizeBytes,

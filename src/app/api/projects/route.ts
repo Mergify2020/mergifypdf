@@ -7,7 +7,6 @@ import {
   markPrismaDatabaseUnavailable,
   prisma,
 } from "@/lib/prisma";
-import { getR2Config, getR2ObjectSize } from "@/lib/r2";
 import { isSameOrigin } from "@/lib/requestGuards";
 
 function extractPagesCountFromData(data: unknown): number | null {
@@ -49,6 +48,11 @@ function extractFileSizeFromData(data: unknown): number | null {
   return sizes.reduce((total, size) => total + size, 0);
 }
 
+function logRouteDebug(event: string, detail: Record<string, unknown>) {
+  if (process.env.NODE_ENV === "production") return;
+  console.info(`[projects-route:${event}]`, detail);
+}
+
 async function ensureDbConnection() {
   if (isPrismaDatabaseCooldownActive()) {
     throw new Error("PRISMA_DB_COOLDOWN_ACTIVE");
@@ -59,8 +63,8 @@ async function ensureDbConnection() {
       await prisma.$connect();
       clearPrismaDatabaseUnavailable();
       return;
-    } catch (err: any) {
-      const code = err?.code;
+    } catch (err: unknown) {
+      const code = err && typeof err === "object" && "code" in err ? (err as { code?: unknown }).code : null;
       if (code === "P1017" || code === "P1001") {
         markPrismaDatabaseUnavailable(err);
         try {
@@ -77,14 +81,24 @@ async function ensureDbConnection() {
 }
 
 export async function GET(request: NextRequest) {
+  const routeStartedAt = Date.now();
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
+    logRouteDebug("summary-unauthenticated", {
+      summary: request.nextUrl.searchParams.get("summary"),
+      durationMs: Date.now() - routeStartedAt,
+    });
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
     await ensureDbConnection();
-  } catch {
+  } catch (error) {
+    logRouteDebug("summary-db-unavailable", {
+      userId: session.user.id,
+      error: error instanceof Error ? error.message : String(error),
+      durationMs: Date.now() - routeStartedAt,
+    });
     return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
   }
 
@@ -93,17 +107,15 @@ export async function GET(request: NextRequest) {
   const trashedParam = request.nextUrl.searchParams.get("trashed");
   const trashed = trashedParam === "1" || trashedParam === "true";
   const trashedFilter = trashed ? { not: null } : null;
+  logRouteDebug("summary-start", {
+    userId,
+    summary,
+    trashed,
+  });
 
   // Lightweight summary payload used by the All Projects grid.
   if (summary === "1") {
     try {
-      let r2Config: ReturnType<typeof getR2Config> | null = null;
-      try {
-        r2Config = getR2Config();
-      } catch {
-        r2Config = null;
-      }
-
       const projects = await prisma.project.findMany({
         where: { userId, trashedAt: trashedFilter },
         orderBy: { updatedAt: "desc" },
@@ -119,34 +131,53 @@ export async function GET(request: NextRequest) {
         },
       });
       clearPrismaDatabaseUnavailable();
+      logRouteDebug("summary-project-count", {
+        userId,
+        count: projects.length,
+      });
 
+      const summaryProjects = await Promise.all(projects.map(async (project) => {
+        try {
+          const derivedPagesCount = extractPagesCountFromData(project.data);
+          const fileSizeBytes = extractFileSizeFromData(project.data);
+          return {
+            id: project.id,
+            name: project.name,
+            updatedAt: project.updatedAt,
+            hasPreview: !!project.previewKey,
+            hasPdf: !!project.pdfKey,
+            previewUrl: project.previewKey ? `/api/projects/${project.id}/preview` : null,
+            pagesCount: project.pagesCount ?? derivedPagesCount ?? 0,
+            rotation: extractRotationFromData(project.data) ?? 0,
+            fileSizeBytes,
+          };
+        } catch (error) {
+          logRouteDebug("summary-project-parse-failed", {
+            userId,
+            projectId: project.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          return {
+            id: project.id,
+            name: project.name,
+            updatedAt: project.updatedAt,
+            hasPreview: !!project.previewKey,
+            hasPdf: !!project.pdfKey,
+            previewUrl: project.previewKey ? `/api/projects/${project.id}/preview` : null,
+            pagesCount: project.pagesCount ?? 0,
+            rotation: 0,
+            fileSizeBytes: null,
+          };
+        }
+      }));
+
+      logRouteDebug("summary-end", {
+        userId,
+        count: summaryProjects.length,
+        durationMs: Date.now() - routeStartedAt,
+      });
       return NextResponse.json(
-        {
-          projects: await Promise.all(projects.map(async (project) => {
-            const derivedPagesCount = extractPagesCountFromData(project.data);
-            let fileSizeBytes: number | null = null;
-            if (r2Config && project.pdfKey) {
-              try {
-                fileSizeBytes = await getR2ObjectSize(r2Config, project.pdfKey);
-              } catch {
-                fileSizeBytes = extractFileSizeFromData(project.data);
-              }
-            } else {
-              fileSizeBytes = extractFileSizeFromData(project.data);
-            }
-
-            return {
-              id: project.id,
-              name: project.name,
-              updatedAt: project.updatedAt,
-              hasPreview: !!project.previewKey,
-              hasPdf: !!project.pdfKey,
-              pagesCount: project.pagesCount ?? derivedPagesCount ?? 0,
-              rotation: extractRotationFromData(project.data) ?? 0,
-              fileSizeBytes,
-            };
-          })),
-        },
+        { projects: summaryProjects },
         {
           headers: {
             "Cache-Control": "no-store",
@@ -155,6 +186,13 @@ export async function GET(request: NextRequest) {
       );
     } catch (error) {
       markPrismaDatabaseUnavailable(error);
+      logRouteDebug("summary-error", {
+        userId,
+        name: error instanceof Error ? error.name : "Error",
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        durationMs: Date.now() - routeStartedAt,
+      });
       return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
     }
   }
@@ -178,6 +216,13 @@ export async function GET(request: NextRequest) {
     clearPrismaDatabaseUnavailable();
   } catch (error) {
     markPrismaDatabaseUnavailable(error);
+    logRouteDebug("full-error", {
+      userId,
+      name: error instanceof Error ? error.name : "Error",
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      durationMs: Date.now() - routeStartedAt,
+    });
     return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
   }
 
@@ -246,8 +291,8 @@ export async function POST(req: Request) {
       });
       clearPrismaDatabaseUnavailable();
       break;
-    } catch (err: any) {
-      const code = err?.code;
+    } catch (err: unknown) {
+      const code = err && typeof err === "object" && "code" in err ? (err as { code?: unknown }).code : null;
       if (attempt === 0 && (code === "P1017" || code === "P1001")) {
         markPrismaDatabaseUnavailable(err);
         try {

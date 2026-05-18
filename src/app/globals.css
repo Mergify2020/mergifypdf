@@ -513,10 +513,6 @@ body::-webkit-scrollbar-track {
   will-change: opacity, transform, filter;
 }
 
-html.theme-transition body {
-  transition: background-color 200ms ease, color 200ms ease;
-}
-
 /* Keep browser autofill from forcing light blue fields, especially in dark mode. */
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
@@ -645,19 +641,6 @@ main[data-login-page] input:-webkit-autofill:focus {
   backface-visibility: hidden;
   transform: translateX(0);
   -webkit-font-smoothing: antialiased;
-}
-
-html.theme-transition body * {
-  transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease;
-}
-
-html.theme-transition .no-theme-transition,
-html.theme-transition .no-theme-transition * {
-  transition: none !important;
-}
-
-html.theme-transition {
-  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
 header[data-hero="true"] .hero-nav {
@@ -1147,6 +1130,10 @@ html.theme-scroll-reveal:not(.dark) ::-webkit-scrollbar-thumb {
   opacity: 1;
 }
 
+.project-card:has(.project-card-preview:hover) .project-card-actions {
+  border-width: 2px;
+}
+
 @media (hover: none) and (pointer: coarse) {
   .project-card:has(.project-card-preview:hover) {
     transform: none !important;
@@ -1173,6 +1160,10 @@ html.theme-scroll-reveal:not(.dark) ::-webkit-scrollbar-thumb {
   .project-card .project-card-actions,
   .project-card .project-card-pages {
     transform: none !important;
+  }
+
+  .project-card .project-card-actions {
+    border-width: 1px !important;
   }
 }
 

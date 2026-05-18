@@ -117,13 +117,34 @@ export async function GET(
   }
 
   const url = await createSignedR2Url(r2Config, project.previewKey, 60);
-  console.info("Issued signed preview URL.", { projectId: id, env: process.env.NODE_ENV });
-  return NextResponse.json(
-    { url },
-    {
-      headers: {
-        "Cache-Control": "no-store",
-      },
-    }
-  );
+
+  const upstream = await fetch(url, { cache: "no-store" });
+  if (!upstream.ok || !upstream.body) {
+    return NextResponse.json(
+      { error: `Preview fetch failed with status ${upstream.status}` },
+      { status: 502 }
+    );
+  }
+
+  const headers = new Headers();
+  const contentType = upstream.headers.get("content-type");
+  if (contentType) {
+    headers.set("Content-Type", contentType);
+  }
+  const contentLength = upstream.headers.get("content-length");
+  if (contentLength) {
+    headers.set("Content-Length", contentLength);
+  }
+  headers.set("Cache-Control", "no-store");
+
+  console.info("Proxied preview image from R2.", {
+    projectId: id,
+    env: process.env.NODE_ENV,
+    status: upstream.status,
+  });
+
+  return new NextResponse(upstream.body, {
+    status: upstream.status,
+    headers,
+  });
 }

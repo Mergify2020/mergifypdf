@@ -9,6 +9,7 @@ type Project = {
   id: string;
   title: string;
   updated: string;
+  previewUrl?: string | null;
   pdfUrl?: string | null;
   pagesCount?: number;
   rotation?: number | null;

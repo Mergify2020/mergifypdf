@@ -4,6 +4,7 @@ export type ProjectsSummaryProject = {
   id: string;
   name: string | null;
   updatedAt: string | number | Date;
+  previewUrl?: string | null;
   hasPreview?: boolean;
   hasPdf?: boolean;
   pagesCount?: number | null;

@@ -5,6 +5,7 @@ import { ChevronDown, Moon, Sun } from "lucide-react";
 import { useSession } from "next-auth/react";
 import SettingsMenu from "@/components/SettingsMenu";
 import { getAvatarFallback } from "@/lib/avatarFallback";
+import { applyThemePreference, persistThemePreference, type ThemeMode } from "@/lib/theme";
 
 type TrashHeaderControlsProps = {
   accountName: string;
@@ -27,21 +28,14 @@ export default function TrashHeaderControls({ accountName, accountEmail }: Trash
   const showAvatarImage = Boolean(avatar) && !avatarLoadFailed;
 
   useEffect(() => {
-    document.documentElement.classList.toggle("dark", theme === "dark");
-    if (theme === "light") {
-      document.body.classList.remove("dark");
-    }
+    applyThemePreference(theme);
   }, [theme]);
 
   const toggleTheme = () => {
-    document.documentElement.classList.add("theme-transition");
-    const nextTheme = theme === "dark" ? "light" : "dark";
-    window.localStorage.setItem("theme", nextTheme);
-    document.cookie = `theme=${nextTheme}; path=/; max-age=31536000`;
+    const nextTheme: ThemeMode = theme === "dark" ? "light" : "dark";
+    persistThemePreference(nextTheme);
+    applyThemePreference(nextTheme);
     setTheme(nextTheme);
-    window.setTimeout(() => {
-      document.documentElement.classList.remove("theme-transition");
-    }, 200);
   };
 
   return (

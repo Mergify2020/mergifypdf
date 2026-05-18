@@ -9,6 +9,7 @@ import { FileText as PhFileText, Folders as PhFolders, Signature as PhSignature,
 import { siInstagram, siTiktok, siX } from "simple-icons";
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
 import { getAvatarFallback } from "@/lib/avatarFallback";
+import { applyThemePreference, persistThemePreference } from "@/lib/theme";
 import {
   meetsPasswordPolicy,
   NEW_PASSWORD_REQUIREMENTS_ERROR,
@@ -281,7 +282,12 @@ export function AccountSettingsPage({
 
   const [activeSettingsTab, setActiveSettingsTab] = useState<SettingsTab>(initialSettingsTab);
   const [mobileSettingsView, setMobileSettingsView] = useState<SettingsTab | "home">(initialMobileView ?? "home");
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    if (typeof window === "undefined") return "light";
+    const stored = window.localStorage.getItem("theme");
+    if (stored === "dark" || stored === "light") return stored;
+    return document.documentElement.classList.contains("dark") ? "dark" : "light";
+  });
   const [accountHydrating, setAccountHydrating] = useState(true);
   const [themeHydrated, setThemeHydrated] = useState(false);
   const [suppressAccountLoader, setSuppressAccountLoader] = useState(false);
@@ -447,15 +453,9 @@ export function AccountSettingsPage({
   }, [activeSettingsTab, savedFirstName, savedLastName]);
 
   useEffect(() => {
-    const stored = window.localStorage.getItem("theme");
-    const initialTheme = stored === "dark" ? "dark" : "light";
-    document.documentElement.classList.toggle("dark", initialTheme === "dark");
-    if (initialTheme === "light") {
-      document.body.classList.remove("dark");
-    }
-    setTheme(initialTheme);
+    applyThemePreference(theme);
     setThemeHydrated(true);
-  }, []);
+  }, [theme]);
 
   useEffect(() => {
     router.prefetch("/");
@@ -560,17 +560,9 @@ export function AccountSettingsPage({
   }, [session?.user?.email]);
 
   function applyTheme(nextTheme: "light" | "dark") {
-    document.documentElement.classList.add("theme-transition");
-    document.documentElement.classList.toggle("dark", nextTheme === "dark");
-    if (nextTheme === "light") {
-      document.body.classList.remove("dark");
-    }
-    window.localStorage.setItem("theme", nextTheme);
-    document.cookie = `theme=${nextTheme}; path=/; max-age=31536000`;
+    persistThemePreference(nextTheme);
+    applyThemePreference(nextTheme);
     setTheme(nextTheme);
-    window.setTimeout(() => {
-      document.documentElement.classList.remove("theme-transition");
-    }, 200);
   }
 
   useEffect(() => {

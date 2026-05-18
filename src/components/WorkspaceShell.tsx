@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
-import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   BookOpen,
@@ -72,6 +72,7 @@ import {
   subscribeProjectsSummary,
   type ProjectsSummaryProject,
 } from "@/lib/projectsSummaryCache";
+import { applyThemePreference, persistThemePreference, type ThemeMode } from "@/lib/theme";
 
 const AccountSettingsPage = dynamic(
   () => import("@/app/(app)/account/page").then((module) => module.AccountSettingsPage),
@@ -99,13 +100,12 @@ const STARTUP_OVERLAY_CONTEXT_KEY = "mpdf:startup-overlay-context";
 const EXISTING_PROJECT_OVERLAY_STORAGE_KEY = "mpdf:existing-project-overlay";
 const EXISTING_PROJECT_OVERLAY_EXIT_MS = 220;
 const EXISTING_PROJECT_OVERLAY_MIN_VISIBLE_MS = 700;
-const EXISTING_PROJECT_OVERLAY_MAX_WAIT_MS = 2200;
+const EXISTING_PROJECT_OVERLAY_MAX_WAIT_MS = 1200;
+const EXISTING_PROJECT_OVERLAY_AUTO_CLOSE_MS = 900;
 const SIDEBAR_EXPANDED_KEY = "mpdf:sidebar-expanded";
 const STRIPE_STATUS_CACHE_KEY = "mpdf:stripe-status";
 const STRIPE_PLAN_TIER_CACHE_KEY = "mpdf:stripe-plan-tier";
 const PROFILE_DISPLAY_CACHE_KEY = "mpdf:profile-display";
-const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
-
 function isPlaceholderProfileName(value: string): boolean {
   const normalized = value.trim().toLowerCase();
   if (!normalized) return true;
@@ -234,6 +234,7 @@ const sidebarPanels: Record<string, SidebarPanel> = {
 interface WorkspaceShellProps {
   children: React.ReactNode;
   initialSidebarExpanded?: boolean;
+  initialTheme?: "light" | "dark";
   initialProfile?: {
     id?: string | null;
     name?: string | null;
@@ -275,6 +276,7 @@ type PersistedWorkspaceLaunchOverlay = {
 export default function WorkspaceShell({
   children,
   initialSidebarExpanded = true,
+  initialTheme = "light",
   initialProfile,
 }: WorkspaceShellProps) {
   const router = useRouter();
@@ -349,7 +351,7 @@ export default function WorkspaceShell({
   const [contentSwapIn, setContentSwapIn] = useState(false);
   const [homeProjectsQuery, setHomeProjectsQuery] = useState("");
   const [mobileSearchExpanded, setMobileSearchExpanded] = useState(false);
-  const [shellTheme, setShellTheme] = useState<"light" | "dark">("light");
+  const [shellTheme, setShellTheme] = useState<"light" | "dark">(initialTheme);
   const contentSwapTimerRef = useRef<number | null>(null);
   const contentSettleTimerRef = useRef<number | null>(null);
   const contentSwapSafetyRef = useRef<number | null>(null);
@@ -546,29 +548,9 @@ export default function WorkspaceShell({
     }
   }, [stableProfile]);
 
-  useIsomorphicLayoutEffect(() => {
-    if (typeof window === "undefined") return;
-    const stored = window.localStorage.getItem("theme");
-    const initialTheme =
-      stored === "dark" || stored === "light"
-        ? stored
-        : document.documentElement.classList.contains("dark")
-          ? "dark"
-          : "light";
-    document.documentElement.classList.toggle("dark", initialTheme === "dark");
-    document.body.classList.remove("dark");
-    setShellTheme(initialTheme);
-  }, []);
-
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const stored = window.localStorage.getItem("theme");
-    if (stored === "dark" || stored === "light") {
-      setShellTheme(stored);
-      return;
-    }
-    setShellTheme(document.documentElement.classList.contains("dark") ? "dark" : "light");
-  }, []);
+    applyThemePreference(shellTheme);
+  }, [shellTheme]);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -581,18 +563,10 @@ export default function WorkspaceShell({
   }, []);
 
   const toggleShellTheme = () => {
-    document.documentElement.classList.add("theme-transition");
-    const nextTheme = shellTheme === "dark" ? "light" : "dark";
-    document.documentElement.classList.toggle("dark", nextTheme === "dark");
-    if (nextTheme === "light") {
-      document.body.classList.remove("dark");
-    }
-    window.localStorage.setItem("theme", nextTheme);
-    document.cookie = `theme=${nextTheme}; path=/; max-age=31536000`;
+    const nextTheme: ThemeMode = shellTheme === "dark" ? "light" : "dark";
+    persistThemePreference(nextTheme);
+    applyThemePreference(nextTheme);
     setShellTheme(nextTheme);
-    window.setTimeout(() => {
-      document.documentElement.classList.remove("theme-transition");
-    }, 200);
   };
 
   useEffect(() => {
@@ -1085,15 +1059,12 @@ export default function WorkspaceShell({
       showWorkspaceLaunchOverlay(detail?.files ?? [], detail?.startedAtMs ?? null);
     };
     const handleWorkspaceContentReady = () => {
+      if (existingProjectOverlayOpen && !existingProjectOverlayExiting) {
+        closeExistingProjectOverlayNow();
+        return;
+      }
       if (!workspaceLaunchOverlayOpen || workspaceLaunchOverlayExiting) return;
       if (workspaceLaunchOverlayFiles.length === 0) return;
-      if (workspaceLaunchOverlayFallbackTimerRef.current !== null) {
-        window.clearTimeout(workspaceLaunchOverlayFallbackTimerRef.current);
-        workspaceLaunchOverlayFallbackTimerRef.current = null;
-      }
-    };
-    const handleWorkspaceContentPainted = () => {
-      if (!workspaceLaunchOverlayOpen || workspaceLaunchOverlayExiting) return;
       if (workspaceLaunchOverlayFallbackTimerRef.current !== null) {
         window.clearTimeout(workspaceLaunchOverlayFallbackTimerRef.current);
         workspaceLaunchOverlayFallbackTimerRef.current = null;
@@ -1111,23 +1082,24 @@ export default function WorkspaceShell({
     };
     window.addEventListener("workspace-launch-overlay-show", handleShow as EventListener);
     window.addEventListener("workspace-content-ready", handleWorkspaceContentReady);
-    window.addEventListener("workspace-content-painted", handleWorkspaceContentPainted);
     window.addEventListener("workspace-existing-overlay-show", handleExistingShow);
     window.addEventListener("workspace-launch-overlay-hide", handleHide);
     return () => {
       window.removeEventListener("workspace-launch-overlay-show", handleShow as EventListener);
       window.removeEventListener("workspace-content-ready", handleWorkspaceContentReady);
-      window.removeEventListener("workspace-content-painted", handleWorkspaceContentPainted);
       window.removeEventListener("workspace-existing-overlay-show", handleExistingShow);
       window.removeEventListener("workspace-launch-overlay-hide", handleHide);
     };
   }, [
     hideWorkspaceLaunchOverlay,
+    closeExistingProjectOverlayNow,
     preloadExistingWorkspaceProject,
     showWorkspaceLaunchOverlay,
-      workspaceLaunchOverlayExiting,
-      workspaceLaunchOverlayOpen,
-    ]);
+    existingProjectOverlayExiting,
+    existingProjectOverlayOpen,
+    workspaceLaunchOverlayExiting,
+    workspaceLaunchOverlayOpen,
+  ]);
 
   const createId = () =>
     typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -1341,6 +1313,23 @@ export default function WorkspaceShell({
       if (existingProjectOverlaySafetyTimerRef.current !== null) {
         window.clearTimeout(existingProjectOverlaySafetyTimerRef.current);
         existingProjectOverlaySafetyTimerRef.current = null;
+      }
+    };
+  }, [existingProjectOverlayExiting, existingProjectOverlayOpen, isStudioRoute, closeExistingProjectOverlayNow]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!existingProjectOverlayOpen || existingProjectOverlayExiting || !isStudioRoute) return;
+    if (existingProjectOverlayHideTimerRef.current !== null) {
+      window.clearTimeout(existingProjectOverlayHideTimerRef.current);
+    }
+    existingProjectOverlayHideTimerRef.current = window.setTimeout(() => {
+      existingProjectOverlayHideTimerRef.current = null;
+      closeExistingProjectOverlayNow();
+    }, EXISTING_PROJECT_OVERLAY_AUTO_CLOSE_MS);
+    return () => {
+      if (existingProjectOverlayHideTimerRef.current !== null) {
+        window.clearTimeout(existingProjectOverlayHideTimerRef.current);
+        existingProjectOverlayHideTimerRef.current = null;
       }
     };
   }, [existingProjectOverlayExiting, existingProjectOverlayOpen, isStudioRoute, closeExistingProjectOverlayNow]);
@@ -1743,13 +1732,9 @@ export default function WorkspaceShell({
       if (!res.ok) {
         throw new Error(`Preview refresh failed with status ${res.status}`);
       }
-      const data = (await res.json().catch(() => null)) as { url?: string } | null;
-      if (!data?.url) {
-        throw new Error("Preview refresh returned an invalid payload.");
-      }
       lastFailedPreviewRef.current.delete(projectId);
       setHomeRecentProjects((prev) =>
-        prev.map((entry) => (entry.id === projectId ? { ...entry, previewUrl: data.url ?? null } : entry))
+        prev.map((entry) => (entry.id === projectId ? { ...entry, previewUrl: res.url } : entry))
       );
     } catch {
       if (previousUrl) {
@@ -3379,23 +3364,50 @@ export default function WorkspaceShell({
           ) : null}
           <Suspense
             fallback={
-              <main className="relative z-0 flex-1 lg:z-40">
-                <div className={`flex w-full ${contentShellWrapperClass}`}>
-                  <div
-                    className="workspace-content-shell w-full transition-none 2xl:transition-[max-width] 2xl:duration-300 2xl:ease-[cubic-bezier(0.22,1,0.36,1)]"
-                    style={{ maxWidth: "var(--shell-content-width)" }}
-                  >
+              isStudioRoute || pathname === "/projects/all" ? null : (
+                <main className="relative z-0 flex-1 lg:z-40">
+                  <div className={`flex w-full ${contentShellWrapperClass}`}>
                     <div
-                      aria-hidden
-                      className="box-border w-full bg-[var(--app-surface)] pt-3 pb-0 md:pt-6 md:pb-0"
-                      style={{
-                        height:
-                          "calc(var(--workspace-vh,100dvh) - var(--home-banner-offset,0px) - var(--home-topbar-offset,0px) - var(--workspace-content-bottom-subtract,var(--workspace-frame-gutter,48px)))",
-                      }}
-                    />
+                      className="workspace-content-shell w-full transition-none 2xl:transition-[max-width] 2xl:duration-300 2xl:ease-[cubic-bezier(0.22,1,0.36,1)]"
+                      style={{ maxWidth: "var(--shell-content-width)" }}
+                    >
+                      <div
+                        aria-hidden
+                        className="box-border flex w-full flex-col rounded-xl border-[1.5px] border-gray-200 bg-white p-3 shadow-sm dark:border-[#3F3F3F] dark:bg-[#323232] dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] md:p-5"
+                        style={{
+                          height:
+                            "calc(var(--workspace-vh,100dvh) - var(--home-banner-offset,0px) - var(--home-topbar-offset,0px) - var(--workspace-content-bottom-subtract,var(--workspace-frame-gutter,48px)))",
+                        }}
+                      >
+                        <div className="flex flex-row items-center justify-between gap-2 md:gap-4 md:pl-[21px]">
+                          <div className="h-7 w-40 rounded-full bg-slate-100 skeleton-shimmer dark:bg-[#2B2B2B]/70" />
+                          <div className="flex min-w-0 shrink items-center justify-end gap-1.5 md:gap-2">
+                            <div className="h-[34px] w-[110px] rounded-full bg-slate-100 skeleton-shimmer dark:bg-[#2B2B2B]/70" />
+                            <div className="h-[34px] w-[96px] rounded-full bg-slate-100 skeleton-shimmer dark:bg-[#2B2B2B]/70" />
+                          </div>
+                        </div>
+                        <div className="recent-projects-container mt-6 flex-1 overflow-y-hidden overflow-x-hidden" style={{ paddingRight: 6, paddingLeft: 6, paddingBottom: 6 }}>
+                          <div className="recent-projects-grid projects-grid mt-2 grid w-full max-w-[1880px] items-start gap-4 sm:gap-6">
+                            {Array.from({ length: 6 }).map((_, index) => (
+                              <div key={`workspace-fallback-${index}`} className="flex w-full flex-col text-left">
+                                <div className="relative rounded-[10px] bg-[#F9FAFC] dark:bg-[#323232]/60">
+                                  <div className="relative m-[3px] aspect-square w-[calc(100%-6px)] overflow-hidden rounded-[10px] border border-[rgba(0,0,0,0.06)] bg-[#EEF1F5] dark:border-[#3A3A3A] dark:bg-[#2B2B2B]/70">
+                                    <div className="absolute inset-0 rounded-[10px] skeleton-shimmer opacity-90" />
+                                  </div>
+                                </div>
+                                <div className="mt-2 space-y-1">
+                                  <div className="h-5 w-[72%] rounded-full bg-slate-100 skeleton-shimmer dark:bg-[#2B2B2B]/70" />
+                                  <div className="h-3.5 w-[48%] rounded-full bg-slate-100 skeleton-shimmer dark:bg-[#2B2B2B]/70" />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </main>
+                </main>
+              )
             }
           >
             <main className="relative z-0 flex-1 lg:z-40">
@@ -3723,22 +3735,7 @@ export default function WorkspaceShell({
 
   const primaryShell = isStudioRoute ? (
     <Suspense
-      fallback={
-        workspaceLaunchOverlayOpen ? null : (
-          <div className="fixed inset-0 z-[1280] flex items-center justify-center bg-[var(--app-surface)] px-6 py-10">
-            <div className="pointer-events-none flex flex-col items-center text-center">
-              <div
-                className="h-14 w-14 animate-spin rounded-full border-[5px] border-[#D9CCFF] border-t-[#6C47FF] dark:border-[#3F3F3F] dark:border-t-[#8B6CFF]"
-                aria-hidden
-              />
-              <p className="mt-5 text-[24px] font-semibold tracking-tight text-slate-900 sm:text-[28px] dark:text-zinc-100">
-                Opening Workspace...
-              </p>
-              <span className="sr-only">Opening Workspace</span>
-            </div>
-          </div>
-        )
-      }
+      fallback={null}
     >
       <main>{children}</main>
     </Suspense>

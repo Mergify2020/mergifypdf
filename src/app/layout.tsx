@@ -37,7 +37,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const cookieStore = await cookies();
   const themeCookie = cookieStore.get?.("theme")?.value;
   const themeClass = themeCookie === "dark" ? "dark" : undefined;
-  const themeColor = themeCookie === "dark" ? "#222224" : "#ffffff";
+  const themeColor = themeCookie === "dark" ? "#222224" : "#f1f4f9";
   const colorScheme = themeCookie === "dark" ? "dark light" : "light dark";
   const themeStyle = {
     backgroundColor: themeColor,
@@ -73,19 +73,19 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   var fallback = document.documentElement.classList.contains("dark") ? "dark" : "light";
                   var theme = stored === "dark" || stored === "light" ? stored : fallback;
                   document.documentElement.classList.toggle("dark", theme === "dark");
-                  document.documentElement.style.backgroundColor = theme === "dark" ? "#222224" : "#ffffff";
+                  document.documentElement.style.backgroundColor = theme === "dark" ? "#222224" : "#f1f4f9";
                   document.documentElement.style.color = theme === "dark" ? "#f5f5f5" : "#171717";
                   document.documentElement.style.colorScheme = theme === "dark" ? "dark light" : "light dark";
-                  document.documentElement.style.setProperty("--app-surface", theme === "dark" ? "#222224" : "#ffffff");
+                  document.documentElement.style.setProperty("--app-surface", theme === "dark" ? "#222224" : "#f1f4f9");
                   document.documentElement.style.setProperty("--app-foreground", theme === "dark" ? "#f5f5f5" : "#171717");
                   document.documentElement.style.setProperty("--spinner-track", theme === "dark" ? "#3f3f3f" : "#d9ccff");
                   document.documentElement.style.setProperty("--spinner-head", "#6C47FF");
                   var body = document.body;
                   if (body) {
-                    body.style.backgroundColor = theme === "dark" ? "#222224" : "#ffffff";
+                    body.style.backgroundColor = theme === "dark" ? "#222224" : "#f1f4f9";
                     body.style.color = theme === "dark" ? "#f5f5f5" : "#171717";
                     body.style.colorScheme = theme === "dark" ? "dark light" : "light dark";
-                    body.style.setProperty("--app-surface", theme === "dark" ? "#222224" : "#ffffff");
+                    body.style.setProperty("--app-surface", theme === "dark" ? "#222224" : "#f1f4f9");
                     body.style.setProperty("--app-foreground", theme === "dark" ? "#f5f5f5" : "#171717");
                     body.style.setProperty("--spinner-track", theme === "dark" ? "#3f3f3f" : "#d9ccff");
                     body.style.setProperty("--spinner-head", "#6C47FF");

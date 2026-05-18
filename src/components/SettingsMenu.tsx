@@ -8,6 +8,7 @@ import { AlertTriangle, CircleHelp, CreditCard, ExternalLink, Folders, LogOut, M
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
 import { getAvatarFallback } from "@/lib/avatarFallback";
 import { getBillingStatusPresentation } from "@/lib/billingPlans";
+import { applyThemePreference, persistThemePreference, type ThemeMode } from "@/lib/theme";
 
 export type SettingsMenuProps = {
   variant?: "default" | "pricing";
@@ -63,10 +64,7 @@ export default function SettingsMenu({
   }, []);
 
   useEffect(() => {
-    document.documentElement.classList.toggle("dark", theme === "dark");
-    if (theme === "light") {
-      document.body.classList.remove("dark");
-    }
+    applyThemePreference(theme);
   }, [theme]);
 
   useEffect(() => {
@@ -223,17 +221,9 @@ export default function SettingsMenu({
   }
 
   function applyTheme(nextTheme: "light" | "dark") {
-    document.documentElement.classList.add("theme-transition");
-    document.documentElement.classList.toggle("dark", nextTheme === "dark");
-    if (nextTheme === "light") {
-      document.body.classList.remove("dark");
-    }
-    window.localStorage.setItem("theme", nextTheme);
-    document.cookie = `theme=${nextTheme}; path=/; max-age=31536000`;
+    persistThemePreference(nextTheme);
+    applyThemePreference(nextTheme);
     setTheme(nextTheme);
-    window.setTimeout(() => {
-      document.documentElement.classList.remove("theme-transition");
-    }, 200);
   }
 
   const billingPresentationState = getBillingStatusPresentation(stripeStatus);

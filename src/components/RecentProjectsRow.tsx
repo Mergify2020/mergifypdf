@@ -30,6 +30,7 @@ type SummaryProject = {
 
 type Props = {
   initialProjects?: SummaryProject[];
+  loading?: boolean;
   query?: string;
   ownerFilter?: "any" | "shared" | "you";
   sortOption?: "activity" | "starred" | "az" | "za";
@@ -141,6 +142,7 @@ async function getPdfAccessTarget(res: Response) {
 
 export default function RecentProjectsRow({
   initialProjects,
+  loading = false,
   query = "",
   ownerFilter = "any",
   sortOption = "activity",
@@ -171,7 +173,7 @@ export default function RecentProjectsRow({
   const [renamedProjectId, setRenamedProjectId] = useState<string | null>(null);
   const trashToastTouchStartY = useRef<number | null>(null);
   const copyToastTouchStartY = useRef<number | null>(null);
-  const loading = false;
+  const workspaceWarmupStartedRef = useRef<Set<string>>(new Set());
   const router = useRouter();
 
   const closeListMenu = () => {
@@ -181,14 +183,18 @@ export default function RecentProjectsRow({
     setListMenuAnimateIn(false);
   };
 
-  const openProject = async (projectId: string) => {
+  const openProject = (projectId: string) => {
     beginExistingWorkspaceOpenHandoff(projectId);
-    await preloadExistingWorkspaceProject(projectId);
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        router.push(`/studio?project=${encodeURIComponent(projectId)}`);
-      });
-    });
+    void preloadExistingWorkspaceProject(projectId);
+    void router.prefetch(`/studio?project=${encodeURIComponent(projectId)}`);
+    router.push(`/studio?project=${encodeURIComponent(projectId)}`);
+  };
+
+  const warmProjectOpen = (projectId: string) => {
+    if (workspaceWarmupStartedRef.current.has(projectId)) return;
+    workspaceWarmupStartedRef.current.add(projectId);
+    void preloadExistingWorkspaceProject(projectId);
+    void router.prefetch(`/studio?project=${encodeURIComponent(projectId)}`);
   };
 
   useEffect(() => {
@@ -782,6 +788,9 @@ export default function RecentProjectsRow({
                               ? "[animation:rename-text-flash_1400ms_ease-out_forwards]"
                               : ""
                           }`}
+                          onFocus={() => warmProjectOpen(project.id)}
+                          onMouseEnter={() => warmProjectOpen(project.id)}
+                          onTouchStart={() => warmProjectOpen(project.id)}
                           onClick={(event) => {
                             if (!shouldHandleWorkspaceOpenClick(event)) return;
                             event.preventDefault();
@@ -1242,6 +1251,9 @@ export default function RecentProjectsRow({
                                   ? "[animation:rename-text-flash_1400ms_ease-out_forwards]"
                                   : ""
                               }`}
+                              onFocus={() => warmProjectOpen(project.id)}
+                              onMouseEnter={() => warmProjectOpen(project.id)}
+                              onTouchStart={() => warmProjectOpen(project.id)}
                               onClick={(event) => {
                                 if (!shouldHandleWorkspaceOpenClick(event)) return;
                                 event.preventDefault();
@@ -1813,6 +1825,9 @@ export default function RecentProjectsRow({
                     <Link
                       href={`/studio?project=${encodeURIComponent(copyToast.id)}`}
                       className="shrink-0 rounded-md border-2 border-white/25 px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-white/10"
+                      onFocus={() => warmProjectOpen(copyToast.id)}
+                      onMouseEnter={() => warmProjectOpen(copyToast.id)}
+                      onTouchStart={() => warmProjectOpen(copyToast.id)}
                       onClick={(event) => {
                         if (!shouldHandleWorkspaceOpenClick(event)) return;
                         event.preventDefault();

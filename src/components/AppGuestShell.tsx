@@ -54,7 +54,7 @@ export default function AppGuestShell({ children }: AppGuestShellProps) {
           </div>
         </div>
       </HeroHeader>
-      <main className="page-fade-in pt-[calc(76px+env(safe-area-inset-top))]">{children}</main>
+      <main className="pt-[calc(76px+env(safe-area-inset-top))]">{children}</main>
       <Footer />
     </>
   );

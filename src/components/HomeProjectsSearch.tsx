@@ -28,6 +28,7 @@ type SummaryProject = {
   id: string;
   name: string;
   updatedAt: string | Date;
+  previewUrl?: string | null;
   pdfUrl?: string | null;
   pagesCount?: number | null;
   rotation?: number | null;
@@ -51,12 +52,19 @@ type SortOption = "activity" | "starred" | "az" | "za";
 type ViewMode = "grid" | "list";
 const ALL_PROJECTS_VIEW_MODE_KEY = "mpdf:all-projects-view-mode";
 
-const mapProjectsFromSummary = (projects: ProjectsSummaryProject[]): SummaryProject[] =>
+const mapProjectsFromSummary = (
+  projects: ProjectsSummaryProject[],
+  fallback?: SummaryProject[]
+): SummaryProject[] =>
   projects.map((project) => ({
     id: project.id,
     name: project.name?.trim() || "Untitled project",
     updatedAt:
       typeof project.updatedAt === "number" ? new Date(project.updatedAt) : project.updatedAt,
+    previewUrl:
+      project.previewUrl ??
+      fallback?.find((item) => item.id === project.id)?.previewUrl ??
+      null,
     pdfUrl: null,
     pagesCount: project.pagesCount ?? 0,
     rotation: project.rotation ?? 0,
@@ -69,6 +77,7 @@ const mapProjectsToSummary = (projects: SummaryProject[]): ProjectsSummaryProjec
     id: project.id,
     name: project.name,
     updatedAt: project.updatedAt,
+    previewUrl: project.previewUrl ?? null,
     hasPreview: project.hasPreview ?? false,
     pagesCount: project.pagesCount ?? 0,
     rotation: project.rotation ?? 0,
@@ -90,10 +99,11 @@ export default function HomeProjectsSearch({
   const [projectsState, setProjectsState] = useState<SummaryProject[]>(() => {
     if (typeof window !== "undefined" && ownerKey) {
       const cached = getProjectsSummaryCache(ownerKey);
-      if (cached) return mapProjectsFromSummary(cached);
+      if (cached) return mapProjectsFromSummary(cached, projects);
     }
     return projects;
   });
+  const [projectsLoading, setProjectsLoading] = useState(() => projects.length === 0);
   const initialProjects = useMemo(() => projectsState, [projectsState]);
   const hasProjects = (projectsState.length ?? 0) > 0;
   const [sortOption, setSortOption] = useState<SortOption>("activity");
@@ -109,10 +119,16 @@ export default function HomeProjectsSearch({
   useEffect(() => {
     if (!ownerKey) return;
     const cached = getProjectsSummaryCache(ownerKey);
-    if (cached) {
-      setProjectsState(mapProjectsFromSummary(cached));
-    }
-  }, [ownerKey]);
+    const frame = window.requestAnimationFrame(() => {
+      if (cached) {
+        setProjectsState(mapProjectsFromSummary(cached, projects));
+      }
+      setProjectsLoading(projects.length === 0 && !cached);
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, [ownerKey, projects]);
 
   useEffect(() => {
     if (!ownerKey) return;
@@ -155,11 +171,19 @@ export default function HomeProjectsSearch({
 
     const unsubscribe = subscribeProjectsSummary((update) => {
       if (update.ownerKey !== ownerKey || !update.projects) return;
-      setProjectsState(mapProjectsFromSummary(update.projects));
+      setProjectsState(mapProjectsFromSummary(update.projects, projects));
+      setProjectsLoading(false);
+    });
+
+    const frame = window.requestAnimationFrame(() => {
+      // The initial render can show a skeleton, but once the effect has synced
+      // cached or route data we want the real empty state or project grid.
+      setProjectsLoading(false);
     });
 
     return () => {
       unsubscribe();
+      window.cancelAnimationFrame(frame);
     };
   }, [ownerKey, projects, showAllProjects]);
 
@@ -510,6 +534,7 @@ export default function HomeProjectsSearch({
           >
             <RecentProjectsRow
               initialProjects={initialProjects}
+              loading={projectsLoading}
               query={query}
               ownerFilter={ownerFilter}
               sortOption={sortOption}

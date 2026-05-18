@@ -85,7 +85,7 @@ export default function HomePdfPreview({
     <div className="flex h-full w-full items-center justify-center">
       <div className="flex flex-col items-center justify-center gap-2">
         <div
-          className="relative flex items-center justify-center bg-white dark:bg-[#222224]"
+          className="relative flex items-center justify-center bg-[var(--app-surface)]"
           style={{ width: PREVIEW_MAX_WIDTH, height: PREVIEW_MAX_HEIGHT }}
         >
           <canvas
@@ -93,7 +93,7 @@ export default function HomePdfPreview({
             className="block"
             style={{ visibility: loading ? "hidden" : "visible" }}
           />
-          {loading ? <div className="absolute inset-0 bg-white dark:bg-[#222224]" /> : null}
+          {loading ? <div className="absolute inset-0 bg-[var(--app-surface)]" /> : null}
         </div>
       </div>
     </div>

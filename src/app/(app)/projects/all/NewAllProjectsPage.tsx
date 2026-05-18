@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatProjectLastEdited } from "@/lib/formatProjectLastEdited";
 import HomePdfPreview from "@/components/HomePdfPreview";
@@ -120,14 +120,18 @@ function ProjectCardView({
 }) {
   const pdfUrl = project.pdfUrl ?? null;
   const rotation = project.rotation ?? 0;
-  const openProject = async () => {
+  const warmupStartedRef = useRef(false);
+  const openProject = () => {
     beginExistingWorkspaceOpenHandoff(project.id);
-    await preloadExistingWorkspaceProject(project.id);
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        router.push(`/studio?project=${encodeURIComponent(project.id)}`);
-      });
-    });
+    void preloadExistingWorkspaceProject(project.id);
+    void router.prefetch(`/studio?project=${encodeURIComponent(project.id)}`);
+    router.push(`/studio?project=${encodeURIComponent(project.id)}`);
+  };
+  const warmProjectOpen = () => {
+    if (warmupStartedRef.current) return;
+    warmupStartedRef.current = true;
+    void preloadExistingWorkspaceProject(project.id);
+    void router.prefetch(`/studio?project=${encodeURIComponent(project.id)}`);
   };
 
   return (
@@ -135,6 +139,9 @@ function ProjectCardView({
       href={`/studio?project=${encodeURIComponent(project.id)}`}
       className="group flex flex-col rounded-2xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-zinc-600"
       aria-label={project.title}
+      onFocus={warmProjectOpen}
+      onMouseEnter={warmProjectOpen}
+      onTouchStart={warmProjectOpen}
       onClick={(event) => {
         if (!shouldHandleWorkspaceOpenClick(event)) return;
         event.preventDefault();

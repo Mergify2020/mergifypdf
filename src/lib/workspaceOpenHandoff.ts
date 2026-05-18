@@ -5,11 +5,15 @@ export const WORKSPACE_OPEN_IN_PROGRESS_STORAGE_KEY = "mpdf:workspace-open-in-pr
 const STARTUP_OVERLAY_KEY = "mpdf:workspace-startup-overlay";
 const STARTUP_OVERLAY_CONTEXT_KEY = "mpdf:workspace-startup-overlay-context";
 const PENDING_UPLOAD_STORAGE_KEY = "mpdf:pending-upload";
-const WORKSPACE_DB_NAME = "mpdf-file-store";
-const WORKSPACE_DB_STORE = "files";
 const WORKSPACE_META_KEY = "mpdf:files";
 const WORKSPACE_PREVIEW_CACHE_KEY = "mpdf:preview-cache";
 const PREVIEW_CACHE_VERSION = 1;
+const existingProjectPreloadInFlight = new Map<string, Promise<boolean>>();
+
+function debugWorkspaceOpen(event: string, detail: Record<string, unknown>) {
+  if (process.env.NODE_ENV === "production") return;
+  console.info(`[workspace-open:${event}]`, detail);
+}
 
 type StoredSourceMeta = { id: string; name?: string; size?: number; updatedAt?: number };
 type WorkspacePreviewCache = {
@@ -54,76 +58,24 @@ function workspacePreviewCacheKey(projectId: string) {
   return `${WORKSPACE_PREVIEW_CACHE_KEY}:${projectId}`;
 }
 
-function openWorkspaceDb(): Promise<IDBDatabase> {
-  if (typeof window === "undefined" || !("indexedDB" in window)) {
-    return Promise.reject(new Error("IndexedDB is unavailable"));
-  }
-  return new Promise((resolve, reject) => {
-    const request = window.indexedDB.open(WORKSPACE_DB_NAME, 1);
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(WORKSPACE_DB_STORE)) {
-        db.createObjectStore(WORKSPACE_DB_STORE);
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error("IndexedDB open failed"));
-  });
+function readStringField(value: unknown, field: string) {
+  if (!value || typeof value !== "object") return "";
+  const next = (value as Record<string, unknown>)[field];
+  return typeof next === "string" ? next : "";
 }
 
-function putWorkspaceBlob(db: IDBDatabase, id: string, blob: Blob, name: string, size: number) {
-  return new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(WORKSPACE_DB_STORE, "readwrite");
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error ?? new Error("IndexedDB write failed"));
-    tx.objectStore(WORKSPACE_DB_STORE).put({ blob, name, size, updatedAt: Date.now() }, id);
-  });
+function readNumberField(value: unknown, field: string, fallback = 0) {
+  if (!value || typeof value !== "object") return fallback;
+  const next = (value as Record<string, unknown>)[field];
+  return typeof next === "number" && Number.isFinite(next) ? next : fallback;
 }
 
-async function readStoredBlob(id: string) {
-  const db = await openWorkspaceDb();
-  return new Promise<Blob | null>((resolve, reject) => {
-    const tx = db.transaction(WORKSPACE_DB_STORE, "readonly");
-    const request = tx.objectStore(WORKSPACE_DB_STORE).get(id);
-    request.onsuccess = () => {
-      const value = request.result as { blob?: unknown } | undefined;
-      resolve(value?.blob instanceof Blob ? value.blob : null);
-    };
-    request.onerror = () => reject(request.error ?? new Error("IndexedDB read failed"));
-  });
-}
-
-async function storeCombinedProjectPdf(projectId: string, projectName: string, pdfUrl: string) {
-  if (typeof window === "undefined") return false;
-  const projectKey = workspaceFilesKey(projectId);
-  try {
-    const res = await fetch(pdfUrl, { cache: "force-cache" });
-    if (!res.ok) return false;
-    const blob = await res.blob();
-    const combinedStorageId = `cloud-project-${projectId}`;
-    const db = await openWorkspaceDb();
-    await putWorkspaceBlob(db, combinedStorageId, blob, projectName || "Document.pdf", blob.size);
-    const payload: StoredSourceMeta[] = [
-      {
-        id: combinedStorageId,
-        name: projectName || "Document.pdf",
-        size: blob.size,
-        updatedAt: Date.now(),
-      },
-    ];
-    try {
-      window.localStorage?.setItem(projectKey, JSON.stringify(payload));
-      window.sessionStorage?.setItem(projectKey, JSON.stringify(payload));
-    } catch {
-      // ignore storage write failures
-    }
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function storePreviewCacheSkeleton(projectId: string, sourceIds: string[], pages: unknown) {
+function storePreviewCacheFromProjectData(
+  projectId: string,
+  sourceIds: string[],
+  pages: unknown,
+  coverPreviewUrl: string | null = null,
+) {
   if (typeof window === "undefined" || sourceIds.length === 0 || !Array.isArray(pages) || pages.length === 0) return;
   const payload: WorkspacePreviewCache = {
     version: PREVIEW_CACHE_VERSION,
@@ -131,33 +83,23 @@ function storePreviewCacheSkeleton(projectId: string, sourceIds: string[], pages
     pages: pages
       .map((page, pageIdx) => {
         if (!page || typeof page !== "object") return null;
-        const srcIdx =
-          typeof (page as { srcIdx?: unknown }).srcIdx === "number" ? (page as { srcIdx: number }).srcIdx : 0;
+        const srcIdx = readNumberField(page, "srcIdx", 0);
         const sourceId = sourceIds[srcIdx] ?? sourceIds[0];
         if (!sourceId) return null;
-        const rotation =
-          typeof (page as { rotation?: unknown }).rotation === "number"
-            ? (page as { rotation: number }).rotation
-            : 0;
-        const width =
-          typeof (page as { width?: unknown }).width === "number"
-            ? (page as { width: number }).width
-            : 612;
-        const height =
-          typeof (page as { height?: unknown }).height === "number"
-            ? (page as { height: number }).height
-            : 792;
+        const pageNumber = readNumberField(page, "pageIdx", pageIdx);
+        const preview = readStringField(page, "preview") || (pageIdx === 0 ? coverPreviewUrl ?? "" : "");
+        const thumb = readStringField(page, "thumb") || (pageIdx === 0 ? preview : "");
         return {
-          id: `${sourceId}::${pageIdx}`,
+          id: `${sourceId}::${pageNumber}`,
           srcIdx,
-          pageIdx,
-          rotation,
-          width,
-          height,
-          thumb: "",
-          thumbWidth: 0,
-          thumbHeight: 0,
-          preview: "",
+          pageIdx: pageNumber,
+          rotation: readNumberField(page, "rotation", 0),
+          width: readNumberField(page, "width", 612),
+          height: readNumberField(page, "height", 792),
+          thumb,
+          thumbWidth: readNumberField(page, "thumbWidth", 0),
+          thumbHeight: readNumberField(page, "thumbHeight", 0),
+          preview,
         };
       })
       .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry)),
@@ -222,20 +164,39 @@ export function readExistingWorkspaceProjectId() {
   }
 }
 
-export async function preloadExistingWorkspaceProject(projectId: string | null) {
-  if (typeof window === "undefined" || !projectId) return false;
+export function preloadExistingWorkspaceProject(projectId: string | null) {
+  if (typeof window === "undefined" || !projectId) return Promise.resolve(false);
+  const inFlight = existingProjectPreloadInFlight.get(projectId);
+  if (inFlight) return inFlight;
+  const preload = preloadExistingWorkspaceProjectNow(projectId).finally(() => {
+    existingProjectPreloadInFlight.delete(projectId);
+  });
+  existingProjectPreloadInFlight.set(projectId, preload);
+  return preload;
+}
+
+async function preloadExistingWorkspaceProjectNow(projectId: string) {
+  const startedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
+  debugWorkspaceOpen("preload-start", { projectId });
   try {
     const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}`, { cache: "no-store" });
+    debugWorkspaceOpen("project-fetch-end", {
+      projectId,
+      status: res.status,
+      durationMs: Math.round((typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt),
+    });
     if (!res.ok) return false;
     const json = (await res.json().catch(() => null)) as {
       project?: {
         name?: string | null;
         pdfUrl?: string | null;
+        previewUrl?: string | null;
         data?: unknown;
       };
     } | null;
     const project = json?.project;
     const pdfUrl = typeof project?.pdfUrl === "string" ? project.pdfUrl : null;
+    const previewUrl = typeof project?.previewUrl === "string" ? project.previewUrl : null;
     if (!pdfUrl) return false;
 
     const cloudData = project?.data;
@@ -285,28 +246,6 @@ export async function preloadExistingWorkspaceProject(projectId: string | null) 
         : [];
 
     if (Array.isArray(cloudSources) && cloudSources.length > 0) {
-      const missingSource = await Promise.all(
-        cloudSources.map(async (entry) => {
-          if (!entry || typeof entry !== "object") return true;
-          const id = "id" in entry && typeof (entry as { id?: unknown }).id === "string"
-            ? (entry as { id: string }).id
-            : null;
-          if (!id) return true;
-          try {
-            const blob = await readStoredBlob(id);
-            return !blob;
-          } catch {
-            return true;
-          }
-        }),
-      );
-      if (missingSource.some(Boolean)) {
-        const stored = await storeCombinedProjectPdf(projectId, project?.name ?? "Document.pdf", pdfUrl);
-        if (stored && projectPages) {
-          storePreviewCacheSkeleton(projectId, [`cloud-project-${projectId}`], projectPages);
-        }
-        return stored;
-      }
       if (projectPages) {
         try {
           window.localStorage?.setItem(workspaceFilesKey(projectId), JSON.stringify(cloudSourceMeta));
@@ -314,17 +253,46 @@ export async function preloadExistingWorkspaceProject(projectId: string | null) 
         } catch {
           // ignore storage write failures
         }
-        storePreviewCacheSkeleton(projectId, cloudSourceIds, projectPages);
+        storePreviewCacheFromProjectData(projectId, cloudSourceIds, projectPages, previewUrl);
       }
-      return false;
+      debugWorkspaceOpen("preload-end", {
+        projectId,
+        source: "cloud-sources",
+        durationMs: Math.round((typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt),
+      });
+      return true;
     }
 
-    const stored = await storeCombinedProjectPdf(projectId, project?.name ?? "Document.pdf", pdfUrl);
-    if (stored && projectPages) {
-      storePreviewCacheSkeleton(projectId, [`cloud-project-${projectId}`], projectPages);
+    const combinedStorageId = `cloud-project-${projectId}`;
+    const combinedSourceMeta: StoredSourceMeta[] = [
+      {
+        id: combinedStorageId,
+        name: project?.name ?? "Document.pdf",
+        size: 0,
+        updatedAt: Date.now(),
+      },
+    ];
+    try {
+      window.localStorage?.setItem(workspaceFilesKey(projectId), JSON.stringify(combinedSourceMeta));
+      window.sessionStorage?.setItem(workspaceFilesKey(projectId), JSON.stringify(combinedSourceMeta));
+    } catch {
+      // ignore storage write failures
     }
-    return stored;
-  } catch {
+    if (projectPages) {
+      storePreviewCacheFromProjectData(projectId, [`cloud-project-${projectId}`], projectPages, previewUrl);
+    }
+    debugWorkspaceOpen("preload-end", {
+      projectId,
+      source: "combined-cloud-pdf",
+      durationMs: Math.round((typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt),
+    });
+    return true;
+  } catch (error) {
+    debugWorkspaceOpen("preload-error", {
+      projectId,
+      durationMs: Math.round((typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt),
+      error: error instanceof Error ? error.message : String(error),
+    });
     return false;
   }
 }
