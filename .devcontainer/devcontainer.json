@@ -1,24 +1,19 @@
 {
   "name": "MergifyPDF",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:20-bookworm",
-  "features": {
-    "ghcr.io/devcontainers/features/pnpm:1": {
-      "version": "latest"
-    }
-  },
   "forwardPorts": [3000],
   "portsAttributes": {
     "3000": {
-      "label": "Next dev server",
+      "label": "MergifyPDF",
       "onAutoForward": "openBrowser"
     }
   },
-  "postCreateCommand": "pnpm install",
+  "postCreateCommand": "corepack enable && corepack prepare pnpm@10.33.0 --activate && pnpm install",
   "customizations": {
     "vscode": {
-      "extensions": [
-        "Prisma.prisma"
-      ]
+      "settings": {
+        "npm.packageManager": "pnpm"
+      }
     }
   }
 }
