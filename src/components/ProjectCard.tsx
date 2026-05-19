@@ -22,8 +22,12 @@ type PreviewCacheEntry = {
 
 const PREVIEW_CACHE_MAX_AGE_MS = 10 * 60 * 1000;
 const PREVIEW_FETCH_TIMEOUT_MS = 8000;
-const PREVIEW_IMAGE_TIMEOUT_MS = 10000;
+const PREVIEW_IMAGE_TIMEOUT_MS = process.env.NODE_ENV === "production" ? 10000 : 0;
 const PREVIEW_FETCH_CONCURRENCY = 4;
+const SHOULD_AUTO_FETCH_PREVIEWS = process.env.NODE_ENV === "production";
+// Load previews in any browser environment so local/dev builds exercise the same
+// thumbnail path as production. The guards below still keep this client-side.
+const SHOULD_LOAD_PREVIEWS = typeof window !== "undefined";
 const STARRED_STORAGE_KEY = "mpdf:starred-projects";
 const PREVIEW_STORAGE_KEY_PREFIX = "mpdf:project-preview:";
 const previewMemoryCache = new Map<string, PreviewCacheEntry>();
@@ -220,6 +224,7 @@ export default function ProjectCard({
   const menuTriggerButtonRef = useRef<HTMLButtonElement | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(project.previewUrl ?? null);
   const [previewLoading, setPreviewLoading] = useState(Boolean(project.hasPreview));
+  const previewImageRef = useRef<HTMLImageElement | null>(null);
   const previewRefreshInFlight = useRef(false);
   const workspaceWarmupStartedRef = useRef<Set<string>>(new Set());
   const lastFailedPreviewRef = useRef<string | null>(null);
@@ -535,6 +540,9 @@ export default function ProjectCard({
   }, [renameJustSaved]);
 
   const fetchPreviewUrl = useCallback(async (signal?: AbortSignal) => {
+    if (!SHOULD_AUTO_FETCH_PREVIEWS) {
+      throw new Error("Preview auto-fetch is disabled in development.");
+    }
     const existing = previewFetchInFlight.get(project.id);
     if (existing) {
       debugProjectPreview("dedupe", { projectId: project.id });
@@ -553,7 +561,7 @@ export default function ProjectCard({
       signal?.addEventListener("abort", handleAbort, { once: true });
       try {
         debugProjectPreview("miss", { projectId: project.id, queued: activePreviewFetches >= PREVIEW_FETCH_CONCURRENCY });
-        const res = await fetch(`/api/projects/${encodeURIComponent(project.id)}/preview`, {
+        const res = await fetch(`/api/projects/${encodeURIComponent(project.id)}/thumbnail?format=json`, {
           signal: controller.signal,
           cache: "no-store",
         });
@@ -565,7 +573,11 @@ export default function ProjectCard({
         if (!res.ok) {
           throw new Error(`Preview fetch failed with status ${res.status}`);
         }
-        return res.url;
+        const data = (await res.json().catch(() => null)) as { url?: string } | null;
+        if (!data?.url) {
+          throw new Error("Preview fetch did not return a URL");
+        }
+        return data.url;
       } catch (error) {
         debugProjectPreview("error", {
           projectId: project.id,
@@ -586,6 +598,13 @@ export default function ProjectCard({
   }, [project.id]);
 
   useEffect(() => {
+    if (!SHOULD_LOAD_PREVIEWS) {
+      setPreviewUrl(null);
+      setPreviewLoading(false);
+      clearPreviewCache(project.id);
+      return;
+    }
+
     if (!project.hasPreview) {
       setPreviewUrl(null);
       setPreviewLoading(false);
@@ -596,6 +615,13 @@ export default function ProjectCard({
     if (project.previewUrl) {
       setPreviewUrl(project.previewUrl);
       setPreviewLoading(true);
+      return;
+    }
+
+    if (!SHOULD_AUTO_FETCH_PREVIEWS) {
+      setPreviewUrl(null);
+      setPreviewLoading(false);
+      clearPreviewCache(project.id);
       return;
     }
 
@@ -636,6 +662,8 @@ export default function ProjectCard({
   }, [fetchPreviewUrl, project.hasPreview, project.id, project.previewUrl, project.rotation]);
 
   useEffect(() => {
+    if (!SHOULD_LOAD_PREVIEWS) return;
+    if (PREVIEW_IMAGE_TIMEOUT_MS <= 0) return;
     if (!previewLoading || !previewUrl) return;
     const timer = window.setTimeout(() => {
       // Fail fast when image loading hangs so cards don't shimmer indefinitely.
@@ -648,7 +676,17 @@ export default function ProjectCard({
     };
   }, [previewLoading, previewUrl, project.id]);
 
+  useEffect(() => {
+    if (!SHOULD_LOAD_PREVIEWS) return;
+    if (!previewUrl || !previewLoading) return;
+    const image = previewImageRef.current;
+    if (image?.complete && image.naturalWidth > 0) {
+      setPreviewLoading(false);
+    }
+  }, [previewLoading, previewUrl]);
+
   const refreshPreviewUrl = async () => {
+    if (!SHOULD_AUTO_FETCH_PREVIEWS) return;
     if (!project.hasPreview || previewRefreshInFlight.current) return;
     setPreviewLoading(true);
     previewRefreshInFlight.current = true;
@@ -667,6 +705,13 @@ export default function ProjectCard({
   };
 
   useLayoutEffect(() => {
+    if (!SHOULD_LOAD_PREVIEWS) {
+      setPreviewUrl(null);
+      setPreviewLoading(false);
+      clearPreviewCache(project.id);
+      return;
+    }
+
     if (!project.hasPreview) {
       setPreviewUrl(null);
       setPreviewLoading(false);
@@ -1246,6 +1291,7 @@ export default function ProjectCard({
           <div className="flex h-full w-full items-center justify-center p-3 sm:p-4">
             {previewUrl ? (
               <img
+                ref={previewImageRef}
                 src={previewUrl}
                 alt=""
                 className={`max-h-full max-w-full object-contain transition-opacity duration-200 ${

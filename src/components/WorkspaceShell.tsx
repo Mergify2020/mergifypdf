@@ -100,8 +100,10 @@ const STARTUP_OVERLAY_CONTEXT_KEY = "mpdf:startup-overlay-context";
 const EXISTING_PROJECT_OVERLAY_STORAGE_KEY = "mpdf:existing-project-overlay";
 const EXISTING_PROJECT_OVERLAY_EXIT_MS = 220;
 const EXISTING_PROJECT_OVERLAY_MIN_VISIBLE_MS = 700;
-const EXISTING_PROJECT_OVERLAY_MAX_WAIT_MS = 1200;
+const EXISTING_PROJECT_OVERLAY_MAX_WAIT_MS = 6000;
 const EXISTING_PROJECT_OVERLAY_AUTO_CLOSE_MS = 900;
+const SHOULD_RUN_HOME_BOOTSTRAP = process.env.NODE_ENV === "production";
+const SHOULD_AUTO_FETCH_PREVIEWS = process.env.NODE_ENV === "production";
 const SIDEBAR_EXPANDED_KEY = "mpdf:sidebar-expanded";
 const STRIPE_STATUS_CACHE_KEY = "mpdf:stripe-status";
 const STRIPE_PLAN_TIER_CACHE_KEY = "mpdf:stripe-plan-tier";
@@ -1525,6 +1527,11 @@ export default function WorkspaceShell({
   }, []);
 
   useEffect(() => {
+    if (!SHOULD_RUN_HOME_BOOTSTRAP) {
+      setHomeStripeStatusOverride(undefined);
+      setHomeBillingMetaReady(true);
+      return;
+    }
     if (!isBillingBannerRoute) {
       setHomeStripeStatusOverride(undefined);
       setHomeBillingMetaReady(false);
@@ -1635,6 +1642,10 @@ export default function WorkspaceShell({
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (!SHOULD_RUN_HOME_BOOTSTRAP) {
+      setFallbackProjectCountReady(true);
+      return;
+    }
 
     const ownerKey = session?.user?.id ?? null;
     if (!ownerKey) {
@@ -1675,18 +1686,20 @@ export default function WorkspaceShell({
       if (cancelled) return;
       setHomeRecentProjects(mapped);
       setFallbackProjectCountReady(true);
-      mapped
-        .filter((project) => project.hasPreview && !project.previewUrl && project.id)
-        .slice(0, 12)
-        .forEach((project) => {
-          if (project.id) {
-            void refreshPreviewUrl(project.id);
-          }
-        });
-      const previewUrls = mapped
-        .flatMap((project) => (project.previewUrl ? [project.previewUrl] : []))
-        .slice(0, 12);
-      preloadImages(previewUrls);
+      if (SHOULD_AUTO_FETCH_PREVIEWS) {
+        mapped
+          .filter((project) => project.hasPreview && !project.previewUrl && project.id)
+          .slice(0, 12)
+          .forEach((project) => {
+            if (project.id) {
+              void refreshPreviewUrl(project.id);
+            }
+          });
+        const previewUrls = mapped
+          .flatMap((project) => (project.previewUrl ? [project.previewUrl] : []))
+          .slice(0, 12);
+        preloadImages(previewUrls);
+      }
     };
 
     const cached = getProjectsSummaryCache(ownerKey);
@@ -1726,15 +1739,19 @@ export default function WorkspaceShell({
     }
     previewRefreshInFlight.current.add(projectId);
     try {
-      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/preview`, {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/thumbnail?format=json`, {
         cache: "no-store",
       });
       if (!res.ok) {
         throw new Error(`Preview refresh failed with status ${res.status}`);
       }
+      const data = (await res.json().catch(() => null)) as { url?: string } | null;
+      if (!data?.url) {
+        throw new Error("Preview refresh did not return a URL");
+      }
       lastFailedPreviewRef.current.delete(projectId);
       setHomeRecentProjects((prev) =>
-        prev.map((entry) => (entry.id === projectId ? { ...entry, previewUrl: res.url } : entry))
+        prev.map((entry) => (entry.id === projectId ? { ...entry, previewUrl: data.url } : entry))
       );
     } catch {
       if (previousUrl) {
@@ -3362,54 +3379,7 @@ export default function WorkspaceShell({
               </div>
             </div>
           ) : null}
-          <Suspense
-            fallback={
-              isStudioRoute || pathname === "/projects/all" ? null : (
-                <main className="relative z-0 flex-1 lg:z-40">
-                  <div className={`flex w-full ${contentShellWrapperClass}`}>
-                    <div
-                      className="workspace-content-shell w-full transition-none 2xl:transition-[max-width] 2xl:duration-300 2xl:ease-[cubic-bezier(0.22,1,0.36,1)]"
-                      style={{ maxWidth: "var(--shell-content-width)" }}
-                    >
-                      <div
-                        aria-hidden
-                        className="box-border flex w-full flex-col rounded-xl border-[1.5px] border-gray-200 bg-white p-3 shadow-sm dark:border-[#3F3F3F] dark:bg-[#323232] dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] md:p-5"
-                        style={{
-                          height:
-                            "calc(var(--workspace-vh,100dvh) - var(--home-banner-offset,0px) - var(--home-topbar-offset,0px) - var(--workspace-content-bottom-subtract,var(--workspace-frame-gutter,48px)))",
-                        }}
-                      >
-                        <div className="flex flex-row items-center justify-between gap-2 md:gap-4 md:pl-[21px]">
-                          <div className="h-7 w-40 rounded-full bg-slate-100 skeleton-shimmer dark:bg-[#2B2B2B]/70" />
-                          <div className="flex min-w-0 shrink items-center justify-end gap-1.5 md:gap-2">
-                            <div className="h-[34px] w-[110px] rounded-full bg-slate-100 skeleton-shimmer dark:bg-[#2B2B2B]/70" />
-                            <div className="h-[34px] w-[96px] rounded-full bg-slate-100 skeleton-shimmer dark:bg-[#2B2B2B]/70" />
-                          </div>
-                        </div>
-                        <div className="recent-projects-container mt-6 flex-1 overflow-y-hidden overflow-x-hidden" style={{ paddingRight: 6, paddingLeft: 6, paddingBottom: 6 }}>
-                          <div className="recent-projects-grid projects-grid mt-2 grid w-full max-w-[1880px] items-start gap-4 sm:gap-6">
-                            {Array.from({ length: 6 }).map((_, index) => (
-                              <div key={`workspace-fallback-${index}`} className="flex w-full flex-col text-left">
-                                <div className="relative rounded-[10px] bg-[#F9FAFC] dark:bg-[#323232]/60">
-                                  <div className="relative m-[3px] aspect-square w-[calc(100%-6px)] overflow-hidden rounded-[10px] border border-[rgba(0,0,0,0.06)] bg-[#EEF1F5] dark:border-[#3A3A3A] dark:bg-[#2B2B2B]/70">
-                                    <div className="absolute inset-0 rounded-[10px] skeleton-shimmer opacity-90" />
-                                  </div>
-                                </div>
-                                <div className="mt-2 space-y-1">
-                                  <div className="h-5 w-[72%] rounded-full bg-slate-100 skeleton-shimmer dark:bg-[#2B2B2B]/70" />
-                                  <div className="h-3.5 w-[48%] rounded-full bg-slate-100 skeleton-shimmer dark:bg-[#2B2B2B]/70" />
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </main>
-              )
-            }
-          >
+          <Suspense fallback={null}>
             <main className="relative z-0 flex-1 lg:z-40">
               <div className={`flex w-full ${contentShellWrapperClass}`}>
                 <div

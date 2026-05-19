@@ -21,6 +21,7 @@ type SummaryProject = {
   id: string;
   name: string;
   updatedAt: string | Date;
+  previewUrl?: string | null;
   pdfUrl?: string | null;
   pagesCount?: number | null;
   rotation?: number | null;
@@ -380,6 +381,7 @@ export default function RecentProjectsRow({
     id: project.id,
     title: projectNameToDisplay(project.name),
     updated: formatProjectLastEdited(project.updatedAt),
+    previewUrl: project.previewUrl ?? null,
     pdfUrl: project.pdfUrl ?? null,
     pagesCount: project.pagesCount ?? 0,
     rotation: project.rotation ?? 0,

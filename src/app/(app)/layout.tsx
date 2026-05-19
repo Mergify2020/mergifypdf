@@ -7,9 +7,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  // Shell selection must use an accurate auth result. A short timeout here can
-  // intermittently return null and flash the public header/footer on protected pages.
-  const session = await getServerSessionSafe(0);
+  const session = await getServerSessionSafe();
   const cookieStore = await cookies();
   const sidebarExpandedCookie = cookieStore.get("mpdf_sidebar_expanded")?.value;
   const initialSidebarExpanded = sidebarExpandedCookie === "0" ? false : true;

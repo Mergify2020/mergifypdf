@@ -7008,6 +7008,9 @@ const timer =
     if (existingProjectOverlayHideSentRef.current) return;
     if (typeof window === "undefined") return;
     if (!projectParam) return;
+    if (loading) return;
+    if (pages.length === 0) return;
+    if (loadedPreviewIds.size === 0) return;
     existingProjectOverlayHideSentRef.current = true;
     const frameId = window.requestAnimationFrame(() => {
       window.dispatchEvent(new Event("workspace-content-ready"));
@@ -7015,7 +7018,7 @@ const timer =
     return () => {
       window.cancelAnimationFrame(frameId);
     };
-  }, [projectParam]);
+  }, [loadedPreviewIds.size, loading, pages.length, projectParam]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -10487,6 +10490,7 @@ const timer =
     [projectedThumbOrder]
   );
   const isLoadingPages = loading && pages.length === 0;
+  const showPageCountSkeleton = loading || pages.length === 0 || loadedPreviewIds.size === 0;
   const downloadDisabled = busy || pages.length === 0 || isLoadingPages;
   const printProjectId = projectParam ?? currentProjectId ?? null;
   const printDisabled = isPrinting || busy || isLoadingPages || !printProjectId;
@@ -15918,10 +15922,10 @@ const timer =
                                   className="toolbar-font flex h-[45px] items-center justify-between border-b border-slate-200 bg-white px-4 dark:border-[#4A4A4A] dark:bg-[#323232]"
                                   data-text-toolbar
                                 >
-				                                  {loading && pages.length === 0 ? (
-                                    <div className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-zinc-300">
-                                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-[#024d7c] dark:border-[#2A2A31] dark:border-t-slate-200" aria-hidden />
-                                      <span>Loading</span>
+				                                  {showPageCountSkeleton ? (
+                                    <div className="flex items-center gap-2" aria-hidden>
+                                      <div className="h-4 w-24 rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
+                                      <span className="inline-flex h-6 min-w-6 rounded-md bg-slate-200 skeleton-shimmer px-2 dark:bg-[#3A3A3A]" />
                                     </div>
 				                                  ) : (
                                     <div className="flex items-center gap-2">

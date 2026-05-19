@@ -128,7 +128,7 @@ export async function GET(
       signedPdfUrl = await createSignedR2Url(r2Config, project.pdfKey);
     }
     if (project.previewKey) {
-      previewUrl = `/api/projects/${id}/preview`;
+      previewUrl = `/api/projects/${id}/thumbnail`;
     }
   }
 

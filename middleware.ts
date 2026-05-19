@@ -49,6 +49,10 @@ export async function middleware(req: NextRequest) {
     return applySecurityHeaders(NextResponse.next());
   }
 
+  if (process.env.NODE_ENV !== "production") {
+    return applySecurityHeaders(NextResponse.next());
+  }
+
   const secret = process.env.NEXTAUTH_SECRET;
   const token = (secret ? await getToken({ req, secret }) : null) as JWT | null;
 

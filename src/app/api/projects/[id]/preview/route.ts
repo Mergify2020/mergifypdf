@@ -69,6 +69,7 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const format = _req.nextUrl.searchParams.get("format");
   const { id } = await params;
 
   const session = await getServerSession(authOptions);
@@ -118,33 +119,25 @@ export async function GET(
 
   const url = await createSignedR2Url(r2Config, project.previewKey, 60);
 
-  const upstream = await fetch(url, { cache: "no-store" });
-  if (!upstream.ok || !upstream.body) {
+  if (format === "json") {
     return NextResponse.json(
-      { error: `Preview fetch failed with status ${upstream.status}` },
-      { status: 502 }
+      { url },
+      {
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      }
     );
   }
 
-  const headers = new Headers();
-  const contentType = upstream.headers.get("content-type");
-  if (contentType) {
-    headers.set("Content-Type", contentType);
-  }
-  const contentLength = upstream.headers.get("content-length");
-  if (contentLength) {
-    headers.set("Content-Length", contentLength);
-  }
-  headers.set("Cache-Control", "no-store");
-
-  console.info("Proxied preview image from R2.", {
+  console.info("Redirected preview image request to signed R2 URL.", {
     projectId: id,
     env: process.env.NODE_ENV,
-    status: upstream.status,
   });
 
-  return new NextResponse(upstream.body, {
-    status: upstream.status,
-    headers,
+  return NextResponse.redirect(url, {
+    headers: {
+      "Cache-Control": "no-store",
+    },
   });
 }

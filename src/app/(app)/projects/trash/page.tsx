@@ -27,6 +27,8 @@ function extractFileSizeFromData(data: unknown): number | null {
 
 export default async function TrashProjectsPage() {
   const session = await getServerSessionSafe();
+  const shouldFetchRemoteSizes = process.env.NODE_ENV === "production";
+  const projectLimit = shouldFetchRemoteSizes ? undefined : 24;
 
   if (!session?.user) {
     redirect("/login");
@@ -46,6 +48,7 @@ export default async function TrashProjectsPage() {
   const projects = await prisma.project.findMany({
     where: { userId, trashedAt: { not: null } },
     orderBy: { trashedAt: "desc" },
+    ...(projectLimit ? { take: projectLimit } : {}),
     select: {
       id: true,
       name: true,
@@ -58,16 +61,18 @@ export default async function TrashProjectsPage() {
   });
 
   let r2Config: ReturnType<typeof getR2Config> | null = null;
-  try {
-    r2Config = getR2Config();
-  } catch {
-    r2Config = null;
+  if (shouldFetchRemoteSizes) {
+    try {
+      r2Config = getR2Config();
+    } catch {
+      r2Config = null;
+    }
   }
 
   const trashProjects = await Promise.all(
     projects.map(async (project) => {
       let fileSizeBytes: number | null = null;
-      if (r2Config && project.pdfKey) {
+      if (shouldFetchRemoteSizes && r2Config && project.pdfKey) {
         try {
           fileSizeBytes = await getR2ObjectSize(r2Config, project.pdfKey);
         } catch {

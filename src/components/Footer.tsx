@@ -1,17 +1,13 @@
 "use client";
 
-import React from "react";
-import { siInstagram, siTiktok, siX } from "simple-icons";
 import RevealOnScroll from "@/components/RevealOnScroll";
-
-type IconProps = React.SVGProps<SVGSVGElement>;
 
 type FooterProps = {
   reveal?: boolean;
 };
 
-function SocialIcon(props: { label: string; href?: string; name: string; icon: React.ReactNode }) {
-  const { label, href = "#", name, icon } = props;
+function SocialIcon(props: { label: string; href?: string; name: string; badge: string }) {
+  const { label, href = "#", name, badge } = props;
   return (
     <a
       href={href}
@@ -20,51 +16,11 @@ function SocialIcon(props: { label: string; href?: string; name: string; icon: R
       rel="noreferrer"
       className="inline-flex items-center gap-3 text-[13px] text-slate-300 transition hover:text-white"
     >
-      <span className="text-slate-200">{icon}</span>
+      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-500/50 text-[10px] font-semibold text-slate-200">
+        {badge}
+      </span>
       <span>{name}</span>
     </a>
-  );
-}
-
-function TikTokIcon(props: IconProps) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width={20}
-      height={20}
-      aria-hidden="true"
-      {...props}
-    >
-      <path fill="currentColor" d={siTiktok.path} />
-    </svg>
-  );
-}
-
-function InstagramIcon(props: IconProps) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width={20}
-      height={20}
-      aria-hidden="true"
-      {...props}
-    >
-      <path fill="currentColor" d={siInstagram.path} />
-    </svg>
-  );
-}
-
-function XIcon(props: IconProps) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width={17}
-      height={17}
-      aria-hidden="true"
-      {...props}
-    >
-      <path fill="currentColor" d={siX.path} />
-    </svg>
   );
 }
 
@@ -136,19 +92,19 @@ export default function Footer({ reveal = true }: FooterProps) {
                 label="MergifyPDF on TikTok"
                 href="https://www.tiktok.com/@mergify.pdf"
                 name="TikTok"
-                icon={<TikTokIcon />}
+                badge="T"
               />
               <SocialIcon
                 label="MergifyPDF on Instagram"
                 href="https://www.instagram.com/mergifypdf/"
                 name="Instagram"
-                icon={<InstagramIcon />}
+                badge="IG"
               />
               <SocialIcon
                 label="MergifyPDF on X (Twitter)"
                 href="https://x.com/MergifyPDF"
                 name="X"
-                icon={<XIcon />}
+                badge="X"
               />
             </div>
           </div>

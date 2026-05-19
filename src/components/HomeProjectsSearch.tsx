@@ -259,8 +259,10 @@ export default function HomeProjectsSearch({
   return (
     <>
       <section className="mt-0 flex w-full min-h-0 flex-1 flex-col">
-        <div
-          className="box-border flex min-h-0 flex-1 flex-col rounded-xl border-[1.5px] border-gray-200 bg-white p-3 transition-[height] duration-300 ease-out shadow-sm dark:border-[#3F3F3F] dark:bg-[#323232] dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] md:p-5"
+          <div
+          className={`box-border flex min-h-0 flex-1 flex-col rounded-xl border-[1.5px] border-gray-200 bg-white p-3 transition-[height] duration-300 ease-out shadow-sm dark:border-[#3F3F3F] dark:bg-[#323232] dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] md:p-5 ${
+            showAllProjects ? "mt-3 sm:mt-4 md:mt-0" : ""
+          }`}
           style={{ height: "calc(100% - var(--workspace-projects-bottom-gap, 0px))" }}
         >
           <div className="flex flex-row items-center justify-between gap-2 md:gap-4 md:pl-[21px]">

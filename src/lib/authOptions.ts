@@ -17,6 +17,7 @@ export const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 const AUTH_DB_UNAVAILABLE_ERROR = "AUTH_DB_UNAVAILABLE";
 const authDbIssueLogTimestamps = new Map<string, number>();
 const AUTH_DB_ISSUE_LOG_WINDOW_MS = 30_000;
+const isProduction = process.env.NODE_ENV === "production";
 
 async function runAuthDbOperationWithRetry<T>(operation: () => Promise<T>) {
   try {
@@ -167,7 +168,7 @@ export const authOptions: NextAuthOptions = {
 
       if (account || !token.providers) {
         let linkedAccounts: Array<{ provider: string }> = [];
-        if (!isPrismaDatabaseCooldownActive()) {
+        if (isProduction && !isPrismaDatabaseCooldownActive()) {
           try {
             linkedAccounts = await prisma.account.findMany({
               where: { userId },
@@ -215,7 +216,7 @@ export const authOptions: NextAuthOptions = {
             stripePriceId: string | null;
           }
         | null = null;
-      if (shouldRefreshAuthState && !isPrismaDatabaseCooldownActive()) {
+      if (shouldRefreshAuthState && isProduction && !isPrismaDatabaseCooldownActive()) {
         try {
           dbUser = await prisma.user.findUnique({
             where: { id: userId },

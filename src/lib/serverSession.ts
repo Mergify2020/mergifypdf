@@ -1,7 +1,7 @@
 import type { Session } from "next-auth";
 import { getServerSession } from "next-auth";
 
-const DEFAULT_SESSION_TIMEOUT_MS = 1500;
+const DEFAULT_SESSION_TIMEOUT_MS = process.env.NODE_ENV === "production" ? 1500 : 250;
 
 export async function getServerSessionSafe(
   timeoutMs: number = DEFAULT_SESSION_TIMEOUT_MS,

@@ -11,6 +11,7 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const format = _req.nextUrl.searchParams.get("format");
   const { id } = await params;
 
   const session = await getServerSession(authOptions);
@@ -42,6 +43,16 @@ export async function GET(
   }
 
   const url = await createSignedR2Url(r2Config, previewKey);
+  if (format === "json") {
+    return NextResponse.json(
+      { url },
+      {
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      },
+    );
+  }
   return NextResponse.redirect(url, {
     headers: {
       "Cache-Control": "no-store",

@@ -76,6 +76,9 @@ export default function SettingsMenu({
     let active = true;
 
     async function loadPlanStatus() {
+      if (!open) {
+        return;
+      }
       if (!session?.user?.email) {
         if (active) {
           setBillingStatusLoaded(false);

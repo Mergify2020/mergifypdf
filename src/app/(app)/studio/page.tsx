@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getServerSessionSafe } from "@/lib/serverSession";
 import { prisma } from "@/lib/prisma";
-import StudioClient from "./StudioClient";
+import StudioClientLoader from "./StudioClientLoader";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -25,15 +25,24 @@ export default async function StudioPage({
   if (projectId) {
     const session = await getServerSessionSafe(250);
     if (session?.user) {
-      const owned = await prisma.project.findFirst({
-        where: { id: projectId, userId: session.user.id },
-        select: { id: true },
-      });
-      if (!owned) {
+      try {
+        const owned = await prisma.project.findFirst({
+          where: { id: projectId, userId: session.user.id },
+          select: { id: true },
+        });
+        if (!owned) {
+          redirect("/projects");
+        }
+      } catch (error) {
+        if (process.env.NODE_ENV === "production") {
+          console.error("[studio] Failed to verify project ownership; redirecting to projects.", error);
+        } else {
+          console.warn("[studio] Failed to verify project ownership; redirecting to projects.", error);
+        }
         redirect("/projects");
       }
     }
   }
 
-  return <StudioClient />;
+  return <StudioClientLoader />;
 }

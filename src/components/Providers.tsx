@@ -12,10 +12,12 @@ export default function Providers({
   children: React.ReactNode;
   session?: Session | null;
 }) {
+  const enableAnalytics = process.env.NODE_ENV === "production";
+
   return (
     <SessionProvider session={session} refetchOnWindowFocus={false}>
-      <PostHogInit />
-      <PostHogIdentify />
+      {enableAnalytics ? <PostHogInit /> : null}
+      {enableAnalytics ? <PostHogIdentify /> : null}
       {children}
     </SessionProvider>
   );

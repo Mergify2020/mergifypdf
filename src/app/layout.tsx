@@ -108,11 +108,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <link rel="mask-icon" href="/favicons/safari-pinned-tab.svg" color="#024d7c" />
         <link rel="manifest" href="/favicons/site.webmanifest" />
 
-        {/* TrustBox script */}
-        <Script
-          src="//widget.trustpilot.com/bootstrap/v5/tp.widget.bootstrap.min.js"
-          strategy="afterInteractive"
-        />
+        {process.env.NODE_ENV === "production" ? (
+          <Script
+            src="//widget.trustpilot.com/bootstrap/v5/tp.widget.bootstrap.min.js"
+            strategy="afterInteractive"
+          />
+        ) : null}
       </head>
 
       <body className="min-h-screen bg-[var(--background)] text-[var(--foreground)]" style={themeStyle}>

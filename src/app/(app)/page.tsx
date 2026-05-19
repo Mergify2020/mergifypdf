@@ -27,9 +27,7 @@ export default async function Home({
         ? landingParam[0]
         : undefined;
 
-  // Keep auth resolution behavior in sync with the app layout to avoid mixed
-  // renders (workspace shell + marketing hero) during first load.
-  const session = await getServerSessionSafe(0);
+  const session = await getServerSessionSafe();
 
   // Only honor marketing-hero forcing for signed-out visitors.
   if (landing === "hero" && !session?.user) {
