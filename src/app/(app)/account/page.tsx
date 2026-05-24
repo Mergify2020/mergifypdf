@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, CreditCard, Eye, EyeOff, ExternalLink, Lock, Mail, MoveLeft, PencilLine, Plus, Send, Shield, Smile, Star, Sun, User } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, CreditCard, Eye, EyeOff, ExternalLink, Lock, Mail, MoveLeft, PencilLine, Plus, Shield, Smile, Star, Sun, User } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { useEffect, useRef, useState, type ComponentType, type SVGProps } from "react";
@@ -200,6 +200,7 @@ export function AccountSettingsPage({
   const [billingPortalError, setBillingPortalError] = useState<string | null>(null);
   const [warmedBillingPortalUrl, setWarmedBillingPortalUrl] = useState<string | null>(null);
   const [warmedBillingPortalAt, setWarmedBillingPortalAt] = useState<number>(0);
+  const [warmedBillingPortalOrigin, setWarmedBillingPortalOrigin] = useState<string | null>(null);
   const [pricingBillingPeriod, setPricingBillingPeriod] = useState<"monthly" | "annual">("monthly");
   const [pricingCheckoutLoading, setPricingCheckoutLoading] = useState<string | null>(null);
   const [pricingMessage, setPricingMessage] = useState<string | null>(null);
@@ -282,12 +283,7 @@ export function AccountSettingsPage({
 
   const [activeSettingsTab, setActiveSettingsTab] = useState<SettingsTab>(initialSettingsTab);
   const [mobileSettingsView, setMobileSettingsView] = useState<SettingsTab | "home">(initialMobileView ?? "home");
-  const [theme, setTheme] = useState<"light" | "dark">(() => {
-    if (typeof window === "undefined") return "light";
-    const stored = window.localStorage.getItem("theme");
-    if (stored === "dark" || stored === "light") return stored;
-    return document.documentElement.classList.contains("dark") ? "dark" : "light";
-  });
+  const [theme, setTheme] = useState<"light" | "dark">("light");
   const [accountHydrating, setAccountHydrating] = useState(true);
   const [themeHydrated, setThemeHydrated] = useState(false);
   const [suppressAccountLoader, setSuppressAccountLoader] = useState(false);
@@ -453,9 +449,24 @@ export function AccountSettingsPage({
   }, [activeSettingsTab, savedFirstName, savedLastName]);
 
   useEffect(() => {
-    applyThemePreference(theme);
+    if (typeof window === "undefined") return;
+
+    const stored = window.localStorage.getItem("theme");
+    const nextTheme =
+      stored === "dark" || stored === "light"
+        ? stored
+        : document.documentElement.classList.contains("dark")
+          ? "dark"
+          : "light";
+
+    setTheme(nextTheme);
     setThemeHydrated(true);
-  }, [theme]);
+  }, []);
+
+  useEffect(() => {
+    if (!themeHydrated) return;
+    applyThemePreference(theme);
+  }, [theme, themeHydrated]);
 
   useEffect(() => {
     router.prefetch("/");
@@ -817,6 +828,7 @@ export function AccountSettingsPage({
       const now = Date.now();
       if (
         warmedBillingPortalUrl &&
+        warmedBillingPortalOrigin === window.location.origin &&
         warmedBillingPortalAt > 0 &&
         now - warmedBillingPortalAt < 25_000
       ) {
@@ -861,6 +873,7 @@ export function AccountSettingsPage({
     const now = Date.now();
     if (
       warmedBillingPortalUrl &&
+      warmedBillingPortalOrigin === window.location.origin &&
       warmedBillingPortalAt > 0 &&
       now - warmedBillingPortalAt < 25_000
     ) {
@@ -888,6 +901,7 @@ export function AccountSettingsPage({
       if (!response.ok || typeof data?.url !== "string") return;
       setWarmedBillingPortalUrl(data.url);
       setWarmedBillingPortalAt(now);
+      setWarmedBillingPortalOrigin(window.location.origin);
     } catch {
       // best-effort warmup; ignore failures
     }
@@ -1521,7 +1535,7 @@ export function AccountSettingsPage({
     >
       <div
         className={`flex w-full flex-col ${
-          embedded ? "lg:bg-transparent" : "mx-auto max-w-[var(--shell-content-width)]"
+          embedded ? "lg:bg-transparent" : "lg:mx-auto lg:max-w-[var(--shell-content-width)]"
         }`}
       >
         <div className="account-settings-home-intro fixed inset-x-0 top-0 z-30 border-b border-gray-300 bg-slate-100 px-4 py-3 dark:border-[#4A4A4A] dark:bg-[#252525] lg:static lg:inset-auto lg:mx-0 lg:mb-6 lg:border-0 lg:bg-transparent lg:px-0 lg:py-0">
@@ -1560,7 +1574,7 @@ export function AccountSettingsPage({
                   {mobileSettingsView === "home"
                     ? "Account settings"
                     : activeSettingsTab === "security"
-                      ? "Security"
+                      ? "Security & data"
                       : activeSettingsTab === "pricing"
                       ? "Plans & pricing"
                       : "Personal details"}
@@ -1659,7 +1673,7 @@ export function AccountSettingsPage({
                 <span className="flex items-start gap-3">
                   <Lock className="mt-0.5 h-5 w-5 stroke-[2.2] text-gray-600 dark:text-zinc-400" aria-hidden />
                   <span className="flex flex-col gap-1">
-                    <span className="text-[16px] font-semibold tracking-tight">Security</span>
+                    <span className="text-[16px] font-semibold tracking-tight">Security &amp; data</span>
                     <span className="text-[12.5px] leading-4 text-gray-500 dark:text-zinc-400">
                       Password and 2FA settings
                     </span>
@@ -1710,24 +1724,7 @@ export function AccountSettingsPage({
                 <ChevronRight className="mt-1.5 h-4 w-4 text-current opacity-70" aria-hidden />
               </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  router.push("/support");
-                }}
-                className="account-settings-stagger-item relative flex w-full items-start justify-between border-b border-gray-300 px-4 py-[17px] text-left text-gray-800 transition duration-150 motion-safe:active:scale-[0.99] active:bg-gray-100 active:text-gray-900 last:border-b-0 hover:bg-gray-50 hover:text-gray-900 dark:border-[#4A4A4A] dark:text-zinc-300 dark:active:bg-[#3F3F3F] dark:active:text-zinc-100 dark:hover:bg-[#3A3A3A] dark:hover:text-zinc-100"
-              >
-                <span className="flex items-start gap-3">
-                  <Send className="mt-0.5 h-5 w-5 text-gray-600 stroke-[2.2] dark:text-zinc-400" aria-hidden />
-                  <span className="flex flex-col gap-1">
-                    <span className="text-[16px] font-semibold tracking-tight">Contact us</span>
-                    <span className="text-[12.5px] leading-4 text-gray-500 dark:text-zinc-400">
-                      Message support for account help
-                    </span>
-                  </span>
-                </span>
-                <ChevronRight className="mt-1.5 h-4 w-4 text-current opacity-70" aria-hidden />
-              </button>
+
 
               <button
                 type="button"
@@ -1748,7 +1745,7 @@ export function AccountSettingsPage({
                 <ChevronRight className="mt-1.5 h-4 w-4 text-current opacity-70" aria-hidden />
               </button>
 
-              <div className="account-settings-stagger-item mt-3 px-4 pt-2 text-xs font-medium text-gray-500 dark:text-zinc-400">
+              <div className="account-settings-stagger-item mt-3 flex items-center justify-between gap-4 px-4 pt-2 text-xs font-medium text-gray-500 dark:text-zinc-400">
                 <div className="flex flex-wrap gap-x-4 gap-y-2">
                   <Link href="/terms" className="transition hover:text-gray-700 dark:hover:text-zinc-200">
                     Terms of Service
@@ -1756,6 +1753,41 @@ export function AccountSettingsPage({
                   <Link href="/privacy" className="transition hover:text-gray-700 dark:hover:text-zinc-200">
                     Privacy Policy
                   </Link>
+                </div>
+                <div className="flex items-center gap-3">
+                  <a
+                    href="https://www.tiktok.com/@mergify.pdf"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-gray-700 transition hover:text-gray-900 dark:text-zinc-300 dark:hover:text-zinc-100"
+                    aria-label="MergifyPDF on TikTok"
+                  >
+                    <span className="h-5 w-5" aria-hidden>
+                      <TikTokIcon />
+                    </span>
+                  </a>
+                  <a
+                    href="https://www.instagram.com/mergifypdf/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-gray-700 transition hover:text-gray-900 dark:text-zinc-300 dark:hover:text-zinc-100"
+                    aria-label="MergifyPDF on Instagram"
+                  >
+                    <span className="h-5 w-5" aria-hidden>
+                      <InstagramIcon />
+                    </span>
+                  </a>
+                  <a
+                    href="https://x.com/MergifyPDF"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-gray-700 transition hover:text-gray-900 dark:text-zinc-300 dark:hover:text-zinc-100"
+                    aria-label="MergifyPDF on X"
+                  >
+                    <span className="h-5 w-5" aria-hidden>
+                      <XIcon />
+                    </span>
+                  </a>
                 </div>
               </div>
           </div>
@@ -1766,7 +1798,7 @@ export function AccountSettingsPage({
           className={`lg:mx-auto lg:flex lg:h-full lg:min-h-0 lg:w-full lg:flex-col ${mobileSettingsView === "home" ? "hidden lg:block" : "block"}`}
           style={{ maxWidth: desktopSettingsMaxWidth }}
         >
-          <div className="hidden w-full gap-6 lg:grid lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start">
+          <div className="w-full gap-6 lg:grid lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start">
           <aside className="hidden self-start rounded-2xl border-[1.5px] border-gray-200 bg-white p-4 shadow-sm lg:sticky lg:top-6 lg:block dark:border-[#3F3F3F] dark:bg-[#323232] dark:shadow-[0_8px_22px_rgba(0,0,0,0.28),0_24px_52px_rgba(0,0,0,0.24)]">
             <nav className="space-y-1">
               <button
@@ -1801,7 +1833,7 @@ export function AccountSettingsPage({
                   className={`h-5 w-5 stroke-[2.2] ${activeSettingsTab === "security" ? "text-[#5B38E6] dark:text-white" : "text-gray-600 dark:text-zinc-400"}`}
                   aria-hidden
                 />
-                <span>Security</span>
+                <span>Security &amp; data</span>
               </button>
               <button
                 type="button"
@@ -1844,6 +1876,7 @@ export function AccountSettingsPage({
                 <p className="px-3 text-xs font-medium text-rose-600 dark:text-rose-400">{billingPortalError}</p>
               ) : null}
             </nav>
+
             <div className="mt-4 border-t border-gray-200 pt-4 dark:border-[#3F3F3F]">
               <div className="space-y-1.5">
                 <a
@@ -1884,6 +1917,7 @@ export function AccountSettingsPage({
                 </a>
               </div>
             </div>
+
             <div className="mt-4 border-t border-gray-200 pt-4 dark:border-[#3F3F3F]">
               <div className="flex flex-col gap-1">
                 <Link
@@ -1904,11 +1938,11 @@ export function AccountSettingsPage({
 
           <div
             key={activeSettingsTab}
-            className="account-settings-content-pane flex w-full flex-col bg-white p-6 dark:bg-[#323232] lg:overflow-y-auto lg:rounded-2xl lg:border-[1.5px] lg:border-gray-200 lg:bg-white lg:shadow-sm lg:dark:border-[#3F3F3F] lg:dark:bg-[#323232] lg:dark:shadow-[0_8px_22px_rgba(0,0,0,0.28),0_24px_52px_rgba(0,0,0,0.24)] xl:p-7"
+            className="account-settings-content-pane flex w-[calc(100%+2rem)] min-h-[calc(100dvh-8.5rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] flex-col bg-white px-0 py-5 -mx-4 dark:bg-[#323232] sm:w-full sm:mx-0 sm:px-0 sm:py-6 lg:min-h-0 lg:overflow-y-auto lg:rounded-2xl lg:border-[1.5px] lg:border-gray-200 lg:bg-white lg:shadow-sm lg:dark:border-[#3F3F3F] lg:dark:bg-[#323232] lg:dark:shadow-[0_8px_22px_rgba(0,0,0,0.28),0_24px_52px_rgba(0,0,0,0.24)] xl:p-7"
           >
             {activeSettingsTab === "pricing" ? (
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <h2 className="text-3xl font-semibold tracking-tight text-gray-900 dark:text-zinc-100">
+                <h2 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-zinc-100 sm:text-3xl">
                   Plans & pricing
                 </h2>
                 <div className="flex flex-col items-start gap-2 text-sm text-gray-600 dark:text-zinc-400 sm:items-end sm:text-right">
@@ -1923,8 +1957,8 @@ export function AccountSettingsPage({
                 </div>
               </div>
             ) : (
-              <h2 className="text-3xl font-semibold tracking-tight text-gray-900 dark:text-zinc-100">
-                {activeSettingsTab === "security" ? "Security" : "Personal details"}
+              <h2 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-zinc-100 sm:text-3xl">
+                {activeSettingsTab === "security" ? "Security & data" : "Personal details"}
               </h2>
             )}
 
@@ -2247,16 +2281,22 @@ export function AccountSettingsPage({
             </form>
           </>
           ) : (
-            <div className="mt-4 rounded-lg border border-[#D8C8FF] bg-[#F3EEFF] px-4 py-3">
-              <p className="text-sm font-semibold text-[#5B38E6] dark:text-violet-300">
+            <div
+              className={`mt-4 rounded-lg border px-4 py-3 shadow-sm ${
+                theme === "dark"
+                  ? "border-[#4A4A4A] bg-[#2B2B2B]"
+                  : "border-[#D8C8FF] bg-[#F3EEFF]"
+              }`}
+            >
+              <p className={`text-sm font-semibold ${theme === "dark" ? "text-zinc-100" : "text-[#5B38E6]"}`}>
                 {managedByGoogle ? "Email managed by Google" : "Email changes unavailable"}
               </p>
               {managedByGoogle ? (
-                <p className="mt-1 text-sm text-[#6C47FF] dark:text-violet-200">
+                <p className={`mt-1 text-sm ${theme === "dark" ? "text-zinc-400" : "text-[#6C47FF]"}`}>
                   Your email is managed by Google and can&apos;t be changed here.
                 </p>
               ) : (
-                <p className="mt-1 text-sm text-[#6C47FF] dark:text-violet-200">
+                <p className={`mt-1 text-sm ${theme === "dark" ? "text-zinc-400" : "text-[#6C47FF]"}`}>
                   Your sign-in method manages your email address. Email changes are not available from this page.
                 </p>
               )}
@@ -2758,16 +2798,13 @@ export function AccountSettingsPage({
         <section className="mt-8 border-t border-gray-200 pt-6 dark:border-[#3F3F3F]">
           <div className="flex items-center gap-2">
             <Shield className="h-4 w-4 text-slate-600 dark:text-zinc-400" aria-hidden />
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">Security</h2>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">Two-Factor Authentication</h2>
           </div>
           <p className="mt-1 text-sm text-gray-600 dark:text-zinc-400">Keep your MergifyPDF account secure.</p>
               <div className="mt-4 space-y-6">
             <div className="flex flex-col gap-1 rounded-lg border border-gray-200 bg-white p-4 dark:border-[#3F3F3F] dark:bg-[#2B2B2B]/60">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-sm font-medium text-gray-800 dark:text-zinc-100">
-                    Two-Factor Authentication
-                  </p>
                   {!managedByGoogle && twoFactorMethod && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold leading-none text-white ring-1 ring-inset ring-emerald-700/20 dark:bg-emerald-600 dark:text-white dark:ring-emerald-500/20">
                       <CheckCircle2 className="h-3 w-3" aria-hidden />
@@ -2776,9 +2813,11 @@ export function AccountSettingsPage({
                   )}
                 </div>
                 {managedByGoogle ? (
-                  <div className="mt-3 rounded-lg border border-[#D8C8FF] bg-[#F3EEFF] px-4 py-3 text-[#5B38E6] dark:border-[#6650D6]/40 dark:bg-[#2D2250]/30 dark:text-[#B8A8FF]">
-                    <p className="text-sm font-medium">2FA unavailable for Google accounts</p>
-                    <p className="mt-1 text-sm leading-6">
+                  <div className="mt-3 space-y-1">
+                    <p className={`text-sm font-medium ${theme === "dark" ? "text-zinc-100" : "text-[#5B38E6]"}`}>
+                      2FA unavailable for Google accounts
+                    </p>
+                    <p className={`text-sm leading-6 ${theme === "dark" ? "text-zinc-400" : "text-[#6C47FF]"}`}>
                       This account uses Google sign-in, so 2FA can’t be turned on.
                     </p>
                   </div>

@@ -1,23 +1,55 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { prisma } from "@/lib/prisma";
-import { isSameOrigin } from "@/lib/requestGuards";
 
-function safeReturnUrl(origin: string, candidate: unknown) {
-  if (typeof candidate !== "string" || !candidate) return origin;
+function normalizeOrigin(origin: string) {
+  return origin.replace(/\/+$/, "");
+}
+
+function getAppBaseUrl(req: NextRequest) {
+  return (
+    process.env.NEXT_PUBLIC_APP_URL
+    || process.env.NEXTAUTH_URL
+    || req.headers.get("origin")
+    || req.nextUrl.origin
+  );
+}
+
+function getAllowedOrigins(req: NextRequest) {
+  const origins = new Set<string>();
+  const candidates = [
+    process.env.NEXT_PUBLIC_APP_URL,
+    process.env.NEXTAUTH_URL,
+    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+    req.headers.get("origin"),
+    req.nextUrl.origin,
+  ];
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    origins.add(normalizeOrigin(candidate));
+  }
+  const forwardedHost = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+  if (forwardedHost) {
+    const proto = req.headers.get("x-forwarded-proto") ?? "http";
+    origins.add(`${proto}://${forwardedHost}`);
+  }
+  return origins;
+}
+
+function safeReturnUrl(req: NextRequest, candidate: unknown) {
+  const fallback = getAppBaseUrl(req);
+  if (typeof candidate !== "string" || !candidate) return fallback;
   try {
+    const allowedOrigins = getAllowedOrigins(req);
     const url = new URL(candidate);
-    if (url.origin !== origin) return origin;
-    return url.toString();
+    if (allowedOrigins.has(normalizeOrigin(url.origin))) return url.toString();
+    return fallback;
   } catch {
-    return origin;
+    return fallback;
   }
 }
 
 export async function POST(req: NextRequest) {
-  if (!isSameOrigin(req)) {
-    return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
-  }
   const [{ authOptions }, { resolveStripeCustomerIdForUser }, { getStripe }] = await Promise.all([
     import("@/lib/authOptions"),
     import("@/lib/stripeCustomers"),
@@ -39,8 +71,7 @@ export async function POST(req: NextRequest) {
     body = null;
   }
 
-  const origin = req.nextUrl.origin;
-  const returnUrl = safeReturnUrl(origin, (body as { returnUrl?: unknown } | null)?.returnUrl);
+  const returnUrl = safeReturnUrl(req, (body as { returnUrl?: unknown } | null)?.returnUrl);
 
   try {
     const user = await prisma.user.findUnique({

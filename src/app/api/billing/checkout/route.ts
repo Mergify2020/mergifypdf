@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { getStripe } from "@/lib/stripe";
-import { isSameOrigin } from "@/lib/requestGuards";
 import { prisma } from "@/lib/prisma";
 import { randomUUID } from "crypto";
 import { captureServerEvent } from "@/lib/posthogServer";
@@ -14,9 +13,6 @@ import {
 } from "@/lib/billingPlans";
 
 export async function POST(req: NextRequest) {
-  if (!isSameOrigin(req)) {
-    return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
-  }
   const stripe = getStripe();
   const session = await getServerSession(authOptions);
 
@@ -52,7 +48,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const origin = req.nextUrl.origin;
+    const origin = req.headers.get("origin") ?? req.nextUrl.origin;
     const successUrl = `${origin}/pricing?status=success`;
     const cancelUrl = `${origin}/pricing?canceled=true`;
 
