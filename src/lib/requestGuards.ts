@@ -44,6 +44,8 @@ export function isSameOrigin(req: Request) {
     return Boolean(requestHostname && allowedHosts.has(requestHostname));
   }
 
+  if (!normalizedOrigin) return false;
+
   if (allowedOrigins.has(normalizedOrigin)) return true;
 
   try {
