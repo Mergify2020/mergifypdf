@@ -20,7 +20,7 @@ export default function TrashProjectActions({ projectId }: Props) {
   const DELETE_PROGRESS_MS = 1100;
   const router = useRouter();
   const { data: session } = useSession();
-  const ownerKey = session?.user?.id ?? session?.user?.email ?? null;
+  const ownerKey = session?.user?.id ?? null;
   const [isPending, startTransition] = useTransition();
   const [busy, setBusy] = useState<"restore" | "delete" | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);

@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { signIn } from "next-auth/react";
+import { submitGoogleSignIn } from "@/lib/googleSignIn";
 
 type Step = "form" | "verify";
 
@@ -422,7 +422,10 @@ export default function RegisterPage() {
                       setGoogleBusy(true);
                       setErr(null);
                       setInfo(null);
-                      await signIn("google", { callbackUrl: "/" });
+                      await submitGoogleSignIn({
+                        callbackUrl: "/",
+                        loginHint: email.trim() ? email.trim().toLowerCase() : null,
+                      });
                     } catch {
                       setGoogleBusy(false);
                       setErr("Google login failed. Please try again.");

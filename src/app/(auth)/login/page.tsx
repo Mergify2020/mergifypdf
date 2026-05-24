@@ -3,6 +3,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { getSession, signIn } from "next-auth/react";
+import { submitGoogleSignIn } from "@/lib/googleSignIn";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -104,7 +105,10 @@ export default function LoginPage() {
     if (actionBusy) return;
     try {
       setGoogleBusy(true);
-      await signIn("google", { callbackUrl });
+      await submitGoogleSignIn({
+        callbackUrl,
+        loginHint: email.trim() ? email.trim().toLowerCase() : null,
+      });
       // No setGoogleBusy(false) here; page will unmount on redirect
     } catch {
       setGoogleBusy(false);

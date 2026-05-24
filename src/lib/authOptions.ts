@@ -118,20 +118,23 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
       authorization: {
         params: {
-          prompt: "select_account",
+          prompt: "select_account consent",
           access_type: "offline",
           response_type: "code",
         },
       },
-      /** If an email already exists (credentials) let Google link to it again */
-      allowDangerousEmailAccountLinking: true,
     }),
   ],
 
   callbacks: {
     async jwt({ token, account, user, profile, trigger, session }) {
-      const userId = token.sub ?? user?.id;
+      const freshUserId = user?.id ?? null;
+      const userId = freshUserId ?? token.sub;
       if (!userId) return token;
+
+      if (freshUserId) {
+        token.sub = freshUserId;
+      }
 
       if (trigger === "update" && session) {
         if (typeof session.email === "string") {
@@ -167,6 +170,7 @@ export const authOptions: NextAuthOptions = {
       }
 
       if (account || !token.providers) {
+        const isFreshSignIn = account != null || user != null;
         let linkedAccounts: Array<{ provider: string }> = [];
         if (isProduction && !isPrismaDatabaseCooldownActive()) {
           try {
@@ -182,7 +186,7 @@ export const authOptions: NextAuthOptions = {
 
         const providerIds = new Set<string>(linkedAccounts.map((entry) => entry.provider));
         if (account?.provider) providerIds.add(account.provider);
-        if (providerIds.size === 0) {
+        if (!isFreshSignIn && providerIds.size === 0) {
           const existingProviders = Array.isArray(token.providers) ? token.providers : [];
           existingProviders.forEach((provider) => {
             if (typeof provider === "string") providerIds.add(provider);

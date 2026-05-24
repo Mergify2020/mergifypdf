@@ -37,7 +37,7 @@ export default function SettingsMenu({
   const [billingPortalPending, setBillingPortalPending] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [themeHydrated, setThemeHydrated] = useState(false);
-  const avatarKey = session?.user?.id ?? session?.user?.email ?? null;
+  const avatarKey = session?.user?.id ?? null;
   const { avatar } = useAvatarPreference(avatarKey);
   const showProfileSkeleton = sessionStatus === "loading";
   const profileName = (session?.user?.name ?? "").trim();

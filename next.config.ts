@@ -17,15 +17,13 @@ const nextConfig: NextConfig = {
     },
   },
   allowedDevOrigins: [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://[::1]:3000",
-    "http://172.30.190.27:3000",
-    "http://10.0.0.163:3000",
-    "http://10.0.0.163",
-    "http://0.0.0.0:3000",
-    "10.0.0.163:3000",
+    "localhost",
+    "127.0.0.1",
+    "::1",
+    "172.30.190.27",
     "10.0.0.163",
+    "0.0.0.0",
+    "*.app.github.dev",
   ],
 
   webpack: (config) => {

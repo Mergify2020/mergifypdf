@@ -62,6 +62,7 @@ import PendingFilesReorderList from "@/components/PendingFilesReorderList";
 import WorkspaceLaunchLoadingState from "@/components/WorkspaceLaunchLoadingState";
 import BillingStatusBanner from "@/components/BillingStatusBanner";
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
+import { resetAuthScopedClientState } from "@/lib/authClientState";
 import { getAvatarFallback } from "@/lib/avatarFallback";
 import { useWorkspaceFilePreloader, type PendingWorkspaceFile } from "@/components/useWorkspaceFilePreloader";
 import { uploadProjectPreviewFromFile } from "@/lib/projectPreview";
@@ -411,8 +412,9 @@ export default function WorkspaceShell({
   const existingProjectOverlaySafetyTimerRef = useRef<number | null>(null);
   const wasStudioRouteRef = useRef(false);
   const homeProjectsSearchInputRef = useRef<HTMLInputElement | null>(null);
-  const avatarKey = session?.user?.id ?? session?.user?.email ?? null;
+  const avatarKey = session?.user?.id ?? null;
   const { avatar } = useAvatarPreference(avatarKey);
+  const lastSessionUserIdRef = useRef<string | null>(null);
   const [stableProfile, setStableProfile] = useState<{ name: string; email: string }>(() => {
     const initialNameRaw = typeof initialProfile?.name === "string" ? initialProfile.name.trim() : "";
     const initialName = isPlaceholderProfileName(initialNameRaw) ? "" : initialNameRaw;
@@ -526,16 +528,28 @@ export default function WorkspaceShell({
   }, [workspaceLaunchOverlayOpen]);
 
   useEffect(() => {
+    const nextUserId = session?.user?.id ?? null;
     const nextNameRaw = (session?.user?.name ?? "").trim();
     const nextName = isPlaceholderProfileName(nextNameRaw) ? "" : nextNameRaw;
     const nextEmail = (session?.user?.email ?? "").trim();
+    const nextProfile = {
+      name: nextName || nextEmail || "",
+      email: nextEmail || "",
+    };
+
+    if (lastSessionUserIdRef.current !== nextUserId) {
+      lastSessionUserIdRef.current = nextUserId;
+      setStableProfile(nextUserId ? nextProfile : { name: "", email: "" });
+      return;
+    }
+
     if (!nextName && !nextEmail) return;
     if (sessionStatus === "loading" && stableProfile.name) return;
     setStableProfile((prev) => ({
-      name: nextName || nextEmail || prev.name || "",
-      email: nextEmail || prev.email || "",
+      name: nextProfile.name || prev.name || "",
+      email: nextProfile.email || prev.email || "",
     }));
-  }, [session?.user?.email, session?.user?.name, sessionStatus, stableProfile.name]);
+  }, [session?.user?.id, session?.user?.email, session?.user?.name, sessionStatus, stableProfile.name]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -802,7 +816,10 @@ export default function WorkspaceShell({
 
     try {
       setSigningOut(true);
-      await signOut({ callbackUrl: "/login" });
+      resetAuthScopedClientState(session?.user?.id ?? null, null);
+      await signOut({ redirect: false, callbackUrl: "/login" });
+      router.replace("/login");
+      router.refresh();
     } finally {
       setSigningOut(false);
     }

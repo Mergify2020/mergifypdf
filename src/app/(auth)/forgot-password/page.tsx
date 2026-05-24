@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { signIn } from "next-auth/react";
+import { submitGoogleSignIn } from "@/lib/googleSignIn";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -317,7 +317,10 @@ export default function ForgotPasswordPage() {
                       setGoogleBusy(true);
                       setMessage(null);
                       setIsError(false);
-                      await signIn("google", { callbackUrl: "/" });
+                      await submitGoogleSignIn({
+                        callbackUrl: "/",
+                        loginHint: email.trim() ? email.trim().toLowerCase() : null,
+                      });
                     } catch {
                       setGoogleBusy(false);
                       // no-op; this button is secondary to the reset flow

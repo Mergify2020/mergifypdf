@@ -23,7 +23,7 @@ export default function TrashHeaderControls({ accountName, accountEmail }: Trash
   const profileEmail = (session?.user?.email ?? accountEmail ?? "").trim();
   const hasProfileInfo = Boolean(profileName || profileEmail);
   const avatar = (session?.user as { image?: string | null } | undefined)?.image ?? null;
-  const avatarKey = session?.user?.id ?? session?.user?.email ?? profileEmail ?? profileName ?? null;
+  const avatarKey = session?.user?.id ?? null;
   const fallbackAvatar = getAvatarFallback(avatarKey, profileName || profileEmail || null);
   const showAvatarImage = Boolean(avatar) && !avatarLoadFailed;
 

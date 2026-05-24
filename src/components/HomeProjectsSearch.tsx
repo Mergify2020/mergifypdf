@@ -96,13 +96,7 @@ export default function HomeProjectsSearch({
 }: Props) {
   const queryBridge = useWorkspaceHomeQuery();
   const query = queryBridge?.query ?? "";
-  const [projectsState, setProjectsState] = useState<SummaryProject[]>(() => {
-    if (typeof window !== "undefined" && ownerKey) {
-      const cached = getProjectsSummaryCache(ownerKey);
-      if (cached) return mapProjectsFromSummary(cached, projects);
-    }
-    return projects;
-  });
+  const [projectsState, setProjectsState] = useState<SummaryProject[]>(projects);
   const [projectsLoading, setProjectsLoading] = useState(() => projects.length === 0);
   const initialProjects = useMemo(() => projectsState, [projectsState]);
   const hasProjects = (projectsState.length ?? 0) > 0;
@@ -119,10 +113,9 @@ export default function HomeProjectsSearch({
   useEffect(() => {
     if (!ownerKey) return;
     const cached = getProjectsSummaryCache(ownerKey);
+    const nextProjects = cached ? mapProjectsFromSummary(cached, projects) : projects;
     const frame = window.requestAnimationFrame(() => {
-      if (cached) {
-        setProjectsState(mapProjectsFromSummary(cached, projects));
-      }
+      setProjectsState(nextProjects);
       setProjectsLoading(projects.length === 0 && !cached);
     });
     return () => {

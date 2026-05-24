@@ -21,6 +21,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return authedWorkspace ? (
     <WorkspaceShell
+      key={session?.user?.id ?? "guest"}
       initialSidebarExpanded={initialSidebarExpanded}
       initialTheme={initialTheme}
       initialProfile={{

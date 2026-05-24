@@ -231,7 +231,7 @@ export function AccountSettingsPage({
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
   const [passwordSubmitAttempted, setPasswordSubmitAttempted] = useState(false);
   const accountEmail = email || session?.user?.email || null;
-  const avatarKey = session?.user?.id ?? session?.user?.email ?? null;
+  const avatarKey = session?.user?.id ?? null;
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const accountNameFromSavedFields = [savedFirstName.trim(), savedLastName.trim()].filter(Boolean).join(" ");
   const accountName =

@@ -128,6 +128,7 @@ async function AllProjectsContent() {
           >
             <div className="flex h-full min-h-0 w-full flex-col">
               <HomeProjectsSearch
+                key={userId}
                 accountName={displayName}
                 ownerKey={userId}
                 projects={summaryProjects}

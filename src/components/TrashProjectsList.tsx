@@ -80,7 +80,7 @@ export default function TrashProjectsList({ projects, accountName, accountEmail 
   const now = Date.now();
   const router = useRouter();
   const { data: session } = useSession();
-  const ownerKey = session?.user?.id ?? session?.user?.email ?? null;
+  const ownerKey = session?.user?.id ?? null;
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [bulkBusy, setBulkBusy] = useState<null | "restore" | "delete">(null);

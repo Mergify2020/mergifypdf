@@ -100,6 +100,25 @@ export function clearProjectsSummaryCache(ownerKey: string | null | undefined) {
   notify({ ownerKey, projects: null });
 }
 
+export function clearAllProjectsSummaryCache() {
+  if (typeof window === "undefined") return;
+  memoryCache.clear();
+  inFlightRefreshes.clear();
+  try {
+    const keys: string[] = [];
+    for (let index = 0; index < window.sessionStorage.length; index += 1) {
+      const key = window.sessionStorage.key(index);
+      if (key && key.startsWith(CACHE_PREFIX)) {
+        keys.push(key);
+      }
+    }
+    keys.forEach((key) => window.sessionStorage.removeItem(key));
+  } catch {
+    // ignore storage failures
+  }
+  notify({ ownerKey: null, projects: null });
+}
+
 export function subscribeProjectsSummary(listener: (update: ProjectsSummaryUpdate) => void) {
   listeners.add(listener);
   return () => {
