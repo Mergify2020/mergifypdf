@@ -29,6 +29,7 @@ export const PRICING_TIERS = [
       "Secure cloud storage",
       "Fast, reliable processing",
     ],
+    featured: false,
   },
   {
     name: "Signature Pro",
