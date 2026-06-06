@@ -8,6 +8,7 @@ import { captureServerEvent } from "@/lib/posthogServer";
 import { resolveStripeCustomerIdForUser } from "@/lib/stripeCustomers";
 import {
   ALLOWED_PRICE_IDS,
+  FREE_TRIAL_DAYS,
   getPlanTierFromPriceId,
   getTrialEligibilityForUser,
 } from "@/lib/billingPlans";
@@ -105,7 +106,7 @@ export async function POST(req: NextRequest) {
         allow_promotion_codes: true,
         subscription_data: {
           metadata: { appUserId: user.id },
-          ...(trialAllowed ? { trial_period_days: 7 } : {}),
+          ...(trialAllowed ? { trial_period_days: FREE_TRIAL_DAYS } : {}),
         },
       },
       {

@@ -31,7 +31,7 @@ export default function AppGuestShell({ children }: AppGuestShellProps) {
   return (
     <>
       <HeroHeader>
-        <div className="mx-auto grid h-[76px] w-full max-w-[1400px] grid-cols-[auto_1fr_auto] items-center px-3 sm:px-5 lg:px-8">
+        <div className="hero-shell mx-auto grid h-[56px] w-full max-w-[1280px] grid-cols-[auto_1fr_auto] items-center px-4 transition-all duration-150 ease-out sm:px-5 lg:px-6">
           <div className="flex items-center gap-3">
             <AppHeaderBrand
               logoLightSrc="/logos/home-expanded-sidebar-logo-light-v6.svg"
@@ -54,7 +54,7 @@ export default function AppGuestShell({ children }: AppGuestShellProps) {
           </div>
         </div>
       </HeroHeader>
-      <main className="pt-[calc(76px+env(safe-area-inset-top))]">{children}</main>
+      <main className="pt-[calc(56px+env(safe-area-inset-top)+10px)]">{children}</main>
       <Footer />
     </>
   );

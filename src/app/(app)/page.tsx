@@ -1,12 +1,13 @@
 import { redirect } from "next/navigation";
 import { getServerSessionSafe } from "@/lib/serverSession";
-import HeroStats from "@/components/HeroStats";
 import HeroFeatureArea from "@/components/HeroFeatureArea";
 import LogoCarousel from "@/components/LogoCarousel";
 import { hasUsedToday } from "@/lib/quota";
 import RevealOnScroll from "@/components/RevealOnScroll";
-import HeroUploadAndBullets from "@/components/HeroUploadAndBullets";
+import HeroUploadCard from "@/components/HeroUploadCard";
 import FeaturesAutoScroll from "@/components/FeaturesAutoScroll";
+import LandingImpactStats from "@/components/LandingImpactStats";
+import LandingScrollbarTone from "@/components/LandingScrollbarTone";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -53,71 +54,53 @@ export default async function Home({
 
 function MarketingLanding() {
   return (
-    <div className="bg-[#F6F8FF]">
+    <div className="bg-[#050510]">
+      <LandingScrollbarTone />
       <FeaturesAutoScroll />
-      <section className="relative -mt-[calc(76px+env(safe-area-inset-top))] w-full min-h-[46vh] overflow-hidden pt-[calc(76px+env(safe-area-inset-top))] lg:min-h-[50vh]">
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#2F109C] via-[#6156E6] to-[#7A9CFF]" />
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_18%,rgba(255,255,255,0.2),transparent_45%),radial-gradient(circle_at_85%_25%,rgba(255,255,255,0.16),transparent_42%)]" />
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(115deg,rgba(255,255,255,0.18)_0%,rgba(255,255,255,0)_40%,rgba(255,255,255,0)_100%)]" />
-        <div className="pointer-events-none absolute left-[-10%] top-[-10%] h-[260px] w-[520px] bg-[radial-gradient(ellipse_at_top_left,rgba(255,255,255,0.45),rgba(255,255,255,0)_70%)]" />
-        <div className="pointer-events-none absolute right-[-10%] top-[-10%] h-[260px] w-[520px] bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.45),rgba(255,255,255,0)_70%)]" />
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(0,0,0,0.22),transparent_55%)]" />
-        <div className="pointer-events-none absolute inset-0 opacity-[0.08] bg-[linear-gradient(rgba(255,255,255,0.35)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.35)_1px,transparent_1px)] [background-size:22px_22px]" />
-        <div className="relative mx-auto w-full max-w-[1400px] px-4 pt-6 pb-8 sm:px-6 sm:pt-10 sm:pb-10 lg:px-8 lg:pt-12 lg:pb-12">
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,620px)_minmax(0,760px)] lg:items-stretch">
-            <div className="space-y-5 text-center lg:col-start-1 lg:flex lg:h-full lg:flex-col lg:self-stretch lg:space-y-7 lg:pt-3 lg:text-left">
-              <RevealOnScroll as="div">
-                <h1 className="text-[clamp(2rem,3.2vw,2.8rem)] font-bold leading-[1.08] tracking-tight text-white drop-shadow-[0_1px_2px_rgba(15,23,42,0.6)] lg:text-balance">
-                  Merge, edit, and sign documents in minutes.
+      <section className="relative -mt-[calc(76px+env(safe-area-inset-top))] w-full overflow-hidden pt-[calc(76px+env(safe-area-inset-top))]">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_-5%,rgba(139,124,255,0.35),transparent_36%),radial-gradient(circle_at_18%_18%,rgba(79,70,229,0.28),transparent_32%),radial-gradient(circle_at_82%_20%,rgba(14,165,233,0.16),transparent_28%),linear-gradient(180deg,#050816_0%,#050816_48%,#090b16_100%)]" />
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(115deg,rgba(255,255,255,0.07)_0%,rgba(255,255,255,0)_34%,rgba(255,255,255,0)_100%)]" />
+        <div className="pointer-events-none absolute inset-0 opacity-[0.08] bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.22)_1px,transparent_1px)] [background-size:20px_20px]" />
+        <div className="relative mx-auto flex w-full max-w-[1400px] flex-col items-center px-4 pb-8 pt-5 text-center sm:px-6 sm:pb-10 sm:pt-8 lg:px-8 lg:pb-12 lg:pt-9">
+          <div className="max-w-4xl">
+            <RevealOnScroll as="div">
+              <div className="relative mx-auto max-w-4xl">
+                <h1 className="text-balance text-[clamp(2.25rem,5.2vw,4.1rem)] font-semibold tracking-[-0.05em] text-white sm:leading-[0.96]">
+                  Work with PDFs from a single powerful workspace.
                 </h1>
-              </RevealOnScroll>
-              <RevealOnScroll as="div">
-                <p className="text-[1.125rem] font-bold leading-relaxed text-white drop-shadow-[0_1px_2px_rgba(15,23,42,0.6)]">
-                  No installs. No clutter. Upload and finish fast.{" "}
-                  <span className="whitespace-nowrap lg:block lg:whitespace-normal">
-                    Your work stays saved.
-                  </span>
-                </p>
-              </RevealOnScroll>
-              <RevealOnScroll
-                as="div"
-                className="hidden text-left lg:-mt-[3px] lg:mt-auto lg:flex lg:flex-1 lg:flex-col lg:gap-4"
-              >
-                <div className="flex flex-col items-start gap-y-3 text-sm text-white/80 lg:mt-[15px]">
-                  {[
-                    "Upload and start instantly",
-                    "Fast, reliable, and secure",
-                    "Runs right in your browser",
-                  ].map((badge) => (
-                    <div key={badge} className="flex items-center gap-3 text-[1rem] font-semibold lg:gap-5">
-                      <span
-                        className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-[12px] text-white shadow-[0_8px_18px_rgba(15,23,42,0.22),0_1px_3px_rgba(15,23,42,0.28)]"
-                        aria-hidden="true"
-                      >
-                        ✓
-                      </span>
-                      <span className="font-bold text-white drop-shadow-[0_1px_2px_rgba(15,23,42,0.6)]">
-                        {badge}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex justify-start text-white/90 lg:mb-0 lg:mt-auto lg:translate-y-2">
-                  <HeroStats className="hero-stats" />
-                </div>
-              </RevealOnScroll>
-            </div>
-
-            <HeroUploadAndBullets />
+              </div>
+            </RevealOnScroll>
+            <RevealOnScroll as="div" delayMs={80}>
+              <p className="mx-auto mt-5 max-w-2xl text-pretty text-base leading-8 text-white/[0.72] sm:text-lg">
+                Everything you need to merge, edit, sign, compress, and organize documents.
+              </p>
+            </RevealOnScroll>
           </div>
+
+          <RevealOnScroll as="div" delayMs={220} className="relative mt-10 w-full max-w-[1060px]">
+            <div className="pointer-events-none absolute inset-x-10 top-6 h-28 rounded-full bg-[#8B7CFF]/20 blur-3xl" />
+            <div className="relative rounded-[34px] border border-white/10 bg-white/[0.05] p-3 shadow-[0_36px_120px_rgba(0,0,0,0.6)] ring-1 ring-white/5 backdrop-blur-xl sm:p-4">
+              <div className="rounded-[26px] border border-white/10 bg-[#0a0d1c] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:p-5">
+                <HeroUploadCard />
+              </div>
+            </div>
+          </RevealOnScroll>
+
+          <RevealOnScroll as="div" className="relative mt-4 w-full -mb-2">
+            <LogoCarousel />
+          </RevealOnScroll>
         </div>
       </section>
 
-      <RevealOnScroll as="div" className="w-full border-y border-slate-200 bg-[#fff]">
-        <LogoCarousel />
-      </RevealOnScroll>
+      <div className="relative overflow-hidden bg-[linear-gradient(180deg,#090b16_0%,#080819_46%,#0a0a1d_100%)] text-white">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(139,124,255,0.12),transparent_34%),radial-gradient(circle_at_18%_18%,rgba(79,70,229,0.07),transparent_30%),radial-gradient(circle_at_82%_16%,rgba(14,165,233,0.05),transparent_28%)]" />
+        <div className="pointer-events-none absolute inset-0 opacity-[0.055] bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.24)_1px,transparent_1px)] [background-size:22px_22px]" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-[#8B7CFF]/8 via-transparent to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-72 bg-[radial-gradient(ellipse_at_50%_100%,rgba(139,124,255,0.12),transparent_68%)]" />
+        <LandingImpactStats />
+        <HeroFeatureArea />
+      </div>
 
-      <HeroFeatureArea />
     </div>
   );
 }

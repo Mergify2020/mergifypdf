@@ -1,5 +1,6 @@
 export type BillingPlanTier = "essential_plus" | "signature_pro";
 export type BillingStatusPresentation = "none" | "active" | "trialing" | "past_due" | "unpaid";
+export const FREE_TRIAL_DAYS = 3;
 
 export const BILLING_PRICE_IDS: Record<BillingPlanTier, { monthly: string; annual: string }> = {
   essential_plus: {

@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Check, CreditCard, ShieldCheck, Download, Lock } from "lucide-react";
 import RevealOnScroll from "@/components/RevealOnScroll";
-import { BILLING_PRICE_IDS } from "@/lib/billingPlans";
+import { BILLING_PRICE_IDS, FREE_TRIAL_DAYS } from "@/lib/billingPlans";
 import PricingTierCards from "@/components/PricingTierCards";
 
 export default function PricingPlans() {
@@ -244,7 +244,7 @@ export default function PricingPlans() {
             billingPeriod={billingPeriod}
             canUseTrialForPlan={canUseTrialForPlan}
             getPrimaryActionLabel={(_, canUseTrial) =>
-              canUseTrial ? "Start 7-day trial" : "Subscribe now"
+              canUseTrial ? `Start ${FREE_TRIAL_DAYS}-day trial` : "Subscribe now"
             }
             getPrimaryActionOptions={(_, canUseTrial) => (canUseTrial ? undefined : { skipTrial: true })}
             onPrimaryAction={(tierName, options) => {
@@ -423,7 +423,7 @@ export default function PricingPlans() {
                 onClick={scrollToPricingTop}
                 className="inline-flex items-center justify-center rounded-full border border-white/20 bg-gradient-to-r from-[#6D5EF3] to-[#8B7CFF] px-9 py-3 text-base font-semibold text-white shadow-[0_14px_28px_rgba(109,94,243,0.28)] transition hover:-translate-y-0.5 hover:from-[#7567F5] hover:to-[#9486FF]"
               >
-                Start free trial →
+                Start 3-day trial →
               </button>
             </div>
           </RevealOnScroll>

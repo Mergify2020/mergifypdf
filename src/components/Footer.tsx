@@ -26,7 +26,7 @@ function SocialIcon(props: { label: string; href?: string; name: string; badge: 
 
 export default function Footer({ reveal = true }: FooterProps) {
   const footerContent = (
-      <div className="mx-auto w-full max-w-[1400px] px-4 pt-12 pb-8 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-[1400px] px-4 pt-10 pb-7 sm:px-6 lg:px-8">
         {/* Top grid */}
         <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-5 lg:gap-10">
           {/* Features */}
@@ -111,7 +111,7 @@ export default function Footer({ reveal = true }: FooterProps) {
         </div>
 
         {/* Bottom bar */}
-        <div className="mt-8 border-t border-slate-700/40 pt-4">
+        <div className="mt-7 pt-3">
           <div className="flex flex-col items-start justify-between gap-3 lg:flex-row lg:items-center">
             <p className="text-xs text-slate-400 sm:text-sm">
               © 2026 MergifyPDF. All rights reserved.
@@ -122,11 +122,11 @@ export default function Footer({ reveal = true }: FooterProps) {
   );
 
   if (!reveal) {
-    return <footer className="border-t border-slate-700/40 bg-[#1E2230] text-slate-300">{footerContent}</footer>;
+    return <footer className="bg-[#1E2230] text-slate-300">{footerContent}</footer>;
   }
 
   return (
-    <RevealOnScroll as="footer" variant="fade" className="border-t border-slate-700/40 bg-[#1E2230] text-slate-300">
+    <RevealOnScroll as="footer" variant="fade" className="bg-[#1E2230] text-slate-300">
       {footerContent}
     </RevealOnScroll>
   );

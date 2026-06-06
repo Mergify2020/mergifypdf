@@ -1,284 +1,125 @@
+import LandingPricingCards from "@/components/LandingPricingCards";
 import RevealOnScroll from "@/components/RevealOnScroll";
 import FaqAccordion from "@/components/FaqAccordion";
 
-type FeatureBox = {
-  title: string;
-  description: string;
-  icon: string;
-};
-
-const FEATURE_ILLUSTRATIONS: Record<string, string> = {
-  "Merge Documents": "/illustrations/merge-documents-illustration.svg",
-  "Edit & Annotate": "/illustrations/edit&annotate-illustration.svg",
-  "Sign Documents": "/illustrations/sign-documents-illustration.svg",
-  "Reorder Pages": "/illustrations/reorder-documents-illustration.svg",
-  "Add or Remove Pages": "/illustrations/add-documents-illustration.svg",
-  "Extract Pages": "/illustrations/extract-pages-illustration.svg",
-  "Split Documents": "/illustrations/split-documents-illustration.svg",
-  "Rotate Pages": "/illustrations/rotate-document-illustration.svg",
-};
-
-const FEATURE_BOXES: FeatureBox[] = [
-  {
-    title: "Merge Documents",
-    description: "Deliver one polished PDF from multiple files.",
-    icon: "🧩",
-  },
-  {
-    title: "Edit & Annotate",
-    description: "Clarify feedback and approvals in one place.",
-    icon: "✏️",
-  },
-  {
-    title: "Sign Documents",
-    description: "Collect signatures quickly without leaving the browser.",
-    icon: "✍️",
-  },
-  {
-    title: "Reorder Pages",
-    description: "Present documents in the right story order.",
-    icon: "🔀",
-  },
-  {
-    title: "Add or Remove Pages",
-    description: "Keep only what matters in the final file.",
-    icon: "➕",
-  },
-  {
-    title: "Extract Pages",
-    description: "Share just the pages people actually need.",
-    icon: "📤",
-  },
-  {
-    title: "Rotate Pages",
-    description: "Ensure every page reads perfectly.",
-    icon: "🔁",
-  },
-  {
-    title: "Split Documents",
-    description: "Break large PDFs into ready-to-send parts.",
-    icon: "✂️",
-  },
+const FEATURE_CARDS = [
+  { title: "Merge Documents", description: "Combine PDFs into one file.", emoji: "🧩" },
+  { title: "Reorder Pages", description: "Move pages into the right order.", emoji: "↕️" },
+  { title: "Edit & Annotate", description: "Add notes, highlights, and markups.", emoji: "📝" },
+  { title: "Sign Documents", description: "Add signatures in the browser.", emoji: "✍️" },
+  { title: "Compress PDFs", description: "Reduce file size without losing quality.", emoji: "📦" },
+  { title: "Split PDFs", description: "Split large PDFs into smaller files.", emoji: "✂️" },
+  { title: "Add or Remove Pages", description: "Build the final version easily.", emoji: "➕" },
+  { title: "Extract Pages", description: "Pull out only the pages you need.", emoji: "📄" },
+  { title: "Rotate Pages", description: "Fix page orientation fast.", emoji: "🔁" },
+  { title: "Add Text", description: "Type directly on any page.", emoji: "🅰️" },
+  { title: "Collect Signatures", description: "Send docs out and track approvals.", emoji: "✅" },
+  { title: "Watermark PDFs", description: "Add a visible mark for sharing.", emoji: "💧" },
+  { title: "Convert Files", description: "Convert PDFs and clean files fast.", emoji: "🔄" },
+  { title: "Organize Documents", description: "Keep pages and versions organized.", emoji: "🗂️" },
+  { title: "Add Images", description: "Add logos, photos, or visuals.", emoji: "🖼️" },
+  { title: "Forms & Templates", description: "Fill fields and reuse layouts.", emoji: "📋" },
 ];
 
-const FAQS = [
-  {
-    question: "What is MergifyPDF?",
-    answer:
-      "MergifyPDF is a browser-based workspace for working with documents. It brings essential document tools into one place so you can get things done quickly—without installs or complicated software.",
-  },
-  {
-    question: "What’s included in the 7-day free trial?",
-    answer:
-      "You get full access to every tool and workspace feature for 7 days—free. We’ll remind you before the trial ends.",
-  },
-  {
-    question: "Is MergifyPDF secure?",
-    answer:
-      "Yes. Your documents are protected using encryption and strict access controls designed to keep your files private.",
-  },
-  {
-    question: "Does MergifyPDF have an app?",
-    answer:
-      "No app is required. MergifyPDF works directly in your browser on desktop and mobile, so you can start instantly. We’re actively developing a dedicated app.",
-  },
-  {
-    question: "Who is MergifyPDF best for?",
-    answer:
-      "MergifyPDF is ideal for anyone who works with documents regularly and wants powerful tools without the complexity of traditional document software.",
-  },
-];
+
 
 export default function HeroFeatureArea() {
   return (
-    <section id="features" className="bg-[#F6F8FF]">
-      <div className="mx-auto w-full max-w-[1400px] px-4 py-10 sm:px-6 lg:px-8">
-        {/* Feature grid */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 sm:gap-5">
-          {FEATURE_BOXES.map((feature, index) => (
-            <RevealOnScroll
-              key={feature.title}
-              delayMs={index * 80}
-              className="relative flex h-full flex-col items-center rounded-2xl border border-slate-200 bg-white/80 p-4 text-center shadow-[0_1px_3px_rgba(15,23,42,0.08)] backdrop-blur-sm transition-shadow duration-200 hover:border-slate-300 hover:shadow-[0_0_0_1px_rgba(148,163,184,0.35)] sm:p-5"
-            >
-              <div className="mb-5 flex h-28 w-full items-center justify-center sm:h-32">
-                {FEATURE_ILLUSTRATIONS[feature.title] ? (
-                  <img
-                    src={FEATURE_ILLUSTRATIONS[feature.title]}
-                    alt=""
-                    className="h-full w-auto object-contain"
-                    aria-hidden="true"
-                  />
-                ) : (
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-50 sm:h-12 sm:w-12">
-                    <span className="text-xl sm:text-2xl" aria-hidden>
-                      {feature.icon}
-                    </span>
-                  </div>
-                )}
-              </div>
-              <h3 className="text-[19px] font-bold text-slate-950 sm:text-xl">
-                {feature.title}
-              </h3>
-              <p className="mt-1 text-xs leading-[1.7] text-slate-600 sm:text-sm mb-0">
-                {feature.description}
-              </p>
-            </RevealOnScroll>
-          ))}
-        </div>
+    <section id="features" className="relative overflow-hidden text-white">
+      <div className="relative mx-auto w-full max-w-[1440px] px-4 pb-14 pt-12 sm:px-6 lg:px-8 lg:pb-20 lg:pt-16">
+        <RevealOnScroll as="div" className="mx-auto max-w-3xl text-center">          <h2 className="mt-3 text-balance text-[clamp(2rem,4vw,3.5rem)] font-semibold tracking-[-0.05em] text-white">
+            Handle every PDF task in one place.
+          </h2>
+          <p className="mx-auto mt-4 max-w-2xl text-pretty text-base leading-7 text-white/68 sm:text-lg">
+            Merge, edit, sign, compress, and organize files without jumping between tools.
+          </p>
+        </RevealOnScroll>
 
-        <div className="mt-12 border-t border-slate-200/70 pt-10 pb-8 sm:pb-10">
-          <RevealOnScroll as="div">
-            <h2 className="text-center text-[1.65rem] font-semibold tracking-tight text-slate-900 sm:text-3xl">
-              Why choose MergifyPDF
-            </h2>
-          </RevealOnScroll>
-          <div className="mt-8 grid grid-cols-2 gap-3 text-center sm:gap-6 lg:grid-cols-4 lg:text-left">
-            <RevealOnScroll className="relative flex h-full flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-white/80 p-4 text-center shadow-[0_1px_3px_rgba(15,23,42,0.08)] backdrop-blur-sm transition-shadow duration-200 hover:border-slate-300 hover:shadow-[0_0_0_1px_rgba(148,163,184,0.35)] sm:items-start sm:gap-4 sm:p-6 sm:text-left" delayMs={0}>
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-indigo-50 via-white to-indigo-100 text-indigo-600/70 ring-1 ring-indigo-100/70">
-                <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6">
-                  <path
-                    d="M6 5h12a2 2 0 0 1 2 2v11a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V7a2 2 0 0 1 2-2Z"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeLinejoin="round"
-                    strokeWidth="1.6"
-                  />
-                  <path
-                    d="M8 3v4M16 3v4M4 10h16M8 14h3M13 14h3"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="1.6"
-                  />
-                  <path
-                    d="m9 17 2 2 4-4"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="1.6"
-                  />
-                </svg>
-              </div>
-              <p className="text-sm font-semibold text-slate-900">Free 7-Day Trial</p>
-              <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                Try every feature risk-free. No commitment.
-              </p>
-            </RevealOnScroll>
-            <RevealOnScroll className="relative flex h-full flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-white/80 p-4 text-center shadow-[0_1px_3px_rgba(15,23,42,0.08)] backdrop-blur-sm transition-shadow duration-200 hover:border-slate-300 hover:shadow-[0_0_0_1px_rgba(148,163,184,0.35)] sm:items-start sm:gap-4 sm:p-6 sm:text-left" delayMs={80}>
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-indigo-50 via-white to-indigo-100 text-indigo-600/70 ring-1 ring-indigo-100/70">
-                <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6">
-                  <path
-                    d="M13.5 2 5 13h5l-1 9 9.5-12h-5L13.5 2Z"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeLinejoin="round"
-                    strokeWidth="1.6"
-                  />
-                </svg>
-              </div>
-              <p className="text-sm font-semibold text-slate-900">No Printing. No Scanning.</p>
-              <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                Fill out and sign documents digitally - skip the paper process.
-              </p>
-            </RevealOnScroll>
-            <RevealOnScroll className="relative flex h-full flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-white/80 p-4 text-center shadow-[0_1px_3px_rgba(15,23,42,0.08)] backdrop-blur-sm transition-shadow duration-200 hover:border-slate-300 hover:shadow-[0_0_0_1px_rgba(148,163,184,0.35)] sm:items-start sm:gap-4 sm:p-6 sm:text-left" delayMs={160}>
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-indigo-50 via-white to-indigo-100 text-indigo-600/70 ring-1 ring-indigo-100/70">
-                <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6">
-                  <path
-                    d="M4 8l8-4 8 4-8 4-8-4Z"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeLinejoin="round"
-                    strokeWidth="1.6"
-                  />
-                  <path
-                    d="M4 12l8 4 8-4M4 16l8 4 8-4"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeLinejoin="round"
-                    strokeWidth="1.6"
-                  />
-                </svg>
-              </div>
-              <p className="text-sm font-semibold text-slate-900">Everything in One Workspace</p>
-              <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                Edit, merge, and send documents without switching between tools.
-              </p>
-            </RevealOnScroll>
-            <RevealOnScroll className="relative flex h-full flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-white/80 p-4 text-center shadow-[0_1px_3px_rgba(15,23,42,0.08)] backdrop-blur-sm transition-shadow duration-200 hover:border-slate-300 hover:shadow-[0_0_0_1px_rgba(148,163,184,0.35)] sm:items-start sm:gap-4 sm:p-6 sm:text-left" delayMs={240}>
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-indigo-50 via-white to-indigo-100 text-indigo-600/70 ring-1 ring-indigo-100/70">
-                <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6">
-                  <path
-                    d="M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18Z"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeLinejoin="round"
-                    strokeWidth="1.6"
-                  />
-                  <path
-                    d="M3.5 12h17M12 3c2.2 2.2 3.3 5.2 3.3 9S14.2 18.8 12 21M12 3C9.8 5.2 8.7 8.2 8.7 12S9.8 18.8 12 21"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="1.6"
-                  />
-                </svg>
-              </div>
-              <p className="text-sm font-semibold text-slate-900">Built for Real-World Workflows</p>
-              <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                From self-signing forms to sending documents to multiple signers.
-              </p>
-            </RevealOnScroll>
-          </div>
-        </div>
+        <div className="mt-10">
+          <RevealOnScroll as="div" delayMs={40} className="mx-auto max-w-7xl">
+            <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+              {FEATURE_CARDS.map((feature, index) => {
+                const accentClass =
+                  index % 4 === 0
+                    ? "from-[#8B7CFF]/22 to-[#C1BAFF]/12"
+                    : index % 4 === 1
+                      ? "from-[#6D5EF3]/22 to-[#8B7CFF]/12"
+                      : index % 4 === 2
+                        ? "from-[#4F8CFF]/22 to-[#7EB8FF]/12"
+                        : "from-[#A56BFF]/22 to-[#C98BFF]/12";
 
-        <div className="mt-12 mb-0 border-t border-slate-200/70 pt-10">
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.08)] sm:p-6">
-          <div className="grid w-full items-center gap-8 text-center lg:grid-cols-[1.1fr_0.9fr] lg:text-left xl:grid-cols-[1fr_1fr]">
-            <RevealOnScroll as="div" className="flex justify-center lg:justify-start">
-              <img
-                src="/illustrations/hero-ipad-illustration.png"
-                alt=""
-                className="h-auto w-auto max-h-72 rounded-xl border border-slate-200/70 shadow-[0_10px_28px_rgba(15,23,42,0.10)] sm:max-h-80 lg:max-h-96"
-                aria-hidden="true"
-              />
-            </RevealOnScroll>
-            <div className="flex flex-col items-center gap-5 text-center lg:items-start lg:text-left">
-              <RevealOnScroll as="div">
-                <p className="text-center text-3xl leading-tight font-semibold text-slate-900 sm:text-4xl lg:text-[2.75rem] xl:text-[3.25rem] lg:text-left">
-                  <span className="block">Do more with your</span>
-                  <span className="block whitespace-nowrap">documents — for less.</span>
-                </p>
-                <p className="mt-3 text-center text-base leading-relaxed text-slate-600 sm:text-lg lg:text-left">
-                  No installs. No delays. Just the tools you need, at a fraction of the cost.
-                </p>
-              </RevealOnScroll>
-              <RevealOnScroll as="div" delayMs={120}>
-                <a
-                  href="/pricing"
-                  className="inline-flex items-center justify-center rounded-full border border-white/20 bg-gradient-to-r from-[#6D5EF3] to-[#8B7CFF] px-8 py-2.5 text-base font-semibold text-white shadow-[0_12px_26px_rgba(109,94,243,0.25)] transition hover:-translate-y-0.5 hover:from-[#7567F5] hover:to-[#9486FF]"
-                >
-                  Start free trial
-                </a>
-              </RevealOnScroll>
+                return (
+                  <article
+                    key={feature.title}
+                    className="group relative h-[180px] overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.045] p-5 text-left shadow-[0_10px_24px_rgba(0,0,0,0.14)] transition-all duration-300 ease-out hover:-translate-y-1 hover:border-white/18 hover:bg-white/[0.06] hover:shadow-[0_18px_42px_rgba(139,124,255,0.16)] sm:h-[184px] lg:h-[188px]"
+                  >
+                    <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${accentClass}`} />
+                    <div className="relative flex h-full flex-col gap-3">
+                      <div className={`flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br shadow-[0_8px_18px_rgba(0,0,0,0.18)] ${accentClass} border border-white/12 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]`}>
+                        <span className="text-[1.45rem] leading-none drop-shadow-[0_1px_1px_rgba(0,0,0,0.28)]" aria-hidden="true">{feature.emoji}</span>
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="line-clamp-1 text-[1rem] font-semibold tracking-[-0.02em] text-white sm:text-[1.05rem]">
+                          {feature.title}
+                        </h3>
+                        <p className="line-clamp-2 mt-1 text-sm leading-6 text-white/62">
+                          {feature.description}
+                        </p>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
-          </div>
-          </div>
-        </div>
-
-        <div className="mt-12 mb-10 border-t border-slate-200/70 pt-10">
-          <RevealOnScroll as="div">
-            <h2 className="text-center text-2xl font-semibold text-slate-900 sm:text-3xl">
-              Frequently Asked Questions
-            </h2>
           </RevealOnScroll>
-          <FaqAccordion items={FAQS} />
         </div>
 
+        <section className="mt-14">
+          <RevealOnScroll as="div" variant="fade">
+            <p className="text-center text-[12px] font-semibold uppercase tracking-[0.24em] text-white/60">
+              Pricing
+            </p>
+            <h2 className="mt-3 text-center text-[clamp(2rem,4vw,3.25rem)] font-semibold tracking-tight text-white">
+              Pick a plan.
+            </h2>
+            <p className="mx-auto mt-3 max-w-2xl text-center text-sm leading-6 text-white/68 sm:text-base">
+              Choose Essential Plus for your own documents, or Signature Pro when you send files out for signatures.
+            </p>
+          </RevealOnScroll>
+          <div className="mx-auto mt-10 w-full max-w-6xl">
+            <LandingPricingCards />
+          </div>
+        </section>
+
+        <section id="faq" className="scroll-mt-24 mt-16 pt-2">
+          <FaqAccordion
+            variant="dark"
+            items={[
+              {
+                question: "What is MergifyPDF?",
+                answer:
+                  "MergifyPDF is a browser-based PDF workspace for merging, editing, signing, and organizing files in one place.",
+              },
+              {
+                question: "What’s included in the 3-day free trial?",
+                answer: "You get full access to every tool for 3 days. We’ll remind you before the trial ends.",
+              },
+              {
+                question: "Is MergifyPDF secure?",
+                answer: "Yes. Your documents are protected with encryption and access controls designed to keep files private.",
+              },
+              {
+                question: "Does MergifyPDF have an app?",
+                answer: "No app is required. It works directly in your browser on desktop and mobile.",
+              },
+              {
+                question: "Who is MergifyPDF best for?",
+                answer:
+                  "It is best for people and teams who handle PDFs regularly and want a faster workflow than traditional document software.",
+              },
+            ]}
+          />
+        </section>
       </div>
     </section>
   );

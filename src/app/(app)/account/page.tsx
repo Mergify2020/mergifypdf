@@ -15,7 +15,7 @@ import {
   NEW_PASSWORD_REQUIREMENTS_ERROR,
   NEW_PASSWORD_REQUIREMENTS_HINT,
 } from "@/lib/passwordPolicy";
-import { BILLING_PRICE_IDS, getBillingStatusPresentation, getPlanTierFromPriceId } from "@/lib/billingPlans";
+import { BILLING_PRICE_IDS, FREE_TRIAL_DAYS, getBillingStatusPresentation, getPlanTierFromPriceId } from "@/lib/billingPlans";
 import SettingsMenu from "@/components/SettingsMenu";
 import PricingTierCards, { PRICING_TIERS } from "@/components/PricingTierCards";
 
@@ -397,7 +397,7 @@ export function AccountSettingsPage({
     }
     return null;
   })();
-  const desktopSettingsMaxWidth = "min(2064px, calc(100vw - 48px))";
+  const desktopSettingsMaxWidth = "min(2400px, calc(100vw - 24px))";
   const mobileDockItems: MobileDockItem[] = [
     {
       label: "Projects",
@@ -1528,7 +1528,7 @@ export function AccountSettingsPage({
 
   return (
     <main
-      className={`box-border flex w-full flex-col overflow-y-auto overscroll-y-contain bg-white px-4 pt-[calc(3.5rem+env(safe-area-inset-top))] pb-[calc(5rem+env(safe-area-inset-bottom))] scroll-pt-[calc(3.5rem+env(safe-area-inset-top))] scroll-pb-[calc(5rem+env(safe-area-inset-bottom))] text-slate-900 dark:bg-[#252525] dark:text-zinc-100 ${
+      className={`box-border flex w-full flex-col overflow-y-auto overscroll-y-contain bg-white px-4 pb-[calc(5rem+env(safe-area-inset-bottom))] scroll-pb-[calc(5rem+env(safe-area-inset-bottom))] text-slate-900 dark:bg-[#252525] dark:text-zinc-100 ${
         embedded ? "lg:bg-slate-100 lg:px-0 lg:pt-6 lg:pb-0 lg:scroll-pt-0 lg:scroll-pb-0" : "lg:bg-slate-100 lg:px-0 lg:pt-6 lg:pb-6 lg:overflow-visible lg:scroll-pt-0 lg:scroll-pb-0"
       }`}
       style={{ scrollbarGutter: "stable both-edges" }}
@@ -1538,7 +1538,7 @@ export function AccountSettingsPage({
           embedded ? "lg:bg-transparent" : "lg:mx-auto lg:max-w-[var(--shell-content-width)]"
         }`}
       >
-        <div className="account-settings-home-intro fixed inset-x-0 top-0 z-30 border-b border-gray-300 bg-slate-100 px-4 py-3 dark:border-[#4A4A4A] dark:bg-[#252525] lg:static lg:inset-auto lg:mx-0 lg:mb-6 lg:border-0 lg:bg-transparent lg:px-0 lg:py-0">
+        <div className="account-settings-home-intro sticky top-0 z-30 border-b border-gray-300 bg-slate-100 px-4 py-3 pt-[env(safe-area-inset-top)] dark:border-[#4A4A4A] dark:bg-[#252525] lg:static lg:inset-auto lg:mx-0 lg:mb-6 lg:border-0 lg:bg-transparent lg:px-0 lg:py-0 lg:pt-0">
           <div
             className="mx-auto flex w-full items-center justify-between gap-3 lg:grid lg:grid-cols-[280px_minmax(0,1fr)] lg:items-center lg:justify-start lg:gap-5"
             style={{ maxWidth: desktopSettingsMaxWidth }}
@@ -1938,11 +1938,11 @@ export function AccountSettingsPage({
 
           <div
             key={activeSettingsTab}
-            className="account-settings-content-pane flex w-[calc(100%+2rem)] min-h-[calc(100dvh-8.5rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] flex-col bg-white px-0 py-5 -mx-4 dark:bg-[#323232] sm:w-full sm:mx-0 sm:px-0 sm:py-6 lg:min-h-0 lg:overflow-y-auto lg:rounded-2xl lg:border-[1.5px] lg:border-gray-200 lg:bg-white lg:shadow-sm lg:dark:border-[#3F3F3F] lg:dark:bg-[#323232] lg:dark:shadow-[0_8px_22px_rgba(0,0,0,0.28),0_24px_52px_rgba(0,0,0,0.24)] xl:p-7"
+            className="account-settings-content-pane flex w-[calc(100%+2rem)] min-h-[calc(100dvh-8.5rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] flex-col bg-transparent px-0 pb-5 -mx-4 pt-0 dark:bg-transparent sm:w-full sm:mx-0 sm:px-0 sm:py-6 lg:min-h-0 lg:w-full lg:mx-0 lg:overflow-y-auto lg:rounded-2xl lg:border-[1.5px] lg:border-gray-200 lg:bg-white lg:p-7 lg:shadow-sm lg:dark:border-[#3F3F3F] lg:dark:bg-[#323232] lg:dark:shadow-[0_8px_22px_rgba(0,0,0,0.28),0_24px_52px_rgba(0,0,0,0.24)] xl:p-7"
           >
             {activeSettingsTab === "pricing" ? (
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <h2 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-zinc-100 sm:text-3xl">
+                <h2 className="hidden text-2xl font-semibold tracking-tight text-gray-900 dark:text-zinc-100 lg:block lg:text-3xl">
                   Plans & pricing
                 </h2>
                 <div className="flex flex-col items-start gap-2 text-sm text-gray-600 dark:text-zinc-400 sm:items-end sm:text-right">
@@ -1957,15 +1957,15 @@ export function AccountSettingsPage({
                 </div>
               </div>
             ) : (
-              <h2 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-zinc-100 sm:text-3xl">
+              <h2 className="hidden text-2xl font-semibold tracking-tight text-gray-900 dark:text-zinc-100 lg:block lg:text-3xl">
                 {activeSettingsTab === "security" ? "Security & data" : "Personal details"}
               </h2>
             )}
 
           {activeSettingsTab === "account" ? (
           <>
-          <section className="pt-6">
-        <dl className="mt-4 grid gap-x-6 gap-y-4 md:grid-cols-2">
+          <section className="pt-0 sm:pt-6">
+        <dl className="mt-0 grid grid-cols-2 gap-x-4 gap-y-4 max-[360px]:grid-cols-1 sm:mt-4 sm:gap-x-6">
           <div className="min-w-0">
             <dt className="text-sm font-medium text-gray-700 dark:text-zinc-300">First name</dt>
             {editingNameField === "first" ? (
@@ -2093,7 +2093,7 @@ export function AccountSettingsPage({
         {nameMessage ? <p className="mt-2 text-sm text-rose-600 dark:text-rose-400">{nameMessage}</p> : null}
         </section>
 
-        <section className="mt-8 border-t border-gray-200 pt-6 dark:border-[#3F3F3F]">
+        <section className="mt-0 sm:mt-8">
           <div className="flex items-center gap-2">
             <Mail className="h-4 w-4 text-slate-600 dark:text-zinc-400" aria-hidden />
             <h2 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">Change email</h2>
@@ -2630,7 +2630,7 @@ export function AccountSettingsPage({
                       : currentPlanTier === "Signature Pro" && tierName === "Essential Plus"
                         ? "Downgrade to Essential Plus"
                         : canUseTrial
-                          ? "Start 7-day trial"
+                          ? `Start ${FREE_TRIAL_DAYS}-day trial`
                           : "Subscribe now"
                   }
                   getPrimaryActionOptions={(_, canUseTrial) => (canUseTrial ? undefined : { skipTrial: true })}
@@ -2795,7 +2795,7 @@ export function AccountSettingsPage({
         )}
 
         {activeSettingsTab === "security" ? (
-        <section className="mt-8 border-t border-gray-200 pt-6 dark:border-[#3F3F3F]">
+        <section className="mt-0 sm:mt-8">
           <div className="flex items-center gap-2">
             <Shield className="h-4 w-4 text-slate-600 dark:text-zinc-400" aria-hidden />
             <h2 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">Two-Factor Authentication</h2>

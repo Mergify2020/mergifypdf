@@ -8,7 +8,7 @@ import { AlertTriangle, CircleHelp, CreditCard, ExternalLink, Folders, LogOut, M
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
 import { getAvatarFallback } from "@/lib/avatarFallback";
 import { getBillingStatusPresentation } from "@/lib/billingPlans";
-import { applyThemePreference, persistThemePreference, type ThemeMode } from "@/lib/theme";
+import { applyThemePreference, persistThemePreference } from "@/lib/theme";
 
 export type SettingsMenuProps = {
   variant?: "default" | "pricing";

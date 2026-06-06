@@ -23,14 +23,12 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
   const rafId = useRef<number | null>(null);
   const revertTimeoutId = useRef<number | null>(null);
   const fadeTimeoutId = useRef<number | null>(null);
-  const revertDelayMs = 1000;
+  const revertDelayMs = 80;
   const scrollThreshold = 12;
 
   useEffect(() => {
     if (!isAnimatedPage) {
-      setScrolledPastHero(false);
       lastScrolledState.current = false;
-      setFadeToGradient(false);
       if (revertTimeoutId.current !== null) {
         window.clearTimeout(revertTimeoutId.current);
         revertTimeoutId.current = null;
@@ -39,7 +37,13 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
         window.clearTimeout(fadeTimeoutId.current);
         fadeTimeoutId.current = null;
       }
-      return;
+      const resetId = window.setTimeout(() => {
+        setScrolledPastHero(false);
+        setFadeToGradient(false);
+      }, 0);
+      return () => {
+        window.clearTimeout(resetId);
+      };
     }
 
     const handleScroll = () => {
@@ -77,7 +81,7 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
               fadeTimeoutId.current = window.setTimeout(() => {
                 setFadeToGradient(false);
                 fadeTimeoutId.current = null;
-              }, 400);
+              }, 180);
             }
           }, revertDelayMs);
         }
@@ -107,7 +111,7 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
     if (!isHomePage && !isPricingPage) return;
     const meta = document.querySelector('meta[name="theme-color"]');
     if (!meta) return;
-    const color = isHomePage && !scrolledPastHero ? "#DAECFF" : "#FFFFFF";
+    const color = isHomePage ? "#050816" : "#FFFFFF";
     meta.setAttribute("content", color);
   }, [isHomePage, isPricingPage, scrolledPastHero]);
 
@@ -122,11 +126,11 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
         ? "bg-transparent"
         : "bg-gradient-to-r from-[#FDF2FF] via-[#EEF2FF] to-[#E0F7FF]";
   } else {
-    backgroundClass = "bg-white";
+    backgroundClass = isHomePage && scrolledPastHero ? "bg-transparent" : "bg-white";
   }
 
-  const shadowClass = gradientActive ? "" : "shadow-sm";
-  const borderColorClass = gradientActive ? "border-transparent" : "border-slate-200";
+  const shadowClass = gradientActive || isHomePage ? "" : "shadow-sm";
+  const borderColorClass = gradientActive || isHomePage ? "border-transparent" : "border-slate-200";
   const homeHeaderOverlay =
     isHomePage && gradientActive ? "backdrop-blur-0 shadow-none border-transparent" : "";
   const visibilityClass = "translate-y-0 opacity-100";
@@ -136,13 +140,14 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
   }
 
   const transitionClass = fadeToGradient
-    ? "transition-[background-color,box-shadow,border-color,backdrop-filter] duration-400 ease-out"
+    ? "transition-[background-color,box-shadow,border-color,backdrop-filter] duration-180 ease-out"
     : "";
 
   return (
     <header
       data-hero={gradientActive ? "true" : "false"}
-      className={`fixed top-0 left-0 right-0 z-50 w-full pt-[env(safe-area-inset-top)] ${gradientActive ? "" : "border-b"} ${backgroundClass} ${shadowClass} ${borderColorClass} ${visibilityClass} ${homeHeaderOverlay} ${transitionClass}`}
+      data-scrolled={isHomePage && scrolledPastHero ? "true" : "false"}
+      className={`fixed top-0 left-0 right-0 z-50 w-full pt-[env(safe-area-inset-top)] ${isHomePage ? "" : gradientActive ? "" : "border-b"} ${backgroundClass} ${shadowClass} ${borderColorClass} ${visibilityClass} ${homeHeaderOverlay} ${transitionClass}`}
     >
       <div className="relative z-10">{children}</div>
     </header>

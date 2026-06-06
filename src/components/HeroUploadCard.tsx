@@ -458,10 +458,8 @@ export default function HeroUploadCard() {
   const listHeight =
     visibleRows > 0 ? visibleRows * rowHeight + Math.max(0, visibleRows - 1) * 8 : 0;
   const containerClassName = isIdle
-    ? `upload-card-animate flex h-[320px] lg:h-[402px] flex-col justify-start overflow-hidden rounded-2xl border-[3px] ${
-        isIdle ? "border-dashed border-[#6D5EF3] py-6 sm:py-9" : "border-solid border-white/70 py-6"
-      } bg-gradient-to-b from-white/85 via-slate-50/90 to-white/80 px-8 shadow-[0_0_0_1px_rgba(148,163,184,0.18),0_18px_40px_rgba(15,23,42,0.08)] transition-shadow duration-200 hover:shadow-[0_0_0_1px_rgba(109,94,243,0.2),0_22px_46px_rgba(15,23,42,0.12)] active:shadow-[0_0_0_1px_rgba(109,94,243,0.2),0_16px_34px_rgba(15,23,42,0.1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6D5EF3]/40`
-    : "flex min-h-[320px] max-w-full flex-col justify-start overflow-hidden text-left";
+    ? `upload-card-animate relative isolate flex h-[320px] lg:h-[402px] flex-col justify-start overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(139,124,255,0.16),transparent_42%),linear-gradient(180deg,rgba(12,15,30,0.98)_0%,rgba(9,12,24,0.96)_100%)] px-8 py-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_0_0_1px_rgba(139,124,255,0.14),0_18px_40px_rgba(0,0,0,0.28)] backdrop-blur-xl transition-shadow duration-200 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_0_0_1px_rgba(139,124,255,0.2),0_22px_46px_rgba(0,0,0,0.36)] active:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_0_0_1px_rgba(139,124,255,0.2),0_16px_34px_rgba(0,0,0,0.3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B7CFF]/35`
+    : "relative isolate flex min-h-[320px] max-w-full flex-col justify-start overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(12,15,30,0.96)_0%,rgba(9,12,24,0.94)_100%)] text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_0_0_1px_rgba(255,255,255,0.04)] backdrop-blur-xl";
 
   return (
     <div
@@ -481,43 +479,43 @@ export default function HeroUploadCard() {
         >
           <div className="mb-2 flex justify-center sm:mb-4">
             <FileUp
-              className="h-16 w-16 text-[#6D5EF3] drop-shadow-[0_10px_26px_rgba(109,94,243,0.35)]"
+              className="h-16 w-16 text-[#A79BFF] drop-shadow-[0_10px_26px_rgba(139,124,255,0.35)]"
               aria-hidden="true"
             />
           </div>
-          <p className="hidden text-lg font-semibold text-slate-900 md:block">Drag & drop to upload</p>
+          <p className="hidden text-lg font-semibold text-white md:block">Drag & drop to upload</p>
           <div className="mt-3 hidden w-full items-center justify-center gap-3 md:flex">
-            <span className="h-[2px] w-20 bg-slate-400/90" aria-hidden="true" />
-            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">OR</span>
-            <span className="h-[2px] w-20 bg-slate-400/90" aria-hidden="true" />
+            <span className="h-[2px] w-20 bg-white/70" aria-hidden="true" />
+            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-white/85">OR</span>
+            <span className="h-[2px] w-20 bg-white/70" aria-hidden="true" />
           </div>
           <div className="mt-4 flex justify-center md:mt-3">
             <label
               htmlFor={inputId}
-              className="inline-flex items-center justify-center rounded-xl bg-[#6D5EF3] px-6 py-2.5 text-base font-semibold text-white shadow-[0_12px_24px_rgba(109,94,243,0.25)] transition hover:bg-[#7567F5] hover:shadow-[0_14px_28px_rgba(109,94,243,0.3)] active:translate-y-0.5 active:shadow-[0_10px_20px_rgba(109,94,243,0.22)] md:hidden"
+              className="press-bounce inline-flex items-center justify-center rounded-xl border border-white/20 bg-gradient-to-r from-[#6D5EF3] to-[#8B7CFF] px-6 py-2.5 text-base font-semibold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.18),0_10px_18px_rgba(109,94,243,0.24)] ring-1 ring-white/20 transition hover:-translate-y-0.5 hover:from-[#7567F5] hover:to-[#9486FF] active:translate-y-0.5 active:shadow-[0_10px_20px_rgba(109,94,243,0.22)] md:hidden"
             >
               Select files
             </label>
             <label
               htmlFor={inputId}
-              className="hidden items-center justify-center rounded-xl bg-[#6D5EF3] px-6 py-2.5 text-base font-semibold text-white shadow-[0_12px_24px_rgba(109,94,243,0.25)] transition hover:bg-[#7567F5] hover:shadow-[0_14px_28px_rgba(109,94,243,0.3)] active:translate-y-0.5 active:shadow-[0_10px_20px_rgba(109,94,243,0.22)] md:inline-flex"
+              className="press-bounce hidden items-center justify-center rounded-xl border border-white/20 bg-gradient-to-r from-[#6D5EF3] to-[#8B7CFF] px-6 py-2.5 text-base font-semibold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.18),0_10px_18px_rgba(109,94,243,0.24)] ring-1 ring-white/20 transition hover:-translate-y-0.5 hover:from-[#7567F5] hover:to-[#9486FF] active:translate-y-0.5 active:shadow-[0_10px_20px_rgba(109,94,243,0.22)] md:inline-flex"
             >
               Browse files
             </label>
           </div>
-          <p className="mt-7 text-[11px] text-slate-400 sm:mt-7">
+          <p className="mt-7 text-[11px] text-white/40 sm:mt-7">
             By uploading a file, you agree to our{" "}
-            <a href="/terms" className="text-sky-600 underline underline-offset-2">
+            <a href="/terms" className="text-sky-300 underline underline-offset-2 hover:text-sky-200">
               Terms of Service
             </a>{" "}
             and{" "}
-            <a href="/privacy" className="text-sky-600 underline underline-offset-2">
+            <a href="/privacy" className="text-sky-300 underline underline-offset-2 hover:text-sky-200">
               Privacy Policy
             </a>
             .
           </p>
           <p
-            className={`mt-1 min-h-[1rem] text-xs font-semibold text-rose-600 transition-opacity sm:mt-2 ${
+            className={`mt-1 min-h-[1rem] text-xs font-semibold text-rose-300 transition-opacity sm:mt-2 ${
               error ? "opacity-100" : "opacity-0"
             }`}
             aria-live="polite"
@@ -533,7 +531,7 @@ export default function HeroUploadCard() {
           <div className="flex w-full max-w-full flex-col px-1">
             {error ? (
               <div
-                className="mb-2 flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700"
+                className="mb-2 flex items-center gap-2 rounded-lg border border-rose-400/20 bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-200"
                 aria-live="polite"
               >
                 <Info className="h-4 w-4" aria-hidden />
@@ -543,14 +541,14 @@ export default function HeroUploadCard() {
               <div className="pb-2" />
             )}
             <div className="flex items-center justify-between pb-2 pt-1">
-              <p className="flex items-center gap-2 text-base font-semibold text-slate-900">
+              <p className="flex items-center gap-2 text-base font-semibold text-white">
                 <CheckCircle2 className="h-5 w-5 text-emerald-500" aria-hidden />
                 Ready to upload
               </p>
-              <span className="text-base font-semibold text-slate-900">{readyCount}/12</span>
+              <span className="text-base font-semibold text-white">{readyCount}/12</span>
             </div>
 
-            <div className="mt-0 overflow-hidden rounded-xl border-2 border-slate-200/80 bg-white/75 p-1">
+            <div className="mt-0 overflow-hidden rounded-xl border border-white/10 bg-[#0f1327] p-1">
               <div
                 ref={listRef}
                 className="ios-scroll-padding relative w-full max-w-full min-w-0 space-y-2 overflow-hidden"
@@ -603,7 +601,7 @@ export default function HeroUploadCard() {
                     <div key={`${file.name}-${file.size}-${index}`} className="space-y-2">
                       {showSpacer ? (
                         <div
-                          className="mx-3 rounded-lg border border-dashed border-[#6D5EF3]/70 bg-[#6D5EF3]/10"
+                          className="mx-3 rounded-lg border border-dashed border-[#8B7CFF]/70 bg-[#8B7CFF]/10"
                           style={{ height: dragOverlay?.height ?? 40 }}
                         />
                       ) : null}
@@ -611,7 +609,7 @@ export default function HeroUploadCard() {
                         ref={(node) => {
                           rowRefs.current[index] = node;
                         }}
-                        className={`group relative grid h-[54px] w-full max-w-full min-w-0 grid-cols-[auto_1fr_auto] items-center gap-3 overflow-hidden rounded-lg border-2 border-slate-200/90 bg-white px-3 py-2 transition-colors hover:border-slate-300/80 hover:bg-slate-50/40 ${
+                        className={`group relative grid h-[54px] w-full max-w-full min-w-0 grid-cols-[auto_1fr_auto] items-center gap-3 overflow-hidden rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 transition-colors hover:border-white/15 hover:bg-white/[0.07] ${
                           busy ? "opacity-70" : ""
                         }`}
                       >
@@ -621,8 +619,8 @@ export default function HeroUploadCard() {
                               onPointerDown={(event) =>
                                 beginReorder(index, event as unknown as React.PointerEvent<HTMLDivElement>)
                               }
-                              className={`hidden h-8 w-8 items-center justify-center rounded-lg border-2 border-slate-200/80 bg-slate-50 text-slate-400 transition-colors group-hover:bg-slate-100 group-hover:text-slate-500 lg:flex ${
-                                busy ? "" : "cursor-grab active:cursor-grabbing active:bg-slate-200"
+                              className={`hidden h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/[0.06] text-white/45 transition-colors group-hover:bg-white/[0.1] group-hover:text-white/70 lg:flex ${
+                                busy ? "" : "cursor-grab active:cursor-grabbing active:bg-white/[0.12]"
                               }`}
                             >
                               <GripVertical className="h-4 w-4" aria-hidden />
@@ -631,7 +629,7 @@ export default function HeroUploadCard() {
                               <button
                                 type="button"
                                 onClick={() => moveFile(index, -1)}
-                                className="relative z-10 p-0 text-slate-400 transition hover:text-[#6D5EF3] disabled:cursor-not-allowed disabled:opacity-40"
+                                className="relative z-10 p-0 text-white/45 transition hover:text-[#B6AAFF] disabled:cursor-not-allowed disabled:opacity-40"
                                 aria-label={`Move ${file.name} up`}
                                 disabled={uiState === "staging" || index === 0}
                               >
@@ -640,7 +638,7 @@ export default function HeroUploadCard() {
                               <button
                                 type="button"
                                 onClick={() => moveFile(index, 1)}
-                                className="relative z-10 p-0 text-slate-400 transition hover:text-[#6D5EF3] disabled:cursor-not-allowed disabled:opacity-40"
+                                className="relative z-10 p-0 text-white/45 transition hover:text-[#B6AAFF] disabled:cursor-not-allowed disabled:opacity-40"
                                 aria-label={`Move ${file.name} down`}
                                 disabled={uiState === "staging" || index === selectedFiles.length - 1}
                               >
@@ -648,18 +646,18 @@ export default function HeroUploadCard() {
                               </button>
                             </div>
                           </div>
-                          <span className="shrink-0 text-[15px] font-semibold text-slate-400">
+                          <span className="shrink-0 text-[15px] font-semibold text-white/40">
                             {orderMap.get(index) ?? index + 1}
                           </span>
                         </div>
                         <div className="flex min-w-0 flex-col justify-center gap-0.5 overflow-hidden -translate-y-[6px] lg:translate-y-0">
                           <div className="flex min-w-0 items-center gap-2 overflow-hidden">
-                            <FileText className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
-                            <span className="block min-w-0 truncate whitespace-nowrap text-sm font-semibold leading-[1.1] text-slate-800">
+                            <FileText className="h-4 w-4 shrink-0 text-white/45" aria-hidden />
+                            <span className="block min-w-0 truncate whitespace-nowrap text-sm font-semibold leading-[1.1] text-white/[0.88]">
                               {file.name}
                             </span>
                           </div>
-                          <p className="text-[10px] leading-[1.1] text-slate-400">
+                          <p className="text-[10px] leading-[1.1] text-white/38">
                             {formatBytes(file.size)}
                           </p>
                         </div>
@@ -668,7 +666,7 @@ export default function HeroUploadCard() {
                             <button
                               type="button"
                               onClick={() => setConfirmDeleteIndex(null)}
-                              className="flex-1 min-w-0 rounded-md border-2 border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-800"
+                              className="flex-1 min-w-0 rounded-md border border-white/10 bg-white/[0.06] px-2 py-1 text-[11px] font-semibold text-white/72 transition hover:border-white/15 hover:text-white"
                               disabled={uiState === "staging"}
                             >
                               <span className="block min-w-0">Cancel</span>
@@ -676,7 +674,7 @@ export default function HeroUploadCard() {
                             <button
                               type="button"
                               onClick={() => cancelPendingFile(index)}
-                              className="flex-1 min-w-0 rounded-md border-2 border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-semibold text-rose-600 transition hover:border-rose-300 hover:bg-rose-100"
+                              className="flex-1 min-w-0 rounded-md border border-rose-400/30 bg-rose-500/10 px-2 py-1 text-[11px] font-semibold text-rose-200 transition hover:border-rose-300/40 hover:bg-rose-500/15"
                               disabled={uiState === "staging"}
                             >
                               <span className="block min-w-0">Delete</span>
@@ -686,7 +684,7 @@ export default function HeroUploadCard() {
                           <button
                             type="button"
                             onClick={() => setConfirmDeleteIndex(index)}
-                            className="rounded-md border-2 border-transparent p-1 text-slate-400 transition hover:border-[#6D5EF3] hover:bg-slate-100 hover:text-slate-600 -translate-y-[6px] lg:translate-y-0"
+                            className="rounded-md border border-transparent p-1 text-white/45 transition hover:border-white/10 hover:bg-white/[0.06] hover:text-white/75 -translate-y-[6px] lg:translate-y-0"
                             aria-label={`Remove ${file.name}`}
                             disabled={uiState === "staging"}
                           >
@@ -703,7 +701,7 @@ export default function HeroUploadCard() {
                   effectiveInsertIndex === visibleIndices.length ? (
                     <div
                       key="drag-tail-spacer"
-                      className="mx-3 rounded-lg border border-dashed border-[#6D5EF3]/70 bg-[#6D5EF3]/10"
+                      className="mx-3 rounded-lg border border-dashed border-[#8B7CFF]/70 bg-[#8B7CFF]/10"
                       style={{ height: dragOverlay.height }}
                     />
                   ) : null;
@@ -718,24 +716,24 @@ export default function HeroUploadCard() {
                     width: dragOverlay.width,
                   }}
                 >
-                  <div className="flex items-center justify-between gap-3 rounded-lg border-2 border-[#6D5EF3]/80 bg-white px-3 py-2">
+                  <div className="flex items-center justify-between gap-3 rounded-lg border border-[#8B7CFF]/50 bg-[#11162c] px-3 py-2 shadow-[0_10px_24px_rgba(0,0,0,0.25)]">
                     <div className="flex min-w-0 items-center gap-3">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200/80 bg-slate-200 text-slate-500">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/10 text-white/70">
                         <GripVertical className="h-4 w-4" aria-hidden />
                       </span>
-                      <span className="shrink-0 text-[15px] font-semibold text-slate-500">
+                      <span className="shrink-0 text-[15px] font-semibold text-white/55">
                         {dragIndex !== null && (insertIndexRef.current ?? insertIndex) !== null
                           ? (insertIndexRef.current ?? insertIndex)! + 1
                           : dragOverlay.index + 1}
                       </span>
                       <div className="min-w-0">
                         <div className="flex min-w-0 items-center gap-2">
-                          <FileText className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
-                          <span className="min-w-0 truncate text-sm font-semibold text-slate-800">
+                          <FileText className="h-4 w-4 shrink-0 text-white/45" aria-hidden />
+                          <span className="min-w-0 truncate text-sm font-semibold text-white/[0.88]">
                             {selectedFiles[dragOverlay.index]?.name}
                           </span>
                         </div>
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-white/45">
                           {formatBytes(selectedFiles[dragOverlay.index]?.size ?? 0)}
                         </p>
                       </div>
@@ -751,7 +749,7 @@ export default function HeroUploadCard() {
                 <label
                   htmlFor={inputId}
                   aria-disabled={busy}
-                  className={`inline-flex w-fit items-center gap-2 rounded-full border-2 border-slate-200 bg-white px-3.5 py-1.5 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-800 ${
+                  className={`inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3.5 py-1.5 text-sm font-semibold text-white/72 transition hover:border-white/15 hover:bg-white/[0.1] hover:text-white ${
                     busy ? "pointer-events-none opacity-60" : "cursor-pointer"
                   }`}
                 >
@@ -762,7 +760,7 @@ export default function HeroUploadCard() {
                 type="button"
                 onClick={handleMergeFiles}
                 disabled={busy}
-                className="rounded-full bg-[#6D5EF3] px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-[#5E4EEF] disabled:opacity-60"
+                className="rounded-full border border-[#8B7CFF]/45 bg-[#8B7CFF] px-4 py-1.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(139,124,255,0.22)] transition hover:bg-[#9A8DFF] disabled:opacity-60"
               >
                 {uiState === "staging" ? "Preparing..." : "Continue to workspace"}
               </button>
