@@ -722,10 +722,9 @@ header[data-scrolled="true"] .hero-shell {
   overflow: hidden;
   width: min(1060px, calc(100% - 56px));
   margin: 10px auto 0;
-  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 12px;
   background: rgba(16, 19, 32, 0.94);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(18px);
 }
 
@@ -765,8 +764,7 @@ header[data-scrolled="true"] > div {
   header[data-scrolled="true"] .hero-shell {
     width: calc(100% - 20px);
     margin: 8px auto 0;
-    border-color: transparent;
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.38), inset 0 0 0 1px rgba(15, 23, 42, 0.16);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.38);
   }
 }
 
