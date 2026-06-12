@@ -27,7 +27,8 @@ export default function HeroFeatureArea() {
   return (
     <section id="features" className="relative overflow-hidden text-white">
       <div className="relative mx-auto w-full max-w-[1440px] px-4 pb-14 pt-12 sm:px-6 lg:px-8 lg:pb-20 lg:pt-16">
-        <RevealOnScroll as="div" className="mx-auto max-w-3xl text-center">          <h2 className="mt-3 text-balance text-[clamp(2rem,4vw,3.5rem)] font-semibold tracking-[-0.05em] text-white">
+        <RevealOnScroll as="div" className="mx-auto max-w-3xl text-center">
+          <h2 className="mt-3 text-balance text-[clamp(2rem,4vw,3.5rem)] font-semibold tracking-[-0.05em] text-white">
             Handle every PDF task in one place.
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-pretty text-base leading-7 text-white/68 sm:text-lg">
@@ -37,7 +38,7 @@ export default function HeroFeatureArea() {
 
         <div className="mt-10">
           <RevealOnScroll as="div" delayMs={40} className="mx-auto max-w-7xl">
-            <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4">
               {FEATURE_CARDS.map((feature, index) => {
                 const accentClass =
                   index % 4 === 0
@@ -51,18 +52,16 @@ export default function HeroFeatureArea() {
                 return (
                   <article
                     key={feature.title}
-                    className="group relative h-[180px] overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.045] p-5 text-left shadow-[0_10px_24px_rgba(0,0,0,0.14)] transition-all duration-300 ease-out hover:-translate-y-1 hover:border-white/18 hover:bg-white/[0.06] hover:shadow-[0_18px_42px_rgba(139,124,255,0.16)] sm:h-[184px] lg:h-[188px]"
+                    className="group relative min-h-[168px] overflow-hidden rounded-[24px] border border-white/14 bg-white/[0.075] p-4 text-left shadow-[0_16px_36px_rgba(0,0,0,0.22)] ring-1 ring-white/5 backdrop-blur-md transition-all duration-300 ease-out hover:-translate-y-1 hover:border-white/24 hover:bg-white/[0.1] hover:shadow-[0_24px_52px_rgba(139,124,255,0.22)] sm:min-h-[176px] md:min-h-[182px] lg:min-h-[190px] xl:min-h-[196px] sm:p-4 lg:p-5 xl:p-6"
                   >
                     <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${accentClass}`} />
-                    <div className="relative flex h-full flex-col gap-3">
-                      <div className={`flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br shadow-[0_8px_18px_rgba(0,0,0,0.18)] ${accentClass} border border-white/12 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]`}>
-                        <span className="text-[1.45rem] leading-none drop-shadow-[0_1px_1px_rgba(0,0,0,0.28)]" aria-hidden="true">{feature.emoji}</span>
-                      </div>
+                    <div className="relative flex h-full flex-col gap-2.5 sm:gap-3 lg:gap-3.5">
+                      <span className="mb-1 inline-block text-[1.45rem] leading-none drop-shadow-[0_1px_1px_rgba(0,0,0,0.28)] sm:text-[1.6rem] lg:text-[1.9rem] xl:text-[2.1rem]" aria-hidden="true">{feature.emoji}</span>
                       <div className="min-w-0">
-                        <h3 className="line-clamp-1 text-[1rem] font-semibold tracking-[-0.02em] text-white sm:text-[1.05rem]">
+                        <h3 className="text-pretty text-[0.92rem] font-semibold tracking-[-0.02em] text-white/96 sm:text-[1rem] lg:text-[1.08rem] xl:text-[1.15rem]">
                           {feature.title}
                         </h3>
-                        <p className="line-clamp-2 mt-1 text-sm leading-6 text-white/62">
+                        <p className="mt-1 text-[0.8rem] leading-5 text-white/72 sm:text-[0.9rem] lg:text-[0.92rem] lg:leading-6 xl:text-[0.96rem] xl:leading-6">
                           {feature.description}
                         </p>
                       </div>
@@ -76,14 +75,11 @@ export default function HeroFeatureArea() {
 
         <section className="mt-14">
           <RevealOnScroll as="div" variant="fade">
-            <p className="text-center text-[12px] font-semibold uppercase tracking-[0.24em] text-white/60">
-              Pricing
-            </p>
             <h2 className="mt-3 text-center text-[clamp(2rem,4vw,3.25rem)] font-semibold tracking-tight text-white">
-              Pick a plan.
+              Plans made for everyday PDF work.
             </h2>
             <p className="mx-auto mt-3 max-w-2xl text-center text-sm leading-6 text-white/68 sm:text-base">
-              Choose Essential Plus for your own documents, or Signature Pro when you send files out for signatures.
+              Pick the plan that fits your workflow. Upgrade, switch, or cancel anytime.
             </p>
           </RevealOnScroll>
           <div className="mx-auto mt-10 w-full max-w-6xl">
@@ -91,7 +87,7 @@ export default function HeroFeatureArea() {
           </div>
         </section>
 
-        <section id="faq" className="scroll-mt-24 mt-16 pt-2">
+        <section id="faq" className="scroll-mt-24 mt-16 pb-12 pt-2 sm:pb-14 lg:pb-16">
           <FaqAccordion
             variant="dark"
             items={[
@@ -101,8 +97,8 @@ export default function HeroFeatureArea() {
                   "MergifyPDF is a browser-based PDF workspace for merging, editing, signing, and organizing files in one place.",
               },
               {
-                question: "What’s included in the 3-day free trial?",
-                answer: "You get full access to every tool for 3 days. We’ll remind you before the trial ends.",
+                question: "Can I switch plans later?",
+                answer: "Yes. You can upgrade, switch, or manage billing from your account whenever your workflow changes.",
               },
               {
                 question: "Is MergifyPDF secure?",

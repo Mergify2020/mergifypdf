@@ -4,9 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CircleHelp, Info, LogIn, Menu, Shapes, Tag, X } from "lucide-react";
+import { CircleHelp, LogIn, Menu, Shapes, Tag, X } from "lucide-react";
 import { siInstagram, siTiktok, siX } from "simple-icons";
 import HeaderFeaturesLink from "@/components/HeaderFeaturesLink";
+import HeaderUploadLink from "@/components/HeaderUploadLink";
 
 export default function HeaderMobileMenu() {
   const pathname = usePathname();
@@ -111,6 +112,10 @@ export default function HeaderMobileMenu() {
                 </div>
                 <nav className="flex min-h-0 flex-1 flex-col px-5 pb-4 pt-3 sm:px-6 sm:py-8">
                   <div className="flex flex-col gap-0.5 text-base font-semibold text-white sm:gap-2 sm:text-lg">
+                    <HeaderUploadLink
+                      className="cursor-pointer rounded-xl px-2 py-2.5 text-white/82 transition hover:bg-white/[0.06] active:bg-white/10"
+                      onNavigate={handleCloseMenu}
+                    />
                     <HeaderFeaturesLink
                       className="cursor-pointer rounded-xl px-2 py-2.5 text-white/82 transition hover:bg-white/[0.06] active:bg-white/10"
                       onNavigate={handleCloseMenu}
@@ -135,10 +140,6 @@ export default function HeaderMobileMenu() {
                         </span>
                       </span>
                     </Link>
-                    <span className="inline-flex items-center gap-2 rounded-xl px-2 py-2.5 text-white/82 transition hover:bg-white/[0.08] active:bg-white/12">
-                      <Info className="h-4 w-4 text-white/48" aria-hidden="true" />
-                      <span>About</span>
-                    </span>
                     <Link
                       href="/support"
                       onClick={handleCloseMenu}

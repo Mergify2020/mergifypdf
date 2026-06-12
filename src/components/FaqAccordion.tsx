@@ -136,11 +136,11 @@ export default function FaqAccordion({ items, variant = "default" }: FaqAccordio
             answered.
           </h2>
           <p className="mt-5 max-w-sm text-base leading-7 text-white/68">
-            Quick answers to the things that usually slow sign-up down.
+            Answers to the questions people ask before choosing MergifyPDF.
           </p>
           <a
             href="/support"
-            className="mt-7 inline-flex items-center justify-center rounded-full border border-white/10 bg-white/[0.04] px-5 py-2.5 text-sm font-medium text-white transition hover:border-[#8b7cff]/30 hover:bg-white/[0.07]"
+            className="mt-7 inline-flex w-fit items-center justify-center rounded-full bg-white/10 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(139,124,255,0.14)] ring-1 ring-white/10 transition duration-200 hover:-translate-y-[1px] hover:bg-white/14 hover:shadow-[0_16px_30px_rgba(139,124,255,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-[#111125]"
           >
             Contact us
           </a>

@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { signIn } from "next-auth/react";
 import { submitGoogleSignIn } from "@/lib/googleSignIn";
 
 type Step = "form" | "verify";
@@ -12,6 +13,13 @@ export default function RegisterPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const verifyEmailParam = searchParams.get("verifyEmail");
+  const selectedPlan = searchParams.get("plan");
+  const selectedBilling = searchParams.get("billing");
+  const selectedPlanTier = selectedPlan === "essential_plus" || selectedPlan === "signature_pro" ? selectedPlan : null;
+  const selectedBillingPeriod = selectedBilling === "annual" || selectedBilling === "monthly" ? selectedBilling : null;
+  const postSignupCallbackUrl = selectedPlanTier && selectedBillingPeriod
+    ? "/pricing?checkout=" + selectedPlanTier + "&billing=" + selectedBillingPeriod
+    : "/projects/all";
   const [step, setStep] = useState<Step>("form");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -152,8 +160,22 @@ export default function RegisterPage() {
         return;
       }
 
-      setInfo("Email verified! You can sign in now.");
-      setTimeout(() => router.replace("/login"), 1200);
+      setInfo(selectedPlanTier ? "Email verified! Taking you to checkout..." : "Email verified! Signing you in...");
+      if (password) {
+        const signInResult = await signIn("credentials", {
+          redirect: false,
+          email: pendingEmail.trim().toLowerCase(),
+          password,
+          callbackUrl: postSignupCallbackUrl,
+        });
+
+        if (!signInResult?.error) {
+          window.location.assign(signInResult?.url ?? postSignupCallbackUrl);
+          return;
+        }
+      }
+
+      router.replace("/login?callbackUrl=" + encodeURIComponent(postSignupCallbackUrl));
     } catch (error) {
       setErr("Verification failed. Please try again.");
     } finally {
@@ -423,7 +445,7 @@ export default function RegisterPage() {
                       setErr(null);
                       setInfo(null);
                       await submitGoogleSignIn({
-                        callbackUrl: "/",
+                        callbackUrl: postSignupCallbackUrl,
                         loginHint: email.trim() ? email.trim().toLowerCase() : null,
                       });
                     } catch {

@@ -6,12 +6,14 @@ import { usePathname } from "next/navigation";
 
 type Props = {
   variant?: "default" | "sidebarPanel";
+  href?: string;
   logoLightSrc?: string;
   logoDarkSrc?: string;
 };
 
 export default function AppHeaderBrand({
   variant = "default",
+  href = "/projects/all",
   logoLightSrc,
   logoDarkSrc,
 }: Props) {
@@ -21,9 +23,8 @@ export default function AppHeaderBrand({
   const useHardNav = process.env.NODE_ENV === "development" && isStudio;
 
   const handleBrandClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
-    if (pathname === "/projects/all") {
+    if (pathname === href) {
       event.preventDefault();
-      window.history.replaceState(null, "", "/projects/all");
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
@@ -39,9 +40,9 @@ export default function AppHeaderBrand({
 
   return useHardNav ? (
     <a
-      href="/projects/all"
+      href={href}
       className="inline-flex items-center gap-2"
-      aria-label="Back to dashboard"
+      aria-label={href === "/" ? "Back to home" : "Back to dashboard"}
       onClick={handleBrandClick}
     >
       <Image
@@ -67,9 +68,9 @@ export default function AppHeaderBrand({
     </a>
   ) : (
     <Link
-      href="/projects/all"
+      href={href}
       className="inline-flex items-center gap-2"
-      aria-label="Back to dashboard"
+      aria-label={href === "/" ? "Back to home" : "Back to dashboard"}
       onClick={handleBrandClick}
     >
       <Image

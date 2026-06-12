@@ -1,24 +1,25 @@
 "use client";
 
 import RevealOnScroll from "@/components/RevealOnScroll";
+import { siInstagram, siTiktok, siX } from "simple-icons";
 
 type FooterProps = {
   reveal?: boolean;
 };
 
-function SocialIcon(props: { label: string; href?: string; name: string; badge: string }) {
-  const { label, href = "#", name, badge } = props;
+function SocialIcon(props: { label: string; href?: string; name: string; iconPath: string }) {
+  const { label, href = "#", name, iconPath } = props;
   return (
     <a
       href={href}
       aria-label={label}
       target="_blank"
       rel="noreferrer"
-      className="inline-flex items-center gap-3 text-[13px] text-slate-300 transition hover:text-white"
+      className="inline-flex items-center gap-3 text-[13px] text-slate-400 transition hover:text-white"
     >
-      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-500/50 text-[10px] font-semibold text-slate-200">
-        {badge}
-      </span>
+      <svg viewBox="0 0 24 24" className="h-4 w-4 text-slate-300" aria-hidden="true">
+        <path fill="currentColor" d={iconPath} />
+      </svg>
       <span>{name}</span>
     </a>
   );
@@ -26,23 +27,23 @@ function SocialIcon(props: { label: string; href?: string; name: string; badge: 
 
 export default function Footer({ reveal = true }: FooterProps) {
   const footerContent = (
-      <div className="mx-auto w-full max-w-[1400px] px-4 pt-10 pb-7 sm:px-6 lg:px-8">
+      <div className="relative z-10 mx-auto w-full max-w-[1400px] px-4 pt-12 pb-8 sm:px-6 lg:px-8">
         {/* Top grid */}
-        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-5 lg:gap-10">
+        <div className="relative z-10 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-5 lg:gap-10">
           {/* Features */}
           <div>
-            <h3 className="text-sm font-semibold text-slate-100">Features</h3>
+            <h3 className="text-sm font-semibold text-slate-50">Features</h3>
             <div className="mt-4 space-y-2">
-              <a href="#" className="block text-[13px] text-slate-300 transition hover:text-white">
+              <a href="#" className="block text-[13px] text-slate-400 transition hover:text-white">
                 Merge Documents
               </a>
-              <a href="#" className="block text-[13px] text-slate-300 transition hover:text-white">
+              <a href="#" className="block text-[13px] text-slate-400 transition hover:text-white">
                 Edit &amp; Annotate
               </a>
-              <a href="#" className="block text-[13px] text-slate-300 transition hover:text-white">
+              <a href="#" className="block text-[13px] text-slate-400 transition hover:text-white">
                 Sign Documents
               </a>
-              <a href="#" className="block text-[13px] text-slate-300 transition hover:text-white">
+              <a href="#" className="block text-[13px] text-slate-400 transition hover:text-white">
                 Split &amp; Reorder
               </a>
             </div>
@@ -50,9 +51,9 @@ export default function Footer({ reveal = true }: FooterProps) {
 
           {/* Support */}
           <div>
-            <h3 className="text-sm font-semibold text-slate-100">Support</h3>
+            <h3 className="text-sm font-semibold text-slate-50">Support</h3>
             <div className="mt-4 space-y-2">
-              <a href="#" className="block text-[13px] text-slate-300 transition hover:text-white">
+              <a href="#" className="block text-[13px] text-slate-400 transition hover:text-white">
                 Help Center
               </a>
             </div>
@@ -60,12 +61,12 @@ export default function Footer({ reveal = true }: FooterProps) {
 
           {/* Product */}
           <div>
-            <h3 className="text-sm font-semibold text-slate-100">Product</h3>
+            <h3 className="text-sm font-semibold text-slate-50">Product</h3>
             <div className="mt-4 space-y-2">
-              <a href="/pricing" className="block text-[13px] text-slate-300 transition hover:text-white">
+              <a href="/pricing" className="block text-[13px] text-slate-400 transition hover:text-white">
                 Pricing
               </a>
-              <a href="#" className="block text-[13px] text-slate-300 transition hover:text-white">
+              <a href="#" className="block text-[13px] text-slate-400 transition hover:text-white">
                 About Us
               </a>
             </div>
@@ -73,12 +74,12 @@ export default function Footer({ reveal = true }: FooterProps) {
 
           {/* Legal */}
           <div>
-            <h3 className="text-sm font-semibold text-slate-100">Legal</h3>
+            <h3 className="text-sm font-semibold text-slate-50">Legal</h3>
             <div className="mt-4 space-y-2">
-              <a href="#" className="block text-[13px] text-slate-300 transition hover:text-white">
+              <a href="#" className="block text-[13px] text-slate-400 transition hover:text-white">
                 Terms of Service
               </a>
-              <a href="#" className="block text-[13px] text-slate-300 transition hover:text-white">
+              <a href="#" className="block text-[13px] text-slate-400 transition hover:text-white">
                 Privacy Policy
               </a>
             </div>
@@ -86,32 +87,32 @@ export default function Footer({ reveal = true }: FooterProps) {
 
           {/* Social */}
           <div className="text-left">
-            <h3 className="text-sm font-semibold text-slate-100">Follow us</h3>
-            <div className="mt-4 flex flex-col gap-3 text-slate-300">
+            <h3 className="text-sm font-semibold text-slate-50">Follow us</h3>
+            <div className="mt-4 flex flex-col gap-3 text-slate-400">
               <SocialIcon
                 label="MergifyPDF on TikTok"
                 href="https://www.tiktok.com/@mergify.pdf"
                 name="TikTok"
-                badge="T"
+                iconPath={siTiktok.path}
               />
               <SocialIcon
                 label="MergifyPDF on Instagram"
                 href="https://www.instagram.com/mergifypdf/"
                 name="Instagram"
-                badge="IG"
+                iconPath={siInstagram.path}
               />
               <SocialIcon
                 label="MergifyPDF on X (Twitter)"
                 href="https://x.com/MergifyPDF"
                 name="X"
-                badge="X"
+                iconPath={siX.path}
               />
             </div>
           </div>
         </div>
 
         {/* Bottom bar */}
-        <div className="mt-7 pt-3">
+        <div className="relative z-10 mt-7 pt-3">
           <div className="flex flex-col items-start justify-between gap-3 lg:flex-row lg:items-center">
             <p className="text-xs text-slate-400 sm:text-sm">
               © 2026 MergifyPDF. All rights reserved.
@@ -122,11 +123,11 @@ export default function Footer({ reveal = true }: FooterProps) {
   );
 
   if (!reveal) {
-    return <footer className="bg-[#1E2230] text-slate-300">{footerContent}</footer>;
+    return <footer className="relative overflow-hidden border-t border-white/12 bg-[#0b0d18] text-slate-400 shadow-[0_-1px_0_rgba(255,255,255,0.06),0_-20px_70px_rgba(0,0,0,0.18)]">{footerContent}</footer>;
   }
 
   return (
-    <RevealOnScroll as="footer" variant="fade" className="bg-[#1E2230] text-slate-300">
+    <RevealOnScroll as="footer" variant="fade" className="relative overflow-hidden border-t border-white/12 bg-[#0b0d18] text-slate-400 shadow-[0_-1px_0_rgba(255,255,255,0.06),0_-20px_70px_rgba(0,0,0,0.18)]">
       {footerContent}
     </RevealOnScroll>
   );

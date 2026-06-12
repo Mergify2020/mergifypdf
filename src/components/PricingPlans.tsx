@@ -4,82 +4,36 @@ import Image from "next/image";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Check, CreditCard, ShieldCheck, Download, Lock } from "lucide-react";
 import RevealOnScroll from "@/components/RevealOnScroll";
-import { BILLING_PRICE_IDS, FREE_TRIAL_DAYS } from "@/lib/billingPlans";
 import PricingTierCards from "@/components/PricingTierCards";
 
 export default function PricingPlans() {
   const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("monthly");
   const [billingPreferenceReady, setBillingPreferenceReady] = useState(false);
-  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const toggleRef = useRef<HTMLDivElement | null>(null);
   const monthlyRef = useRef<HTMLButtonElement | null>(null);
   const annualRef = useRef<HTMLButtonElement | null>(null);
   const [toggleHighlight, setToggleHighlight] = useState({ left: 0, width: 0 });
-  const [trialStatus, setTrialStatus] = useState<null | {
-    eligibleForTrial: boolean;
-    eligibleForTrialByPlan?: {
-      essentialPlus?: boolean;
-      signaturePro?: boolean;
-    };
-  }>(null);
   const [shouldAnimateToggle, setShouldAnimateToggle] = useState(false);
   const toggleMeasured = toggleHighlight.width > 0;
 
-  const PRICE_IDS: Record<string, { monthly?: string; annual?: string }> = {
-    "Essential Plus": {
-      monthly: BILLING_PRICE_IDS.essential_plus.monthly,
-      annual: BILLING_PRICE_IDS.essential_plus.annual,
-    },
-    "Signature Pro": {
-      monthly: BILLING_PRICE_IDS.signature_pro.monthly,
-      annual: BILLING_PRICE_IDS.signature_pro.annual,
-    },
-  };
-
-  function canUseTrialForPlan(planName: string) {
-    const byPlan = trialStatus?.eligibleForTrialByPlan;
-    if (!byPlan) return trialStatus?.eligibleForTrial !== false;
-    if (planName === "Essential Plus") return byPlan.essentialPlus !== false;
-    if (planName === "Signature Pro") return byPlan.signaturePro !== false;
-    return trialStatus?.eligibleForTrial !== false;
+  function canUseTrialForPlan() {
+    return false;
   }
 
-  async function handleSelectPlan(tierName: string, options?: { skipTrial?: boolean }) {
-    const tierPrices = PRICE_IDS[tierName];
-    const priceId = tierPrices?.[billingPeriod];
+  function getPlanTierFromName(tierName: string) {
+    if (tierName === "Essential Plus") return "essential_plus";
+    if (tierName === "Signature Pro") return "signature_pro";
+    return null;
+  }
 
-    if (!priceId) {
-      console.error("Missing Stripe price ID for tier", tierName, "and period", billingPeriod);
+  function handleSelectPlan(tierName: string) {
+    const planTier = getPlanTierFromName(tierName);
+    if (!planTier) {
+      window.location.href = "/register";
       return;
     }
-
-    try {
-      setLoadingPlan(tierName);
-      const res = await fetch("/api/billing/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ priceId, skipTrial: options?.skipTrial === true }),
-      });
-
-      if (res.status === 401) {
-        window.location.href = "/login?callbackUrl=/pricing";
-        return;
-      }
-
-      if (!res.ok) {
-        console.error("Failed to create checkout session", await res.text());
-        return;
-      }
-
-      const data = (await res.json()) as { url?: string };
-      if (data?.url) {
-        window.location.href = data.url;
-      }
-    } catch (error) {
-      console.error("Error starting checkout", error);
-    } finally {
-      setLoadingPlan(null);
-    }
+    const params = new URLSearchParams({ plan: planTier, billing: billingPeriod });
+    window.location.href = "/register?" + params.toString();
   }
 
   function handleBillingPeriodChange(nextPeriod: "monthly" | "annual") {
@@ -89,15 +43,26 @@ export default function PricingPlans() {
   }
 
   useLayoutEffect(() => {
+    let storedPeriod: "monthly" | "annual" | null = null;
     try {
       const stored = window.localStorage.getItem("pricing:billing-period");
       if (stored === "monthly" || stored === "annual") {
-        setBillingPeriod(stored);
+        storedPeriod = stored;
       }
     } catch {
       // ignore storage access errors
     }
-    setBillingPreferenceReady(true);
+
+    const rafId = window.requestAnimationFrame(() => {
+      if (storedPeriod) {
+        setBillingPeriod(storedPeriod);
+      }
+      setBillingPreferenceReady(true);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+    };
   }, []);
 
   useEffect(() => {
@@ -130,35 +95,6 @@ export default function PricingPlans() {
     }
   }, [billingPeriod, billingPreferenceReady]);
 
-  useEffect(() => {
-    let active = true;
-    const loadTrialStatus = async () => {
-      try {
-        const res = await fetch("/api/account/trial-status");
-        if (!res.ok) return;
-        const data = (await res.json()) as {
-          eligibleForTrial?: boolean;
-          eligibleForTrialByPlan?: {
-            essentialPlus?: boolean;
-            signaturePro?: boolean;
-          };
-        };
-        if (active && typeof data.eligibleForTrial === "boolean") {
-          setTrialStatus({
-            eligibleForTrial: data.eligibleForTrial,
-            eligibleForTrialByPlan: data.eligibleForTrialByPlan,
-          });
-        }
-      } catch {
-        // no-op
-      }
-    };
-    void loadTrialStatus();
-    return () => {
-      active = false;
-    };
-  }, []);
-
   function scrollToPricingTop() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -178,12 +114,12 @@ export default function PricingPlans() {
         <div id="pricing-page-intro" className="text-center">
           <RevealOnScroll as="div">
             <h1 className="text-4xl font-semibold tracking-tight text-white">
-              Simple pricing. Smart workflows.
+              Merge, edit, organize, and send PDFs for signature.
             </h1>
           </RevealOnScroll>
           <RevealOnScroll as="div" delayMs={70}>
             <p className="mt-3 text-4xl font-semibold tracking-tight text-white/90">
-              Try all features free for 3 days.
+              Choose the plan that fits your workflow.
             </p>
           </RevealOnScroll>
           <RevealOnScroll as="div" delayMs={130} className="mt-6 flex justify-center">
@@ -243,18 +179,11 @@ export default function PricingPlans() {
           <PricingTierCards
             billingPeriod={billingPeriod}
             canUseTrialForPlan={canUseTrialForPlan}
-            getPrimaryActionLabel={(_, canUseTrial) =>
-              canUseTrial ? `Start ${FREE_TRIAL_DAYS}-day trial` : "Subscribe now"
-            }
-            getPrimaryActionOptions={(_, canUseTrial) => (canUseTrial ? undefined : { skipTrial: true })}
-            onPrimaryAction={(tierName, options) => {
-              void handleSelectPlan(tierName, options);
+            getPrimaryActionLabel={() => "Select Plan"}
+            getPrimaryActionOptions={() => ({ skipTrial: true })}
+            onPrimaryAction={(tierName) => {
+              handleSelectPlan(tierName);
             }}
-            getSecondaryActionLabel={(_, canUseTrial) => (canUseTrial ? "Pay now" : null)}
-            onSecondaryAction={(tierName) => {
-              void handleSelectPlan(tierName, { skipTrial: true });
-            }}
-            loadingPlan={loadingPlan}
             className="grid w-full scroll-mt-28 gap-10 md:grid-cols-2"
           />
         </div>
@@ -423,7 +352,7 @@ export default function PricingPlans() {
                 onClick={scrollToPricingTop}
                 className="inline-flex items-center justify-center rounded-full border border-white/20 bg-gradient-to-r from-[#6D5EF3] to-[#8B7CFF] px-9 py-3 text-base font-semibold text-white shadow-[0_14px_28px_rgba(109,94,243,0.28)] transition hover:-translate-y-0.5 hover:from-[#7567F5] hover:to-[#9486FF]"
               >
-                Start 3-day trial →
+                View plans →
               </button>
             </div>
           </RevealOnScroll>

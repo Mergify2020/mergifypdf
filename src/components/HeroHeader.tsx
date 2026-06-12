@@ -15,7 +15,8 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
   const isRegisterPage = pathname === "/register";
   const isForgotPasswordPage = pathname === "/forgot-password";
   const isResetPasswordPage = pathname === "/reset-password";
-  const isAnimatedPage = isHomePage || isPricingPage;
+  const useHeroTreatment = isHomePage || isPricingPage;
+  const isAnimatedPage = useHeroTreatment;
 
   const [scrolledPastHero, setScrolledPastHero] = useState(false);
   const [fadeToGradient, setFadeToGradient] = useState(false);
@@ -111,18 +112,16 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
     if (!isHomePage && !isPricingPage) return;
     const meta = document.querySelector('meta[name="theme-color"]');
     if (!meta) return;
-    const color = isHomePage ? "#050816" : "#FFFFFF";
+    const color = isPricingPage ? "#050816" : "#FFFFFF";
     meta.setAttribute("content", color);
-  }, [isHomePage, isPricingPage, scrolledPastHero]);
+  }, [isHomePage, isPricingPage, useHeroTreatment]);
 
-  const gradientActive = isHomePage
-    ? !scrolledPastHero
-    : isAnimatedPage && !scrolledPastHero && !isPricingPage;
+  const gradientActive = isHomePage ? !scrolledPastHero : useHeroTreatment && !scrolledPastHero;
   let backgroundClass: string;
   if (gradientActive) {
     backgroundClass = isHomePage
       ? "bg-transparent"
-      : isPricingPage
+      : useHeroTreatment
         ? "bg-transparent"
         : "bg-gradient-to-r from-[#FDF2FF] via-[#EEF2FF] to-[#E0F7FF]";
   } else {
@@ -131,8 +130,7 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
 
   const shadowClass = gradientActive || isHomePage ? "" : "shadow-sm";
   const borderColorClass = gradientActive || isHomePage ? "border-transparent" : "border-slate-200";
-  const homeHeaderOverlay =
-    isHomePage && gradientActive ? "backdrop-blur-0 shadow-none border-transparent" : "";
+  const heroHeaderOverlay = useHeroTreatment && gradientActive ? "backdrop-blur-0 shadow-none border-transparent" : "";
   const visibilityClass = "translate-y-0 opacity-100";
 
   if (isLoginPage || isRegisterPage || isForgotPasswordPage || isResetPasswordPage) {
@@ -146,8 +144,9 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
   return (
     <header
       data-hero={gradientActive ? "true" : "false"}
-      data-scrolled={isHomePage && scrolledPastHero ? "true" : "false"}
-      className={`fixed top-0 left-0 right-0 z-50 w-full pt-[env(safe-area-inset-top)] ${isHomePage ? "" : gradientActive ? "" : "border-b"} ${backgroundClass} ${shadowClass} ${borderColorClass} ${visibilityClass} ${homeHeaderOverlay} ${transitionClass}`}
+      data-pricing-header={isPricingPage ? "true" : "false"}
+      data-scrolled={useHeroTreatment && scrolledPastHero ? "true" : "false"}
+      className={`fixed top-0 left-0 right-0 z-50 w-full pt-[env(safe-area-inset-top)] ${isHomePage ? "" : gradientActive ? "" : "border-b"} ${backgroundClass} ${shadowClass} ${borderColorClass} ${visibilityClass} ${heroHeaderOverlay} ${transitionClass}`}
     >
       <div className="relative z-10">{children}</div>
     </header>

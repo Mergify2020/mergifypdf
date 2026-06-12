@@ -15,7 +15,7 @@ import {
   NEW_PASSWORD_REQUIREMENTS_ERROR,
   NEW_PASSWORD_REQUIREMENTS_HINT,
 } from "@/lib/passwordPolicy";
-import { BILLING_PRICE_IDS, FREE_TRIAL_DAYS, getBillingStatusPresentation, getPlanTierFromPriceId } from "@/lib/billingPlans";
+import { BILLING_PRICE_IDS, getBillingStatusPresentation, getPlanTierFromPriceId } from "@/lib/billingPlans";
 import SettingsMenu from "@/components/SettingsMenu";
 import PricingTierCards, { PRICING_TIERS } from "@/components/PricingTierCards";
 
@@ -2533,7 +2533,7 @@ export function AccountSettingsPage({
                             {pricingIsDelinquent
                               ? "Update payment"
                               : accountStripeStatus === "trialing"
-                                ? "Cancel free trial"
+                                ? "Cancel trial"
                                 : "Cancel plan"}
                           </button>
                         ) : null}
@@ -2624,23 +2624,21 @@ export function AccountSettingsPage({
                   canUseTrialForPlan={pricingCanUseTrialForPlan}
                   currentPlanTier={currentPlanTier}
                   currentPlanBillingPeriod={currentPlanBillingPeriod}
-                  getPrimaryActionLabel={(tierName, canUseTrial) =>
+                  getPrimaryActionLabel={(tierName) =>
                     currentPlanTier === "Essential Plus" && tierName === "Signature Pro"
                       ? "Upgrade to Pro"
                       : currentPlanTier === "Signature Pro" && tierName === "Essential Plus"
                         ? "Downgrade to Essential Plus"
-                        : canUseTrial
-                          ? `Start ${FREE_TRIAL_DAYS}-day trial`
-                          : "Subscribe now"
+                        : "Select Plan"
                   }
-                  getPrimaryActionOptions={(_, canUseTrial) => (canUseTrial ? undefined : { skipTrial: true })}
+                  getPrimaryActionOptions={() => ({ skipTrial: true })}
                   onPrimaryAction={(planName, options) => {
                     void handlePricingPlanSelect(planName, options);
                   }}
                   onPortalAction={() => {
                     void openBillingPortal();
                   }}
-                  getSecondaryActionLabel={(_, canUseTrial) => (currentPlanTier ? null : canUseTrial ? "Pay now" : null)}
+                  getSecondaryActionLabel={() => null}
                   onSecondaryAction={(planName) => {
                     void handlePricingPlanSelect(planName, { skipTrial: true });
                   }}

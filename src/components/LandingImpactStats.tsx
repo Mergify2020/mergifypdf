@@ -21,7 +21,7 @@ export default function LandingImpactStats() {
       <div className="relative mx-auto w-full max-w-[1440px] px-4 pb-16 pt-4 sm:px-6 sm:pb-20 sm:pt-6 lg:px-8 lg:pb-24 lg:pt-8">
         <RevealOnScroll as="div" className="mx-auto max-w-4xl text-center">
           <h2 className="text-balance text-[clamp(1.85rem,3.1vw,3.2rem)] font-semibold tracking-[-0.04em] text-white whitespace-nowrap">
-            Turn PDF busywork into saved time.
+            Turn busy PDF work into saved time for other tasks.
           </h2>
         </RevealOnScroll>
 

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import AuthFooter from "@/app/(auth)/AuthFooter";
 import Footer from "@/components/Footer";
 import HeaderFeaturesLink from "@/components/HeaderFeaturesLink";
+import HeaderUploadLink from "@/components/HeaderUploadLink";
 import HeaderPricingLink from "@/components/HeaderPricingLink";
 import HeaderSupportLink from "@/components/HeaderSupportLink";
 import HeroHeader from "@/components/HeroHeader";
@@ -34,20 +35,21 @@ export default function AppGuestShell({ children }: AppGuestShellProps) {
         <div className="hero-shell mx-auto grid h-[56px] w-full max-w-[1280px] grid-cols-[auto_1fr_auto] items-center px-4 transition-all duration-150 ease-out sm:px-5 lg:px-6">
           <div className="flex items-center gap-3">
             <AppHeaderBrand
+              href="/"
               logoLightSrc="/logos/home-expanded-sidebar-logo-light-v6.svg"
               logoDarkSrc="/logos/home-expanded-sidebar-logo-dark-v6.svg"
             />
           </div>
           <div className="hero-nav hidden items-center justify-center gap-4 text-base font-semibold min-[810px]:flex min-[810px]:gap-6">
+            <HeaderUploadLink className="hero-nav-link transition hover:underline hover:underline-offset-8" />
             <HeaderFeaturesLink className="hero-nav-link transition hover:underline hover:underline-offset-8" />
             <HeaderPricingLink />
-            <span className="hero-nav-link cursor-default">About</span>
             <HeaderSupportLink className="hero-nav-link transition hover:underline hover:underline-offset-8" />
           </div>
           <div className="hero-nav hidden items-center justify-center gap-4 text-base font-semibold min-[700px]:flex min-[810px]:hidden">
+            <HeaderUploadLink className="hero-nav-link transition hover:underline hover:underline-offset-8" />
             <HeaderFeaturesLink className="hero-nav-link transition hover:underline hover:underline-offset-8" />
             <HeaderPricingLink />
-            <span className="hero-nav-link cursor-default">About</span>
           </div>
           <div className="justify-self-end">
             <HeaderAuthButtons />

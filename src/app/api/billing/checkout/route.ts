@@ -8,9 +8,7 @@ import { captureServerEvent } from "@/lib/posthogServer";
 import { resolveStripeCustomerIdForUser } from "@/lib/stripeCustomers";
 import {
   ALLOWED_PRICE_IDS,
-  FREE_TRIAL_DAYS,
   getPlanTierFromPriceId,
-  getTrialEligibilityForUser,
 } from "@/lib/billingPlans";
 
 export async function POST(req: NextRequest) {
@@ -35,7 +33,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { priceId, skipTrial } = body as { priceId?: unknown; skipTrial?: unknown };
+  const { priceId } = body as { priceId?: unknown };
 
   if (!priceId || typeof priceId !== "string") {
     return NextResponse.json({ error: "Missing or invalid priceId" }, { status: 400 });
@@ -52,18 +50,6 @@ export async function POST(req: NextRequest) {
     const origin = req.headers.get("origin") ?? req.nextUrl.origin;
     const successUrl = `${origin}/pricing?status=success`;
     const cancelUrl = `${origin}/pricing?canceled=true`;
-
-    const wantsTrial = skipTrial !== true;
-    const trialEligibility = getTrialEligibilityForUser({
-      essentialPlusTrialUsedAt: user?.essentialPlusTrialUsedAt,
-      signatureProTrialUsedAt: user?.signatureProTrialUsedAt,
-      legacyTrialUsedAt: user?.trialUsedAt,
-    });
-    const eligibleForTrial =
-      selectedPlanTier === "essential_plus"
-        ? trialEligibility.eligibleForTrialByPlan.essentialPlus
-        : trialEligibility.eligibleForTrialByPlan.signaturePro;
-    const trialAllowed = wantsTrial && eligibleForTrial;
 
     const normalizedEmail = (user.email ?? session.user.email ?? "").trim().toLowerCase();
     if (!normalizedEmail) {
@@ -106,7 +92,6 @@ export async function POST(req: NextRequest) {
         allow_promotion_codes: true,
         subscription_data: {
           metadata: { appUserId: user.id },
-          ...(trialAllowed ? { trial_period_days: FREE_TRIAL_DAYS } : {}),
         },
       },
       {
@@ -127,7 +112,6 @@ export async function POST(req: NextRequest) {
         priceId,
         stripeCustomerId: customerId,
         stripeCheckoutSessionId: checkoutSession.id,
-        trialAllowed,
       },
     });
 

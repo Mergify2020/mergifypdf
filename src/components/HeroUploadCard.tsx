@@ -463,7 +463,8 @@ export default function HeroUploadCard() {
 
   return (
     <div
-      className={containerClassName}
+      id="upload"
+      className={`scroll-mt-[calc(56px+env(safe-area-inset-top)+18px)] ${containerClassName}`}
       role={isIdle ? "button" : undefined}
       tabIndex={isIdle ? 0 : -1}
       onClick={isIdle ? handleContainerClick : undefined}
