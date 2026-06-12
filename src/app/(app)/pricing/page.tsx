@@ -112,10 +112,10 @@ export default function PricingPlans() {
     const validBilling = checkoutBilling === "annual" || checkoutBilling === "monthly" ? checkoutBilling : null;
     if (!validPlan || !validBilling) return;
 
+    const priceId = PRICE_IDS[validPlan][validBilling];
     autoCheckoutStartedRef.current = true;
 
     async function startSelectedCheckout() {
-      const priceId = PRICE_IDS[validPlan][validBilling];
       const res = await fetch("/api/billing/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
