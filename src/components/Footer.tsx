@@ -29,26 +29,7 @@ export default function Footer({ reveal = true }: FooterProps) {
   const footerContent = (
       <div className="relative z-10 mx-auto w-full max-w-[1400px] px-4 pt-12 pb-8 sm:px-6 lg:px-8">
         {/* Top grid */}
-        <div className="relative z-10 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-5 lg:gap-10">
-          {/* Features */}
-          <div>
-            <h3 className="text-sm font-semibold text-slate-50">Features</h3>
-            <div className="mt-4 space-y-2">
-              <a href="#" className="block text-[13px] text-slate-400 transition hover:text-white">
-                Merge Documents
-              </a>
-              <a href="#" className="block text-[13px] text-slate-400 transition hover:text-white">
-                Edit &amp; Annotate
-              </a>
-              <a href="#" className="block text-[13px] text-slate-400 transition hover:text-white">
-                Sign Documents
-              </a>
-              <a href="#" className="block text-[13px] text-slate-400 transition hover:text-white">
-                Split &amp; Reorder
-              </a>
-            </div>
-          </div>
-
+        <div className="relative z-10 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4 lg:gap-10">
           {/* Support */}
           <div>
             <h3 className="text-sm font-semibold text-slate-50">Support</h3>

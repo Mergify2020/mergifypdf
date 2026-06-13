@@ -16,9 +16,7 @@ import {
   FileSignature,
   FileText,
   FolderKanban,
-  Folders,
-  Home,
-  LogOut,
+  Folders,  LogOut,
   Moon,
   PanelLeftClose,
   PenSquare,
@@ -35,9 +33,7 @@ import {
 } from "lucide-react";
 import {
   FileText as PhFileText,
-  Folders as PhFolders,
-  House as PhHouse,
-  Signature as PhSignature,
+  Folders as PhFolders,  Signature as PhSignature,
   Trash as PhTrash,
 } from "@phosphor-icons/react";
 import { getBillingStatusPresentation } from "@/lib/billingPlans";
@@ -1417,6 +1413,8 @@ export default function WorkspaceShell({
   const showPersistentWorkspaceTopBar =
     pathname === "/" || pathname === "/projects/all" || (pathname?.startsWith("/signature-center") ?? false);
   const isAllProjectsRoute = pathname === "/" || pathname === "/projects/all";
+  const showDesktopAllProjectsTopBar = pathname === "/projects/all" && !phoneViewport;
+  const useFlatAllProjectsShell = showDesktopAllProjectsTopBar;
   const fallbackProjectCardCount = fallbackProjectCountReady
     ? (isAllProjectsRoute ? Math.min(homeRecentProjects.length, 60) : Math.min(homeRecentProjects.length, 9))
     : isAllProjectsRoute
@@ -1933,15 +1931,25 @@ export default function WorkspaceShell({
   const sidebarCompact = compactSidebar || narrowSidebar;
   const shouldOverlay = overlaySidebar;
   const railWidthClass = "w-full";
-  const panelLeftClass = "left-[calc(var(--shell-left)+var(--shell-sidebar-width)+24px)]";
+  const panelLeftClass = useFlatAllProjectsShell
+    ? "left-[calc(var(--shell-left)+var(--shell-sidebar-width))]"
+    : "left-[calc(var(--shell-left)+var(--shell-sidebar-width)+24px)]";
   const baseContentOffsetClass = expanded
-    ? "md:pl-[calc(var(--shell-left)+256px+24px)]"
-    : "md:pl-[calc(var(--shell-left)+80px+24px)]";
+    ? useFlatAllProjectsShell
+      ? "md:pl-[calc(var(--shell-left)+256px)]"
+      : "md:pl-[calc(var(--shell-left)+256px+24px)]"
+    : useFlatAllProjectsShell
+      ? "md:pl-[calc(var(--shell-left)+80px)]"
+      : "md:pl-[calc(var(--shell-left)+80px+24px)]";
   const expandedContentOffsetClass =
     panelExpanded && !shouldOverlay
       ? expanded
-        ? "md:pl-[calc(var(--shell-left)+256px+24px+320px)]"
-        : "md:pl-[calc(var(--shell-left)+80px+24px+240px)]"
+        ? useFlatAllProjectsShell
+        ? "md:pl-[calc(var(--shell-left)+256px+320px)]"
+        : "md:pl-[calc(var(--shell-left)+256px+24px+320px)]"
+        : useFlatAllProjectsShell
+          ? "md:pl-[calc(var(--shell-left)+80px+240px)]"
+          : "md:pl-[calc(var(--shell-left)+80px+24px+240px)]"
       : "";
   const sidebarExpandedClass = panelExpanded && !shouldOverlay ? "with-sidebar-panel" : "";
   const contentOffsetClass = hideWorkspaceSidebar
@@ -1951,7 +1959,9 @@ export default function WorkspaceShell({
     ? "justify-center px-[13px]"
     : hideWorkspaceSidebar
       ? "justify-center px-6"
-      : "justify-start px-3 sm:px-4 md:pl-0 md:pr-6";
+      : useFlatAllProjectsShell
+        ? "justify-start px-0"
+        : "justify-start px-3 sm:px-4 md:pl-0 md:pr-6";
   const clearSidebarTooltip = () => {
     if (sidebarTooltipTimeoutRef.current !== null) {
       window.clearTimeout(sidebarTooltipTimeoutRef.current);
@@ -2494,18 +2504,17 @@ export default function WorkspaceShell({
     {isBillingBannerRoute ? (
       <div
         aria-hidden
-        className={`fixed inset-0 z-0 ${workspaceBackgroundClass} dark:bg-[#252525]`}
+        className={`fixed inset-0 z-0 ${workspaceBackgroundClass} dark:bg-[#252525] ${useFlatAllProjectsShell ? "projects-all-workspace" : ""}`}
       />
     ) : null}
     <div
-      className={`workspace-shell-root relative z-10 flex pt-0 ${workspaceLaunchUnderlayClass} ${homeBillingBannerExiting ? "transition-[padding-top,min-height] duration-300 ease-out" : "transition-none"} md:pt-[var(--home-banner-offset)] ${workspaceBackgroundClass} ${sidebarCompact ? "sidebar-collapsed" : ""} ${expanded ? "" : "sidebar-minimized"} dark:bg-[#252525]`}
+      className={`workspace-shell-root ${useFlatAllProjectsShell ? "projects-all-workspace" : ""} relative z-10 flex pt-0 ${workspaceLaunchUnderlayClass} ${homeBillingBannerExiting ? "transition-[padding-top,min-height] duration-300 ease-out" : "transition-none"} md:pt-[var(--home-banner-offset)] ${workspaceBackgroundClass} ${sidebarCompact ? "sidebar-collapsed" : ""} ${expanded ? "" : "sidebar-minimized"} dark:bg-[#252525] `}
       style={
         {
           minHeight: "calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset))",
           "--shell-content-width":
-            isAccountRoute ? "2064px" : "calc(1960px - (var(--shell-sidebar-width) - 80px))",
-          "--shell-left":
-            "max(24px, calc((100vw - (var(--shell-content-width) + var(--shell-sidebar-width) + 24px)) / 2))",
+            isAccountRoute ? "2064px" : useFlatAllProjectsShell ? "100%" : "calc(1960px - (var(--shell-sidebar-width) - 80px))",
+          "--shell-left": useFlatAllProjectsShell ? "0px" : "max(24px, calc((100vw - (var(--shell-content-width) + var(--shell-sidebar-width) + 24px)) / 2))",
           "--shell-sidebar-width": expanded ? "256px" : "80px",
           "--home-banner-offset": homeBillingBannerOccupiesSpace ? "56px" : "0px",
           "--home-topbar-offset": showPersistentWorkspaceTopBar ? "68px" : "0px",
@@ -2578,19 +2587,22 @@ export default function WorkspaceShell({
       {/* Desktop sidebar */}
       <aside
         id={isHomePanel ? "home-sidebar" : undefined}
-        className={`workspace-desktop-sidebar absolute left-[var(--shell-left)] top-[calc(24px+var(--home-banner-offset))] z-50 hidden w-[var(--shell-sidebar-width)] text-slate-800 ${homeBillingBannerExiting ? "transition-[top,height] duration-300 ease-out" : "transition-none 2xl:transition-[width] 2xl:duration-300 2xl:ease-[cubic-bezier(0.22,1,0.36,1)]"} dark:text-zinc-100 md:flex`}
+        className={`workspace-desktop-sidebar absolute left-[var(--shell-left)] top-[var(--home-banner-offset)] z-50 hidden w-[var(--shell-sidebar-width)] text-slate-800 ${homeBillingBannerExiting ? "transition-[top,height] duration-300 ease-out" : "transition-none 2xl:transition-[width] 2xl:duration-300 2xl:ease-[cubic-bezier(0.22,1,0.36,1)]"} dark:text-zinc-100 md:flex`}
         style={{
-          height:
-            "calc(var(--workspace-vh, 100dvh) - var(--workspace-frame-gutter, 48px) - var(--home-banner-offset, 0px))",
+          height: useFlatAllProjectsShell
+            ? "calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset, 0px))"
+            : "calc(var(--workspace-vh, 100dvh) - var(--workspace-frame-gutter, 48px) - var(--home-banner-offset, 0px))",
         }}
       >
         <div className="relative flex h-full w-full">
           <div
             ref={sidebarRef}
             className={`flex h-full ${railWidthClass} flex-col ${
-              useUnifiedWorkspaceBackground
-                ? "rounded-xl border-[1.5px] border-gray-200 bg-white shadow-sm dark:border-[#3A3A3A] dark:bg-[#323232] dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)]"
-                : "rounded-xl border-[1.5px] border-gray-200 bg-white shadow-sm dark:border-[#3A3A3A] dark:bg-[#323232] dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)]"
+              useFlatAllProjectsShell
+                ? "border-r border-slate-200 bg-white shadow-none dark:border-[#3A3A3A] dark:bg-[#323232] dark:shadow-none"
+                : useUnifiedWorkspaceBackground
+                  ? "rounded-xl border-[1.5px] border-gray-200 bg-white shadow-sm dark:border-[#3A3A3A] dark:bg-[#323232] dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)]"
+                  : "rounded-xl border-[1.5px] border-gray-200 bg-white shadow-sm dark:border-[#3A3A3A] dark:bg-[#323232] dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)]"
             } w-full ${sidebarCompact ? "z-10" : "z-20"}`}
           >
             <div className="flex flex-1 flex-col gap-4 overflow-y-auto overflow-x-hidden px-1 py-5 lg:px-2">
@@ -3267,14 +3279,16 @@ export default function WorkspaceShell({
         <WorkspaceHomeQueryProvider value={homeProjectsQueryContext}>
           {showPersistentWorkspaceTopBar ? (
             <div
-              className={`relative z-[80] flex w-full ${contentShellWrapperClass} pt-3 md:pt-6`}
+              className={`relative z-[80] flex w-full ${showDesktopAllProjectsTopBar ? "px-0 pt-0" : `${contentShellWrapperClass} pt-3 md:pt-6`}`}
             >
               <div
-                style={{ maxWidth: "var(--shell-content-width)" }}
+                style={{ maxWidth: showDesktopAllProjectsTopBar ? "100%" : "var(--shell-content-width)" }}
                 className="w-full transition-none 2xl:transition-[max-width] 2xl:duration-300 2xl:ease-[cubic-bezier(0.22,1,0.36,1)]"
               >
-                <div className="flex w-full items-center gap-3">
-                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                <div
+                  className={`flex w-full items-center gap-3 ${showDesktopAllProjectsTopBar ? "justify-end border-b border-slate-200 pb-4 dark:border-[#3A3A3A]" : ""}`}
+                >
+                    <div className={showDesktopAllProjectsTopBar ? "hidden" : "flex min-w-0 flex-1 items-center gap-3"}>
                     <div
                       className={`flex transition-[max-width,width] duration-200 ease-out ${
                         mobileSearchExpanded
@@ -3322,11 +3336,33 @@ export default function WorkspaceShell({
                   </div>
                   <div
                     className={`flex h-11 flex-nowrap items-center gap-2 shrink-0 ${
-                      mobileSearchExpanded
-                        ? "pointer-events-none w-0 min-w-0 max-w-0 overflow-hidden opacity-0 transition-[width,max-width,opacity] duration-200 ease-out"
-                        : "w-[44px] min-w-[44px] max-w-[44px] opacity-100 transition-none md:w-[276px] md:min-w-[276px] md:max-w-[276px] md:transition-[width,max-width,opacity] md:duration-200 md:ease-out"
+                      showDesktopAllProjectsTopBar
+                        ? "w-auto min-w-0 max-w-none opacity-100"
+                        : mobileSearchExpanded
+                          ? "pointer-events-none w-0 min-w-0 max-w-0 overflow-hidden opacity-0 transition-[width,max-width,opacity] duration-200 ease-out"
+                          : "w-[44px] min-w-[44px] max-w-[44px] opacity-100 transition-none md:w-[276px] md:min-w-[276px] md:max-w-[276px] md:transition-[width,max-width,opacity] md:duration-200 md:ease-out"
                     }`}
                   >
+                    {showDesktopAllProjectsTopBar ? (
+                      <div className="hidden items-center gap-2 md:flex">
+                        <span className="inline-flex items-center rounded-full border border-[#E8DFF8] bg-[#F7F0FF] px-3 py-2 text-xs font-semibold text-[#6C47FF] dark:border-[#4A3A6A] dark:bg-[#2B223F] dark:text-[#D8C8FF]">
+                          {homeRecentProjects.length} Projects
+                        </span>
+                        <Link
+                          href="/pricing"
+                          className="inline-flex items-center rounded-full bg-[#6C47FF] px-4 py-2 text-xs font-semibold text-white shadow-[0_10px_24px_rgba(108,71,255,0.24)] transition hover:-translate-y-[1px] hover:bg-[#5B38E6] hover:shadow-[0_12px_28px_rgba(108,71,255,0.32)] dark:bg-[#6C47FF] dark:text-zinc-100 dark:shadow-[0_10px_24px_rgba(108,71,255,0.3)] dark:hover:bg-[#5B38E6] dark:hover:shadow-[0_12px_28px_rgba(108,71,255,0.4)]"
+                        >
+                          Upgrade Pro
+                        </Link>
+                      </div>
+                    ) : null}
+                    {showDesktopAllProjectsTopBar ? (
+                      <StartProjectButton
+                        variant="custom"
+                        label="Create New"
+                        className="inline-flex h-11 items-center gap-2 rounded-full bg-[#6C47FF] px-4 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(108,71,255,0.28)] transition-[transform,background-color,box-shadow] duration-200 hover:-translate-y-[1px] hover:bg-[#5B38E6] hover:shadow-[0_12px_28px_rgba(108,71,255,0.36)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/15 dark:bg-[#6C47FF] dark:text-zinc-100 dark:shadow-[0_10px_24px_rgba(108,71,255,0.32)] dark:hover:bg-[#5B38E6] dark:hover:shadow-[0_12px_28px_rgba(108,71,255,0.42)]"
+                      />
+                    ) : null}
                     <UiTooltip label={shellTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
                       <button
                         type="button"
@@ -3398,10 +3434,10 @@ export default function WorkspaceShell({
           ) : null}
           <Suspense fallback={null}>
             <main className="relative z-0 flex-1 lg:z-40">
-              <div className={`flex w-full ${contentShellWrapperClass}`}>
+              <div className={`flex w-full ${showDesktopAllProjectsTopBar ? "px-0" : contentShellWrapperClass}`}>
                 <div
                   className="workspace-content-shell w-full transition-none 2xl:transition-[max-width] 2xl:duration-300 2xl:ease-[cubic-bezier(0.22,1,0.36,1)]"
-                  style={{ maxWidth: "var(--shell-content-width)" }}
+                  style={{ maxWidth: showDesktopAllProjectsTopBar ? "100%" : "var(--shell-content-width)" }}
                   onClickCapture={handleExistingProjectLinkCapture}
                 >
                   {children}

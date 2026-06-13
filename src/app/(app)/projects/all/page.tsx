@@ -61,7 +61,7 @@ async function AllProjectsContent() {
 
   const displayName = session.user.name ?? session.user.email ?? "Guest";
   const persistedViewMode = cookieStore.get("mpdf:all-projects-view-mode")?.value;
-  const initialViewMode = persistedViewMode === "list" ? "list" : "grid";
+  const initialViewMode = persistedViewMode === "grid" ? "grid" : "list";
 
   let shapedProjects: Array<{
     id: string;
@@ -114,20 +114,13 @@ async function AllProjectsContent() {
 
   return (
     <main
-      className="box-border w-full bg-[#F1F4F9] pt-3 pb-0 md:pt-6 md:pb-0 dark:bg-[#252525]"
+      className="projects-content-grid box-border flex h-full w-full min-h-0 flex-col bg-transparent pt-0 pb-0 dark:bg-transparent"
       style={{
         height:
-          "calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset, 0px) - var(--home-topbar-offset, 0px) - var(--workspace-content-bottom-subtract, var(--workspace-frame-gutter, 48px)))",
+          "calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset, 0px) - var(--home-topbar-offset, 0px))",
       }}
     >
-      <div className="h-full min-h-0 w-full">
-        <div className="projects-content-grid flex h-full w-full min-h-0 flex-col">
-          <div
-            id="home-projects-container"
-            className="relative z-40 flex h-full min-h-0 w-full flex-col px-0 pt-0 data-[shadow-overlay=true]:border-transparent data-[shadow-overlay=true]:shadow-none md:pl-1 md:pr-0"
-          >
-            <div className="flex h-full min-h-0 w-full flex-col">
-              <HomeProjectsSearch
+      <HomeProjectsSearch
                 key={userId}
                 accountName={displayName}
                 ownerKey={userId}
@@ -137,10 +130,6 @@ async function AllProjectsContent() {
                 showOwnerFilter={false}
                 initialViewMode={initialViewMode}
               />
-            </div>
-          </div>
-        </div>
-      </div>
     </main>
   );
 }

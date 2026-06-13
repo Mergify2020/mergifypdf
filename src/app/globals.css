@@ -1701,6 +1701,21 @@ header[data-hero="true"] .app-brand-dark {
   --workspace-projects-bottom-gap: 0px;
 }
 
+.projects-all-workspace .workspace-desktop-sidebar {
+  left: 0 !important;
+  top: var(--home-banner-offset) !important;
+  height: calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset, 0px)) !important;
+}
+
+.projects-all-workspace .workspace-desktop-sidebar > div > div {
+  border-radius: 0 !important;
+  border-left: 0 !important;
+  border-top: 0 !important;
+  border-bottom: 0 !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: none !important;
+}
+
 @container (min-width: 640px) {
   .recent-projects-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

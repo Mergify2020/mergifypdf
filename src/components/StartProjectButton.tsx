@@ -33,6 +33,7 @@ type Props = {
   variant?: "default" | "custom";
   iconOnly?: boolean;
   onOpen?: () => void;
+  label?: string;
 };
 
 async function resetWorkspaceStorage() {
@@ -72,7 +73,13 @@ async function uploadProjectPdfFromFile(file: File | null | undefined, projectId
   return res.ok;
 }
 
-export default function StartProjectButton({ className, variant = "default", iconOnly = false, onOpen }: Props) {
+export default function StartProjectButton({
+  className,
+  variant = "default",
+  iconOnly = false,
+  onOpen,
+  label = "Create New",
+}: Props) {
   const router = useRouter();
   const { queuePreload } = useWorkspaceFilePreloader();
   const [open, setOpen] = useState(false);
@@ -282,9 +289,9 @@ export default function StartProjectButton({ className, variant = "default", ico
           }`}
           aria-hidden={iconOnly}
         >
-          Start a new project
+          {label}
         </span>
-        {iconOnly ? <span className="sr-only">Start a new project</span> : null}
+        {iconOnly ? <span className="sr-only">{label}</span> : null}
       </button>
 
       {open

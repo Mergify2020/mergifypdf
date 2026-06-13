@@ -317,17 +317,22 @@ export default function RecentProjectsRow({
   }
 
   if (!projects.length && !loading) {
-    return (
-      <div className="mt-6 flex min-h-[260px] w-full flex-col items-center justify-center px-8 py-12 text-center">
+    return showAllProjects ? (
+      <div className="rounded-2xl border border-[#3F3F3F] bg-[#323232] px-6 py-6 text-left shadow-[0_10px_24px_rgba(0,0,0,0.24)]">
+        <p className="text-base font-semibold tracking-tight text-zinc-100">No recent projects yet.</p>
+        <p className="mt-2 text-sm leading-6 text-zinc-400">Create your first project or use one of the quick actions above.</p>
+      </div>
+    ) : (
+      <div className="mt-4 flex min-h-[360px] w-full flex-col items-center justify-start px-8 pt-8 pb-8 text-center sm:min-h-[480px] sm:pt-12">
         <Image
           src="/noprojectyet.svg"
           alt=""
           width={405}
           height={405}
-          className="mt-[-100px] h-[318px] w-[318px] opacity-90 sm:h-[405px] sm:w-[405px]"
+          className="mt-0 h-[318px] w-[318px] opacity-90 sm:h-[405px] sm:w-[405px]"
           priority
         />
-        <p className="-mt-5 text-lg font-semibold text-slate-900 dark:text-zinc-100 sm:text-xl">No projects yet</p>
+        <p className="-mt-2 text-lg font-semibold text-slate-900 dark:text-zinc-100 sm:text-xl">No projects yet</p>
         <p className="mt-2 max-w-sm text-sm text-slate-600 dark:text-zinc-300 sm:text-base">Start a new project to see it here.</p>
       </div>
     );

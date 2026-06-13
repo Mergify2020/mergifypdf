@@ -15,7 +15,8 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
   const isRegisterPage = pathname === "/register";
   const isForgotPasswordPage = pathname === "/forgot-password";
   const isResetPasswordPage = pathname === "/reset-password";
-  const useHeroTreatment = isHomePage || isPricingPage;
+  const isSupportPage = pathname === "/support";
+  const useHeroTreatment = isHomePage || isPricingPage || isSupportPage;
   const isAnimatedPage = useHeroTreatment;
 
   const [scrolledPastHero, setScrolledPastHero] = useState(false);
@@ -109,16 +110,18 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
   }, [isAnimatedPage]);
 
   useEffect(() => {
-    if (!isHomePage && !isPricingPage) return;
+    if (!isHomePage && !isPricingPage && !isSupportPage) return;
     const meta = document.querySelector('meta[name="theme-color"]');
     if (!meta) return;
-    const color = isPricingPage ? "#050816" : "#FFFFFF";
+    const color = isPricingPage || isSupportPage ? "#050816" : "#FFFFFF";
     meta.setAttribute("content", color);
-  }, [isHomePage, isPricingPage, useHeroTreatment]);
+  }, [isHomePage, isPricingPage, isSupportPage, useHeroTreatment]);
 
   const gradientActive = isHomePage ? !scrolledPastHero : useHeroTreatment && !scrolledPastHero;
   let backgroundClass: string;
-  if (gradientActive) {
+  if (isSupportPage) {
+    backgroundClass = "bg-transparent";
+  } else if (gradientActive) {
     backgroundClass = isHomePage
       ? "bg-transparent"
       : useHeroTreatment
@@ -128,9 +131,9 @@ export default function HeroHeader({ children }: HeroHeaderProps) {
     backgroundClass = isHomePage && scrolledPastHero ? "bg-transparent" : "bg-white";
   }
 
-  const shadowClass = gradientActive || isHomePage ? "" : "shadow-sm";
-  const borderColorClass = gradientActive || isHomePage ? "border-transparent" : "border-slate-200";
-  const heroHeaderOverlay = useHeroTreatment && gradientActive ? "backdrop-blur-0 shadow-none border-transparent" : "";
+  const shadowClass = gradientActive || isHomePage || isSupportPage ? "" : "shadow-sm";
+  const borderColorClass = gradientActive || isHomePage || isSupportPage ? "border-transparent" : "border-slate-200";
+  const heroHeaderOverlay = isSupportPage ? "backdrop-blur-0 shadow-none border-transparent" : useHeroTreatment && gradientActive ? "backdrop-blur-0 shadow-none border-transparent" : "";
   const visibilityClass = "translate-y-0 opacity-100";
 
   if (isLoginPage || isRegisterPage || isForgotPasswordPage || isResetPasswordPage) {

@@ -115,43 +115,46 @@ export default function SupportPage() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#F6F8FF] px-3 py-10 text-slate-900 sm:px-5 lg:px-8">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-[420px]">
+    <div className="relative -mt-[calc(56px+env(safe-area-inset-top)+10px)] min-h-screen overflow-hidden bg-[#050816] px-3 pb-16 pt-[calc(76px+env(safe-area-inset-top)+18px)] text-white sm:px-5 lg:px-8">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(139,124,255,0.28),transparent_28%),radial-gradient(circle_at_82%_8%,rgba(109,94,243,0.24),transparent_26%),radial-gradient(circle_at_50%_0%,rgba(14,165,233,0.12),transparent_24%),linear-gradient(180deg,#050816_0%,#070b16_48%,#090b16_100%)]" />
         <Image
           src="/backgrounds/login-page-background-v5.svg"
           alt=""
           fill
-          className="object-cover object-[50%_10%] scale-[1.08]"
+          className="object-cover object-[50%_10%] scale-[1.08] opacity-20 mix-blend-screen"
           priority={false}
         />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,8,22,0.08)_0%,rgba(5,8,22,0.32)_34%,rgba(5,8,22,0.86)_100%)]" />
+        <div className="absolute inset-x-0 top-0 h-40 bg-[linear-gradient(180deg,rgba(139,124,255,0.24)_0%,rgba(139,124,255,0)_100%)]" />
       </div>
 
-      <div className="relative mx-auto w-full max-w-6xl">
-        <section className="px-0 py-8 sm:py-10">
-          <h1 className="mt-3 text-center text-4xl font-semibold tracking-tight text-white sm:text-5xl">
+      <div className="relative mx-auto flex w-full max-w-6xl flex-col gap-6">
+        <section className="px-0 pb-4 pt-4 sm:pt-6">
+          <h1 className="text-balance text-center text-4xl font-semibold tracking-[-0.04em] text-white sm:text-5xl">
             Hi, how can we help?
           </h1>
           <div className="mx-auto mt-7 w-full max-w-3xl">
-            <label className="group flex items-center gap-3 rounded-full border border-white/65 bg-white px-5 py-3 shadow-[0_10px_26px_rgba(15,23,42,0.14)]">
-              <Search className="h-5 w-5 text-slate-500" />
+            <label className="group flex items-center gap-3 rounded-full border border-white/10 bg-white/10 px-5 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.2)] backdrop-blur-xl">
+              <Search className="h-5 w-5 text-white/55" />
               <input
                 type="text"
                 placeholder="Search the knowledge base"
-                className="w-full bg-transparent text-base text-slate-900 placeholder:text-slate-500 focus:outline-none"
+                className="w-full bg-transparent text-base text-white placeholder:text-white/45 focus:outline-none"
               />
             </label>
           </div>
         </section>
 
-        <section className="mt-6">
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_45px_rgba(15,23,42,0.08)] sm:p-8">
+        <section className="relative">
+          <div className="rounded-[28px] border border-white/10 bg-[#0b1020]/96 p-6 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:p-8">
             <div className="relative">
               <div
                 className={activeTopic ? "invisible pointer-events-none select-none" : ""}
                 style={{ animation: "supportTopicListOpen 220ms ease-out" }}
               >
-                <h2 className="text-3xl font-semibold tracking-tight text-slate-900">Popular Help Topics</h2>
-                <div className="mt-6 grid gap-2 border-t border-slate-200 sm:grid-cols-2">
+                <h2 className="text-3xl font-semibold tracking-tight text-white">Popular Help Topics</h2>
+                <div className="mt-6 grid gap-2 border-t border-white/10 sm:grid-cols-2">
                   {topics.map((topic) => {
                     const Icon = topic.icon;
                     return (
@@ -159,14 +162,14 @@ export default function SupportPage() {
                         key={topic.title}
                         type="button"
                         onClick={() => setActiveTopic(topic)}
-                        className="flex w-full gap-3 border-b border-slate-200 px-1 py-5 text-left transition-all duration-200 hover:bg-slate-50/80 hover:shadow-[inset_0_0_0_1px_rgba(99,102,241,0.16)] sm:px-2"
+                        className="flex w-full gap-3 border-b border-white/10 px-1 py-5 text-left transition-all duration-200 hover:bg-white/6 hover:shadow-[inset_0_0_0_1px_rgba(139,124,255,0.16)] sm:px-2"
                       >
-                        <span className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-violet-50 text-violet-600">
+                        <span className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#8B7CFF]/12 text-[#CBBEFF]">
                           <Icon className="h-5 w-5" />
                         </span>
                         <div>
-                          <h3 className="text-xl font-semibold text-slate-900">{topic.title}</h3>
-                          <p className="mt-1 text-sm leading-relaxed text-slate-600">{topic.description}</p>
+                          <h3 className="text-xl font-semibold text-white">{topic.title}</h3>
+                          <p className="mt-1 text-sm leading-relaxed text-white/68">{topic.description}</p>
                         </div>
                       </button>
                     );
@@ -175,60 +178,60 @@ export default function SupportPage() {
               </div>
 
               {activeTopic ? (
-                <div className="absolute inset-0 bg-white" style={{ animation: "supportTopicOpen 260ms ease-out" }}>
-                <div className="flex items-center gap-3 border-b border-slate-200 pb-4">
-                  <button
-                    type="button"
-                    onClick={() => setActiveTopic(null)}
-                    className="inline-flex h-8 w-8 items-center justify-center text-slate-700 transition-colors hover:text-slate-400"
-                    aria-label="Back to help topics"
-                  >
-                    <ArrowLeft className="h-5 w-5" />
-                  </button>
-                  <h2 className="text-2xl font-semibold tracking-tight text-slate-900">{activeTopic.title}</h2>
-                </div>
+                <div className="absolute inset-0 rounded-[28px] border border-white/10 bg-[#080B16] shadow-[0_24px_60px_rgba(0,0,0,0.3)]" style={{ animation: "supportTopicOpen 260ms ease-out" }}>
+                  <div className="flex items-center gap-3 border-b border-white/10 pb-4">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTopic(null)}
+                      className="inline-flex h-8 w-8 items-center justify-center text-white/80 transition-colors hover:text-white"
+                      aria-label="Back to help topics"
+                    >
+                      <ArrowLeft className="h-5 w-5" />
+                    </button>
+                    <h2 className="text-2xl font-semibold tracking-tight text-white">{activeTopic.title}</h2>
+                  </div>
 
-                <div className="mt-6 space-y-4">
-                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5">
-                    <div className="h-4 w-40 rounded-full bg-slate-200" />
-                    <div className="mt-3 h-3 w-full rounded-full bg-slate-200/80" />
-                    <div className="mt-2 h-3 w-5/6 rounded-full bg-slate-200/80" />
-                    <div className="mt-2 h-3 w-4/6 rounded-full bg-slate-200/80" />
-                  </div>
-                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5">
-                    <div className="h-4 w-32 rounded-full bg-slate-200" />
-                    <div className="mt-3 h-3 w-full rounded-full bg-slate-200/80" />
-                    <div className="mt-2 h-3 w-3/4 rounded-full bg-slate-200/80" />
-                  </div>
-                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5">
-                    <div className="h-4 w-36 rounded-full bg-slate-200" />
-                    <div className="mt-3 h-3 w-full rounded-full bg-slate-200/80" />
-                    <div className="mt-2 h-3 w-2/3 rounded-full bg-slate-200/80" />
+                  <div className="mt-6 space-y-4">
+                    <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-5">
+                      <div className="h-4 w-40 rounded-full bg-white/15" />
+                      <div className="mt-3 h-3 w-full rounded-full bg-white/12" />
+                      <div className="mt-2 h-3 w-5/6 rounded-full bg-white/12" />
+                      <div className="mt-2 h-3 w-4/6 rounded-full bg-white/12" />
+                    </div>
+                    <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-5">
+                      <div className="h-4 w-32 rounded-full bg-white/15" />
+                      <div className="mt-3 h-3 w-full rounded-full bg-white/12" />
+                      <div className="mt-2 h-3 w-3/4 rounded-full bg-white/12" />
+                    </div>
+                    <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-5">
+                      <div className="h-4 w-36 rounded-full bg-white/15" />
+                      <div className="mt-3 h-3 w-full rounded-full bg-white/12" />
+                      <div className="mt-2 h-3 w-2/3 rounded-full bg-white/12" />
+                    </div>
                   </div>
                 </div>
-              </div>
               ) : null}
             </div>
           </div>
         </section>
 
-        <section className="mt-6 grid gap-4 lg:grid-cols-[320px_1fr]">
-          <aside className="order-2 rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.08)] sm:p-6 lg:order-1">
+        <section className="grid gap-4 lg:grid-cols-[340px_1fr]">
+          <aside className="order-2 rounded-[28px] border border-white/10 bg-white/6 p-5 shadow-[0_24px_60px_rgba(0,0,0,0.28)] backdrop-blur-xl sm:p-6 lg:order-1">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between lg:flex-col">
               <div className="order-2 sm:order-2 sm:self-center lg:order-2 lg:w-full">
-                <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Contact Support</h2>
-                <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                <h2 className="text-2xl font-semibold tracking-tight text-white">Contact Support</h2>
+                <p className="mt-2 text-sm leading-relaxed text-white/68">
                   Get help with your account, billing, or document workflows.
                 </p>
 
                 <div className="mt-5 space-y-4">
                   <div className="flex items-start gap-3">
-                    <span className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-violet-50 text-violet-600">
+                    <span className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#8B7CFF]/12 text-[#CBBEFF]">
                       <Mail className="h-5 w-5" />
                     </span>
                     <div>
-                      <p className="text-sm font-semibold text-slate-900">Email</p>
-                      <a href="mailto:support@mergifypdf.com" className="text-sm text-slate-600 hover:text-violet-600">
+                      <p className="text-sm font-semibold text-white">Email</p>
+                      <a href="mailto:support@mergifypdf.com" className="text-sm text-white/72 transition hover:text-white">
                         support@mergifypdf.com
                       </a>
                     </div>
@@ -242,15 +245,15 @@ export default function SupportPage() {
                   alt="Support illustration"
                   width={242}
                   height={161}
-                  className="h-auto w-[242px] -scale-x-100"
+                  className="h-auto w-[242px] -scale-x-100 drop-shadow-[0_20px_40px_rgba(0,0,0,0.22)]"
                 />
               </div>
             </div>
           </aside>
 
-          <div className="order-1 rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_45px_rgba(15,23,42,0.08)] sm:p-7 lg:order-2">
-            <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Get help from our support team</h2>
-            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+          <div className="order-1 rounded-[28px] border border-white/10 bg-white/6 p-6 shadow-[0_24px_60px_rgba(0,0,0,0.28)] backdrop-blur-xl sm:p-7 lg:order-2">
+            <h2 className="text-2xl font-semibold tracking-tight text-white">Get help from our support team</h2>
+            <p className="mt-2 text-sm leading-relaxed text-white/68">
               Share what you need, and we&apos;ll guide you to the fastest solution.
             </p>
 
@@ -258,11 +261,11 @@ export default function SupportPage() {
               <div>
                 <div
                   ref={issueTypeRef}
-                  className={`relative rounded-xl border-2 bg-white transition-colors ${
-                    errors.issueType ? "border-rose-500 focus-within:border-rose-500" : "border-slate-400 focus-within:border-violet-500"
+                  className={`relative rounded-xl border-2 bg-[#0B1020] transition-colors ${
+                    errors.issueType ? "border-rose-500 focus-within:border-rose-500" : "border-white/15 focus-within:border-[#8B7CFF]"
                   }`}
                 >
-                  <span className="pointer-events-none absolute inset-y-0 left-3 z-10 inline-flex items-center text-slate-400">
+                  <span className="pointer-events-none absolute inset-y-0 left-3 z-10 inline-flex items-center text-white/35">
                     <ListFilter className="h-4.5 w-4.5" />
                   </span>
                   <button
@@ -271,12 +274,12 @@ export default function SupportPage() {
                     aria-expanded={issueTypeOpen}
                     onClick={() => setIssueTypeOpen((current) => !current)}
                     className={`w-full bg-transparent py-3 pr-11 pl-10 text-left text-base outline-none ${
-                      issueType ? "text-slate-900" : "text-slate-400"
+                      issueType ? "text-white" : "text-white/40"
                     }`}
                   >
                     {issueTypeOptions.find((option) => option.value === issueType)?.label ?? "Issue Type"}
                   </button>
-                  <span className="pointer-events-none absolute inset-y-0 right-3 z-10 inline-flex items-center text-slate-500">
+                  <span className="pointer-events-none absolute inset-y-0 right-3 z-10 inline-flex items-center text-white/45">
                     <ChevronDown className={`h-4.5 w-4.5 transition-transform ${issueTypeOpen ? "rotate-180" : ""}`} />
                   </span>
                   <div
@@ -286,7 +289,7 @@ export default function SupportPage() {
                         : "pointer-events-none max-h-0 -translate-y-1 opacity-0"
                     }`}
                   >
-                    <div className="rounded-xl border border-slate-200 bg-white p-1 shadow-[0_16px_32px_rgba(15,23,42,0.14)]">
+                    <div className="rounded-xl border border-white/10 bg-[#090B16] p-1 shadow-[0_18px_40px_rgba(0,0,0,0.35)]">
                       {issueTypeOptions.map((option) => (
                         <button
                           key={option.value}
@@ -300,8 +303,8 @@ export default function SupportPage() {
                           }}
                           className={`block w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${
                             issueType === option.value
-                              ? "bg-violet-50 text-violet-700"
-                              : "text-slate-700 hover:bg-slate-50"
+                              ? "bg-[#8B7CFF]/15 text-white"
+                              : "text-white/78 hover:bg-white/6"
                           }`}
                         >
                           {option.label}
@@ -325,8 +328,8 @@ export default function SupportPage() {
                         setErrors((current) => ({ ...current, name: false }));
                       }
                     }}
-                    className={`w-full rounded-xl border-2 bg-white px-4 py-3 text-base text-slate-900 outline-none transition-colors placeholder:text-slate-400 ${
-                      errors.name ? "border-rose-500 focus:border-rose-500" : "border-slate-400 focus:border-violet-500"
+                    className={`w-full rounded-xl border-2 bg-[#0B1020] px-4 py-3 text-base text-white outline-none transition-colors placeholder:text-white/35 ${
+                      errors.name ? "border-rose-500 focus:border-rose-500" : "border-white/15 focus:border-[#8B7CFF]"
                     }`}
                   />
                 </div>
@@ -342,8 +345,8 @@ export default function SupportPage() {
                         setErrors((current) => ({ ...current, email: false }));
                       }
                     }}
-                    className={`w-full rounded-xl border-2 bg-white px-4 py-3 text-base text-slate-900 outline-none transition-colors placeholder:text-slate-400 ${
-                      errors.email ? "border-rose-500 focus:border-rose-500" : "border-slate-400 focus:border-violet-500"
+                    className={`w-full rounded-xl border-2 bg-[#0B1020] px-4 py-3 text-base text-white outline-none transition-colors placeholder:text-white/35 ${
+                      errors.email ? "border-rose-500 focus:border-rose-500" : "border-white/15 focus:border-[#8B7CFF]"
                     }`}
                   />
                 </div>
@@ -351,8 +354,8 @@ export default function SupportPage() {
 
               <div>
                 <div
-                  className={`overflow-hidden rounded-xl border-2 bg-white transition-colors ${
-                    errors.message ? "border-rose-500 focus-within:border-rose-500" : "border-slate-400 focus-within:border-violet-500"
+                  className={`overflow-hidden rounded-xl border-2 bg-[#0B1020] transition-colors ${
+                    errors.message ? "border-rose-500 focus-within:border-rose-500" : "border-white/15 focus-within:border-[#8B7CFF]"
                   }`}
                 >
                   <textarea
@@ -366,14 +369,14 @@ export default function SupportPage() {
                         setErrors((current) => ({ ...current, message: false }));
                       }
                     }}
-                    className="w-full resize-none border-0 bg-transparent px-4 py-3 text-base text-slate-900 outline-none placeholder:text-slate-400"
+                    className="w-full resize-none border-0 bg-transparent px-4 py-3 text-base text-white outline-none placeholder:text-white/35"
                   />
                 </div>
               </div>
 
               <button
                 type="submit"
-                className="mt-2 inline-flex min-w-44 items-center justify-center rounded-xl bg-violet-500 px-5 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(109,89,255,0.32)] transition-colors hover:bg-violet-600"
+                className="mt-2 inline-flex min-w-44 items-center justify-center rounded-xl bg-gradient-to-r from-[#6D5EF3] to-[#8B7CFF] px-5 py-3 text-sm font-semibold text-white shadow-[0_16px_30px_rgba(109,89,255,0.28)] transition-colors hover:from-[#7567F5] hover:to-[#9486FF]"
               >
                 Send Message
               </button>
