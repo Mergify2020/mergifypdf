@@ -12,6 +12,7 @@ import {
   CreditCard,
   CircleHelp,
   Bell,
+  BookOpen,
   FileUp,
   FileSignature,
   FileText,
