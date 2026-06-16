@@ -112,24 +112,38 @@ async function AllProjectsContent() {
     rotation: extractRotationFromData(project.data),
   }));
 
+  const renderedAt = new Date().toISOString();
+
   return (
     <main
-      className="projects-content-grid box-border flex h-full w-full min-h-0 flex-col bg-transparent pt-0 pb-0 dark:bg-transparent"
+      className="box-border w-full bg-white pt-3 pb-0 md:pt-6 md:pb-0 dark:bg-[#252525]"
       style={{
         height:
-          "calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset, 0px) - var(--home-topbar-offset, 0px))",
+          "calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset, 0px) - var(--home-topbar-offset, 0px) - var(--workspace-content-bottom-subtract, var(--workspace-frame-gutter, 48px)))",
       }}
     >
-      <HomeProjectsSearch
+      <div className="h-full min-h-0 w-full">
+        <div className="projects-content-grid flex h-full w-full min-h-0 flex-col">
+          <div
+            id="home-projects-container"
+            className="relative z-40 flex h-full min-h-0 w-full flex-col px-0 pt-0 data-[shadow-overlay=true]:border-transparent data-[shadow-overlay=true]:shadow-none md:pl-1 md:pr-0"
+          >
+            <div className="flex h-full min-h-0 w-full flex-col">
+              <HomeProjectsSearch
                 key={userId}
                 accountName={displayName}
                 ownerKey={userId}
                 projects={summaryProjects}
                 sectionLabel="All projects"
+                renderedAt={renderedAt}
                 showAllProjects
                 showOwnerFilter={false}
                 initialViewMode={initialViewMode}
               />
+            </div>
+          </div>
+        </div>
+      </div>
     </main>
   );
 }

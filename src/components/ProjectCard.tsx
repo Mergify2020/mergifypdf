@@ -727,7 +727,7 @@ export default function ProjectCard({
   }, [project.hasPreview, project.id, project.rotation]);
 
   const cardClasses = [
-    "relative overflow-hidden rounded-[10px] bg-[#F9FAFC] transition outline outline-0 outline-transparent dark:bg-zinc-900 dark:shadow-[0_8px_18px_rgba(0,0,0,0.22)]",
+    "relative overflow-hidden rounded-[10px] bg-[#F9FAFC] transition outline outline-0 outline-transparent shadow-[0_1px_0_rgba(15,23,42,0.02),0_8px_18px_rgba(15,23,42,0.05)] dark:bg-zinc-900 dark:shadow-[0_8px_18px_rgba(0,0,0,0.22)]",
     isSelected
       ? "shadow-[inset_0_0_0_3px_rgba(108,71,255,1)] dark:shadow-[inset_0_0_0_3px_rgba(108,71,255,1)]"
       : "",
@@ -1422,7 +1422,7 @@ export default function ProjectCard({
                   </span>
                 ) : null}
               </div>
-              <p className="mt-0.5 text-xs font-medium text-slate-500 dark:text-zinc-400" suppressHydrationWarning>
+              <p className="mt-0.5 text-xs font-medium text-slate-500 dark:text-zinc-400">
                 <span className="sm:hidden">
                   {typeof project.pagesCount === "number" && project.pagesCount > 0
                     ? `${project.pagesCount} ${project.pagesCount === 1 ? "page" : "pages"} · ${compactUpdatedLabel}`

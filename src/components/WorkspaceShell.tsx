@@ -7,11 +7,11 @@ import { usePathname, useRouter } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-  BookOpen,
-  ChevronDown,
-  ChevronLeft,
+    ChevronLeft,
   ChevronRight,
   CreditCard,
+  CircleHelp,
+  Bell,
   FileUp,
   FileSignature,
   FileText,
@@ -53,7 +53,6 @@ import AppHeaderBrand from "./AppHeaderBrand";
 import SettingsMenu from "./SettingsMenu";
 import HeroHeader from "./HeroHeader";
 import LoadingOverlay from "./LoadingOverlay";
-import UiTooltip from "./UiTooltip";
 import PendingFilesReorderList from "@/components/PendingFilesReorderList";
 import WorkspaceLaunchLoadingState from "@/components/WorkspaceLaunchLoadingState";
 import BillingStatusBanner from "@/components/BillingStatusBanner";
@@ -172,10 +171,8 @@ const navigationItems: SidebarItem[] = [
   { label: "Projects", icon: PhFolders, href: "/projects" },
   { label: "Signatures", icon: PhSignature, href: "/signature-center" },
   { label: "Templates", icon: PhFileText, href: "/templates" },
-  { label: "Trash", icon: PhTrash, href: "/projects/trash" },
 ];
 
-const bottomSidebarItems: SidebarItem[] = [];
 
 type SidebarPanel = {
   title: string;
@@ -1374,15 +1371,17 @@ export default function WorkspaceShell({
     pathname === "/" ||
     (pathname?.startsWith("/projects") ?? false) ||
     (pathname?.startsWith("/signature-center") ?? false);
-  const workspaceBackgroundClass = useUnifiedWorkspaceBackground
-    ? "bg-[var(--app-surface)]"
-    : isStudioRoute
+  const workspaceBackgroundClass = pathname === "/projects/all"
+    ? "bg-white"
+    : useUnifiedWorkspaceBackground
       ? "bg-[var(--app-surface)]"
-    : isHomePanel
-      ? "bg-[var(--app-surface)]"
-      : isAccountRoute
-        ? "bg-white md:bg-slate-100"
-        : "bg-slate-100";
+      : isStudioRoute
+        ? "bg-[var(--app-surface)]"
+      : isHomePanel
+        ? "bg-[var(--app-surface)]"
+        : isAccountRoute
+          ? "bg-white md:bg-slate-100"
+          : "bg-[#323232]";
   const workspaceLaunchUnderlayClass =
     existingProjectOverlayOpen
       ? existingProjectOverlayExiting
@@ -1934,21 +1933,29 @@ export default function WorkspaceShell({
   const panelLeftClass = useFlatAllProjectsShell
     ? "left-[calc(var(--shell-left)+var(--shell-sidebar-width))]"
     : "left-[calc(var(--shell-left)+var(--shell-sidebar-width)+24px)]";
+  const shellSidebarContentOffsetClass = "md:pl-[calc(var(--shell-left)+var(--shell-sidebar-width)+24px)]";
+  const flatShellSidebarContentOffsetClass = "md:pl-[calc(var(--shell-left)+var(--shell-sidebar-width))]";
+  const shellSidebarPanelOffsetClass = sidebarCompact
+    ? "md:pl-[calc(var(--shell-left)+var(--shell-sidebar-width)+24px+240px)]"
+    : "md:pl-[calc(var(--shell-left)+var(--shell-sidebar-width)+24px+320px)]";
+  const flatShellSidebarPanelOffsetClass = sidebarCompact
+    ? "md:pl-[calc(var(--shell-left)+var(--shell-sidebar-width)+240px)]"
+    : "md:pl-[calc(var(--shell-left)+var(--shell-sidebar-width)+320px)]";
   const baseContentOffsetClass = expanded
     ? useFlatAllProjectsShell
-      ? "md:pl-[calc(var(--shell-left)+256px)]"
+      ? flatShellSidebarContentOffsetClass
       : "md:pl-[calc(var(--shell-left)+256px+24px)]"
     : useFlatAllProjectsShell
-      ? "md:pl-[calc(var(--shell-left)+80px)]"
+      ? flatShellSidebarContentOffsetClass
       : "md:pl-[calc(var(--shell-left)+80px+24px)]";
   const expandedContentOffsetClass =
     panelExpanded && !shouldOverlay
       ? expanded
         ? useFlatAllProjectsShell
-        ? "md:pl-[calc(var(--shell-left)+256px+320px)]"
+        ? flatShellSidebarPanelOffsetClass
         : "md:pl-[calc(var(--shell-left)+256px+24px+320px)]"
         : useFlatAllProjectsShell
-          ? "md:pl-[calc(var(--shell-left)+80px+240px)]"
+          ? flatShellSidebarPanelOffsetClass
           : "md:pl-[calc(var(--shell-left)+80px+24px+240px)]"
       : "";
   const sidebarExpandedClass = panelExpanded && !shouldOverlay ? "with-sidebar-panel" : "";
@@ -2131,13 +2138,27 @@ export default function WorkspaceShell({
     }
   };
 
+  const bottomSidebarItems: SidebarItem[] = [
+    {
+      label: shellTheme === "dark" ? "Light mode" : "Dark mode",
+      icon: shellTheme === "dark" ? Sun : Moon,
+      href: "#",
+      onClick: toggleShellTheme,
+    },
+    { label: "Account settings", icon: Settings, href: "/account", onClick: openAccountSettingsPanel },
+    { label: "Billing portal", icon: CreditCard, href: "/account", onClick: () => { void openBillingPortal(); } },
+    { label: "Help Center", icon: CircleHelp, href: "/support" },
+    { label: "Trash", icon: PhTrash, href: "/projects/trash" },
+  ];
+
   const renderItems = (
     items: SidebarItem[],
     {
       labelClassName,
       forceExpanded,
       hideCollapsedLabel,
-    }: { labelClassName?: string; forceExpanded?: boolean; hideCollapsedLabel?: boolean } = {},
+      variant = "primary",
+    }: { labelClassName?: string; forceExpanded?: boolean; hideCollapsedLabel?: boolean; variant?: "primary" | "utility" } = {},
   ) =>
     items.map(({ label, icon: Icon, href, disabled, onClick }) => {
       const isExpanded = forceExpanded ?? navExpanded;
@@ -2152,101 +2173,68 @@ export default function WorkspaceShell({
             : href === "/"
               ? pathname === "/"
               : pathname?.startsWith(href) || false);
-      const iconWrapperBase = isExpanded
-        ? `flex ${sidebarCompact ? "w-9" : "w-10"} items-center justify-center rounded-2xl transition`
-        : "flex h-8 w-full items-center justify-center rounded-2xl transition";
-      const iconWrapperState = homeSidebarLocked
+      const isUtilityVariant = variant === "utility";
+      const itemStateClasses = homeSidebarLocked
         ? isActive
           ? "text-[#6C47FF] dark:text-zinc-100"
-          : "text-[#6B7280] dark:text-zinc-400"
+          : "cursor-pointer text-[#4B5563] hover:-translate-y-[1px] hover:text-[#374151] dark:text-zinc-400 dark:hover:text-zinc-200"
         : isActive
-          ? "text-[#6C47FF] dark:text-zinc-100"
-          : "text-[#6B7280] dark:text-zinc-400";
-      const iconWrapperHover = !isActive && !disabled
-        ? isLogout
-          ? "group-hover:text-red-600 dark:group-hover:text-red-600"
-          : "group-hover:text-[#0F172A] dark:group-hover:text-zinc-100"
-        : "";
-      const logoutHoverClass = isLogout ? "group-hover:text-red-600 dark:group-hover:text-red-600" : "";
-      const iconWrapperClasses = `${iconWrapperBase} ${iconWrapperState} ${iconWrapperHover} ${logoutHoverClass} transition-colors duration-[120ms] ease-out`;
-      const iconSizeClasses = "h-6 w-6";
-      const expandedLayoutClasses = sidebarCompact
-        ? "items-center justify-start gap-2 px-1 py-0 text-left text-[11px] h-11"
-        : "items-center justify-start gap-2 px-1 py-0 text-left h-11";
-      const collapsedLayoutClasses =
-        "flex-col items-stretch justify-center gap-1 px-1 py-0 text-center h-[36px]";
-
+          ? "text-[#5B38E6] dark:text-zinc-100"
+          : "cursor-pointer text-[#4B5563] hover:-translate-y-[1px] hover:text-[#374151] dark:text-zinc-400 dark:hover:text-zinc-200";
+      const itemClasses = `group relative flex w-full items-center overflow-visible rounded-[10px] text-left text-sm font-medium transition-[background-color,color,transform] duration-[160ms] ease-out ${
+        disabled ? "cursor-not-allowed text-[#374151] dark:text-zinc-400" : itemStateClasses
+      } ${isLogout && logoutConfirmArmed ? "bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-300" : ""}`;
+      const rowHeight = isUtilityVariant ? "h-8" : "h-10";
+      const iconLaneClasses = "relative z-10 flex h-full w-10 flex-none items-center justify-center";
+      const surfaceActiveClasses = homeSidebarLocked
+        ? "bg-[rgba(108,71,255,0.2)] shadow-[0_1px_2px_rgba(108,71,255,0.12)] text-[#6C47FF] dark:bg-[#2B223F] dark:text-zinc-100"
+        : "bg-[rgba(108,71,255,0.2)] shadow-[0_1px_2px_rgba(108,71,255,0.12)] text-[#5B38E6] dark:bg-[#2B223F] dark:text-zinc-100";
+      const surfaceInactiveClasses = "group-hover:bg-[rgba(15,23,42,0.06)] dark:group-hover:bg-white/[0.06]";
+      const iconSizeClasses = isUtilityVariant ? "h-6 w-6" : "h-6 w-6";
+      const labelTextClasses = isUtilityVariant ? "text-[13px]" : "text-[13px] font-semibold";
       const targetHref = label === "Projects" ? "/projects/all" : href;
-      const itemClasses = homeSidebarLocked
-        ? `group relative flex w-full overflow-visible rounded-xl text-sm font-medium transition-[background-color,color,transform] duration-[160ms] ease-out ${
-            disabled
-              ? "cursor-not-allowed text-[#4B5563] dark:text-zinc-500"
-              : isActive
-                ? "text-[#6C47FF] dark:text-zinc-100"
-                : "cursor-pointer text-[#4B5563] hover:-translate-y-[1px] hover:text-[#374151] dark:text-zinc-400 dark:hover:text-zinc-200"
-          } ${isExpanded ? expandedLayoutClasses : collapsedLayoutClasses} ${
-            isLogout && logoutConfirmArmed ? "bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-300" : ""
-          }`
-        : `group relative flex w-full overflow-visible rounded-xl text-sm font-medium transition-[background-color,color,transform] duration-[160ms] ease-out ${
-            disabled
-              ? "cursor-not-allowed text-[#4B5563] dark:text-zinc-500"
-              : isActive
-                ? "text-[#6C47FF] dark:text-zinc-100"
-                : "cursor-pointer text-[#4B5563] hover:-translate-y-[1px] hover:text-[#374151] dark:text-zinc-400 dark:hover:text-zinc-200"
-          } ${isExpanded ? expandedLayoutClasses : collapsedLayoutClasses} ${
-            isLogout && logoutConfirmArmed ? "bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-300" : ""
-          }`;
-
-      const basePadding = isExpanded ? "px-3 py-2.5" : "px-3 py-[5.5px]";
-      const activeRoundedClass = "rounded-r-xl";
       const content = (
-        <span className="relative flex w-full items-center pl-0">
+        <span className={`relative flex w-full items-center px-[8px] ${rowHeight}`}>
           {isActive ? (
             isExpanded ? (
-                <span
-                className="absolute left-0 inset-y-0 w-[3px] rounded-full bg-[#6C47FF] dark:bg-[#E5E5E5]"
-                style={{ top: 3, bottom: 3 }}
+              <span
+                className={`pointer-events-none absolute inset-y-0 left-[8px] right-[8px] rounded-[10px] transition-[opacity,transform,background-color,box-shadow] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] ${surfaceActiveClasses}`}
                 aria-hidden
               />
             ) : (
-                <span
-                className="absolute left-0 inset-y-0 w-[3px] rounded-full bg-[#6C47FF] dark:bg-[#E5E5E5]"
-                style={{ top: 3, bottom: 3 }}
+              <span
+                className={`pointer-events-none absolute left-[8px] top-1/2 h-10 w-10 -translate-y-1/2 rounded-[10px] transition-[opacity,transform,background-color,box-shadow] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] ${surfaceActiveClasses}`}
                 aria-hidden
               />
             )
-          ) : null}
+          ) : (
+            <span
+              className={`pointer-events-none absolute inset-0 rounded-[10px] transition-[background-color,box-shadow,opacity] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] ${surfaceInactiveClasses}`}
+              aria-hidden
+            />
+          )}
+          <span className={iconLaneClasses}>
+            <Icon
+              className={`${iconSizeClasses} shrink-0 ${
+                isActive ? "text-[#6C47FF] dark:text-zinc-100" : "text-[#6B7280] dark:text-zinc-400"
+              } ${
+                !isActive && !disabled
+                  ? isLogout
+                    ? "group-hover:text-red-600 dark:group-hover:text-red-600"
+                    : "group-hover:text-[#0F172A] dark:group-hover:text-zinc-100"
+                  : ""
+              } transition-colors duration-[120ms] ease-out`}
+              aria-hidden
+              weight={isActive && label !== "Signatures" ? "fill" : "regular"}
+            />
+          </span>
           <span
-            className={`flex items-center ${basePadding} transition-[width,background-color,box-shadow] duration-[180ms] ease-out ${
-              isActive
-                ? `w-full ${activeRoundedClass} bg-[rgba(108,71,255,0.06)] shadow-inner dark:shadow-none dark:bg-[#2B2B2B]/60`
-                : "group-hover:w-full group-hover:rounded-xl group-hover:bg-[rgba(15,23,42,0.08)] group-hover:shadow-[0_10px_22px_rgba(15,23,42,0.08),inset_0_1px_0_rgba(255,255,255,0.45)] dark:group-hover:bg-white/[0.08] dark:group-hover:shadow-[0_10px_24px_rgba(0,0,0,0.26)]"
-            } ${isExpanded ? "" : "w-full justify-center"}`}
+            className={`relative z-10 min-w-0 flex-1 whitespace-nowrap overflow-hidden text-ellipsis pl-2 transition-[opacity,transform,max-width] duration-300 ease-out ${
+              isExpanded ? "max-w-full translate-x-0 opacity-100" : "max-w-0 -translate-x-2 opacity-0 pointer-events-none"
+            } ${isExpanded ? labelClassName ?? "" : ""} ${isLogout ? "group-hover:text-red-600 dark:group-hover:text-red-600" : ""} ${labelTextClasses}`}
+            aria-hidden={!isExpanded && hideCollapsedLabel}
           >
-            <span className={iconWrapperClasses}>
-              <Icon
-                className={`${iconSizeClasses} shrink-0`}
-                aria-hidden
-                weight={isActive && label !== "Signatures" ? "fill" : "regular"}
-              />
-            </span>
-            {isExpanded ? (
-              <span
-                className={`inline-flex flex-1 whitespace-nowrap overflow-hidden text-ellipsis text-sm transition-all duration-200 ease-in-out ${
-                  isExpanded ? "ml-2" : "ml-0"
-                } ${labelClassName ?? ""} ${logoutHoverClass} font-medium`}
-              >
-                {label}
-              </span>
-            ) : hideCollapsedLabel ? null : (
-              <span
-                className={`text-[11px] sm:text-xs lg:text-sm font-medium tracking-wide ${logoutHoverClass} ${
-                  isActive ? "text-[#5B38E6] dark:text-zinc-100" : "text-slate-500 dark:text-zinc-400"
-                }`}
-              >
-                {label}
-              </span>
-            )}
+            {label}
           </span>
         </span>
       );
@@ -2515,7 +2503,7 @@ export default function WorkspaceShell({
           "--shell-content-width":
             isAccountRoute ? "2064px" : useFlatAllProjectsShell ? "100%" : "calc(1960px - (var(--shell-sidebar-width) - 80px))",
           "--shell-left": useFlatAllProjectsShell ? "0px" : "max(24px, calc((100vw - (var(--shell-content-width) + var(--shell-sidebar-width) + 24px)) / 2))",
-          "--shell-sidebar-width": expanded ? "256px" : "80px",
+          "--shell-sidebar-width": expanded ? "228px" : "56px",
           "--home-banner-offset": homeBillingBannerOccupiesSpace ? "56px" : "0px",
           "--home-topbar-offset": showPersistentWorkspaceTopBar ? "68px" : "0px",
           "--home-right-column-offset": showPersistentWorkspaceTopBar ? "0px" : "240px",
@@ -2587,7 +2575,7 @@ export default function WorkspaceShell({
       {/* Desktop sidebar */}
       <aside
         id={isHomePanel ? "home-sidebar" : undefined}
-        className={`workspace-desktop-sidebar absolute left-[var(--shell-left)] top-[var(--home-banner-offset)] z-50 hidden w-[var(--shell-sidebar-width)] text-slate-800 ${homeBillingBannerExiting ? "transition-[top,height] duration-300 ease-out" : "transition-none 2xl:transition-[width] 2xl:duration-300 2xl:ease-[cubic-bezier(0.22,1,0.36,1)]"} dark:text-zinc-100 md:flex`}
+        className={`workspace-desktop-sidebar absolute left-[var(--shell-left)] top-[var(--home-banner-offset)] z-50 hidden w-[var(--shell-sidebar-width)] text-slate-800 ${homeBillingBannerExiting ? "transition-[top,height] duration-300 ease-out" : "transition-[width,transform,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"} dark:text-zinc-100 md:flex`}
         style={{
           height: useFlatAllProjectsShell
             ? "calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset, 0px))"
@@ -2597,7 +2585,7 @@ export default function WorkspaceShell({
         <div className="relative flex h-full w-full">
           <div
             ref={sidebarRef}
-            className={`flex h-full ${railWidthClass} flex-col ${
+            className={`flex h-full ${railWidthClass} flex-col overflow-hidden transform-gpu transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${expanded ? "translate-x-0 opacity-100" : "translate-x-0 opacity-100"} ${
               useFlatAllProjectsShell
                 ? "border-r border-slate-200 bg-white shadow-none dark:border-[#3A3A3A] dark:bg-[#323232] dark:shadow-none"
                 : useUnifiedWorkspaceBackground
@@ -2605,11 +2593,11 @@ export default function WorkspaceShell({
                   : "rounded-xl border-[1.5px] border-gray-200 bg-white shadow-sm dark:border-[#3A3A3A] dark:bg-[#323232] dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)]"
             } w-full ${sidebarCompact ? "z-10" : "z-20"}`}
           >
-            <div className="flex flex-1 flex-col gap-4 overflow-y-auto overflow-x-hidden px-1 py-5 lg:px-2">
+            <div className="flex flex-1 flex-col gap-3 overflow-y-auto overflow-x-hidden px-0 py-3">
               <div
-                className={`flex h-12 w-full items-center px-1 ${
+                className={`flex h-10 w-full items-center px-1 ${
                   expanded ? "justify-between" : "justify-center"
-                }`}
+                } ${useFlatAllProjectsShell ? "pb-3" : ""}`}
               >
                 {expanded ? (
                   <>
@@ -2634,7 +2622,7 @@ export default function WorkspaceShell({
                       onMouseDown={() => {
                         clearSidebarTooltip();
                       }}
-                      className="relative z-10 inline-flex items-center justify-center p-1 text-slate-500 transition hover:text-slate-900 dark:text-zinc-300 dark:hover:text-white"
+                      className="relative z-10 inline-flex items-center justify-center p-1 text-[#374151] transition hover:text-[#111827] dark:text-zinc-300 dark:hover:text-white"
                       aria-label="Collapse sidebar"
                       onMouseEnter={(event) => {
                         setSidebarTooltipFromEvent(event, "Hide navigation", 3, true);
@@ -2662,7 +2650,7 @@ export default function WorkspaceShell({
                     onMouseDown={() => {
                       clearSidebarTooltip();
                     }}
-                    className="inline-flex items-center justify-center overflow-visible"
+                    className="flex h-11 w-full items-center justify-center rounded-lg bg-transparent p-0 transition hover:bg-slate-100 dark:hover:bg-[#2B2B2B]"
                     aria-label="Expand sidebar"
                     onMouseEnter={(event) => {
                       setSidebarTooltipFromEvent(event, "Show navigation", 3, true);
@@ -2680,23 +2668,24 @@ export default function WorkspaceShell({
                     <Image
                       src="/logos/home-collapsed-sidebar-logo-light-dark.svg"
                       alt="MergifyPDF"
-                      width={187}
-                      height={49}
+                      width={56}
+                      height={56}
                       priority
-                      className="h-[49px] w-[187px] max-w-none"
+                      className="h-14 w-14 max-w-none"
                     />
                   </button>
                 )}
               </div>
               <div className="flex flex-1 flex-col">
-                <nav className={`mt-2 flex flex-col items-center ${navExpanded ? "gap-3" : "gap-[18px]"}`}>
+                <nav className={`mt-1.5 flex flex-col items-stretch ${navExpanded ? "gap-1.5" : "gap-2"}`}>
                   {renderItems(navigationItems, {
                     labelClassName: itemLabelClasses,
                     forceExpanded: navExpanded,
                     hideCollapsedLabel: true,
+                    variant: "primary",
                   })}
                   <div
-                    className="relative"
+                    className="flex w-full items-center px-[8px]"
                     onMouseEnter={(event) => {
                       if (navExpanded) return;
                       setSidebarTooltipFromEvent(event, "Create a new project", 3, true);
@@ -2712,25 +2701,28 @@ export default function WorkspaceShell({
                       if (!navExpanded) clearSidebarTooltip();
                     }}
                   >
-                    <StartProjectButton
-                      variant="custom"
-                      iconOnly={!navExpanded}
-                      onOpen={() => clearSidebarTooltip()}
-                      className={
-                        navExpanded
-                          ? "flex h-12 w-[220px] items-center justify-center rounded-xl border border-transparent bg-[#6C47FF] px-5 text-sm font-semibold tracking-wide text-white shadow-[0_8px_18px_rgba(15,23,42,0.14)] transition-[width,transform,opacity,background-color,box-shadow] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] origin-left transform-gpu opacity-100 scale-100 hover:bg-[#5B38E6] hover:shadow-[0_10px_22px_rgba(15,23,42,0.18)] dark:border-[#3A3A3A]/40 dark:bg-[#6C47FF] dark:text-zinc-100 dark:shadow-[0_10px_22px_rgba(0,0,0,0.35)] dark:hover:bg-[#5B38E6] dark:hover:border-[#4A4A4A]/60 dark:hover:shadow-[0_12px_26px_rgba(0,0,0,0.42)] dark:active:bg-[#4E2FD1]"
-                          : "flex h-12 w-12 items-center justify-center rounded-lg border border-transparent bg-[#6C47FF] text-white shadow-[0_8px_18px_rgba(15,23,42,0.14)] transition-[width,transform,opacity,background-color,box-shadow] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] origin-left transform-gpu opacity-100 scale-95 hover:bg-[#5B38E6] hover:shadow-[0_10px_22px_rgba(15,23,42,0.18)] dark:border-[#3A3A3A]/40 dark:bg-[#6C47FF] dark:text-zinc-100 dark:shadow-[0_10px_22px_rgba(0,0,0,0.35)] dark:hover:bg-[#5B38E6] dark:hover:border-[#4A4A4A]/60 dark:hover:shadow-[0_12px_26px_rgba(0,0,0,0.42)] dark:active:bg-[#4E2FD1]"
-                      }
-                    />
+                    <div className="flex w-10 flex-none items-center justify-center">
+                      <StartProjectButton
+                        variant="custom"
+                        iconOnly={!navExpanded}
+                        onOpen={() => clearSidebarTooltip()}
+                        className={
+                          navExpanded
+                            ? "flex h-9 w-[176px] items-center justify-center rounded-xl border border-transparent bg-[#6C47FF] px-3 text-[12px] font-semibold tracking-wide text-white shadow-[0_8px_18px_rgba(15,23,42,0.14)] transition-[width,transform,opacity,background-color,box-shadow] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] origin-left transform-gpu opacity-100 scale-100 hover:bg-[#5B38E6] hover:shadow-[0_10px_22px_rgba(15,23,42,0.18)] dark:border-[#3A3A3A]/40 dark:bg-[#6C47FF] dark:text-zinc-100 dark:shadow-[0_10px_22px_rgba(0,0,0,0.35)] dark:hover:bg-[#5B38E6] dark:hover:border-[#4A4A4A]/60 dark:hover:shadow-[0_12px_26px_rgba(0,0,0,0.42)] dark:active:bg-[#4E2FD1]"
+                            : "flex h-10 w-10 items-center justify-center rounded-lg border border-transparent bg-[#6C47FF] text-white shadow-[0_8px_18px_rgba(15,23,42,0.14)] transition-[width,transform,opacity,background-color,box-shadow] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] origin-left transform-gpu opacity-100 scale-95 hover:bg-[#5B38E6] hover:shadow-[0_10px_22px_rgba(15,23,42,0.18)] dark:border-[#3A3A3A]/40 dark:bg-[#6C47FF] dark:text-zinc-100 dark:shadow-[0_10px_22px_rgba(0,0,0,0.35)] dark:hover:bg-[#5B38E6] dark:hover:border-[#4A4A4A]/60 dark:hover:shadow-[0_12px_26px_rgba(0,0,0,0.42)] dark:active:bg-[#4E2FD1]"
+                        }
+                      />
+                    </div>
                   </div>
                 </nav>
 
               {bottomSidebarItems.length > 0 ? (
-                  <div className="mt-auto flex flex-col items-center gap-3 pt-6">
+                  <div className="mt-auto flex flex-col items-center gap-1.5 pt-3">
                     {renderItems(bottomSidebarItems, {
                       labelClassName: itemLabelClasses,
                       forceExpanded: navExpanded,
                       hideCollapsedLabel: true,
+                      variant: "utility",
                     })}
                   </div>
               ) : null}
@@ -3274,19 +3266,19 @@ export default function WorkspaceShell({
       ) : null}
 
       <div
-        className={`workspace-main-with-dock flex min-h-0 w-full flex-1 flex-col bg-transparent transition-none 2xl:transition-[padding-left] 2xl:duration-300 2xl:ease-[cubic-bezier(0.22,1,0.36,1)] ${contentOffsetClass}`}
+        className={`workspace-main-with-dock flex min-h-0 w-full flex-1 flex-col bg-transparent transition-[padding-left] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${contentOffsetClass}`} 
       >
         <WorkspaceHomeQueryProvider value={homeProjectsQueryContext}>
           {showPersistentWorkspaceTopBar ? (
             <div
-              className={`relative z-[80] flex w-full ${showDesktopAllProjectsTopBar ? "px-0 pt-0" : `${contentShellWrapperClass} pt-3 md:pt-6`}`}
+              className={`relative z-40 flex w-full ${showDesktopAllProjectsTopBar ? "px-0 pt-0" : `${contentShellWrapperClass} pt-3 md:pt-6`}`}
             >
               <div
-                style={{ maxWidth: showDesktopAllProjectsTopBar ? "100%" : "var(--shell-content-width)" }}
+                style={{ maxWidth: showDesktopAllProjectsTopBar ? "none" : "var(--shell-content-width)", width: "100%" }}
                 className="w-full transition-none 2xl:transition-[max-width] 2xl:duration-300 2xl:ease-[cubic-bezier(0.22,1,0.36,1)]"
               >
                 <div
-                  className={`flex w-full items-center gap-3 ${showDesktopAllProjectsTopBar ? "justify-end border-b border-slate-200 pb-4 dark:border-[#3A3A3A]" : ""}`}
+                  className={`flex w-full items-center gap-3 ${showDesktopAllProjectsTopBar ? "md:pl-[calc(var(--shell-sidebar-width)+24px)] justify-end border-b border-slate-200 pb-3 dark:border-[#3A3A3A]" : ""}`}
                 >
                     <div className={showDesktopAllProjectsTopBar ? "hidden" : "flex min-w-0 flex-1 items-center gap-3"}>
                     <div
@@ -3335,96 +3327,60 @@ export default function WorkspaceShell({
                     </div>
                   </div>
                   <div
-                    className={`flex h-11 flex-nowrap items-center gap-2 shrink-0 ${
+                    className={`flex h-10 flex-nowrap items-center gap-2 shrink-0 whitespace-nowrap ${
                       showDesktopAllProjectsTopBar
-                        ? "w-auto min-w-0 max-w-none opacity-100"
+                        ? "w-auto min-w-0 max-w-none pr-2 opacity-100 md:pr-3 translate-y-[6px]"
                         : mobileSearchExpanded
                           ? "pointer-events-none w-0 min-w-0 max-w-0 overflow-hidden opacity-0 transition-[width,max-width,opacity] duration-200 ease-out"
                           : "w-[44px] min-w-[44px] max-w-[44px] opacity-100 transition-none md:w-[276px] md:min-w-[276px] md:max-w-[276px] md:transition-[width,max-width,opacity] md:duration-200 md:ease-out"
                     }`}
                   >
                     {showDesktopAllProjectsTopBar ? (
-                      <div className="hidden items-center gap-2 md:flex">
-                        <span className="inline-flex items-center rounded-full border border-[#E8DFF8] bg-[#F7F0FF] px-3 py-2 text-xs font-semibold text-[#6C47FF] dark:border-[#4A3A6A] dark:bg-[#2B223F] dark:text-[#D8C8FF]">
-                          {homeRecentProjects.length} Projects
-                        </span>
-                        <Link
-                          href="/pricing"
-                          className="inline-flex items-center rounded-full bg-[#6C47FF] px-4 py-2 text-xs font-semibold text-white shadow-[0_10px_24px_rgba(108,71,255,0.24)] transition hover:-translate-y-[1px] hover:bg-[#5B38E6] hover:shadow-[0_12px_28px_rgba(108,71,255,0.32)] dark:bg-[#6C47FF] dark:text-zinc-100 dark:shadow-[0_10px_24px_rgba(108,71,255,0.3)] dark:hover:bg-[#5B38E6] dark:hover:shadow-[0_12px_28px_rgba(108,71,255,0.4)]"
-                        >
-                          Upgrade Pro
-                        </Link>
-                      </div>
-                    ) : null}
-                    {showDesktopAllProjectsTopBar ? (
-                      <StartProjectButton
-                        variant="custom"
-                        label="Create New"
-                        className="inline-flex h-11 items-center gap-2 rounded-full bg-[#6C47FF] px-4 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(108,71,255,0.28)] transition-[transform,background-color,box-shadow] duration-200 hover:-translate-y-[1px] hover:bg-[#5B38E6] hover:shadow-[0_12px_28px_rgba(108,71,255,0.36)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/15 dark:bg-[#6C47FF] dark:text-zinc-100 dark:shadow-[0_10px_24px_rgba(108,71,255,0.32)] dark:hover:bg-[#5B38E6] dark:hover:shadow-[0_12px_28px_rgba(108,71,255,0.42)]"
-                      />
-                    ) : null}
-                    <UiTooltip label={shellTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
                       <button
                         type="button"
-                        onClick={toggleShellTheme}
-                        className="hidden shrink-0 h-11 w-11 items-center justify-center rounded-full border-[1.5px] border-gray-200 bg-white text-[#1F2A37] shadow-sm transition-[transform,background-color,border-color,box-shadow,color] duration-200 hover:-translate-y-[1px] hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950 hover:shadow-[0_12px_24px_rgba(15,23,42,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/15 dark:border-[#3A3A3A] dark:bg-[#323232] dark:text-zinc-100 dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] dark:hover:border-[#4A4A4A] dark:hover:bg-[#2B2B2B] dark:hover:text-white dark:hover:shadow-[0_12px_24px_rgba(0,0,0,0.34)] dark:focus-visible:ring-[#2563EB]/30 md:flex"
-                        aria-label={shellTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-                        aria-pressed={shellTheme === "dark"}
+                        onClick={() => {
+                          if (typeof window !== "undefined") {
+                            window.dispatchEvent(new Event("open-create-project"));
+                          }
+                        }}
+                        className="hidden md:inline-flex shrink-0 whitespace-nowrap h-10 items-center gap-2 rounded-md bg-[#6C47FF] px-4 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(108,71,255,0.28)] transition-[transform,background-color,box-shadow] duration-200 hover:-translate-y-[1px] hover:bg-[#5B38E6] hover:shadow-[0_12px_28px_rgba(108,71,255,0.36)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/15 dark:bg-[#6C47FF] dark:text-zinc-100 dark:shadow-[0_10px_24px_rgba(108,71,255,0.32)] dark:hover:bg-[#5B38E6] dark:hover:shadow-[0_12px_28px_rgba(108,71,255,0.42)]"
                       >
-                        {shellTheme === "dark" ? (
-                          <Sun className="h-4 w-4" aria-hidden />
-                        ) : (
-                          <Moon className="h-4 w-4" aria-hidden />
-                        )}
+                        <FileUp className="h-5 w-5" aria-hidden />
+                        <span>Upload file</span>
                       </button>
-                    </UiTooltip>
+                    ) : null}
+                    <button
+                      type="button"
+                      aria-label="Notifications"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-transparent p-0 text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/15 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F1F4F9] dark:text-zinc-100 dark:hover:bg-[#2B2B2B] dark:focus-visible:ring-[#2563EB]/30 dark:focus-visible:ring-offset-[#252525]"
+                    >
+                      <Bell className="h-6 w-6" aria-hidden />
+                    </button>
                     <SettingsMenu
                       trigger="custom"
                       triggerLabel="Open profile menu"
-                      triggerClassName="w-full min-w-0 max-w-full overflow-hidden flex h-11 items-center justify-center rounded-full border-[1.5px] border-gray-200 bg-white p-1 shadow-sm transition-[transform,background-color,border-color,box-shadow] duration-200 hover:-translate-y-[1px] hover:border-slate-300 hover:bg-slate-50 hover:shadow-[0_12px_24px_rgba(15,23,42,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/15 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F1F4F9] dark:border-[#3A3A3A] dark:bg-[#323232] dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] dark:hover:border-[#4A4A4A] dark:hover:bg-[#2B2B2B] dark:hover:shadow-[0_12px_24px_rgba(0,0,0,0.34)] dark:focus-visible:ring-[#2563EB]/30 dark:focus-visible:ring-offset-[#252525] md:justify-start md:gap-1.5 md:p-0 md:py-1.5 md:pl-1 md:pr-1.5"
+                      triggerClassName="inline-flex h-10 w-10 items-center justify-center rounded-full bg-transparent p-0 text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/15 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F1F4F9] dark:text-zinc-100 dark:hover:bg-[#2B2B2B] dark:focus-visible:ring-[#2563EB]/30 dark:focus-visible:ring-offset-[#252525]"
                       triggerContent={
-                        <>
-                          <span className="shrink-0 pointer-events-none">
-                            {showAvatarImage ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                src={avatar!}
-                                alt="Your avatar"
-                                className="h-8 w-8 rounded-full object-cover"
-                                onError={() => setAvatarLoadFailed(true)}
-                              />
-                            ) : showProfileSkeleton ? (
-                              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
-                            ) : (
-                              <span
-                                className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold uppercase text-white"
-                                style={{ backgroundColor: fallbackAvatar.color }}
-                              >
-                                {hasProfileInfo ? fallbackAvatar.initials : ""}
-                              </span>
-                            )}
-                          </span>
-                          {showProfileSkeleton ? (
-                            <span className="hidden min-w-0 flex-1 flex-col gap-1.5 text-left md:flex">
-                              <span className="h-3.5 w-24 rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
-                              <span className="h-3 w-32 rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
+                        <span className="pointer-events-none flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full">
+                          {showAvatarImage ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={avatar!}
+                              alt="Your avatar"
+                              className="h-full w-full rounded-full object-cover"
+                              onError={() => setAvatarLoadFailed(true)}
+                            />
+                          ) : showProfileSkeleton ? (
+                            <span className="flex h-full w-full items-center justify-center rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
+                          ) : (
+                            <span
+                              className="flex h-full w-full items-center justify-center rounded-full text-xs font-semibold uppercase text-white"
+                              style={{ backgroundColor: fallbackAvatar.color }}
+                            >
+                              {hasProfileInfo ? fallbackAvatar.initials : ""}
                             </span>
-                          ) : hasProfileInfo ? (
-                            <span className="hidden min-w-0 flex-1 flex-col leading-tight text-left md:flex">
-                              {profileName ? (
-                                <span className="truncate text-[13px] font-semibold text-[#1F2A37] dark:text-zinc-100">
-                                  {profileName}
-                                </span>
-                              ) : null}
-                              {profileEmail ? (
-                                <span className="hidden truncate text-[11px] font-medium text-[#64748B] dark:text-zinc-400 md:block">
-                                  {profileEmail}
-                                </span>
-                              ) : null}
-                            </span>
-                          ) : null}
-                          <ChevronDown className="hidden h-4 w-4 shrink-0 text-[#94A3B8] dark:text-zinc-400 md:block" aria-hidden="true" />
-                        </>
+                          )}
+                        </span>
                       }
                     />
                   </div>
@@ -3433,11 +3389,11 @@ export default function WorkspaceShell({
             </div>
           ) : null}
           <Suspense fallback={null}>
-            <main className="relative z-0 flex-1 lg:z-40">
-              <div className={`flex w-full ${showDesktopAllProjectsTopBar ? "px-0" : contentShellWrapperClass}`}>
+            <main className="relative z-0 flex min-h-0 flex-1 flex-col lg:z-40">
+              <div className={`flex min-h-0 w-full flex-1 flex-col `}>
                 <div
-                  className="workspace-content-shell w-full transition-none 2xl:transition-[max-width] 2xl:duration-300 2xl:ease-[cubic-bezier(0.22,1,0.36,1)]"
-                  style={{ maxWidth: showDesktopAllProjectsTopBar ? "100%" : "var(--shell-content-width)" }}
+                  className="workspace-content-shell flex h-full min-h-0 w-full flex-1 flex-col transition-none 2xl:transition-[max-width] 2xl:duration-300 2xl:ease-[cubic-bezier(0.22,1,0.36,1)]"
+                  style={{ maxWidth: showDesktopAllProjectsTopBar ? "none" : "var(--shell-content-width)", width: "100%" }}
                   onClickCapture={handleExistingProjectLinkCapture}
                 >
                   {children}
@@ -3614,7 +3570,7 @@ export default function WorkspaceShell({
                                   )}
                                 </p>
                                 {!createDragActive ? (
-                                  <p className="mt-2 text-sm text-slate-500 dark:text-zinc-400">Add up to 12 PDF files.</p>
+                                  <p className="mt-2 text-sm text-[#4B5563] dark:text-zinc-400">Add up to 12 PDF files.</p>
                                 ) : null}
                               </div>
                             ) : (

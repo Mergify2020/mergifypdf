@@ -1341,6 +1341,21 @@ html.theme-scroll-reveal:not(.dark) ::-webkit-scrollbar-thumb {
   max-width: 1960px;
 }
 
+.projects-all-workspace .projects-content-grid {
+  max-width: none;
+  width: 100%;
+}
+
+.projects-all-workspace .workspace-content-shell {
+  max-width: none;
+  width: 100%;
+}
+
+.projects-all-workspace .workspace-main-with-dock {
+  width: 100%;
+  min-width: 0;
+}
+
 .signature-center-layout {
   --sc-tasks-grid: minmax(0, 1.48fr) minmax(0, 0.98fr) minmax(0, 1fr) auto;
   --sc-requests-grid: minmax(0, 1.55fr) minmax(0, 1.12fr) minmax(0, 0.82fr) auto;
@@ -1712,7 +1727,7 @@ header[data-hero="true"] .app-brand-dark {
   border-left: 0 !important;
   border-top: 0 !important;
   border-bottom: 0 !important;
-  border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-right: 1px solid #e2e8f0 !important;
   box-shadow: none !important;
 }
 

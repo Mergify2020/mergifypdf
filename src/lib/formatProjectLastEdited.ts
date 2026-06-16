@@ -1,13 +1,13 @@
-export function formatProjectLastEdited(value: string | number | Date): string {
-  return `Edited ${formatProjectRelativeTime(value)}`;
+export function formatProjectLastEdited(value: string | number | Date, referenceNow: string | number | Date = new Date()): string {
+  return `Edited ${formatProjectRelativeTime(value, referenceNow)}`;
 }
 
-export function formatProjectRelativeTime(value: string | number | Date): string {
+export function formatProjectRelativeTime(value: string | number | Date, referenceNow: string | number | Date = new Date()): string {
   const target = value instanceof Date ? value : new Date(value);
   const targetMs = target.getTime();
   if (Number.isNaN(targetMs)) return "recently";
 
-  const now = new Date();
+  const now = referenceNow instanceof Date ? referenceNow : new Date(referenceNow);
   const diffMs = Math.max(0, now.getTime() - targetMs);
   const minuteMs = 60_000;
   const hourMs = 60 * minuteMs;
@@ -37,15 +37,15 @@ export function formatProjectRelativeTime(value: string | number | Date): string
   return formatter.format(target);
 }
 
-export function formatProjectActivityDate(value: string | number | Date): string {
+export function formatProjectActivityDate(value: string | number | Date, referenceNow: string | number | Date = new Date()): string {
   const target = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(target.getTime())) return "Oct 2, 2025";
 
-  const now = new Date();
+  const now = referenceNow instanceof Date ? referenceNow : new Date(referenceNow);
   const isToday =
-    target.getFullYear() === now.getFullYear() &&
-    target.getMonth() === now.getMonth() &&
-    target.getDate() === now.getDate();
+    target.getUTCFullYear() === now.getUTCFullYear() &&
+    target.getUTCMonth() === now.getUTCMonth() &&
+    target.getUTCDate() === now.getUTCDate();
 
   if (isToday) return "Today";
 
@@ -53,5 +53,6 @@ export function formatProjectActivityDate(value: string | number | Date): string
     month: "short",
     day: "numeric",
     year: "numeric",
+    timeZone: "UTC"
   }).format(target);
 }

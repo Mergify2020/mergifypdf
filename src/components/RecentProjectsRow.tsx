@@ -38,6 +38,7 @@ type Props = {
   viewMode?: "grid" | "list";
   showAllProjects?: boolean;
   showResumeBadge?: boolean;
+  renderedAt?: string | Date;
 };
 
 const TRASH_PROGRESS_MS = 1100;
@@ -150,6 +151,7 @@ export default function RecentProjectsRow({
   viewMode = "grid",
   showAllProjects = false,
   showResumeBadge = false,
+  renderedAt,
 }: Props) {
   const [projects, setProjects] = useState<SummaryProject[]>(initialProjects ?? []);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
@@ -318,9 +320,11 @@ export default function RecentProjectsRow({
 
   if (!projects.length && !loading) {
     return showAllProjects ? (
-      <div className="rounded-2xl border border-[#3F3F3F] bg-[#323232] px-6 py-6 text-left shadow-[0_10px_24px_rgba(0,0,0,0.24)]">
-        <p className="text-base font-semibold tracking-tight text-zinc-100">No recent projects yet.</p>
-        <p className="mt-2 text-sm leading-6 text-zinc-400">Create your first project or use one of the quick actions above.</p>
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-[#E5EAF2] bg-white px-4 py-4 text-left shadow-none dark:border-[#3F3F3F] dark:bg-[#323232]">
+          <p className="text-[15px] font-semibold tracking-tight text-[#1F2A37] dark:text-zinc-100">No recent projects yet.</p>
+          <p className="mt-1.5 text-[13px] leading-6 text-[#6B7280] dark:text-zinc-400">Create your first project or use one of the quick actions above.</p>
+        </div>
       </div>
     ) : (
       <div className="mt-4 flex min-h-[360px] w-full flex-col items-center justify-start px-8 pt-8 pb-8 text-center sm:min-h-[480px] sm:pt-12">
@@ -340,7 +344,7 @@ export default function RecentProjectsRow({
 
   if (loading && !projects.length) {
     return (
-      <div className="recent-projects-grid projects-grid mt-2 grid w-full max-w-[1880px] items-start gap-4 sm:gap-6">
+      <div className="recent-projects-grid projects-grid mt-3 grid w-full min-w-0 items-start gap-5 sm:gap-6 xl:gap-7">
         {Array.from({ length: 6 }).map((_, index) => (
           <div
             key={`home-loading-project-${index}`}
@@ -385,7 +389,7 @@ export default function RecentProjectsRow({
   const mapped = displayProjects.map((project) => ({
     id: project.id,
     title: projectNameToDisplay(project.name),
-    updated: formatProjectLastEdited(project.updatedAt),
+    updated: formatProjectLastEdited(project.updatedAt, renderedAt ?? new Date()),
     previewUrl: project.previewUrl ?? null,
     pdfUrl: project.pdfUrl ?? null,
     pagesCount: project.pagesCount ?? 0,
@@ -1291,7 +1295,8 @@ export default function RecentProjectsRow({
                     )}
                     <span className="truncate text-left text-[15px] text-slate-600 dark:text-zinc-200">
                       {formatProjectActivityDate(
-                        projects.find((entry) => entry.id === project.id)?.updatedAt ?? project.updated
+                        projects.find((entry) => entry.id === project.id)?.updatedAt ?? project.updated,
+                        renderedAt ?? new Date()
                       )}
                     </span>
                     <span className="block w-full text-center text-[15px] text-slate-600 dark:text-zinc-200">
@@ -1333,7 +1338,7 @@ export default function RecentProjectsRow({
           </div>
         </div>
       ) : (
-        <div className="recent-projects-grid projects-grid mt-2 grid w-full max-w-[1880px] items-start gap-4 sm:gap-6">
+        <div className="recent-projects-grid projects-grid mt-2 grid w-full min-w-0 items-start gap-4 sm:gap-6">
           {mapped.map((project, index) => {
           const isSelected = !!selected[project.id];
           return (

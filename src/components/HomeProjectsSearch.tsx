@@ -8,6 +8,8 @@ import {
   ArrowUp,
   Check,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Combine,
   FileText,
@@ -49,6 +51,7 @@ type Props = {
   ownerKey?: string | null;
   projects: SummaryProject[];
   sectionLabel?: string;
+  renderedAt?: string | Date;
   showAllProjects?: boolean;
   showOwnerFilter?: boolean;
   showResumeBadge?: boolean;
@@ -58,48 +61,54 @@ type Props = {
 type OwnerFilter = "any" | "shared" | "you";
 type SortOption = "activity" | "starred" | "az" | "za";
 type ViewMode = "grid" | "list";
-const ALL_PROJECTS_VIEW_MODE_KEY = "mpdf:all-projects-view-mode";
-
 const ALL_PROJECTS_QUICK_ACTIONS = [
   {
     title: "Merge PDFs",
     description: "Combine multiple PDFs into one document",
     icon: Combine,
+    toneClass: "bg-[#6C47FF]/12 text-[#6C47FF] group-hover:bg-[#6C47FF]/16 group-hover:text-[#5B38E6] dark:bg-[#6C47FF]/15 dark:text-[#CBB8FF] dark:group-hover:bg-[#6C47FF]/20 dark:group-hover:text-white",
   },
   {
     title: "Split PDF",
     description: "Extract pages from a PDF",
     icon: Scissors,
+    toneClass: "bg-[#14B8A6]/12 text-[#14B8A6] group-hover:bg-[#14B8A6]/16 group-hover:text-[#0F988C] dark:bg-[#14B8A6]/15 dark:text-[#8DE7DE] dark:group-hover:bg-[#14B8A6]/20 dark:group-hover:text-white",
   },
   {
     title: "Compress PDF",
     description: "Reduce PDF file size",
     icon: FileUp,
+    toneClass: "bg-[#F97316]/12 text-[#F97316] group-hover:bg-[#F97316]/16 group-hover:text-[#E85C00] dark:bg-[#F97316]/15 dark:text-[#FEC49A] dark:group-hover:bg-[#F97316]/20 dark:group-hover:text-white",
   },
   {
     title: "Convert PDF",
     description: "Convert between PDF, Word, JPG, PNG",
     icon: ArrowLeftRight,
+    toneClass: "bg-[#3B82F6]/12 text-[#3B82F6] group-hover:bg-[#3B82F6]/16 group-hover:text-[#2563EB] dark:bg-[#3B82F6]/15 dark:text-[#9CC3FF] dark:group-hover:bg-[#3B82F6]/20 dark:group-hover:text-white",
   },
   {
     title: "eSign Document",
     description: "Add or request signatures",
     icon: Signature,
+    toneClass: "bg-[#EC4899]/12 text-[#EC4899] group-hover:bg-[#EC4899]/16 group-hover:text-[#DB2777] dark:bg-[#EC4899]/15 dark:text-[#F8A5C2] dark:group-hover:bg-[#EC4899]/20 dark:group-hover:text-white",
   },
   {
     title: "Templates",
     description: "Start from reusable templates",
     icon: FileText,
+    toneClass: "bg-[#8B5CF6]/12 text-[#8B5CF6] group-hover:bg-[#8B5CF6]/16 group-hover:text-[#7C3AED] dark:bg-[#8B5CF6]/15 dark:text-[#D7C9FF] dark:group-hover:bg-[#8B5CF6]/20 dark:group-hover:text-white",
   },
   {
     title: "OCR PDF",
     description: "Extract searchable text",
     icon: ScanText,
+    toneClass: "bg-[#22C55E]/12 text-[#22C55E] group-hover:bg-[#22C55E]/16 group-hover:text-[#16A34A] dark:bg-[#22C55E]/15 dark:text-[#9BE7AE] dark:group-hover:bg-[#22C55E]/20 dark:group-hover:text-white",
   },
   {
     title: "Batch Processing",
     description: "Process multiple files at once",
     icon: Workflow,
+    toneClass: "bg-[#64748B]/12 text-[#64748B] group-hover:bg-[#64748B]/16 group-hover:text-[#475569] dark:bg-[#64748B]/15 dark:text-[#CBD5E1] dark:group-hover:bg-[#64748B]/20 dark:group-hover:text-white",
   },
 ] as const;
 
@@ -140,6 +149,7 @@ export default function HomeProjectsSearch({
   ownerKey,
   projects,
   sectionLabel = "Recent projects",
+  renderedAt,
   showAllProjects = false,
   showOwnerFilter = true,
   showResumeBadge = false,
@@ -150,6 +160,17 @@ export default function HomeProjectsSearch({
   const [projectsState, setProjectsState] = useState<SummaryProject[]>(projects);
   const [projectsLoading, setProjectsLoading] = useState(() => projects.length === 0);
   const initialProjects = useMemo(() => projectsState, [projectsState]);
+  const accountInitials = useMemo(() => {
+    const parts = accountName.trim().split(/\s+/).filter(Boolean);
+    const first = parts[0]?.[0] ?? "";
+    const second = parts.length > 1 ? parts[parts.length - 1]?.[0] ?? "" : parts[0]?.[1] ?? "";
+    const initials = `${first}${second}`.toUpperCase();
+    return initials.length ? initials : "Y";
+  }, [accountName]);
+  const accountFirstName = useMemo(() => {
+    const parts = accountName.trim().split(/\s+/).filter(Boolean);
+    return parts[0] ?? accountName.trim() ?? "there";
+  }, [accountName]);
   const hasProjects = (projectsState.length ?? 0) > 0;
   const [sortOption, setSortOption] = useState<SortOption>("activity");
   const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode);
@@ -161,6 +182,13 @@ export default function HomeProjectsSearch({
   const [ownerSearch, setOwnerSearch] = useState("");
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const recentListRef = useRef<HTMLDivElement | null>(null);
+  const quickActionsTrackRef = useRef<HTMLDivElement | null>(null);
+  const quickActionsFirstCardRef = useRef<HTMLButtonElement | null>(null);
+  const quickActionsLastCardRef = useRef<HTMLButtonElement | null>(null);
+  const [canScrollQuickActionsPrev, setCanScrollQuickActionsPrev] = useState(false);
+  const [canScrollQuickActionsNext, setCanScrollQuickActionsNext] = useState(false);
+  const [leftArrowMounted, setLeftArrowMounted] = useState(false);
+  const [rightArrowMounted, setRightArrowMounted] = useState(false);
 
   useEffect(() => {
     if (!ownerKey) return;
@@ -232,258 +260,265 @@ export default function HomeProjectsSearch({
     };
   }, [ownerKey, projects, showAllProjects]);
 
-  const accountInitials = useMemo(() => {
-    const parts = accountName
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean);
-    const first = parts[0]?.[0] ?? "";
-    const second = parts.length > 1 ? parts[parts.length - 1]?.[0] ?? "" : parts[0]?.[1] ?? "";
-    const initials = `${first}${second}`.toUpperCase();
-    return initials.length ? initials : "Y";
-  }, [accountName]);
-  const accountFirstName = useMemo(() => {
-    const parts = accountName.trim().split(/\s+/).filter(Boolean);
-    return parts[0] ?? accountName.trim() ?? "there";
-  }, [accountName]);
-  useEffect(() => {
-    if (!sortMenuOpen) return;
-
-    const handleClick = (event: MouseEvent) => {
-      if (!sortMenuRef.current?.contains(event.target as Node)) {
-        setSortMenuOpen(false);
-      }
-    };
-
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setSortMenuOpen(false);
-    };
-
-    document.addEventListener("mousedown", handleClick);
-    document.addEventListener("keydown", handleKey);
-    return () => {
-      document.removeEventListener("mousedown", handleClick);
-      document.removeEventListener("keydown", handleKey);
-    };
-  }, [sortMenuOpen]);
-
-  useEffect(() => {
-    if (!ownerMenuOpen) return;
-
-    const handleClick = (event: MouseEvent) => {
-      if (!ownerMenuRef.current?.contains(event.target as Node)) {
-        setOwnerMenuOpen(false);
-      }
-    };
-
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOwnerMenuOpen(false);
-    };
-
-    document.addEventListener("mousedown", handleClick);
-    document.addEventListener("keydown", handleKey);
-    return () => {
-      document.removeEventListener("mousedown", handleClick);
-      document.removeEventListener("keydown", handleKey);
-    };
-  }, [ownerMenuOpen]);
-
   useEffect(() => {
     if (!showAllProjects) return;
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(ALL_PROJECTS_VIEW_MODE_KEY, viewMode);
-    document.cookie = `${ALL_PROJECTS_VIEW_MODE_KEY}=${viewMode}; path=/; max-age=31536000; samesite=lax`;
-  }, [showAllProjects, viewMode]);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const frame = window.requestAnimationFrame(() => {
-      window.dispatchEvent(new Event("workspace-content-ready"));
-    });
-    return () => {
-      window.cancelAnimationFrame(frame);
+    const track = quickActionsTrackRef.current;
+    if (!track) return;
+
+    const measure = () => {
+      const nextCanScrollPrev = track.scrollLeft > 4;
+      const nextCanScrollNext = track.scrollLeft + track.clientWidth < track.scrollWidth - 4;
+
+      setCanScrollQuickActionsPrev(nextCanScrollPrev);
+      setCanScrollQuickActionsNext(nextCanScrollNext);
+      setLeftArrowMounted(true);
+      setRightArrowMounted(true);
     };
-  }, []);
+
+    measure();
+
+    const handleScroll = () => {
+      measure();
+    };
+
+    track.addEventListener('scroll', handleScroll, { passive: true });
+
+    const resizeObserver =
+      typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    resizeObserver?.observe(track);
+
+    window.addEventListener('resize', measure);
+
+    return () => {
+      track.removeEventListener('scroll', handleScroll);
+      resizeObserver?.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [showAllProjects]);
+
+  const scrollQuickActions = (direction: 'prev' | 'next') => {
+    const track = quickActionsTrackRef.current;
+    if (!track) return;
+
+    const firstCard = quickActionsFirstCardRef.current;
+    const cardWidth = firstCard?.offsetWidth ?? 260;
+    const computedStyles = window.getComputedStyle(track);
+    const gap = Number.parseFloat(computedStyles.columnGap || computedStyles.gap || '0') || 0;
+    const distance = Math.max(cardWidth + gap, track.clientWidth * 0.72);
+
+    track.scrollBy({
+      left: direction === 'next' ? distance : -distance,
+      behavior: 'smooth',
+    });
+  };
 
   if (showAllProjects) {
+
     return (
       <section className="flex w-full min-h-0 flex-1 flex-col">
-        <div className="mx-auto flex w-full max-w-[1680px] flex-1 min-h-0 flex-col px-6 pb-8 pt-6 sm:px-8 sm:pb-10 lg:px-10 xl:px-12">
-          <div className="space-y-8">
-            <header className="space-y-3">
-              <h1 className="text-[28px] font-semibold tracking-tight text-zinc-100 sm:text-[34px] lg:text-[40px]">
-                Welcome back, {accountFirstName} 👋
+        <div className={`flex w-full flex-1 min-h-0 flex-col px-4 pb-4 pt-2 sm:px-5 sm:pb-6 sm:pt-3 lg:px-7 xl:px-8 ${showAllProjects ? "max-w-none" : "mx-auto max-w-[1680px]"}`}>
+          <div className="space-y-6">
+            <header className="space-y-1">
+              <h1 className="text-[26px] font-semibold leading-tight tracking-tight text-[#1F2A37] dark:text-zinc-100 sm:text-[28px] lg:text-[32px]">
+                Hey {accountFirstName}, ready to get started?
               </h1>
-              <p className="text-base font-medium text-zinc-300 sm:text-lg">What would you like to do today?</p>
-              <p className="max-w-3xl text-sm leading-6 text-zinc-400 sm:text-base">
-                Merge, split, compress, convert, sign, and manage your PDF workflows.
-              </p>
             </header>
 
-            <div className="w-full max-w-[1480px]">
-              <div className="flex h-14 w-full items-center gap-3 rounded-2xl border border-[#3A3A3A] bg-[#323232] px-4 shadow-[0_8px_24px_rgba(0,0,0,0.24)] transition focus-within:border-[#6C47FF] focus-within:shadow-[0_12px_32px_rgba(108,71,255,0.16)]">
-                <Search className="h-5 w-5 shrink-0 text-zinc-400" aria-hidden />
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  value={query}
-                  onChange={(event) => queryBridge?.setQuery(event.target.value)}
-                  placeholder="Search projects, files, templates..."
-                  className="h-full min-w-0 flex-1 border-none bg-transparent text-base text-zinc-100 placeholder:text-zinc-500 outline-none focus:outline-none focus:ring-0"
-                />
-              </div>
-            </div>
-
-            <section className="space-y-4">
-              <div className="flex items-end justify-between gap-4">
-                <div>
-                  <h2 className="text-lg font-semibold tracking-tight text-zinc-100 sm:text-xl lg:text-2xl">Quick Actions</h2>
-                  <p className="mt-1 text-sm text-zinc-400 sm:text-base">
-                    Start a new workflow or jump into a common PDF task.
-                  </p>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                {ALL_PROJECTS_QUICK_ACTIONS.map(({ title, description, icon: Icon }) => (
+            <section className="space-y-5">
+              <div className="relative">
+                {leftArrowMounted && canScrollQuickActionsPrev ? (<div className="pointer-events-none absolute inset-y-0 left-0 z-10 hidden w-8 bg-gradient-to-r from-white via-white/90 to-transparent md:block dark:from-[#111111] dark:via-[#111111]/90" />) : null}
+                {rightArrowMounted && canScrollQuickActionsNext ? (<div className="pointer-events-none absolute inset-y-0 right-0 z-10 hidden w-8 bg-gradient-to-l from-white via-white/90 to-transparent md:block dark:from-[#111111] dark:via-[#111111]/90" />) : null}
+                <div className="pointer-events-none absolute inset-y-0 left-[-12px] right-[-12px] z-20 hidden items-center justify-between md:flex">
                   <button
-                    key={title}
                     type="button"
-                    onClick={() => {
-                      if (typeof window !== "undefined") {
-                        window.dispatchEvent(new Event("open-create-project"));
-                      }
-                    }}
-                    className="group flex min-h-[140px] flex-col items-start justify-between rounded-2xl border border-[#3A3A3A] bg-[#323232] p-5 text-left shadow-[0_10px_24px_rgba(0,0,0,0.24)] transition-all duration-200 hover:-translate-y-1 hover:border-[#5B38E6] hover:shadow-[0_16px_30px_rgba(0,0,0,0.3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/30"
+                    onClick={() => scrollQuickActions("prev")}
+                    disabled={!canScrollQuickActionsPrev}
+                    className={"pointer-events-auto absolute left-0 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-[#0F172A]/15 bg-white/80 text-[#1F2A37] backdrop-blur-xl shadow-[0_18px_42px_rgba(15,23,42,0.24),0_2px_6px_rgba(15,23,42,0.10)] ring-1 ring-[#0F172A]/10 transition before:pointer-events-none before:absolute before:inset-[-18px] before:rounded-full before:bg-white/45 before:blur-2xl before:content-['']  " + (canScrollQuickActionsPrev ? "hover:border-[#0F172A]/25 hover:bg-white/95" : "opacity-0 pointer-events-none")}
+                    aria-label="Scroll quick actions left"
                   >
-                    <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-[#6C47FF]/15 text-[#CBB8FF] transition group-hover:bg-[#6C47FF]/20 group-hover:text-white">
-                      <Icon className="h-6 w-6" aria-hidden />
-                    </span>
-                    <span className="space-y-1">
-                      <span className="block text-base font-semibold text-zinc-100">{title}</span>
-                      <span className="block text-sm leading-6 text-zinc-400">{description}</span>
-                    </span>
+                    <ChevronLeft className="relative z-10 h-4 w-4" aria-hidden />
                   </button>
-                ))}
+                  <button
+                    type="button"
+                    onClick={() => scrollQuickActions("next")}
+                    disabled={!canScrollQuickActionsNext}
+                    className={"pointer-events-auto absolute right-0 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-[#0F172A]/15 bg-white/80 text-[#1F2A37] backdrop-blur-xl shadow-[0_18px_42px_rgba(15,23,42,0.26),0_2px_6px_rgba(15,23,42,0.10)] ring-1 ring-[#0F172A]/10 transition before:pointer-events-none before:absolute before:inset-[-18px] before:rounded-full before:bg-white/50 before:blur-2xl before:content-['']  " + (canScrollQuickActionsNext ? "hover:border-[#0F172A]/25 hover:bg-white/95" : "opacity-0 pointer-events-none")}
+                    aria-label="Scroll quick actions right"
+                  >
+                    <ChevronRight className="relative z-10 h-4 w-4" aria-hidden />
+                  </button>
+                </div>
+                <div
+                  ref={quickActionsTrackRef}
+                  className="relative z-0 flex gap-3 overflow-x-auto scroll-smooth snap-x snap-proximity pb-2 pr-12 pl-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden md:pr-16"
+                >
+                  {ALL_PROJECTS_QUICK_ACTIONS.map(({ title, description, icon: Icon, toneClass }, index) => (
+                    <button
+                      key={title}
+                      ref={index === 0 ? quickActionsFirstCardRef : index === ALL_PROJECTS_QUICK_ACTIONS.length - 1 ? quickActionsLastCardRef : undefined}
+                      type="button"
+                      onClick={() => {
+                        if (typeof window !== "undefined") {
+                          window.dispatchEvent(new Event("open-create-project"));
+                        }
+                      }}
+                      className="group relative overflow-hidden flex min-h-[112px] min-w-[240px] max-w-[280px] snap-start flex-1 flex-col items-start justify-between rounded-[10px] border border-[rgba(0,0,0,0.05)] bg-[#EEF1F5] p-4 text-left transition outline outline-0 outline-transparent shadow-[0_1px_0_rgba(15,23,42,0.02),0_8px_18px_rgba(15,23,42,0.05)] dark:bg-zinc-900 dark:shadow-[0_8px_18px_rgba(0,0,0,0.22)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/20"
+                    >
+                      <span className={"inline-flex h-11 w-11 items-center justify-center rounded-2xl transition " + toneClass}>
+                        <Icon className="h-5.5 w-5.5" aria-hidden />
+                      </span>
+                      <span className="space-y-1">
+                        <span className="block text-[15px] font-semibold text-[#1F2A37] dark:text-zinc-100">{title}</span>
+                        <span className="block text-sm leading-6 text-slate-500 dark:text-zinc-400">{description}</span>
+                      </span>
+                      <span className="mt-2 inline-flex w-fit text-xs font-medium tracking-tight text-[#6C47FF] underline-offset-4 transition group-hover:underline">
+                        Start now
+                      </span>
+                    </button>
+                  ))}
+                </div>
               </div>
             </section>
 
-            <section className="space-y-4">
-              <div className="flex items-end justify-between gap-4">
-                <div>
-                  <h2 className="text-lg font-semibold tracking-tight text-zinc-100 sm:text-xl lg:text-2xl">
-                    Recent Projects
-                  </h2>
-                  <p className="mt-1 text-sm text-zinc-400 sm:text-base">
-                    {projectsState.length > 0
-                      ? `${projectsState.length} ${projectsState.length === 1 ? "project" : "projects"}`
-                      : "No recent projects yet."}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="relative inline-flex items-center rounded-full border border-[#3F3F3F] bg-[#323232] p-1">
-                    <button
-                      type="button"
-                      onClick={() => setViewMode("grid")}
-                      className={`inline-flex h-9 min-w-[56px] items-center justify-center rounded-full px-3 text-xs font-semibold transition ${
-                        viewMode === "grid"
-                          ? "bg-[#E5E7EB] text-slate-700 dark:bg-[#3A3A3A] dark:text-zinc-100"
-                          : "text-zinc-400 hover:text-zinc-100"
-                      }`}
-                      aria-label="Grid view"
-                      aria-pressed={viewMode === "grid"}
-                    >
-                      <LayoutGrid className="mr-1.5 h-4 w-4" aria-hidden />
-                      Grid
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setViewMode("list")}
-                      className={`inline-flex h-9 min-w-[56px] items-center justify-center rounded-full px-3 text-xs font-semibold transition ${
-                        viewMode === "list"
-                          ? "bg-[#E5E7EB] text-slate-700 dark:bg-[#3A3A3A] dark:text-zinc-100"
-                          : "text-zinc-400 hover:text-zinc-100"
-                      }`}
-                      aria-label="List view"
-                      aria-pressed={viewMode === "list"}
-                    >
-                      <List className="mr-1.5 h-4 w-4" aria-hidden />
-                      List
-                    </button>
+            <section className="space-y-5">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <h2 className="min-w-0 shrink-0 text-base font-semibold tracking-tight text-[#1F2A37] dark:text-zinc-100 sm:text-lg lg:text-xl">
+                  Your projects
+                </h2>
+                <div className="flex min-w-0 flex-1 items-center gap-3 lg:justify-end">
+                  <div
+                    className="flex h-10 min-w-0 w-full flex-[0_1_480px] items-center gap-2 rounded-xl border border-[#E6EBF2] bg-white px-3 shadow-sm transition focus-within:border-[#4F46E5] dark:border-[#3F3F3F] dark:bg-[#323232] dark:shadow-[0_8px_18px_rgba(0,0,0,0.12)] lg:max-w-[480px]"
+                    onMouseDown={(event) => {
+                      const target = event.target;
+                      if (target instanceof HTMLInputElement) return;
+                      event.preventDefault();
+                      searchInputRef.current?.focus();
+                    }}
+                    onClick={() => {
+                      searchInputRef.current?.focus();
+                    }}
+                  >
+                    <Search className="h-4.5 w-4.5 text-[#6B7280] dark:text-zinc-400" aria-hidden />
+                    <input
+                      ref={searchInputRef}
+                      type="text"
+                      value={query}
+                      onChange={(event) => queryBridge?.setQuery(event.target.value)}
+                      placeholder="Search projects, files, templates..."
+                      className="h-full min-w-0 flex-1 border-none bg-transparent text-sm text-[#1F2A37] placeholder:text-[#6B7280] outline-none focus:outline-none focus:ring-0 dark:text-zinc-100 dark:placeholder:text-zinc-400"
+                    />
                   </div>
-                  <div ref={sortMenuRef} className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setSortMenuOpen((prev) => !prev)}
-                      className={`inline-flex h-11 items-center gap-2 rounded-full border border-[#3F3F3F] px-4 text-xs font-semibold transition ${
-                        sortMenuOpen
-                          ? "bg-[#3A3A3A] text-zinc-100"
-                          : "bg-[#323232] text-zinc-100 hover:border-[#4A4A4A]"
-                      }`}
-                      aria-haspopup="menu"
-                      aria-expanded={sortMenuOpen}
-                    >
-                      {sortOption === "activity" ? (
-                        <Clock className="h-4 w-4" aria-hidden />
-                      ) : sortOption === "starred" ? (
-                        <Star className="h-4 w-4" aria-hidden />
-                      ) : null}
-                      <span className="whitespace-nowrap">
-                        {sortOption === "activity"
-                          ? "Last activity"
-                          : sortOption === "starred"
-                            ? "Starred"
-                            : sortOption === "az"
-                              ? "Name (A-Z)"
-                              : "Name (Z-A)"}
-                      </span>
-                      <ChevronDown className={`h-4 w-4 transition-transform ${sortMenuOpen ? "rotate-180" : ""}`} aria-hidden />
-                    </button>
-
-                    {sortMenuOpen ? (
-                      <div
-                        role="menu"
-                        className="project-actions-menu absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-2xl border border-[#3F3F3F] bg-[#323232] text-sm text-zinc-100 shadow-[0_16px_36px_rgba(0,0,0,0.35)]"
+                  <div className="flex shrink-0 items-center gap-2">
+                    <div className="relative inline-flex items-center rounded-xl border border-[#E6EBF2] bg-white p-1 shadow-sm dark:border-[#3F3F3F] dark:bg-[#323232]">
+                      <button
+                        type="button"
+                        onClick={() => setViewMode("grid")}
+                        className={`inline-flex h-8 min-w-[46px] items-center justify-center rounded-lg px-2.5 text-xs font-semibold transition ${
+                          viewMode === "grid"
+                            ? "bg-[#E5E7EB] text-[#1F2A37] dark:bg-[#3A3A3A] dark:text-zinc-100"
+                            : "text-slate-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                        }`}
+                        aria-label="Grid view"
+                        aria-pressed={viewMode === "grid"}
                       >
-                        {([
-                          { value: "activity", label: "Last activity", icon: Clock },
-                          { value: "starred", label: "Starred", icon: Star },
-                          { value: "az", label: "Name (A-Z)", icon: ArrowUp },
-                          { value: "za", label: "Name (Z-A)", icon: ArrowDown },
-                        ] as const).map((option) => {
-                          const OptionIcon = option.icon;
-                          const active = sortOption === option.value;
-                          return (
-                            <button
-                              key={option.value}
-                              type="button"
-                              role="menuitem"
-                              onClick={() => {
-                                setSortOption(option.value);
-                                setSortMenuOpen(false);
-                              }}
-                              className={`flex w-full items-center gap-3 px-4 py-3 text-left transition ${
-                                active ? "bg-[#3A3A3A]" : "hover:bg-[#2B2B2B]"
-                              }`}
-                            >
-                              <OptionIcon className="h-4 w-4 text-zinc-300" aria-hidden />
-                              <span className="flex-1">{option.label}</span>
-                              {active ? <Check className="h-4 w-4 text-[#CBB8FF]" aria-hidden /> : null}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ) : null}
+                        <LayoutGrid className="mr-1.5 h-4 w-4" aria-hidden />
+                        <span className="hidden min-[470px]:inline">Grid</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setViewMode("list")}
+                        className={`inline-flex h-8 min-w-[46px] items-center justify-center rounded-lg px-2.5 text-xs font-semibold transition ${
+                          viewMode === "list"
+                            ? "bg-[#E5E7EB] text-[#1F2A37] dark:bg-[#3A3A3A] dark:text-zinc-100"
+                            : "text-slate-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                        }`}
+                        aria-label="List view"
+                        aria-pressed={viewMode === "list"}
+                      >
+                        <List className="mr-1.5 h-4 w-4" aria-hidden />
+                        <span className="hidden min-[470px]:inline">List</span>
+                      </button>
+                    </div>
+                    <div ref={sortMenuRef} className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setSortMenuOpen((prev) => !prev)}
+                        className={`inline-flex h-10 items-center gap-2 rounded-xl border border-[#E6EBF2] px-3 text-xs font-semibold shadow-sm text-[#1F2A37] transition dark:border-[#3F3F3F] dark:bg-[#323232] dark:text-zinc-100 dark:shadow-[0_8px_18px_rgba(0,0,0,0.12)] ${
+                          sortMenuOpen ? "bg-[#F8FAFC] dark:bg-[#3A3A3A]" : "bg-white hover:border-[#D8DEE8] dark:hover:border-[#4A4A4A]"
+                        }`}
+                        aria-haspopup="menu"
+                        aria-expanded={sortMenuOpen}
+                      >
+                        {sortOption === "activity" ? (
+                          <Clock className="h-4 w-4" aria-hidden />
+                        ) : sortOption === "starred" ? (
+                          <Star className="h-4 w-4" aria-hidden />
+                        ) : null}
+                        <span className="whitespace-nowrap">
+                          {sortOption === "activity"
+                            ? "Last activity"
+                            : sortOption === "starred"
+                              ? "Starred"
+                              : sortOption === "az"
+                                ? "Name (A-Z)"
+                                : "Name (Z-A)"}
+                        </span>
+                        <ChevronDown className={`h-4 w-4 transition-transform ${sortMenuOpen ? "rotate-180" : ""}`} aria-hidden />
+                      </button>
+
+                      {sortMenuOpen ? (
+                        <div
+                          role="menu"
+                          className="project-actions-menu absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white text-sm text-[#1F2A37] shadow-[0_16px_36px_rgba(15,23,42,0.14)] dark:border-[#3F3F3F] dark:bg-[#323232] dark:text-zinc-100 dark:shadow-[0_20px_44px_rgba(0,0,0,0.5)]"
+                        >
+                          <div className="pb-1.5 pt-1.5">
+                            {([
+                              { key: "activity", label: "Last activity", Icon: Clock },
+                              { key: "starred", label: "Starred", Icon: Star },
+                              { key: "az", label: "Name (A-Z)", Icon: ArrowUp },
+                              { key: "za", label: "Name (Z-A)", Icon: ArrowDown },
+                            ] as const).map(({ key, label, Icon }) => (
+                              <button
+                                key={key}
+                                type="button"
+                                role="menuitem"
+                                onClick={() => {
+                                  setSortOption(key);
+                                  setSortMenuOpen(false);
+                                }}
+                                className={`project-actions-stagger-item mx-2 flex w-[calc(100%-1rem)] items-center justify-between rounded-lg px-2.5 py-2 text-left transition ${
+                                  sortOption === key
+                                    ? "bg-[#F8FAFC] dark:bg-[#3A3A3A]/70"
+                                    : "hover:bg-[#F8FAFC] dark:hover:bg-[#3A3A3A]/60"
+                                }`}
+                              >
+                                <span className="flex min-w-0 items-center gap-2.5 text-slate-900 dark:text-zinc-100">
+                                  <Icon className="h-4 w-4 text-current" aria-hidden />
+                                  <span className="truncate text-[15px] font-medium text-slate-900 dark:text-zinc-100">{label}</span>
+                                </span>
+                                {sortOption === key ? (
+                                  <Check className="h-5 w-5 text-slate-900 dark:text-zinc-100" aria-hidden />
+                                ) : null}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               </div>
-
               <div
                 ref={recentListRef}
                 data-projects-scroll-layer="true"
-                className="recent-projects-container relative flex min-h-0 w-full flex-1 flex-col overflow-visible"
+                className={`recent-projects-container mt-0 h-0 min-h-0 flex-1 relative ${
+                  showAllProjects ? "mt-3 sm:mt-4 overflow-y-auto overflow-x-hidden overscroll-contain" : "mt-5 sm:mt-6 overflow-y-auto overflow-x-hidden overscroll-contain"
+                }`}
                 style={{
-                  paddingBottom: "calc(40px + env(safe-area-inset-bottom, 0px))",
-                  scrollbarGutter: "stable",
+                  paddingRight: showAllProjects ? 0 : 4,
+                  paddingLeft: 4,
+                  paddingBottom: showAllProjects ? 0 : "calc(40px + env(safe-area-inset-bottom, 0px))",
                   WebkitOverflowScrolling: "touch",
                   touchAction: "pan-y",
                 }}
@@ -497,6 +532,7 @@ export default function HomeProjectsSearch({
                   viewMode={viewMode}
                   showAllProjects={showAllProjects}
                   showResumeBadge={showResumeBadge}
+                  renderedAt={renderedAt}
                 />
               </div>
             </section>
@@ -508,39 +544,15 @@ export default function HomeProjectsSearch({
 
   return (
     <>
-
-            <section className={`mt-0 flex w-full min-h-0 flex-1 flex-col ${showAllProjects ? "px-6 pb-6 pt-5 sm:px-8 sm:pb-8 sm:pt-6 lg:px-10 xl:px-12" : ""}`}>
-        <div className="flex min-h-0 flex-1 flex-col">
-          <div className="flex flex-row items-center justify-between gap-3 md:gap-4 md:pl-0">
-            {showAllProjects ? (
-              <div className="flex min-w-0 flex-1">
-                <div
-                  className="flex h-11 w-full cursor-text rounded-full border-[1.5px] border-gray-200 bg-white shadow-sm transition focus-within:border-[3.5px] focus-within:border-[#4F46E5] dark:border-[#3A3A3A] dark:bg-[#323232] dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] dark:focus-within:border-[#4F46E5]"
-                  onMouseDown={(event) => {
-                    const target = event.target;
-                    if (target instanceof HTMLInputElement) return;
-                    event.preventDefault();
-                    searchInputRef.current?.focus();
-                  }}
-                  onClick={() => {
-                    searchInputRef.current?.focus();
-                  }}
-                >
-                  <div className="flex h-full w-full items-center gap-2 rounded-full bg-white px-4 text-[#1F2A37] dark:bg-[#323232] dark:text-zinc-100">
-                    <Search className="h-5 w-5 text-[#6B7280] dark:text-zinc-400" aria-hidden />
-                    <input
-                      ref={searchInputRef}
-                      type="text"
-                      value={query}
-                      onChange={(event) => queryBridge?.setQuery(event.target.value)}
-                      placeholder="Search projects..."
-                      className="h-full min-w-0 flex-1 border-none bg-white text-base text-[#1F2A37] placeholder:text-[#6B7280] outline-none focus:outline-none focus:ring-0 dark:bg-[#323232] dark:text-zinc-100 dark:placeholder:text-zinc-400"
-                    />
-                  </div>
-                </div>
-              </div>
-            ) : null}
-            <h2 className={showAllProjects ? "hidden" : "min-w-0 shrink-0 text-lg font-semibold text-[#1F2A37] min-[560px]:text-xl dark:text-zinc-100 md:text-2xl"}>
+      <section className="mt-0 flex w-full min-h-0 flex-1 flex-col">
+          <div
+          className={`box-border flex min-h-0 flex-1 flex-col rounded-xl border-[1.5px] border-gray-200 bg-white p-3 transition-[height] duration-300 ease-out shadow-sm dark:border-[#3F3F3F] dark:bg-[#323232] dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)] md:p-4 ${
+            showAllProjects ? "mt-3 sm:mt-4 md:mt-0" : ""
+          }`}
+          style={{ height: "calc(100% - var(--workspace-projects-bottom-gap, 0px))" }}
+        >
+          <div className="flex flex-row items-center justify-between gap-2 md:gap-4 md:pl-3">
+            <h2 className="min-w-0 shrink-0 text-base font-semibold text-[#1F2A37] min-[560px]:text-lg dark:text-zinc-100 md:text-xl">
               {query.trim() ? (
                 "Search results"
               ) : (
@@ -552,10 +564,10 @@ export default function HomeProjectsSearch({
             <div className="flex min-w-0 shrink items-center justify-end gap-1.5 md:gap-2">
               {showAllProjects ? (
                 <div className="flex min-w-0 items-center gap-1.5 md:gap-2">
-                  <div className="relative inline-flex items-center rounded-full border-2 border-[#E6EBF2] bg-white dark:border-[#3F3F3F] dark:bg-[#323232]">
+                  <div className="relative inline-flex items-center rounded-xl border border-[#E6EBF2] bg-white dark:border-[#3F3F3F] dark:bg-[#323232]">
                     <span
                       aria-hidden
-                      className={`pointer-events-none absolute left-0 top-0 h-full w-[48px] rounded-full bg-[#E5E7EB] transition-[width,transform] duration-200 ease-out min-[470px]:w-[68px] dark:bg-[#3A3A3A] ${
+                      className={`pointer-events-none absolute left-0 top-0 h-full w-[48px] rounded-lg bg-[#E5E7EB] transition-[width,transform] duration-200 ease-out min-[470px]:w-[68px] dark:bg-[#3A3A3A] ${
                         viewMode === "grid"
                           ? "translate-x-0"
                           : "translate-x-[48px] min-[470px]:translate-x-[68px]"
@@ -564,7 +576,7 @@ export default function HomeProjectsSearch({
                     <button
                       type="button"
                       onClick={() => setViewMode("grid")}
-                      className={`relative z-10 inline-flex h-[34px] w-[48px] items-center justify-center gap-1.5 rounded-full px-3 text-xs font-semibold transition min-[470px]:w-[68px] ${
+                      className={`relative z-10 inline-flex h-[34px] w-[48px] items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition min-[470px]:w-[68px] ${
                         viewMode === "grid"
                           ? "text-slate-700 dark:text-[#F4F4F5]"
                           : "text-slate-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-zinc-100"
@@ -578,7 +590,7 @@ export default function HomeProjectsSearch({
                     <button
                       type="button"
                       onClick={() => setViewMode("list")}
-                      className={`relative z-10 inline-flex h-[34px] w-[48px] items-center justify-center gap-1.5 rounded-full px-3 text-xs font-semibold transition min-[470px]:w-[68px] ${
+                      className={`relative z-10 inline-flex h-[34px] w-[48px] items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition min-[470px]:w-[68px] ${
                         viewMode === "list"
                           ? "text-slate-700 dark:text-[#F4F4F5]"
                           : "text-slate-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-zinc-100"
@@ -594,7 +606,7 @@ export default function HomeProjectsSearch({
                     <button
                       type="button"
                       onClick={() => setSortMenuOpen((prev) => !prev)}
-                      className={`inline-flex items-center gap-2 rounded-full border-2 px-2.5 py-2 text-xs font-semibold transition min-[410px]:px-3 md:px-4 ${
+                      className={`inline-flex items-center gap-2 rounded-xl border px-2.5 py-2 text-xs font-semibold shadow-sm transition min-[410px]:px-3 md:px-4 dark:shadow-[0_8px_18px_rgba(0,0,0,0.12)] ${
                         sortMenuOpen
                           ? "border-[#E6EBF2] bg-[#E5E7EB] text-[#1F2A37] dark:border-[#3F3F3F] dark:bg-[#3A3A3A] dark:text-zinc-100"
                           : "border-[#E6EBF2] bg-white text-[#1F2A37] hover:border-[#D8DEE8] dark:border-[#3F3F3F] dark:bg-[#323232] dark:text-zinc-100 dark:hover:border-[#4A4A4A]"
@@ -689,7 +701,7 @@ export default function HomeProjectsSearch({
                         return next;
                       });
                     }}
-                    className={`inline-flex items-center gap-2 rounded-full border-2 border-[#E6EBF2] px-4 py-2 text-xs font-semibold transition dark:border-[#3A3A3A] ${
+                    className={`inline-flex items-center gap-2 rounded-xl border border-[#E6EBF2] px-4 py-2 text-xs font-semibold transition dark:border-[#3A3A3A] ${
                       ownerMenuOpen
                         ? "bg-[#009DFD] text-white dark:bg-[#E5E5E5] dark:text-[#1F1F1F]"
                         : "bg-white text-[#1F2A37] hover:border-[#D8DEE8] dark:bg-[#323232] dark:text-zinc-100 dark:hover:border-[#4A4A4A]"
@@ -793,10 +805,6 @@ export default function HomeProjectsSearch({
               ) : null}
             </div>
           </div>
-
-
-
-
           <div
             ref={recentListRef}
             data-projects-scroll-layer="true"
@@ -821,13 +829,14 @@ export default function HomeProjectsSearch({
               viewMode={viewMode}
               showAllProjects={showAllProjects}
               showResumeBadge={showResumeBadge}
+              renderedAt={renderedAt}
             />
           </div>
           {!showAllProjects && hasProjects ? (
             <div className="mt-4 flex items-center">
               <Link
                 href="/projects/all"
-                className="inline-flex items-center rounded-full border-2 border-[#E6EBF2] px-4 py-2 text-xs font-semibold text-[#1F2A37] transition hover:border-[#D8DEE8] active:translate-y-[1px] active:scale-[0.98] active:bg-[#2563EB]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#51bdff]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F1F4F9] dark:border-[#3A3A3A] dark:text-zinc-100 dark:hover:border-[#4A4A4A] dark:active:bg-white/10 dark:focus-visible:ring-offset-[#252525]"
+                className="inline-flex items-center rounded-xl border border-[#E6EBF2] px-4 py-2 text-xs font-semibold text-[#1F2A37] transition hover:border-[#D8DEE8] active:translate-y-[1px] active:scale-[0.98] active:bg-[#2563EB]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#51bdff]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F1F4F9] dark:border-[#3A3A3A] dark:text-zinc-100 dark:hover:border-[#4A4A4A] dark:active:bg-white/10 dark:focus-visible:ring-offset-[#252525]"
               >
                 View all projects
               </Link>
