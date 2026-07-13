@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { AlertTriangle, CircleHelp, CreditCard, ExternalLink, Folders, LogOut, Moon, PenLine, Settings, Sparkles, Sun, User } from "lucide-react";
+import { AlertTriangle, CircleHelp, CreditCard, LogOut, Moon, Sparkles, Sun, User } from "lucide-react";
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
 import { getAvatarFallback } from "@/lib/avatarFallback";
 import { getBillingStatusPresentation } from "@/lib/billingPlans";
@@ -17,6 +17,8 @@ export type SettingsMenuProps = {
   triggerContent?: React.ReactNode;
   triggerLabel?: string;
 };
+
+const MENU_CLOSE_MS = 160;
 
 export default function SettingsMenu({
   variant = "default",
@@ -31,13 +33,15 @@ export default function SettingsMenu({
   const panelRef = useRef<HTMLDivElement>(null);
   const { data: session, status: sessionStatus } = useSession();
   const [open, setOpen] = useState(false);
-  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
+  const [isClosing, setIsClosing] = useState(false);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const [stripeStatus, setStripeStatus] = useState<string | null>(null);
   const [billingStatusLoaded, setBillingStatusLoaded] = useState(false);
   const [billingPortalPending, setBillingPortalPending] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
+  const closeTimerRef = useRef<number | null>(null);
   const [themeHydrated, setThemeHydrated] = useState(false);
   const avatarKey = session?.user?.id ?? null;
   const { avatar } = useAvatarPreference(avatarKey);
@@ -119,16 +123,29 @@ export default function SettingsMenu({
   useEffect(() => {
     if (!open) return;
 
+    function closeMenu() {
+      if (closeTimerRef.current !== null) {
+        window.clearTimeout(closeTimerRef.current);
+        closeTimerRef.current = null;
+      }
+      setIsClosing(true);
+      closeTimerRef.current = window.setTimeout(() => {
+        setOpen(false);
+        setIsClosing(false);
+        closeTimerRef.current = null;
+      }, MENU_CLOSE_MS);
+    }
+
     function handleClick(event: MouseEvent) {
       const target = event.target as Node;
       if (!containerRef.current?.contains(target) && !panelRef.current?.contains(target)) {
-        setOpen(false);
+        closeMenu();
       }
     }
 
     function handleKey(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        setOpen(false);
+        closeMenu();
       }
     }
 
@@ -138,44 +155,99 @@ export default function SettingsMenu({
       document.removeEventListener("mousedown", handleClick);
       document.removeEventListener("keydown", handleKey);
     };
-  }, [open]);
+  }, [open, isClosing, variant]);
 
   function handleToggle() {
-    setOpen((prev) => {
-      const next = !prev;
-      if (!next) {
-        window.requestAnimationFrame(() => {
-          triggerRef.current?.blur();
-        });
+    if (open) {
+      if (closeTimerRef.current !== null) {
+        window.clearTimeout(closeTimerRef.current);
+        closeTimerRef.current = null;
       }
-      return next;
-    });
+      setIsClosing(true);
+      window.requestAnimationFrame(() => {
+        triggerRef.current?.blur();
+      });
+      closeTimerRef.current = window.setTimeout(() => {
+        setOpen(false);
+        setIsClosing(false);
+        closeTimerRef.current = null;
+      }, MENU_CLOSE_MS);
+      return;
+    }
+
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+    setIsClosing(false);
+    setOpen(true);
   }
 
   useEffect(() => {
-    if (!open) {
+    if (!open && !isClosing) {
       setMenuPosition(null);
       return;
     }
 
+    let raf = 0;
+    let rafFollowup = 0;
     const updatePosition = () => {
       const anchor = triggerRef.current;
       if (!anchor) return;
       const rect = anchor.getBoundingClientRect();
-      const top = Math.round(rect.bottom + 12);
-      const right = Math.round(Math.max(16, window.innerWidth - rect.right));
-      setMenuPosition({ top, right });
+      const menuWidth = 280;
+      const viewportPadding = 4;
+      const gap = 4;
+      const estimatedMenuHeight = variant === "pricing" ? 456 : 412;
+      const measuredMenuHeight = panelRef.current?.offsetHeight ?? 0;
+      const menuHeight = Math.max(estimatedMenuHeight, measuredMenuHeight || 0);
+      const openBelow = rect.bottom + gap + menuHeight <= window.innerHeight - viewportPadding;
+      const top = Math.round(
+        openBelow
+          ? Math.min(Math.max(rect.bottom + gap, viewportPadding), window.innerHeight - menuHeight - viewportPadding)
+          : window.innerHeight - menuHeight - viewportPadding
+      );
+      const preferredLeft = Math.round(rect.right + gap);
+      const left = Math.round(
+        Math.min(Math.max(preferredLeft, viewportPadding), window.innerWidth - menuWidth - viewportPadding)
+      );
+      setMenuPosition({ top, left });
     };
 
-    updatePosition();
-    window.addEventListener("scroll", updatePosition, { passive: true });
-    window.addEventListener("resize", updatePosition);
+    const scheduleUpdate = () => {
+      if (raf) window.cancelAnimationFrame(raf);
+      if (rafFollowup) window.cancelAnimationFrame(rafFollowup);
+      raf = window.requestAnimationFrame(() => {
+        updatePosition();
+        rafFollowup = window.requestAnimationFrame(() => {
+          updatePosition();
+        });
+      });
+    };
+
+    scheduleUpdate();
+    window.addEventListener("scroll", scheduleUpdate, { passive: true });
+    window.addEventListener("resize", scheduleUpdate);
+    const resizeObserver = typeof ResizeObserver !== "undefined" && panelRef.current ? new ResizeObserver(scheduleUpdate) : null;
+    resizeObserver?.observe(panelRef.current as Element);
 
     return () => {
-      window.removeEventListener("scroll", updatePosition);
-      window.removeEventListener("resize", updatePosition);
+      if (raf) window.cancelAnimationFrame(raf);
+      if (rafFollowup) window.cancelAnimationFrame(rafFollowup);
+      window.removeEventListener("scroll", scheduleUpdate);
+      window.removeEventListener("resize", scheduleUpdate);
+      resizeObserver?.disconnect();
     };
-  }, [open]);
+  }, [open, isClosing, variant]);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current !== null) {
+        window.clearTimeout(closeTimerRef.current);
+        closeTimerRef.current = null;
+      }
+    };
+  }, []);
 
   function handlePricing() {
     setOpen(false);
@@ -225,19 +297,14 @@ export default function SettingsMenu({
     }
   }
 
-  function handleProjects() {
-    setOpen(false);
-    router.push("/projects/all");
-  }
-
-  function handleSignatures() {
-    setOpen(false);
-    router.push("/signature-center");
-  }
-
   function handleHelpCenter() {
     setOpen(false);
     router.push("/support");
+  }
+
+  function handleAppearance(nextTheme: "light" | "dark") {
+    applyTheme(nextTheme);
+    setOpen(false);
   }
 
   async function handleSignOut() {
@@ -317,12 +384,12 @@ export default function SettingsMenu({
           ) : null}
         </button>
 
-        {typeof document !== "undefined" && open && menuPosition
+        {typeof document !== "undefined" && (open || isClosing) && menuPosition
           ? createPortal(
               <div
                 ref={panelRef}
-                className="fixed z-[1200] w-[280px] rounded-xl border border-[#E5E7EB] bg-white p-3 text-left shadow-[0_16px_36px_rgba(15,23,42,0.14)] origin-top-right transition duration-200 ease-out dark:border-[#3F3F3F] dark:bg-[#323232] dark:shadow-[0_20px_44px_rgba(0,0,0,0.5)] pointer-events-auto opacity-100 translate-y-0 scale-100"
-                style={{ top: menuPosition.top, right: menuPosition.right }}
+                className={`fixed z-[1200] w-[280px] max-h-[calc(100vh-24px)] overflow-auto rounded-xl border border-[#E5E7EB] bg-white p-3 text-left shadow-[0_12px_28px_rgba(15,23,42,0.10)] origin-top-left transition duration-[160ms] ease-out dark:border-[#3F3F3F] dark:bg-[#323232] dark:shadow-[0_18px_40px_rgba(0,0,0,0.45)] pointer-events-auto ${isClosing ? "opacity-0 translate-y-1 scale-[0.98]" : "opacity-100 translate-y-0 scale-100"}`}
+                style={{ top: menuPosition.top, left: menuPosition.left }}
                 onMouseDown={(event) => {
                   event.stopPropagation();
                 }}
@@ -394,26 +461,10 @@ export default function SettingsMenu({
                     ) : null}
                     <button
                       type="button"
-                      onClick={handleProjects}
-                      className="group flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-[15px] font-medium text-[#1E293B] transition hover:bg-[#F8FAFC] hover:text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/35 focus:ring-offset-2 focus:ring-offset-white dark:text-zinc-100 dark:hover:bg-[#3A3A3A]/70 dark:hover:text-white dark:focus:ring-offset-[#323232]"
-                    >
-                      <Folders className="h-4 w-4 text-current" aria-hidden />
-                      <span>All projects</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSignatures}
-                      className="group flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-[15px] font-medium text-[#1E293B] transition hover:bg-[#F8FAFC] hover:text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/35 focus:ring-offset-2 focus:ring-offset-white dark:text-zinc-100 dark:hover:bg-[#3A3A3A]/70 dark:hover:text-white dark:focus:ring-offset-[#323232]"
-                    >
-                      <PenLine className="h-4 w-4 text-current" aria-hidden />
-                      <span>Signatures</span>
-                    </button>
-                    <button
-                      type="button"
                       onClick={handleAccountSettings}
                       className="group flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-[15px] font-medium text-[#1E293B] transition hover:bg-[#F8FAFC] hover:text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/35 focus:ring-offset-2 focus:ring-offset-white dark:text-zinc-100 dark:hover:bg-[#3A3A3A]/70 dark:hover:text-white dark:focus:ring-offset-[#323232]"
                     >
-                      <Settings className="h-4 w-4 text-current" aria-hidden />
+                      <User className="h-4 w-4 text-current" aria-hidden />
                       <span>Account Settings</span>
                     </button>
                     <button
@@ -424,60 +475,60 @@ export default function SettingsMenu({
                       className="group flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-[15px] font-medium text-[#1E293B] transition hover:bg-[#F8FAFC] hover:text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/35 focus:ring-offset-2 focus:ring-offset-white dark:text-zinc-100 dark:hover:bg-[#3A3A3A]/70 dark:hover:text-white dark:focus:ring-offset-[#323232]"
                     >
                       <CreditCard className="h-4 w-4 text-current" aria-hidden />
-                      <span>Billing portal</span>
+                      <span>Billing / Subscription</span>
                     </button>
                     <button
                       type="button"
                       onClick={handleHelpCenter}
-                      className="group flex w-full items-center justify-between rounded-md px-3 py-2.5 text-left text-[15px] font-medium text-[#1E293B] transition hover:bg-[#F8FAFC] hover:text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/35 focus:ring-offset-2 focus:ring-offset-white dark:text-zinc-100 dark:hover:bg-[#3A3A3A]/70 dark:hover:text-white dark:focus:ring-offset-[#323232]"
+                      className="group flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-[15px] font-medium text-[#1E293B] transition hover:bg-[#F8FAFC] hover:text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/35 focus:ring-offset-2 focus:ring-offset-white dark:text-zinc-100 dark:hover:bg-[#3A3A3A]/70 dark:hover:text-white dark:focus:ring-offset-[#323232]"
                     >
-                      <span className="flex items-center gap-3">
-                        <CircleHelp className="h-4 w-4 text-current" aria-hidden />
-                        <span>Help Center</span>
-                      </span>
-                      <ExternalLink
-                        className="h-4 w-4 text-[#94A3B8] transition group-hover:text-[#64748B] dark:text-zinc-500 dark:group-hover:text-zinc-300"
-                        aria-hidden
-                      />
+                      <CircleHelp className="h-4 w-4 text-current" aria-hidden />
+                      <span>Help Center</span>
                     </button>
                   </div>
 
                   <div className="border-t border-[#E6EBF2] pt-2 dark:border-[#3F3F3F]">
                     <div className="px-3 py-2">
-                      <div className="relative grid h-10 w-full grid-cols-2 gap-1 rounded-lg border border-gray-300 bg-white p-1 dark:border-[#3F3F3F] dark:bg-[#2B2B2B]">
-                        <span
-                          aria-hidden
-                          suppressHydrationWarning
-                          className={`absolute inset-y-1 left-1 w-[calc(50%-6px)] rounded-md bg-[#1F2937] shadow-sm transition-transform dark:bg-white ${
-                            themeHydrated && theme === "dark" ? "translate-x-[calc(100%+4px)]" : "translate-x-0"
-                          }`}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => applyTheme("light")}
-                          aria-pressed={theme === "light"}
-                          className={`relative z-10 flex min-w-0 items-center justify-center gap-1.5 rounded-md px-1.5 py-2 text-sm font-medium leading-[1.15] transition ${
-                            theme === "light"
-                              ? "text-white dark:text-zinc-950"
-                              : "text-gray-700 hover:bg-gray-100 dark:text-zinc-200 dark:hover:bg-[#3A3A3A]"
-                          }`}
-                        >
-                          <Sun className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                          <span className="truncate">Light</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => applyTheme("dark")}
-                          aria-pressed={theme === "dark"}
-                          className={`relative z-10 flex min-w-0 items-center justify-center gap-1.5 rounded-md px-1.5 py-2 text-sm font-medium leading-[1.15] transition ${
-                            theme === "dark"
-                              ? "text-white dark:text-zinc-950"
-                              : "text-gray-700 hover:bg-gray-100 dark:text-zinc-200 dark:hover:bg-[#3A3A3A]"
-                          }`}
-                        >
-                          <Moon className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                          <span className="truncate">Dark</span>
-                        </button>
+                      <div className="space-y-2 rounded-xl border border-gray-200 bg-white p-3 dark:border-[#3F3F3F] dark:bg-[#2B2B2B]">
+                        <div className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-zinc-400">
+                          <Sun className="h-3.5 w-3.5" aria-hidden />
+                          <span>Appearance</span>
+                        </div>
+                        <div className="relative grid h-10 w-full grid-cols-2 gap-1 rounded-lg border border-gray-300 bg-white p-1 dark:border-[#3F3F3F] dark:bg-[#2B2B2B]">
+                          <span
+                            aria-hidden
+                            suppressHydrationWarning
+                            className={`absolute inset-y-1 left-1 w-[calc(50%-6px)] rounded-md bg-[#1F2937] shadow-sm transition-transform dark:bg-white ${
+                              themeHydrated && theme === "dark" ? "translate-x-[calc(100%+4px)]" : "translate-x-0"
+                            }`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleAppearance("light")}
+                            aria-pressed={theme === "light"}
+                            className={`relative z-10 flex min-w-0 items-center justify-center gap-1.5 rounded-md px-1.5 py-2 text-sm font-medium leading-[1.15] transition ${
+                              theme === "light"
+                                ? "text-white dark:text-zinc-950"
+                                : "text-gray-700 hover:bg-gray-100 dark:text-zinc-200 dark:hover:bg-[#3A3A3A]"
+                            }`}
+                          >
+                            <Sun className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                            <span className="truncate">Light</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleAppearance("dark")}
+                            aria-pressed={theme === "dark"}
+                            className={`relative z-10 flex min-w-0 items-center justify-center gap-1.5 rounded-md px-1.5 py-2 text-sm font-medium leading-[1.15] transition ${
+                              theme === "dark"
+                                ? "text-white dark:text-zinc-950"
+                                : "text-gray-700 hover:bg-gray-100 dark:text-zinc-200 dark:hover:bg-[#3A3A3A]"
+                            }`}
+                          >
+                            <Moon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                            <span className="truncate">Dark</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                     <button

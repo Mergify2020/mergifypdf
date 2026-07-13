@@ -1253,11 +1253,11 @@ html.theme-scroll-reveal:not(.dark) ::-webkit-scrollbar-thumb {
 }
 
 .project-card:has(.project-card-preview:hover) {
-  transform: translateY(-4px);
+  transform: translateY(-2px);
 }
 
 .project-card:has(.project-card-preview:hover) .project-card-preview {
-  background-color: #e3e8ef;
+  background-color: #e8edf5;
 }
 
 .dark .project-card:has(.project-card-preview:hover) .project-card-preview {

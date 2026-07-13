@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import Image from "next/image";
-import { Check, ChevronRight, Copy, Download, ExternalLink, Loader2, MoreHorizontal, Pencil, Printer, SearchX, Star, Trash2, X } from "lucide-react";
+import { Check, ChevronRight, Copy, Download, ExternalLink, Loader2, MoreHorizontal, Pencil, Plus, Printer, SearchX, Star, Trash2, X } from "lucide-react";
 import ProjectCard from "./ProjectCard";
 import { matchesSearch } from "@/lib/search";
 import { formatProjectActivityDate, formatProjectLastEdited } from "@/lib/formatProjectLastEdited";
@@ -320,31 +320,73 @@ export default function RecentProjectsRow({
 
   if (!projects.length && !loading) {
     return showAllProjects ? (
-      <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-[#E5EAF2] bg-white px-4 py-4 text-left shadow-none dark:border-[#3F3F3F] dark:bg-[#323232]">
-          <p className="text-[15px] font-semibold tracking-tight text-[#1F2A37] dark:text-zinc-100">No recent projects yet.</p>
-          <p className="mt-1.5 text-[13px] leading-6 text-[#6B7280] dark:text-zinc-400">Create your first project or use one of the quick actions above.</p>
+      <div className="flex min-h-0 flex-1 items-center justify-center p-0 text-center">
+        <div className="flex w-full max-w-[760px] flex-col items-center gap-0 text-center">
+          <Image
+            src="/illustrations/undraw_folder-files_5www.svg"
+            alt=""
+            width={405}
+            height={405}
+            className="opacity-90" style={{ height: "clamp(140px, 28dvh, 360px)", width: "auto" }}
+            priority
+          />
+          <div className="space-y-3">
+            <h3 className="text-[clamp(1.6rem,2.6vw,2.3rem)] font-semibold tracking-[-0.04em] text-slate-900 dark:text-zinc-100">
+              No projects yet
+            </h3>
+            <p className="max-w-xl text-[15px] leading-7 text-slate-600 dark:text-zinc-300">
+              Create a new project or use one of the quick actions above and it will show up here.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  window.dispatchEvent(new Event("open-create-project"));
+                }
+              }}
+              className="inline-flex h-10 items-center rounded-xl border-[3px] border-[#5B38E6] bg-[#6C47FF] px-4 text-sm font-semibold text-white shadow-[0_6px_18px_rgba(108,71,255,0.18)] transition-[transform,background-color,box-shadow,border-color] hover:-translate-y-px hover:border-[#4A2ED0] hover:bg-[#5B38E6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/15 dark:border-[#5B38E6] dark:bg-[#6C47FF] dark:text-zinc-100"
+            >
+              <Plus className="mr-2 h-4 w-4" aria-hidden />
+              New Project
+            </button>
+          </div>
         </div>
       </div>
     ) : (
-      <div className="mt-4 flex min-h-[360px] w-full flex-col items-center justify-start px-8 pt-8 pb-8 text-center sm:min-h-[480px] sm:pt-12">
-        <Image
-          src="/noprojectyet.svg"
-          alt=""
-          width={405}
-          height={405}
-          className="mt-0 h-[318px] w-[318px] opacity-90 sm:h-[405px] sm:w-[405px]"
-          priority
-        />
-        <p className="-mt-2 text-lg font-semibold text-slate-900 dark:text-zinc-100 sm:text-xl">No projects yet</p>
-        <p className="mt-2 max-w-sm text-sm text-slate-600 dark:text-zinc-300 sm:text-base">Start a new project to see it here.</p>
+      <div className="mt-0 flex min-h-[360px] w-full items-center justify-center p-0 text-center sm:min-h-[480px]">
+        <div className="flex w-full max-w-[560px] flex-col items-center gap-0 text-center">
+          <Image
+            src="/illustrations/undraw_folder-files_5www.svg"
+            alt=""
+            width={405}
+            height={405}
+            className="opacity-90" style={{ height: "clamp(140px, 28dvh, 360px)", width: "auto" }}
+            priority
+          />
+          <div className="space-y-3">
+            <p className="max-w-md text-sm leading-6 text-slate-600 dark:text-zinc-300 sm:text-base">
+              Start a project to see it here.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  window.dispatchEvent(new Event("open-create-project"));
+                }
+              }}
+              className="inline-flex h-10 items-center rounded-xl border-[3px] border-[#5B38E6] bg-[#6C47FF] px-4 text-sm font-semibold text-white shadow-[0_6px_18px_rgba(108,71,255,0.18)] transition-[transform,background-color,box-shadow,border-color] hover:-translate-y-px hover:border-[#4A2ED0] hover:bg-[#5B38E6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/15 dark:border-[#5B38E6] dark:bg-[#6C47FF] dark:text-zinc-100"
+            >
+              <Plus className="mr-2 h-4 w-4" aria-hidden />
+              Start new project
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
-
   if (loading && !projects.length) {
     return (
-      <div className="recent-projects-grid projects-grid mt-3 grid w-full min-w-0 items-start gap-5 sm:gap-6 xl:gap-7">
+      <div className="recent-projects-grid projects-grid mt-2 grid w-full min-w-0 items-start gap-4 sm:gap-5 xl:gap-6">
         {Array.from({ length: 6 }).map((_, index) => (
           <div
             key={`home-loading-project-${index}`}
@@ -500,16 +542,16 @@ export default function RecentProjectsRow({
 
   if (sortOption === "starred" && !trimmed && filteredProjects.length === 0) {
     return (
-      <div className="mt-6 flex min-h-[260px] w-full flex-col items-center justify-center px-8 py-12 text-center">
+      <div className="mt-6 flex min-h-[260px] w-full flex-col items-center justify-center p-0 text-center">
         <Image
-          src="/noprojectyet.svg"
+          src="/illustrations/undraw_folder-files_5www.svg"
           alt=""
           width={405}
           height={405}
-          className="mt-[-80px] h-[318px] w-[318px] opacity-90 sm:h-[405px] sm:w-[405px]"
+          className="opacity-90" style={{ height: "clamp(140px, 28dvh, 320px)", width: "auto" }}
           priority
         />
-        <p className="-mt-4 text-lg font-semibold text-slate-900 dark:text-zinc-100 sm:text-xl">
+        <p className="mt-0 text-lg font-semibold text-slate-900 dark:text-zinc-100 sm:text-xl">
           No starred projects yet
         </p>
         <p className="mt-2 max-w-sm text-sm text-slate-600 dark:text-zinc-300 sm:text-base">
@@ -1125,7 +1167,7 @@ export default function RecentProjectsRow({
               })}
             </div>
           </div>
-          <div className="hidden md:flex md:max-h-[calc(100vh-280px)] md:flex-col">
+          <div className="hidden md:flex md:flex-col">
             <div className="z-10 grid grid-cols-[36px_20px_minmax(280px,1fr)_120px_96px_56px] items-center gap-x-3 border-b border-[#E6EBF2] bg-white px-4 py-3 text-sm font-bold uppercase tracking-[0.08em] text-slate-700 dark:border-[#3C3C3C] dark:bg-[#323232] dark:text-zinc-100 xl:grid-cols-[36px_20px_minmax(420px,1fr)_180px_120px_72px] xl:gap-x-5 2xl:grid-cols-[36px_20px_minmax(560px,1fr)_208px_132px_84px] 2xl:gap-x-6">
               <button
                 type="button"
@@ -1165,7 +1207,7 @@ export default function RecentProjectsRow({
               <span className="block w-full text-center">Pages</span>
               <span className="text-right">Actions</span>
             </div>
-            <div className="min-h-0 overflow-y-auto divide-y divide-[#E6EBF2] dark:divide-[#3C3C3C]">
+            <div className={showAllProjects ? "min-h-0 divide-y divide-[#E6EBF2] dark:divide-[#3C3C3C]" : "min-h-0 overflow-y-auto divide-y divide-[#E6EBF2] dark:divide-[#3C3C3C]"}>
               {mapped.map((project) => {
                 const isSelected = !!selected[project.id];
                 return (
@@ -1338,7 +1380,7 @@ export default function RecentProjectsRow({
           </div>
         </div>
       ) : (
-        <div className="recent-projects-grid projects-grid mt-2 grid w-full min-w-0 items-start gap-4 sm:gap-6">
+        <div className="recent-projects-grid projects-grid mt-2 grid w-full min-w-0 items-start gap-4 sm:gap-5 xl:gap-6">
           {mapped.map((project, index) => {
           const isSelected = !!selected[project.id];
           return (

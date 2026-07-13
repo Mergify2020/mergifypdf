@@ -14,6 +14,7 @@ import {
   Combine,
   FileText,
   FileUp,
+  Plus,
   List,
   LayoutGrid,
   Scissors,
@@ -167,10 +168,8 @@ export default function HomeProjectsSearch({
     const initials = `${first}${second}`.toUpperCase();
     return initials.length ? initials : "Y";
   }, [accountName]);
-  const accountFirstName = useMemo(() => {
-    const parts = accountName.trim().split(/\s+/).filter(Boolean);
-    return parts[0] ?? accountName.trim() ?? "there";
-  }, [accountName]);
+
+
   const hasProjects = (projectsState.length ?? 0) > 0;
   const [sortOption, setSortOption] = useState<SortOption>("activity");
   const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode);
@@ -301,15 +300,24 @@ export default function HomeProjectsSearch({
     const track = quickActionsTrackRef.current;
     if (!track) return;
 
-    const firstCard = quickActionsFirstCardRef.current;
-    const cardWidth = firstCard?.offsetWidth ?? 260;
-    const computedStyles = window.getComputedStyle(track);
-    const gap = Number.parseFloat(computedStyles.columnGap || computedStyles.gap || '0') || 0;
-    const distance = Math.max(cardWidth + gap, track.clientWidth * 0.72);
+    const cards = Array.from(track.querySelectorAll<HTMLButtonElement>('[data-quick-action-card="true"]'));
+    if (!cards.length) return;
 
-    track.scrollBy({
-      left: direction === 'next' ? distance : -distance,
+    const cardWidth = cards[0]?.offsetWidth ?? 320;
+    const computedStyles = window.getComputedStyle(track);
+    const gap = Number.parseFloat(computedStyles.columnGap || computedStyles.gap || "0") || 0;
+    const step = track.clientWidth < 768 ? 1 : 2;
+    const currentLeft = track.scrollLeft + 4;
+    let currentIndex = cards.findIndex((card) => card.offsetLeft + cardWidth + gap > currentLeft);
+    if (currentIndex === -1) currentIndex = cards.length - 1;
+
+    const targetIndex = direction === "next"
+      ? Math.min(cards.length - 1, currentIndex + step)
+      : Math.max(0, currentIndex - step);
+    cards[targetIndex]?.scrollIntoView({
       behavior: 'smooth',
+      inline: 'start',
+      block: 'nearest',
     });
   };
 
@@ -317,15 +325,10 @@ export default function HomeProjectsSearch({
 
     return (
       <section className="flex w-full min-h-0 flex-1 flex-col">
-        <div className={`flex w-full flex-1 min-h-0 flex-col px-4 pb-4 pt-2 sm:px-5 sm:pb-6 sm:pt-3 lg:px-7 xl:px-8 ${showAllProjects ? "max-w-none" : "mx-auto max-w-[1680px]"}`}>
-          <div className="space-y-6">
-            <header className="space-y-1">
-              <h1 className="text-[26px] font-semibold leading-tight tracking-tight text-[#1F2A37] dark:text-zinc-100 sm:text-[28px] lg:text-[32px]">
-                Hey {accountFirstName}, ready to get started?
-              </h1>
-            </header>
+        <div className={`flex h-full w-full flex-1 min-h-0 flex-col px-4 pt-2 sm:px-5 sm:pt-3 lg:px-7 xl:px-8 ${showAllProjects ? "max-w-none" : "mx-auto max-w-[1680px]"}`}> 
+          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-visible">
 
-            <section className="space-y-5">
+            <section className="shrink-0 space-y-4">
               <div className="relative">
                 {leftArrowMounted && canScrollQuickActionsPrev ? (<div className="pointer-events-none absolute inset-y-0 left-0 z-10 hidden w-8 bg-gradient-to-r from-white via-white/90 to-transparent md:block dark:from-[#111111] dark:via-[#111111]/90" />) : null}
                 {rightArrowMounted && canScrollQuickActionsNext ? (<div className="pointer-events-none absolute inset-y-0 right-0 z-10 hidden w-8 bg-gradient-to-l from-white via-white/90 to-transparent md:block dark:from-[#111111] dark:via-[#111111]/90" />) : null}
@@ -334,7 +337,7 @@ export default function HomeProjectsSearch({
                     type="button"
                     onClick={() => scrollQuickActions("prev")}
                     disabled={!canScrollQuickActionsPrev}
-                    className={"pointer-events-auto absolute left-0 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-[#0F172A]/15 bg-white/80 text-[#1F2A37] backdrop-blur-xl shadow-[0_18px_42px_rgba(15,23,42,0.24),0_2px_6px_rgba(15,23,42,0.10)] ring-1 ring-[#0F172A]/10 transition before:pointer-events-none before:absolute before:inset-[-18px] before:rounded-full before:bg-white/45 before:blur-2xl before:content-['']  " + (canScrollQuickActionsPrev ? "hover:border-[#0F172A]/25 hover:bg-white/95" : "opacity-0 pointer-events-none")}
+                    className={"pointer-events-auto absolute left-0 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-[#0F172A]/15 bg-white/95 text-[#1F2A37]  shadow-[0_18px_42px_rgba(15,23,42,0.24),0_2px_6px_rgba(15,23,42,0.10)] ring-1 ring-[#0F172A]/10 transition  " + (canScrollQuickActionsPrev ? "hover:border-[#0F172A]/25 hover:bg-white/95" : "opacity-0 pointer-events-none")}
                     aria-label="Scroll quick actions left"
                   >
                     <ChevronLeft className="relative z-10 h-4 w-4" aria-hidden />
@@ -343,7 +346,7 @@ export default function HomeProjectsSearch({
                     type="button"
                     onClick={() => scrollQuickActions("next")}
                     disabled={!canScrollQuickActionsNext}
-                    className={"pointer-events-auto absolute right-0 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-[#0F172A]/15 bg-white/80 text-[#1F2A37] backdrop-blur-xl shadow-[0_18px_42px_rgba(15,23,42,0.26),0_2px_6px_rgba(15,23,42,0.10)] ring-1 ring-[#0F172A]/10 transition before:pointer-events-none before:absolute before:inset-[-18px] before:rounded-full before:bg-white/50 before:blur-2xl before:content-['']  " + (canScrollQuickActionsNext ? "hover:border-[#0F172A]/25 hover:bg-white/95" : "opacity-0 pointer-events-none")}
+                    className={"pointer-events-auto absolute right-0 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-[#0F172A]/15 bg-white/95 text-[#1F2A37]  shadow-[0_18px_42px_rgba(15,23,42,0.26),0_2px_6px_rgba(15,23,42,0.10)] ring-1 ring-[#0F172A]/10 transition  " + (canScrollQuickActionsNext ? "hover:border-[#0F172A]/25 hover:bg-white/95" : "opacity-0 pointer-events-none")}
                     aria-label="Scroll quick actions right"
                   >
                     <ChevronRight className="relative z-10 h-4 w-4" aria-hidden />
@@ -351,7 +354,7 @@ export default function HomeProjectsSearch({
                 </div>
                 <div
                   ref={quickActionsTrackRef}
-                  className="relative z-0 flex gap-3 overflow-x-auto scroll-smooth snap-x snap-proximity pb-2 pr-12 pl-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden md:pr-16"
+                  className="relative z-0 flex gap-3 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 pr-12 pl-1 scroll-pl-4 md:pr-16 md:scroll-pl-16 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
                 >
                   {ALL_PROJECTS_QUICK_ACTIONS.map(({ title, description, icon: Icon, toneClass }, index) => (
                     <button
@@ -363,16 +366,17 @@ export default function HomeProjectsSearch({
                           window.dispatchEvent(new Event("open-create-project"));
                         }
                       }}
-                      className="group relative overflow-hidden flex min-h-[112px] min-w-[240px] max-w-[280px] snap-start flex-1 flex-col items-start justify-between rounded-[10px] border border-[rgba(0,0,0,0.05)] bg-[#EEF1F5] p-4 text-left transition outline outline-0 outline-transparent shadow-[0_1px_0_rgba(15,23,42,0.02),0_8px_18px_rgba(15,23,42,0.05)] dark:bg-zinc-900 dark:shadow-[0_8px_18px_rgba(0,0,0,0.22)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/20"
+                      data-quick-action-card="true"
+                      className="group relative flex min-h-[100px] w-full max-w-[320px] shrink-0 snap-start flex-none flex-col items-start justify-start gap-2 overflow-hidden rounded-[10px] border border-[rgba(0,0,0,0.05)] bg-[#EEF1F5] p-3 text-left transition outline outline-0 outline-transparent shadow-[0_1px_0_rgba(15,23,42,0.02),0_8px_18px_rgba(15,23,42,0.05)] dark:bg-zinc-900 dark:shadow-[0_8px_18px_rgba(0,0,0,0.22)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/20 sm:min-w-[270px] sm:max-w-[340px] lg:min-w-[290px] lg:max-w-[360px]"
                     >
-                      <span className={"inline-flex h-11 w-11 items-center justify-center rounded-2xl transition " + toneClass}>
-                        <Icon className="h-5.5 w-5.5" aria-hidden />
+                      <span className={"inline-flex h-10 w-10 items-center justify-center rounded-2xl transition " + toneClass}>
+                        <Icon className="h-5 w-5" aria-hidden />
                       </span>
                       <span className="space-y-1">
-                        <span className="block text-[15px] font-semibold text-[#1F2A37] dark:text-zinc-100">{title}</span>
-                        <span className="block text-sm leading-6 text-slate-500 dark:text-zinc-400">{description}</span>
+                        <span className="block text-[14px] font-semibold text-[#1F2A37] dark:text-zinc-100">{title}</span>
+                        <span className="block text-[13px] leading-5 text-slate-500 dark:text-zinc-400">{description}</span>
                       </span>
-                      <span className="mt-2 inline-flex w-fit text-xs font-medium tracking-tight text-[#6C47FF] underline-offset-4 transition group-hover:underline">
+                      <span className="inline-flex w-fit text-xs font-medium tracking-tight text-[#6C47FF] underline-offset-4 transition group-hover:underline">
                         Start now
                       </span>
                     </button>
@@ -381,14 +385,15 @@ export default function HomeProjectsSearch({
               </div>
             </section>
 
-            <section className="space-y-5">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <h2 className="min-w-0 shrink-0 text-base font-semibold tracking-tight text-[#1F2A37] dark:text-zinc-100 sm:text-lg lg:text-xl">
+            <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              <div className="shrink-0 border-b border-[#E6EBF2] bg-white dark:border-[#3F3F3F] dark:bg-[#252525]">
+              <div className="flex flex-col gap-2.5 py-2.5 lg:flex-row lg:items-center lg:justify-between">
+                <h2 className="min-w-0 shrink-0 text-lg font-semibold tracking-tight text-[#1F2A37] dark:text-zinc-100 sm:text-xl lg:text-[1.375rem]">
                   Your projects
                 </h2>
                 <div className="flex min-w-0 flex-1 items-center gap-3 lg:justify-end">
                   <div
-                    className="flex h-10 min-w-0 w-full flex-[0_1_480px] items-center gap-2 rounded-xl border border-[#E6EBF2] bg-white px-3 shadow-sm transition focus-within:border-[#4F46E5] dark:border-[#3F3F3F] dark:bg-[#323232] dark:shadow-[0_8px_18px_rgba(0,0,0,0.12)] lg:max-w-[480px]"
+                    className="flex h-10 min-w-0 w-full flex-[0_1_440px] items-center gap-2 rounded-xl border border-[#E6EBF2] bg-white px-3 shadow-sm transition focus-within:border-2 focus-within:border-[#4F46E5] dark:border-[#3F3F3F] dark:bg-[#323232] dark:shadow-[0_8px_18px_rgba(0,0,0,0.12)] lg:max-w-[440px]"
                     onMouseDown={(event) => {
                       const target = event.target;
                       if (target instanceof HTMLInputElement) return;
@@ -470,9 +475,9 @@ export default function HomeProjectsSearch({
                       {sortMenuOpen ? (
                         <div
                           role="menu"
-                          className="project-actions-menu absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white text-sm text-[#1F2A37] shadow-[0_16px_36px_rgba(15,23,42,0.14)] dark:border-[#3F3F3F] dark:bg-[#323232] dark:text-zinc-100 dark:shadow-[0_20px_44px_rgba(0,0,0,0.5)]"
+                          className="project-actions-menu absolute right-0 top-full z-50 mt-2 w-72 rounded-3xl border border-slate-100 bg-white p-2 text-sm text-[#1F2A37] shadow-[0_30px_80px_rgba(15,23,42,0.35)] dark:border-[#3A3A3A] dark:bg-[#323232] dark:text-zinc-100 dark:shadow-[0_30px_80px_rgba(0,0,0,0.55)]"
                         >
-                          <div className="pb-1.5 pt-1.5">
+                          <div className="space-y-1">
                             {([
                               { key: "activity", label: "Last activity", Icon: Clock },
                               { key: "starred", label: "Starred", Icon: Star },
@@ -487,10 +492,10 @@ export default function HomeProjectsSearch({
                                   setSortOption(key);
                                   setSortMenuOpen(false);
                                 }}
-                                className={`project-actions-stagger-item mx-2 flex w-[calc(100%-1rem)] items-center justify-between rounded-lg px-2.5 py-2 text-left transition ${
+                                className={`project-actions-stagger-item flex w-full items-center justify-between rounded-2xl px-3 py-2.5 text-left transition ${
                                   sortOption === key
-                                    ? "bg-[#F8FAFC] dark:bg-[#3A3A3A]/70"
-                                    : "hover:bg-[#F8FAFC] dark:hover:bg-[#3A3A3A]/60"
+                                    ? "bg-slate-100 dark:bg-[#3A3A3A]"
+                                    : "hover:bg-slate-50 dark:hover:bg-[#3A3A3A]/70"
                                 }`}
                               >
                                 <span className="flex min-w-0 items-center gap-2.5 text-slate-900 dark:text-zinc-100">
@@ -506,19 +511,31 @@ export default function HomeProjectsSearch({
                         </div>
                       ) : null}
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (typeof window !== "undefined") {
+                          window.dispatchEvent(new Event("open-create-project"));
+                        }
+                      }}
+                      className="inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border-[3px] border-[#5B38E6] bg-[#6C47FF] px-3.5 text-xs font-semibold text-white shadow-sm transition-[transform,background-color,box-shadow,border-color] duration-200 hover:-translate-y-[1px] hover:border-[#4A2ED0] hover:bg-[#5B38E6] hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/15 dark:border-[#5B38E6] dark:bg-[#6C47FF] dark:text-zinc-100 dark:shadow-[0_8px_18px_rgba(0,0,0,0.12)] dark:hover:bg-[#5B38E6] dark:hover:shadow-[0_8px_18px_rgba(0,0,0,0.12)]"
+                    >
+                      <Plus className="h-4.5 w-4.5" aria-hidden />
+                      <span>New Project</span>
+                    </button>
                   </div>
                 </div>
               </div>
+            </div>
               <div
                 ref={recentListRef}
                 data-projects-scroll-layer="true"
-                className={`recent-projects-container mt-0 h-0 min-h-0 flex-1 relative ${
-                  showAllProjects ? "mt-3 sm:mt-4 overflow-y-auto overflow-x-hidden overscroll-contain" : "mt-5 sm:mt-6 overflow-y-auto overflow-x-hidden overscroll-contain"
-                }`}
+                className="recent-projects-container relative flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden overscroll-contain bg-transparent"
                 style={{
-                  paddingRight: showAllProjects ? 0 : 4,
-                  paddingLeft: 4,
-                  paddingBottom: showAllProjects ? 0 : "calc(40px + env(safe-area-inset-bottom, 0px))",
+                  paddingRight: 0,
+                  paddingLeft: 0,
+                  paddingBottom: 0,
+                  scrollbarGutter: "stable",
                   WebkitOverflowScrolling: "touch",
                   touchAction: "pan-y",
                 }}
@@ -644,9 +661,9 @@ export default function HomeProjectsSearch({
                     {sortMenuOpen ? (
                       <div
                         role="menu"
-                        className="project-actions-menu absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-[#E5E7EB] bg-white text-sm text-[#1F2A37] shadow-[0_16px_36px_rgba(15,23,42,0.14)] dark:border-[#3F3F3F] dark:bg-[#323232] dark:text-zinc-100 dark:shadow-[0_20px_44px_rgba(0,0,0,0.5)]"
+                        className="project-actions-menu absolute right-0 top-full z-50 mt-2 w-72 rounded-3xl border border-slate-100 bg-white p-2 text-sm text-[#1F2A37] shadow-[0_30px_80px_rgba(15,23,42,0.35)] dark:border-[#3A3A3A] dark:bg-[#323232] dark:text-zinc-100 dark:shadow-[0_30px_80px_rgba(0,0,0,0.55)]"
                       >
-                        <div className="pb-1.5 pt-1.5">
+                        <div className="space-y-1">
                           {(
                             [
                               { key: "activity", label: "Last activity", Icon: Clock },
@@ -663,10 +680,10 @@ export default function HomeProjectsSearch({
                                 setSortOption(key);
                                 setSortMenuOpen(false);
                               }}
-                              className={`project-actions-stagger-item mx-2 flex w-[calc(100%-1rem)] items-center justify-between rounded-lg px-2.5 py-2 text-left transition ${
+                              className={`project-actions-stagger-item flex w-full items-center justify-between rounded-2xl px-3 py-2.5 text-left transition ${
                                 sortOption === key
-                                  ? "bg-[#F8FAFC] dark:bg-[#3A3A3A]/70"
-                                  : "hover:bg-[#F8FAFC] dark:hover:bg-[#3A3A3A]/60"
+                                  ? "bg-slate-100 dark:bg-[#3A3A3A]"
+                                  : "hover:bg-slate-50 dark:hover:bg-[#3A3A3A]/70"
                               }`}
                             >
                               <span className="flex min-w-0 items-center gap-2.5 text-slate-900 dark:text-zinc-100">
@@ -809,7 +826,7 @@ export default function HomeProjectsSearch({
             ref={recentListRef}
             data-projects-scroll-layer="true"
             className={`recent-projects-container mt-0 h-0 min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain ${
-              showAllProjects ? "mt-3 sm:mt-4" : "mt-5 sm:mt-6"
+              showAllProjects ? "mt-2 sm:mt-3" : "mt-4 sm:mt-5"
             } relative`}
             style={{
               paddingRight: showAllProjects ? 12 : 4,

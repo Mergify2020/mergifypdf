@@ -727,9 +727,9 @@ export default function ProjectCard({
   }, [project.hasPreview, project.id, project.rotation]);
 
   const cardClasses = [
-    "relative overflow-hidden rounded-[10px] bg-[#F9FAFC] transition outline outline-0 outline-transparent shadow-[0_1px_0_rgba(15,23,42,0.02),0_8px_18px_rgba(15,23,42,0.05)] dark:bg-zinc-900 dark:shadow-[0_8px_18px_rgba(0,0,0,0.22)]",
+    "relative overflow-hidden rounded-[12px] border border-[rgba(15,23,42,0.04)] bg-[#FBFCFE] transition-[transform,box-shadow,border-color,background-color] duration-200 ease-out outline outline-0 outline-transparent shadow-[0_1px_0_rgba(15,23,42,0.02),0_10px_24px_rgba(15,23,42,0.05)] hover:-translate-y-[1px] hover:shadow-[0_16px_32px_rgba(15,23,42,0.08)] dark:border-transparent dark:bg-zinc-900 dark:shadow-[0_10px_24px_rgba(0,0,0,0.22)] dark:hover:shadow-[0_16px_30px_rgba(0,0,0,0.28)]",
     isSelected
-      ? "shadow-[inset_0_0_0_3px_rgba(108,71,255,1)] dark:shadow-[inset_0_0_0_3px_rgba(108,71,255,1)]"
+      ? "ring-1 ring-[#6C47FF]/55 shadow-[inset_0_0_0_2px_rgba(108,71,255,0.92)] dark:ring-[#6C47FF]/55 dark:shadow-[inset_0_0_0_2px_rgba(108,71,255,0.92)]"
       : "",
   ]
     .filter(Boolean)
@@ -1123,7 +1123,7 @@ export default function ProjectCard({
 
   return (
     <div
-      className="project-card group relative flex flex-col text-left transition"
+      className="project-card group relative flex cursor-pointer flex-col text-left transition"
       aria-label={project.title}
       onClick={handleCardClick}
     >
@@ -1247,7 +1247,7 @@ export default function ProjectCard({
               document.body
             )
           : null}
-        <div className="project-card-preview relative m-[3px] w-[calc(100%-6px)] aspect-square rounded-[10px] bg-[#EEF1F5] border border-[rgba(0,0,0,0.06)] transition-colors dark:border-transparent dark:bg-[#2A2A2A] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.02)]">
+        <div className="project-card-preview relative m-[3px] w-[calc(100%-6px)] aspect-square rounded-[12px] border border-[rgba(15,23,42,0.05)] bg-[#F3F6FA] shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] transition-[background-color,border-color,box-shadow] duration-200 dark:border-transparent dark:bg-[#2A2A2A] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.02)]">
           {hasSelection ? (
             <button
               type="button"
@@ -1362,7 +1362,7 @@ export default function ProjectCard({
           ) : null}
         </div>
       </div>
-      <div className="mt-2 space-y-0.5">
+      <div className="mt-1.5 space-y-0.5">
         {renaming && !menuOpen ? (
           <div className="flex min-h-[32px] items-center gap-2">
             <input
@@ -1410,7 +1410,7 @@ export default function ProjectCard({
             <div className="project-card-rename group/rename min-w-0 flex-1 rounded-lg py-1 text-left">
               <div className="flex items-center gap-2">
                 <span
-                  className={`min-w-0 truncate text-base font-semibold text-slate-900 dark:text-zinc-100 ${
+                  className={`min-w-0 truncate text-[15px] font-semibold text-slate-900 dark:text-zinc-100 ${
                     renameJustSaved ? "[animation:rename-text-flash_1400ms_ease-out_forwards]" : ""
                   }`}
                 >
@@ -1422,7 +1422,7 @@ export default function ProjectCard({
                   </span>
                 ) : null}
               </div>
-              <p className="mt-0.5 text-xs font-medium text-slate-500 dark:text-zinc-400">
+              <p className="mt-0.5 text-[12px] font-medium leading-5 text-slate-500 dark:text-zinc-400">
                 <span className="sm:hidden">
                   {typeof project.pagesCount === "number" && project.pagesCount > 0
                     ? `${project.pagesCount} ${project.pagesCount === 1 ? "page" : "pages"} · ${compactUpdatedLabel}`

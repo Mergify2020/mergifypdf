@@ -316,9 +316,9 @@ export default function TrashProjectsList({ projects, accountName, accountEmail 
               {sortMenuOpen ? (
                 <div
                   role="menu"
-                  className="project-actions-menu absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-[#E5E7EB] bg-white text-sm text-[#1F2A37] shadow-[0_16px_36px_rgba(15,23,42,0.14)] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:shadow-[0_20px_44px_rgba(0,0,0,0.5)]"
+                  className="project-actions-menu absolute right-0 top-full z-50 mt-2 w-72 rounded-3xl border border-slate-100 bg-white p-2 text-sm text-[#1F2A37] shadow-[0_30px_80px_rgba(15,23,42,0.35)] dark:border-[#3A3A3A] dark:bg-[#323232] dark:text-zinc-100 dark:shadow-[0_30px_80px_rgba(0,0,0,0.55)]"
                 >
-                  <div className="pb-1.5 pt-1.5">
+                  <div className="space-y-1">
                     {(
                       [
                         { key: "activity", label: "Last activity", Icon: Clock },
@@ -334,10 +334,10 @@ export default function TrashProjectsList({ projects, accountName, accountEmail 
                           setSortOption(key);
                           setSortMenuOpen(false);
                         }}
-                        className={`project-actions-stagger-item mx-2 flex w-[calc(100%-1rem)] items-center justify-between rounded-lg px-2.5 py-2 text-left transition ${
+                        className={`project-actions-stagger-item flex w-full items-center justify-between rounded-2xl px-3 py-2.5 text-left transition ${
                           sortOption === key
-                            ? "bg-[#F8FAFC] dark:bg-zinc-800/60"
-                            : "hover:bg-[#F8FAFC] dark:hover:bg-zinc-800/60"
+                            ? "bg-slate-100 dark:bg-[#3A3A3A]"
+                            : "hover:bg-slate-50 dark:hover:bg-[#3A3A3A]/70"
                         }`}
                       >
                         <span className="flex min-w-0 items-center gap-2.5 text-slate-900 dark:text-zinc-100">

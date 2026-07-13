@@ -7,25 +7,19 @@ import { usePathname, useRouter } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-    ChevronLeft,
+  ChevronLeft,
   ChevronRight,
   CreditCard,
-  CircleHelp,
   Bell,
   BookOpen,
   FileUp,
-  FileSignature,
   FileText,
   FolderKanban,
-  Folders,  LogOut,
-  Moon,
+  Folders, LogOut,
   PanelLeftClose,
+  PanelRightClose,
   PenSquare,
-  Plus,
-  Settings,
-  Sparkles,
   Star,
-  Sun,
   Trash2,
   User,
   Users,
@@ -34,12 +28,12 @@ import {
 } from "lucide-react";
 import {
   FileText as PhFileText,
-  Folders as PhFolders,  Signature as PhSignature,
+  Folders as PhFolders, Signature as PhSignature,
   Trash as PhTrash,
 } from "@phosphor-icons/react";
 import { getBillingStatusPresentation } from "@/lib/billingPlans";
+import { applyThemePreference } from "@/lib/theme";
 import { useSession, signOut } from "next-auth/react";
-import StartProjectButton from "@/components/StartProjectButton";
 import {
   PROJECT_NAME_STORAGE_KEY,
   deriveProjectNameFromFilename,
@@ -69,7 +63,6 @@ import {
   subscribeProjectsSummary,
   type ProjectsSummaryProject,
 } from "@/lib/projectsSummaryCache";
-import { applyThemePreference, persistThemePreference, type ThemeMode } from "@/lib/theme";
 
 const AccountSettingsPage = dynamic(
   () => import("@/app/(app)/account/page").then((module) => module.AccountSettingsPage),
@@ -330,7 +323,7 @@ export default function WorkspaceShell({
   const [expanded, setExpanded] = useState(initialSidebarExpanded);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [profileMenuPosition, setProfileMenuPosition] = useState<{ left: number; bottom: number } | null>(
+  const [profileMenuPosition, setProfileMenuPosition] = useState<{ left: number; top: number } | null>(
     null,
   );
   const [createOpen, setCreateOpen] = useState(false);
@@ -348,7 +341,6 @@ export default function WorkspaceShell({
   const [contentSwapIn, setContentSwapIn] = useState(false);
   const [homeProjectsQuery, setHomeProjectsQuery] = useState("");
   const [mobileSearchExpanded, setMobileSearchExpanded] = useState(false);
-  const [shellTheme, setShellTheme] = useState<"light" | "dark">(initialTheme);
   const contentSwapTimerRef = useRef<number | null>(null);
   const contentSettleTimerRef = useRef<number | null>(null);
   const contentSwapSafetyRef = useRef<number | null>(null);
@@ -416,6 +408,10 @@ export default function WorkspaceShell({
     return initialName || initialEmail ? { name: initialName || initialEmail, email: initialEmail } : { name: "", email: "" };
   });
   const [signingOut, setSigningOut] = useState(false);
+
+  useEffect(() => {
+    applyThemePreference(initialTheme);
+  }, [initialTheme]);
   const [logoutConfirmArmed, setLogoutConfirmArmed] = useState(false);
   const logoutConfirmTimeoutRef = useRef<number | null>(null);
   const sidebarTooltipTimeoutRef = useRef<number | null>(null);
@@ -559,10 +555,6 @@ export default function WorkspaceShell({
   }, [stableProfile]);
 
   useEffect(() => {
-    applyThemePreference(shellTheme);
-  }, [shellTheme]);
-
-  useEffect(() => {
     if (typeof document === "undefined") return;
     document.documentElement.classList.add("workspace-shell-active");
     document.body.classList.add("workspace-shell-active");
@@ -571,13 +563,6 @@ export default function WorkspaceShell({
       document.body.classList.remove("workspace-shell-active");
     };
   }, []);
-
-  const toggleShellTheme = () => {
-    const nextTheme: ThemeMode = shellTheme === "dark" ? "light" : "dark";
-    persistThemePreference(nextTheme);
-    applyThemePreference(nextTheme);
-    setShellTheme(nextTheme);
-  };
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1411,7 +1396,7 @@ export default function WorkspaceShell({
   const isHomeProjectsPath = (value?: string | null) =>
     value === "/" || (value?.startsWith("/projects") ?? false);
   const showPersistentWorkspaceTopBar =
-    pathname === "/" || pathname === "/projects/all" || (pathname?.startsWith("/signature-center") ?? false);
+    (pathname === "/" || pathname === "/projects/all") ? false : (pathname?.startsWith("/signature-center") ?? false);
   const isAllProjectsRoute = pathname === "/" || pathname === "/projects/all";
   const showDesktopAllProjectsTopBar = pathname === "/projects/all" && !phoneViewport;
   const useFlatAllProjectsShell = showDesktopAllProjectsTopBar;
@@ -1829,11 +1814,6 @@ export default function WorkspaceShell({
       return;
     }
 
-    if (isHomePanel) {
-      setProfileMenuPosition(null);
-      return;
-    }
-
     let raf = 0;
 
     const update = () => {
@@ -1843,8 +1823,8 @@ export default function WorkspaceShell({
         if (!anchor) return;
         const rect = anchor.getBoundingClientRect();
         const left = Math.round(rect.right + 16);
-        const bottom = Math.round(window.innerHeight - (rect.bottom - 24));
-        setProfileMenuPosition({ left, bottom });
+        const top = Math.round(rect.top);
+        setProfileMenuPosition({ left, top });
       });
     };
 
@@ -1927,6 +1907,7 @@ export default function WorkspaceShell({
   useEffect(() => {
     setMobileSearchExpanded(false);
   }, [pathname]);
+
 
   const sidebarCompact = compactSidebar || narrowSidebar;
   const shouldOverlay = overlaySidebar;
@@ -2140,15 +2121,6 @@ export default function WorkspaceShell({
   };
 
   const bottomSidebarItems: SidebarItem[] = [
-    {
-      label: shellTheme === "dark" ? "Light mode" : "Dark mode",
-      icon: shellTheme === "dark" ? Sun : Moon,
-      href: "#",
-      onClick: toggleShellTheme,
-    },
-    { label: "Account settings", icon: Settings, href: "/account", onClick: openAccountSettingsPanel },
-    { label: "Billing portal", icon: CreditCard, href: "/account", onClick: () => { void openBillingPortal(); } },
-    { label: "Help Center", icon: CircleHelp, href: "/support" },
     { label: "Trash", icon: PhTrash, href: "/projects/trash" },
   ];
 
@@ -2177,40 +2149,39 @@ export default function WorkspaceShell({
       const isUtilityVariant = variant === "utility";
       const itemStateClasses = homeSidebarLocked
         ? isActive
-          ? "text-[#6C47FF] dark:text-zinc-100"
-          : "cursor-pointer text-[#4B5563] hover:-translate-y-[1px] hover:text-[#374151] dark:text-zinc-400 dark:hover:text-zinc-200"
-        : isActive
           ? "text-[#5B38E6] dark:text-zinc-100"
-          : "cursor-pointer text-[#4B5563] hover:-translate-y-[1px] hover:text-[#374151] dark:text-zinc-400 dark:hover:text-zinc-200";
-      const itemClasses = `group relative flex w-full items-center overflow-visible rounded-[10px] text-left text-sm font-medium transition-[background-color,color,transform] duration-[160ms] ease-out ${
+          : "cursor-pointer text-[#4B5563] hover:text-[#111827] dark:text-zinc-400 dark:hover:text-zinc-100"
+        : isActive
+          ? "text-[#4C34C9] dark:text-zinc-100"
+          : "cursor-pointer text-[#4B5563] hover:text-[#111827] dark:text-zinc-400 dark:hover:text-zinc-100";
+      const itemClasses = `group relative flex w-full items-center overflow-visible rounded-xl text-left text-[15px] font-medium transition-[background-color,color,transform] duration-[160ms] ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/25 ${
         disabled ? "cursor-not-allowed text-[#374151] dark:text-zinc-400" : itemStateClasses
       } ${isLogout && logoutConfirmArmed ? "bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-300" : ""}`;
-      const rowHeight = isUtilityVariant ? "h-8" : "h-10";
+      const rowHeight = isUtilityVariant ? "h-9" : "h-10";
       const iconLaneClasses = "relative z-10 flex h-full w-10 flex-none items-center justify-center";
       const surfaceActiveClasses = homeSidebarLocked
-        ? "bg-[rgba(108,71,255,0.2)] shadow-[0_1px_2px_rgba(108,71,255,0.12)] text-[#6C47FF] dark:bg-[#2B223F] dark:text-zinc-100"
-        : "bg-[rgba(108,71,255,0.2)] shadow-[0_1px_2px_rgba(108,71,255,0.12)] text-[#5B38E6] dark:bg-[#2B223F] dark:text-zinc-100";
-      const surfaceInactiveClasses = "group-hover:bg-[rgba(15,23,42,0.06)] dark:group-hover:bg-white/[0.06]";
-      const iconSizeClasses = isUtilityVariant ? "h-6 w-6" : "h-6 w-6";
-      const labelTextClasses = isUtilityVariant ? "text-[13px]" : "text-[13px] font-semibold";
+        ? "bg-sky-50 shadow-[0_1px_1px_rgba(15,23,42,0.05)] text-[#5B38E6] dark:bg-white/8 dark:text-zinc-100"
+        : "bg-sky-50 shadow-[0_1px_1px_rgba(15,23,42,0.05)] text-[#4C34C9] dark:bg-white/8 dark:text-zinc-100";
+      const iconSizeClasses = isUtilityVariant ? "h-5.5 w-5.5" : "h-5.5 w-5.5";
+      const labelTextClasses = isUtilityVariant ? "text-[15px] font-medium tracking-tight" : "text-[15px] font-medium tracking-tight";
       const targetHref = label === "Projects" ? "/projects/all" : href;
       const content = (
         <span className={`relative flex w-full items-center px-[8px] ${rowHeight}`}>
           {isActive ? (
             isExpanded ? (
               <span
-                className={`pointer-events-none absolute inset-y-0 left-[8px] right-[8px] rounded-[10px] transition-[opacity,transform,background-color,box-shadow] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] ${surfaceActiveClasses}`}
+                className={`pointer-events-none absolute inset-y-0 left-[8px] right-[8px] rounded-xl transition-[opacity,transform,background-color,box-shadow] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] ${surfaceActiveClasses}`}
                 aria-hidden
               />
             ) : (
               <span
-                className={`pointer-events-none absolute left-[8px] top-1/2 h-10 w-10 -translate-y-1/2 rounded-[10px] transition-[opacity,transform,background-color,box-shadow] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] ${surfaceActiveClasses}`}
+                className={`pointer-events-none absolute left-[8px] top-1/2 h-10 w-10 -translate-y-1/2 rounded-xl transition-[opacity,transform,background-color,box-shadow] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] ${surfaceActiveClasses}`}
                 aria-hidden
               />
             )
           ) : (
             <span
-              className={`pointer-events-none absolute inset-0 rounded-[10px] transition-[background-color,box-shadow,opacity] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] ${surfaceInactiveClasses}`}
+              className={`pointer-events-none absolute ${isExpanded ? "inset-y-0 left-[8px] right-[8px]" : "left-[8px] top-1/2 h-10 w-10 -translate-y-1/2"} rounded-xl bg-transparent transition-[background-color,box-shadow,opacity,transform] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] group-hover:bg-slate-50 dark:group-hover:bg-white/[0.05]`}
               aria-hidden
             />
           )}
@@ -2497,10 +2468,11 @@ export default function WorkspaceShell({
       />
     ) : null}
     <div
-      className={`workspace-shell-root ${useFlatAllProjectsShell ? "projects-all-workspace" : ""} relative z-10 flex pt-0 ${workspaceLaunchUnderlayClass} ${homeBillingBannerExiting ? "transition-[padding-top,min-height] duration-300 ease-out" : "transition-none"} md:pt-[var(--home-banner-offset)] ${workspaceBackgroundClass} ${sidebarCompact ? "sidebar-collapsed" : ""} ${expanded ? "" : "sidebar-minimized"} dark:bg-[#252525] `}
+      className={`workspace-shell-root ${useFlatAllProjectsShell ? "projects-all-workspace" : ""} relative z-10 flex h-[calc(var(--workspace-vh,100dvh)-var(--home-banner-offset,0px))] overflow-hidden pt-0 ${workspaceLaunchUnderlayClass} ${homeBillingBannerExiting ? "transition-[padding-top,min-height] duration-300 ease-out" : "transition-none"} md:pt-[var(--home-banner-offset)] ${workspaceBackgroundClass} ${sidebarCompact ? "sidebar-collapsed" : ""} ${expanded ? "" : "sidebar-minimized"} dark:bg-[#252525] `}
       style={
         {
-          minHeight: "calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset))",
+          height: "calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset, 0px))",
+          minHeight: "calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset, 0px))",
           "--shell-content-width":
             isAccountRoute ? "2064px" : useFlatAllProjectsShell ? "100%" : "calc(1960px - (var(--shell-sidebar-width) - 80px))",
           "--shell-left": useFlatAllProjectsShell ? "0px" : "max(24px, calc((100vw - (var(--shell-content-width) + var(--shell-sidebar-width) + 24px)) / 2))",
@@ -2594,9 +2566,9 @@ export default function WorkspaceShell({
                   : "rounded-xl border-[1.5px] border-gray-200 bg-white shadow-sm dark:border-[#3A3A3A] dark:bg-[#323232] dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_8px_18px_rgba(0,0,0,0.24)]"
             } w-full ${sidebarCompact ? "z-10" : "z-20"}`}
           >
-            <div className="flex flex-1 flex-col gap-3 overflow-y-auto overflow-x-hidden px-0 py-3">
+            <div className="flex flex-1 flex-col gap-2.5 overflow-y-auto overflow-x-hidden px-0 py-2.5">
               <div
-                className={`flex h-10 w-full items-center px-1 ${
+                className={`flex h-10 w-full items-center border-b border-slate-200 px-1 pb-3 dark:border-[#3A3A3A] ${
                   expanded ? "justify-between" : "justify-center"
                 } ${useFlatAllProjectsShell ? "pb-3" : ""}`}
               >
@@ -2651,20 +2623,8 @@ export default function WorkspaceShell({
                     onMouseDown={() => {
                       clearSidebarTooltip();
                     }}
-                    className="flex h-11 w-full items-center justify-center rounded-lg bg-transparent p-0 transition hover:bg-slate-100 dark:hover:bg-[#2B2B2B]"
+                    className="group relative flex h-11 w-full items-center justify-center rounded-lg bg-transparent p-0 transition"
                     aria-label="Expand sidebar"
-                    onMouseEnter={(event) => {
-                      setSidebarTooltipFromEvent(event, "Show navigation", 3, true);
-                    }}
-                    onMouseLeave={() => {
-                      clearSidebarTooltip();
-                    }}
-                    onFocus={(event) => {
-                      setSidebarTooltipFromEvent(event, "Show navigation", 3, true);
-                    }}
-                    onBlur={() => {
-                      clearSidebarTooltip();
-                    }}
                   >
                     <Image
                       src="/logos/home-collapsed-sidebar-logo-light-dark.svg"
@@ -2672,49 +2632,22 @@ export default function WorkspaceShell({
                       width={56}
                       height={56}
                       priority
-                      className="h-14 w-14 max-w-none"
+                      className="h-14 w-14 max-w-none transition-opacity duration-200 group-hover:opacity-0 group-focus-visible:opacity-0"
                     />
+                    <span className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100">
+                      <PanelRightClose className="h-6 w-6 text-slate-800 dark:text-zinc-100" aria-hidden />
+                    </span>
                   </button>
                 )}
-              </div>
+                </div>
               <div className="flex flex-1 flex-col">
-                <nav className={`mt-1.5 flex flex-col items-stretch ${navExpanded ? "gap-1.5" : "gap-2"}`}>
+                <nav className={`mt-1.5 flex flex-col items-stretch ${navExpanded ? "gap-1" : "gap-1.5"}`}>
                   {renderItems(navigationItems, {
                     labelClassName: itemLabelClasses,
                     forceExpanded: navExpanded,
                     hideCollapsedLabel: true,
                     variant: "primary",
                   })}
-                  <div
-                    className="flex w-full items-center px-[8px]"
-                    onMouseEnter={(event) => {
-                      if (navExpanded) return;
-                      setSidebarTooltipFromEvent(event, "Create a new project", 3, true);
-                    }}
-                    onMouseLeave={() => {
-                      if (!navExpanded) clearSidebarTooltip();
-                    }}
-                    onFocus={(event) => {
-                      if (navExpanded) return;
-                      setSidebarTooltipFromEvent(event, "Create a new project", 3, true);
-                    }}
-                    onBlur={() => {
-                      if (!navExpanded) clearSidebarTooltip();
-                    }}
-                  >
-                    <div className="flex w-10 flex-none items-center justify-center">
-                      <StartProjectButton
-                        variant="custom"
-                        iconOnly={!navExpanded}
-                        onOpen={() => clearSidebarTooltip()}
-                        className={
-                          navExpanded
-                            ? "flex h-9 w-[176px] items-center justify-center rounded-xl border border-transparent bg-[#6C47FF] px-3 text-[12px] font-semibold tracking-wide text-white shadow-[0_8px_18px_rgba(15,23,42,0.14)] transition-[width,transform,opacity,background-color,box-shadow] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] origin-left transform-gpu opacity-100 scale-100 hover:bg-[#5B38E6] hover:shadow-[0_10px_22px_rgba(15,23,42,0.18)] dark:border-[#3A3A3A]/40 dark:bg-[#6C47FF] dark:text-zinc-100 dark:shadow-[0_10px_22px_rgba(0,0,0,0.35)] dark:hover:bg-[#5B38E6] dark:hover:border-[#4A4A4A]/60 dark:hover:shadow-[0_12px_26px_rgba(0,0,0,0.42)] dark:active:bg-[#4E2FD1]"
-                            : "flex h-10 w-10 items-center justify-center rounded-lg border border-transparent bg-[#6C47FF] text-white shadow-[0_8px_18px_rgba(15,23,42,0.14)] transition-[width,transform,opacity,background-color,box-shadow] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] origin-left transform-gpu opacity-100 scale-95 hover:bg-[#5B38E6] hover:shadow-[0_10px_22px_rgba(15,23,42,0.18)] dark:border-[#3A3A3A]/40 dark:bg-[#6C47FF] dark:text-zinc-100 dark:shadow-[0_10px_22px_rgba(0,0,0,0.35)] dark:hover:bg-[#5B38E6] dark:hover:border-[#4A4A4A]/60 dark:hover:shadow-[0_12px_26px_rgba(0,0,0,0.42)] dark:active:bg-[#4E2FD1]"
-                        }
-                      />
-                    </div>
-                  </div>
                 </nav>
 
               {bottomSidebarItems.length > 0 ? (
@@ -2727,199 +2660,301 @@ export default function WorkspaceShell({
                     })}
                   </div>
               ) : null}
-            </div>
-            </div>
-            {typeof document !== "undefined" && profileOpen && (isHomePanel || profileMenuPosition)
-              ? createPortal(
-                  <div
-                    ref={profileMenuRef}
-                    className={`avatar-dropdown-menu fixed z-[60] w-80 rounded-3xl border border-slate-100 bg-white p-4 text-sm text-slate-800 shadow-[0_30px_80px_rgba(15,23,42,0.35)] dark:border-[#3A3A3A] dark:bg-[#323232] dark:text-zinc-100 dark:shadow-[0_30px_80px_rgba(0,0,0,0.55)] ${
-                      isHomePanel ? "right-8 top-[92px] max-h-[calc(100vh-120px)] overflow-auto" : ""
-                    }`}
-                    style={
-                      isHomePanel
-                        ? undefined
-                        : { left: profileMenuPosition!.left, bottom: profileMenuPosition!.bottom }
-                    }
-                    onMouseDown={(event) => {
-                      event.stopPropagation();
-                    }}
-                  >
-                    <div className="flex items-center gap-3 rounded-2xl border-[3px] border-slate-300 px-3 py-3">
-                      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-50 text-slate-600">
-                        {showAvatarImage ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={avatar!}
-                            alt="Your avatar"
-                            className="h-10 w-10 rounded-full object-cover"
-                            onError={() => setAvatarLoadFailed(true)}
-                          />
-                        ) : showProfileSkeleton ? (
-                          <span className="h-10 w-10 rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
-                        ) : (
+              <div className="mt-2.5 flex flex-col gap-1.5">
+                <button
+                  type="button"
+                  aria-label="Notifications"
+                  className={`group relative flex w-full items-center overflow-visible rounded-xl text-left text-[15px] font-medium transition-[background-color,color,transform] duration-[160ms] ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/25 ${navExpanded ? "cursor-pointer text-[#4B5563] hover:text-[#111827] dark:text-zinc-400 dark:hover:text-zinc-100" : "cursor-pointer text-[#4B5563] hover:text-[#111827] dark:text-zinc-400 dark:hover:text-zinc-100"}`}
+                >
+                  <span className={`relative flex w-full items-center px-[8px] h-9`}>
+                    <span
+                      className={`pointer-events-none absolute ${navExpanded ? "inset-y-0 left-[8px] right-[8px]" : "left-[8px] top-1/2 h-10 w-10 -translate-y-1/2"} rounded-xl bg-transparent transition-[background-color,box-shadow,opacity,transform] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] group-hover:bg-slate-50 dark:group-hover:bg-white/[0.05]`}
+                      aria-hidden
+                    />
+                    <span className="relative z-10 flex h-full w-10 flex-none items-center justify-center">
+                      <Bell
+                        className={`h-5.5 w-5.5 shrink-0 text-[#6B7280] transition-colors duration-[120ms] ease-out ${navExpanded ? "group-hover:text-[#0F172A] dark:group-hover:text-zinc-100" : ""}`}
+                        aria-hidden
+                      />
+                    </span>
+                    <span className={`relative z-10 min-w-0 flex-1 whitespace-nowrap overflow-hidden text-ellipsis pl-2 transition-[opacity,transform,max-width] duration-300 ease-out ${navExpanded ? "max-w-full translate-x-0 opacity-100" : "max-w-0 -translate-x-2 opacity-0 pointer-events-none"} text-[15px] font-medium tracking-tight`}>
+                      Notifications
+                    </span>
+                  </span>
+                </button>
+                <div ref={profileRef} className="mt-1.5 border-t border-slate-200 pt-2.5 dark:border-[#3A3A3A] w-full">
+                  <SettingsMenu
+                    trigger="custom"
+                    triggerLabel="Open profile menu"
+                    triggerClassName={navExpanded ? "group relative flex w-full items-center overflow-visible rounded-xl text-left text-[15px] font-medium transition-[background-color,color,transform] duration-[160ms] ease-out cursor-pointer text-[#4B5563] hover:text-[#111827] dark:text-zinc-400 dark:hover:text-zinc-100" : "group relative flex w-full items-center overflow-visible rounded-xl text-left text-[15px] font-medium transition-[background-color,color,transform] duration-[160ms] ease-out cursor-pointer text-[#4B5563] hover:text-[#111827] dark:text-zinc-400 dark:hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/25"}
+                    triggerContent={
+                      navExpanded ? (
+                        <span className="relative flex w-full items-center px-[8px] h-9">
                           <span
-                            className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold uppercase text-white"
-                            style={{ backgroundColor: fallbackAvatar.color }}
-                          >
-                            {hasProfileInfo ? fallbackAvatar.initials : ""}
+                            className="pointer-events-none absolute inset-y-0 left-[8px] right-[8px] rounded-xl bg-transparent transition-[background-color,box-shadow,opacity,transform] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] group-hover:bg-slate-50 dark:group-hover:bg-white/[0.05]"
+                            aria-hidden
+                          />
+                          <span className="relative z-10 flex h-full w-10 flex-none items-center justify-center">
+                            <span className="pointer-events-none flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full">
+                              {showAvatarImage ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={avatar!}
+                                  alt="Your avatar"
+                                  className="h-full w-full rounded-full object-cover"
+                                  onError={() => setAvatarLoadFailed(true)}
+                                />
+                              ) : showProfileSkeleton ? (
+                                <span className="flex h-full w-full items-center justify-center rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
+                              ) : (
+                                <span
+                                  className="flex h-full w-full items-center justify-center rounded-full text-xs font-semibold uppercase text-white"
+                                  style={{ backgroundColor: fallbackAvatar.color }}
+                                >
+                                  {hasProfileInfo ? fallbackAvatar.initials : ""}
+                                </span>
+                              )}
+                            </span>
                           </span>
-                        )}
-                      </span>
-                      {showProfileSkeleton ? (
-                        <div className="flex-1 space-y-2">
-                          <div className="h-5 w-36 rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
-                          <div className="h-4 w-48 rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
-                        </div>
-                      ) : hasProfileInfo ? (
-                        <div className="flex-1">
-                          {profileName ? <p className="text-lg font-semibold text-slate-900">{profileName}</p> : null}
-                          {profileEmail ? <p className="text-sm text-slate-500">{profileEmail}</p> : null}
-                        </div>
-                      ) : null}
-                    </div>
-                    <div className="mt-4 space-y-2">
-                      {isAccountRoute ? (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setExpanded(true);
-                              openAccountSettingsPanel();
-                            }}
-                            className="flex w-full items-center justify-between rounded-2xl bg-slate-100 px-4 py-3.5 text-left text-2xl font-semibold text-slate-800"
-                          >
-                            <div className="flex items-center gap-3">
-                              <User className="h-6 w-6 text-slate-600" aria-hidden />
-                              <span>Account</span>
-                            </div>
-                            <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              void openBillingPortal();
-                            }}
-                            className="flex w-full items-center justify-between rounded-2xl px-4 py-3.5 text-left text-2xl font-semibold text-slate-800 transition hover:bg-slate-50"
-                          >
-                            <div className="flex items-center gap-3">
-                              <CreditCard className="h-6 w-6 text-slate-500" aria-hidden />
-                              <span>Billing portal</span>
-                            </div>
-                            <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setProfileOpen(false);
-                              router.push("/pricing");
-                            }}
-                            className="flex w-full items-center justify-between rounded-2xl px-4 py-3.5 text-left text-2xl font-semibold text-slate-800 transition hover:bg-slate-50"
-                          >
-                            <div className="flex items-center gap-3">
-                              <FileText className="h-6 w-6 text-slate-500" aria-hidden />
-                              <span>Plans &amp; Pricing</span>
-                            </div>
-                            <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
-                          </button>
-                          <Link
-                            href="/projects/trash"
-                            onClick={() => {
-                              setProfileOpen(false);
-                            }}
-                            className="flex w-full items-center justify-between rounded-2xl px-4 py-3.5 text-left text-2xl font-semibold text-slate-800 transition hover:bg-slate-50"
-                          >
-                            <div className="flex items-center gap-3">
-                              <Trash2 className="h-6 w-6 text-slate-500" aria-hidden />
-                              <span>Trash</span>
-                            </div>
-                            <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
-                          </Link>
-                          <button
-                            type="button"
-                            disabled={signingOut}
-                            onClick={async () => {
-                              await handleLogoutRequest({ closeProfile: true });
-                            }}
-                            className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-left text-2xl font-semibold text-red-600 transition hover:bg-red-50"
-                          >
-                            <LogOut className="h-6 w-6" aria-hidden />
-                            <span>{signingOut ? "Logging out..." : "Log out"}</span>
-                          </button>
-                        </>
+                          {showProfileSkeleton ? (
+                            <span className="relative z-10 min-w-0 flex-1 space-y-1.5 pl-2 text-left">
+                              <span className="block h-3.5 w-28 rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
+                              <span className="block h-3 w-36 rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
+                            </span>
+                          ) : hasProfileInfo ? (
+                            <span className="relative z-10 min-w-0 flex-1 pl-2 text-left">
+                              {profileName ? (
+                                <span className="block truncate text-[15px] font-medium leading-5 tracking-tight text-slate-900 dark:text-zinc-100">
+                                  {profileName}
+                                </span>
+                              ) : null}
+                            </span>
+                          ) : (
+                            <span className="relative z-10 min-w-0 flex-1 pl-2 text-left">
+                              <span className="block truncate text-[15px] font-medium leading-5 tracking-tight text-slate-900 dark:text-zinc-100">
+                                Profile
+                              </span>
+                            </span>
+                          )}
+                          <ChevronRight className="relative z-10 h-4 w-4 shrink-0 rotate-90 text-slate-400" aria-hidden />
+                        </span>
                       ) : (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              openAccountSettingsPanel();
-                            }}
-                            className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-2xl font-semibold text-slate-700 transition hover:bg-slate-50"
-                          >
-                            <div className="flex items-center gap-3">
-                              <User className="h-5 w-5 text-slate-500" aria-hidden />
-                              <span>Account</span>
-                            </div>
-                            <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              void openBillingPortal();
-                            }}
-                            className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-2xl font-semibold text-slate-700 transition hover:bg-slate-50"
-                          >
-                            <div className="flex items-center gap-3">
-                              <CreditCard className="h-5 w-5 text-slate-500" aria-hidden />
-                              <span>Billing portal</span>
-                            </div>
-                            <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setProfileOpen(false);
-                              router.push("/pricing");
-                            }}
-                            className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-2xl font-semibold text-slate-700 transition hover:bg-slate-50"
-                          >
-                            <div className="flex items-center gap-3">
-                              <FileText className="h-5 w-5 text-slate-500" aria-hidden />
-                              <span>Plans &amp; Pricing</span>
-                            </div>
-                            <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
-                          </button>
-                          <Link
-                            href="/projects/trash"
-                            onClick={() => {
-                              setProfileOpen(false);
-                            }}
-                            className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-2xl font-semibold text-slate-700 transition hover:bg-slate-50"
-                          >
-                            <div className="flex items-center gap-3">
-                              <Trash2 className="h-5 w-5 text-slate-500" aria-hidden />
-                              <span>Trash</span>
-                            </div>
-                            <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
-                          </Link>
-                          <button
-                            type="button"
-                            disabled={signingOut}
-                            onClick={async () => {
-                              await handleLogoutRequest({ closeProfile: true });
-                            }}
-                            className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-2xl font-semibold text-red-600 transition hover:bg-red-50"
-                          >
-                            <LogOut className="h-6 w-6" aria-hidden />
-                            <span>{signingOut ? "Logging out..." : "Log out"}</span>
-                          </button>
-                        </>
-                      )}
+                        <span className="relative flex w-full items-center px-[8px] h-9">
+                          <span
+                            className="pointer-events-none absolute left-[8px] top-1/2 h-10 w-10 -translate-y-1/2 rounded-xl bg-transparent transition-[background-color,box-shadow,opacity,transform] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] group-hover:bg-slate-50 dark:group-hover:bg-white/[0.05]"
+                            aria-hidden
+                          />
+                          <span className="relative z-10 flex h-full w-10 flex-none items-center justify-center">
+                            <span className="pointer-events-none flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full">
+                              {showAvatarImage ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={avatar!}
+                                  alt="Your avatar"
+                                  className="h-full w-full rounded-full object-cover"
+                                  onError={() => setAvatarLoadFailed(true)}
+                                />
+                              ) : showProfileSkeleton ? (
+                                <span className="flex h-full w-full items-center justify-center rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
+                              ) : (
+                                <span
+                                  className="flex h-full w-full items-center justify-center rounded-full text-xs font-semibold uppercase text-white"
+                                  style={{ backgroundColor: fallbackAvatar.color }}
+                                >
+                                  {hasProfileInfo ? fallbackAvatar.initials : ""}
+                                </span>
+                              )}
+                            </span>
+                          </span>
+                        </span>
+                      )
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+            {profileOpen && profileMenuPosition && (
+              <div
+                ref={profileMenuRef}
+                className="avatar-dropdown-menu fixed z-[60] w-80 max-h-[calc(100vh-24px)] overflow-auto rounded-3xl border border-slate-100 bg-white p-4 text-sm text-slate-800 shadow-[0_30px_80px_rgba(15,23,42,0.35)] dark:border-[#3A3A3A] dark:bg-[#323232] dark:text-zinc-100 dark:shadow-[0_30px_80px_rgba(0,0,0,0.55)]"
+                style={{ left: profileMenuPosition.left, top: profileMenuPosition.top }}
+                onMouseDown={(event) => {
+                  event.stopPropagation();
+                }}
+              >
+                <div className="flex items-center gap-3 rounded-2xl border-[3px] border-slate-300 px-3 py-3">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-50 text-slate-600">
+                    {showAvatarImage ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={avatar!}
+                        alt="Your avatar"
+                        className="h-10 w-10 rounded-full object-cover"
+                        onError={() => setAvatarLoadFailed(true)}
+                      />
+                    ) : showProfileSkeleton ? (
+                      <span className="h-10 w-10 rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
+                    ) : (
+                      <span
+                        className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold uppercase text-white"
+                        style={{ backgroundColor: fallbackAvatar.color }}
+                      >
+                        {hasProfileInfo ? fallbackAvatar.initials : ""}
+                      </span>
+                    )}
+                  </span>
+                  {showProfileSkeleton ? (
+                    <div className="flex-1 space-y-2">
+                      <div className="h-5 w-36 rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
+                      <div className="h-4 w-48 rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
                     </div>
-                  </div>,
-                  document.body,
-                )
-              : null}
+                  ) : hasProfileInfo ? (
+                    <div className="flex-1">
+                      {profileName ? <p className="text-lg font-semibold text-slate-900">{profileName}</p> : null}
+                      {profileEmail ? <p className="text-sm text-slate-500">{profileEmail}</p> : null}
+                    </div>
+                  ) : null}
+                </div>
+                <div className="mt-4 space-y-2">
+                  {isAccountRoute ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setExpanded(true);
+                          openAccountSettingsPanel();
+                        }}
+                        className="flex w-full items-center justify-between rounded-2xl bg-slate-100 px-4 py-3.5 text-left text-2xl font-semibold text-slate-800"
+                      >
+                        <div className="flex items-center gap-3">
+                          <User className="h-6 w-6 text-slate-600" aria-hidden />
+                          <span>Account</span>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void openBillingPortal();
+                        }}
+                        className="flex w-full items-center justify-between rounded-2xl px-4 py-3.5 text-left text-2xl font-semibold text-slate-800 transition hover:bg-slate-50"
+                      >
+                        <div className="flex items-center gap-3">
+                          <CreditCard className="h-6 w-6 text-slate-500" aria-hidden />
+                          <span>Billing portal</span>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileOpen(false);
+                          router.push("/pricing");
+                        }}
+                        className="flex w-full items-center justify-between rounded-2xl px-4 py-3.5 text-left text-2xl font-semibold text-slate-800 transition hover:bg-slate-50"
+                      >
+                        <div className="flex items-center gap-3">
+                          <FileText className="h-6 w-6 text-slate-500" aria-hidden />
+                          <span>Plans &amp; Pricing</span>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
+                      </button>
+                      <Link
+                        href="/projects/trash"
+                        onClick={() => {
+                          setProfileOpen(false);
+                        }}
+                        className="flex w-full items-center justify-between rounded-2xl px-4 py-3.5 text-left text-2xl font-semibold text-slate-800 transition hover:bg-slate-50"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Trash2 className="h-6 w-6 text-slate-500" aria-hidden />
+                          <span>Trash</span>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
+                      </Link>
+                      <button
+                        type="button"
+                        disabled={signingOut}
+                        onClick={async () => {
+                          await handleLogoutRequest({ closeProfile: true });
+                        }}
+                        className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-left text-2xl font-semibold text-red-600 transition hover:bg-red-50"
+                      >
+                        <LogOut className="h-6 w-6" aria-hidden />
+                        <span>{signingOut ? "Logging out..." : "Log out"}</span>
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          openAccountSettingsPanel();
+                        }}
+                        className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-2xl font-semibold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        <div className="flex items-center gap-3">
+                          <User className="h-5 w-5 text-slate-500" aria-hidden />
+                          <span>Account</span>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void openBillingPortal();
+                        }}
+                        className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-2xl font-semibold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        <div className="flex items-center gap-3">
+                          <CreditCard className="h-5 w-5 text-slate-500" aria-hidden />
+                          <span>Billing portal</span>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileOpen(false);
+                          router.push("/pricing");
+                        }}
+                        className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-2xl font-semibold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        <div className="flex items-center gap-3">
+                          <FileText className="h-5 w-5 text-slate-500" aria-hidden />
+                          <span>Plans &amp; Pricing</span>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
+                      </button>
+                      <Link
+                        href="/projects/trash"
+                        onClick={() => {
+                          setProfileOpen(false);
+                        }}
+                        className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-2xl font-semibold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Trash2 className="h-5 w-5 text-slate-500" aria-hidden />
+                          <span>Trash</span>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
+                      </Link>
+                      <button
+                        type="button"
+                        disabled={signingOut}
+                        onClick={async () => {
+                          await handleLogoutRequest({ closeProfile: true });
+                        }}
+                        className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-2xl font-semibold text-red-600 transition hover:bg-red-50"
+                      >
+                        <LogOut className="h-6 w-6" aria-hidden />
+                        <span>{signingOut ? "Logging out..." : "Log out"}</span>
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
           {panelExpanded ? (
             <div
@@ -3157,11 +3192,12 @@ export default function WorkspaceShell({
                       </button>
                     ) : null}
                   </>
-                )}
-              </div>
+                  )}
+                </div>
             </div>
           ) : null}
         </div>
+      </div>
       </aside>
       </>
       ) : null}
@@ -3182,85 +3218,19 @@ export default function WorkspaceShell({
               </button>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-3">
               <nav className="flex flex-col gap-1">
                 {renderMobileNavItems(navigationItems)}
               </nav>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileOpen(false);
-                  openCreateModal();
-                }}
-                className="w-full rounded-2xl border-[3px] border-[#51bdff] bg-[#008ade] py-3 text-center text-sm font-semibold text-white shadow-[0_14px_40px_rgba(15,23,42,0.25)] transition hover:bg-[#007fcd] hover:shadow-[0_18px_50px_rgba(15,23,42,0.32)]"
-              >
-                Start New Project
-              </button>
-
-              {bottomSidebarItems.length > 0 ? (
+              {bottomSidebarItems.length > 0 && (
                 <div className="border-t border-slate-200 pt-4">
                   <div className="flex flex-col gap-1">
                     {renderMobileNavItems(bottomSidebarItems)}
                   </div>
                 </div>
-              ) : null}
+              )}
 
-              <div className="border-t border-slate-200 pt-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    openAccountSettingsPanel();
-                  }}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold transition hover:bg-slate-100"
-                >
-                  <User className="h-6 w-6 text-slate-500" aria-hidden />
-                  <span>Profile / Account Settings</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMobileOpen(false);
-                    void openBillingPortal();
-                  }}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold transition hover:bg-slate-100"
-                >
-                  <CreditCard className="h-6 w-6 text-slate-500" aria-hidden />
-                  <span>Billing portal</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMobileOpen(false);
-                    router.push("/pricing");
-                  }}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold transition hover:bg-slate-100"
-                >
-                  <FileText className="h-6 w-6 text-slate-500" aria-hidden />
-                  <span>Plans &amp; Pricing</span>
-                </button>
-                <Link
-                  href="/projects/trash"
-                  onClick={() => {
-                    setMobileOpen(false);
-                  }}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold transition hover:bg-slate-100"
-                >
-                  <Trash2 className="h-6 w-6 text-slate-500" aria-hidden />
-                  <span>Trash</span>
-                </Link>
-                <button
-                  type="button"
-                  disabled={signingOut}
-                  onClick={async () => {
-                    await handleLogoutRequest({ closeMobile: true });
-                  }}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-red-600 transition hover:bg-red-50"
-                >
-                  <LogOut className="h-6 w-6" aria-hidden />
-                  <span>{signingOut ? "Logging out..." : "Log out"}</span>
-                </button>
-              </div>
             </div>
           </aside>
         </>
@@ -3347,7 +3317,7 @@ export default function WorkspaceShell({
                         className="hidden md:inline-flex shrink-0 whitespace-nowrap h-10 items-center gap-2 rounded-md bg-[#6C47FF] px-4 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(108,71,255,0.28)] transition-[transform,background-color,box-shadow] duration-200 hover:-translate-y-[1px] hover:bg-[#5B38E6] hover:shadow-[0_12px_28px_rgba(108,71,255,0.36)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/15 dark:bg-[#6C47FF] dark:text-zinc-100 dark:shadow-[0_10px_24px_rgba(108,71,255,0.32)] dark:hover:bg-[#5B38E6] dark:hover:shadow-[0_12px_28px_rgba(108,71,255,0.42)]"
                       >
                         <FileUp className="h-5 w-5" aria-hidden />
-                        <span>Upload file</span>
+                        <span>Upload PDF</span>
                       </button>
                     ) : null}
                     <button
@@ -3360,28 +3330,81 @@ export default function WorkspaceShell({
                     <SettingsMenu
                       trigger="custom"
                       triggerLabel="Open profile menu"
-                      triggerClassName="inline-flex h-10 w-10 items-center justify-center rounded-full bg-transparent p-0 text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/15 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F1F4F9] dark:text-zinc-100 dark:hover:bg-[#2B2B2B] dark:focus-visible:ring-[#2563EB]/30 dark:focus-visible:ring-offset-[#252525]"
+                      triggerClassName={navExpanded ? "group flex min-h-[56px] w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/15 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F1F4F9] dark:text-zinc-100 dark:hover:bg-[#2B2B2B] dark:focus-visible:ring-[#2563EB]/30 dark:focus-visible:ring-offset-[#252525]" : "group flex h-10 w-full items-center justify-center rounded-lg px-2 text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/15 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F1F4F9] dark:text-zinc-100 dark:hover:bg-[#2B2B2B] dark:focus-visible:ring-[#2563EB]/30 dark:focus-visible:ring-offset-[#252525]"}
                       triggerContent={
-                        <span className="pointer-events-none flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full">
-                          {showAvatarImage ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={avatar!}
-                              alt="Your avatar"
-                              className="h-full w-full rounded-full object-cover"
-                              onError={() => setAvatarLoadFailed(true)}
-                            />
-                          ) : showProfileSkeleton ? (
-                            <span className="flex h-full w-full items-center justify-center rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
-                          ) : (
-                            <span
-                              className="flex h-full w-full items-center justify-center rounded-full text-xs font-semibold uppercase text-white"
-                              style={{ backgroundColor: fallbackAvatar.color }}
-                            >
-                              {hasProfileInfo ? fallbackAvatar.initials : ""}
+                        navExpanded ? (
+                          <>
+                            <span className="flex min-w-0 flex-1 items-center gap-3">
+                              <span className="pointer-events-none flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full">
+                                {showAvatarImage ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={avatar!}
+                                    alt="Your avatar"
+                                    className="h-full w-full rounded-full object-cover"
+                                    onError={() => setAvatarLoadFailed(true)}
+                                  />
+                                ) : showProfileSkeleton ? (
+                                  <span className="flex h-full w-full items-center justify-center rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
+                                ) : (
+                                  <span
+                                    className="flex h-full w-full items-center justify-center rounded-full text-xs font-semibold uppercase text-white"
+                                    style={{ backgroundColor: fallbackAvatar.color }}
+                                  >
+                                    {hasProfileInfo ? fallbackAvatar.initials : ""}
+                                  </span>
+                                )}
+                              </span>
+                              {showProfileSkeleton ? (
+                                <span className="min-w-0 flex-1 space-y-1 text-left">
+                                  <span className="block h-3.5 w-28 rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
+                                  <span className="block h-3 w-36 rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
+                                </span>
+                              ) : hasProfileInfo ? (
+                                <span className="min-w-0 text-left">
+                                  {profileName ? (
+                                    <span className="block truncate text-[14px] font-semibold leading-5 text-slate-900 dark:text-zinc-100">
+                                      {profileName}
+                                    </span>
+                                  ) : null}
+                                  {profileEmail ? (
+                                    <span className="block truncate text-[12px] leading-4 text-slate-500 dark:text-zinc-400">
+                                      {profileEmail}
+                                    </span>
+                                  ) : null}
+                                </span>
+                              ) : (
+                                <span className="min-w-0 text-left">
+                                  <span className="block text-[14px] font-semibold leading-5 text-slate-900 dark:text-zinc-100">
+                                    Profile
+                                  </span>
+                                </span>
+                              )}
                             </span>
-                          )}
-                        </span>
+                            <ChevronRight className="h-4 w-4 shrink-0 rotate-90 text-slate-400" aria-hidden />
+                          </>
+                        ) : (
+                          <span className="pointer-events-none flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full">
+                            {showAvatarImage ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={avatar!}
+                                alt="Your avatar"
+                                className="h-full w-full rounded-full object-cover"
+                                onError={() => setAvatarLoadFailed(true)}
+                              />
+                            ) : showProfileSkeleton ? (
+                              <span className="flex h-full w-full items-center justify-center rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
+                            ) : (
+                              <span
+                                className="flex h-full w-full items-center justify-center rounded-full text-xs font-semibold uppercase text-white"
+                                style={{ backgroundColor: fallbackAvatar.color }}
+                              >
+                                {hasProfileInfo ? fallbackAvatar.initials : ""}
+                              </span>
+                            )}
+                          </span>
+                        )
                       }
                     />
                   </div>
@@ -3412,17 +3435,7 @@ export default function WorkspaceShell({
             showHomeBillingModal ? "pointer-events-none blur-sm opacity-55" : ""
           }`}
         >
-          <div className="mx-auto grid max-w-xl grid-cols-5 items-end gap-1">
-            <button
-              type="button"
-              onClick={openCreateModal}
-              className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1 py-2 text-[11px] font-semibold text-[#4B5563] transition hover:bg-[rgba(0,0,0,0.04)] dark:text-white dark:hover:bg-white/5"
-            >
-              <span className="flex h-[22px] w-[22px] items-center justify-center rounded-full border-[1.5px] border-[#A8B0BA] bg-transparent text-[#6C757D] dark:border-[1.5px] dark:border-white dark:bg-transparent dark:text-white">
-                <Plus className="h-[14px] w-[14px]" aria-hidden />
-              </span>
-              <span className="truncate leading-[1.15] dark:text-white">Create</span>
-            </button>
+          <div className="mx-auto grid max-w-xl grid-cols-4 items-end gap-1">
             {mobileBottomDockItems.map((item) => {
               const Icon = item.icon;
               const activeDockColor = "#7C3AED";
@@ -3513,7 +3526,7 @@ export default function WorkspaceShell({
 
                     <div className="mt-5">
                           <div
-                            className={`group flex min-h-[360px] w-full flex-col overflow-hidden rounded-[10px] text-center transition duration-200 sm:min-h-[400px] ${
+                            className={`group flex min-h-[360px] w-full flex-col overflow-hidden rounded-xl text-center transition duration-200 sm:min-h-[400px] ${
                               showCreateFilesError
                                 ? "border border-rose-300 bg-gradient-to-b from-rose-50/70 via-white/90 to-white text-rose-600 shadow-[0_0_0_1px_rgba(251,113,133,0.15)] dark:bg-[#323232]/60"
                                 : createDragActive

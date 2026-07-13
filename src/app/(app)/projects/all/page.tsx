@@ -116,10 +116,10 @@ async function AllProjectsContent() {
 
   return (
     <main
-      className="box-border w-full bg-white pt-3 pb-0 md:pt-6 md:pb-0 dark:bg-[#252525]"
+      className="box-border flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-white pt-3 pb-0 md:pt-6 md:pb-0 dark:bg-[#252525]"
       style={{
         height:
-          "calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset, 0px) - var(--home-topbar-offset, 0px) - var(--workspace-content-bottom-subtract, var(--workspace-frame-gutter, 48px)))",
+          "calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset, 0px) - var(--home-topbar-offset, 0px))",
       }}
     >
       <div className="h-full min-h-0 w-full">
