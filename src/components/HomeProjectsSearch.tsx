@@ -174,6 +174,7 @@ export default function HomeProjectsSearch({
   const [sortOption, setSortOption] = useState<SortOption>("activity");
   const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode);
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const [closeRowMenusTick, setCloseRowMenusTick] = useState(0);
   const sortMenuRef = useRef<HTMLDivElement | null>(null);
   const [ownerFilter, setOwnerFilter] = useState<OwnerFilter>("any");
   const [ownerMenuOpen, setOwnerMenuOpen] = useState(false);
@@ -337,7 +338,7 @@ export default function HomeProjectsSearch({
                     type="button"
                     onClick={() => scrollQuickActions("prev")}
                     disabled={!canScrollQuickActionsPrev}
-                    className={"pointer-events-auto absolute left-0 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-[#0F172A]/15 bg-white/95 text-[#1F2A37]  shadow-[0_18px_42px_rgba(15,23,42,0.24),0_2px_6px_rgba(15,23,42,0.10)] ring-1 ring-[#0F172A]/10 transition  " + (canScrollQuickActionsPrev ? "hover:border-[#0F172A]/25 hover:bg-white/95" : "opacity-0 pointer-events-none")}
+                    className={"pointer-events-auto absolute left-0 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-[#0F172A]/15 bg-white/95 text-[#1F2A37]  shadow-[0_18px_42px_rgba(15,23,42,0.24),0_2px_6px_rgba(15,23,42,0.10)] ring-1 ring-[#0F172A]/10 transition  " + (canScrollQuickActionsPrev ? "hover:border-[#0F172A]/25 hover:bg-white/95" : "opacity-0 pointer-events-none")}
                     aria-label="Scroll quick actions left"
                   >
                     <ChevronLeft className="relative z-10 h-4 w-4" aria-hidden />
@@ -346,7 +347,7 @@ export default function HomeProjectsSearch({
                     type="button"
                     onClick={() => scrollQuickActions("next")}
                     disabled={!canScrollQuickActionsNext}
-                    className={"pointer-events-auto absolute right-0 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-[#0F172A]/15 bg-white/95 text-[#1F2A37]  shadow-[0_18px_42px_rgba(15,23,42,0.26),0_2px_6px_rgba(15,23,42,0.10)] ring-1 ring-[#0F172A]/10 transition  " + (canScrollQuickActionsNext ? "hover:border-[#0F172A]/25 hover:bg-white/95" : "opacity-0 pointer-events-none")}
+                    className={"pointer-events-auto absolute right-0 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-[#0F172A]/15 bg-white/95 text-[#1F2A37]  shadow-[0_18px_42px_rgba(15,23,42,0.26),0_2px_6px_rgba(15,23,42,0.10)] ring-1 ring-[#0F172A]/10 transition  " + (canScrollQuickActionsNext ? "hover:border-[#0F172A]/25 hover:bg-white/95" : "opacity-0 pointer-events-none")}
                     aria-label="Scroll quick actions right"
                   >
                     <ChevronRight className="relative z-10 h-4 w-4" aria-hidden />
@@ -367,14 +368,14 @@ export default function HomeProjectsSearch({
                         }
                       }}
                       data-quick-action-card="true"
-                      className="group relative flex min-h-[100px] w-full max-w-[320px] shrink-0 snap-start flex-none flex-col items-start justify-start gap-2 overflow-hidden rounded-[10px] border border-[rgba(0,0,0,0.05)] bg-[#EEF1F5] p-3 text-left transition outline outline-0 outline-transparent shadow-[0_1px_0_rgba(15,23,42,0.02),0_8px_18px_rgba(15,23,42,0.05)] dark:bg-zinc-900 dark:shadow-[0_8px_18px_rgba(0,0,0,0.22)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/20 sm:min-w-[270px] sm:max-w-[340px] lg:min-w-[290px] lg:max-w-[360px]"
+                      className="group relative flex min-h-[92px] w-full max-w-[280px] shrink-0 snap-start flex-none flex-col items-start justify-start gap-1.5 overflow-hidden rounded-[10px] border-2 border-[#D7DDE5] bg-[#F3F5F8] hover:border-[#C9D0D8] hover:bg-[#E8EBEF] dark:border-[#3F3F3F] dark:bg-[#F8F8F9] dark:hover:border-[#505050] dark:hover:bg-[#323232] p-2.5 text-left transition outline outline-0 outline-transparent shadow-[0_1px_0_rgba(15,23,42,0.015),0_6px_14px_rgba(15,23,42,0.035)] dark:shadow-[0_6px_14px_rgba(0,0,0,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/20 sm:min-w-[250px] sm:max-w-[300px] lg:min-w-[260px] lg:max-w-[320px]"
                     >
-                      <span className={"inline-flex h-10 w-10 items-center justify-center rounded-2xl transition " + toneClass}>
+                      <span className={"inline-flex h-9 w-9 items-center justify-center rounded-2xl transition " + toneClass}>
                         <Icon className="h-5 w-5" aria-hidden />
                       </span>
                       <span className="space-y-1">
                         <span className="block text-[14px] font-semibold text-[#1F2A37] dark:text-zinc-100">{title}</span>
-                        <span className="block text-[13px] leading-5 text-slate-500 dark:text-zinc-400">{description}</span>
+                        <span className="block text-[12px] leading-4 text-slate-500 dark:text-zinc-400">{description}</span>
                       </span>
                       <span className="inline-flex w-fit text-xs font-medium tracking-tight text-[#6C47FF] underline-offset-4 transition group-hover:underline">
                         Start now
@@ -449,16 +450,28 @@ export default function HomeProjectsSearch({
                       <button
                         type="button"
                         onClick={() => setSortMenuOpen((prev) => !prev)}
-                        className={`inline-flex h-10 items-center gap-2 rounded-xl border border-[#E6EBF2] px-3 text-xs font-semibold shadow-sm text-[#1F2A37] transition dark:border-[#3F3F3F] dark:bg-[#323232] dark:text-zinc-100 dark:shadow-[0_8px_18px_rgba(0,0,0,0.12)] ${
-                          sortMenuOpen ? "bg-[#F8FAFC] dark:bg-[#3A3A3A]" : "bg-white hover:border-[#D8DEE8] dark:hover:border-[#4A4A4A]"
+                        className={`inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-xs font-semibold text-[#1F2A37] shadow-sm transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/15 dark:text-zinc-100 dark:shadow-[0_8px_18px_rgba(0,0,0,0.12)] ${
+                          sortMenuOpen
+                            ? "border-[#CBD5E1] bg-gradient-to-b from-white to-[#F2F5FA] shadow-[0_14px_32px_rgba(15,23,42,0.14)] ring-1 ring-inset ring-[#D9E2F0] dark:border-[#565656] dark:from-[#414141] dark:to-[#343434] dark:shadow-[0_16px_30px_rgba(0,0,0,0.28)] dark:ring-white/10"
+                            : "border-[#E6EBF2] bg-white hover:border-[#D8DEE8] hover:bg-[#E2E8F0] dark:border-[#3F3F3F] dark:bg-[#323232] dark:hover:border-[#4A4A4A] dark:hover:bg-[#2E2E2E]"
                         }`}
                         aria-haspopup="menu"
                         aria-expanded={sortMenuOpen}
                       >
                         {sortOption === "activity" ? (
-                          <Clock className="h-4 w-4" aria-hidden />
+                          <Clock
+                            className={`h-4 w-4 transition-colors ${
+                              sortMenuOpen ? "text-[#6C47FF] dark:text-[#CBB8FF]" : "text-current"
+                            }`}
+                            aria-hidden
+                          />
                         ) : sortOption === "starred" ? (
-                          <Star className="h-4 w-4" aria-hidden />
+                          <Star
+                            className={`h-4 w-4 transition-colors ${
+                              sortMenuOpen ? "text-[#6C47FF] dark:text-[#CBB8FF]" : "text-current"
+                            }`}
+                            aria-hidden
+                          />
                         ) : null}
                         <span className="whitespace-nowrap">
                           {sortOption === "activity"
@@ -469,13 +482,16 @@ export default function HomeProjectsSearch({
                                 ? "Name (A-Z)"
                                 : "Name (Z-A)"}
                         </span>
-                        <ChevronDown className={`h-4 w-4 transition-transform ${sortMenuOpen ? "rotate-180" : ""}`} aria-hidden />
+                        <ChevronDown
+                          className={`h-4 w-4 transition-all ${sortMenuOpen ? "rotate-180 text-[#6C47FF] dark:text-[#CBB8FF]" : "text-current opacity-70"}`}
+                          aria-hidden
+                        />
                       </button>
 
                       {sortMenuOpen ? (
                         <div
                           role="menu"
-                          className="project-actions-menu absolute right-0 top-full z-50 mt-2 w-72 rounded-3xl border border-slate-100 bg-white p-2 text-sm text-[#1F2A37] shadow-[0_30px_80px_rgba(15,23,42,0.35)] dark:border-[#3A3A3A] dark:bg-[#323232] dark:text-zinc-100 dark:shadow-[0_30px_80px_rgba(0,0,0,0.55)]"
+                          className="project-actions-menu absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-[#E5E7EB] bg-white p-1.5 text-sm text-slate-800 shadow-[0_16px_36px_rgba(15,23,42,0.14)] dark:border-[#3A3A3A] dark:bg-[#323232] dark:text-zinc-100 dark:shadow-[0_20px_44px_rgba(0,0,0,0.5)]"
                         >
                           <div className="space-y-1">
                             {([
@@ -492,7 +508,7 @@ export default function HomeProjectsSearch({
                                   setSortOption(key);
                                   setSortMenuOpen(false);
                                 }}
-                                className={`project-actions-stagger-item flex w-full items-center justify-between rounded-2xl px-3 py-2.5 text-left transition ${
+                                className={`project-actions-stagger-item flex w-full items-center justify-between rounded-lg px-3 py-2 text-left transition ${
                                   sortOption === key
                                     ? "bg-slate-100 dark:bg-[#3A3A3A]"
                                     : "hover:bg-slate-50 dark:hover:bg-[#3A3A3A]/70"
@@ -518,7 +534,7 @@ export default function HomeProjectsSearch({
                           window.dispatchEvent(new Event("open-create-project"));
                         }
                       }}
-                      className="inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border-[3px] border-[#5B38E6] bg-[#6C47FF] px-3.5 text-xs font-semibold text-white shadow-sm transition-[transform,background-color,box-shadow,border-color] duration-200 hover:-translate-y-[1px] hover:border-[#4A2ED0] hover:bg-[#5B38E6] hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/15 dark:border-[#5B38E6] dark:bg-[#6C47FF] dark:text-zinc-100 dark:shadow-[0_8px_18px_rgba(0,0,0,0.12)] dark:hover:bg-[#5B38E6] dark:hover:shadow-[0_8px_18px_rgba(0,0,0,0.12)]"
+                      className="inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border-2 border-[#5B38E6] bg-[#6C47FF] px-3.5 text-xs font-semibold text-white shadow-sm transition-[transform,background-color,box-shadow,border-color] duration-200 hover:-translate-y-[1px] hover:border-[#4A2ED0] hover:bg-[#5B38E6] hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/15 dark:border-[#5B38E6] dark:bg-[#6C47FF] dark:text-zinc-100 dark:shadow-[0_8px_18px_rgba(0,0,0,0.12)] dark:hover:bg-[#5B38E6] dark:hover:shadow-[0_8px_18px_rgba(0,0,0,0.12)]"
                     >
                       <Plus className="h-4.5 w-4.5" aria-hidden />
                       <span>New Project</span>
@@ -550,6 +566,8 @@ export default function HomeProjectsSearch({
                   showAllProjects={showAllProjects}
                   showResumeBadge={showResumeBadge}
                   renderedAt={renderedAt}
+                  closeRowMenusTick={closeRowMenusTick}
+                  onRowMenuOpen={() => setSortMenuOpen(false)}
                 />
               </div>
             </section>
@@ -622,19 +640,37 @@ export default function HomeProjectsSearch({
                   <div ref={sortMenuRef} className="relative">
                     <button
                       type="button"
-                      onClick={() => setSortMenuOpen((prev) => !prev)}
-                      className={`inline-flex items-center gap-2 rounded-xl border px-2.5 py-2 text-xs font-semibold shadow-sm transition min-[410px]:px-3 md:px-4 dark:shadow-[0_8px_18px_rgba(0,0,0,0.12)] ${
+                      onClick={() => {
+                        setSortMenuOpen((prev) => {
+                          const next = !prev;
+                          if (next) {
+                            setCloseRowMenusTick((value) => value + 1);
+                          }
+                          return next;
+                        });
+                      }}
+                      className={`inline-flex items-center gap-2 rounded-xl border px-2.5 py-2 text-xs font-semibold shadow-sm transition duration-200 min-[410px]:px-3 md:px-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/15 dark:shadow-[0_8px_18px_rgba(0,0,0,0.12)] ${
                         sortMenuOpen
-                          ? "border-[#E6EBF2] bg-[#E5E7EB] text-[#1F2A37] dark:border-[#3F3F3F] dark:bg-[#3A3A3A] dark:text-zinc-100"
-                          : "border-[#E6EBF2] bg-white text-[#1F2A37] hover:border-[#D8DEE8] dark:border-[#3F3F3F] dark:bg-[#323232] dark:text-zinc-100 dark:hover:border-[#4A4A4A]"
+                          ? "border-[#CBD5E1] bg-gradient-to-b from-white to-[#F2F5FA] text-[#1F2A37] shadow-[0_14px_32px_rgba(15,23,42,0.14)] ring-1 ring-inset ring-[#D9E2F0] dark:border-[#565656] dark:from-[#414141] dark:to-[#343434] dark:text-zinc-100 dark:shadow-[0_16px_30px_rgba(0,0,0,0.28)] dark:ring-white/10"
+                          : "border-[#E6EBF2] bg-white text-[#1F2A37] hover:border-[#D8DEE8] hover:bg-[#E2E8F0] dark:border-[#3F3F3F] dark:bg-[#323232] dark:text-zinc-100 dark:hover:border-[#4A4A4A] dark:hover:bg-[#2E2E2E]"
                       }`}
                       aria-haspopup="menu"
                       aria-expanded={sortMenuOpen}
                     >
                       {sortOption === "activity" ? (
-                        <Clock className="h-4 w-4" aria-hidden />
+                        <Clock
+                          className={`h-4 w-4 transition-colors ${
+                            sortMenuOpen ? "text-[#6C47FF] dark:text-[#CBB8FF]" : "text-current"
+                          }`}
+                          aria-hidden
+                        />
                       ) : sortOption === "starred" ? (
-                        <Star className="h-4 w-4" aria-hidden />
+                        <Star
+                          className={`h-4 w-4 transition-colors ${
+                            sortMenuOpen ? "text-[#6C47FF] dark:text-[#CBB8FF]" : "text-current"
+                          }`}
+                          aria-hidden
+                        />
                       ) : null}
                       {sortOption === "az" || sortOption === "za" ? (
                         <span className="whitespace-nowrap min-[450px]:hidden">
@@ -651,8 +687,8 @@ export default function HomeProjectsSearch({
                             : "Name (Z-A)"}
                       </span>
                       <ChevronDown
-                        className={`ml-1 h-4 w-4 opacity-70 transition-transform ${
-                          sortMenuOpen ? "rotate-180" : ""
+                        className={`ml-1 h-4 w-4 transition-all ${
+                          sortMenuOpen ? "rotate-180 text-[#6C47FF] dark:text-[#CBB8FF]" : "text-current opacity-70"
                         }`}
                         aria-hidden
                       />
@@ -661,7 +697,7 @@ export default function HomeProjectsSearch({
                     {sortMenuOpen ? (
                       <div
                         role="menu"
-                        className="project-actions-menu absolute right-0 top-full z-50 mt-2 w-72 rounded-3xl border border-slate-100 bg-white p-2 text-sm text-[#1F2A37] shadow-[0_30px_80px_rgba(15,23,42,0.35)] dark:border-[#3A3A3A] dark:bg-[#323232] dark:text-zinc-100 dark:shadow-[0_30px_80px_rgba(0,0,0,0.55)]"
+                        className="project-actions-menu absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-[#E5E7EB] bg-white p-1.5 text-sm text-slate-800 shadow-[0_16px_36px_rgba(15,23,42,0.14)] dark:border-[#3A3A3A] dark:bg-[#323232] dark:text-zinc-100 dark:shadow-[0_20px_44px_rgba(0,0,0,0.5)]"
                       >
                         <div className="space-y-1">
                           {(
@@ -680,7 +716,7 @@ export default function HomeProjectsSearch({
                                 setSortOption(key);
                                 setSortMenuOpen(false);
                               }}
-                              className={`project-actions-stagger-item flex w-full items-center justify-between rounded-2xl px-3 py-2.5 text-left transition ${
+                              className={`project-actions-stagger-item flex w-full items-center justify-between rounded-lg px-3 py-2 text-left transition ${
                                 sortOption === key
                                   ? "bg-slate-100 dark:bg-[#3A3A3A]"
                                   : "hover:bg-slate-50 dark:hover:bg-[#3A3A3A]/70"
@@ -761,7 +797,7 @@ export default function HomeProjectsSearch({
                               key: "any",
                               label: "Any owner",
                               leading: (
-                                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-slate-700 dark:bg-[#2B2B2B] dark:text-zinc-200">
+                                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 text-slate-700 dark:bg-[#2B2B2B] dark:text-zinc-200">
                                   <UserRound className="h-5 w-5" aria-hidden />
                                 </span>
                               ),
@@ -770,7 +806,7 @@ export default function HomeProjectsSearch({
                               key: "shared",
                               label: "Shared with you",
                               leading: (
-                                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-slate-700 dark:bg-[#2B2B2B] dark:text-zinc-200">
+                                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 text-slate-700 dark:bg-[#2B2B2B] dark:text-zinc-200">
                                   <UsersRound className="h-5 w-5" aria-hidden />
                                 </span>
                               ),
@@ -779,7 +815,7 @@ export default function HomeProjectsSearch({
                               key: "you",
                               label: `${accountName} (You)`,
                               leading: (
-                                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-600 text-sm font-semibold text-white dark:bg-[#3A3A3A]">
+                                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-600 text-sm font-semibold text-white dark:bg-[#3A3A3A]">
                                   {accountInitials}
                                 </span>
                               ),

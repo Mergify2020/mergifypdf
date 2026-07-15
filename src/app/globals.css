@@ -1252,54 +1252,49 @@ html.theme-scroll-reveal:not(.dark) ::-webkit-scrollbar-thumb {
   width: 10px;
 }
 
-.project-card:has(.project-card-preview:hover) {
+.project-card:has(.project-card-preview:hover, .project-card-select:hover) {
   transform: translateY(-2px);
 }
 
-.project-card:has(.project-card-preview:hover) .project-card-preview {
+.project-card:has(.project-card-preview:hover, .project-card-select:hover) .project-card-preview {
   background-color: #e8edf5;
 }
 
-.dark .project-card:has(.project-card-preview:hover) .project-card-preview {
+.dark .project-card:has(.project-card-preview:hover, .project-card-select:hover) .project-card-preview {
   background-color: rgb(39 39 42 / 0.7);
 }
 
-.project-card:has(.project-card-preview:hover) .project-card-pages {
+.project-card:has(.project-card-preview:hover, .project-card-select:hover) .project-card-pages {
   opacity: 1;
 }
 
-.project-card:has(.project-card-preview:hover) .project-card-overlay {
+.project-card:has(.project-card-preview:hover, .project-card-select:hover) .project-card-overlay {
   opacity: 1;
 }
 
-.project-card:has(.project-card-preview:hover, .project-card-select:hover) .project-card-select[aria-pressed="false"] {
-  opacity: 1;
-  transform: scale(1);
-  border-color: #94a3b8;
-}
 
-.project-card:has(.project-card-preview:hover, .project-card-actions:hover) .project-card-actions {
+.project-card:has(.project-card-preview:hover, .project-card-select:hover, .project-card-actions:hover) .project-card-actions {
   opacity: 1;
 }
 
-.project-card:has(.project-card-preview:hover) .project-card-actions {
+.project-card:has(.project-card-preview:hover, .project-card-select:hover) .project-card-actions {
   border-width: 2px;
 }
 
 @media (hover: none) and (pointer: coarse) {
-  .project-card:has(.project-card-preview:hover) {
+  .project-card:has(.project-card-preview:hover, .project-card-select:hover) {
     transform: none !important;
   }
 
-  .project-card:has(.project-card-preview:hover) .project-card-preview {
+  .project-card:has(.project-card-preview:hover, .project-card-select:hover) .project-card-preview {
     background-color: #eef1f5 !important;
   }
 
-  .dark .project-card:has(.project-card-preview:hover) .project-card-preview {
+  .dark .project-card:has(.project-card-preview:hover, .project-card-select:hover) .project-card-preview {
     background-color: rgb(39 39 42 / 0.7) !important;
   }
 
-  .project-card:has(.project-card-preview:hover) .project-card-overlay {
+  .project-card:has(.project-card-preview:hover, .project-card-select:hover) .project-card-overlay {
     opacity: 0 !important;
   }
 

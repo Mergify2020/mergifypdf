@@ -10,7 +10,6 @@ import { refreshProjectsSummary } from "@/lib/projectsSummaryCache";
 import { projectNameToEditable, sanitizeProjectName } from "@/lib/projectName";
 import {
   beginExistingWorkspaceOpenHandoff,
-  preloadExistingWorkspaceProject,
   shouldHandleWorkspaceOpenClick,
 } from "@/lib/workspaceOpenHandoff";
 
@@ -226,7 +225,6 @@ export default function ProjectCard({
   const [previewLoading, setPreviewLoading] = useState(Boolean(project.hasPreview));
   const previewImageRef = useRef<HTMLImageElement | null>(null);
   const previewRefreshInFlight = useRef(false);
-  const workspaceWarmupStartedRef = useRef<Set<string>>(new Set());
   const lastFailedPreviewRef = useRef<string | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [isCopying, setIsCopying] = useState(false);
@@ -247,16 +245,7 @@ export default function ProjectCard({
 
   const openProject = (projectId: string) => {
     beginExistingWorkspaceOpenHandoff(projectId);
-    void preloadExistingWorkspaceProject(projectId);
-    void router.prefetch(`/studio?project=${encodeURIComponent(projectId)}`);
     router.push(`/studio?project=${encodeURIComponent(projectId)}`);
-  };
-
-  const warmProjectOpen = (projectId: string) => {
-    if (workspaceWarmupStartedRef.current.has(projectId)) return;
-    workspaceWarmupStartedRef.current.add(projectId);
-    void preloadExistingWorkspaceProject(projectId);
-    void router.prefetch(`/studio?project=${encodeURIComponent(projectId)}`);
   };
 
   function isMobileViewport() {
@@ -727,24 +716,17 @@ export default function ProjectCard({
   }, [project.hasPreview, project.id, project.rotation]);
 
   const cardClasses = [
-    "relative overflow-hidden rounded-[12px] border border-[rgba(15,23,42,0.04)] bg-[#FBFCFE] transition-[transform,box-shadow,border-color,background-color] duration-200 ease-out outline outline-0 outline-transparent shadow-[0_1px_0_rgba(15,23,42,0.02),0_10px_24px_rgba(15,23,42,0.05)] hover:-translate-y-[1px] hover:shadow-[0_16px_32px_rgba(15,23,42,0.08)] dark:border-transparent dark:bg-zinc-900 dark:shadow-[0_10px_24px_rgba(0,0,0,0.22)] dark:hover:shadow-[0_16px_30px_rgba(0,0,0,0.28)]",
-    isSelected
-      ? "ring-1 ring-[#6C47FF]/55 shadow-[inset_0_0_0_2px_rgba(108,71,255,0.92)] dark:ring-[#6C47FF]/55 dark:shadow-[inset_0_0_0_2px_rgba(108,71,255,0.92)]"
-      : "",
+    "relative overflow-hidden rounded-[12px] border-2 border-[rgba(15,23,42,0.04)] bg-[#FBFCFE] transition-[transform,box-shadow,border-color,background-color] duration-200 ease-out outline outline-0 outline-transparent shadow-[0_1px_0_rgba(15,23,42,0.02),0_10px_24px_rgba(15,23,42,0.05)] hover:-translate-y-[1px] hover:shadow-[0_16px_32px_rgba(15,23,42,0.08)] dark:border-transparent dark:bg-zinc-900 dark:shadow-[0_10px_24px_rgba(0,0,0,0.22)] dark:hover:shadow-[0_16px_30px_rgba(0,0,0,0.28)]",
+    isSelected ? "border-[#6C47FF] dark:border-[#6C47FF]" : "",
   ]
     .filter(Boolean)
     .join(" ");
 
   const checkboxClasses = [
-    "absolute left-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-[10px] border-[2px] text-xs font-semibold shadow-md dark:shadow-[0_6px_16px_rgba(0,0,0,0.35)] transition-transform transition-opacity duration-150 xl:h-9 xl:w-9",
+    "absolute left-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-[10px] border-[2px] text-xs font-semibold shadow-md transition-[transform,box-shadow,border-color,background-color,opacity] duration-150 xl:h-9 xl:w-9",
     isSelected
-        ? "bg-[#6C47FF] border-[#6C47FF] text-white opacity-100 scale-100"
-        : [
-          // Always visible on very small screens (no hover), hover-only from sm and up.
-          "bg-white/95 border-slate-300 text-slate-500 shadow-[0_3px_10px_rgba(15,23,42,0.14)] opacity-100 scale-90 dark:bg-[#2F2F2F] dark:border-zinc-500 dark:text-zinc-200 dark:shadow-[0_6px_16px_rgba(0,0,0,0.35)]",
-          "sm:opacity-0 sm:scale-90",
-          hasSelection ? "sm:!opacity-100 sm:!scale-100" : "",
-        ].join(" "),
+      ? "bg-[#6C47FF] border-[#6C47FF] text-white opacity-100 scale-100 shadow-[0_4px_12px_rgba(108,71,255,0.22)] hover:-translate-y-[1px] hover:border-[#5B38E6] hover:shadow-[0_6px_14px_rgba(108,71,255,0.28)]"
+      : "bg-white/95 border-slate-300 text-slate-500 opacity-100 scale-100 shadow-[0_3px_10px_rgba(15,23,42,0.14)] hover:-translate-y-[1px] hover:border-slate-400 hover:shadow-[0_6px_14px_rgba(15,23,42,0.18)] dark:bg-[#2F2F2F] dark:border-zinc-500 dark:text-zinc-200 dark:shadow-[0_6px_16px_rgba(0,0,0,0.35)] dark:hover:border-zinc-400 dark:hover:shadow-[0_8px_18px_rgba(0,0,0,0.4)]",
   ]
     .filter(Boolean)
     .join(" ");
@@ -893,17 +875,11 @@ export default function ProjectCard({
     "project-actions-menu z-[9999] w-56 overflow-hidden rounded-xl border border-[#E5E7EB] bg-white text-sm text-slate-800 shadow-[0_16px_36px_rgba(15,23,42,0.14)] sm:w-64 dark:border-[#3F3F3F] dark:bg-[#323232] dark:text-zinc-100 dark:shadow-[0_20px_44px_rgba(0,0,0,0.5)]";
 
   const handleCardClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (!hasSelection) return;
     const target = event.target as HTMLElement | null;
     if (target?.closest("button,a,input,textarea,select,label")) return;
+    if (!shouldHandleWorkspaceOpenClick(event)) return;
     event.preventDefault();
-    onToggleSelected(project.id);
-  };
-
-  const handleSelectModeClick = (event: React.MouseEvent<HTMLElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    onToggleSelected(project.id);
+    openProject(project.id);
   };
 
   const renderMenuPanel = (style: CSSProperties, useFixed: boolean) => (
@@ -1127,7 +1103,11 @@ export default function ProjectCard({
       aria-label={project.title}
       onClick={handleCardClick}
     >
-      <div ref={cardRef} className={cardClasses}>
+      <div
+        ref={cardRef}
+        className={cardClasses}
+        style={isSelected ? { borderColor: "#6C47FF", borderWidth: 3 } : undefined}
+      >
         <button
           type="button"
           className={`${checkboxClasses} project-card-select`}
@@ -1236,9 +1216,6 @@ export default function ProjectCard({
                       setCopyToast(null);
                       openProject(copyToast.id);
                     }}
-                    onFocus={() => warmProjectOpen(copyToast.id)}
-                    onMouseEnter={() => warmProjectOpen(copyToast.id)}
-                    onTouchStart={() => warmProjectOpen(copyToast.id)}
                   >
                     Open
                   </Link>
@@ -1247,38 +1224,22 @@ export default function ProjectCard({
               document.body
             )
           : null}
-        <div className="project-card-preview relative m-[3px] w-[calc(100%-6px)] aspect-square rounded-[12px] border border-[rgba(15,23,42,0.05)] bg-[#F3F6FA] shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] transition-[background-color,border-color,box-shadow] duration-200 dark:border-transparent dark:bg-[#2A2A2A] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.02)]">
-          {hasSelection ? (
-            <button
-              type="button"
-              className="absolute inset-0"
-              aria-label={`Select ${project.title}`}
-              onClick={handleSelectModeClick}
-              onMouseDown={(event) => {
+        <div className="project-card-preview relative m-[3px] w-[calc(100%-6px)] aspect-square rounded-[12px] border border-[rgba(15,23,42,0.09)] bg-[#EEF2F7] shadow-[inset_0_1px_0_rgba(255,255,255,0.75),0_1px_2px_rgba(15,23,42,0.04)] transition-[background-color,border-color,box-shadow] duration-200 dark:border-transparent dark:bg-[#2A2A2A] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.02)]">
+          <Link
+            href={`/studio?project=${encodeURIComponent(project.id)}`}
+            className="absolute inset-0"
+            aria-label={`Open ${project.title}`}
+            onClick={(event) => {
+              if (renaming) {
                 event.preventDefault();
                 event.stopPropagation();
-              }}
-            />
-          ) : (
-            <Link
-              href={`/studio?project=${encodeURIComponent(project.id)}`}
-              className="absolute inset-0"
-              aria-label={`Open ${project.title}`}
-              onFocus={() => warmProjectOpen(project.id)}
-              onMouseEnter={() => warmProjectOpen(project.id)}
-              onTouchStart={() => warmProjectOpen(project.id)}
-              onClick={(event) => {
-                if (renaming) {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  return;
-                }
-                if (!shouldHandleWorkspaceOpenClick(event)) return;
-                event.preventDefault();
-                openProject(project.id);
-              }}
-            />
-          )}
+                return;
+              }
+              if (!shouldHandleWorkspaceOpenClick(event)) return;
+              event.preventDefault();
+              openProject(project.id);
+            }}
+          />
           {typeof project.pagesCount === "number" && project.pagesCount > 0 ? (
             <div className="project-card-pages pointer-events-none absolute bottom-2.5 left-2.5 z-10 hidden rounded-full bg-black/60 px-3.5 py-1 text-[12px] font-semibold text-white opacity-0 shadow-sm dark:shadow-none backdrop-blur-sm transition-opacity dark:bg-[#2B2B2B]/80 dark:text-zinc-100 sm:block">
               {project.pagesCount} {project.pagesCount === 1 ? "page" : "pages"}
@@ -1353,10 +1314,7 @@ export default function ProjectCard({
               href={`/studio?project=${encodeURIComponent(project.id)}`}
               className="project-card-resume absolute bottom-2.5 right-2.5 hidden rounded-full bg-[#6C47FF] px-3.5 py-1 text-[12px] font-semibold text-white shadow-sm transition-colors hover:bg-[#5B38E6] sm:inline-flex"
               aria-label={`Resume ${project.title}`}
-              onFocus={() => warmProjectOpen(project.id)}
-              onMouseEnter={() => warmProjectOpen(project.id)}
-              onTouchStart={() => warmProjectOpen(project.id)}
-            >
+                  >
               Resume
             </Link>
           ) : null}

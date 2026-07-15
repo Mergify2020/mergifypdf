@@ -3335,25 +3335,33 @@ export default function WorkspaceShell({
                         navExpanded ? (
                           <>
                             <span className="flex min-w-0 flex-1 items-center gap-3">
-                              <span className="pointer-events-none flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full">
-                                {showAvatarImage ? (
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img
-                                    src={avatar!}
-                                    alt="Your avatar"
-                                    className="h-full w-full rounded-full object-cover"
-                                    onError={() => setAvatarLoadFailed(true)}
-                                  />
-                                ) : showProfileSkeleton ? (
-                                  <span className="flex h-full w-full items-center justify-center rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
-                                ) : (
+                              <span className="relative flex h-10 w-10 shrink-0 items-center justify-center">
+                                {profileOpen ? (
                                   <span
-                                    className="flex h-full w-full items-center justify-center rounded-full text-xs font-semibold uppercase text-white"
-                                    style={{ backgroundColor: fallbackAvatar.color }}
-                                  >
-                                    {hasProfileInfo ? fallbackAvatar.initials : ""}
-                                  </span>
-                                )}
+                                    className="pointer-events-none absolute inset-[1px] rounded-full border-2 border-[#6C47FF] bg-transparent"
+                                    aria-hidden
+                                  />
+                                ) : null}
+                                <span className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full">
+                                  {showAvatarImage ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                      src={avatar!}
+                                      alt="Your avatar"
+                                      className="h-full w-full rounded-full object-cover"
+                                      onError={() => setAvatarLoadFailed(true)}
+                                    />
+                                  ) : showProfileSkeleton ? (
+                                    <span className="flex h-full w-full items-center justify-center rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
+                                  ) : (
+                                    <span
+                                      className="flex h-full w-full items-center justify-center rounded-full text-xs font-semibold uppercase text-white"
+                                      style={{ backgroundColor: fallbackAvatar.color }}
+                                    >
+                                      {hasProfileInfo ? fallbackAvatar.initials : ""}
+                                    </span>
+                                  )}
+                                </span>
                               </span>
                               {showProfileSkeleton ? (
                                 <span className="min-w-0 flex-1 space-y-1 text-left">
@@ -3384,25 +3392,33 @@ export default function WorkspaceShell({
                             <ChevronRight className="h-4 w-4 shrink-0 rotate-90 text-slate-400" aria-hidden />
                           </>
                         ) : (
-                          <span className="pointer-events-none flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full">
-                            {showAvatarImage ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                src={avatar!}
-                                alt="Your avatar"
-                                className="h-full w-full rounded-full object-cover"
-                                onError={() => setAvatarLoadFailed(true)}
-                              />
-                            ) : showProfileSkeleton ? (
-                              <span className="flex h-full w-full items-center justify-center rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
-                            ) : (
-                              <span
-                                className="flex h-full w-full items-center justify-center rounded-full text-xs font-semibold uppercase text-white"
-                                style={{ backgroundColor: fallbackAvatar.color }}
-                              >
-                                {hasProfileInfo ? fallbackAvatar.initials : ""}
-                              </span>
-                            )}
+                          <span className="relative flex h-10 w-10 shrink-0 items-center justify-center">
+                                {profileOpen ? (
+                                  <span
+                                    className="pointer-events-none absolute inset-[1px] rounded-full border-2 border-[#6C47FF] bg-transparent"
+                                    aria-hidden
+                                  />
+                                ) : null}
+                                <span className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full">
+                              {showAvatarImage ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={avatar!}
+                                  alt="Your avatar"
+                                  className="h-full w-full rounded-full object-cover"
+                                  onError={() => setAvatarLoadFailed(true)}
+                                />
+                              ) : showProfileSkeleton ? (
+                                <span className="flex h-full w-full items-center justify-center rounded-full bg-slate-200 skeleton-shimmer dark:bg-[#3A3A3A]" />
+                              ) : (
+                                <span
+                                  className="flex h-full w-full items-center justify-center rounded-full text-xs font-semibold uppercase text-white"
+                                  style={{ backgroundColor: fallbackAvatar.color }}
+                                >
+                                  {hasProfileInfo ? fallbackAvatar.initials : ""}
+                                </span>
+                              )}
+                            </span>
                           </span>
                         )
                       }

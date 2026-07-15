@@ -2145,6 +2145,7 @@ function SortableThumb({
   disableMoveDown,
   registerThumbNode,
   onThumbLoad,
+  deferRender = false,
 }: {
   item: PageItem;
   index: number;
@@ -2158,6 +2159,7 @@ function SortableThumb({
   disableMoveDown: boolean;
   registerThumbNode: (id: string) => (node: HTMLLIElement | null) => void;
   onThumbLoad: (id: string) => void;
+  deferRender?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
@@ -2187,7 +2189,7 @@ function SortableThumb({
           registerThumbNode(item.id)(node);
         }}
         data-thumb-id={item.id}
-        style={style}
+        style={deferRender ? { ...style, contentVisibility: "auto", containIntrinsicSize: "320px" } : style}
         className="group relative flex w-full justify-center"
         {...attributes}
       >
@@ -2339,7 +2341,8 @@ const MemoSortableThumb = memo(
     prevProps.item.thumbHeight === nextProps.item.thumbHeight &&
     prevProps.item.preview === nextProps.item.preview &&
     prevProps.item.width === nextProps.item.width &&
-    prevProps.item.height === nextProps.item.height
+    prevProps.item.height === nextProps.item.height &&
+    prevProps.deferRender === nextProps.deferRender
 );
 
 function SortableOrganizeTile({
@@ -6971,7 +6974,6 @@ const timer =
     if (pages.length === 0) return;
     const pageList = pagesRef.current;
     window.requestAnimationFrame(() => {
-      const limit = largeDocMode ? Math.min(LARGE_DOC_THUMB_LIMIT, pageList.length) : pageList.length;
       const orderedThumbIds: string[] = [];
       const seen = new Set<string>();
       const addThumbId = (id: string | null | undefined) => {
@@ -6988,10 +6990,13 @@ const timer =
         const page = pageList[idx];
         addThumbId(page?.id);
       }
-      for (let index = 0; index < pageList.length && orderedThumbIds.length < limit; index += 1) {
-        addThumbId(pageList[index]?.id);
+      if (!largeDocMode) {
+        const limit = pageList.length;
+        for (let index = 0; index < pageList.length && orderedThumbIds.length < limit; index += 1) {
+          addThumbId(pageList[index]?.id);
+        }
       }
-      orderedThumbIds.slice(0, limit).forEach((id, index) => {
+      orderedThumbIds.forEach((id, index) => {
         const page = pagesByIdRef.current.get(id);
         if (!page) return;
         enqueueThumbRender({
@@ -7009,8 +7014,7 @@ const timer =
     if (typeof window === "undefined") return;
     if (!projectParam) return;
     if (loading) return;
-    if (pages.length === 0) return;
-    if (loadedPreviewIds.size === 0) return;
+    if (!sourcesHydrated && error == null) return;
     existingProjectOverlayHideSentRef.current = true;
     const frameId = window.requestAnimationFrame(() => {
       window.dispatchEvent(new Event("workspace-content-ready"));
@@ -7018,7 +7022,7 @@ const timer =
     return () => {
       window.cancelAnimationFrame(frameId);
     };
-  }, [loadedPreviewIds.size, loading, pages.length, projectParam]);
+  }, [error, loading, projectParam, sourcesHydrated]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -7163,17 +7167,12 @@ const timer =
     if (!showStartupOverlay) return;
     if (!sourcesHydrated) return;
     if (loading) return;
-    const targetCount = Math.min(STARTUP_OVERLAY_PREVIEW_TARGET, pages.length);
-    if (targetCount > 0) {
-      const readyCount = pages.slice(0, targetCount).filter((page) => page.preview).length;
-      if (readyCount < targetCount) return;
-    }
     const timer = setTimeout(() => {
       setShowStartupOverlay(false);
       startupOverlayActiveRef.current = false;
     }, 400);
     return () => clearTimeout(timer);
-  }, [loading, pages, showStartupOverlay, sourcesHydrated, startupOverlayVariant]);
+  }, [loading, showStartupOverlay, sourcesHydrated]);
 
   useEffect(() => {
     if (!showStartupOverlay) return;
@@ -7221,14 +7220,12 @@ const timer =
         startupProgressTimerRef.current = null;
       }
     };
-  }, [computeStartupProgress, showStartupOverlay, startupOverlayVariant]);
+  }, [loading, showStartupOverlay, sourcesHydrated, startupOverlayVariant]);
 
   useEffect(() => {
     if (!startupOverlayActiveRef.current || !showStartupOverlay) return;
-    if (pages.length === 0) return;
-    const targetCount = Math.min(STARTUP_OVERLAY_PREVIEW_TARGET, pages.length);
-    const readyCount = pages.slice(0, targetCount).filter((page) => page.preview).length;
-    if (readyCount < targetCount) return;
+    if (!sourcesHydrated) return;
+    if (loading) return;
     const startedAt = startupOverlayStartRef.current ?? performance.now();
     const now = performance.now();
     const elapsed = now - startedAt;
@@ -7293,7 +7290,7 @@ const timer =
         startupOverlayFullTimerRef.current = null;
       }
     };
-  }, [largeDocMode, pages, showStartupOverlay, startupOverlayVariant]);
+  }, [largeDocMode, loading, showStartupOverlay, sourcesHydrated]);
 
   /** Add more PDFs (create object URLs and append to sources) */
   function handleAddClick() {
@@ -7871,6 +7868,8 @@ const timer =
             style={{
               width: fittedWidth,
               height: displayHeight,
+              contentVisibility: "auto",
+              containIntrinsicSize: "460px",
             }}
             onClick={(event) => {
               if (activeDrawingTool || deleteMode) {
@@ -16004,6 +16003,7 @@ const timer =
                                                 return next;
                                               });
                                             }}
+                                            deferRender
 		                                      />
                                       {i < pages.length - 1 ? (
 		                                        <li className="group relative flex h-12 items-center justify-center">

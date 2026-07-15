@@ -39,6 +39,8 @@ type Props = {
   showAllProjects?: boolean;
   showResumeBadge?: boolean;
   renderedAt?: string | Date;
+  closeRowMenusTick?: number;
+  onRowMenuOpen?: () => void;
 };
 
 const TRASH_PROGRESS_MS = 1100;
@@ -54,6 +56,9 @@ type CopyToastState = {
   id: string;
   name: string;
 };
+
+
+
 
 const STARRED_STORAGE_KEY = "mpdf:starred-projects";
 
@@ -152,6 +157,8 @@ export default function RecentProjectsRow({
   showAllProjects = false,
   showResumeBadge = false,
   renderedAt,
+  closeRowMenusTick,
+  onRowMenuOpen,
 }: Props) {
   const [projects, setProjects] = useState<SummaryProject[]>(initialProjects ?? []);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
@@ -256,6 +263,10 @@ export default function RecentProjectsRow({
   }, []);
 
   useEffect(() => {
+    closeListMenu();
+  }, [closeRowMenusTick]);
+
+  useEffect(() => {
     if (!listMenuOpenId) return;
     const handleMouseDown = () => closeListMenu();
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -321,13 +332,13 @@ export default function RecentProjectsRow({
   if (!projects.length && !loading) {
     return showAllProjects ? (
       <div className="flex min-h-0 flex-1 items-center justify-center p-0 text-center">
-        <div className="flex w-full max-w-[760px] flex-col items-center gap-0 text-center">
+        <div className="flex w-full max-w-[760px] flex-col items-center gap-3 text-center">
           <Image
             src="/illustrations/undraw_folder-files_5www.svg"
             alt=""
             width={405}
             height={405}
-            className="opacity-90" style={{ height: "clamp(140px, 28dvh, 360px)", width: "auto" }}
+            className="opacity-90" style={{ height: "clamp(140px, 28dvh, 360px)", width: "auto", marginBottom: "1.5rem" }}
             priority
           />
           <div className="space-y-3">
@@ -335,37 +346,25 @@ export default function RecentProjectsRow({
               No projects yet
             </h3>
             <p className="max-w-xl text-[15px] leading-7 text-slate-600 dark:text-zinc-300">
-              Create a new project or use one of the quick actions above and it will show up here.
+              Start a new project to see it here.
             </p>
-            <button
-              type="button"
-              onClick={() => {
-                if (typeof window !== "undefined") {
-                  window.dispatchEvent(new Event("open-create-project"));
-                }
-              }}
-              className="inline-flex h-10 items-center rounded-xl border-[3px] border-[#5B38E6] bg-[#6C47FF] px-4 text-sm font-semibold text-white shadow-[0_6px_18px_rgba(108,71,255,0.18)] transition-[transform,background-color,box-shadow,border-color] hover:-translate-y-px hover:border-[#4A2ED0] hover:bg-[#5B38E6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/15 dark:border-[#5B38E6] dark:bg-[#6C47FF] dark:text-zinc-100"
-            >
-              <Plus className="mr-2 h-4 w-4" aria-hidden />
-              New Project
-            </button>
           </div>
         </div>
       </div>
     ) : (
       <div className="mt-0 flex min-h-[360px] w-full items-center justify-center p-0 text-center sm:min-h-[480px]">
-        <div className="flex w-full max-w-[560px] flex-col items-center gap-0 text-center">
+        <div className="flex w-full max-w-[560px] flex-col items-center gap-3 text-center">
           <Image
             src="/illustrations/undraw_folder-files_5www.svg"
             alt=""
             width={405}
             height={405}
-            className="opacity-90" style={{ height: "clamp(140px, 28dvh, 360px)", width: "auto" }}
+            className="opacity-90" style={{ height: "clamp(140px, 28dvh, 360px)", width: "auto", marginBottom: "1.5rem" }}
             priority
           />
           <div className="space-y-3">
             <p className="max-w-md text-sm leading-6 text-slate-600 dark:text-zinc-300 sm:text-base">
-              Start a project to see it here.
+              Start a new project to see it here.
             </p>
             <button
               type="button"
@@ -505,24 +504,9 @@ export default function RecentProjectsRow({
     });
   };
 
-  if (trimmed && mapped.length === 0) {
-    if (viewMode === "list" && showAllProjects) {
-      return (
-        <div className="mt-2 px-6 py-14">
-          <div className="flex flex-col items-center text-center">
-            <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-500 dark:bg-[#2B2B2B] dark:text-zinc-200">
-              <SearchX className="h-5 w-5" aria-hidden />
-            </span>
-            <p className="mt-4 text-lg font-semibold text-slate-900 dark:text-zinc-100">
-              No projects found for &quot;{trimmed}&quot;
-            </p>
-            <p className="mt-2 text-sm text-slate-500 dark:text-zinc-300">
-              Try a different name or clear the search.
-            </p>
-          </div>
-        </div>
-      );
-    }
+  const showInlineListEmptyState = trimmed && mapped.length === 0 && viewMode === "list" && showAllProjects;
+
+  if (trimmed && mapped.length === 0 && !showInlineListEmptyState) {
     return (
       <div className="mt-2 flex min-h-[320px] items-center justify-center px-6 py-16">
         <div className="flex flex-col items-center text-center">
@@ -548,7 +532,7 @@ export default function RecentProjectsRow({
           alt=""
           width={405}
           height={405}
-          className="opacity-90" style={{ height: "clamp(140px, 28dvh, 320px)", width: "auto" }}
+          className="opacity-90" style={{ height: "clamp(140px, 28dvh, 320px)", width: "auto", marginBottom: "1.5rem" }}
           priority
         />
         <p className="mt-0 text-lg font-semibold text-slate-900 dark:text-zinc-100 sm:text-xl">
@@ -713,13 +697,28 @@ export default function RecentProjectsRow({
   const activeListMenuProject = listMenuOpenId
     ? mapped.find((project) => project.id === listMenuOpenId) ?? null
     : null;
+  const listEmptyState = (
+    <div className="flex min-h-full w-full items-center justify-center px-6 py-16">
+      <div className="flex flex-col items-center text-center">
+        <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-500 dark:bg-[#2B2B2B] dark:text-zinc-200">
+          <SearchX className="h-5 w-5" aria-hidden />
+        </span>
+        <p className="mt-4 text-lg font-semibold text-slate-900 dark:text-zinc-100">
+          No projects found for &quot;{trimmed}&quot;
+        </p>
+        <p className="mt-2 text-sm text-slate-500 dark:text-zinc-300">
+          Try a different name or clear the search.
+        </p>
+      </div>
+    </div>
+  );
 
   return (
     <>
       {viewMode === "list" && showAllProjects ? (
-        <div className="mt-2 overflow-hidden rounded-xl border border-[#E6EBF2] bg-white shadow-sm dark:border-[#3F3F3F] dark:bg-[#323232] dark:shadow-[0_1px_0_rgba(255,255,255,0.02)]">
-          <div className="md:hidden">
-            <div className="grid grid-cols-[36px_minmax(0,1fr)_40px] items-center gap-x-4 border-b border-[#E6EBF2] bg-white px-4 py-3 text-sm font-bold uppercase tracking-[0.08em] text-slate-700 dark:border-[#3C3C3C] dark:bg-[#323232] dark:text-zinc-100">
+        <div className="mt-2 flex min-h-0 flex-1 flex-col">
+          <div className="md:hidden flex min-h-0 flex-1 flex-col">
+            <div className="grid grid-cols-[36px_minmax(0,1fr)_40px] items-center gap-x-4 border-b border-[#E6EBF2] bg-white px-4 py-3 text-sm font-bold tracking-[0.02em] text-slate-700 dark:border-[#3C3C3C] dark:bg-[#323232] dark:text-zinc-100">
               <button
                 type="button"
                 onClick={() => {
@@ -755,8 +754,12 @@ export default function RecentProjectsRow({
               <span className="text-left">Name</span>
               <span aria-hidden />
             </div>
-            <div className="divide-y divide-[#E6EBF2] dark:divide-[#3C3C3C]">
-              {mapped.map((project) => {
+            <div className="flex min-h-0 flex-1 overflow-y-auto">
+              {showInlineListEmptyState ? (
+                listEmptyState
+              ) : (
+                <div className="w-full divide-y divide-[#E6EBF2] dark:divide-[#3C3C3C]">
+                  {mapped.map((project) => {
                 const isSelected = !!selected[project.id];
                 const fileSize = formatFileSize(project.fileSizeBytes);
                 const primaryMetaParts = [
@@ -872,6 +875,7 @@ export default function RecentProjectsRow({
                             return;
                           }
                           setListMenuAnimateIn(listMenuOpenId === null);
+                          onRowMenuOpen?.();
                           const trigger = event.currentTarget.getBoundingClientRect();
                           setListMenuPosition(getListMenuPosition(trigger));
                           setListMenuOpenId(project.id);
@@ -1164,11 +1168,13 @@ export default function RecentProjectsRow({
                     </div>
                   </div>
                 );
-              })}
+                  })}
+                </div>
+              )}
             </div>
           </div>
-          <div className="hidden md:flex md:flex-col">
-            <div className="z-10 grid grid-cols-[36px_20px_minmax(280px,1fr)_120px_96px_56px] items-center gap-x-3 border-b border-[#E6EBF2] bg-white px-4 py-3 text-sm font-bold uppercase tracking-[0.08em] text-slate-700 dark:border-[#3C3C3C] dark:bg-[#323232] dark:text-zinc-100 xl:grid-cols-[36px_20px_minmax(420px,1fr)_180px_120px_72px] xl:gap-x-5 2xl:grid-cols-[36px_20px_minmax(560px,1fr)_208px_132px_84px] 2xl:gap-x-6">
+          <div className="hidden md:flex min-h-0 flex-1 flex-col">
+            <div className="z-10 grid grid-cols-[36px_20px_minmax(280px,1fr)_120px_96px_56px] items-center gap-x-3 border-b border-[#E6EBF2] bg-white px-4 py-3 text-sm font-bold tracking-[0.02em] text-slate-700 dark:border-[#3C3C3C] dark:bg-[#323232] dark:text-zinc-100 xl:grid-cols-[36px_20px_minmax(420px,1fr)_180px_120px_72px] xl:gap-x-5 2xl:grid-cols-[36px_20px_minmax(560px,1fr)_208px_132px_84px] 2xl:gap-x-6">
               <button
                 type="button"
                 onClick={() => {
@@ -1207,8 +1213,12 @@ export default function RecentProjectsRow({
               <span className="block w-full text-center">Pages</span>
               <span className="text-right">Actions</span>
             </div>
-            <div className={showAllProjects ? "min-h-0 divide-y divide-[#E6EBF2] dark:divide-[#3C3C3C]" : "min-h-0 overflow-y-auto divide-y divide-[#E6EBF2] dark:divide-[#3C3C3C]"}>
-              {mapped.map((project) => {
+            <div className={showAllProjects ? "min-h-0 flex-1 overflow-y-auto" : "min-h-0 overflow-y-auto"}>
+              {showInlineListEmptyState ? (
+                listEmptyState
+              ) : (
+                <div className="divide-y divide-[#E6EBF2] dark:divide-[#3C3C3C]">
+                  {mapped.map((project) => {
                 const isSelected = !!selected[project.id];
                 return (
                   <div
@@ -1357,6 +1367,7 @@ export default function RecentProjectsRow({
                             setListMenuRenamingId(null);
                             return;
                           }
+                          onRowMenuOpen?.();
                           const trigger = event.currentTarget.getBoundingClientRect();
                           setListMenuPosition(getListMenuPosition(trigger));
                           setListMenuOpenId(project.id);
@@ -1375,7 +1386,9 @@ export default function RecentProjectsRow({
                     </div>
                   </div>
                 );
-              })}
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1467,7 +1480,7 @@ export default function RecentProjectsRow({
         ? createPortal(
             <>
               <div
-                className={`fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+72px)] z-[80] flex justify-center px-4 transition-all duration-200 ease-out sm:bottom-10 lg:bottom-14 xl:bottom-18 sm:px-6 ${
+                className={`fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+20px)] z-[80] flex justify-center px-4 transition-all duration-200 ease-out sm:bottom-6 lg:bottom-8 xl:bottom-8 sm:px-6 ${
                   hasSelection
                     ? "pointer-events-auto translate-y-0 opacity-100"
                     : "pointer-events-none translate-y-3 opacity-0"
