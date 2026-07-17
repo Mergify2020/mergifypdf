@@ -441,76 +441,15 @@ body::-webkit-scrollbar-track {
   animation: workspace-launch-screen-enter 240ms ease-out both;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .workspace-launch-screen,
+  .workspace-launch-screen-content {
+    animation: none !important;
+  }
+}
+
 .workspace-launch-screen-content {
   animation: workspace-launch-screen-content-enter 340ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-@keyframes workspace-handoff-overlay-enter {
-  0% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 1;
-  }
-}
-
-@keyframes workspace-handoff-overlay-exit {
-  0% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 1;
-  }
-}
-
-@keyframes workspace-handoff-content-exit {
-  0% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    filter: blur(0);
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(-8px) scale(0.985);
-    filter: blur(8px);
-  }
-}
-
-.workspace-handoff-overlay-enter {
-  animation: workspace-handoff-overlay-enter 180ms ease-out both;
-}
-
-.workspace-handoff-overlay-exit {
-  animation: workspace-handoff-overlay-exit 280ms ease-out both;
-}
-
-.workspace-handoff-content-exit {
-  animation: workspace-handoff-content-exit 220ms cubic-bezier(0.4, 0, 0.2, 1) both;
-}
-
-@keyframes workspace-launch-underlay-reveal {
-  0% {
-    opacity: 0.7;
-    transform: translateY(14px) scale(0.989);
-    filter: blur(14px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    filter: blur(0);
-  }
-}
-
-.workspace-launch-underlay-prep {
-  opacity: 0.7;
-  transform: translateY(14px) scale(0.989);
-  filter: blur(14px);
-  transition: opacity 240ms ease-out, transform 240ms ease-out, filter 240ms ease-out;
-}
-
-.workspace-launch-underlay-reveal {
-  animation: workspace-launch-underlay-reveal 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  will-change: opacity, transform, filter;
 }
 
 /* Keep browser autofill from forcing light blue fields, especially in dark mode. */

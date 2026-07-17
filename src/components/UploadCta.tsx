@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { GUEST_PROJECT_STORAGE_KEY, type GuestProject } from "@/lib/guestProject";
 import { PENDING_UPLOAD_STORAGE_KEY } from "@/lib/pendingUpload";
+import { beginWorkspaceOpenHandoff, cancelWorkspaceOpenHandoff } from "@/lib/workspaceOpenHandoff";
 
 type UploadCtaProps = {
   variant?: "default" | "hero";
@@ -11,8 +12,6 @@ type UploadCtaProps = {
   inputId?: string;
 };
 
-const STARTUP_OVERLAY_KEY = "mpdf:startup-overlay";
-const STARTUP_OVERLAY_CONTEXT_KEY = "mpdf:startup-overlay-context";
 
 export default function UploadCta({
   variant = "default",
@@ -64,6 +63,8 @@ export default function UploadCta({
       }
     }
 
+    beginWorkspaceOpenHandoff([{ file }], Date.now(), { preservePendingUpload: true });
+
     const reader = new FileReader();
     reader.onload = () => {
       try {
@@ -72,13 +73,12 @@ export default function UploadCta({
             PENDING_UPLOAD_STORAGE_KEY,
             JSON.stringify({ name: file.name, data: reader.result })
           );
-          window.sessionStorage?.setItem(STARTUP_OVERLAY_KEY, "1");
-          window.sessionStorage?.setItem(STARTUP_OVERLAY_CONTEXT_KEY, "new");
         }
         router.push("/studio");
       } catch (err) {
         console.error("Failed to stage upload", err);
         setError("Unable to prepare that file. Please try a smaller PDF.");
+        cancelWorkspaceOpenHandoff();
       } finally {
         setBusy(false);
       }
@@ -86,6 +86,7 @@ export default function UploadCta({
     reader.onerror = () => {
       setError("Unable to read that file. Please try again.");
       setBusy(false);
+      cancelWorkspaceOpenHandoff();
     };
     reader.readAsDataURL(file);
   }

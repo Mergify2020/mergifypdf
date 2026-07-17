@@ -262,6 +262,16 @@ export default function HomeProjectsSearch({
 
   useEffect(() => {
     if (!showAllProjects) return;
+    const frame = window.requestAnimationFrame(() => {
+      window.dispatchEvent(new Event("workspace-content-ready"));
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, [showAllProjects]);
+
+  useEffect(() => {
+    if (!showAllProjects) return;
 
     const track = quickActionsTrackRef.current;
     if (!track) return;

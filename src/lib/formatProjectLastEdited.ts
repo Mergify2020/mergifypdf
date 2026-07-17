@@ -29,10 +29,13 @@ export function formatProjectRelativeTime(value: string | number | Date, referen
     return `${displayDays} ${displayDays === 1 ? "day" : "days"} ago`;
   }
 
-  const inSameYear = target.getFullYear() === now.getFullYear();
-  const formatter = new Intl.DateTimeFormat("en-US", inSameYear
-    ? { month: "short", day: "numeric" }
-    : { month: "short", day: "numeric", year: "numeric" });
+  const inSameYear = target.getUTCFullYear() === now.getUTCFullYear();
+  const formatter = new Intl.DateTimeFormat(
+    "en-US",
+    inSameYear
+      ? { month: "short", day: "numeric", timeZone: "UTC" }
+      : { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }
+  );
 
   return formatter.format(target);
 }

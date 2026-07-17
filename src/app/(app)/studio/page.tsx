@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getServerSessionSafe } from "@/lib/serverSession";
 import { prisma } from "@/lib/prisma";
 import StudioClientLoader from "./StudioClientLoader";
+import { getStudioProjectIdFromSearchParams } from "@/lib/studioRoute";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -14,13 +15,7 @@ export default async function StudioPage({
   searchParams?: Promise<StudioSearchParams>;
 }) {
   const resolved = ((await searchParams) ?? {}) as StudioSearchParams;
-  const projectParam = resolved.project;
-  const projectId =
-    typeof projectParam === "string"
-      ? projectParam
-      : Array.isArray(projectParam)
-        ? projectParam[0]
-        : null;
+  const projectId = getStudioProjectIdFromSearchParams(resolved);
 
   if (projectId) {
     const session = await getServerSessionSafe(250);

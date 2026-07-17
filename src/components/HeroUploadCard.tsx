@@ -5,9 +5,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { GUEST_PROJECT_STORAGE_KEY, type GuestProject } from "@/lib/guestProject";
 import { PENDING_UPLOAD_STORAGE_KEY } from "@/lib/pendingUpload";
-
-const STARTUP_OVERLAY_KEY = "mpdf:startup-overlay";
-const STARTUP_OVERLAY_CONTEXT_KEY = "mpdf:startup-overlay-context";
+import { beginWorkspaceOpenHandoff, cancelWorkspaceOpenHandoff } from "@/lib/workspaceOpenHandoff";
 const MAX_HERO_FILES = 12;
 
 export default function HeroUploadCard() {
@@ -20,7 +18,6 @@ export default function HeroUploadCard() {
   const [error, setError] = useState<string | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [extraCount, setExtraCount] = useState(0);
-  const [progress, setProgress] = useState(0);
   const [uiState, setUiState] = useState<"idle" | "ready" | "staging">("idle");
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [insertIndex, setInsertIndex] = useState<number | null>(null);
@@ -127,7 +124,6 @@ export default function HeroUploadCard() {
     const remaining = Math.max(0, nextFiles.length - 1);
     setSelectedFiles((prev) => (prev.length ? [...prev, ...nextFiles] : nextFiles));
     setExtraCount((prev) => (prev ? prev + remaining : remaining));
-    setProgress(0);
     setUiState("ready");
   }
 
@@ -164,7 +160,6 @@ export default function HeroUploadCard() {
       setUiState("idle");
       setConfirmDeleteIndex(null);
     }
-    setProgress(0);
     setBusy(false);
     setError(null);
     if (readerRef.current) {
@@ -415,7 +410,12 @@ export default function HeroUploadCard() {
     setBusy(true);
     setError(null);
     setUiState("staging");
-    setProgress(0);
+    const startedAt = Date.now();
+    beginWorkspaceOpenHandoff(
+      selectedFiles.map((file) => ({ file })),
+      startedAt,
+      { preservePendingUpload: true },
+    );
     const uploadId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     uploadIdRef.current = uploadId;
     try {
@@ -429,21 +429,22 @@ export default function HeroUploadCard() {
           reader.onerror = () => reject(new Error("read_failed"));
           reader.readAsDataURL(file);
         });
-        if (uploadIdRef.current !== uploadId) return;
+        if (uploadIdRef.current !== uploadId) {
+          cancelWorkspaceOpenHandoff();
+          return;
+        }
         staged.push({ name: file.name, data });
-        setProgress(Math.round(((i + 1) / selectedFiles.length) * 100));
       }
       window.localStorage?.setItem(
         PENDING_UPLOAD_STORAGE_KEY,
         JSON.stringify({ files: staged })
       );
-      window.sessionStorage?.setItem(STARTUP_OVERLAY_KEY, "1");
-      window.sessionStorage?.setItem(STARTUP_OVERLAY_CONTEXT_KEY, "new");
       router.push("/studio");
     } catch (err) {
       console.error("Failed to stage upload", err);
       setError("Unable to prepare those files. Please try again.");
       setUiState("ready");
+      cancelWorkspaceOpenHandoff();
     } finally {
       setBusy(false);
       readerRef.current = null;

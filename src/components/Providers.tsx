@@ -5,6 +5,8 @@ import { SessionProvider } from "next-auth/react";
 import AuthStateSync from "@/components/AuthStateSync";
 import PostHogInit from "@/components/PostHogInit";
 import PostHogIdentify from "@/components/PostHogIdentify";
+import ProjectEntryLoadingHost from "@/components/ProjectEntryLoadingHost";
+import ThemePreferenceSync from "@/components/ThemePreferenceSync";
 
 export default function Providers({
   children,
@@ -18,8 +20,10 @@ export default function Providers({
   return (
     <SessionProvider session={session} refetchOnWindowFocus>
       <AuthStateSync />
+      <ThemePreferenceSync />
       {enableAnalytics ? <PostHogInit /> : null}
       {enableAnalytics ? <PostHogIdentify /> : null}
+      <ProjectEntryLoadingHost />
       {children}
     </SessionProvider>
   );

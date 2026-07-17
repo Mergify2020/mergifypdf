@@ -11,8 +11,10 @@ import {
 import { useWorkspaceFilePreloader, type PendingWorkspaceFile } from "@/components/useWorkspaceFilePreloader";
 import PendingFilesReorderList from "@/components/PendingFilesReorderList";
 import { uploadProjectPreviewFromFile } from "@/lib/projectPreview";
+import { buildStudioProjectHref } from "@/lib/studioRoute";
 import {
   beginWorkspaceOpenHandoff,
+  cancelWorkspaceOpenHandoff,
   WORKSPACE_OPEN_IN_PROGRESS_STORAGE_KEY,
 } from "@/lib/workspaceOpenHandoff";
 
@@ -22,11 +24,8 @@ const STARTUP_OVERLAY_KEY = "mpdf:startup-overlay";
 const STARTUP_OVERLAY_CONTEXT_KEY = "mpdf:startup-overlay-context";
 const EXISTING_PROJECT_OVERLAY_STORAGE_KEY = "mpdf:existing-project-overlay";
 const MAX_PENDING_FILES = 12;
-const WORKSPACE_LAUNCH_MIN_MS = 900;
-const WORKSPACE_LAUNCH_HOLD_FOR_TESTING = false;
 const WORKSPACE_LAUNCH_MODAL_EXIT_MS = 180;
 const WORKSPACE_LAUNCH_FILE_FLASH_MS = 130;
-const WORKSPACE_LAUNCH_PANEL_COMPLETE_MS = 0;
 
 type Props = {
   className?: string;
@@ -225,8 +224,8 @@ export default function StartProjectButton({
       launchFlashTimerRef.current = null;
     }, WORKSPACE_LAUNCH_FILE_FLASH_MS);
     setBusy(true);
-    beginWorkspaceOpenHandoff(pendingFiles, startedAt);
     await resetWorkspaceStorage();
+    beginWorkspaceOpenHandoff(pendingFiles, startedAt);
     try {
       const res = await fetch("/api/projects", {
         method: "POST",
@@ -237,6 +236,7 @@ export default function StartProjectButton({
         setError("Could not create that project. Please try again.");
         setBusy(false);
         resetLaunchTransition();
+        cancelWorkspaceOpenHandoff();
         return;
       }
       const json = (await res.json().catch(() => null)) as { project?: { id?: string } } | null;
@@ -245,6 +245,7 @@ export default function StartProjectButton({
         setError("Could not create that project. Please try again.");
         setBusy(false);
         resetLaunchTransition();
+        cancelWorkspaceOpenHandoff();
         return;
       }
       void uploadProjectPreviewFromFile(pendingFiles[0]?.file, id);
@@ -254,22 +255,12 @@ export default function StartProjectButton({
         });
       }
       queuePreload(pendingFiles, id);
-      const elapsed = Date.now() - startedAt;
-      if (elapsed < WORKSPACE_LAUNCH_MIN_MS) {
-        await new Promise((resolve) => setTimeout(resolve, WORKSPACE_LAUNCH_MIN_MS - elapsed));
-      }
-      if (WORKSPACE_LAUNCH_PANEL_COMPLETE_MS > 0) {
-        await new Promise((resolve) => setTimeout(resolve, WORKSPACE_LAUNCH_PANEL_COMPLETE_MS));
-      }
-      if (WORKSPACE_LAUNCH_HOLD_FOR_TESTING) {
-        return;
-      }
-      router.push(`/studio?project=${encodeURIComponent(id)}`);
+      router.push(buildStudioProjectHref(id));
     } catch {
       setError("Could not create that project. Please try again.");
       setBusy(false);
       resetLaunchTransition();
-      window.dispatchEvent(new Event("workspace-launch-overlay-hide"));
+      cancelWorkspaceOpenHandoff();
     }
   }
 

@@ -32,7 +32,11 @@ import {
   type PDFFont,
 } from "pdf-lib";
 import { AnimatePresence, motion } from "framer-motion";
-import { WORKSPACE_OPEN_IN_PROGRESS_STORAGE_KEY } from "@/lib/workspaceOpenHandoff";
+import {
+  cancelWorkspaceOpenHandoff,
+  WORKSPACE_OPEN_IN_PROGRESS_STORAGE_KEY,
+} from "@/lib/workspaceOpenHandoff";
+import { buildStudioProjectHref, getStudioProjectIdFromSearchParams } from "@/lib/studioRoute";
 import {
   getProjectsSummaryCache,
   setProjectsSummaryCache,
@@ -133,6 +137,7 @@ type PageItem = {
   rotation: number;
   width: number;
   height: number;
+  isPlaceholder?: boolean;
 };
 type Point = { x: number; y: number; move?: boolean };
 type DrawingTool = "highlight" | "pen" | "pencil" | "text";
@@ -473,6 +478,7 @@ const STARTUP_OVERLAY_KEY = "mpdf:startup-overlay";
 const STARTUP_OVERLAY_CONTEXT_KEY = "mpdf:startup-overlay-context";
 const WORKSPACE_LAUNCH_OVERLAY_STORAGE_KEY = "mpdf:workspace-launch-overlay";
 const EXISTING_PROJECT_OVERLAY_STORAGE_KEY = "mpdf:existing-project-overlay";
+const WORKSPACE_EXIT_TRANSITION_MS = 200;
 const WORKSPACE_PREVIEW_CACHE_KEY = "mpdf:preview-cache";
 const PREVIEW_CACHE_VERSION = 1;
 const PREVIEW_CACHE_NEAR_RANGE = 1;
@@ -1102,7 +1108,7 @@ async function getPdfAccessTarget(res: Response) {
 function useProjects(ownerKey: string | null, enabled = true) {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const projectParam = typeof window !== "undefined" ? searchParams.get("project") : null;
+  const projectParam = getStudioProjectIdFromSearchParams(searchParams);
   const initialProjectId = projectParam;
   const [projects, setProjects] = useState<CloudProject[]>([]);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(initialProjectId);
@@ -1234,7 +1240,7 @@ function useProjects(ownerKey: string | null, enabled = true) {
           }
           setProjects((prev) => [created, ...prev]);
           setCurrentProjectId(created.id);
-          router.replace(`/studio?project=${encodeURIComponent(created.id)}`);
+          router.replace(buildStudioProjectHref(created.id));
           return created;
         }
       } catch {
@@ -2039,6 +2045,7 @@ function mergePageList(current: PageItem[], nextPages: PageItem[]) {
   return nextPages.map((page) => {
     const existing = byId.get(page.id);
     if (!existing) return page;
+    if (existing.isPlaceholder) return { ...page, isPlaceholder: undefined };
     const rotation = typeof existing.rotation === "number" ? existing.rotation : page.rotation;
     const preview = existing.preview || page.preview;
     const thumb = existing.thumb || page.thumb;
@@ -2079,6 +2086,7 @@ function mergePageListPreserveOrder(current: PageItem[], nextPages: PageItem[]) 
     .filter((page) => nextById.has(page.id))
     .map((page) => {
       const next = nextById.get(page.id)!;
+      if (page.isPlaceholder) return { ...next, isPlaceholder: undefined };
       const rotation = typeof page.rotation === "number" ? page.rotation : next.rotation;
       const preview = page.preview || next.preview;
       const thumb = page.thumb || next.thumb;
@@ -2095,6 +2103,7 @@ function mergePageListPreserveOrder(current: PageItem[], nextPages: PageItem[]) 
         thumbHeight,
         width,
         height,
+        isPlaceholder: undefined,
       };
     });
   const existingIds = new Set(preserved.map((page) => page.id));
@@ -2455,7 +2464,7 @@ function WorkspaceClient() {
   const searchParams = useSearchParams();
   const studioOwnerKey = authSession?.user?.id ?? authSession?.user?.email ?? null;
   const { saveProject, savingProject, currentProjectId } = useProjects(studioOwnerKey, Boolean(authSession?.user));
-  const projectParam = searchParams.get("project");
+  const projectParam = getStudioProjectIdFromSearchParams(searchParams);
   const projectKey = projectParam ?? currentProjectId ?? "local";
   const isDevEnvironment = process.env.NODE_ENV !== "production";
   const [showAuthGate, setShowAuthGate] = useState(false);
@@ -2584,7 +2593,6 @@ function WorkspaceClient() {
   const startupProgressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startupOverlayShownRef = useRef(false);
   const startupOverlayProjectRef = useRef<string | null>(projectParam);
-  const [showExistingProjectWorkspace, setShowExistingProjectWorkspace] = useState(() => Boolean(projectParam));
   const [hasWorkspaceOpenInProgress] = useState(() => {
     if (typeof window === "undefined") return false;
     try {
@@ -2593,7 +2601,9 @@ function WorkspaceClient() {
       return false;
     }
   });
-  const existingProjectOverlayHideSentRef = useRef(false);
+  const workspaceReadySentRef = useRef(false);
+  const [workspaceExiting, setWorkspaceExiting] = useState(false);
+  const workspaceExitTimerRef = useRef<number | null>(null);
   const [loadedPreviewIds, setLoadedPreviewIds] = useState<Set<string>>(() => new Set());
   const [loadedThumbIds, setLoadedThumbIds] = useState<Set<string>>(() => new Set());
   const INSERT_BEFORE_FIRST_ID = "__before_first__";
@@ -2622,9 +2632,8 @@ function WorkspaceClient() {
     if (startupOverlayProjectRef.current !== projectParam) {
       startupOverlayProjectRef.current = projectParam;
       startupOverlayShownRef.current = false;
-      existingProjectOverlayHideSentRef.current = false;
+      workspaceReadySentRef.current = false;
       setShowStartupOverlay(false);
-      setShowExistingProjectWorkspace(Boolean(projectParam));
       setLoading(Boolean(projectParam));
       setSources([]);
       setPages([]);
@@ -2641,17 +2650,9 @@ function WorkspaceClient() {
     }
   }, [projectParam]);
 
-  useEffect(() => {
-    if (projectParam) return;
-    setShowExistingProjectWorkspace(false);
-  }, [projectParam]);
 
-  useEffect(() => {
-    if (pages.length === 0) return;
-    setShowExistingProjectWorkspace(false);
-  }, [pages.length]);
 
-  const shouldShowStartupOverlay = showStartupOverlay && !hasPersistentHandoffOverlay && !hasWorkspaceOpenInProgress;
+  const shouldShowStartupOverlay = showStartupOverlay && !hasPersistentHandoffOverlay && !hasWorkspaceOpenInProgress && !projectParam;
 
   useEffect(() => {
     setLoadedPreviewIds((prev) => {
@@ -5121,7 +5122,7 @@ const timer =
   const toolRailInnerBase = "flex h-9 w-9 items-center justify-center";
   const toolRailInnerInactive = "rounded-lg hover:bg-slate-200 dark:hover:bg-[#2A2A31]";
   const toolRailInnerActive = "rounded-lg bg-[#6C47FF] text-white";
-  const toolbarLoading = loading || !sourcesHydrated;
+  const toolbarLoading = loading;
   const searchPopupRightOffset = showPageOrderPanel ? 40 : -232;
   const controlButtonClass =
     "flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,0.08)] transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-40 dark:border-[#2A2A31] dark:bg-[#1C1C1F] dark:text-zinc-200 dark:hover:border-[#4A4A4A] dark:hover:text-white";
@@ -5514,6 +5515,7 @@ const timer =
     let cancelled = false;
 
     async function hydrateFromStorage() {
+      const hydrateStartedAt = performance.now();
       hasHydratedSources.current = false;
       setProjectHasSources(null);
       const storageProjectId = projectParam ?? currentProjectId ?? null;
@@ -5568,7 +5570,7 @@ const timer =
             throw new Error(`Cloud project fetch failed with status ${res.status}`);
           }
           const json = (await res.json().catch(() => null)) as {
-            project?: { data?: unknown; pdfUrl?: string | null; previewUrl?: string | null };
+            project?: { data?: unknown; pdfUrl?: string | null; previewUrl?: string | null; pagesCount?: number | null };
           } | null;
           const cloudData = json?.project?.data;
           const cloudPages =
@@ -5587,6 +5589,24 @@ const timer =
             json?.project && "previewUrl" in json.project && typeof json.project.previewUrl === "string"
               ? json.project.previewUrl
               : null;
+          const projectPagesCount =
+            typeof json?.project?.pagesCount === "number" && json.project.pagesCount > 0
+              ? json.project.pagesCount
+              : 0;
+          const createPlaceholderPages = (sourceId: string, count: number): PageItem[] =>
+            Array.from({ length: count }, (_, pageIdx) => ({
+              id: buildPageId(sourceId, pageIdx),
+              srcIdx: 0,
+              pageIdx,
+              thumb: "",
+              thumbWidth: 0,
+              thumbHeight: 0,
+              preview: "",
+              rotation: 0,
+              width: 612,
+              height: 792,
+              isPlaceholder: true,
+            }));
           const paintCloudPages = (sourceIds: string[], options?: { force?: boolean }) => {
             if (cancelled) return;
             if (!options?.force && pagesRef.current.length > 0) return;
@@ -5621,10 +5641,24 @@ const timer =
             if (!cancelled) {
               setSources([combinedSource]);
               setError(null);
+              if (projectPagesCount > 0 && (!Array.isArray(cloudPages) || cloudPages.length === 0)) {
+                const placeholderPages = createPlaceholderPages(combinedStorageId, projectPagesCount);
+                setPages(sortPagesBySavedOrder(placeholderPages, savedPageOrderRef.current));
+                debugStudioLoad("project-placeholder-pages", {
+                  projectId,
+                  count: placeholderPages.length,
+                  durationMs: Math.round(performance.now() - fetchStartedAt),
+                });
+              }
             }
             if (!cancelled) {
               hasHydratedSources.current = true;
               setSourcesHydrated(true);
+              debugStudioLoad("project-sources-ready", {
+                projectId,
+                durationMs: Math.round(performance.now() - fetchStartedAt),
+                source: "cloud",
+              });
             }
           };
           if (pdfUrl) {
@@ -5695,27 +5729,29 @@ const timer =
           return;
         }
 
-        const restored: SourceRef[] = [];
-        for (const entry of parsed) {
-          if (!entry || typeof entry !== "object") continue;
-          const id = (entry as StoredSourceMeta).id ?? (entry as { storageId?: string }).storageId;
-          if (!id) continue;
-          try {
-            const stored = await readFileBlob(id);
-            const blobRecord = stored?.blob instanceof Blob ? stored.blob : null;
-            if (!blobRecord) continue;
-            const objectUrl = URL.createObjectURL(blobRecord);
-            restored.push({
-              storageId: id,
-              url: objectUrl,
-              name: entry.name ?? stored?.name ?? "Document.pdf",
-              size: entry.size ?? stored?.size ?? blobRecord.size ?? 0,
-              updatedAt: entry.updatedAt ?? stored?.updatedAt ?? Date.now(),
-            });
-          } catch (err) {
-            console.error("Failed to restore stored PDF", err);
-          }
-        }
+        const restored = (await Promise.all(
+          parsed.map(async (entry): Promise<SourceRef | null> => {
+            if (!entry || typeof entry !== "object") return null;
+            const id = (entry as StoredSourceMeta).id ?? (entry as { storageId?: string }).storageId;
+            if (!id) return null;
+            try {
+              const stored = await readFileBlob(id);
+              const blobRecord = stored?.blob instanceof Blob ? stored.blob : null;
+              if (!blobRecord) return null;
+              const objectUrl = URL.createObjectURL(blobRecord);
+              return {
+                storageId: id,
+                url: objectUrl,
+                name: entry.name ?? stored?.name ?? "Document.pdf",
+                size: entry.size ?? stored?.size ?? blobRecord.size ?? 0,
+                updatedAt: entry.updatedAt ?? stored?.updatedAt ?? Date.now(),
+              };
+            } catch (err) {
+              console.error("Failed to restore stored PDF", err);
+              return null;
+            }
+          }),
+        )).filter((item): item is SourceRef => item !== null);
 
         if (!cancelled) {
           if (restored.length > 0) {
@@ -5740,6 +5776,10 @@ const timer =
         if (!cancelled) {
           hasHydratedSources.current = true;
           setSourcesHydrated(true);
+          debugStudioLoad("storage-hydration-complete", {
+            projectId,
+            durationMs: Math.round(performance.now() - hydrateStartedAt),
+          });
         }
       }
     }
@@ -6389,6 +6429,7 @@ const timer =
 
   useEffect(() => {
     if (pages.length === 0) return;
+    if (renderedSourcesRef.current === 0) return;
     if (pendingInitialRenderRef.current.length === 0) return;
     const initialPages = pendingInitialRenderRef.current;
     pendingInitialRenderRef.current = [];
@@ -6943,6 +6984,7 @@ const timer =
 
   useEffect(() => {
     if (pages.length === 0) return;
+    if (renderedSourcesRef.current === 0) return;
     const candidates = new Set<string>();
     nearPageIds.forEach((id) => candidates.add(id));
     candidates.forEach((id) => {
@@ -6954,6 +6996,7 @@ const timer =
 
   useEffect(() => {
     if (pages.length === 0) return;
+    if (renderedSourcesRef.current === 0) return;
     const candidates = new Set<string>(visiblePageIds);
     const activeIndex =
       activePageIndexState >= 0 && activePageIndexState < pages.length ? activePageIndexState : 0;
@@ -6972,6 +7015,7 @@ const timer =
 
   useEffect(() => {
     if (pages.length === 0) return;
+    if (renderedSourcesRef.current === 0) return;
     const pageList = pagesRef.current;
     window.requestAnimationFrame(() => {
       const orderedThumbIds: string[] = [];
@@ -7010,19 +7054,24 @@ const timer =
   }, [activePageIndexState, enqueueThumbRender, largeDocMode, nearPageIds, pages.length, visiblePageIds]);
 
   useEffect(() => {
-    if (existingProjectOverlayHideSentRef.current) return;
+    if (workspaceReadySentRef.current) return;
     if (typeof window === "undefined") return;
     if (!projectParam) return;
-    if (loading) return;
-    if (!sourcesHydrated && error == null) return;
-    existingProjectOverlayHideSentRef.current = true;
+    if (loading && pages.length === 0 && error == null) return;
+    workspaceReadySentRef.current = true;
+    debugStudioLoad("workspace-ready-dispatch", {
+      projectId: projectParam,
+      loading,
+      pagesCount: pages.length,
+      hasError: Boolean(error),
+    });
     const frameId = window.requestAnimationFrame(() => {
       window.dispatchEvent(new Event("workspace-content-ready"));
     });
     return () => {
       window.cancelAnimationFrame(frameId);
     };
-  }, [error, loading, projectParam, sourcesHydrated]);
+  }, [error, loading, pages.length, projectParam]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -7081,12 +7130,16 @@ const timer =
                 return new File([blob], entry.name as string, { type: blob.type ?? "application/pdf" });
               });
             if (files.length > 0) {
-              processSelectedFiles(files);
+              void processSelectedFiles(files).finally(() => {
+                window.dispatchEvent(new Event("workspace-content-ready"));
+              });
             }
           } else if (parsed?.data && parsed?.name) {
             const blob = dataURLToBlob(parsed.data as string);
             const file = new File([blob], parsed.name as string, { type: blob.type ?? "application/pdf" });
-            processSelectedFiles([file]);
+            void processSelectedFiles([file]).finally(() => {
+              window.dispatchEvent(new Event("workspace-content-ready"));
+            });
           }
         } catch (err) {
           console.error("Failed to import pending upload", err);
@@ -13183,17 +13236,32 @@ const timer =
   }
 
   const handleLogoNavigate = useCallback(
-    (event: React.MouseEvent<HTMLAnchorElement>) => {
+    (event: React.MouseEvent<HTMLElement>) => {
       event.preventDefault();
       event.stopPropagation();
-      if (typeof window !== "undefined") {
-        window.location.href = "/";
-        return;
-      }
-      router.push("/");
+      if (workspaceExiting) return;
+
+      cancelWorkspaceOpenHandoff();
+      setWorkspaceExiting(true);
+      const reduceMotion =
+        window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+      workspaceExitTimerRef.current = window.setTimeout(() => {
+        router.push("/");
+        workspaceExitTimerRef.current = null;
+      }, reduceMotion ? 0 : WORKSPACE_EXIT_TRANSITION_MS);
     },
-    [router]
+    [router, workspaceExiting]
   );
+
+  useEffect(() => {
+    router.prefetch("/");
+    return () => {
+      if (workspaceExitTimerRef.current !== null) {
+        window.clearTimeout(workspaceExitTimerRef.current);
+        workspaceExitTimerRef.current = null;
+      }
+    };
+  }, [router]);
 
   function handleRotatePage(pageId: string) {
     rotationSaveRef.current = true;
@@ -13965,16 +14033,33 @@ const timer =
           </div>
         </div>
       ) : null}
-      <div className="flex min-h-0 flex-1 flex-col bg-[var(--app-surface)] transition-opacity duration-[260ms] ease-out">
+      <div
+        className={`flex min-h-0 flex-1 flex-col bg-[var(--app-surface)] transition-[opacity,transform,filter] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+          workspaceExiting
+            ? "pointer-events-none translate-y-1 scale-[0.995] opacity-0 blur-[1px]"
+            : "translate-y-0 scale-100 opacity-100 blur-0"
+        }`}
+        style={{ transitionDuration: `${WORKSPACE_EXIT_TRANSITION_MS}ms` }}
+      >
       <header className="sticky top-0 z-40 border-b border-slate-200/60 bg-white dark:border-[#4A4A4A]/60 dark:bg-[#323232]">
         {/* Top row */}
         <div className="w-full border-b border-slate-100 bg-white dark:border-[#4A4A4A]/60 dark:bg-[#323232]">
           <div className="relative flex h-14 w-full items-center justify-between gap-4 pl-4 pr-0 lg:pl-6 lg:pr-0">
-            <Link
+            <div className="relative z-10 flex shrink-0 items-center gap-1">
+              <button
+              type="button"
+              className="relative z-10 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF] dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white"
+              aria-label="Back to projects"
+              onClick={handleLogoNavigate}
+              disabled={workspaceExiting}
+            >
+              <ChevronLeft className="h-5 w-5" aria-hidden />
+              </button>
+              <Link
               href="/"
-              className="relative z-10 inline-flex shrink-0 items-center gap-2"
+              className="relative z-10 -ml-2 inline-flex shrink-0 items-center gap-2"
               aria-label="Back to workspace"
-              onClickCapture={handleLogoNavigate}
+              onClick={handleLogoNavigate}
             >
               <Image
                 src="/logos/home-expanded-sidebar-logo-light-v6.svg"
@@ -13992,7 +14077,8 @@ const timer =
                 priority
                 className="hidden dark:block"
               />
-            </Link>
+              </Link>
+            </div>
 
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-56">
               <div className="pointer-events-auto flex min-w-0 max-w-[420px] items-center justify-center gap-2 sm:max-w-[520px] md:max-w-[620px]">
@@ -14577,7 +14663,7 @@ const timer =
                   </motion.div>
                 ) : null}
 
-	                {!organizeMode && (pages.length > 0 || loading || showExistingProjectWorkspace) ? (
+	                {!organizeMode && (pages.length > 0 || loading ) ? (
 	                  <motion.div
 	                    key="preview-view"
 	                    initial={{ opacity: 0.95, scale: 0.97 }}

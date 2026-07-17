@@ -12,6 +12,7 @@ import {
   beginExistingWorkspaceOpenHandoff,
   shouldHandleWorkspaceOpenClick,
 } from "@/lib/workspaceOpenHandoff";
+import { buildStudioProjectHref } from "@/lib/studioRoute";
 
 type PreviewCacheEntry = {
   url: string;
@@ -245,7 +246,7 @@ export default function ProjectCard({
 
   const openProject = (projectId: string) => {
     beginExistingWorkspaceOpenHandoff(projectId);
-    router.push(`/studio?project=${encodeURIComponent(projectId)}`);
+    router.push(buildStudioProjectHref(projectId));
   };
 
   function isMobileViewport() {
@@ -1208,7 +1209,7 @@ export default function ProjectCard({
                     {`Created "Copy of ${copyToast.name}"`}
                   </p>
                   <Link
-                    href={`/studio?project=${encodeURIComponent(copyToast.id)}`}
+                    href={buildStudioProjectHref(copyToast.id)}
                     className="shrink-0 rounded-md border-2 border-white/25 px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-white/10"
                     onClick={(event) => {
                       if (!shouldHandleWorkspaceOpenClick(event)) return;
@@ -1226,7 +1227,7 @@ export default function ProjectCard({
           : null}
         <div className="project-card-preview relative m-[3px] w-[calc(100%-6px)] aspect-square rounded-[12px] border border-[rgba(15,23,42,0.09)] bg-[#EEF2F7] shadow-[inset_0_1px_0_rgba(255,255,255,0.75),0_1px_2px_rgba(15,23,42,0.04)] transition-[background-color,border-color,box-shadow] duration-200 dark:border-transparent dark:bg-[#2A2A2A] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.02)]">
           <Link
-            href={`/studio?project=${encodeURIComponent(project.id)}`}
+            href={buildStudioProjectHref(project.id)}
             className="absolute inset-0"
             aria-label={`Open ${project.title}`}
             onClick={(event) => {
@@ -1311,7 +1312,7 @@ export default function ProjectCard({
           ) : null}
           {showResumeBadge && !isSelected ? (
             <Link
-              href={`/studio?project=${encodeURIComponent(project.id)}`}
+              href={buildStudioProjectHref(project.id)}
               className="project-card-resume absolute bottom-2.5 right-2.5 hidden rounded-full bg-[#6C47FF] px-3.5 py-1 text-[12px] font-semibold text-white shadow-sm transition-colors hover:bg-[#5B38E6] sm:inline-flex"
               aria-label={`Resume ${project.title}`}
                   >

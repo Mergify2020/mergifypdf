@@ -38,18 +38,16 @@ import {
   PROJECT_NAME_STORAGE_KEY,
   deriveProjectNameFromFilename,
 } from "@/lib/projectName";
-import { PENDING_UPLOAD_STORAGE_KEY } from "@/lib/pendingUpload";
 import {
-  WORKSPACE_OPEN_IN_PROGRESS_STORAGE_KEY,
-  readExistingWorkspaceProjectId,
-  preloadExistingWorkspaceProject,
+  beginExistingWorkspaceOpenHandoff,
+  beginWorkspaceOpenHandoff,
+  cancelWorkspaceOpenHandoff,
 } from "@/lib/workspaceOpenHandoff";
+import { buildStudioProjectHref } from "@/lib/studioRoute";
 import AppHeaderBrand from "./AppHeaderBrand";
 import SettingsMenu from "./SettingsMenu";
 import HeroHeader from "./HeroHeader";
-import LoadingOverlay from "./LoadingOverlay";
 import PendingFilesReorderList from "@/components/PendingFilesReorderList";
-import WorkspaceLaunchLoadingState from "@/components/WorkspaceLaunchLoadingState";
 import BillingStatusBanner from "@/components/BillingStatusBanner";
 import { useAvatarPreference } from "@/lib/useAvatarPreference";
 import { resetAuthScopedClientState } from "@/lib/authClientState";
@@ -75,23 +73,8 @@ const AccountSettingsPage = dynamic(
 const WORKSPACE_META_KEY = "mpdf:files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
 const MAX_PENDING_FILES = 12;
-const WORKSPACE_LAUNCH_MIN_MS = 900;
-const WORKSPACE_LAUNCH_HOLD_FOR_TESTING = false;
 const WORKSPACE_LAUNCH_MODAL_EXIT_MS = 180;
 const WORKSPACE_LAUNCH_FILE_FLASH_MS = 130;
-const WORKSPACE_LAUNCH_PANEL_COMPLETE_MS = 0;
-const WORKSPACE_LAUNCH_PRE_COMPLETE_MAX_PROGRESS = 0.82;
-const WORKSPACE_LAUNCH_FALLBACK_COMPLETE_MS = 3500;
-const WORKSPACE_LAUNCH_OVERLAY_COMPLETE_HOLD_MS = 120;
-const WORKSPACE_LAUNCH_OVERLAY_EXIT_MS = 260;
-const WORKSPACE_LAUNCH_OVERLAY_STORAGE_KEY = "mpdf:workspace-launch-overlay";
-const STARTUP_OVERLAY_KEY = "mpdf:startup-overlay";
-const STARTUP_OVERLAY_CONTEXT_KEY = "mpdf:startup-overlay-context";
-const EXISTING_PROJECT_OVERLAY_STORAGE_KEY = "mpdf:existing-project-overlay";
-const EXISTING_PROJECT_OVERLAY_EXIT_MS = 220;
-const EXISTING_PROJECT_OVERLAY_MIN_VISIBLE_MS = 700;
-const EXISTING_PROJECT_OVERLAY_MAX_WAIT_MS = 6000;
-const EXISTING_PROJECT_OVERLAY_AUTO_CLOSE_MS = 900;
 const SHOULD_RUN_HOME_BOOTSTRAP = process.env.NODE_ENV === "production";
 const SHOULD_AUTO_FETCH_PREVIEWS = process.env.NODE_ENV === "production";
 const SIDEBAR_EXPANDED_KEY = "mpdf:sidebar-expanded";
@@ -125,14 +108,7 @@ async function resetWorkspaceStorage() {
   } catch {
     // ignore
   }
-  try {
-    window.sessionStorage?.removeItem(STARTUP_OVERLAY_KEY);
-    window.sessionStorage?.removeItem(STARTUP_OVERLAY_CONTEXT_KEY);
-    window.sessionStorage?.removeItem(EXISTING_PROJECT_OVERLAY_STORAGE_KEY);
-    window.sessionStorage?.removeItem(WORKSPACE_OPEN_IN_PROGRESS_STORAGE_KEY);
-  } catch {
-    // ignore
-  }
+  cancelWorkspaceOpenHandoff();
 }
 
 async function uploadProjectPdfFromFile(file: File | null | undefined, projectId: string) {
@@ -232,37 +208,6 @@ interface WorkspaceShellProps {
   };
 }
 
-function shouldShowBootLoader(): boolean {
-  return false;
-}
-
-function bootLoaderMinVisibleMs(): number {
-  return 450;
-}
-
-function bootLoaderShowDelayMs(): number {
-  return 240;
-}
-
-function getWorkspaceLaunchProgress(elapsedMs: number): number {
-  const safeElapsed = Math.max(0, elapsedMs);
-  let next = 0;
-  if (safeElapsed < 700) {
-    next = (safeElapsed / 700) * 0.32;
-  } else if (safeElapsed < 1800) {
-    next = 0.32 + ((safeElapsed - 700) / 1100) * 0.38;
-  } else {
-    const tail = 1 - Math.exp(-(safeElapsed - 1800) / 1200);
-    next = 0.7 + tail * 0.12;
-  }
-  return Math.min(next, WORKSPACE_LAUNCH_PRE_COMPLETE_MAX_PROGRESS);
-}
-
-type PersistedWorkspaceLaunchOverlay = {
-  files: PendingWorkspaceFile[];
-  startedAtMs: number | null;
-};
-
 export default function WorkspaceShell({
   children,
   initialSidebarExpanded = true,
@@ -281,41 +226,6 @@ export default function WorkspaceShell({
   const lastFailedPreviewRef = useRef<Map<string, string>>(new Map());
   const pathname = usePathname();
   const { queuePreload } = useWorkspaceFilePreloader();
-  const readPersistedWorkspaceLaunchOverlay = (): PersistedWorkspaceLaunchOverlay => {
-    if (typeof window === "undefined") return { files: [], startedAtMs: null };
-    try {
-      const raw = window.sessionStorage?.getItem(WORKSPACE_LAUNCH_OVERLAY_STORAGE_KEY);
-      if (!raw) return { files: [], startedAtMs: null };
-      const parsed = JSON.parse(raw) as { names?: unknown; startedAtMs?: unknown };
-      const names = Array.isArray(parsed?.names)
-        ? parsed.names.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
-        : [];
-      const startedAtMs =
-        typeof parsed?.startedAtMs === "number" && Number.isFinite(parsed.startedAtMs)
-          ? parsed.startedAtMs
-          : null;
-      return {
-        files: names.map((name, index) => ({
-          id: `launch-overlay-${index}-${name}`,
-          file: new File([], name, { type: "application/pdf" }),
-        })),
-        startedAtMs,
-      };
-    } catch {
-      return { files: [], startedAtMs: null };
-    }
-  };
-  const [workspaceLaunchOverlayFiles, setWorkspaceLaunchOverlayFiles] = useState<PendingWorkspaceFile[]>([]);
-  const [workspaceLaunchOverlayOpen, setWorkspaceLaunchOverlayOpen] = useState(false);
-  const [workspaceLaunchOverlayStartedAtMs, setWorkspaceLaunchOverlayStartedAtMs] = useState<number | null>(null);
-  const [workspaceLaunchOverlayInitialProgress, setWorkspaceLaunchOverlayInitialProgress] = useState<number | null>(
-    null,
-  );
-  const [workspaceLaunchOverlayCompleting, setWorkspaceLaunchOverlayCompleting] = useState(false);
-  const [workspaceLaunchOverlayExiting, setWorkspaceLaunchOverlayExiting] = useState(false);
-  const [existingProjectOverlayOpen, setExistingProjectOverlayOpen] = useState(false);
-  const [existingProjectOverlayExiting, setExistingProjectOverlayExiting] = useState(false);
-  const existingProjectOverlayShownAtRef = useRef<number>(0);
   const [homeRecentProjects, setHomeRecentProjects] = useState<
     { id?: string; title: string; updatedAt?: number; previewUrl?: string | null; hasPreview?: boolean }[]
   >([]);
@@ -331,10 +241,7 @@ export default function WorkspaceShell({
   const [createLimitFlashSignal, setCreateLimitFlashSignal] = useState(0);
   const [createError, setCreateError] = useState<string | null>(null);
   const [createBusy, setCreateBusy] = useState(false);
-  const [createLaunchReadyForTesting, setCreateLaunchReadyForTesting] = useState(false);
-  const [createLaunchStartedAtMs, setCreateLaunchStartedAtMs] = useState<number | null>(null);
   const [createLaunchExiting, setCreateLaunchExiting] = useState(false);
-  const [showCreateLaunchLoader, setShowCreateLaunchLoader] = useState(false);
   const [createLaunchFileFlash, setCreateLaunchFileFlash] = useState(false);
   const [createShowValidation, setCreateShowValidation] = useState(false);
   const [contentSwapOut, setContentSwapOut] = useState(false);
@@ -347,26 +254,6 @@ export default function WorkspaceShell({
   const pendingContentSwapPathRef = useRef<string | null>(null);
   const [billingPortalLoading, setBillingPortalLoading] = useState(false);
 
-  const closeExistingProjectOverlayNow = useCallback(() => {
-    if (existingProjectOverlayHideTimerRef.current !== null) {
-      window.clearTimeout(existingProjectOverlayHideTimerRef.current);
-      existingProjectOverlayHideTimerRef.current = null;
-    }
-    if (existingProjectOverlaySafetyTimerRef.current !== null) {
-      window.clearTimeout(existingProjectOverlaySafetyTimerRef.current);
-      existingProjectOverlaySafetyTimerRef.current = null;
-    }
-    try {
-      window.sessionStorage?.removeItem(EXISTING_PROJECT_OVERLAY_STORAGE_KEY);
-      window.sessionStorage?.removeItem(WORKSPACE_OPEN_IN_PROGRESS_STORAGE_KEY);
-      window.sessionStorage?.removeItem("mpdf:existing-project-id");
-    } catch {
-      // ignore storage write failures
-    }
-    setExistingProjectOverlayOpen(false);
-    setExistingProjectOverlayExiting(false);
-    existingProjectOverlayShownAtRef.current = 0;
-  }, []);
   const [homeStripeStatusOverride, setHomeStripeStatusOverride] = useState<string | null | undefined>(undefined);
   const [homeBillingBannerDismissed, setHomeBillingBannerDismissed] = useState(false);
   const [homeBillingBannerMounted, setHomeBillingBannerMounted] = useState(false);
@@ -387,16 +274,7 @@ export default function WorkspaceShell({
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const createRef = useRef<HTMLDivElement>(null);
   const createFileInputRef = useRef<HTMLInputElement | null>(null);
-  const createLaunchLoaderTimerRef = useRef<number | null>(null);
   const createLaunchFlashTimerRef = useRef<number | null>(null);
-  const createLaunchVisualReadyResolveRef = useRef<(() => void) | null>(null);
-  const workspaceLaunchOverlayHideTimerRef = useRef<number | null>(null);
-  const workspaceLaunchOverlayCompleteTimerRef = useRef<number | null>(null);
-  const workspaceLaunchOverlayFallbackTimerRef = useRef<number | null>(null);
-  const workspaceLaunchOverlaySafetyTimerRef = useRef<number | null>(null);
-  const existingProjectOverlayHideTimerRef = useRef<number | null>(null);
-  const existingProjectOverlaySafetyTimerRef = useRef<number | null>(null);
-  const wasStudioRouteRef = useRef(false);
   const homeProjectsSearchInputRef = useRef<HTMLInputElement | null>(null);
   const avatarKey = session?.user?.id ?? null;
   const { avatar } = useAvatarPreference(avatarKey);
@@ -421,11 +299,6 @@ export default function WorkspaceShell({
     left: number;
   } | null>(null);
   const [createDragActive, setCreateDragActive] = useState(false);
-  const [homeBootLoading, setHomeBootLoading] = useState(() => shouldShowBootLoader());
-  const homeBootStartedAtRef = useRef(0);
-  const homeBootShownAtRef = useRef(0);
-  const homeBootVisibleRef = useRef(shouldShowBootLoader());
-  const manualLoadingSafetyRef = useRef<number | null>(null);
   const profileName = stableProfile.name || "";
   const profileEmail = stableProfile.email;
   const hasProfileInfo = Boolean(profileName || profileEmail);
@@ -467,55 +340,6 @@ export default function WorkspaceShell({
       // ignore storage read failures
     }
   }, []);
-
-  useEffect(() => {
-    const persistedWorkspaceLaunchOverlay = readPersistedWorkspaceLaunchOverlay();
-    if (persistedWorkspaceLaunchOverlay.files.length === 0) return;
-    setWorkspaceLaunchOverlayFiles((current) =>
-      current.length > 0 ? current : persistedWorkspaceLaunchOverlay.files,
-    );
-    setWorkspaceLaunchOverlayStartedAtMs((current) =>
-      current ?? persistedWorkspaceLaunchOverlay.startedAtMs,
-    );
-    setWorkspaceLaunchOverlayOpen((current) =>
-      current || persistedWorkspaceLaunchOverlay.files.length > 0,
-    );
-  }, []);
-
-  useEffect(() => {
-    if (!workspaceLaunchOverlayOpen) {
-      if (workspaceLaunchOverlaySafetyTimerRef.current !== null) {
-        window.clearTimeout(workspaceLaunchOverlaySafetyTimerRef.current);
-        workspaceLaunchOverlaySafetyTimerRef.current = null;
-      }
-      setWorkspaceLaunchOverlayInitialProgress(null);
-      return;
-    }
-    if (workspaceLaunchOverlaySafetyTimerRef.current !== null) {
-      window.clearTimeout(workspaceLaunchOverlaySafetyTimerRef.current);
-      workspaceLaunchOverlaySafetyTimerRef.current = null;
-    }
-    workspaceLaunchOverlaySafetyTimerRef.current = window.setTimeout(() => {
-      try {
-        window.sessionStorage?.removeItem(WORKSPACE_LAUNCH_OVERLAY_STORAGE_KEY);
-        window.sessionStorage?.removeItem(WORKSPACE_OPEN_IN_PROGRESS_STORAGE_KEY);
-      } catch {
-        // ignore storage write failures
-      }
-      setWorkspaceLaunchOverlayOpen(false);
-      setWorkspaceLaunchOverlayCompleting(false);
-      setWorkspaceLaunchOverlayExiting(false);
-      setWorkspaceLaunchOverlayStartedAtMs(null);
-      setWorkspaceLaunchOverlayFiles([]);
-      workspaceLaunchOverlaySafetyTimerRef.current = null;
-    }, 12000);
-    return () => {
-      if (workspaceLaunchOverlaySafetyTimerRef.current !== null) {
-        window.clearTimeout(workspaceLaunchOverlaySafetyTimerRef.current);
-        workspaceLaunchOverlaySafetyTimerRef.current = null;
-      }
-    };
-  }, [workspaceLaunchOverlayOpen]);
 
   useEffect(() => {
     const nextUserId = session?.user?.id ?? null;
@@ -575,39 +399,6 @@ export default function WorkspaceShell({
   }, [expanded]);
 
   useEffect(() => {
-    homeBootVisibleRef.current = homeBootLoading;
-  }, [homeBootLoading]);
-
-  useEffect(() => {
-    const clearManualLoadingSafety = () => {
-      if (manualLoadingSafetyRef.current !== null) {
-        window.clearTimeout(manualLoadingSafetyRef.current);
-        manualLoadingSafetyRef.current = null;
-      }
-    };
-    const handleLoadingStart = () => {
-      homeBootShownAtRef.current = performance.now();
-      setHomeBootLoading(true);
-      clearManualLoadingSafety();
-      manualLoadingSafetyRef.current = window.setTimeout(() => {
-        setHomeBootLoading(false);
-        manualLoadingSafetyRef.current = null;
-      }, 8000);
-    };
-    const handleLoadingStop = () => {
-      clearManualLoadingSafety();
-      setHomeBootLoading(false);
-    };
-    window.addEventListener("workspace-loading-start", handleLoadingStart);
-    window.addEventListener("workspace-loading-stop", handleLoadingStop);
-    return () => {
-      clearManualLoadingSafety();
-      window.removeEventListener("workspace-loading-start", handleLoadingStart);
-      window.removeEventListener("workspace-loading-stop", handleLoadingStop);
-    };
-  }, []);
-
-  useEffect(() => {
     const handleBillingStart = () => {
       setBillingPortalLoading(true);
     };
@@ -634,68 +425,6 @@ export default function WorkspaceShell({
     };
   }, []);
 
-  useEffect(() => {
-    if (!shouldShowBootLoader()) {
-      if (manualLoadingSafetyRef.current !== null) {
-        window.clearTimeout(manualLoadingSafetyRef.current);
-        manualLoadingSafetyRef.current = null;
-      }
-      setHomeBootLoading(false);
-      return;
-    }
-    homeBootStartedAtRef.current = performance.now();
-
-    let readyReceived = false;
-    const showDelayMs = bootLoaderShowDelayMs();
-    const minVisibleMs = bootLoaderMinVisibleMs();
-    const showTimer = !homeBootVisibleRef.current
-      ? window.setTimeout(() => {
-          if (readyReceived) return;
-          homeBootShownAtRef.current = performance.now();
-          setHomeBootLoading(true);
-        }, showDelayMs)
-      : null;
-    if (homeBootVisibleRef.current && homeBootShownAtRef.current <= 0) {
-      homeBootShownAtRef.current = performance.now();
-    }
-    const safetyTimeout = window.setTimeout(() => {
-      setHomeBootLoading(false);
-    }, 8000);
-
-    const handleReady = () => {
-      readyReceived = true;
-      if (manualLoadingSafetyRef.current !== null) {
-        window.clearTimeout(manualLoadingSafetyRef.current);
-        manualLoadingSafetyRef.current = null;
-      }
-      try {
-        window.sessionStorage?.removeItem(WORKSPACE_OPEN_IN_PROGRESS_STORAGE_KEY);
-      } catch {
-        // ignore storage write failures
-      }
-      if (showTimer !== null) window.clearTimeout(showTimer);
-      const shownAt = homeBootShownAtRef.current;
-      if (!homeBootVisibleRef.current || shownAt <= 0) {
-        setHomeBootLoading(false);
-        window.clearTimeout(safetyTimeout);
-        return;
-      }
-      const elapsedVisible = performance.now() - shownAt;
-      const remaining = Math.max(0, minVisibleMs - elapsedVisible);
-      window.setTimeout(() => {
-        setHomeBootLoading(false);
-      }, remaining);
-      window.clearTimeout(safetyTimeout);
-    };
-
-    window.addEventListener("workspace-content-ready", handleReady);
-    return () => {
-      window.removeEventListener("workspace-content-ready", handleReady);
-      if (showTimer !== null) window.clearTimeout(showTimer);
-      window.clearTimeout(safetyTimeout);
-    };
-  }, [pathname]);
-
   const clearLogoutConfirmTimer = () => {
     if (logoutConfirmTimeoutRef.current !== null && typeof window !== "undefined") {
       window.clearTimeout(logoutConfirmTimeoutRef.current);
@@ -706,74 +435,6 @@ export default function WorkspaceShell({
   const resetLogoutConfirm = () => {
     clearLogoutConfirmTimer();
     setLogoutConfirmArmed(false);
-  };
-
-  const markExistingProjectStartupOverlay = () => {
-    if (typeof window === "undefined") return;
-    if (workspaceLaunchOverlayOpen) return;
-    try {
-      window.sessionStorage?.setItem(WORKSPACE_OPEN_IN_PROGRESS_STORAGE_KEY, "1");
-      window.sessionStorage?.setItem(EXISTING_PROJECT_OVERLAY_STORAGE_KEY, "1");
-      window.sessionStorage?.removeItem(STARTUP_OVERLAY_KEY);
-      window.sessionStorage?.removeItem(STARTUP_OVERLAY_CONTEXT_KEY);
-      window.sessionStorage?.removeItem(PENDING_UPLOAD_STORAGE_KEY);
-    } catch {
-      // ignore storage write failures
-    }
-    if (existingProjectOverlayHideTimerRef.current !== null) {
-      window.clearTimeout(existingProjectOverlayHideTimerRef.current);
-      existingProjectOverlayHideTimerRef.current = null;
-    }
-    existingProjectOverlayShownAtRef.current = performance.now();
-    setExistingProjectOverlayExiting(false);
-    setExistingProjectOverlayOpen(true);
-  };
-
-  const maybeMarkExistingProjectNavigation = ({
-    defaultPrevented,
-    button,
-    metaKey,
-    ctrlKey,
-    shiftKey,
-    altKey,
-    target,
-  }: {
-    defaultPrevented: boolean;
-    button: number;
-    metaKey: boolean;
-    ctrlKey: boolean;
-    shiftKey: boolean;
-    altKey: boolean;
-    target: EventTarget | null;
-  }) => {
-    if (defaultPrevented) return;
-    if (button !== 0) return;
-    if (metaKey || ctrlKey || shiftKey || altKey) return;
-    if (!(target instanceof Element)) return;
-    const anchor = target.closest("a[href]");
-    if (!(anchor instanceof HTMLAnchorElement)) return;
-    if (anchor.target && anchor.target !== "_self") return;
-    try {
-      const url = new URL(anchor.href, window.location.href);
-      if (url.origin !== window.location.origin) return;
-      if (url.pathname !== "/studio") return;
-      if (!url.searchParams.get("project")) return;
-      markExistingProjectStartupOverlay();
-    } catch {
-      // ignore malformed hrefs
-    }
-  };
-
-  const handleExistingProjectLinkCapture = (event: React.MouseEvent<HTMLElement>) => {
-    maybeMarkExistingProjectNavigation({
-      defaultPrevented: event.defaultPrevented,
-      button: event.button,
-      metaKey: event.metaKey,
-      ctrlKey: event.ctrlKey,
-      shiftKey: event.shiftKey,
-      altKey: event.altKey,
-      target: event.target,
-    });
   };
 
   const handleLogoutRequest = async ({
@@ -849,255 +510,9 @@ export default function WorkspaceShell({
       if (sidebarTooltipTimeoutRef.current !== null) {
         window.clearTimeout(sidebarTooltipTimeoutRef.current);
       }
-      if (createLaunchLoaderTimerRef.current !== null) window.clearTimeout(createLaunchLoaderTimerRef.current);
       if (createLaunchFlashTimerRef.current !== null) window.clearTimeout(createLaunchFlashTimerRef.current);
-      if (workspaceLaunchOverlayHideTimerRef.current !== null) {
-        window.clearTimeout(workspaceLaunchOverlayHideTimerRef.current);
-      }
-      if (workspaceLaunchOverlayCompleteTimerRef.current !== null) {
-        window.clearTimeout(workspaceLaunchOverlayCompleteTimerRef.current);
-      }
-      if (workspaceLaunchOverlaySafetyTimerRef.current !== null) {
-        window.clearTimeout(workspaceLaunchOverlaySafetyTimerRef.current);
-      }
-      if (existingProjectOverlayHideTimerRef.current !== null) {
-        window.clearTimeout(existingProjectOverlayHideTimerRef.current);
-      }
-      if (existingProjectOverlaySafetyTimerRef.current !== null) {
-        window.clearTimeout(existingProjectOverlaySafetyTimerRef.current);
-      }
     };
   }, []);
-
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    const handleDocumentClickCapture = (event: MouseEvent) => {
-      maybeMarkExistingProjectNavigation({
-        defaultPrevented: event.defaultPrevented,
-        button: event.button,
-        metaKey: event.metaKey,
-        ctrlKey: event.ctrlKey,
-        shiftKey: event.shiftKey,
-        altKey: event.altKey,
-        target: event.target,
-      });
-    };
-    document.addEventListener("click", handleDocumentClickCapture, true);
-    return () => {
-      document.removeEventListener("click", handleDocumentClickCapture, true);
-    };
-  }, []);
-
-  useEffect(() => {
-    const handleHide = () => {
-      if (!existingProjectOverlayOpen || existingProjectOverlayExiting) return;
-      const elapsedVisible =
-        existingProjectOverlayShownAtRef.current > 0
-          ? performance.now() - existingProjectOverlayShownAtRef.current
-          : EXISTING_PROJECT_OVERLAY_MIN_VISIBLE_MS;
-      const remainingVisible = Math.max(0, EXISTING_PROJECT_OVERLAY_MIN_VISIBLE_MS - elapsedVisible);
-      existingProjectOverlayHideTimerRef.current = window.setTimeout(() => {
-        setExistingProjectOverlayExiting(true);
-        existingProjectOverlayHideTimerRef.current = window.setTimeout(() => {
-          try {
-            window.sessionStorage?.removeItem(EXISTING_PROJECT_OVERLAY_STORAGE_KEY);
-            window.sessionStorage?.removeItem("mpdf:existing-project-id");
-          } catch {
-            // ignore storage write failures
-          }
-          setExistingProjectOverlayOpen(false);
-          setExistingProjectOverlayExiting(false);
-          existingProjectOverlayShownAtRef.current = 0;
-          existingProjectOverlayHideTimerRef.current = null;
-          if (existingProjectOverlaySafetyTimerRef.current !== null) {
-            window.clearTimeout(existingProjectOverlaySafetyTimerRef.current);
-            existingProjectOverlaySafetyTimerRef.current = null;
-          }
-        }, EXISTING_PROJECT_OVERLAY_EXIT_MS);
-      }, remainingVisible);
-      try {
-        window.sessionStorage?.removeItem(WORKSPACE_OPEN_IN_PROGRESS_STORAGE_KEY);
-      } catch {
-        // ignore storage write failures
-      }
-    };
-    window.addEventListener("workspace-launch-overlay-hide", handleHide);
-    return () => {
-      window.removeEventListener("workspace-launch-overlay-hide", handleHide);
-    };
-  }, [existingProjectOverlayExiting, existingProjectOverlayOpen]);
-
-  useEffect(() => {
-    const projectId = readExistingWorkspaceProjectId();
-    if (!projectId) return;
-    router.prefetch(`/studio?project=${encodeURIComponent(projectId)}`);
-    void preloadExistingWorkspaceProject(projectId);
-  }, [router, preloadExistingWorkspaceProject]);
-
-  const showWorkspaceLaunchOverlay = (
-    files: PendingWorkspaceFile[],
-    startedAtMs: number | null = null,
-    initialProgress: number | null = null,
-  ) => {
-    if (workspaceLaunchOverlayCompleteTimerRef.current !== null) {
-      window.clearTimeout(workspaceLaunchOverlayCompleteTimerRef.current);
-      workspaceLaunchOverlayCompleteTimerRef.current = null;
-    }
-    if (workspaceLaunchOverlayFallbackTimerRef.current !== null) {
-      window.clearTimeout(workspaceLaunchOverlayFallbackTimerRef.current);
-      workspaceLaunchOverlayFallbackTimerRef.current = null;
-    }
-    if (workspaceLaunchOverlayHideTimerRef.current !== null) {
-      window.clearTimeout(workspaceLaunchOverlayHideTimerRef.current);
-      workspaceLaunchOverlayHideTimerRef.current = null;
-    }
-    if (workspaceLaunchOverlaySafetyTimerRef.current !== null) {
-      window.clearTimeout(workspaceLaunchOverlaySafetyTimerRef.current);
-      workspaceLaunchOverlaySafetyTimerRef.current = null;
-    }
-    try {
-      window.sessionStorage?.setItem(WORKSPACE_OPEN_IN_PROGRESS_STORAGE_KEY, "1");
-      window.sessionStorage?.setItem(
-        WORKSPACE_LAUNCH_OVERLAY_STORAGE_KEY,
-        JSON.stringify({
-          names: files.map((entry) => entry.file.name).filter(Boolean),
-          startedAtMs,
-        }),
-      );
-    } catch {
-      // ignore storage write failures
-    }
-    setWorkspaceLaunchOverlayFiles(files);
-    setWorkspaceLaunchOverlayStartedAtMs(startedAtMs);
-    setWorkspaceLaunchOverlayInitialProgress(
-      typeof initialProgress === "number" && Number.isFinite(initialProgress)
-        ? Math.min(Math.max(initialProgress, 0), WORKSPACE_LAUNCH_PRE_COMPLETE_MAX_PROGRESS)
-        : null,
-    );
-    setWorkspaceLaunchOverlayCompleting(false);
-    setWorkspaceLaunchOverlayExiting(false);
-    setWorkspaceLaunchOverlayOpen(true);
-    workspaceLaunchOverlayFallbackTimerRef.current = window.setTimeout(() => {
-      workspaceLaunchOverlayFallbackTimerRef.current = null;
-      setWorkspaceLaunchOverlayCompleting(true);
-    }, WORKSPACE_LAUNCH_FALLBACK_COMPLETE_MS);
-    workspaceLaunchOverlaySafetyTimerRef.current = window.setTimeout(() => {
-      try {
-        window.sessionStorage?.removeItem(WORKSPACE_LAUNCH_OVERLAY_STORAGE_KEY);
-      } catch {
-        // ignore storage write failures
-      }
-      setWorkspaceLaunchOverlayOpen(false);
-      setWorkspaceLaunchOverlayCompleting(false);
-      setWorkspaceLaunchOverlayExiting(false);
-      setWorkspaceLaunchOverlayStartedAtMs(null);
-      setWorkspaceLaunchOverlayInitialProgress(null);
-      setWorkspaceLaunchOverlayFiles([]);
-      if (workspaceLaunchOverlayFallbackTimerRef.current !== null) {
-        window.clearTimeout(workspaceLaunchOverlayFallbackTimerRef.current);
-        workspaceLaunchOverlayFallbackTimerRef.current = null;
-      }
-      workspaceLaunchOverlaySafetyTimerRef.current = null;
-    }, 12000);
-  };
-
-  const hideWorkspaceLaunchOverlay = () => {
-    if (workspaceLaunchOverlayCompleteTimerRef.current !== null) {
-      window.clearTimeout(workspaceLaunchOverlayCompleteTimerRef.current);
-      workspaceLaunchOverlayCompleteTimerRef.current = null;
-    }
-    if (workspaceLaunchOverlayHideTimerRef.current !== null) {
-      window.clearTimeout(workspaceLaunchOverlayHideTimerRef.current);
-      workspaceLaunchOverlayHideTimerRef.current = null;
-    }
-    if (workspaceLaunchOverlaySafetyTimerRef.current !== null) {
-      window.clearTimeout(workspaceLaunchOverlaySafetyTimerRef.current);
-      workspaceLaunchOverlaySafetyTimerRef.current = null;
-    }
-    if (workspaceLaunchOverlayFallbackTimerRef.current !== null) {
-      window.clearTimeout(workspaceLaunchOverlayFallbackTimerRef.current);
-      workspaceLaunchOverlayFallbackTimerRef.current = null;
-    }
-    setWorkspaceLaunchOverlayCompleting(true);
-  };
-
-  const beginWorkspaceLaunchOverlayExit = () => {
-    if (!workspaceLaunchOverlayCompleting || workspaceLaunchOverlayExiting) return;
-    if (workspaceLaunchOverlayCompleteTimerRef.current !== null) {
-      window.clearTimeout(workspaceLaunchOverlayCompleteTimerRef.current);
-    }
-    workspaceLaunchOverlayCompleteTimerRef.current = window.setTimeout(() => {
-      setWorkspaceLaunchOverlayExiting(true);
-      workspaceLaunchOverlayCompleteTimerRef.current = null;
-      workspaceLaunchOverlayHideTimerRef.current = window.setTimeout(() => {
-        try {
-          window.sessionStorage?.removeItem(WORKSPACE_LAUNCH_OVERLAY_STORAGE_KEY);
-          window.sessionStorage?.removeItem(WORKSPACE_OPEN_IN_PROGRESS_STORAGE_KEY);
-        } catch {
-          // ignore storage write failures
-        }
-        setWorkspaceLaunchOverlayOpen(false);
-        setWorkspaceLaunchOverlayCompleting(false);
-        setWorkspaceLaunchOverlayExiting(false);
-        setWorkspaceLaunchOverlayStartedAtMs(null);
-        setWorkspaceLaunchOverlayInitialProgress(null);
-        setWorkspaceLaunchOverlayFiles([]);
-        if (workspaceLaunchOverlayFallbackTimerRef.current !== null) {
-          window.clearTimeout(workspaceLaunchOverlayFallbackTimerRef.current);
-          workspaceLaunchOverlayFallbackTimerRef.current = null;
-        }
-        workspaceLaunchOverlayHideTimerRef.current = null;
-        }, WORKSPACE_LAUNCH_OVERLAY_EXIT_MS);
-      }, WORKSPACE_LAUNCH_OVERLAY_COMPLETE_HOLD_MS);
-  };
-
-  useEffect(() => {
-    const handleShow = (event: Event) => {
-      const detail = (event as CustomEvent<{ files?: PendingWorkspaceFile[]; startedAtMs?: number | null }>).detail;
-      showWorkspaceLaunchOverlay(detail?.files ?? [], detail?.startedAtMs ?? null);
-    };
-    const handleWorkspaceContentReady = () => {
-      if (existingProjectOverlayOpen && !existingProjectOverlayExiting) {
-        closeExistingProjectOverlayNow();
-        return;
-      }
-      if (!workspaceLaunchOverlayOpen || workspaceLaunchOverlayExiting) return;
-      if (workspaceLaunchOverlayFiles.length === 0) return;
-      if (workspaceLaunchOverlayFallbackTimerRef.current !== null) {
-        window.clearTimeout(workspaceLaunchOverlayFallbackTimerRef.current);
-        workspaceLaunchOverlayFallbackTimerRef.current = null;
-      }
-      setWorkspaceLaunchOverlayCompleting(true);
-    };
-    const handleExistingShow = (event: Event) => {
-      const detail = (event as CustomEvent<{ startedAtMs?: number | null; projectId?: string | null }>).detail;
-      const projectId = detail?.projectId ?? readExistingWorkspaceProjectId();
-      markExistingProjectStartupOverlay();
-      void preloadExistingWorkspaceProject(projectId);
-    };
-    const handleHide = () => {
-      hideWorkspaceLaunchOverlay();
-    };
-    window.addEventListener("workspace-launch-overlay-show", handleShow as EventListener);
-    window.addEventListener("workspace-content-ready", handleWorkspaceContentReady);
-    window.addEventListener("workspace-existing-overlay-show", handleExistingShow);
-    window.addEventListener("workspace-launch-overlay-hide", handleHide);
-    return () => {
-      window.removeEventListener("workspace-launch-overlay-show", handleShow as EventListener);
-      window.removeEventListener("workspace-content-ready", handleWorkspaceContentReady);
-      window.removeEventListener("workspace-existing-overlay-show", handleExistingShow);
-      window.removeEventListener("workspace-launch-overlay-hide", handleHide);
-    };
-  }, [
-    hideWorkspaceLaunchOverlay,
-    closeExistingProjectOverlayNow,
-    preloadExistingWorkspaceProject,
-    showWorkspaceLaunchOverlay,
-    existingProjectOverlayExiting,
-    existingProjectOverlayOpen,
-    workspaceLaunchOverlayExiting,
-    workspaceLaunchOverlayOpen,
-  ]);
 
   const createId = () =>
     typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -1136,25 +551,18 @@ export default function WorkspaceShell({
   const showCreateFilesError = createShowValidation && createMissingFiles;
 
   const resetCreateLaunchTransition = () => {
-    if (createLaunchLoaderTimerRef.current !== null) {
-      window.clearTimeout(createLaunchLoaderTimerRef.current);
-      createLaunchLoaderTimerRef.current = null;
-    }
     if (createLaunchFlashTimerRef.current !== null) {
       window.clearTimeout(createLaunchFlashTimerRef.current);
       createLaunchFlashTimerRef.current = null;
     }
-    createLaunchVisualReadyResolveRef.current = null;
     setCreateLaunchExiting(false);
     setCreateLaunchFileFlash(false);
-    setCreateLaunchStartedAtMs(null);
   };
 
   function openCreateModal() {
     setCreateError(null);
     setCreateBusy(false);
     setCreatePendingFiles([]);
-    setCreateLaunchReadyForTesting(false);
     resetCreateLaunchTransition();
     setCreateLimitFlashSignal(0);
     setCreateDragActive(false);
@@ -1170,7 +578,6 @@ export default function WorkspaceShell({
 
   async function handleCreateStart() {
     const startedAt = Date.now();
-    setCreateLaunchStartedAtMs(startedAt);
     setCreateShowValidation(true);
     if (createMissingFiles) {
       setCreateError(null);
@@ -1189,10 +596,9 @@ export default function WorkspaceShell({
       setCreateLaunchFileFlash(false);
       createLaunchFlashTimerRef.current = null;
     }, WORKSPACE_LAUNCH_FILE_FLASH_MS);
-    setShowCreateLaunchLoader(true);
     setCreateBusy(true);
-    setCreateLaunchReadyForTesting(false);
     await resetWorkspaceStorage();
+    beginWorkspaceOpenHandoff(createPendingFiles, startedAt);
     try {
       const res = await fetch("/api/projects", {
         method: "POST",
@@ -1202,8 +608,8 @@ export default function WorkspaceShell({
       if (!res.ok) {
         setCreateError("Could not create that project. Please try again.");
         setCreateBusy(false);
-        setCreateLaunchReadyForTesting(false);
         resetCreateLaunchTransition();
+        cancelWorkspaceOpenHandoff();
         return;
       }
       const json = (await res.json().catch(() => null)) as { project?: { id?: string } } | null;
@@ -1211,8 +617,8 @@ export default function WorkspaceShell({
       if (!id) {
         setCreateError("Could not create that project. Please try again.");
         setCreateBusy(false);
-        setCreateLaunchReadyForTesting(false);
         resetCreateLaunchTransition();
+        cancelWorkspaceOpenHandoff();
         return;
       }
       void uploadProjectPreviewFromFile(createPendingFiles[0]?.file, id);
@@ -1222,22 +628,12 @@ export default function WorkspaceShell({
         });
       }
       queuePreload(createPendingFiles, id);
-      const elapsed = Date.now() - startedAt;
-      if (elapsed < WORKSPACE_LAUNCH_MIN_MS) {
-        await new Promise((resolve) => setTimeout(resolve, WORKSPACE_LAUNCH_MIN_MS - elapsed));
-      }
-      if (WORKSPACE_LAUNCH_HOLD_FOR_TESTING) {
-        return;
-      }
-      showWorkspaceLaunchOverlay(createPendingFiles, startedAt, getWorkspaceLaunchProgress(Date.now() - startedAt));
-      router.push(`/studio?project=${encodeURIComponent(id)}`);
+      router.push(buildStudioProjectHref(id));
     } catch {
       setCreateError("Could not create that project. Please try again.");
       setCreateBusy(false);
-      setCreateLaunchReadyForTesting(false);
-      createLaunchVisualReadyResolveRef.current = null;
       resetCreateLaunchTransition();
-      hideWorkspaceLaunchOverlay();
+      cancelWorkspaceOpenHandoff();
     }
   }
 
@@ -1270,89 +666,6 @@ export default function WorkspaceShell({
   const isHomePanel = panelKey === "home";
   const isSignaturesPanel = panelKey === "signatures";
   const isTemplatesPanel = panelKey === "templates";
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!isStudioRoute) return;
-    try {
-      if (!window.sessionStorage?.getItem(EXISTING_PROJECT_OVERLAY_STORAGE_KEY)) return;
-    } catch {
-      return;
-    }
-    if (workspaceLaunchOverlayOpen) return;
-    if (existingProjectOverlayHideTimerRef.current !== null) {
-      window.clearTimeout(existingProjectOverlayHideTimerRef.current);
-      existingProjectOverlayHideTimerRef.current = null;
-    }
-    if (existingProjectOverlaySafetyTimerRef.current !== null) {
-      window.clearTimeout(existingProjectOverlaySafetyTimerRef.current);
-      existingProjectOverlaySafetyTimerRef.current = null;
-    }
-    existingProjectOverlayShownAtRef.current = performance.now();
-    setExistingProjectOverlayExiting(false);
-    setExistingProjectOverlayOpen(true);
-  }, [isStudioRoute]);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!existingProjectOverlayOpen || existingProjectOverlayExiting || !isStudioRoute) {
-      if (existingProjectOverlaySafetyTimerRef.current !== null) {
-        window.clearTimeout(existingProjectOverlaySafetyTimerRef.current);
-        existingProjectOverlaySafetyTimerRef.current = null;
-      }
-      return;
-    }
-    if (existingProjectOverlaySafetyTimerRef.current !== null) {
-      window.clearTimeout(existingProjectOverlaySafetyTimerRef.current);
-    }
-    existingProjectOverlaySafetyTimerRef.current = window.setTimeout(() => {
-      existingProjectOverlaySafetyTimerRef.current = null;
-      closeExistingProjectOverlayNow();
-    }, EXISTING_PROJECT_OVERLAY_MAX_WAIT_MS);
-    return () => {
-      if (existingProjectOverlaySafetyTimerRef.current !== null) {
-        window.clearTimeout(existingProjectOverlaySafetyTimerRef.current);
-        existingProjectOverlaySafetyTimerRef.current = null;
-      }
-    };
-  }, [existingProjectOverlayExiting, existingProjectOverlayOpen, isStudioRoute, closeExistingProjectOverlayNow]);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!existingProjectOverlayOpen || existingProjectOverlayExiting || !isStudioRoute) return;
-    if (existingProjectOverlayHideTimerRef.current !== null) {
-      window.clearTimeout(existingProjectOverlayHideTimerRef.current);
-    }
-    existingProjectOverlayHideTimerRef.current = window.setTimeout(() => {
-      existingProjectOverlayHideTimerRef.current = null;
-      closeExistingProjectOverlayNow();
-    }, EXISTING_PROJECT_OVERLAY_AUTO_CLOSE_MS);
-    return () => {
-      if (existingProjectOverlayHideTimerRef.current !== null) {
-        window.clearTimeout(existingProjectOverlayHideTimerRef.current);
-        existingProjectOverlayHideTimerRef.current = null;
-      }
-    };
-  }, [existingProjectOverlayExiting, existingProjectOverlayOpen, isStudioRoute, closeExistingProjectOverlayNow]);
-  useEffect(() => {
-    const leftStudio = wasStudioRouteRef.current && !isStudioRoute;
-    if (!leftStudio || !existingProjectOverlayOpen) return;
-    if (existingProjectOverlayHideTimerRef.current !== null) {
-      window.clearTimeout(existingProjectOverlayHideTimerRef.current);
-      existingProjectOverlayHideTimerRef.current = null;
-    }
-      if (existingProjectOverlaySafetyTimerRef.current !== null) {
-        window.clearTimeout(existingProjectOverlaySafetyTimerRef.current);
-        existingProjectOverlaySafetyTimerRef.current = null;
-      }
-        try {
-          window.sessionStorage?.removeItem(EXISTING_PROJECT_OVERLAY_STORAGE_KEY);
-          window.sessionStorage?.removeItem(WORKSPACE_OPEN_IN_PROGRESS_STORAGE_KEY);
-          window.sessionStorage?.removeItem("mpdf:existing-project-id");
-        } catch {
-          // ignore storage write failures
-        }
-    setExistingProjectOverlayOpen(false);
-    setExistingProjectOverlayExiting(false);
-    existingProjectOverlayShownAtRef.current = 0;
-  }, [existingProjectOverlayOpen, isStudioRoute]);
   const useUnifiedWorkspaceBackground =
     pathname === "/" ||
     (pathname?.startsWith("/projects") ?? false) ||
@@ -1368,12 +681,6 @@ export default function WorkspaceShell({
         : isAccountRoute
           ? "bg-white md:bg-slate-100"
           : "bg-[#323232]";
-  const workspaceLaunchUnderlayClass =
-    existingProjectOverlayOpen
-      ? existingProjectOverlayExiting
-        ? "workspace-launch-underlay-reveal"
-        : "workspace-launch-underlay-prep"
-      : "";
   const isBillingBannerRoute = isHomePanel || isAccountRoute;
   const homeStripeStatus =
     homeStripeStatusOverride !== undefined ? homeStripeStatusOverride : (session?.user?.stripeStatus ?? null);
@@ -1391,8 +698,6 @@ export default function WorkspaceShell({
         ? "Signature Pro"
         : "Your plan";
   const homeBillingModalBody = "Please update your payment method to restore access.";
-  const shellLoadingOpen = homeBootLoading;
-
   const isHomeProjectsPath = (value?: string | null) =>
     value === "/" || (value?.startsWith("/projects") ?? false);
   const showPersistentWorkspaceTopBar =
@@ -1482,12 +787,6 @@ export default function WorkspaceShell({
     setAccountPanelOpen(false);
   }, [accountPanelOpen, isAccountRoute, pathname]);
 
-  useEffect(() => {
-    const leftStudio = wasStudioRouteRef.current && !isStudioRoute;
-    wasStudioRouteRef.current = isStudioRoute;
-    if (!leftStudio) return;
-    closeExistingProjectOverlayNow();
-  }, [isStudioRoute, closeExistingProjectOverlayNow]);
 
   useEffect(() => {
     const pendingPath = pendingContentSwapPathRef.current;
@@ -2408,57 +1707,6 @@ export default function WorkspaceShell({
     { label: "Trash", href: "/projects/trash", icon: PhTrash, active: isTrashRoute },
   ] as const;
 
-  const routeHandoffOverlays = (
-    <>
-      {workspaceLaunchOverlayOpen ? (
-        <div
-          className={`pointer-events-none fixed inset-0 z-[1300] ${
-            workspaceLaunchOverlayExiting ? "workspace-handoff-overlay-exit" : "workspace-handoff-overlay-enter"
-          }`}
-        >
-          <div className="workspace-handoff-overlay-backdrop absolute inset-0 bg-[var(--app-surface)]" />
-          <div className={`relative min-h-screen ${workspaceLaunchOverlayExiting ? "workspace-handoff-content-exit" : ""}`}>
-            <WorkspaceLaunchLoadingState
-              files={workspaceLaunchOverlayFiles}
-              complete={workspaceLaunchOverlayCompleting || workspaceLaunchOverlayExiting}
-              startedAtMs={workspaceLaunchOverlayStartedAtMs}
-              initialProgress={workspaceLaunchOverlayInitialProgress}
-              onCompleteVisualReady={beginWorkspaceLaunchOverlayExit}
-              headlineOverride={
-                workspaceLaunchOverlayFiles.length > 0 ? undefined : "Preparing your workspace"
-              }
-            />
-          </div>
-        </div>
-      ) : null}
-      {existingProjectOverlayOpen ? (
-        <div
-          className={`pointer-events-none fixed inset-0 z-[1280] ${
-            existingProjectOverlayExiting ? "workspace-handoff-overlay-exit" : "workspace-handoff-overlay-enter"
-          }`}
-        >
-          <div className="workspace-handoff-overlay-backdrop absolute inset-0 bg-[var(--app-surface)]" />
-          <div
-            className={`relative flex min-h-screen items-center justify-center px-6 py-10 ${
-              existingProjectOverlayExiting ? "workspace-handoff-content-exit" : ""
-            }`}
-          >
-            <div className="pointer-events-none flex flex-col items-center text-center">
-              <div
-                className="no-theme-transition h-14 w-14 animate-spin rounded-full border-[5px] border-[color:var(--spinner-track)] border-t-[color:var(--spinner-head)]"
-                aria-hidden
-              />
-              <p className="no-theme-transition mt-5 text-[24px] font-semibold tracking-tight text-[var(--app-foreground)] sm:text-[28px]">
-                Opening Workspace...
-              </p>
-              <span className="sr-only">Opening Workspace</span>
-            </div>
-          </div>
-        </div>
-      ) : null}
-    </>
-  );
-
   const workspaceShell = (
     <>
     {isBillingBannerRoute ? (
@@ -2468,7 +1716,7 @@ export default function WorkspaceShell({
       />
     ) : null}
     <div
-      className={`workspace-shell-root ${useFlatAllProjectsShell ? "projects-all-workspace" : ""} relative z-10 flex h-[calc(var(--workspace-vh,100dvh)-var(--home-banner-offset,0px))] overflow-hidden pt-0 ${workspaceLaunchUnderlayClass} ${homeBillingBannerExiting ? "transition-[padding-top,min-height] duration-300 ease-out" : "transition-none"} md:pt-[var(--home-banner-offset)] ${workspaceBackgroundClass} ${sidebarCompact ? "sidebar-collapsed" : ""} ${expanded ? "" : "sidebar-minimized"} dark:bg-[#252525] `}
+      className={`workspace-shell-root ${useFlatAllProjectsShell ? "projects-all-workspace" : ""} relative z-10 flex h-[calc(var(--workspace-vh,100dvh)-var(--home-banner-offset,0px))] overflow-hidden pt-0 ${homeBillingBannerExiting ? "transition-[padding-top,min-height] duration-300 ease-out" : "transition-none"} md:pt-[var(--home-banner-offset)] ${workspaceBackgroundClass} ${sidebarCompact ? "sidebar-collapsed" : ""} ${expanded ? "" : "sidebar-minimized"} dark:bg-[#252525] `}
       style={
         {
           height: "calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset, 0px))",
@@ -3110,8 +2358,8 @@ export default function WorkspaceShell({
 	                              <button
 	                                type="button"
 	                                onClick={() => {
-                                      markExistingProjectStartupOverlay();
-	                                  router.push(`/studio?project=${encodeURIComponent(item.key as string)}`);
+                                      beginExistingWorkspaceOpenHandoff(item.key);
+	                                  router.push(buildStudioProjectHref(item.key));
 	                                  if (shouldOverlay) {
 	                                    setExpanded(false);
 	                                  }
@@ -3434,7 +2682,6 @@ export default function WorkspaceShell({
                 <div
                   className="workspace-content-shell flex h-full min-h-0 w-full flex-1 flex-col transition-none 2xl:transition-[max-width] 2xl:duration-300 2xl:ease-[cubic-bezier(0.22,1,0.36,1)]"
                   style={{ maxWidth: showDesktopAllProjectsTopBar ? "none" : "var(--shell-content-width)", width: "100%" }}
-                  onClickCapture={handleExistingProjectLinkCapture}
                 >
                   {children}
                 </div>
@@ -3497,25 +2744,6 @@ export default function WorkspaceShell({
       {createOpen
         ? createPortal(
             <>
-            <div
-              className={`fixed inset-0 z-[1100] transition-[opacity,transform,filter] duration-[260ms] ease-[cubic-bezier(0.22,1,0.36,1)] ${
-                showCreateLaunchLoader
-                  ? "opacity-100 scale-100 blur-0"
-                  : "pointer-events-none opacity-0 scale-[1.01] blur-[2px]"
-              }`}
-            >
-              {showCreateLaunchLoader ? (
-                <WorkspaceLaunchLoadingState
-                  files={createPendingFiles}
-                  complete={createLaunchReadyForTesting}
-                  startedAtMs={createLaunchStartedAtMs}
-                  onCompleteVisualReady={() => {
-                    createLaunchVisualReadyResolveRef.current?.();
-                    createLaunchVisualReadyResolveRef.current = null;
-                  }}
-                />
-              ) : null}
-            </div>
             <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
               <div
                 className={`absolute inset-0 bg-black/40 transition-opacity duration-[${WORKSPACE_LAUNCH_MODAL_EXIT_MS}ms] ease-out dark:bg-black/55 dark:backdrop-blur-sm ${
@@ -3676,12 +2904,6 @@ export default function WorkspaceShell({
           </div>
         </div>
       ) : null}
-      <LoadingOverlay
-        open={shellLoadingOpen}
-        keepMounted
-        label="Loading..."
-        zIndexClassName="z-[1200]"
-      />
       {sidebarTooltip && document.body.dataset.modalOpen !== "true"
         ? createPortal(
           <div
@@ -3758,7 +2980,6 @@ export default function WorkspaceShell({
     <>
       {primaryShell}
       {accountPanelOverlay}
-      {routeHandoffOverlays}
     </>
   );
 }

@@ -13,9 +13,9 @@ import { formatFileSize } from "@/lib/formatFileSize";
 import { projectNameToDisplay, projectNameToEditable, sanitizeProjectName } from "@/lib/projectName";
 import {
   beginExistingWorkspaceOpenHandoff,
-  preloadExistingWorkspaceProject,
   shouldHandleWorkspaceOpenClick,
 } from "@/lib/workspaceOpenHandoff";
+import { buildStudioProjectHref } from "@/lib/studioRoute";
 
 type SummaryProject = {
   id: string;
@@ -195,16 +195,14 @@ export default function RecentProjectsRow({
 
   const openProject = (projectId: string) => {
     beginExistingWorkspaceOpenHandoff(projectId);
-    void preloadExistingWorkspaceProject(projectId);
-    void router.prefetch(`/studio?project=${encodeURIComponent(projectId)}`);
-    router.push(`/studio?project=${encodeURIComponent(projectId)}`);
+    void router.prefetch(buildStudioProjectHref(projectId));
+    router.push(buildStudioProjectHref(projectId));
   };
 
   const warmProjectOpen = (projectId: string) => {
     if (workspaceWarmupStartedRef.current.has(projectId)) return;
     workspaceWarmupStartedRef.current.add(projectId);
-    void preloadExistingWorkspaceProject(projectId);
-    void router.prefetch(`/studio?project=${encodeURIComponent(projectId)}`);
+    void router.prefetch(buildStudioProjectHref(projectId));
   };
 
   useEffect(() => {
@@ -838,7 +836,7 @@ export default function RecentProjectsRow({
                     ) : (
                       <div className="min-w-0 flex-1 pt-0.5">
                         <Link
-                          href={`/studio?project=${encodeURIComponent(project.id)}`}
+                          href={buildStudioProjectHref(project.id)}
                           className={`block min-w-0 truncate text-[16px] font-semibold text-slate-900 dark:text-zinc-100 ${
                             renamedProjectId === project.id
                               ? "[animation:rename-text-flash_1400ms_ease-out_forwards]"
@@ -1014,7 +1012,7 @@ export default function RecentProjectsRow({
                               event.stopPropagation();
                               closeListMenu();
                               window.open(
-                                `/studio?project=${encodeURIComponent(project.id)}`,
+                                buildStudioProjectHref(project.id),
                                 "_blank",
                                 "noopener,noreferrer"
                               );
@@ -1308,7 +1306,7 @@ export default function RecentProjectsRow({
                         <div className="min-w-0">
                           <div className="flex min-w-0 items-center gap-1.5">
                             <Link
-                              href={`/studio?project=${encodeURIComponent(project.id)}`}
+                              href={buildStudioProjectHref(project.id)}
                               className={`block min-w-0 flex-1 truncate text-[16px] font-semibold text-slate-900 dark:text-zinc-100 ${
                                 renamedProjectId === project.id
                                   ? "[animation:rename-text-flash_1400ms_ease-out_forwards]"
@@ -1695,7 +1693,7 @@ export default function RecentProjectsRow({
                           setListMenuOpenId(null);
                           setListMenuPosition(null);
                           window.open(
-                            `/studio?project=${encodeURIComponent(activeListMenuProject.id)}`,
+                            buildStudioProjectHref(activeListMenuProject.id),
                             "_blank",
                             "noopener,noreferrer"
                           );
@@ -1890,7 +1888,7 @@ export default function RecentProjectsRow({
                       {`Created "Copy of ${copyToast.name}"`}
                     </p>
                     <Link
-                      href={`/studio?project=${encodeURIComponent(copyToast.id)}`}
+                      href={buildStudioProjectHref(copyToast.id)}
                       className="shrink-0 rounded-md border-2 border-white/25 px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-white/10"
                       onFocus={() => warmProjectOpen(copyToast.id)}
                       onMouseEnter={() => warmProjectOpen(copyToast.id)}

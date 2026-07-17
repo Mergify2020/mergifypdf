@@ -12,7 +12,9 @@ import {
   type ProjectsSummaryProject,
 } from "@/lib/projectsSummaryCache";
 import { beginExistingWorkspaceOpenHandoff, shouldHandleWorkspaceOpenClick } from "@/lib/workspaceOpenHandoff";
-type ResumeSnapshot = { fileName: string; lastEditedLabel: string };
+import { buildStudioProjectHref } from "@/lib/studioRoute";
+
+type ResumeSnapshot = { projectId: string; fileName: string; lastEditedLabel: string };
 
 function formatLastEdited(timestamp: number) {
   if (!Number.isFinite(timestamp)) return "moments ago";
@@ -63,6 +65,7 @@ export default function ProjectsWorkspaceShelf() {
       }
       const updatedAt = new Date(latest.updatedAt).getTime();
       setSnapshot({
+        projectId: latest.id,
         fileName: latest.name?.trim() || "Untitled project",
         lastEditedLabel: formatLastEdited(updatedAt),
       });
@@ -88,13 +91,10 @@ export default function ProjectsWorkspaceShelf() {
     };
   }, [ownerId]);
 
-  const openWorkspace = () => {
-    beginExistingWorkspaceOpenHandoff();
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        router.push("/studio");
-      });
-    });
+  const openWorkspace = (projectId?: string) => {
+    const destination = projectId ? buildStudioProjectHref(projectId) : "/studio";
+    if (projectId) beginExistingWorkspaceOpenHandoff(projectId);
+    router.push(destination);
   };
 
   if (!displaySnapshot) {
@@ -153,7 +153,15 @@ export default function ProjectsWorkspaceShelf() {
           </div>
         </div>
         <div className="shrink-0">
-          <Link href="/studio" className="btn-primary px-7 py-3">
+          <Link
+            href={buildStudioProjectHref(displaySnapshot.projectId)}
+            className="btn-primary px-7 py-3"
+            onClick={(event) => {
+              if (!shouldHandleWorkspaceOpenClick(event)) return;
+              event.preventDefault();
+              openWorkspace(displaySnapshot.projectId);
+            }}
+          >
             Resume / Open
             <ArrowUpRight className="ml-2 h-4 w-4" />
           </Link>
