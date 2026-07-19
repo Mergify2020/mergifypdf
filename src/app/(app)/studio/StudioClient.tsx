@@ -480,7 +480,7 @@ const WORKSPACE_LAUNCH_OVERLAY_STORAGE_KEY = "mpdf:workspace-launch-overlay";
 const EXISTING_PROJECT_OVERLAY_STORAGE_KEY = "mpdf:existing-project-overlay";
 const WORKSPACE_EXIT_TRANSITION_MS = 200;
 const WORKSPACE_PREVIEW_CACHE_KEY = "mpdf:preview-cache";
-const PREVIEW_CACHE_VERSION = 1;
+const PREVIEW_CACHE_VERSION = 2;
 const PREVIEW_CACHE_NEAR_RANGE = 1;
 const BACKGROUND_LOW_RES_BATCH = 1;
 const BACKGROUND_LOW_RES_PRIORITY = 5;
@@ -743,13 +743,17 @@ function buildCloudProjectPreviewPages(
   coverPreviewUrl: string | null,
 ): PageItem[] {
   if (sourceIds.length === 0 || !Array.isArray(pages) || pages.length === 0) return [];
+  const isMergedCloudPdf = sourceIds.length === 1 && sourceIds[0].startsWith("cloud-project-");
   return pages
     .map((page, index): PageItem | null => {
       if (!page || typeof page !== "object") return null;
-      const srcIdx = readProjectPageNumber(page, "srcIdx", 0);
+      // The cloud PDF is the already-merged project output. Its physical page
+      // indexes are sequential even when the saved project data still refers to
+      // several original sources whose page indexes overlap (commonly page 0).
+      const srcIdx = isMergedCloudPdf ? 0 : readProjectPageNumber(page, "srcIdx", 0);
       const sourceId = sourceIds[srcIdx] ?? sourceIds[0];
       if (!sourceId) return null;
-      const pageIdx = readProjectPageNumber(page, "pageIdx", index);
+      const pageIdx = isMergedCloudPdf ? index : readProjectPageNumber(page, "pageIdx", index);
       const preview = readProjectPageString(page, "preview") || (index === 0 ? coverPreviewUrl ?? "" : "");
       const thumb = readProjectPageString(page, "thumb") || (index === 0 ? preview : "");
       return {

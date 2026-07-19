@@ -27,6 +27,7 @@ import {
   Workflow,
 } from "lucide-react";
 import RecentProjectsRow from "@/components/RecentProjectsRow";
+import AllProjectsSkeleton from "@/components/AllProjectsSkeleton";
 import {
   getProjectsSummaryCache,
   setProjectsSummaryCache,
@@ -112,6 +113,7 @@ const ALL_PROJECTS_QUICK_ACTIONS = [
     toneClass: "bg-[#64748B]/12 text-[#64748B] group-hover:bg-[#64748B]/16 group-hover:text-[#475569] dark:bg-[#64748B]/15 dark:text-[#CBD5E1] dark:group-hover:bg-[#64748B]/20 dark:group-hover:text-white",
   },
 ] as const;
+const INITIAL_PROJECTS_SKELETON_MS = 420;
 
 const mapProjectsFromSummary = (
   projects: ProjectsSummaryProject[],
@@ -160,6 +162,7 @@ export default function HomeProjectsSearch({
   const query = queryBridge?.query ?? "";
   const [projectsState, setProjectsState] = useState<SummaryProject[]>(projects);
   const [projectsLoading, setProjectsLoading] = useState(() => projects.length === 0);
+  const [showInitialProjectsSkeleton, setShowInitialProjectsSkeleton] = useState(showAllProjects);
   const initialProjects = useMemo(() => projectsState, [projectsState]);
   const accountInitials = useMemo(() => {
     const parts = accountName.trim().split(/\s+/).filter(Boolean);
@@ -189,6 +192,16 @@ export default function HomeProjectsSearch({
   const [canScrollQuickActionsNext, setCanScrollQuickActionsNext] = useState(false);
   const [leftArrowMounted, setLeftArrowMounted] = useState(false);
   const [rightArrowMounted, setRightArrowMounted] = useState(false);
+
+  useEffect(() => {
+    if (!showAllProjects) return;
+    const timer = window.setTimeout(() => {
+      setShowInitialProjectsSkeleton(false);
+    }, INITIAL_PROJECTS_SKELETON_MS);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [showAllProjects]);
 
   useEffect(() => {
     if (!ownerKey) return;
@@ -261,17 +274,17 @@ export default function HomeProjectsSearch({
   }, [ownerKey, projects, showAllProjects]);
 
   useEffect(() => {
-    if (!showAllProjects) return;
+    if (!showAllProjects || showInitialProjectsSkeleton) return;
     const frame = window.requestAnimationFrame(() => {
       window.dispatchEvent(new Event("workspace-content-ready"));
     });
     return () => {
       window.cancelAnimationFrame(frame);
     };
-  }, [showAllProjects]);
+  }, [showAllProjects, showInitialProjectsSkeleton]);
 
   useEffect(() => {
-    if (!showAllProjects) return;
+    if (!showAllProjects || showInitialProjectsSkeleton) return;
 
     const track = quickActionsTrackRef.current;
     if (!track) return;
@@ -305,7 +318,7 @@ export default function HomeProjectsSearch({
       resizeObserver?.disconnect();
       window.removeEventListener('resize', measure);
     };
-  }, [showAllProjects]);
+  }, [showAllProjects, showInitialProjectsSkeleton]);
 
   const scrollQuickActions = (direction: 'prev' | 'next') => {
     const track = quickActionsTrackRef.current;
@@ -331,6 +344,10 @@ export default function HomeProjectsSearch({
       block: 'nearest',
     });
   };
+
+  if (showAllProjects && showInitialProjectsSkeleton) {
+    return <AllProjectsSkeleton viewMode={initialViewMode} />;
+  }
 
   if (showAllProjects) {
 
