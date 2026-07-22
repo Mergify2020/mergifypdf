@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { getServerSessionSafe } from "@/lib/serverSession";
 
-export const dynamic = "force-dynamic";
 
 export default async function ProjectsPage() {
   const session = await getServerSessionSafe();

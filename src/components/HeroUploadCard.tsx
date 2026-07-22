@@ -58,7 +58,7 @@ export default function HeroUploadCard() {
   }
 
   function openFilePicker() {
-    if (busy || uiState !== "idle") return;
+    if (busy) return;
     setError(null);
     fileInputRef.current?.click();
   }
@@ -66,13 +66,6 @@ export default function HeroUploadCard() {
   function handleContainerClick(event: React.MouseEvent<HTMLDivElement>) {
     if (event.target !== event.currentTarget) return;
     openFilePicker();
-  }
-
-  function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      openFilePicker();
-    }
   }
 
   function ensureGuestProject() {
@@ -466,10 +459,7 @@ export default function HeroUploadCard() {
     <div
       id="upload"
       className={`scroll-mt-[calc(56px+env(safe-area-inset-top)+18px)] ${containerClassName}`}
-      role={isIdle ? "button" : undefined}
-      tabIndex={isIdle ? 0 : -1}
       onClick={isIdle ? handleContainerClick : undefined}
-      onKeyDown={isIdle ? handleKeyDown : undefined}
       onDrop={handleContainerDrop}
       onDragOver={handleContainerDragOver}
       aria-busy={busy}
@@ -492,18 +482,20 @@ export default function HeroUploadCard() {
             <span className="h-[2px] w-20 bg-white/70" aria-hidden="true" />
           </div>
           <div className="mt-4 flex justify-center md:mt-3">
-            <label
-              htmlFor={inputId}
+            <button
+              type="button"
+              onClick={openFilePicker}
               className="press-bounce inline-flex items-center justify-center rounded-xl border border-white/20 bg-gradient-to-r from-[#6D5EF3] to-[#8B7CFF] px-6 py-2.5 text-base font-semibold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.18),0_10px_18px_rgba(109,94,243,0.24)] ring-1 ring-white/20 transition hover:-translate-y-0.5 hover:from-[#7567F5] hover:to-[#9486FF] active:translate-y-0.5 active:shadow-[0_10px_20px_rgba(109,94,243,0.22)] md:hidden"
             >
               Select files
-            </label>
-            <label
-              htmlFor={inputId}
+            </button>
+            <button
+              type="button"
+              onClick={openFilePicker}
               className="press-bounce hidden items-center justify-center rounded-xl border border-white/20 bg-gradient-to-r from-[#6D5EF3] to-[#8B7CFF] px-6 py-2.5 text-base font-semibold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.18),0_10px_18px_rgba(109,94,243,0.24)] ring-1 ring-white/20 transition hover:-translate-y-0.5 hover:from-[#7567F5] hover:to-[#9486FF] active:translate-y-0.5 active:shadow-[0_10px_20px_rgba(109,94,243,0.22)] md:inline-flex"
             >
               Browse files
-            </label>
+            </button>
           </div>
           <p className="mt-7 text-[11px] text-white/40 sm:mt-7">
             By uploading a file, you agree to our{" "}
@@ -748,15 +740,16 @@ export default function HeroUploadCard() {
 
             <div className="mt-2 flex items-center justify-between px-1 pb-0">
               <div className="flex items-center gap-4">
-                <label
-                  htmlFor={inputId}
-                  aria-disabled={busy}
+                <button
+                  type="button"
+                  onClick={openFilePicker}
+                  disabled={busy}
                   className={`inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3.5 py-1.5 text-sm font-semibold text-white/72 transition hover:border-white/15 hover:bg-white/[0.1] hover:text-white ${
                     busy ? "pointer-events-none opacity-60" : "cursor-pointer"
                   }`}
                 >
                   Add files
-                </label>
+                </button>
               </div>
               <button
                 type="button"

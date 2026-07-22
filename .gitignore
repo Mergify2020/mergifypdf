@@ -13,6 +13,9 @@
 
 # testing
 /coverage
+/playwright-report/
+/test-results/
+/.vitest/
 
 # next.js
 /.next/
@@ -32,9 +35,14 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+*.log
+*.bak
+*:Zone.Identifier
+*.Zone.Identifier
 
-# env files (can opt-in for committing if needed)
+# env files (template is safe to commit)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -51,3 +59,8 @@ next-env.d.ts
 
 # Ignore generated PDFs
 storage/
+
+# local databases and benchmark output
+*.db
+*.db-journal
+/artifacts/

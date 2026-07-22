@@ -18,9 +18,7 @@ export default function AppHeaderBrand({
   logoDarkSrc,
 }: Props) {
   const pathname = usePathname();
-  const isStudio = pathname?.startsWith("/studio") ?? false;
   const isAccountSettings = pathname?.startsWith("/account") ?? false;
-  const useHardNav = process.env.NODE_ENV === "development" && isStudio;
 
   const handleBrandClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
     if (pathname === href) {
@@ -38,35 +36,7 @@ export default function AppHeaderBrand({
   const lightLogo = logoLightSrc ?? "/logo-wording.2026.2.svg";
   const darkLogo = logoDarkSrc ?? "/Merg.dark-logo.2026.svg";
 
-  return useHardNav ? (
-    <a
-      href={href}
-      className="inline-flex items-center gap-2"
-      aria-label={href === "/" ? "Back to home" : "Back to dashboard"}
-      onClick={handleBrandClick}
-    >
-      <Image
-        src={lightLogo}
-        alt="MergifyPDF"
-        width={logoWidth}
-        height={logoHeight}
-        priority
-        loading="eager"
-        className="app-brand-light block dark:hidden"
-        style={{ width: logoWidth, height: logoHeight }}
-      />
-      <Image
-        src={darkLogo}
-        alt="MergifyPDF"
-        width={logoWidth}
-        height={logoHeight}
-        priority
-        loading="eager"
-        className="app-brand-dark hidden dark:block"
-        style={{ width: logoWidth, height: logoHeight }}
-      />
-    </a>
-  ) : (
+  return (
     <Link
       href={href}
       className="inline-flex items-center gap-2"

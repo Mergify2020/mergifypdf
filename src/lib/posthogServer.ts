@@ -1,3 +1,5 @@
+import { resolveRuntimeEnvironment } from "@/lib/runtimeEnvironment";
+
 type ServerEventProps = Record<string, unknown>;
 
 function getPostHogHost(): string | null {
@@ -18,6 +20,8 @@ export async function captureServerEvent(params: {
   event: string;
   properties?: ServerEventProps;
 }): Promise<void> {
+  if (resolveRuntimeEnvironment() !== "production") return;
+
   const host = getPostHogHost();
   const apiKey = getPostHogProjectKey();
   if (!host || !apiKey) return;

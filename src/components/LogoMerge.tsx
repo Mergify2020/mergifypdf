@@ -1,6 +1,8 @@
 // src/components/LogoMerge.tsx
 "use client";
 
+import Image from "next/image";
+
 export default function LogoMerge({ size = 80 }: { size?: number }) {
   return (
     <div
@@ -14,8 +16,10 @@ export default function LogoMerge({ size = 80 }: { size?: number }) {
       }}
       aria-hidden
     >
-      <img
+      <Image
         src="/logo5.svg"
+        width={size}
+        height={size}
         alt="MergifyPDF logo"
         className="block h-full w-full select-none"
         draggable={false}

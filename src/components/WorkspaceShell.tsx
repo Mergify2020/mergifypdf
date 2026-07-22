@@ -316,7 +316,7 @@ export default function WorkspaceShell({
 
   const closeAccountPanel = useCallback(() => {
     setAccountPanelOpen(false);
-  }, [router]);
+  }, []);
 
   useEffect(() => {
     setAvatarLoadFailed(false);
@@ -764,22 +764,6 @@ export default function WorkspaceShell({
         : panelKey === "signatures"
           ? PenSquare
           : BookOpen;
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const routes = ["/", "/projects/all", "/signature-center", "/templates", "/projects/trash"];
-    const prefetch = () => {
-      routes.forEach((route) => {
-        router.prefetch(route);
-      });
-    };
-    if ("requestIdleCallback" in globalThis) {
-      const handle = (globalThis as Window & typeof globalThis).requestIdleCallback(prefetch, { timeout: 1200 });
-      return () => (globalThis as Window & typeof globalThis).cancelIdleCallback(handle);
-    }
-    const timer = setTimeout(prefetch, 200);
-    return () => clearTimeout(timer);
-  }, [router]);
 
   useEffect(() => {
     if (!accountPanelOpen) return;
@@ -1396,7 +1380,7 @@ export default function WorkspaceShell({
 
       if (!res.ok) {
         setBillingPortalLoading(false);
-        // eslint-disable-next-line no-console
+         
         console.error("Failed to load portal");
         return;
       }
@@ -1409,7 +1393,7 @@ export default function WorkspaceShell({
       setBillingPortalLoading(false);
     } catch {
       setBillingPortalLoading(false);
-      // eslint-disable-next-line no-console
+       
       console.error("Unexpected error loading billing portal");
     } finally {
       setProfileOpen(false);

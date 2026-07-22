@@ -1,0 +1,85 @@
+name: Development performance report
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "41 5 * * 2"
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: mergify
+          POSTGRES_PASSWORD: mergify
+          POSTGRES_DB: mergify_perf
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mergify -d mergify_perf"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CI: "true"
+      DATABASE_URL: postgresql://mergify:mergify@127.0.0.1:5432/mergify_perf
+      NEXTAUTH_SECRET: performance-only-not-a-production-secret
+      NEXTAUTH_URL: http://127.0.0.1:3000
+      NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
+      APP_RUNTIME_ENV: development
+      APP_RUNTIME_DB_LABEL: mergifypdf-performance-test
+      APP_RUNTIME_GUARD_STRICT: "true"
+      EMAIL_DELIVERY_MODE: disabled
+      STRIPE_SECRET_KEY: sk_test_performance_placeholder
+      R2_BUCKET_ENVIRONMENT: development
+      REDIS_ENVIRONMENT: development
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: corepack enable
+      - run: corepack prepare pnpm@9.15.4 --activate
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm prisma migrate deploy
+      - run: pnpm safety:init
+      - run: pnpm test:seed
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Start development server
+        run: |
+          node scripts/dev.mjs > /tmp/mergifypdf-dev.log 2>&1 &
+          echo $! > /tmp/mergifypdf-dev.pid
+          for attempt in {1..60}; do
+            curl --fail --silent http://127.0.0.1:3000/ > /dev/null && exit 0
+            sleep 1
+          done
+          sed -n '1,200p' /tmp/mergifypdf-dev.log
+          exit 1
+      - run: mkdir -p artifacts
+      - run: pnpm benchmark:dev -- --json > artifacts/development-performance.json
+      - run: pnpm benchmark:hmr > artifacts/hmr-performance.json
+      - run: ENDURANCE_CYCLES=50 ENDURANCE_DURATION_MINUTES=90 pnpm endurance:dev > artifacts/endurance-performance.json
+      - name: Stop development server
+        run: |
+          kill "$(cat /tmp/mergifypdf-dev.pid)" || true
+          for attempt in {1..30}; do
+            if ! curl --silent http://127.0.0.1:3000/ > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - run: pnpm analyze
+      - run: pnpm bundles:report > artifacts/bundle-report.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: development-performance-${{ github.run_id }}
+          path: |
+            artifacts/development-performance.json
+            artifacts/hmr-performance.json
+            artifacts/endurance-performance.json
+            artifacts/bundle-report.json
+            .next/analyze/client.html
+          retention-days: 30

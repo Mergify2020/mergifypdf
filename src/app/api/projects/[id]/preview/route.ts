@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
 import { createSignedR2Url, getR2Config } from "@/lib/r2";
+import { logDevTiming } from "@/lib/devTiming";
 import { isSameOrigin } from "@/lib/requestGuards";
 
 export const dynamic = "force-dynamic";
@@ -130,10 +131,7 @@ export async function GET(
     );
   }
 
-  console.info("Redirected preview image request to signed R2 URL.", {
-    projectId: id,
-    env: process.env.NODE_ENV,
-  });
+  logDevTiming("project-preview", "signed-redirect");
 
   return NextResponse.redirect(url, {
     headers: {

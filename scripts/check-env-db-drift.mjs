@@ -39,10 +39,8 @@ function parseDbTarget(raw) {
 const env = readEnvFile(".env");
 const envLocal = readEnvFile(".env.local");
 
-const summary = { env, envLocal };
-console.log(JSON.stringify(summary, null, 2));
-
 if (!env || !envLocal || !env.parsed || !envLocal.parsed) {
+  console.log(JSON.stringify({ envFilePresent: !!env, envLocalFilePresent: !!envLocal, comparable: false }, null, 2));
   process.exit(0);
 }
 
@@ -51,6 +49,8 @@ const drift =
   || env.parsed.port !== envLocal.parsed.port
   || env.parsed.database !== envLocal.parsed.database
   || env.parsed.username !== envLocal.parsed.username;
+
+console.log(JSON.stringify({ envFilePresent: true, envLocalFilePresent: true, comparable: true, databaseTargetsMatch: !drift }, null, 2));
 
 if (drift) {
   console.error("DATABASE_URL drift detected between .env and .env.local");

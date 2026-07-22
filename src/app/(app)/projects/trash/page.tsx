@@ -5,7 +5,6 @@ import { prisma } from "@/lib/prisma";
 import { formatProjectLastEdited } from "@/lib/formatProjectLastEdited";
 import { getR2Config, getR2ObjectSize } from "@/lib/r2";
 
-export const dynamic = "force-dynamic";
 
 function extractFileSizeFromData(data: unknown): number | null {
   if (!data || typeof data !== "object") return null;

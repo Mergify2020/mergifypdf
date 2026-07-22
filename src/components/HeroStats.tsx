@@ -24,16 +24,12 @@ function computeCurrentCounts() {
 }
 
 export default function HeroStats({ className }: { className?: string }) {
-  const [edited, setEdited] = useState(EDIT_BASE);
-  const [signed, setSigned] = useState(SIGN_BASE);
+  const [edited, setEdited] = useState(() => computeCurrentCounts().edited);
+  const [signed, setSigned] = useState(() => computeCurrentCounts().signed);
   const [editedTick, setEditedTick] = useState(0);
   const [signedTick, setSignedTick] = useState(0);
 
   useEffect(() => {
-    const initial = computeCurrentCounts();
-    setEdited(initial.edited);
-    setSigned(initial.signed);
-
     const editedInterval = setInterval(() => {
       const { edited: nextEdited } = computeCurrentCounts();
       setEdited(nextEdited);

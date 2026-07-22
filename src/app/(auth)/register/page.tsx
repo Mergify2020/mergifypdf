@@ -97,7 +97,7 @@ export default function RegisterPage() {
       setResendCooldown(25);
       setStep("verify");
       setCodeDigits(Array(6).fill(""));
-    } catch (error) {
+    } catch {
       setErr("Sign up failed. Please try again.");
     } finally {
       setBusy(false);
@@ -176,7 +176,7 @@ export default function RegisterPage() {
       }
 
       router.replace("/login?callbackUrl=" + encodeURIComponent(postSignupCallbackUrl));
-    } catch (error) {
+    } catch {
       setErr("Verification failed. Please try again.");
     } finally {
       setBusy(false);
@@ -200,7 +200,7 @@ export default function RegisterPage() {
         return;
       }
       setInfo("We sent a new code. Check your inbox.");
-    } catch (error) {
+    } catch {
       setErr("Unable to resend code right now.");
     } finally {
       setResendBusy(false);
@@ -457,7 +457,7 @@ export default function RegisterPage() {
                   aria-disabled={actionBusy}
                   className="flex w-full items-center justify-center gap-3 rounded-md border-2 border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 transition hover:-translate-y-[1px] hover:border-slate-400 hover:shadow-md active:scale-[0.985] active:brightness-95 active:transition active:duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent disabled:opacity-60"
                 >
-                  <img src="/google.svg" alt="Google logo" className="h-5 w-5" />
+                  <Image src="/google.svg" alt="Google logo" width={20} height={20} className="h-5 w-5" />
                   <span>{googleBusy ? "Signing in with Google…" : "Continue with Google"}</span>
                   {googleBusy && (
                     <svg

@@ -11,10 +11,10 @@ import {
   type ProjectEntryLoadingContext,
 } from "@/lib/projectEntryLoading";
 import { clearWorkspaceOpenHandoffStorage } from "@/lib/workspaceOpenHandoff";
+import { logDevTiming } from "@/lib/devTiming";
 
 function debugProjectEntry(event: string, detail: Record<string, unknown>) {
-  if (process.env.NODE_ENV === "production") return;
-  console.info("[project-entry:" + event + "]", detail);
+  logDevTiming("project-entry", event, detail);
 }
 
 function clearProjectEntrySessionState() {

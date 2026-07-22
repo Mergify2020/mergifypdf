@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: mergify
+          POSTGRES_PASSWORD: mergify
+          POSTGRES_DB: mergify_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mergify -d mergify_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CI: "true"
+      DATABASE_URL: postgresql://mergify:mergify@127.0.0.1:5432/mergify_ci
+      NEXTAUTH_SECRET: ci-only-not-a-production-secret
+      NEXTAUTH_URL: http://127.0.0.1:3000
+      NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
+      APP_RUNTIME_ENV: development
+      APP_RUNTIME_NAME: mergifypdf
+      APP_RUNTIME_DB_LABEL: mergifypdf-ci
+      APP_RUNTIME_GUARD_STRICT: "true"
+      APP_RUNTIME_REQUIRE_USERS: "false"
+      EMAIL_DELIVERY_MODE: disabled
+      STRIPE_SECRET_KEY: sk_test_ci_placeholder
+      R2_BUCKET_ENVIRONMENT: development
+      REDIS_ENVIRONMENT: development
+      E2E_AUTH_ENABLED: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: corepack enable
+      - run: corepack prepare pnpm@9.15.4 --activate
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm prisma migrate deploy
+      - run: pnpm safety:init
+      - run: pnpm test:seed
+      - run: pnpm validate:env
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test:coverage
+      - run: pnpm build
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-failure-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7

@@ -5,7 +5,6 @@ import SignedHistoryList from "./SignedHistoryList";
 import SignatureRequestsTable from "./SignatureRequestsTable";
 import TasksList from "./TasksList";
 
-export const dynamic = "force-dynamic";
 
 export default async function SignatureCenterPage() {
   const session = await getServerSessionSafe();

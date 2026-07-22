@@ -1,4 +1,4 @@
 declare module "fontkit" {
-  const fontkit: any;
+  const fontkit: unknown;
   export default fontkit;
 }

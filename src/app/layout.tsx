@@ -1,10 +1,9 @@
 ﻿// src/app/layout.tsx
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
-import { cookies } from "next/headers";
-import type { CSSProperties } from "react";
 import Providers from "@/components/Providers";
 import "./globals.css";
+import "./enduranceProbe.css";
 
 export const metadata: Metadata = {
   title: "MergifyPDF",
@@ -30,37 +29,39 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+const initialThemeScript = `
+  try {
+    const stored = localStorage.getItem("theme");
+    const dark = stored === "dark";
+    const root = document.documentElement;
+    const surface = dark ? "#222224" : "#f1f4f9";
+    const foreground = dark ? "#f5f5f5" : "#171717";
+    root.classList.toggle("dark", dark);
+    root.style.backgroundColor = surface;
+    root.style.color = foreground;
+    root.style.colorScheme = dark ? "dark light" : "light dark";
+    root.style.setProperty("--app-surface", surface);
+    root.style.setProperty("--app-foreground", foreground);
+    root.style.setProperty("--spinner-track", dark ? "#3f3f3f" : "#d9ccff");
+    root.style.setProperty("--spinner-head", "#6C47FF");
+    const themeMeta = document.querySelector("meta[name=theme-color]");
+    if (themeMeta) themeMeta.setAttribute("content", surface);
+  } catch {}
+`;
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const cookieStore = await cookies();
-  const themeCookie = cookieStore.get?.("theme")?.value;
-  const themeClass = themeCookie === "dark" ? "dark" : undefined;
-  const themeColor = themeCookie === "dark" ? "#222224" : "#f1f4f9";
-  const colorScheme = themeCookie === "dark" ? "dark light" : "light dark";
-  const themeStyle = {
-    backgroundColor: themeColor,
-    color: themeCookie === "dark" ? "#f5f5f5" : "#171717",
-    colorScheme,
-    ["--app-surface"]: themeColor,
-    ["--app-foreground"]: themeCookie === "dark" ? "#f5f5f5" : "#171717",
-    ["--spinner-track"]: themeCookie === "dark" ? "#3f3f3f" : "#d9ccff",
-    ["--spinner-head"]: "#6C47FF",
-  } as CSSProperties & {
-    ["--app-surface"]: string;
-    ["--app-foreground"]: string;
-    ["--spinner-track"]: string;
-    ["--spinner-head"]: string;
-  };
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const externalServicesEnabled =
+    process.env.NODE_ENV === "production" &&
+    process.env.APP_RUNTIME_ENV === "production";
 
   return (
-    <html lang="en" className={themeClass} style={themeStyle} suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <head>
         {/* Set the initial theme metadata before hydration */}
-        <meta name="color-scheme" content={colorScheme} />
-        <meta name="supported-color-schemes" content={colorScheme} />
-        <meta name="theme-color" content={themeColor} />
+        <meta name="color-scheme" content="light dark" />
+        <meta name="supported-color-schemes" content="light dark" />
+        <meta name="theme-color" content="#f1f4f9" />
+        <script dangerouslySetInnerHTML={{ __html: initialThemeScript }} />
 
         {/* Theme preference sync happens client-side after hydration. */}
 
@@ -74,7 +75,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <link rel="mask-icon" href="/favicons/safari-pinned-tab.svg" color="#024d7c" />
         <link rel="manifest" href="/favicons/site.webmanifest" />
 
-        {process.env.NODE_ENV === "production" ? (
+        {externalServicesEnabled ? (
           <Script
             src="//widget.trustpilot.com/bootstrap/v5/tp.widget.bootstrap.min.js"
             strategy="afterInteractive"
@@ -82,8 +83,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         ) : null}
       </head>
 
-      <body className="min-h-screen bg-[var(--background)] text-[var(--foreground)]" style={themeStyle}>
-        <Providers>{children}</Providers>
+      <body className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
+        <Providers analyticsEnabled={externalServicesEnabled}>{children}</Providers>
       </body>
     </html>
   );

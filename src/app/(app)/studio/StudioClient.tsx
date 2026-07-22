@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, memo, startTransition, useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
+import { Fragment, startTransition, useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
 import { flushSync } from "react-dom";
 import { createPortal } from "react-dom";
 import { signIn, useSession } from "next-auth/react";
@@ -16,27 +16,17 @@ import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import QRCode from "react-qr-code";
-import {
-  PDFDocument,
-  rgb,
-  LineCapStyle,
-  degrees,
-  pushGraphicsState,
-  popGraphicsState,
-  clip,
-  endPath,
-  rectangle,
-  translate,
-  rotateDegrees,
-  StandardFonts,
-  type PDFFont,
-} from "pdf-lib";
+import type { PDFDocument as PDFDocumentType, PDFFont } from "pdf-lib";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   cancelWorkspaceOpenHandoff,
   WORKSPACE_OPEN_IN_PROGRESS_STORAGE_KEY,
 } from "@/lib/workspaceOpenHandoff";
 import { buildStudioProjectHref, getStudioProjectIdFromSearchParams } from "@/lib/studioRoute";
+import { loadPdfJs, type PdfJsModule } from "@/lib/pdfjsClient";
+import { loadPdfLib } from "@/lib/pdfLibClient";
+import { SecurePdfReadAccessManager } from "@/lib/securePdfReadClient";
+import { uploadPdfSecurely } from "@/lib/secureUploadClient";
 import {
   getProjectsSummaryCache,
   setProjectsSummaryCache,
@@ -72,7 +62,6 @@ import {
   AlignCenter,
   AlignLeft,
   AlignRight,
-  AlignJustify,
   Bold,
   Italic,
   Underline,
@@ -97,7 +86,6 @@ import {
   Mail,
   Download,
   Printer,
-  FileUp,
 } from "lucide-react";
 import {
   AutoScrollActivator,
@@ -113,7 +101,6 @@ import {
 } from "@dnd-kit/core";
 import {
   SortableContext,
-  useSortable,
   arrayMove,
   verticalListSortingStrategy,
   rectSortingStrategy,
@@ -123,168 +110,64 @@ import WorkspaceSettingsMenu from "@/components/WorkspaceSettingsMenu";
 import { GUEST_PROJECT_STORAGE_KEY, type GuestProject } from "@/lib/guestProject";
 import { PROJECT_NAME_STORAGE_KEY, projectNameToFile, sanitizeProjectName } from "@/lib/projectName";
 import { PENDING_UPLOAD_STORAGE_KEY } from "@/lib/pendingUpload";
-import { refreshProjectsSummary } from "@/lib/projectsSummaryCache";
-
-type SourceRef = { storageId: string; url: string; name: string; size: number; updatedAt: number };
-type PageItem = {
-  id: string;
-  srcIdx: number; // which source file
-  pageIdx: number; // page index inside that source
-  thumb: string; // small preview
-  thumbWidth?: number;
-  thumbHeight?: number;
-  preview: string; // large preview
-  rotation: number;
-  width: number;
-  height: number;
-  isPlaceholder?: boolean;
-};
-type Point = { x: number; y: number; move?: boolean };
-type DrawingTool = "highlight" | "pen" | "pencil" | "text";
-type HeaderMode = "default" | "pen" | "highlight" | "shapes";
-type ShapeType = "line" | "arrow" | "check" | "x" | "rect" | "ellipse" | "triangle";
-type LineStyle = "solid" | "dashed" | "dotted";
-type ShapeAnnotation = {
-  id: string;
-  type: ShapeType;
-  pageId: string;
-  start: Point;
-  end: Point;
-  color: string;
-  fillColor?: string | null;
-  thickness: number;
-  lineStyle?: LineStyle;
-};
-type HighlightStroke = {
-  id: string;
-  tool: DrawingTool;
-  points: Point[];
-  color: string;
-  opacity?: number;
-  seed?: number;
-  thickness: number;
-  lineStyle?: LineStyle;
-};
-type DraftHighlight = {
-  tool: Exclude<DrawingTool, "text">;
-  pageId: string;
-  points: Point[];
-  color: string;
-  opacity?: number;
-  seed?: number;
-  thickness: number;
-  lineStyle?: LineStyle;
-};
-type HighlightHistoryEntry =
-  | { type: "add"; pageId: string; highlight: HighlightStroke }
-  | { type: "delete"; pageId: string; highlight: HighlightStroke }
-  | { type: "addShape"; pageId: string; shape: ShapeAnnotation }
-  | { type: "deleteShape"; pageId: string; shape: ShapeAnnotation }
-  | {
-      type: "clear";
-      previous: {
-        highlights: Record<string, HighlightStroke[]>;
-        shapes: Record<string, ShapeAnnotation[]>;
-        textAnnotations: Record<string, TextAnnotation[]>;
-      };
-    };
-
-type Project = {
-  id: string;
-  name: string;
-  data: any;
-  createdAt: string;
-  updatedAt: string;
-};
-
-type TextAnnotation = {
-  id: string;
-  pageId: string;
-  pageIndex: number;
-  x: number;
-  y: number;
-  text: string;
-  width: number;
-  height: number;
-  rotation?: number;
-  locked?: boolean;
-  textSizePt?: number;
-  richTextHtml?: string;
-  lineSpacing?: number;
-  textAlign?: "left" | "center" | "right" | "justify";
-  sourceType?: "manual";
-};
-type TextFont =
-  | "Inter"
-  | "Arial"
-  | "Roboto"
-  | "Times New Roman"
-  | "Courier New"
-  | "Georgia"
-  | "Poppins";
-type TextFontVariant = "normal" | "bold" | "italic" | "boldItalic";
-type SearchablePdfPage = {
-  getTextContent: () => Promise<{ items: Array<{ str?: string }> }>;
-};
-type SearchablePdfDocument = {
-  getPage: (pageNumber: number) => Promise<SearchablePdfPage>;
-};
-type SignaturePanelMode = "none" | "draw" | "upload" | "saved";
-type SavedSignature = {
-  id: string;
-  name: string;
-  dataUrl: string;
-  naturalWidth: number;
-  naturalHeight: number;
-  createdAt: number;
-};
-type SignaturePlacement = {
-  id: string;
-  signatureId: string;
-  name: string;
-  dataUrl: string;
-  pageId: string;
-  pageIndex: number;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  rotation?: number;
-  status: "draft" | "placed";
-};
-
-type CloudProject = {
-  id: string;
-  name: string;
-  data: unknown;
-  createdAt?: string | number;
-  updatedAt?: string | number;
-  previewUrl?: string | null;
-  hasPreview?: boolean;
-  hasPdf?: boolean;
-  pagesCount?: number | null;
-};
-
-function getProjectCoverPreview(pages: PageItem[]): string | null {
-  const first = pages[0];
-  if (!first) return null;
-  const candidate = first.preview;
-  if (typeof candidate !== "string" || !candidate.startsWith("data:image/")) {
-    return null;
-  }
-  return candidate;
-}
-
-function extractProjectRotationFromData(data: unknown): number {
-  if (!data || typeof data !== "object") return 0;
-  const record = data as Record<string, unknown>;
-  const pages = Array.isArray(record.pages) ? record.pages : null;
-  if (!pages || pages.length === 0) return 0;
-  const first = pages[0];
-  if (!first || typeof first !== "object") return 0;
-  const rotation = (first as { rotation?: unknown }).rotation;
-  return typeof rotation === "number" ? normalizeRotation(rotation) : 0;
-}
+import { logDevTiming } from "@/lib/devTiming";
+import { extractProjectRotationFromData, getProjectCoverPreview } from "./studioProjectData";
+import { MemoSortableThumb, SortableOrganizeTile } from "./StudioPageTiles";
+import StudioHmrProbe from "./StudioHmrProbe";
+import { TEXT_FONT_OPTIONS, type FontOption, type StandardFontName } from "./studioFonts";
+import { calculateBoundedRenderDimensions, selectPageWorkingSet } from "./studioPerformance";
+import type {
+  CloudProject,
+  DraftHighlight,
+  DrawingTool,
+  HeaderMode,
+  HighlightHistoryEntry,
+  HighlightStroke,
+  LineStyle,
+  PageItem,
+  Point,
+  SavedSignature,
+  SearchablePdfDocument,
+  ShapeAnnotation,
+  ShapeType,
+  SignaturePanelMode,
+  SignaturePlacement,
+  SourceRef,
+  TextAnnotation,
+  TextFont,
+  TextFontVariant,
+} from "./studioTypes";
+import {
+  PREVIEW_CACHE_VERSION,
+  getLocalStorage,
+  getSessionStorage,
+  persistSourceMetadata,
+  readFileBlob,
+  readStoredSourceIds,
+  readWorkspacePreviewCache,
+  storeFileBlob,
+  workspaceFilesKey,
+  workspacePreviewCacheKey,
+  type StoredSourceMeta,
+  type WorkspacePreviewCache,
+} from "./studioStorage";
+import {
+  PT_TO_PX,
+  clamp,
+  formatSignedRotation,
+  getSnapTextRotationTarget,
+  hexToRgb,
+  hslToHex,
+  hsvToHex,
+  normalizeCssColor,
+  normalizeRotation,
+  normalizeTextSize,
+  parseFontSize,
+  rgbToHex,
+  rgbToHsv,
+  snapTextRotation,
+  textToHtml,
+} from "./studioPure";
 
 const TYPED_SIGNATURE_STYLES = [
   { id: "script", label: "Script", fontFamily: "'Segoe Script', 'Comic Sans MS', cursive" },
@@ -296,120 +179,6 @@ const TYPED_SIGNATURE_STYLES = [
 const PREVIEW_SYNC_DEBOUNCE_MS = 900;
 const ROTATE_CURSOR =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M20 11A8 8 0 1 1 17.66 5.34' fill='none' stroke='%236C47FF' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M20 4v7h-7' fill='none' stroke='%236C47FF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\") 12 12, auto";
-
-type FontOption =
-  | {
-      label: string;
-      cssFamily: string;
-      pdf: { type: "standard"; variants: Record<TextFontVariant, StandardFonts> };
-    }
-  | {
-      label: string;
-      cssFamily: string;
-      pdf: {
-        type: "custom";
-        variants: Record<TextFontVariant, string>;
-        fallback: StandardFonts;
-      };
-    };
-
-const TEXT_FONT_OPTIONS: Record<TextFont, FontOption> = {
-  Inter: {
-    label: "Inter",
-    cssFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-    pdf: {
-      type: "custom",
-      variants: {
-        normal: "/fonts/Inter-Regular.ttf",
-        bold: "/fonts/Inter-Bold.ttf",
-        italic: "/fonts/Inter-Italic.ttf",
-        boldItalic: "/fonts/Inter-BoldItalic.ttf",
-      },
-      fallback: StandardFonts.Helvetica,
-    },
-  },
-  Arial: {
-    label: "Arial",
-    cssFamily: "'Arimo', 'Arial', 'Helvetica Neue', sans-serif",
-    pdf: {
-      type: "custom",
-      variants: {
-        normal: "/fonts/Arimo-Regular.ttf",
-        bold: "/fonts/Arimo-Bold.ttf",
-        italic: "/fonts/Arimo-Italic.ttf",
-        boldItalic: "/fonts/Arimo-BoldItalic.ttf",
-      },
-      fallback: StandardFonts.Helvetica,
-    },
-  },
-  Roboto: {
-    label: "Roboto",
-    cssFamily: "'Roboto', 'Arial', 'Helvetica Neue', sans-serif",
-    pdf: {
-      type: "custom",
-variants: {
-  normal: "/fonts/Roboto-Regular.ttf",
-  bold: "/fonts/Roboto-Regular.ttf",
-  italic: "/fonts/Roboto-Regular.ttf",
-  boldItalic: "/fonts/Roboto-Regular.ttf",
-},
-      fallback: StandardFonts.Helvetica,
-    },
-  },
-  Poppins: {
-    label: "Poppins",
-    cssFamily: "'Poppins', 'Helvetica Neue', 'Arial', sans-serif",
-    pdf: {
-      type: "custom",
-      variants: {
-        normal: "/fonts/Poppins-Regular.ttf",
-        bold: "/fonts/Poppins-Bold.ttf",
-        italic: "/fonts/Poppins-Italic.ttf",
-        boldItalic: "/fonts/Poppins-BoldItalic.ttf",
-      },
-      fallback: StandardFonts.Helvetica,
-    },
-  },
-  "Times New Roman": {
-    label: "Times New Roman",
-    cssFamily: "'Times New Roman', Times, serif",
-    pdf: {
-      type: "standard",
-      variants: {
-        normal: StandardFonts.TimesRoman,
-        bold: StandardFonts.TimesRomanBold,
-        italic: StandardFonts.TimesRomanItalic,
-        boldItalic: StandardFonts.TimesRomanBoldItalic,
-      },
-    },
-  },
-  "Courier New": {
-    label: "Courier New",
-    cssFamily: "'Courier New', 'SFMono-Regular', Consolas, monospace",
-    pdf: {
-      type: "standard",
-      variants: {
-        normal: StandardFonts.Courier,
-        bold: StandardFonts.CourierBold,
-        italic: StandardFonts.CourierOblique,
-        boldItalic: StandardFonts.CourierBoldOblique,
-      },
-    },
-  },
-  Georgia: {
-    label: "Georgia",
-    cssFamily: "'Georgia', 'Times New Roman', serif",
-    pdf: {
-      type: "standard",
-      variants: {
-        normal: StandardFonts.TimesRoman,
-        bold: StandardFonts.TimesRomanBold,
-        italic: StandardFonts.TimesRomanItalic,
-        boldItalic: StandardFonts.TimesRomanBoldItalic,
-      },
-    },
-  },
-};
 
 const LINE_STYLE_OPTIONS: { value: LineStyle; label: string }[] = [
   { value: "solid", label: "Solid" },
@@ -461,10 +230,7 @@ const COVER_PREVIEW_QUALITY = 0.86;
 const TEXT_PLACEHOLDER = "Type here";
 const TEXT_DEFAULT_WIDTH_PX = 360;
 const TEXT_DEFAULT_HEIGHT_PX = 48;
-const PT_TO_PX = 96 / 72;
 const PX_TO_PT = 72 / 96;
-const TEXT_SIZE_MIN_PT = 1;
-const TEXT_SIZE_MAX_PT = 96;
 const DEFAULT_TEXT_SIZE_PT = 11;
 const DEFAULT_TEXT_SIZE_PX = DEFAULT_TEXT_SIZE_PT * PT_TO_PX;
 const DEFAULT_TEXT_LINE_SPACING = 1.0;
@@ -472,6 +238,12 @@ const LOW_RES_PREVIEW_SCALE = PREVIEW_BASE_SCALE * 0.5;
 const MAX_PARALLEL_PREVIEW_RENDERS = 3;
 const MAX_PARALLEL_LOW_PREVIEW_RENDERS = 1;
 const MAX_PARALLEL_THUMB_RENDERS = 2;
+const HIGH_PREVIEW_MAX_PIXELS = 12_000_000;
+const HIGH_PREVIEW_MAX_DIMENSION = 8192;
+const LOW_PREVIEW_MAX_PIXELS = 4_000_000;
+const LOW_PREVIEW_MAX_DIMENSION = 4096;
+const THUMB_MAX_PIXELS = 1_000_000;
+const THUMB_MAX_DIMENSION = 2048;
 const MIN_STARTUP_OVERLAY_MS = 1200;
 const STARTUP_OVERLAY_FULL_HOLD_MS = 350;
 const STARTUP_OVERLAY_KEY = "mpdf:startup-overlay";
@@ -479,8 +251,6 @@ const STARTUP_OVERLAY_CONTEXT_KEY = "mpdf:startup-overlay-context";
 const WORKSPACE_LAUNCH_OVERLAY_STORAGE_KEY = "mpdf:workspace-launch-overlay";
 const EXISTING_PROJECT_OVERLAY_STORAGE_KEY = "mpdf:existing-project-overlay";
 const WORKSPACE_EXIT_TRANSITION_MS = 200;
-const WORKSPACE_PREVIEW_CACHE_KEY = "mpdf:preview-cache";
-const PREVIEW_CACHE_VERSION = 2;
 const PREVIEW_CACHE_NEAR_RANGE = 1;
 const BACKGROUND_LOW_RES_BATCH = 1;
 const BACKGROUND_LOW_RES_PRIORITY = 5;
@@ -489,9 +259,6 @@ const THUMB_MAX_WIDTH = 240;
 const PREVIEW_IMAGE_QUALITY = 0.98;
 const TRANSPARENT_PIXEL =
   "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=";
-const WORKSPACE_SESSION_KEY = "mpdf:files";
-const WORKSPACE_DB_NAME = "mpdf-file-store";
-const WORKSPACE_DB_STORE = "files";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
 const WORKSPACE_SIGNATURES_KEY = "mpdf:signatures";
 const DEFAULT_ASPECT_RATIO = 792 / 612; // fallback letter portrait
@@ -513,10 +280,6 @@ const GRID_VARIANTS = {
     scale: 1,
     transition: { duration: 0.2, ease: SOFT_EASE, staggerChildren: 0.05, delayChildren: 0.02 },
   },
-};
-const TILE_VARIANTS = {
-  hidden: { opacity: 0, y: 10 },
-  visible: { opacity: 1, y: 0 },
 };
 
 function applyTextTransform(value: string, transform: "none" | "uppercase") {
@@ -573,158 +336,6 @@ function toCoverPreviewDataUrl(canvas: HTMLCanvasElement) {
   return canvas.toDataURL("image/png", COVER_PREVIEW_QUALITY);
 }
 
-type StoredSourceMeta = { id: string; name?: string; size?: number; updatedAt?: number };
-type FileStoreEntry = { blob: Blob; name?: string; size?: number; updatedAt: number };
-
-let fileStorePromise: Promise<IDBDatabase> | null = null;
-
-function getFileStore(): Promise<IDBDatabase> {
-  if (typeof window === "undefined" || !("indexedDB" in window)) {
-    return Promise.reject(new Error("IndexedDB is unavailable"));
-  }
-  if (!fileStorePromise) {
-    fileStorePromise = new Promise((resolve, reject) => {
-      const request = indexedDB.open(WORKSPACE_DB_NAME, 1);
-      request.onupgradeneeded = () => {
-        const db = request.result;
-        if (!db.objectStoreNames.contains(WORKSPACE_DB_STORE)) {
-          db.createObjectStore(WORKSPACE_DB_STORE);
-        }
-      };
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error ?? new Error("IndexedDB open failed"));
-    });
-  }
-  return fileStorePromise;
-}
-
-async function storeFileBlob(id: string, file: Blob, name: string, size: number) {
-  const db = await getFileStore();
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(WORKSPACE_DB_STORE, "readwrite");
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error ?? new Error("IndexedDB write failed"));
-    tx.objectStore(WORKSPACE_DB_STORE).put({ blob: file, name, size, updatedAt: Date.now() }, id);
-  });
-}
-
-async function readFileBlob(id: string): Promise<FileStoreEntry | null> {
-  const db = await getFileStore();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(WORKSPACE_DB_STORE, "readonly");
-    const request = tx.objectStore(WORKSPACE_DB_STORE).get(id);
-    request.onsuccess = () => resolve(request.result ?? null);
-    request.onerror = () => reject(request.error ?? new Error("IndexedDB read failed"));
-  });
-}
-
-function getLocalStorage(): Storage | null {
-  if (typeof window === "undefined") return null;
-  try {
-    return window.localStorage;
-  } catch (err) {
-    console.error("LocalStorage unavailable", err);
-    return null;
-  }
-}
-
-function getSessionStorage(): Storage | null {
-  if (typeof window === "undefined") return null;
-  try {
-    return window.sessionStorage;
-  } catch (err) {
-    console.error("SessionStorage unavailable", err);
-    return null;
-  }
-}
-
-function workspaceFilesKey(projectId: string | null) {
-  return projectId ? `${WORKSPACE_SESSION_KEY}:${projectId}` : WORKSPACE_SESSION_KEY;
-}
-
-function workspacePreviewCacheKey(projectKey: string) {
-  return `${WORKSPACE_PREVIEW_CACHE_KEY}:${projectKey}`;
-}
-
-function arraysEqual<T>(left: T[], right: T[]) {
-  if (left.length !== right.length) return false;
-  for (let i = 0; i < left.length; i += 1) {
-    if (left[i] !== right[i]) return false;
-  }
-  return true;
-}
-
-function readStoredSourceIds(projectId: string | null) {
-  const storage = getLocalStorage();
-  if (!storage) return null;
-  const raw = storage.getItem(workspaceFilesKey(projectId));
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as StoredSourceMeta[];
-    if (!Array.isArray(parsed)) return null;
-    return parsed
-      .map((entry) => (entry && typeof entry === "object" ? entry.id : null))
-      .filter((id): id is string => typeof id === "string" && id.length > 0);
-  } catch {
-    return null;
-  }
-}
-
-type WorkspacePreviewCache = {
-  version: number;
-  sourceIds: string[];
-  pages: Array<{
-    id: string;
-    srcIdx: number;
-    pageIdx: number;
-    rotation: number;
-    width: number;
-    height: number;
-    thumb: string;
-    thumbWidth?: number;
-    thumbHeight?: number;
-    preview: string;
-  }>;
-};
-
-function readWorkspacePreviewCache(projectKey: string, expectedSourceIds: string[] | null) {
-  const storage = getSessionStorage();
-  if (!storage) return null;
-  const raw = storage.getItem(workspacePreviewCacheKey(projectKey));
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as WorkspacePreviewCache;
-    if (
-      !parsed ||
-      parsed.version !== PREVIEW_CACHE_VERSION ||
-      !Array.isArray(parsed.pages) ||
-      !Array.isArray(parsed.sourceIds)
-    ) {
-      return null;
-    }
-    if (expectedSourceIds && expectedSourceIds.length > 0 && !arraysEqual(parsed.sourceIds, expectedSourceIds)) {
-      return null;
-    }
-    const pages = parsed.pages
-      .filter((page) => page && typeof page.id === "string")
-      .map((page) => ({
-        id: page.id,
-        srcIdx: typeof page.srcIdx === "number" ? page.srcIdx : 0,
-        pageIdx: typeof page.pageIdx === "number" ? page.pageIdx : 0,
-        rotation: typeof page.rotation === "number" ? page.rotation : 0,
-        width: typeof page.width === "number" ? page.width : 0,
-        height: typeof page.height === "number" ? page.height : 0,
-        thumb: typeof page.thumb === "string" ? page.thumb : "",
-        thumbWidth: typeof page.thumbWidth === "number" ? page.thumbWidth : 0,
-        thumbHeight: typeof page.thumbHeight === "number" ? page.thumbHeight : 0,
-        preview: typeof page.preview === "string" ? page.preview : "",
-      }));
-    return pages.length > 0 ? pages : null;
-  } catch {
-    return null;
-  }
-}
-
 function readProjectPageString(page: unknown, field: string) {
   if (!page || typeof page !== "object") return "";
   const value = (page as Record<string, unknown>)[field];
@@ -772,9 +383,29 @@ function buildCloudProjectPreviewPages(
     .filter((page): page is PageItem => Boolean(page));
 }
 
-function debugStudioLoad(event: string, detail: Record<string, unknown>) {
-  if (process.env.NODE_ENV === "production") return;
-  console.info(`[studio-load:${event}]`, detail);
+function debugStudioLoad(event: string, detail: Record<string, unknown> = {}) {
+  logDevTiming("studio-load", event, detail);
+}
+
+function isPdfRenderCancellation(error: unknown) {
+  return Boolean(
+    error &&
+      typeof error === "object" &&
+      "name" in error &&
+      (error as { name?: unknown }).name === "RenderingCancelledException",
+  );
+}
+
+function destroyPdfDocuments(cache: Map<number, any>) {
+  cache.forEach((pdf) => {
+    try {
+      pdf.cleanup?.();
+      const pending = pdf.destroy?.();
+      if (pending && typeof pending.catch === "function") pending.catch(() => undefined);
+    } catch {
+    }
+  });
+  cache.clear();
 }
 
 function buildPreviewCachePages(pages: PageItem[], activePageId: string | null) {
@@ -829,27 +460,6 @@ function persistWorkspacePreviewCache(
   }
 }
 
-function persistSourceMetadata(list: SourceRef[], projectId: string | null) {
-  const storage = getLocalStorage();
-  if (!storage) return;
-  const key = workspaceFilesKey(projectId);
-  if (list.length === 0) {
-    storage.removeItem(key);
-    return;
-  }
-  const payload = list.map(({ storageId, name, size, updatedAt }) => ({
-    id: storageId,
-    name,
-    size,
-    updatedAt,
-  }));
-  try {
-    storage.setItem(key, JSON.stringify(payload));
-  } catch (err) {
-    console.error("Failed to persist workspace metadata", err);
-  }
-}
-
 function dataURLToBlob(dataUrl: string): Blob {
   const [header, data] = dataUrl.split(",");
   const mimeMatch = header?.match(/:(.*?);/);
@@ -883,140 +493,6 @@ function getDevicePixelRatio() {
 function getThumbTargetWidth() {
   const pixelRatio = Math.min(2, getDevicePixelRatio());
   return Math.max(1, Math.floor(THUMB_MAX_WIDTH * pixelRatio));
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
-}
-
-function hexToRgb(hex: string) {
-  const value = hex.replace("#", "");
-  if (value.length !== 6) return null;
-  const r = parseInt(value.slice(0, 2), 16) / 255;
-  const g = parseInt(value.slice(2, 4), 16) / 255;
-  const b = parseInt(value.slice(4, 6), 16) / 255;
-  if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return null;
-  return { r, g, b };
-}
-
-function rgbToHex(r: number, g: number, b: number) {
-  const clampChannel = (value: number) => Math.max(0, Math.min(255, Math.round(value)));
-  return `#${clampChannel(r).toString(16).padStart(2, "0")}${clampChannel(g)
-    .toString(16)
-    .padStart(2, "0")}${clampChannel(b).toString(16).padStart(2, "0")}`;
-}
-
-function rgbToHsv(r: number, g: number, b: number) {
-  const rNorm = r / 255;
-  const gNorm = g / 255;
-  const bNorm = b / 255;
-  const max = Math.max(rNorm, gNorm, bNorm);
-  const min = Math.min(rNorm, gNorm, bNorm);
-  const delta = max - min;
-  let hue = 0;
-  if (delta !== 0) {
-    if (max === rNorm) {
-      hue = ((gNorm - bNorm) / delta) % 6;
-    } else if (max === gNorm) {
-      hue = (bNorm - rNorm) / delta + 2;
-    } else {
-      hue = (rNorm - gNorm) / delta + 4;
-    }
-    hue *= 60;
-    if (hue < 0) hue += 360;
-  }
-  const saturation = max === 0 ? 0 : delta / max;
-  const value = max;
-  return { h: hue, s: saturation * 100, v: value * 100 };
-}
-
-function hsvToHex(h: number, s: number, v: number) {
-  const hue = ((h % 360) + 360) % 360;
-  const sat = Math.max(0, Math.min(1, s / 100));
-  const val = Math.max(0, Math.min(1, v / 100));
-  const c = val * sat;
-  const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
-  const m = val - c;
-  let r = 0;
-  let g = 0;
-  let b = 0;
-  if (hue < 60) {
-    r = c;
-    g = x;
-  } else if (hue < 120) {
-    r = x;
-    g = c;
-  } else if (hue < 180) {
-    g = c;
-    b = x;
-  } else if (hue < 240) {
-    g = x;
-    b = c;
-  } else if (hue < 300) {
-    r = x;
-    b = c;
-  } else {
-    r = c;
-    b = x;
-  }
-  return rgbToHex((r + m) * 255, (g + m) * 255, (b + m) * 255);
-}
-
-function hslToHex(h: number, s: number, l: number) {
-  const hue = ((h % 360) + 360) % 360;
-  const sat = Math.max(0, Math.min(1, s / 100));
-  const light = Math.max(0, Math.min(1, l / 100));
-  if (sat === 0) {
-    const gray = Math.round(light * 255);
-    return rgbToHex(gray, gray, gray);
-  }
-  const c = (1 - Math.abs(2 * light - 1)) * sat;
-  const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
-  const m = light - c / 2;
-  let r = 0;
-  let g = 0;
-  let b = 0;
-  if (hue < 60) {
-    r = c;
-    g = x;
-  } else if (hue < 120) {
-    r = x;
-    g = c;
-  } else if (hue < 180) {
-    g = c;
-    b = x;
-  } else if (hue < 240) {
-    g = x;
-    b = c;
-  } else if (hue < 300) {
-    r = x;
-    b = c;
-  } else {
-    r = c;
-    b = x;
-  }
-  return rgbToHex((r + m) * 255, (g + m) * 255, (b + m) * 255);
-}
-
-function normalizeCssColor(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed || trimmed === "transparent") return null;
-  if (trimmed.startsWith("#")) {
-    if (trimmed.length === 4) {
-      const r = trimmed[1];
-      const g = trimmed[2];
-      const b = trimmed[3];
-      return `#${r}${r}${g}${g}${b}${b}`;
-    }
-    return trimmed.slice(0, 7);
-  }
-  const match = trimmed.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/i);
-  if (match) {
-    const alpha = match[4] ? Number(match[4]) : 1;
-    if (Number.isNaN(alpha) || alpha <= 0) return null;
-    return rgbToHex(Number(match[1]), Number(match[2]), Number(match[3]));
-  }
-  return null;
 }
 
 function resolveCaretColor(element: HTMLElement, range: Range, fallback: string) {
@@ -1334,18 +810,6 @@ function loadImageFromDataUrl(src: string) {
   });
 }
 
-function getAspectPadding(width?: number, height?: number) {
-  if (!width || !height || width === 0) {
-    return `${DEFAULT_ASPECT_RATIO * 100}%`;
-  }
-  return `${(height / width) * 100}%`;
-}
-
-function normalizeRotation(rotation?: number) {
-  const value = rotation ?? 0;
-  return ((value % 360) + 360) % 360;
-}
-
 function getPageRotationTransform(rotationDegrees: number, contentWidth: number, contentHeight: number) {
   if (rotationDegrees === 90) {
     return `translateX(${contentHeight}px) rotate(90deg)`;
@@ -1357,38 +821,6 @@ function getPageRotationTransform(rotationDegrees: number, contentWidth: number,
     return `translateY(${contentWidth}px) rotate(270deg)`;
   }
   return "none";
-}
-
-function formatSignedRotation(rotation?: number) {
-  const normalized = normalizeRotation(rotation);
-  const rounded = Math.round(normalized);
-  if (rounded === 360) return 0;
-  return rounded > 180 ? rounded - 360 : rounded;
-}
-
-function getSnapTextRotationTarget(rotation: number, threshold = 3) {
-  const normalized = normalizeRotation(rotation);
-  const snapTargets = [0, 45, 90, 180, 270, 360];
-  let bestTarget: number | null = null;
-  let bestDelta = Number.POSITIVE_INFINITY;
-  for (const target of snapTargets) {
-    const delta = Math.abs(normalized - target);
-    const wrapDelta = Math.min(delta, 360 - delta);
-    if (wrapDelta < bestDelta) {
-      bestDelta = wrapDelta;
-      bestTarget = target === 360 ? 0 : target;
-    }
-  }
-  return bestTarget != null && bestDelta <= threshold ? bestTarget : null;
-}
-
-function snapTextRotation(rotation: number, threshold = 3) {
-  return getSnapTextRotationTarget(rotation, threshold) ?? normalizeRotation(rotation);
-}
-
-function normalizeTextSize(value: number) {
-  const snapped = Math.round(value * 2) / 2;
-  return clamp(snapped, TEXT_SIZE_MIN_PT, TEXT_SIZE_MAX_PT);
 }
 
 type RichTextRun = {
@@ -1408,33 +840,6 @@ type StrikeOverlayLine = {
   height: number;
   color: string;
 };
-
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function textToHtml(value: string) {
-  return escapeHtml(value).replace(/\r?\n/g, "<br>");
-}
-
-function parseFontSize(styleValue: string, fallback: number) {
-  const matchPt = styleValue.match(/(\d+(\.\d+)?)pt/);
-  if (matchPt) {
-    const parsed = Number(matchPt[1]);
-    return Number.isNaN(parsed) ? fallback : parsed;
-  }
-  const matchPx = styleValue.match(/(\d+(\.\d+)?)px/);
-  if (matchPx) {
-    const parsed = Number(matchPx[1]);
-    return Number.isNaN(parsed) ? fallback : parsed / PT_TO_PX;
-  }
-  return fallback;
-}
 
 function stripInlineFontSizes(element: HTMLElement) {
   element.querySelectorAll<HTMLElement>("[data-font-size-pt], [style*='font-size']").forEach((node) => {
@@ -1696,7 +1101,7 @@ function extractRichTextRuns(html: string, fallbackSize: number) {
       runs.push({ text: "\n", ...current });
       return;
     }
-    let next = { ...current };
+    const next = { ...current };
     if (el.dataset.fontSizePt) {
       const parsed = Number(el.dataset.fontSizePt);
       if (!Number.isNaN(parsed)) {
@@ -2144,323 +1549,6 @@ function sortPagesBySavedOrder(
 }
 
 
-/** One sortable thumbnail tile */
-function SortableThumb({
-  item,
-  index,
-  selected,
-  onSelect,
-  onMoveUp,
-  onMoveDown,
-  onDuplicate,
-  onRotate,
-  onDelete,
-  disableMoveDown,
-  registerThumbNode,
-  onThumbLoad,
-  deferRender = false,
-}: {
-  item: PageItem;
-  index: number;
-  selected: boolean;
-  onSelect: () => void;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
-  onDuplicate: () => void;
-  onRotate: () => void;
-  onDelete: () => void;
-  disableMoveDown: boolean;
-  registerThumbNode: (id: string) => (node: HTMLLIElement | null) => void;
-  onThumbLoad: (id: string) => void;
-  deferRender?: boolean;
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: item.id,
-  });
-
-  const style = {
-    transform: CSS.Transform.toString(transform ? { ...transform, x: 0, scaleX: 1, scaleY: 1 } : null),
-    transition,
-    cursor: "default",
-  };
-  const rotationDegrees = normalizeRotation(item.rotation);
-  const isQuarterTurn = rotationDegrees % 180 !== 0;
-  const frameWidth = isQuarterTurn ? item.height : item.width;
-  const frameHeight = isQuarterTurn ? item.width : item.height;
-  const thumbLongEdge = Math.max(frameWidth || 0, frameHeight || 0);
-  const thumbScale = thumbLongEdge > 0 ? 252 / thumbLongEdge : 1;
-  const thumbMaxWidth = Math.round(frameWidth * thumbScale);
-  const innerStageWidth = isQuarterTurn && frameWidth > 0 ? `${(frameHeight / frameWidth) * 100}%` : "100%";
-  const innerStageHeight = isQuarterTurn && frameHeight > 0 ? `${(frameWidth / frameHeight) * 100}%` : "100%";
-  const thumbSrc = item.thumb || TRANSPARENT_PIXEL;
-  const thumbVisible = Boolean(item.thumb);
-
-	return (
-	    <li
-        ref={(node) => {
-          setNodeRef(node);
-          registerThumbNode(item.id)(node);
-        }}
-        data-thumb-id={item.id}
-        style={deferRender ? { ...style, contentVisibility: "auto", containIntrinsicSize: "320px" } : style}
-        className="group relative flex w-full justify-center"
-        {...attributes}
-      >
-	      <div
-	        role="button"
-        tabIndex={0}
-        onClick={onSelect}
-	        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            onSelect();
-          }
-        }}
-	        className="relative shrink-0 cursor-pointer select-none"
-          style={{ width: `${thumbMaxWidth}px`, maxWidth: "100%" }}
-	        {...listeners}
-	      >
-	        <div className="relative w-full" style={{ paddingBottom: getAspectPadding(frameWidth, frameHeight) }}>
-	          <div
-	            className={`absolute inset-0 flex items-center justify-center overflow-hidden rounded-none border bg-[#EEF2F7] transition-colors duration-100 ease-out dark:border-[#4A4A4A] dark:bg-[#222224] ${
-		              selected
-		                ? "border-2 border-[#6C47FF] dark:border-[#8B6CFF]"
-		                : "border-2 border-slate-300 hover:border-slate-400 group-hover:border-slate-400 dark:border-[#4A4A4A] dark:hover:border-[#5B5B65] dark:group-hover:border-[#5B5B65]"
-		            }`}
-	          >
-	            <span
-	              className={`absolute left-0 top-0 z-10 flex h-7 w-7 items-center justify-center rounded-none text-xs font-semibold tabular-nums transition-colors duration-100 ease-out ${
-	                selected
-	                  ? "bg-[#6C47FF] text-white dark:bg-[#8B6CFF]"
-	                  : "bg-slate-200 text-slate-700 group-hover:bg-slate-400 group-hover:text-white dark:bg-[#4A4A4A] dark:text-zinc-200 dark:group-hover:bg-[#52525B]"
-	              }`}
-	            >
-	              {index + 1}
-	            </span>
-            <div
-              className="relative z-0 flex h-full w-full items-center justify-center"
-              style={{
-                width: innerStageWidth,
-                height: innerStageHeight,
-                transform: `rotate(${rotationDegrees}deg)`,
-                transformOrigin: "center",
-              }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={thumbSrc}
-                alt={`Page ${index + 1}`}
-                className={`relative z-10 block h-full w-full object-contain transition-opacity duration-200 ${
-                  thumbVisible ? "opacity-100" : "opacity-0"
-                }`}
-                draggable={false}
-                onLoad={() => {
-                  if (!item.thumb) return;
-                  onThumbLoad(item.id);
-                }}
-              />
-            </div>
-	          </div>
-	        </div>
-	      </div>
-	      <div className="pointer-events-none absolute inset-x-0 bottom-3 z-20 flex justify-center opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100">
-	        <div
-            className="flex items-center justify-center gap-1 rounded-xl border-2 border-slate-300/90 bg-white/96 px-2 py-1.5 shadow-[0_8px_18px_rgba(15,23,42,0.10)] backdrop-blur-sm dark:border-[#3F3F3F] dark:bg-[#323232]/96 dark:shadow-[0_12px_28px_rgba(0,0,0,0.45)]"
-          >
-	          <button
-	            type="button"
-	            onPointerDown={(event) => event.stopPropagation()}
-	            onClick={(event) => {
-	              event.stopPropagation();
-	              onMoveUp();
-	            }}
-	            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-40 dark:text-[#E5E5E5] dark:hover:bg-[#3A3A3A] dark:hover:text-white"
-	            aria-label="Move page up"
-	            disabled={index === 0}
-	          >
-	            <ChevronUp className="h-4 w-4" aria-hidden />
-	          </button>
-	          <div className="h-5 w-0.5 bg-slate-200 dark:bg-[#3A3A3A]" aria-hidden />
-	          <button
-	            type="button"
-	            onPointerDown={(event) => event.stopPropagation()}
-	            onClick={(event) => {
-	              event.stopPropagation();
-	              onMoveDown();
-	            }}
-	            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-40 dark:text-[#E5E5E5] dark:hover:bg-[#3A3A3A] dark:hover:text-white"
-	            aria-label="Move page down"
-	            disabled={disableMoveDown}
-	          >
-	            <ChevronDown className="h-4 w-4" aria-hidden />
-	          </button>
-	          <div className="h-5 w-0.5 bg-slate-200 dark:bg-[#3A3A3A]" aria-hidden />
-	          <button
-	            type="button"
-	            onPointerDown={(event) => event.stopPropagation()}
-	            onClick={(event) => {
-	              event.stopPropagation();
-	              onRotate();
-	            }}
-	            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 dark:text-[#E5E5E5] dark:hover:bg-[#3A3A3A] dark:hover:text-white"
-	            aria-label="Rotate page"
-	          >
-	            <RotateCw className="h-4 w-4" aria-hidden />
-	          </button>
-	          <div className="h-5 w-0.5 bg-slate-200 dark:bg-[#3A3A3A]" aria-hidden />
-	          <button
-	            type="button"
-	            onPointerDown={(event) => event.stopPropagation()}
-	            onClick={(event) => {
-	              event.stopPropagation();
-	              onDuplicate();
-	            }}
-	            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 dark:text-[#E5E5E5] dark:hover:bg-[#3A3A3A] dark:hover:text-white"
-	            aria-label="Duplicate page"
-	          >
-	            <Copy className="h-4 w-4" aria-hidden />
-	          </button>
-	          <div className="h-5 w-0.5 bg-slate-200 dark:bg-[#3A3A3A]" aria-hidden />
-            <button
-              type="button"
-              onPointerDown={(event) => event.stopPropagation()}
-              onClick={(event) => {
-                event.stopPropagation();
-                onDelete();
-              }}
-              className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-rose-600 transition hover:bg-rose-100 hover:text-rose-700 dark:text-rose-300 dark:hover:bg-rose-500/20 dark:hover:text-rose-200"
-              aria-label="Delete page"
-            >
-              <Trash2 className="h-4 w-4" aria-hidden />
-            </button>
-	        </div>
-	      </div>
-	    </li>
-	  );
-}
-
-const MemoSortableThumb = memo(
-  SortableThumb,
-  (prevProps, nextProps) =>
-    prevProps.selected === nextProps.selected &&
-    prevProps.index === nextProps.index &&
-    prevProps.disableMoveDown === nextProps.disableMoveDown &&
-    prevProps.item.id === nextProps.item.id &&
-    prevProps.item.srcIdx === nextProps.item.srcIdx &&
-    prevProps.item.pageIdx === nextProps.item.pageIdx &&
-    prevProps.item.rotation === nextProps.item.rotation &&
-    prevProps.item.thumb === nextProps.item.thumb &&
-    prevProps.item.thumbWidth === nextProps.item.thumbWidth &&
-    prevProps.item.thumbHeight === nextProps.item.thumbHeight &&
-    prevProps.item.preview === nextProps.item.preview &&
-    prevProps.item.width === nextProps.item.width &&
-    prevProps.item.height === nextProps.item.height &&
-    prevProps.deferRender === nextProps.deferRender
-);
-
-function SortableOrganizeTile({
-  item,
-  index,
-  onRotate,
-  onDelete,
-  animateIn,
-}: {
-  item: PageItem;
-  index: number;
-  onRotate: () => void;
-  onDelete: () => void;
-  animateIn?: boolean;
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: item.id,
-  });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    cursor: "grab",
-  };
-  const rotationDegrees = normalizeRotation(item.rotation);
-  const isQuarterTurn = rotationDegrees % 180 !== 0;
-  const ratio = item.width && item.height ? item.width / item.height : 1;
-  const scaleFix = isQuarterTurn ? Math.min(ratio, 1 / ratio) : 1;
-
-  return (
-    <motion.div
-      ref={setNodeRef}
-      style={style}
-      className="w-full"
-      variants={TILE_VARIANTS}
-      initial={animateIn ? "hidden" : false}
-      animate={animateIn ? "visible" : false}
-      transition={{ duration: 0.2, ease: SOFT_EASE }}
-      {...attributes}
-      {...listeners}
-    >
-      {/* Page preview (no rounded corners) */}
-      <div className="relative w-full h-[360px] sm:h-[380px] lg:h-[420px]">
-        <div className="absolute inset-0 flex items-center justify-center overflow-hidden group">
-          <div
-            className={`h-full w-full transition-transform duration-200 ease-out ${
-              isDragging ? "" : "group-hover:scale-[1.02] group-hover:-translate-y-1"
-            }`}
-          >
-            <div
-              className={`relative h-full w-full bg-[#EEF2F7] border border-[rgba(148,163,184,0.5)] dark:bg-[#222224] ${
-                isDragging
-                  ? "shadow-[0_8px_26px_rgba(15,23,42,0.24),_0_24px_60px_rgba(15,23,42,0.30)]"
-                  : "shadow-[0_6px_20px_rgba(15,23,42,0.18),_0_18px_45px_rgba(15,23,42,0.22)] group-hover:outline group-hover:outline-[rgba(37,99,235,0.35)] group-hover:outline-1 group-hover:outline-offset-2 group-hover:shadow-[0_6px_20px_rgba(15,23,42,0.21),_0_18px_45px_rgba(15,23,42,0.25)]"
-              } transition-shadow duration-200 ease-out`}
-              style={{ transform: `rotate(${rotationDegrees}deg) scale(${scaleFix})`, transformOrigin: "center" }}
-            >
-              <div className="absolute inset-0 bg-[#EEF2F7] dark:bg-[#222224]" aria-hidden />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={item.preview || TRANSPARENT_PIXEL}
-                alt={`Page ${index + 1}`}
-                className={`h-full w-full object-contain select-none transition-opacity duration-200 ${
-                  item.preview ? "opacity-100" : "opacity-0"
-                }`}
-                draggable={false}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-      {/* Controls: page number + two circular buttons (no grouped background) */}
-      <div className="mt-1">
-        <div className="text-center text-sm font-semibold text-slate-800">Page {index + 1}</div>
-        <div className="mt-2 flex items-center justify-center gap-3">
-          <button
-            type="button"
-            aria-label="Rotate page"
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={(event) => {
-              event.stopPropagation();
-              onRotate();
-            }}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-slate-700 shadow-[0_4px_14px_rgba(15,23,42,0.15)] transition hover:-translate-y-0.5"
-          >
-            <RotateCcw className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            aria-label="Delete page"
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={(event) => {
-              event.stopPropagation();
-              onDelete();
-            }}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-rose-600 shadow-[0_4px_14px_rgba(15,23,42,0.15)] transition hover:-translate-y-0.5"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
 function WorkspaceClient() {
   const { data: authSession } = useSession();
   const isGuest = !authSession?.user;
@@ -2489,6 +1577,7 @@ function WorkspaceClient() {
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [previewRetryKey, setPreviewRetryKey] = useState(0);
   const [thumbDragState, setThumbDragState] = useState<{ activeId: string; overId: string } | null>(null);
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
   const [activePageId, setActivePageId] = useState<string | null>(null);
@@ -2527,12 +1616,15 @@ function WorkspaceClient() {
   const draftHighlightLivePathRef = useRef<{ pageId: string; d: string; last: Point | null } | null>(null);
   const draftHighlightPathMapRef = useRef<Map<string, SVGPathElement>>(new Map());
   const pdfDocumentCacheRef = useRef<Map<number, any>>(new Map());
+  const secureReadManagerRef = useRef<Map<string, SecurePdfReadAccessManager>>(new Map());
+  const activePdfRenderTasksRef = useRef<Map<string, { cancel: () => void }>>(new Map());
   const renderQueueRef = useRef<
     Array<{ pageId: string; srcIdx: number; pageIdx: number; quality: "low" | "high"; priority: number }>
   >([]);
   const renderQueueKeyRef = useRef<Set<string>>(new Set());
   const renderQueueRafRef = useRef<number | null>(null);
   const activeRenderCountRef = useRef(0);
+  const renderGenerationRef = useRef(0);
   const pageRenderStatusRef = useRef<Map<string, "low" | "high" | "rendering-low" | "rendering-high">>(new Map());
   const thumbRenderQueueRef = useRef<Array<{ pageId: string; srcIdx: number; pageIdx: number; priority: number }>>([]);
   const thumbRenderQueueKeyRef = useRef<Set<string>>(new Set());
@@ -4975,7 +4067,15 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     const renderCover = async () => {
       try {
         const pdfPage = await pdf.getPage(first.pageIdx + 1);
-        const baseViewport = pdfPage.getViewport({ scale: COVER_PREVIEW_SCALE, rotation: firstRotation });
+        const unscaledViewport = pdfPage.getViewport({ scale: 1, rotation: firstRotation });
+      const coverDimensions = calculateBoundedRenderDimensions({
+        pageWidth: unscaledViewport.width,
+        pageHeight: unscaledViewport.height,
+        desiredScale: COVER_PREVIEW_SCALE,
+        maximumPixels: LOW_PREVIEW_MAX_PIXELS,
+        maximumDimension: LOW_PREVIEW_MAX_DIMENSION,
+      });
+      const baseViewport = pdfPage.getViewport({ scale: coverDimensions.scale, rotation: firstRotation });
         const targetWidth = Math.floor(baseViewport.width);
         const targetHeight = Math.floor(baseViewport.height);
         const canvas = document.createElement("canvas");
@@ -4994,6 +4094,9 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
           transform: undefined,
         }).promise;
         const dataUrl = toCoverPreviewDataUrl(canvas);
+        pdfPage.cleanup?.();
+        canvas.width = 1;
+        canvas.height = 1;
         if (cancelled) return;
         setCoverPreviewUrl(dataUrl);
         coverPreviewStatusRef.current = "ready";
@@ -5063,7 +4166,12 @@ const timer =
     visiblePageIdsRef.current.clear();
     setVisiblePageIds([]);
     pagesByIdRef.current.clear();
-    pdfDocumentCacheRef.current.clear();
+    renderGenerationRef.current += 1;
+    activePdfRenderTasksRef.current.forEach((task) => task.cancel());
+    activePdfRenderTasksRef.current.clear();
+    destroyPdfDocuments(pdfDocumentCacheRef.current);
+    secureReadManagerRef.current.forEach((manager) => { void manager.close(); });
+    secureReadManagerRef.current.clear();
     renderQueueRef.current = [];
     renderQueueKeyRef.current.clear();
     pageRenderStatusRef.current.clear();
@@ -5084,6 +4192,13 @@ const timer =
       renderQueueRafRef.current = null;
     }
   }, [projectParam, currentProjectId]);
+  useEffect(() => () => {
+    activePdfRenderTasksRef.current.forEach((task) => task.cancel());
+    activePdfRenderTasksRef.current.clear();
+    destroyPdfDocuments(pdfDocumentCacheRef.current);
+    secureReadManagerRef.current.forEach((manager) => { void manager.close(); });
+    secureReadManagerRef.current.clear();
+  }, []);
   const updatePreviewHeightLimit = useCallback(() => {
     if (typeof window === "undefined") return;
     const container = previewContainerRef.current;
@@ -5419,6 +4534,7 @@ const timer =
     if (previewSyncRef.current.has(projectId)) return;
 
     let cancelled = false;
+    const uploadController = new AbortController();
     previewSyncRef.current.add(projectId);
 
     const ensurePreview = async () => {
@@ -5450,21 +4566,49 @@ const timer =
           throw new Error(`Project fetch failed with status ${res.status}`);
         }
         const json = (await res.json().catch(() => null)) as {
-          project?: { previewUrl?: string | null; pdfUrl?: string | null };
+          project?: {
+            previewUrl?: string | null;
+            pdfUrl?: string | null;
+            secureStorageEnabled?: boolean;
+            secureSourceAvailable?: boolean;
+            secureUploadStatus?: string | null;
+          };
         } | null;
         if (json?.project?.previewUrl) return;
 
-        if (json?.project?.pdfUrl) {
-          console.info("Preview missing; waiting for client-side generation.", { projectId });
+        if (json?.project?.pdfUrl || json?.project?.secureSourceAvailable) {
+          debugStudioLoad("preview-generation-pending");
+          return;
+        }
+        const secureUploadStatus = json?.project?.secureUploadStatus ?? null;
+        if (
+          json?.project?.secureStorageEnabled &&
+          (secureUploadStatus === "ACTIVE" ||
+            secureUploadStatus === "QUARANTINED" ||
+            secureUploadStatus === "READY")
+        ) {
+          debugStudioLoad("secure-upload-processing", { status: secureUploadStatus });
           return;
         }
 
         const blob = await waitForLocalSource();
         if (!blob) {
-          console.info("No local source blob available yet; will retry on the next workspace sync.", {
-            projectId,
-          });
+          debugStudioLoad("local-source-pending");
           previewSyncRef.current.delete(projectId);
+          return;
+        }
+
+        if (json?.project?.secureStorageEnabled) {
+          const source = sources[0];
+          const file = blob instanceof File
+            ? blob
+            : new File([blob], source?.name || "Document.pdf", {
+                type: "application/pdf",
+                lastModified: source?.updatedAt || Date.now(),
+              });
+          debugStudioLoad("secure-upload-start", { bytes: file.size });
+          await uploadPdfSecurely(file, { projectId, signal: uploadController.signal });
+          debugStudioLoad("secure-upload-quarantined", { bytes: file.size });
           return;
         }
 
@@ -5481,7 +4625,7 @@ const timer =
         if (!initData?.url || !initData?.key) {
           throw new Error("PDF upload init returned an invalid payload.");
         }
-        console.info("Uploading PDF via signed R2 URL.", { projectId });
+        debugStudioLoad("signed-upload-start");
         const putRes = await fetch(initData.url, {
           method: "PUT",
           headers: { "Content-Type": blob.type || "application/pdf" },
@@ -5500,8 +4644,9 @@ const timer =
           throw new Error(`PDF upload confirmation failed with status ${confirmRes.status}`);
         }
       } catch (err) {
+        if (cancelled || uploadController.signal.aborted) return;
         previewSyncRef.current.delete(projectId);
-        setError("PDF upload failed in production. Check R2 credentials and network logs.");
+        setError("Private PDF upload failed. Your local file is still safe; retry when the connection is stable.");
         console.error("PDF upload failed during cloud sync.", err);
       }
     };
@@ -5510,6 +4655,7 @@ const timer =
 
     return () => {
       cancelled = true;
+      uploadController.abort();
     };
   }, [authSession?.user, currentProjectId, projectParam, sources]);
 
@@ -5574,7 +4720,16 @@ const timer =
             throw new Error(`Cloud project fetch failed with status ${res.status}`);
           }
           const json = (await res.json().catch(() => null)) as {
-            project?: { data?: unknown; pdfUrl?: string | null; previewUrl?: string | null; pagesCount?: number | null };
+            project?: {
+              data?: unknown;
+              pdfUrl?: string | null;
+              previewUrl?: string | null;
+              pagesCount?: number | null;
+              secureStorageEnabled?: boolean;
+              secureSourceAvailable?: boolean;
+              sourceAssetId?: string | null;
+              sourceByteLength?: number | null;
+            };
           } | null;
           const cloudData = json?.project?.data;
           const cloudPages =
@@ -5597,6 +4752,12 @@ const timer =
             typeof json?.project?.pagesCount === "number" && json.project.pagesCount > 0
               ? json.project.pagesCount
               : 0;
+          const secureSourceAvailable = json?.project?.secureStorageEnabled === true &&
+            json.project.secureSourceAvailable === true &&
+            typeof json.project.sourceAssetId === "string";
+          const secureSourceAssetId = secureSourceAvailable ? json?.project?.sourceAssetId ?? null : null;
+          const secureSourceByteLength =
+            typeof json?.project?.sourceByteLength === "number" ? json.project.sourceByteLength : null;
           const createPlaceholderPages = (sourceId: string, count: number): PageItem[] =>
             Array.from({ length: count }, (_, pageIdx) => ({
               id: buildPageId(sourceId, pageIdx),
@@ -5629,17 +4790,25 @@ const timer =
             });
           };
           const setCombinedCloudSource = (nameHint?: string | null, sizeHint?: number | null) => {
-            if (!pdfUrl) {
+            const secureRead = secureSourceAssetId
+              ? { projectId, assetId: secureSourceAssetId }
+              : undefined;
+            if (!pdfUrl && !secureRead) {
               throw new Error("Cloud PDF is not available for this project.");
             }
-            const sameOriginProjectPdfUrl = `/api/projects/${encodeURIComponent(projectId)}/pdf?mode=editor`;
+            const sameOriginProjectPdfUrl = pdfUrl
+              ? "/api/projects/" + encodeURIComponent(projectId) + "/pdf?mode=editor"
+              : "";
             const combinedStorageId = `cloud-project-${projectId}`;
             const combinedSource: SourceRef = {
               storageId: combinedStorageId,
               url: sameOriginProjectPdfUrl,
               name: nameHint?.trim() || "Document.pdf",
-              size: typeof sizeHint === "number" && Number.isFinite(sizeHint) ? sizeHint : 0,
+              size: typeof sizeHint === "number" && Number.isFinite(sizeHint)
+                ? sizeHint
+                : secureSourceByteLength ?? 0,
               updatedAt: Date.now(),
+              secureRead,
             };
             paintCloudPages([combinedStorageId], { force: true });
             if (!cancelled) {
@@ -5665,7 +4834,7 @@ const timer =
               });
             }
           };
-          if (pdfUrl) {
+          if (pdfUrl || secureSourceAvailable) {
             setProjectHasSources(true);
           }
           if (Array.isArray(cloudSources) && cloudSources.length > 0) {
@@ -5690,11 +4859,11 @@ const timer =
             setCombinedCloudSource(combinedName, combinedSize);
             return true;
           }
-          if (pdfUrl && (!Array.isArray(cloudSources) || cloudSources.length === 0)) {
+          if ((pdfUrl || secureSourceAvailable) && (!Array.isArray(cloudSources) || cloudSources.length === 0)) {
             setCombinedCloudSource(null, null);
             return true;
           }
-          if (!pdfUrl && Array.isArray(cloudSources) && cloudSources.length === 0) {
+          if (!pdfUrl && !secureSourceAvailable && Array.isArray(cloudSources) && cloudSources.length === 0) {
             setProjectHasSources(false);
           }
         } catch (err) {
@@ -6218,37 +5387,50 @@ const timer =
         if (next.quality === "low") {
           activeLow += 1;
         }
+        const renderGeneration = renderGenerationRef.current;
         (async () => {
           const pdf = pdfDocumentCacheRef.current.get(next.srcIdx);
           if (!pdf) {
-            activeRenderCountRef.current -= 1;
-            if (pageRenderStatusRef.current.get(next.pageId) === renderingStatus) {
-              pageRenderStatusRef.current.delete(next.pageId);
+            if (renderGeneration === renderGenerationRef.current) {
+              activeRenderCountRef.current -= 1;
+              if (pageRenderStatusRef.current.get(next.pageId) === renderingStatus) {
+                pageRenderStatusRef.current.delete(next.pageId);
+              }
+              scheduleRenderQueue();
             }
-            scheduleRenderQueue();
             return;
           }
           try {
             const page = await pdf.getPage(next.pageIdx + 1);
-            const scale = next.quality === "high" ? PREVIEW_BASE_SCALE : LOW_RES_PREVIEW_SCALE;
-            const pixelRatio = getDevicePixelRatio();
-            const effectiveRatio = next.quality === "high" ? pixelRatio : Math.min(1, pixelRatio);
-            const viewport = page.getViewport({ scale });
+            const baseViewport = page.getViewport({ scale: 1 });
+            const desiredScale = (next.quality === "high" ? PREVIEW_BASE_SCALE : LOW_RES_PREVIEW_SCALE) *
+              (next.quality === "high" ? getDevicePixelRatio() : 1);
+            const dimensions = calculateBoundedRenderDimensions({
+              pageWidth: baseViewport.width,
+              pageHeight: baseViewport.height,
+              desiredScale,
+              maximumPixels: next.quality === "high" ? HIGH_PREVIEW_MAX_PIXELS : LOW_PREVIEW_MAX_PIXELS,
+              maximumDimension: next.quality === "high" ? HIGH_PREVIEW_MAX_DIMENSION : LOW_PREVIEW_MAX_DIMENSION,
+            });
+            const viewport = page.getViewport({ scale: dimensions.scale });
             const canvas = document.createElement("canvas");
             const ctx = canvas.getContext("2d")!;
-            const scaledWidth = Math.floor(viewport.width * effectiveRatio);
-            const scaledHeight = Math.floor(viewport.height * effectiveRatio);
-            canvas.width = scaledWidth;
-            canvas.height = scaledHeight;
-            const renderContext = {
-              canvasContext: ctx,
-              viewport,
-              transform: effectiveRatio !== 1 ? [effectiveRatio, 0, 0, effectiveRatio, 0, 0] : undefined,
-            };
+            canvas.width = dimensions.width;
+            canvas.height = dimensions.height;
             ctx.imageSmoothingEnabled = true;
             ctx.imageSmoothingQuality = "high";
-            await page.render(renderContext).promise;
+            const taskKey = next.pageId + ":" + next.quality;
+            const renderTask = page.render({ canvasContext: ctx, viewport });
+            activePdfRenderTasksRef.current.set(taskKey, renderTask);
+            try {
+              await renderTask.promise;
+            } finally {
+              activePdfRenderTasksRef.current.delete(taskKey);
+            }
             const previewData = toCardPreviewDataUrl(canvas);
+            page.cleanup?.();
+            canvas.width = 1;
+            canvas.height = 1;
             const status = pageRenderStatusRef.current.get(next.pageId);
             if (next.quality === "low" && status === "high") {
               // skip low-res overwrite if high-res already finished
@@ -6268,13 +5450,17 @@ const timer =
               }
             }
           } catch (err) {
-            console.error("Failed to render preview", err);
-            if (pageRenderStatusRef.current.get(next.pageId) === renderingStatus) {
-              pageRenderStatusRef.current.delete(next.pageId);
+            if (renderGeneration === renderGenerationRef.current) {
+              if (!isPdfRenderCancellation(err)) console.error("Failed to render preview", err);
+              if (pageRenderStatusRef.current.get(next.pageId) === renderingStatus) {
+                pageRenderStatusRef.current.delete(next.pageId);
+              }
             }
           } finally {
-            activeRenderCountRef.current -= 1;
-            scheduleRenderQueue();
+            if (renderGeneration === renderGenerationRef.current) {
+              activeRenderCountRef.current -= 1;
+              scheduleRenderQueue();
+            }
           }
         })();
       }
@@ -6338,38 +5524,47 @@ const timer =
         }
         thumbRenderStatusRef.current.set(next.pageId, "rendering");
         thumbRenderActiveRef.current += 1;
+        const renderGeneration = renderGenerationRef.current;
         (async () => {
           const pdf = pdfDocumentCacheRef.current.get(next.srcIdx);
           if (!pdf) {
-            thumbRenderQueueRef.current.push({ ...next, priority: next.priority - 5 });
-            thumbRenderQueueKeyRef.current.add(next.pageId);
-            thumbRenderActiveRef.current -= 1;
-            if (thumbRenderStatusRef.current.get(next.pageId) === "rendering") {
-              thumbRenderStatusRef.current.delete(next.pageId);
+            if (renderGeneration === renderGenerationRef.current) {
+              thumbRenderQueueRef.current.push({ ...next, priority: next.priority - 5 });
+              thumbRenderQueueKeyRef.current.add(next.pageId);
+              thumbRenderActiveRef.current -= 1;
+              if (thumbRenderStatusRef.current.get(next.pageId) === "rendering") {
+                thumbRenderStatusRef.current.delete(next.pageId);
+              }
+              scheduleThumbRenderQueue();
             }
-            scheduleThumbRenderQueue();
             return;
           }
           try {
             const page = await pdf.getPage(next.pageIdx + 1);
             const baseViewport = page.getViewport({ scale: 1 });
-            const scale = Math.min(1, THUMB_MAX_WIDTH / baseViewport.width);
-            const viewport = page.getViewport({ scale });
             const pixelRatio = Math.min(2, getDevicePixelRatio());
+            const dimensions = calculateBoundedRenderDimensions({
+              pageWidth: baseViewport.width,
+              pageHeight: baseViewport.height,
+              desiredScale: Math.min(1, THUMB_MAX_WIDTH / baseViewport.width) * pixelRatio,
+              maximumPixels: THUMB_MAX_PIXELS,
+              maximumDimension: THUMB_MAX_DIMENSION,
+            });
+            const viewport = page.getViewport({ scale: dimensions.scale });
             const canvas = document.createElement("canvas");
             const ctx = canvas.getContext("2d")!;
-            const scaledWidth = Math.max(1, Math.floor(viewport.width * pixelRatio));
-            const scaledHeight = Math.max(1, Math.floor(viewport.height * pixelRatio));
-            canvas.width = scaledWidth;
-            canvas.height = scaledHeight;
-            const renderContext = {
-              canvasContext: ctx,
-              viewport,
-              transform: pixelRatio !== 1 ? [pixelRatio, 0, 0, pixelRatio, 0, 0] : undefined,
-            };
+            canvas.width = dimensions.width;
+            canvas.height = dimensions.height;
             ctx.imageSmoothingEnabled = true;
             ctx.imageSmoothingQuality = "high";
-            await page.render(renderContext).promise;
+            const taskKey = next.pageId + ":thumb";
+            const renderTask = page.render({ canvasContext: ctx, viewport });
+            activePdfRenderTasksRef.current.set(taskKey, renderTask);
+            try {
+              await renderTask.promise;
+            } finally {
+              activePdfRenderTasksRef.current.delete(taskKey);
+            }
             const targetThumbWidth = Math.max(1, Math.floor(THUMB_MAX_WIDTH * pixelRatio));
             const thumbData = createThumbnailDataUrl(canvas, targetThumbWidth);
             const thumbWidth =
@@ -6378,6 +5573,9 @@ const timer =
               canvas.width <= targetThumbWidth
                 ? canvas.height
                 : Math.floor(canvas.height * (targetThumbWidth / canvas.width));
+            page.cleanup?.();
+            canvas.width = 1;
+            canvas.height = 1;
             setPages((current) => {
               let changed = false;
               const nextPages = current.map((item) => {
@@ -6391,13 +5589,17 @@ const timer =
             });
             thumbRenderStatusRef.current.set(next.pageId, "ready");
           } catch (err) {
-            console.error("Failed to render thumbnail", err);
-            if (thumbRenderStatusRef.current.get(next.pageId) === "rendering") {
-              thumbRenderStatusRef.current.delete(next.pageId);
+            if (renderGeneration === renderGenerationRef.current) {
+              if (!isPdfRenderCancellation(err)) console.error("Failed to render thumbnail", err);
+              if (thumbRenderStatusRef.current.get(next.pageId) === "rendering") {
+                thumbRenderStatusRef.current.delete(next.pageId);
+              }
             }
           } finally {
-            thumbRenderActiveRef.current -= 1;
-            scheduleThumbRenderQueue();
+            if (renderGeneration === renderGenerationRef.current) {
+              thumbRenderActiveRef.current -= 1;
+              scheduleThumbRenderQueue();
+            }
           }
         })();
       }
@@ -6451,6 +5653,9 @@ const timer =
       if (restoringPreviewCacheRef.current) return;
       setPages([]);
       renderedSourcesRef.current = 0;
+      renderGenerationRef.current += 1;
+      activePdfRenderTasksRef.current.forEach((task) => task.cancel());
+      activePdfRenderTasksRef.current.clear();
       renderQueueRef.current = [];
       renderQueueKeyRef.current.clear();
       pageRenderStatusRef.current.clear();
@@ -6475,48 +5680,63 @@ const timer =
     async function loadPdfSource(
       src: SourceRef,
       srcIdx: number,
-      pdfjsLib: typeof import("pdfjs-dist") & { GlobalWorkerOptions: { workerSrc: string } },
+      pdfjsLib: PdfJsModule,
     ) {
       let pdf: any | null = null;
       const stored = await readFileBlob(src.storageId);
       const blob = stored?.blob instanceof Blob ? stored.blob : null;
-      const fetchPdfBytes = async () => {
-        const startedAt = performance.now();
-        const controller = new AbortController();
-        const timeoutId = window.setTimeout(() => controller.abort(), 20_000);
-        try {
-          debugStudioLoad("pdf-fetch-start", { projectId: projectParam ?? currentProjectId ?? null, sourceId: src.storageId });
-          const response = await fetch(src.url, { signal: controller.signal });
-          debugStudioLoad("pdf-fetch-end", {
-            projectId: projectParam ?? currentProjectId ?? null,
-            sourceId: src.storageId,
-            status: response.status,
-            durationMs: Math.round(performance.now() - startedAt),
+      if (src.secureRead && !blob) {
+        let manager = secureReadManagerRef.current.get(src.storageId);
+        if (!manager) {
+          manager = new SecurePdfReadAccessManager({
+            projectId: src.secureRead.projectId,
+            assetId: src.secureRead.assetId,
+            operation: "view",
           });
-          if (!response.ok) {
-            throw new Error(`PDF fetch failed with status ${response.status}`);
-          }
-          return response.arrayBuffer();
-        } catch (error) {
-          debugStudioLoad("pdf-fetch-error", {
-            projectId: projectParam ?? currentProjectId ?? null,
-            sourceId: src.storageId,
-            durationMs: Math.round(performance.now() - startedAt),
-            error: error instanceof Error ? error.message : String(error),
-          });
-          throw error;
-        } finally {
-          window.clearTimeout(timeoutId);
+          secureReadManagerRef.current.set(src.storageId, manager);
         }
-      };
-      const bytes = blob
-        ? new Uint8Array(await blob.arrayBuffer())
-        : new Uint8Array(await fetchPdfBytes());
-      try {
-        pdf = await pdfjsLib.getDocument({ data: bytes } as any).promise;
-      } catch (err) {
-        console.warn("pdfjs getDocument failed, retrying without worker", err);
-        pdf = await pdfjsLib.getDocument({ data: bytes, disableWorker: true } as any).promise;
+        await manager.open();
+        pdf = await pdfjsLib.getDocument(manager.currentPdfJsSource() as any).promise;
+      } else {
+        const fetchPdfBytes = async () => {
+          const startedAt = performance.now();
+          const controller = new AbortController();
+          const timeoutId = window.setTimeout(() => controller.abort(), 120_000);
+          try {
+            debugStudioLoad("pdf-fetch-start", {
+              projectId: projectParam ?? currentProjectId ?? null,
+              sourceId: src.storageId,
+            });
+            const response = await fetch(src.url, { signal: controller.signal });
+            debugStudioLoad("pdf-fetch-end", {
+              projectId: projectParam ?? currentProjectId ?? null,
+              sourceId: src.storageId,
+              status: response.status,
+              durationMs: Math.round(performance.now() - startedAt),
+            });
+            if (!response.ok) throw new Error("PDF fetch failed with status " + response.status);
+            return response.arrayBuffer();
+          } catch (error) {
+            debugStudioLoad("pdf-fetch-error", {
+              projectId: projectParam ?? currentProjectId ?? null,
+              sourceId: src.storageId,
+              durationMs: Math.round(performance.now() - startedAt),
+              error: error instanceof Error ? error.message : String(error),
+            });
+            throw error;
+          } finally {
+            window.clearTimeout(timeoutId);
+          }
+        };
+        const bytes = blob
+          ? new Uint8Array(await blob.arrayBuffer())
+          : new Uint8Array(await fetchPdfBytes());
+        try {
+          pdf = await pdfjsLib.getDocument({ data: bytes } as any).promise;
+        } catch (error) {
+          console.warn("pdfjs getDocument failed, retrying without worker", error);
+          pdf = await pdfjsLib.getDocument({ data: bytes, disableWorker: true } as any).promise;
+        }
       }
       if (!pdf) {
         throw new Error("Unable to load PDF source");
@@ -6548,13 +5768,7 @@ const timer =
       }
 
       try {
-        const pdfjsLib = (await import("pdfjs-dist")) as typeof import("pdfjs-dist") & {
-          GlobalWorkerOptions: { workerSrc: string };
-        };
-        pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-          "pdfjs-dist/build/pdf.worker.min.js",
-          import.meta.url,
-        ).toString();
+        const pdfjsLib = await loadPdfJs();
 
         const makePages = (result: NonNullable<Awaited<ReturnType<typeof loadPdfSource>>>) => {
           const pagesForSource: PageItem[] = [];
@@ -6648,7 +5862,7 @@ const timer =
     return () => {
       cancelled = true;
     };
-  }, [sources]);
+  }, [sources, previewRetryKey]);
 
   useEffect(() => {
     return;
@@ -7016,6 +6230,63 @@ const timer =
       enqueueRender({ pageId: page.id, srcIdx: page.srcIdx, pageIdx: page.pageIdx, quality: "high", priority: 260 });
     });
   }, [activePageIndexState, enqueueRender, pages, visiblePageIds]);
+
+  useEffect(() => {
+    if (!largeDocMode || pages.length === 0) return;
+    const pageIds = pages.map((page) => page.id);
+    const previewWorkingSet = selectPageWorkingSet({
+      pageIds,
+      activeIndex: activePageIndexState,
+      visiblePageIds,
+      nearPageIds,
+      activeRadius: 4,
+    });
+    const thumbnailWorkingSet = selectPageWorkingSet({
+      pageIds,
+      activeIndex: activePageIndexState,
+      visiblePageIds,
+      nearPageIds,
+      activeRadius: 25,
+    });
+    if (pageIds[0]) thumbnailWorkingSet.add(pageIds[0]);
+
+    renderQueueRef.current = renderQueueRef.current.filter((task) => previewWorkingSet.has(task.pageId));
+    renderQueueKeyRef.current = new Set(
+      renderQueueRef.current.map((task) => task.pageId + ":" + task.quality),
+    );
+    thumbRenderQueueRef.current = thumbRenderQueueRef.current.filter((task) => thumbnailWorkingSet.has(task.pageId));
+    thumbRenderQueueKeyRef.current = new Set(thumbRenderQueueRef.current.map((task) => task.pageId));
+
+    pageIds.forEach((pageId) => {
+      if (!previewWorkingSet.has(pageId)) {
+        activePdfRenderTasksRef.current.get(pageId + ":low")?.cancel();
+        activePdfRenderTasksRef.current.get(pageId + ":high")?.cancel();
+        pageRenderStatusRef.current.delete(pageId);
+      }
+      if (!thumbnailWorkingSet.has(pageId)) {
+        activePdfRenderTasksRef.current.get(pageId + ":thumb")?.cancel();
+        thumbRenderStatusRef.current.delete(pageId);
+      }
+    });
+
+    setPages((current) => {
+      let changed = false;
+      const next = current.map((page) => {
+        const dropPreview = !previewWorkingSet.has(page.id) && page.preview.length > 0;
+        const dropThumb = !thumbnailWorkingSet.has(page.id) && page.thumb.length > 0;
+        if (!dropPreview && !dropThumb) return page;
+        changed = true;
+        return {
+          ...page,
+          preview: dropPreview ? "" : page.preview,
+          thumb: dropThumb ? "" : page.thumb,
+          thumbWidth: dropThumb ? 0 : page.thumbWidth,
+          thumbHeight: dropThumb ? 0 : page.thumbHeight,
+        };
+      });
+      return changed ? next : current;
+    });
+  }, [activePageIndexState, largeDocMode, nearPageIds, pages, visiblePageIds]);
 
   useEffect(() => {
     if (pages.length === 0) return;
@@ -7505,6 +6776,7 @@ const timer =
     suppressNextAutoZoomRef.current = 2;
     markWorkspaceDirty();
     const storageId = createUniqueId("page");
+    const { PDFDocument } = await loadPdfLib();
     const doc = await PDFDocument.create();
     doc.addPage([612, 792]);
     const bytes = await doc.save();
@@ -7584,6 +6856,7 @@ const timer =
     suppressNextAutoZoomRef.current = 2;
     markWorkspaceDirty();
     const storageId = createUniqueId("page");
+    const { PDFDocument } = await loadPdfLib();
     const doc = await PDFDocument.create();
     doc.addPage([612, 792]);
     const bytes = await doc.save();
@@ -7666,6 +6939,7 @@ const timer =
     const originalBlob = stored?.blob instanceof Blob ? stored.blob : null;
     if (!originalBlob) return;
     const ab = await originalBlob.arrayBuffer();
+    const { PDFDocument } = await loadPdfLib();
     const sourceDoc = await PDFDocument.load(new Uint8Array(ab));
     const out = await PDFDocument.create();
     const [copied] = await out.copyPages(sourceDoc, [page.pageIdx]);
@@ -9802,7 +9076,15 @@ const timer =
     if (!pdf) return getProjectCoverPreview(sourcePages);
     try {
       const pdfPage = await pdf.getPage(first.pageIdx + 1);
-      const baseViewport = pdfPage.getViewport({ scale: COVER_PREVIEW_SCALE, rotation: firstRotation });
+      const unscaledViewport = pdfPage.getViewport({ scale: 1, rotation: firstRotation });
+      const coverDimensions = calculateBoundedRenderDimensions({
+        pageWidth: unscaledViewport.width,
+        pageHeight: unscaledViewport.height,
+        desiredScale: COVER_PREVIEW_SCALE,
+        maximumPixels: LOW_PREVIEW_MAX_PIXELS,
+        maximumDimension: LOW_PREVIEW_MAX_DIMENSION,
+      });
+      const baseViewport = pdfPage.getViewport({ scale: coverDimensions.scale, rotation: firstRotation });
       const canvas = document.createElement("canvas");
       canvas.width = Math.max(1, Math.floor(baseViewport.width));
       canvas.height = Math.max(1, Math.floor(baseViewport.height));
@@ -9816,6 +9098,9 @@ const timer =
         transform: undefined,
       }).promise;
       const dataUrl = toCoverPreviewDataUrl(canvas);
+      pdfPage.cleanup?.();
+      canvas.width = 1;
+      canvas.height = 1;
       setCoverPreviewUrl(dataUrl);
       coverPreviewPageIdRef.current = first.id;
       coverPreviewRotationRef.current = firstRotation;
@@ -10306,8 +9591,8 @@ const timer =
   );
 
   const addSignatureToPage = useCallback((payload: SignaturePlacement) => {
-    // Stub: wire into real PDF flattening later.
-    console.log("addSignatureToPage", payload);
+    // Reserved for the PDF-flattening boundary; never log signature payloads.
+    void payload;
   }, []);
 
   const handleApplySignaturePlacement = useCallback(
@@ -11053,13 +10338,7 @@ const timer =
       const src = sources[srcIdx];
       if (!src) return null;
 
-      const pdfjsLib = (await import("pdfjs-dist")) as typeof import("pdfjs-dist") & {
-        GlobalWorkerOptions: { workerSrc: string };
-      };
-      pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-        "pdfjs-dist/build/pdf.worker.min.js",
-        import.meta.url,
-      ).toString();
+      const pdfjsLib = await loadPdfJs();
 
       let pdf: SearchablePdfDocument | null = null;
       if (src.url) {
@@ -12507,8 +11786,21 @@ const timer =
 
   async function buildExportPdfBlob(options?: { preservePageRotation?: boolean }) {
     const preservePageRotation = options?.preservePageRotation ?? true;
-    // Load each unique source once into a PDFDocument, cache in a map
-    const docCache = new Map<number, PDFDocument>();
+    const {
+      PDFDocument,
+      LineCapStyle,
+      clip,
+      degrees,
+      endPath,
+      popGraphicsState,
+      pushGraphicsState,
+      rectangle,
+      rgb,
+      rotateDegrees,
+      translate,
+    } = await loadPdfLib();
+    // Load each unique source once into a PDFDocument, cache in a map.
+    const docCache = new Map<number, PDFDocumentType>();
     for (const p of pages) {
       if (!docCache.has(p.srcIdx)) {
         const srcUrl = sources[p.srcIdx].url;
@@ -12520,7 +11812,7 @@ const timer =
 
     // Now copy pages in the displayed order
     const out = await PDFDocument.create();
-    const standardFontCache = new Map<StandardFonts, PDFFont>();
+    const standardFontCache = new Map<StandardFontName, PDFFont>();
     let fontkitRegistered = false;
     async function loadFontBytes(path: string) {
       const cached = customFontBytesRef.current.get(path);
@@ -14014,11 +13306,13 @@ const timer =
 
   return (
     <main
+      data-studio-workspace
       ref={(node) => {
         workspaceFullscreenRef.current = node;
       }}
       className="flex h-screen flex-col overflow-hidden bg-[var(--app-surface)]"
     >
+      <StudioHmrProbe />
       {isBrowserFullscreen && activePresentationPage ? (
         <div className="fixed inset-0 z-[110] bg-[var(--app-surface)]">
           <div className="flex h-full w-full items-center justify-center px-8 py-10">
@@ -14608,7 +13902,18 @@ const timer =
                     <p className="mt-3 text-xs leading-5 text-white/80">{error}</p>
                     <button
                       type="button"
-                      onClick={() => window.location.reload()}
+                      onClick={() => {
+                        renderedSourcesRef.current = 0;
+                        renderGenerationRef.current += 1;
+                        activePdfRenderTasksRef.current.forEach((task) => task.cancel());
+                        activePdfRenderTasksRef.current.clear();
+                        activeRenderCountRef.current = 0;
+                        thumbRenderActiveRef.current = 0;
+                        destroyPdfDocuments(pdfDocumentCacheRef.current);
+                        setPages([]);
+                        setError(null);
+                        setPreviewRetryKey((key) => key + 1);
+                      }}
                       className="mt-5 inline-flex items-center justify-center rounded-full bg-white px-5 py-2 text-sm font-semibold text-[#E53935] transition hover:bg-white/90"
                     >
                       Retry

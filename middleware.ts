@@ -4,6 +4,13 @@ import { getToken } from "next-auth/jwt";
 import type { JWT } from "next-auth/jwt";
 
 function applySecurityHeaders(res: NextResponse) {
+  const r2AccountId = process.env.R2_ACCOUNT_ID?.trim();
+  const secureUploadOrigin =
+    process.env.STORAGE_MODEL_V2_ENABLED === "true" &&
+    r2AccountId &&
+    /^[a-z0-9]{16,64}$/i.test(r2AccountId)
+      ? " https://" + r2AccountId + ".r2.cloudflarestorage.com"
+      : "";
   const csp = [
     "default-src 'self'",
     "base-uri 'self'",
@@ -14,7 +21,7 @@ function applySecurityHeaders(res: NextResponse) {
     "font-src 'self' data:",
     "style-src 'self' 'unsafe-inline'",
     "script-src 'self' https://js.stripe.com",
-    "connect-src 'self' https://api.stripe.com",
+    "connect-src 'self' https://api.stripe.com" + secureUploadOrigin,
     "frame-src 'self' https://js.stripe.com https://checkout.stripe.com",
   ].join("; ");
 

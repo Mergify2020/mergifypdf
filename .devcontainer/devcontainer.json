@@ -1,18 +1,48 @@
 {
   "name": "MergifyPDF",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:20-bookworm",
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "16gb",
+    "storage": "32gb"
+  },
   "forwardPorts": [3000],
   "portsAttributes": {
     "3000": {
       "label": "MergifyPDF",
-      "onAutoForward": "openBrowserOnce"
+      "onAutoForward": "notify"
     }
   },
-  "postCreateCommand": "corepack enable && corepack prepare pnpm@9.15.4 --activate && pnpm install",
+  "onCreateCommand": "corepack enable && corepack prepare pnpm@9.15.4 --activate",
+  "updateContentCommand": "corepack pnpm install --frozen-lockfile",
+  "postCreateCommand": "corepack pnpm prisma generate",
   "customizations": {
     "vscode": {
       "settings": {
-        "npm.packageManager": "pnpm"
+        "npm.packageManager": "pnpm",
+        "typescript.tsdk": "node_modules/typescript/lib",
+        "files.watcherExclude": {
+          "**/.next/**": true,
+          "**/node_modules/**": true,
+          "**/src/generated/**": true,
+          "**/storage/**": true,
+          "**/public/previews/**": true,
+          "**/public/pdfs/**": true,
+          "**/coverage/**": true,
+          "**/playwright-report/**": true,
+          "**/test-results/**": true
+        },
+        "search.exclude": {
+          "**/.next": true,
+          "**/node_modules": true,
+          "**/src/generated": true,
+          "**/storage": true,
+          "**/public/previews": true,
+          "**/public/pdfs": true,
+          "**/coverage": true,
+          "**/playwright-report": true,
+          "**/test-results": true
+        }
       }
     }
   }

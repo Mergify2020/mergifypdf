@@ -44,10 +44,6 @@ export default function UiTooltip({ label, children }: UiTooltipProps) {
   const tooltipRef = useRef<HTMLDivElement | null>(null);
   const showTimeoutRef = useRef<number | null>(null);
 
-  if (!isValidElement(children)) {
-    return children;
-  }
-
   const updatePosition = (target: EventTarget | null) => {
     if (!(target instanceof HTMLElement)) return;
     const rect = target.getBoundingClientRect();
@@ -104,6 +100,10 @@ export default function UiTooltip({ label, children }: UiTooltipProps) {
       placement: shouldPlaceBelow ? "below" : "above",
     });
   }, [visible, triggerRect, label]);
+
+  if (!isValidElement(children)) {
+    return children;
+  }
 
   const childProps = children.props;
 

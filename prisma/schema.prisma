@@ -7,52 +7,59 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/* ---------- Auth models ---------- */
+/**
+ * ---------- Auth models ----------
+ */
 model User {
-  id            String   @id @default(cuid())
-  name          String?
-  email         String?  @unique
-  password      String?
-  emailVerified DateTime?
-  image         String?
+  id                       String               @id @default(cuid())
+  storageNamespace         String?              @unique
+  name                     String?
+  email                    String?              @unique
+  password                 String?
+  emailVerified            DateTime?
+  image                    String?
+  stripeCustomerId         String?
+  stripeSubscriptionId     String?
+  stripePriceId            String?
+  stripeStatus             String?
+  stripeCurrentPeriodEnd   DateTime?
+  essentialPlusTrialUsedAt DateTime?
+  signatureProTrialUsedAt  DateTime?
+  trialUsedAt              DateTime?
+  pendingCheckoutId        String?
+  pendingCheckoutCreatedAt DateTime?
+  accounts                 Account[]
+  sessions                 Session[]
+  resetTokens              ResetToken[]
+  storageObjects           StorageObject[]
+  uploadSessions           UploadSession[]
+  exportJobs               ExportJob[]
+  storageReadSessions      StorageReadSession[]
+  twoFactorEnabled         Boolean              @default(false)
+  twoFactorMethod          String?
+  twoFactorPhone           String?
+  createdAt                DateTime             @default(now())
+  projects                 Project[]
+}
+
+model AccountDeletionRecord {
+  id                   String   @id @default(cuid())
+  userId               String?
+  email                String?
+  reason               String
+  reasonDetail         String?
   stripeCustomerId     String?
   stripeSubscriptionId String?
   stripePriceId        String?
   stripeStatus         String?
-  stripeCurrentPeriodEnd DateTime?
-  essentialPlusTrialUsedAt DateTime?
-  signatureProTrialUsedAt  DateTime?
-  trialUsedAt          DateTime?
-  pendingCheckoutId    String?
-  pendingCheckoutCreatedAt DateTime?
-  accounts      Account[]
-  sessions      Session[]
-  resetTokens   ResetToken[]
-  twoFactorEnabled Boolean  @default(false)
-  twoFactorMethod  String?
-  twoFactorPhone   String?
-  createdAt     DateTime @default(now())
-  projects      Project[]
-}
-
-model AccountDeletionRecord {
-  id                 String   @id @default(cuid())
-  userId             String?
-  email              String?
-  reason             String
-  reasonDetail       String?
-  stripeCustomerId   String?
-  stripeSubscriptionId String?
-  stripePriceId      String?
-  stripeStatus       String?
-  deletedAt          DateTime @default(now())
+  deletedAt            DateTime @default(now())
 
   @@index([userId])
   @@index([deletedAt])
 }
 
 model Account {
-  id                String @id @default(cuid())
+  id                String  @id @default(cuid())
   userId            String
   type              String
   provider          String
@@ -64,7 +71,7 @@ model Account {
   scope             String?
   id_token          String?
   session_state     String?
-  user              User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
 }
@@ -106,18 +113,197 @@ model AppRuntimeGuard {
 }
 
 model Project {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  name      String
-  data       Json
-  pdfKey    String?
-  previewKey String?
-  pagesCount Int?     @default(0)
-  trashedAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String          @id @default(cuid())
+  userId         String
+  user           User            @relation(fields: [userId], references: [id])
+  name           String
+  data           Json
+  pdfKey         String?
+  previewKey     String?
+  pagesCount     Int?            @default(0)
+  trashedAt      DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  assets         ProjectAsset[]
+  uploadSessions UploadSession[]
+  exportJobs     ExportJob[]
 
   @@index([userId, updatedAt])
   @@index([userId, createdAt])
+}
+
+model StorageObject {
+  id            String                @id @default(cuid())
+  ownerId       String
+  owner         User                  @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  environment   String
+  bucketClass   String
+  objectKey     String                @unique
+  kind          String
+  status        String                @default("UPLOADING")
+  contentType   String?
+  byteLength    BigInt?
+  sha256        String?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  readyAt       DateTime?
+  expiresAt     DateTime?
+  deletedAt     DateTime?
+  projectAssets ProjectAsset[]
+  uploadSession UploadSession?
+  inspectionJob StorageInspectionJob?
+  deletionJob   StorageDeletionJob?
+  exportJobs    ExportJob[]           @relation("ExportJobOutput")
+
+  @@index([ownerId, status])
+  @@index([environment, bucketClass, status])
+  @@index([expiresAt])
+}
+
+model ProjectAsset {
+  id              String               @id @default(cuid())
+  projectId       String
+  project         Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  storageObjectId String
+  storageObject   StorageObject        @relation(fields: [storageObjectId], references: [id], onDelete: Restrict)
+  role            String
+  revision        Int                  @default(1)
+  createdAt       DateTime             @default(now())
+  deletedAt       DateTime?
+  readSessions    StorageReadSession[]
+
+  @@unique([projectId, storageObjectId, role])
+  @@unique([projectId, role, revision])
+  @@index([projectId, role, deletedAt])
+  @@index([storageObjectId, deletedAt])
+}
+
+model StorageReadSession {
+  id                String       @id @default(cuid())
+  ownerId           String
+  owner             User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  projectAssetId    String
+  projectAsset      ProjectAsset @relation(fields: [projectAssetId], references: [id], onDelete: Cascade)
+  tokenHash         String       @unique
+  operation         String
+  status            String       @default("ACTIVE")
+  expiresAt         DateTime
+  absoluteExpiresAt DateTime
+  lastUsedAt        DateTime     @default(now())
+  createdAt         DateTime     @default(now())
+  revokedAt         DateTime?
+
+  @@index([ownerId, status, expiresAt])
+  @@index([projectAssetId, status])
+  @@index([absoluteExpiresAt])
+}
+
+model UploadSession {
+  id                String                @id @default(cuid())
+  ownerId           String
+  owner             User                  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  projectId         String
+  project           Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  storageObjectId   String                @unique
+  storageObject     StorageObject         @relation(fields: [storageObjectId], references: [id], onDelete: Cascade)
+  expectedBytes     BigInt
+  expectedSha256    String
+  contentType       String
+  idempotencyKey    String
+  mode              String
+  partSize          Int?
+  partCount         Int?
+  status            String                @default("PENDING")
+  multipartUploadId String?
+  safeErrorCode     String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  expiresAt         DateTime
+  completedAt       DateTime?
+  cancelledAt       DateTime?
+  inspectionJob     StorageInspectionJob?
+
+  @@unique([ownerId, idempotencyKey])
+  @@index([ownerId, status])
+  @@index([projectId, status])
+  @@index([expiresAt])
+}
+
+model StorageInspectionJob {
+  id              String        @id @default(cuid())
+  uploadSessionId String        @unique
+  uploadSession   UploadSession @relation(fields: [uploadSessionId], references: [id], onDelete: Cascade)
+  storageObjectId String        @unique
+  storageObject   StorageObject @relation(fields: [storageObjectId], references: [id], onDelete: Cascade)
+  status          String        @default("PENDING")
+  attempts        Int           @default(0)
+  maxAttempts     Int           @default(5)
+  nextAttemptAt   DateTime      @default(now())
+  leaseToken      String?
+  leaseExpiresAt  DateTime?
+  safeErrorCode   String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  startedAt       DateTime?
+  completedAt     DateTime?
+
+  @@index([status, nextAttemptAt])
+  @@index([leaseExpiresAt])
+}
+
+model StorageDeletionJob {
+  id              String        @id @default(cuid())
+  storageObjectId String        @unique
+  storageObject   StorageObject @relation(fields: [storageObjectId], references: [id], onDelete: Cascade)
+  status          String        @default("PENDING")
+  attempts        Int           @default(0)
+  nextAttemptAt   DateTime      @default(now())
+  lastErrorCode   String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  completedAt     DateTime?
+
+  @@index([status, nextAttemptAt])
+}
+
+model ExportJob {
+  id             String         @id @default(cuid())
+  ownerId        String
+  owner          User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  projectId      String
+  project        Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  inputRevision  Int
+  status         String         @default("PENDING")
+  progress       Int            @default(0)
+  attempts       Int            @default(0)
+  outputObjectId String?
+  outputObject   StorageObject? @relation("ExportJobOutput", fields: [outputObjectId], references: [id], onDelete: SetNull)
+  safeErrorCode  String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  startedAt      DateTime?
+  completedAt    DateTime?
+  expiresAt      DateTime?
+
+  @@index([ownerId, status])
+  @@index([projectId, createdAt])
+  @@index([status, createdAt])
+  @@index([expiresAt])
+}
+
+model StorageAuditEvent {
+  id        String   @id @default(cuid())
+  actorId   String?
+  projectId String?
+  assetId   String?
+  action    String
+  outcome   String
+  safeCode  String?
+  requestId String?
+  createdAt DateTime @default(now())
+
+  @@index([actorId, createdAt])
+  @@index([projectId, createdAt])
+  @@index([assetId, createdAt])
+  @@index([action, outcome, createdAt])
 }

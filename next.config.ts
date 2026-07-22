@@ -1,14 +1,17 @@
 import type { NextConfig } from "next";
+import createBundleAnalyzer from "@next/bundle-analyzer";
+import { assertRuntimeEnvironmentSafe } from "./src/lib/runtimeEnvironment";
+
+assertRuntimeEnvironmentSafe(process.env);
 
 const shouldLimitCpus = process.env.CI === "1" || process.env.CI === "true";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  experimental: shouldLimitCpus
-    ? {
-        cpus: 1,
-      }
-    : {},
+  experimental: {
+    webpackMemoryOptimizations: true,
+    ...(shouldLimitCpus ? { cpus: 1, webpackBuildWorker: true } : {}),
+  },
   turbopack: {
     resolveAlias: {
       canvas: "./src/lib/emptyModule.ts",
@@ -56,4 +59,6 @@ const nextConfig: NextConfig = {
 
 };
 
-export default nextConfig;
+const withBundleAnalyzer = createBundleAnalyzer({ enabled: process.env.ANALYZE === "true" });
+
+export default withBundleAnalyzer(nextConfig);

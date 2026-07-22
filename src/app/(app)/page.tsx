@@ -9,8 +9,6 @@ import FeaturesAutoScroll from "@/components/FeaturesAutoScroll";
 import LandingImpactStats from "@/components/LandingImpactStats";
 import LandingScrollbarTone from "@/components/LandingScrollbarTone";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 type HomeSearchParams = Record<string, string | string[] | undefined>;
 

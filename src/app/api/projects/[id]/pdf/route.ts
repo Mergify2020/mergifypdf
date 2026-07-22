@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
 import { createSignedR2Url, getR2Config, getR2ObjectBuffer, uploadR2Object } from "@/lib/r2";
 import { isSameOrigin } from "@/lib/requestGuards";
+import { logDevTiming } from "@/lib/devTiming";
 import { createWatermarkedPdf } from "@/lib/pdfWatermark";
 
 async function ensureDbConnection() {
@@ -69,7 +70,7 @@ export async function POST(
       where: { id: project.id, userId },
       data: { pdfKey },
     });
-    console.info("Confirmed PDF upload key.", { projectId: id, env: process.env.NODE_ENV });
+    logDevTiming("project-pdf", "upload-confirmed");
     return NextResponse.json({ success: true });
   }
 
@@ -119,7 +120,7 @@ export async function POST(
     data: { pdfKey: objectKey },
   });
 
-  console.info("Uploaded PDF via server route.", { projectId: id, env: process.env.NODE_ENV });
+  logDevTiming("project-pdf", "server-upload-complete");
   return NextResponse.json({ success: true });
 }
 

@@ -30,9 +30,6 @@ export async function issueLoginTwoFactorCode(
     });
 
     if (existing) {
-      if (process.env.NODE_ENV !== "production") {
-        console.log(`[2fa-login] Reusing active code for ${email ?? "unknown"}`);
-      }
       return { ok: true };
     }
   }
@@ -49,10 +46,6 @@ export async function issueLoginTwoFactorCode(
       expires,
     },
   });
-
-  if (process.env.NODE_ENV !== "production") {
-    console.log(`[2fa-login] Verification code for ${email ?? "unknown"}: ${code}`);
-  }
 
   if (!email) {
     console.error("[2fa-login] Cannot send login 2FA email without an address.");

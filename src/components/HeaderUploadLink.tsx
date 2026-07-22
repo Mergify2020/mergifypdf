@@ -35,7 +35,6 @@ export default function HeaderUploadLink({
     }
 
     let cleanup: (() => void) | null = null;
-    let retryId: number | null = null;
 
     const attach = () => {
       const updateActive = () => {
@@ -54,9 +53,6 @@ export default function HeaderUploadLink({
     attach();
 
     return () => {
-      if (retryId !== null) {
-        window.clearTimeout(retryId);
-      }
       cleanup?.();
     };
   }, [pathname, trackActiveSection, activeStrategy]);

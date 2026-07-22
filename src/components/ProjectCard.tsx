@@ -13,6 +13,7 @@ import {
   shouldHandleWorkspaceOpenClick,
 } from "@/lib/workspaceOpenHandoff";
 import { buildStudioProjectHref } from "@/lib/studioRoute";
+import { logDevTiming } from "@/lib/devTiming";
 
 type PreviewCacheEntry = {
   url: string;
@@ -36,8 +37,7 @@ const previewFetchQueue: Array<() => void> = [];
 let activePreviewFetches = 0;
 
 function debugProjectPreview(event: string, detail: Record<string, unknown>) {
-  if (process.env.NODE_ENV === "production") return;
-  console.info(`[project-preview:${event}]`, detail);
+  logDevTiming("project-preview", event, detail);
 }
 
 function runQueuedPreviewFetch<T>(task: () => Promise<T>, signal?: AbortSignal) {
@@ -1252,6 +1252,7 @@ export default function ProjectCard({
           />
           <div className="flex h-full w-full items-center justify-center p-3 sm:p-4">
             {previewUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- authenticated project preview
               <img
                 ref={previewImageRef}
                 src={previewUrl}

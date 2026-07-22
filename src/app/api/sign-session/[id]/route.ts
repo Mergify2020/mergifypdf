@@ -9,21 +9,24 @@ import { rateLimit } from "@/lib/rateLimit";
 const MAX_DATA_URL_LENGTH = 250_000;
 const DATA_URL_RE = /^data:image\/(png|jpeg|jpg|webp);base64,/i;
 
+type RouteContext = { params: Promise<{ id?: string }> };
+
 function extractIdFromPath(request: NextRequest) {
   const segments = request.nextUrl.pathname.split("/");
   return segments[segments.length - 1] || null;
 }
 
-function resolveSessionId(request: NextRequest, context: any): string | null {
-  const ctxId = context?.params?.id as string | undefined;
+async function resolveSessionId(request: NextRequest, context: RouteContext): Promise<string | null> {
+  const params = await context.params;
+  const ctxId = params?.id;
   if (ctxId && typeof ctxId === "string") {
     return ctxId;
   }
   return extractIdFromPath(request);
 }
 
-export async function GET(request: NextRequest, context: any) {
-  const sessionId = resolveSessionId(request, context);
+export async function GET(request: NextRequest, context: RouteContext) {
+  const sessionId = await resolveSessionId(request, context);
   if (!sessionId) {
     return NextResponse.json({ error: "Missing id" }, { status: 400 });
   }
@@ -39,7 +42,7 @@ export async function GET(request: NextRequest, context: any) {
   });
 }
 
-export async function PUT(request: NextRequest, context: any) {
+export async function PUT(request: NextRequest, context: RouteContext) {
   if (!isSameOrigin(request)) {
     return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
   }
@@ -47,7 +50,7 @@ export async function PUT(request: NextRequest, context: any) {
   if (!limit.ok) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
-  const sessionId = resolveSessionId(request, context);
+  const sessionId = await resolveSessionId(request, context);
   if (!sessionId) {
     return NextResponse.json({ error: "Missing id" }, { status: 400 });
   }

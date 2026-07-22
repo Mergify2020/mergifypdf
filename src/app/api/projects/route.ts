@@ -8,6 +8,8 @@ import {
   prisma,
 } from "@/lib/prisma";
 import { isSameOrigin } from "@/lib/requestGuards";
+import { logDevTiming } from "@/lib/devTiming";
+import { toSafeProjectDto } from "@/lib/projectDto";
 
 function extractPagesCountFromData(data: unknown): number | null {
   if (!data || typeof data !== "object") return null;
@@ -49,8 +51,7 @@ function extractFileSizeFromData(data: unknown): number | null {
 }
 
 function logRouteDebug(event: string, detail: Record<string, unknown>) {
-  if (process.env.NODE_ENV === "production") return;
-  console.info(`[projects-route:${event}]`, detail);
+  logDevTiming("projects-route", event, detail);
 }
 
 async function ensureDbConnection() {
@@ -226,14 +227,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
   }
 
-  const sanitized = projects.map((project) => {
-    const { pdfKey: _pdfKey, previewKey: _previewKey, ...rest } = project;
-    return {
-      ...rest,
-      hasPreview: !!project.previewKey,
-      hasPdf: !!project.pdfKey,
-    };
-  });
+  const sanitized = projects.map((project) => toSafeProjectDto(project));
   return NextResponse.json(
     { projects: sanitized },
     {
@@ -307,5 +301,8 @@ export async function POST(req: Request) {
     }
   }
 
-  return NextResponse.json({ project });
+  if (!project) {
+    return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
+  }
+  return NextResponse.json({ project: toSafeProjectDto(project) });
 }
