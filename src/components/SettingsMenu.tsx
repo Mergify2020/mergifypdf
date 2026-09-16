@@ -304,7 +304,6 @@ export default function SettingsMenu({
 
   function handleAppearance(nextTheme: "light" | "dark") {
     applyTheme(nextTheme);
-    setOpen(false);
   }
 
   async function handleSignOut() {
@@ -488,17 +487,17 @@ export default function SettingsMenu({
                   </div>
 
                   <div className="border-t border-[#E6EBF2] pt-2 dark:border-[#3F3F3F]">
-                    <div className="px-3 py-2">
-                      <div className="space-y-2 rounded-xl border border-gray-200 bg-white p-3 dark:border-[#3F3F3F] dark:bg-[#2B2B2B]">
-                        <div className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-zinc-400">
-                          <Sun className="h-3.5 w-3.5" aria-hidden />
+                    <div className="px-3 py-2.5">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-3 text-[15px] font-medium text-[#1E293B] dark:text-zinc-100">
+                          <Sun className="h-4 w-4" aria-hidden />
                           <span>Appearance</span>
                         </div>
-                        <div className="relative grid h-10 w-full grid-cols-2 gap-1 rounded-lg border border-gray-300 bg-white p-1 dark:border-[#3F3F3F] dark:bg-[#2B2B2B]">
+                        <div className="relative grid h-11 w-full grid-cols-2 gap-1 rounded-md border border-[#E2E8F0] bg-[#F8FAFC] p-1 dark:border-[#3F3F3F] dark:bg-[#2B2B2B]">
                           <span
                             aria-hidden
                             suppressHydrationWarning
-                            className={`absolute inset-y-1 left-1 w-[calc(50%-6px)] rounded-md bg-[#1F2937] shadow-sm transition-transform dark:bg-white ${
+                            className={`absolute inset-y-1 left-1 w-[calc(50%-6px)] rounded-md bg-[#1F2937] shadow-sm transition-[transform,background-color,box-shadow] duration-300 ease-out motion-reduce:transition-none dark:bg-white ${
                               themeHydrated && theme === "dark" ? "translate-x-[calc(100%+4px)]" : "translate-x-0"
                             }`}
                           />
@@ -506,7 +505,7 @@ export default function SettingsMenu({
                             type="button"
                             onClick={() => handleAppearance("light")}
                             aria-pressed={theme === "light"}
-                            className={`relative z-10 flex min-w-0 items-center justify-center gap-1.5 rounded-md px-1.5 py-2 text-sm font-medium leading-[1.15] transition ${
+                            className={`relative z-10 flex h-full min-w-0 items-center justify-center gap-1.5 rounded-md px-2 py-0 text-sm font-medium leading-none transition ${
                               theme === "light"
                                 ? "text-white dark:text-zinc-950"
                                 : "text-gray-700 hover:bg-gray-100 dark:text-zinc-200 dark:hover:bg-[#3A3A3A]"
@@ -519,7 +518,7 @@ export default function SettingsMenu({
                             type="button"
                             onClick={() => handleAppearance("dark")}
                             aria-pressed={theme === "dark"}
-                            className={`relative z-10 flex min-w-0 items-center justify-center gap-1.5 rounded-md px-1.5 py-2 text-sm font-medium leading-[1.15] transition ${
+                            className={`relative z-10 flex h-full min-w-0 items-center justify-center gap-1.5 rounded-md px-2 py-0 text-sm font-medium leading-none transition ${
                               theme === "dark"
                                 ? "text-white dark:text-zinc-950"
                                 : "text-gray-700 hover:bg-gray-100 dark:text-zinc-200 dark:hover:bg-[#3A3A3A]"

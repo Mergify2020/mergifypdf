@@ -5,7 +5,7 @@ import {
   type ProjectAssetOperation,
 } from "@/lib/storageAuthorization";
 import { SecureUploadError } from "@/lib/secureUploadPolicy";
-import { resolveRuntimeEnvironment } from "@/lib/runtimeEnvironment";
+import { resolveDataEnvironment } from "@/lib/runtimeEnvironment";
 
 const IDLE_TTL_MS = 10 * 60 * 1000;
 const ABSOLUTE_TTL_MS = 8 * 60 * 60 * 1000;
@@ -106,7 +106,7 @@ export async function createStorageReadSession(input: {
   const asset = await resolveAsset({ ...input, assetId, operation });
   if (
     asset.bucketClass !== "source" ||
-    asset.environment !== resolveRuntimeEnvironment() ||
+    asset.environment !== resolveDataEnvironment() ||
     asset.kind !== "pdf-source" ||
     asset.contentType !== "application/pdf" ||
     asset.byteLength === null ||
@@ -188,7 +188,7 @@ export async function authorizeStorageReadSession(input: {
     session.projectAsset.project.userId !== input.userId ||
     session.projectAsset.storageObject.ownerId !== input.userId ||
     session.projectAsset.storageObject.status !== "READY" ||
-    session.projectAsset.storageObject.environment !== resolveRuntimeEnvironment() ||
+    session.projectAsset.storageObject.environment !== resolveDataEnvironment() ||
     session.projectAsset.storageObject.bucketClass !== "source" ||
     session.projectAsset.storageObject.kind !== "pdf-source" ||
     session.projectAsset.storageObject.contentType !== "application/pdf" ||

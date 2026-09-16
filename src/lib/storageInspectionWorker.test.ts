@@ -29,8 +29,10 @@ import { processStorageInspectionJob } from "@/lib/storageInspectionWorker";
 
 const env = {
   APP_RUNTIME_ENV: "development",
+  APP_DATA_ENV: "test",
+  APP_RUNTIME_DB_LABEL: "mergifypdf-test",
   STORAGE_MODEL_V2_ENABLED: "true",
-  R2_BUCKET_ENVIRONMENT: "development",
+  R2_BUCKET_ENVIRONMENT: "test",
   R2_ACCOUNT_ID: "developmentaccount1234",
   R2_ACCESS_KEY_ID: "test-access",
   R2_SECRET_ACCESS_KEY: "test-secret",

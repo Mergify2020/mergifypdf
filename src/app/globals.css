@@ -1665,6 +1665,11 @@ header[data-hero="true"] .app-brand-dark {
   box-shadow: none !important;
 }
 
+html.dark .projects-all-workspace .workspace-desktop-sidebar > div > div,
+body.dark .projects-all-workspace .workspace-desktop-sidebar > div > div {
+  border-right: 1px solid #3a3a3a !important;
+}
+
 @container (min-width: 640px) {
   .recent-projects-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

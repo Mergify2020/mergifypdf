@@ -2,7 +2,11 @@
 
 This file tracks dashboard, billing, credential, and infrastructure actions that cannot be completed safely through repository code. Do not paste secret values into issues, commits, logs, or chat.
 
-## Not needed yet
+## First checkpoint: read-only inventory
+
+- [ ] Run `pnpm storage:inventory` in the Codespace. It reports aggregate database and a 1,000-object R2 sample without changing data or printing secrets, file names, URLs, or customer information.
+
+## Infrastructure activation
 
 - [ ] Add Stripe test-mode credentials to the Codespace and label any legacy R2 bucket as development (or remove it). The safety guard will intentionally block `pnpm dev` and ordinary local builds while production identities are present. Never paste those values into chat or commit them.
 

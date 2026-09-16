@@ -3,10 +3,10 @@ import { createPrivateObjectKey, createStorageNamespace } from "@/lib/storageMod
 describe("secure storage identifiers", () => {
   it("creates opaque keys without customer identifiers", () => {
     const key = createPrivateObjectKey(
-      { environment: "preview", bucketClass: "source", kind: "pdf-source" },
+      { environment: "test", bucketClass: "source", kind: "pdf-source" },
       () => Buffer.alloc(32, 7),
     );
-    expect(key).toMatch(/^v2\/preview\/source\/pdf-source\/[A-Za-z0-9_-]{43}$/);
+    expect(key).toMatch(/^v2\/test\/source\/pdf-source\/[A-Za-z0-9_-]{43}$/);
     expect(key).not.toContain("project");
     expect(key).not.toContain("@");
   });
@@ -15,7 +15,7 @@ describe("secure storage identifiers", () => {
   });
   it("rejects insufficient entropy", () => {
     expect(() => createPrivateObjectKey(
-      { environment: "development", bucketClass: "incoming", kind: "pdf-source" },
+      { environment: "test", bucketClass: "incoming", kind: "pdf-source" },
       () => Buffer.alloc(8),
     )).toThrow(/256 bits/);
   });

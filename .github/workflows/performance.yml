@@ -30,12 +30,13 @@ jobs:
       NEXTAUTH_URL: http://127.0.0.1:3000
       NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
       APP_RUNTIME_ENV: development
+      APP_DATA_ENV: test
       APP_RUNTIME_DB_LABEL: mergifypdf-performance-test
       APP_RUNTIME_GUARD_STRICT: "true"
       EMAIL_DELIVERY_MODE: disabled
       STRIPE_SECRET_KEY: sk_test_performance_placeholder
-      R2_BUCKET_ENVIRONMENT: development
-      REDIS_ENVIRONMENT: development
+      R2_BUCKET_ENVIRONMENT: test
+      REDIS_ENVIRONMENT: test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

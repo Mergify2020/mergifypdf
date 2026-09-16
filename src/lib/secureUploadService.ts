@@ -1,4 +1,4 @@
-import { resolveRuntimeEnvironment } from "@/lib/runtimeEnvironment";
+import { resolveDataEnvironment } from "@/lib/runtimeEnvironment";
 import {
   chooseSecureUploadPlan,
   expectedPartByteLength,
@@ -139,7 +139,7 @@ export async function initiateSecureUpload(input: {
   }
 
   const plan = chooseSecureUploadPlan(intent.byteLength);
-  const runtime = resolveRuntimeEnvironment(env);
+  const runtime = resolveDataEnvironment(env);
   const objectKey = createPrivateObjectKey({
     environment: runtime,
     bucketClass: "incoming",

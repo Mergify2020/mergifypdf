@@ -34,7 +34,7 @@ import {
 const now = new Date("2026-07-24T12:00:00.000Z");
 const asset = {
   assetId: "asset_12345",
-  environment: "development",
+  environment: "test",
   bucketClass: "source",
   kind: "pdf-source",
   contentType: "application/pdf",
@@ -90,7 +90,7 @@ describe("owner-bound storage read sessions", () => {
         deletedAt: null,
         project: { id: "project-1", name: "Plans", userId: "user-1", trashedAt: null },
         storageObject: {
-          ownerId: "user-1", status: "READY", environment: "development", bucketClass: "source", kind: "pdf-source",
+          ownerId: "user-1", status: "READY", environment: "test", bucketClass: "source", kind: "pdf-source",
           objectKey: "private-source-key", byteLength: BigInt(100), sha256: "b".repeat(64),
           contentType: "application/pdf",
         },
@@ -126,7 +126,7 @@ describe("owner-bound storage read sessions", () => {
         deletedAt: null,
         project: { id: "project-1", name: "Plans", userId: "user-1", trashedAt: null },
         storageObject: {
-          ownerId: "user-1", status: "READY", environment: "development", bucketClass: "source", kind: "pdf-source",
+          ownerId: "user-1", status: "READY", environment: "test", bucketClass: "source", kind: "pdf-source",
           objectKey: "private-source-key", byteLength: BigInt(100), sha256: "b".repeat(64),
           contentType: "application/pdf",
         },

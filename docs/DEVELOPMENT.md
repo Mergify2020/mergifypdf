@@ -34,6 +34,8 @@ GitHub runs lint, types, unit tests, a production build, and critical browser te
 - `pnpm benchmark:dev`: cold/warm route timing report.
 - `pnpm dev:clean`: remove generated Next cache after the server is stopped.
 - `pnpm validate:env`: validate environment isolation without printing values.
+- `pnpm storage:inventory`: read-only aggregate database and legacy R2 inventory.
+- `pnpm storage:inspect:worker`: process queued inspection jobs after the dedicated worker is configured.
 
 Do not run `pnpm build` beside `pnpm dev`; CI performs the production build.
 
@@ -45,18 +47,18 @@ If diagnostics report multiple VS Code extension hosts, close duplicate browser/
 
 ## Environment safety
 
-Copy `.env.example` to `.env.local` and provide development-only resources. Never copy production credentials into development or preview.
+Copy `.env.example` to `.env.local` and provide Test-only resources. The Codespace runtime remains `development`, while `APP_RUNTIME_DB_LABEL=mergifypdf-test` identifies its shared Test data. Never copy production credentials into development or preview.
 
-Preview deployments require:
+Branch deployments use the shared Test data environment and require:
 
-- a separate PostgreSQL database or branch labelled `preview`;
-- a separate R2 bucket with `R2_BUCKET_ENVIRONMENT=preview`;
+- the shared Test PostgreSQL database labelled `mergifypdf-test`;
+- shared Test R2 buckets with `R2_BUCKET_ENVIRONMENT=test`;
 - Stripe test credentials;
 - sandbox email delivery;
-- a separate Redis instance or namespace labelled `preview`;
+- a Test Redis instance or namespace labelled `test`;
 - `APP_RUNTIME_GUARD_STRICT=true`.
 
-Missing or mismatched preview labels fail closed. Email is disabled outside production unless `EMAIL_DELIVERY_MODE=sandbox`.
+Missing or mismatched Test labels fail closed. Email is disabled outside production unless `EMAIL_DELIVERY_MODE=sandbox`.
 
 ## Recovery
 

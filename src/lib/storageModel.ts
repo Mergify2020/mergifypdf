@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 
-export const STORAGE_ENVIRONMENTS = ["development", "preview", "production"] as const;
+export const STORAGE_ENVIRONMENTS = ["test", "production"] as const;
 export const STORAGE_BUCKET_CLASSES = ["incoming", "source", "derived"] as const;
 export const STORAGE_OBJECT_KINDS = ["pdf-source", "preview", "thumbnail", "export"] as const;
 export type StorageEnvironment = (typeof STORAGE_ENVIRONMENTS)[number];

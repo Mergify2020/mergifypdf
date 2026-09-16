@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { assertRuntimeEnvironmentSafe, resolveRuntimeEnvironment } from "@/lib/runtimeEnvironment";
+import { assertRuntimeEnvironmentSafe, resolveDataEnvironment } from "@/lib/runtimeEnvironment";
 import { createPrivateObjectKey } from "@/lib/storageModel";
 import { getSecureUploadLimits, sha256HexToBase64 } from "@/lib/secureUploadPolicy";
 import {
@@ -170,7 +170,7 @@ async function promoteVerifiedArtifact(input: {
   env: Record<string, string | undefined>;
   now: Date;
 }) {
-  const runtime = resolveRuntimeEnvironment(input.env);
+  const runtime = resolveDataEnvironment(input.env);
   const sourceKey = createPrivateObjectKey({
     environment: runtime,
     bucketClass: "source",
