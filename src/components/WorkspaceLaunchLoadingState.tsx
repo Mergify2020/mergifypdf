@@ -121,7 +121,8 @@ export default function WorkspaceLaunchLoadingState({
         typeof startedAtMs === "number" && Number.isFinite(startedAtMs)
           ? startedAtMs
           : (mountedAtRef.current ?? Date.now());
-      const remainingVisibleMs = Math.max(0, PROJECT_ENTRY_MIN_VISIBLE_MS - (Date.now() - visibleSince));
+      const minVisibleMs = variant === "fullscreen" ? 1800 : PROJECT_ENTRY_MIN_VISIBLE_MS;
+      const remainingVisibleMs = Math.max(0, minVisibleMs - (Date.now() - visibleSince));
       const timer = window.setTimeout(() => {
         onCompleteVisualReady?.();
       }, Math.max(PROJECT_ENTRY_PROGRESS_COMPLETE_HOLD_MS, remainingVisibleMs));
@@ -153,7 +154,7 @@ export default function WorkspaceLaunchLoadingState({
         completeHoldTimerRef.current = null;
       }
     };
-  }, [complete, onCompleteVisualReady, presentation, progress, startedAtMs]);
+  }, [complete, onCompleteVisualReady, presentation, progress, startedAtMs, variant]);
 
   useEffect(() => {
     if (presentation === "spinner") return;
@@ -169,6 +170,35 @@ export default function WorkspaceLaunchLoadingState({
   const resolvedSubtitle = subtitle ?? null;
   const ellipsis = ELLIPSIS_FRAMES[ellipsisFrame] ?? "";
   const isPanel = variant === "panel";
+  const showStudioHandoff = presentation === "spinner" && !isPanel;
+
+  if (showStudioHandoff) {
+    return (
+      <div className="workspace-launch-screen relative min-h-screen overflow-hidden bg-[#FAFAFB] dark:bg-[#202024]">
+        <div
+          className="workspace-launch-screen-content absolute inset-0 flex items-center justify-center px-6"
+          role="status"
+          aria-live="polite"
+          aria-busy="true"
+        >
+          <div className="flex flex-col items-center text-center">
+            {/* eslint-disable-next-line @next/next/no-img-element -- brand asset is already loaded by the workspace */}
+            <img
+              src="/logos/home-expanded-sidebar-logo-light-v6.svg"
+              alt="MergifyPDF"
+              className="h-14 w-auto dark:hidden"
+            />
+            {/* eslint-disable-next-line @next/next/no-img-element -- dark-mode brand asset */}
+            <img
+              src="/logos/home-expanded-sidebar-logo-dark-v6.svg"
+              alt="MergifyPDF"
+              className="hidden h-14 w-auto dark:block"
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

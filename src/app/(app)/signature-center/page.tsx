@@ -1,14 +1,11 @@
 import Link from "next/link";
 import { ArrowRight, Send } from "lucide-react";
-import { getServerSessionSafe } from "@/lib/serverSession";
 import SignedHistoryList from "./SignedHistoryList";
 import SignatureRequestsTable from "./SignatureRequestsTable";
 import TasksList from "./TasksList";
 
 
-export default async function SignatureCenterPage() {
-  const session = await getServerSessionSafe();
-  void session;
+export default function SignatureCenterPage() {
   const nowMs = new Date().getTime();
   const tasks = [
     {
@@ -43,7 +40,7 @@ export default async function SignatureCenterPage() {
 
     return (
     <main
-      className="signature-center-layout box-border w-full bg-[#F1F4F9] pt-2 pb-0 md:pt-6 md:pb-0 dark:bg-[#252525]"
+      className="signature-center-layout box-border w-full bg-white pt-0 pb-0 dark:bg-[#252525]"
       style={{
         height:
           "calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset, 0px) - var(--home-topbar-offset, 0px) - var(--workspace-content-bottom-subtract, var(--workspace-frame-gutter, 48px)))",
@@ -53,12 +50,12 @@ export default async function SignatureCenterPage() {
         <div className="h-full w-full">
           <div
             id="home-projects-container"
-            className="relative z-40 flex h-full min-h-0 w-full flex-col px-0 pt-0 data-[shadow-overlay=true]:border-transparent data-[shadow-overlay=true]:shadow-none md:pl-1 md:pr-0"
+            className="relative z-40 flex h-full min-h-0 w-full flex-col px-0 pt-0 data-[shadow-overlay=true]:border-transparent data-[shadow-overlay=true]:shadow-none"
           >
             <div className="flex h-full min-h-0 w-full flex-col">
               <div className="mt-0 flex w-full min-h-0 flex-1 flex-col">
-                <div className="box-border flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border-[1.5px] border-gray-200 bg-white p-3 shadow-sm md:p-5">
-                  <div className="page-fade-in flex items-center justify-between gap-3 md:pl-[21px]">
+                <div className="box-border flex min-h-0 flex-1 flex-col overflow-hidden bg-white px-5 pt-6 dark:bg-[#252525] md:px-9 md:pt-7">
+                  <div className="page-fade-in flex items-center justify-between gap-3">
                     <h2 className="min-w-0 shrink-0 text-lg font-semibold text-[#1F2A37] min-[560px]:text-xl md:text-2xl">
                       Signature Dashboard
                     </h2>

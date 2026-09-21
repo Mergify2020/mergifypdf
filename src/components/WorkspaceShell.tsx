@@ -246,11 +246,15 @@ export default function WorkspaceShell({
   const [createShowValidation, setCreateShowValidation] = useState(false);
   const [contentSwapOut, setContentSwapOut] = useState(false);
   const [contentSwapIn, setContentSwapIn] = useState(false);
+  const [accountOpening, setAccountOpening] = useState(false);
+  const [studioReturnTransition, setStudioReturnTransition] = useState(false);
   const [homeProjectsQuery, setHomeProjectsQuery] = useState("");
   const [mobileSearchExpanded, setMobileSearchExpanded] = useState(false);
   const contentSwapTimerRef = useRef<number | null>(null);
   const contentSettleTimerRef = useRef<number | null>(null);
   const contentSwapSafetyRef = useRef<number | null>(null);
+  const accountNavigationTimerRef = useRef<number | null>(null);
+  const studioReturnTimerRef = useRef<number | null>(null);
   const pendingContentSwapPathRef = useRef<string | null>(null);
   const [billingPortalLoading, setBillingPortalLoading] = useState(false);
 
@@ -288,6 +292,43 @@ export default function WorkspaceShell({
   const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const clearReturnTimer = () => {
+      if (studioReturnTimerRef.current !== null) {
+        window.clearTimeout(studioReturnTimerRef.current);
+        studioReturnTimerRef.current = null;
+      }
+    };
+    const startStudioReturn = () => {
+      try {
+        window.sessionStorage.removeItem("mpdf:studio-return-transition");
+      } catch {
+        // Session storage is only a fallback for a remounted shell.
+      }
+      clearReturnTimer();
+      setStudioReturnTransition(true);
+      studioReturnTimerRef.current = window.setTimeout(() => {
+        setStudioReturnTransition(false);
+        studioReturnTimerRef.current = null;
+      }, 320);
+    };
+
+    try {
+      if (window.sessionStorage.getItem("mpdf:studio-return-transition")) {
+        startStudioReturn();
+      }
+    } catch {
+      // Continue without the optional return animation.
+    }
+    window.addEventListener("workspace-studio-return", startStudioReturn);
+    return () => {
+      window.removeEventListener("workspace-studio-return", startStudioReturn);
+      clearReturnTimer();
+    };
+  }, []);
+
+  useEffect(() => {
     applyThemePreference(initialTheme);
   }, [initialTheme]);
   const [logoutConfirmArmed, setLogoutConfirmArmed] = useState(false);
@@ -311,7 +352,24 @@ export default function WorkspaceShell({
   );
 
   const openAccountPanel = useCallback(() => {
-    router.push("/account");
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+    if (reduceMotion) {
+      router.push("/account");
+      return;
+    }
+
+    router.prefetch("/account");
+    setAccountOpening(true);
+    if (accountNavigationTimerRef.current !== null) {
+      window.clearTimeout(accountNavigationTimerRef.current);
+    }
+    accountNavigationTimerRef.current = window.setTimeout(() => {
+      router.push("/account");
+      accountNavigationTimerRef.current = null;
+    }, 80);
   }, [router]);
 
   const closeAccountPanel = useCallback(() => {
@@ -670,7 +728,7 @@ export default function WorkspaceShell({
     pathname === "/" ||
     (pathname?.startsWith("/projects") ?? false) ||
     (pathname?.startsWith("/signature-center") ?? false);
-  const workspaceBackgroundClass = pathname === "/projects/all"
+  const workspaceBackgroundClass = pathname === "/projects/all" || pathname?.startsWith("/signature-center")
     ? "bg-white"
     : useUnifiedWorkspaceBackground
       ? "bg-[var(--app-surface)]"
@@ -700,11 +758,12 @@ export default function WorkspaceShell({
   const homeBillingModalBody = "Please update your payment method to restore access.";
   const isHomeProjectsPath = (value?: string | null) =>
     value === "/" || (value?.startsWith("/projects") ?? false);
-  const showPersistentWorkspaceTopBar =
-    (pathname === "/" || pathname === "/projects/all") ? false : (pathname?.startsWith("/signature-center") ?? false);
+  const isPrimaryWorkspacePath = (value?: string | null) =>
+    isHomeProjectsPath(value) || (value?.startsWith("/signature-center") ?? false);
+  const showPersistentWorkspaceTopBar = false;
   const isAllProjectsRoute = pathname === "/" || pathname === "/projects/all";
   const showDesktopAllProjectsTopBar = pathname === "/projects/all" && !phoneViewport;
-  const useFlatAllProjectsShell = showDesktopAllProjectsTopBar;
+  const useFlatAllProjectsShell = showDesktopAllProjectsTopBar || isSignaturesPanel;
   const fallbackProjectCardCount = fallbackProjectCountReady
     ? (isAllProjectsRoute ? Math.min(homeRecentProjects.length, 60) : Math.min(homeRecentProjects.length, 9))
     : isAllProjectsRoute
@@ -717,7 +776,7 @@ export default function WorkspaceShell({
       if (closeMobile) setMobileOpen(false);
       return false;
     }
-    const shouldAnimateSwap = isHomeProjectsPath(currentPath) && isHomeProjectsPath(nextPath);
+    const shouldAnimateSwap = isPrimaryWorkspacePath(currentPath) && isPrimaryWorkspacePath(nextPath);
     const reduceMotion =
       typeof window !== "undefined" &&
       window.matchMedia &&
@@ -749,7 +808,7 @@ export default function WorkspaceShell({
     contentSwapTimerRef.current = window.setTimeout(() => {
       router.push(nextPath);
       contentSwapTimerRef.current = null;
-    }, 24);
+    }, 80);
     contentSwapSafetyRef.current = window.setTimeout(() => {
       setContentSwapOut(false);
       contentSwapSafetyRef.current = null;
@@ -764,6 +823,12 @@ export default function WorkspaceShell({
         : panelKey === "signatures"
           ? PenSquare
           : BookOpen;
+
+  useEffect(() => {
+    if (isAccountRoute) {
+      setAccountOpening(false);
+    }
+  }, [isAccountRoute]);
 
   useEffect(() => {
     if (!accountPanelOpen) return;
@@ -805,6 +870,9 @@ export default function WorkspaceShell({
       }
       if (contentSwapSafetyRef.current !== null) {
         window.clearTimeout(contentSwapSafetyRef.current);
+      }
+      if (accountNavigationTimerRef.current !== null) {
+        window.clearTimeout(accountNavigationTimerRef.current);
       }
     };
   }, []);
@@ -1700,7 +1768,7 @@ export default function WorkspaceShell({
       />
     ) : null}
     <div
-      className={`workspace-shell-root ${useFlatAllProjectsShell ? "projects-all-workspace" : ""} relative z-10 flex h-[calc(var(--workspace-vh,100dvh)-var(--home-banner-offset,0px))] overflow-hidden pt-0 ${homeBillingBannerExiting ? "transition-[padding-top,min-height] duration-300 ease-out" : "transition-none"} md:pt-[var(--home-banner-offset)] ${workspaceBackgroundClass} ${sidebarCompact ? "sidebar-collapsed" : ""} ${expanded ? "" : "sidebar-minimized"} dark:bg-[#252525] `}
+      className={`workspace-shell-root ${useFlatAllProjectsShell ? "projects-all-workspace" : ""} ${studioReturnTransition ? "workspace-studio-return-in" : ""} relative z-10 flex h-[calc(var(--workspace-vh,100dvh)-var(--home-banner-offset,0px))] overflow-hidden pt-0 ${homeBillingBannerExiting ? "transition-[padding-top,min-height] duration-300 ease-out" : "transition-none"} md:pt-[var(--home-banner-offset)] ${workspaceBackgroundClass} ${sidebarCompact ? "sidebar-collapsed" : ""} ${expanded ? "" : "sidebar-minimized"} dark:bg-[#252525] `}
       style={
         {
           height: "calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset, 0px))",
@@ -2664,7 +2732,7 @@ export default function WorkspaceShell({
             <main className="relative z-0 flex min-h-0 flex-1 flex-col lg:z-40">
               <div className={`flex min-h-0 w-full flex-1 flex-col `}>
                 <div
-                  className="workspace-content-shell flex h-full min-h-0 w-full flex-1 flex-col transition-none 2xl:transition-[max-width] 2xl:duration-300 2xl:ease-[cubic-bezier(0.22,1,0.36,1)]"
+                  className={["workspace-content-shell flex h-full min-h-0 w-full flex-1 flex-col transition-none 2xl:transition-[max-width] 2xl:duration-300 2xl:ease-[cubic-bezier(0.22,1,0.36,1)]", accountOpening ? "workspace-account-opening-out pointer-events-none" : "", contentSwapOut ? "workspace-content-swap-out pointer-events-none" : "", contentSwapIn ? "workspace-content-swap-in" : ""].join(" ")}
                   style={{ maxWidth: showDesktopAllProjectsTopBar ? "none" : "var(--shell-content-width)", width: "100%" }}
                 >
                   {children}
@@ -2872,22 +2940,6 @@ export default function WorkspaceShell({
           )
         : null}
 
-      {billingPortalLoading ? (
-        <div className="pointer-events-none fixed inset-0 z-[1200]">
-          <div className="absolute inset-0 bg-[var(--app-surface)]" />
-          <div className="relative flex min-h-screen items-center justify-center px-6 py-10">
-            <div className="pointer-events-none flex flex-col items-center text-center">
-              <div
-                className="h-14 w-14 animate-spin rounded-full border-[5px] border-[#D9CCFF] border-t-[#6C47FF] dark:border-[#3F3F3F] dark:border-t-[#8B6CFF]"
-                aria-hidden
-              />
-              <p className="mt-5 text-[24px] font-semibold tracking-tight text-slate-900 dark:text-[#F5F5F5] sm:text-[28px]">
-                Opening Billing Portal...
-              </p>
-            </div>
-          </div>
-        </div>
-      ) : null}
       {sidebarTooltip && document.body.dataset.modalOpen !== "true"
         ? createPortal(
           <div

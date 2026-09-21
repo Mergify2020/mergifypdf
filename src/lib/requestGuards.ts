@@ -19,9 +19,10 @@ export function isSameOrigin(req: Request) {
   const allowedHosts = new Set<string>();
   const nextAuthUrl = process.env.NEXTAUTH_URL;
   const publicAppUrl = process.env.NEXT_PUBLIC_APP_URL;
+  const appOrigin = process.env.APP_ORIGIN;
   const vercelUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null;
 
-  for (const candidate of [nextAuthUrl, publicAppUrl, vercelUrl]) {
+  for (const candidate of [nextAuthUrl, publicAppUrl, appOrigin, vercelUrl]) {
     if (!candidate) continue;
     allowedOrigins.add(normalizeOrigin(candidate));
     const hostname = extractHostname(candidate);
@@ -51,7 +52,26 @@ export function isSameOrigin(req: Request) {
   try {
     const parsedOrigin = new URL(normalizedOrigin);
     const originHostname = parsedOrigin.hostname.toLowerCase().trim();
-    return allowedHosts.has(originHostname) && (parsedOrigin.protocol === "https:" || parsedOrigin.protocol === "http:");
+    if (allowedHosts.has(originHostname) && (parsedOrigin.protocol === "https:" || parsedOrigin.protocol === "http:")) {
+      return true;
+    }
+
+    // Codespaces proxies the public port to the local Next server. In development,
+    // browser requests can therefore carry localhost as Origin while the trusted
+    // forwarded host is the exact public APP_ORIGIN computed by scripts/dev.mjs.
+    const forwardedHostname = extractHostname(req.headers.get("x-forwarded-host"));
+    const appOriginHostname = extractHostname(process.env.APP_ORIGIN);
+    const isLocalDevOrigin = originHostname === "localhost" && parsedOrigin.port === "3000";
+    if (
+      process.env.NODE_ENV === "development" &&
+      isLocalDevOrigin &&
+      Boolean(appOriginHostname) &&
+      forwardedHostname === appOriginHostname
+    ) {
+      return true;
+    }
+
+    return false;
   } catch {
     return false;
   }

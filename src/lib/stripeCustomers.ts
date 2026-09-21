@@ -13,6 +13,12 @@ function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
+function isMissingStripeCustomer(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as { code?: unknown; param?: unknown };
+  return candidate.code === "resource_missing" && candidate.param === "id";
+}
+
 async function pickStripeCustomerByEmail(
   stripe: Stripe,
   email: string,
@@ -52,6 +58,19 @@ export async function resolveStripeCustomerIdForUser(input: EnsureStripeCustomer
     customerId = user?.stripeCustomerId ?? null;
   }
 
+  if (customerId) {
+    try {
+      await stripe.customers.update(customerId, {
+        email,
+        name: input.name ?? undefined,
+        metadata: { appUserId: input.userId },
+      });
+    } catch (error) {
+      if (!isMissingStripeCustomer(error)) throw error;
+      customerId = null;
+    }
+  }
+
   if (!customerId) {
     customerId = await pickStripeCustomerByEmail(stripe, email, input.userId);
   }
@@ -63,12 +82,6 @@ export async function resolveStripeCustomerIdForUser(input: EnsureStripeCustomer
       metadata: { appUserId: input.userId },
     });
     customerId = created.id;
-  } else {
-    await stripe.customers.update(customerId, {
-      email,
-      name: input.name ?? undefined,
-      metadata: { appUserId: input.userId },
-    });
   }
 
   await prisma.user.update({

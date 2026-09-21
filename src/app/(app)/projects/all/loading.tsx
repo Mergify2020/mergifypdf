@@ -3,7 +3,7 @@ import AllProjectsSkeleton from "@/components/AllProjectsSkeleton";
 export default function Loading() {
   return (
     <main
-      className="box-border flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-white pb-0 pt-3 dark:bg-[#252525] md:pb-0 md:pt-6"
+      className="route-loading-deferred box-border flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-white pb-0 pt-3 dark:bg-[#252525] md:pb-0 md:pt-6"
       style={{
         height:
           "calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset, 0px) - var(--home-topbar-offset, 0px))",

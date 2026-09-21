@@ -43,7 +43,7 @@ function SignedHistorySkeletonRow() {
 export default function Loading() {
   return (
     <main
-      className="box-border w-full bg-[#F1F4F9] pt-2 pb-0 md:pt-6 md:pb-0 dark:bg-[#252525]"
+      className="route-loading-deferred box-border w-full bg-white pt-0 pb-0 dark:bg-[#252525]"
       style={{
         height:
           "calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset, 0px) - var(--home-topbar-offset, 0px) - var(--workspace-content-bottom-subtract, var(--workspace-frame-gutter, 48px)))",
@@ -53,12 +53,12 @@ export default function Loading() {
         <div className="h-full w-full">
           <div
             id="home-projects-container"
-            className="relative z-40 flex h-full min-h-0 w-full flex-col px-0 pt-0 md:pl-1 md:pr-0"
+            className="relative z-40 flex h-full min-h-0 w-full flex-col px-0 pt-0"
           >
             <div className="flex h-full min-h-0 w-full flex-col">
               <div className="mt-0 flex w-full min-h-0 flex-1 flex-col">
-                <div className="box-border flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border-[1.5px] border-gray-200 bg-white p-3 shadow-sm md:p-5">
-                  <div className="flex items-center justify-between gap-3 md:pl-[21px]">
+                <div className="box-border flex min-h-0 flex-1 flex-col overflow-hidden bg-white px-5 pt-6 dark:bg-[#252525] md:px-9 md:pt-7">
+                  <div className="flex items-center justify-between gap-3">
                     <div className="h-8 w-56 rounded-full bg-slate-100 skeleton-shimmer" />
                     <div className="flex gap-2">
                       <div className="hidden h-9 w-[200px] rounded-xl bg-slate-100 skeleton-shimmer sm:block" />

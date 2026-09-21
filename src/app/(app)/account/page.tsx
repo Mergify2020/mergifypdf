@@ -187,6 +187,7 @@ export function AccountSettingsPage({
   const canChangePassword = hasCredentialsAccess;
 
   const [email, setEmail] = useState("");
+  const [isLeavingSettings, setIsLeavingSettings] = useState(false);
   const [newEmail, setNewEmail] = useState("");
   const [confirmNewEmail, setConfirmNewEmail] = useState("");
   const [emailCodeDigits, setEmailCodeDigits] = useState<string[]>(Array(6).fill(""));
@@ -439,6 +440,22 @@ export function AccountSettingsPage({
   useEffect(() => {
     setMobileSettingsView(initialMobileView ?? "home");
   }, [initialMobileView]);
+
+  const returnToProjects = () => {
+    if (isLeavingSettings) return;
+
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+    if (reduceMotion) {
+      router.push("/projects/all");
+      return;
+    }
+
+    setIsLeavingSettings(true);
+    window.setTimeout(() => router.push("/projects/all"), 150);
+  };
 
   useEffect(() => {
     if (activeSettingsTab === "account") return;
@@ -1528,6 +1545,7 @@ export function AccountSettingsPage({
 
   return (
     <main
+      data-leaving={isLeavingSettings || undefined}
       className={`box-border flex w-full flex-col overflow-y-auto overscroll-y-contain bg-white px-4 pb-[calc(5rem+env(safe-area-inset-bottom))] scroll-pb-[calc(5rem+env(safe-area-inset-bottom))] text-slate-900 dark:bg-[#252525] dark:text-zinc-100 ${
         embedded ? "lg:bg-slate-100 lg:px-0 lg:pt-6 lg:pb-0 lg:scroll-pt-0 lg:scroll-pb-0" : "lg:bg-slate-100 lg:px-0 lg:pt-6 lg:pb-6 lg:overflow-visible lg:scroll-pt-0 lg:scroll-pb-0"
       }`}
@@ -1563,7 +1581,7 @@ export function AccountSettingsPage({
                     onClose?.();
                     return;
                   }
-                  router.push("/");
+                  returnToProjects();
                 }}
                 className="inline-flex h-9 w-9 items-center justify-center text-gray-700 transition hover:text-gray-900 dark:text-zinc-100 dark:hover:text-white"
                 aria-label={mobileSettingsView === "home" ? "Back to home" : "Back to settings home"}
@@ -1586,9 +1604,10 @@ export function AccountSettingsPage({
                 onClick={() => {
                   router.push("/support");
                 }}
-                className="whitespace-nowrap text-base font-medium text-gray-900 transition hover:text-black dark:text-zinc-100 dark:hover:text-white"
+                className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-[#6C47FF] bg-[#6C47FF] px-4 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(91,56,230,0.24)] transition-[transform,background-color,border-color,box-shadow] duration-200 hover:-translate-y-px hover:border-[#5B38E6] hover:bg-[#5B38E6] hover:shadow-[0_8px_18px_rgba(91,56,230,0.32)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-100 dark:border-[#8B78FF] dark:bg-[#7C5CFA] dark:text-white dark:hover:border-[#A899FF] dark:hover:bg-[#8B6BFF] dark:focus-visible:ring-offset-[#252525]"
               >
                 Contact us
+                <ExternalLink className="h-4 w-4" aria-hidden />
               </button>
               <span className="h-7 w-[1.5px] bg-gray-300 dark:bg-white/30" aria-hidden />
               <SettingsMenu
@@ -1717,7 +1736,7 @@ export function AccountSettingsPage({
                   <span className="flex flex-col gap-1">
                     <span className="text-[16px] font-semibold tracking-tight">Billing portal</span>
                     <span className="text-[12.5px] leading-4 text-gray-500 dark:text-zinc-400">
-                      View invoices and billing information
+                      Manage payment methods and invoices
                     </span>
                   </span>
                 </span>
@@ -1871,6 +1890,7 @@ export function AccountSettingsPage({
               >
                 <CreditCard className="h-5 w-5 text-gray-600 stroke-[2.2] dark:text-zinc-400" aria-hidden />
                 <span>Billing portal</span>
+                <ExternalLink className="ml-auto h-4 w-4 text-gray-500 dark:text-zinc-400" aria-hidden />
               </button>
               {billingPortalError ? (
                 <p className="px-3 text-xs font-medium text-rose-600 dark:text-rose-400">{billingPortalError}</p>
@@ -1890,6 +1910,7 @@ export function AccountSettingsPage({
                     <TikTokIcon />
                   </span>
                   <span>TikTok</span>
+                  <ExternalLink className="ml-auto h-4 w-4 text-gray-500 dark:text-zinc-400" aria-hidden />
                 </a>
                 <a
                   href="https://www.instagram.com/mergifypdf/"
@@ -1902,6 +1923,7 @@ export function AccountSettingsPage({
                     <InstagramIcon />
                   </span>
                   <span>Instagram</span>
+                  <ExternalLink className="ml-auto h-4 w-4 text-gray-500 dark:text-zinc-400" aria-hidden />
                 </a>
                 <a
                   href="https://x.com/MergifyPDF"
@@ -1914,6 +1936,7 @@ export function AccountSettingsPage({
                     <XIcon />
                   </span>
                   <span>X</span>
+                  <ExternalLink className="ml-auto h-4 w-4 text-gray-500 dark:text-zinc-400" aria-hidden />
                 </a>
               </div>
             </div>
@@ -1922,15 +1945,17 @@ export function AccountSettingsPage({
               <div className="flex flex-col gap-1">
                 <Link
                   href="/terms"
-                  className="rounded-xl px-3 py-2.5 text-sm font-semibold text-gray-800 transition hover:bg-gray-50 hover:text-gray-900 dark:text-zinc-300 dark:hover:bg-[#3A3A3A] dark:hover:text-zinc-100"
+                  className="flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-gray-800 transition hover:bg-gray-50 hover:text-gray-900 dark:text-zinc-300 dark:hover:bg-[#3A3A3A] dark:hover:text-zinc-100"
                 >
-                  Terms of Service
+                  <span>Terms of Service</span>
+                  <ChevronRight className="h-4 w-4 text-gray-500 dark:text-zinc-400" aria-hidden />
                 </Link>
                 <Link
                   href="/privacy"
-                  className="rounded-xl px-3 py-2.5 text-sm font-semibold text-gray-800 transition hover:bg-gray-50 hover:text-gray-900 dark:text-zinc-300 dark:hover:bg-[#3A3A3A] dark:hover:text-zinc-100"
+                  className="flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-gray-800 transition hover:bg-gray-50 hover:text-gray-900 dark:text-zinc-300 dark:hover:bg-[#3A3A3A] dark:hover:text-zinc-100"
                 >
-                  Privacy Policy
+                  <span>Privacy Policy</span>
+                  <ChevronRight className="h-4 w-4 text-gray-500 dark:text-zinc-400" aria-hidden />
                 </Link>
               </div>
             </div>
@@ -1941,20 +1966,10 @@ export function AccountSettingsPage({
             className="account-settings-content-pane flex w-[calc(100%+2rem)] min-h-[calc(100dvh-8.5rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] flex-col bg-transparent px-0 pb-5 -mx-4 pt-0 dark:bg-transparent sm:w-full sm:mx-0 sm:px-0 sm:py-6 lg:min-h-0 lg:w-full lg:mx-0 lg:overflow-y-auto lg:rounded-2xl lg:border-[1.5px] lg:border-gray-200 lg:bg-white lg:p-7 lg:shadow-sm lg:dark:border-[#3F3F3F] lg:dark:bg-[#323232] lg:dark:shadow-[0_8px_22px_rgba(0,0,0,0.28),0_24px_52px_rgba(0,0,0,0.24)] xl:p-7"
           >
             {activeSettingsTab === "pricing" ? (
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
                 <h2 className="hidden text-2xl font-semibold tracking-tight text-gray-900 dark:text-zinc-100 lg:block lg:text-3xl">
                   Plans & pricing
                 </h2>
-                <div className="flex flex-col items-start gap-2 text-sm text-gray-600 dark:text-zinc-400 sm:items-end sm:text-right">
-                  {pricingTrialStatus?.stripeCustomerId ? (
-                    <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                      <span className="text-gray-500 dark:text-zinc-500">Billing ID:</span>
-                      <span className="font-mono font-semibold text-gray-900 dark:text-zinc-100">
-                        {pricingTrialStatus.stripeCustomerId}
-                      </span>
-                    </div>
-                  ) : null}
-                </div>
               </div>
             ) : (
               <h2 className="hidden text-2xl font-semibold tracking-tight text-gray-900 dark:text-zinc-100 lg:block lg:text-3xl">
@@ -2503,7 +2518,7 @@ export function AccountSettingsPage({
                       </div>
                       {!billingHasCurrentPlan ? (
                         <p className="max-w-xl text-sm leading-6 text-gray-600 dark:text-zinc-400">
-                          Manage billing settings or choose a plan below.
+                          Choose a plan below, or manage payment methods and receipts in the billing portal.
                         </p>
                       ) : null}
                     </div>
@@ -2516,7 +2531,8 @@ export function AccountSettingsPage({
                           }}
                           className="inline-flex items-center justify-center rounded-full border-2 border-gray-400 bg-white px-4 py-2 text-sm font-semibold text-gray-800 transition hover:bg-gray-100 dark:border-[#5A5A5A] dark:bg-[#2B2B2B] dark:text-zinc-200 dark:hover:bg-[#3A3A3A]"
                         >
-                          View billing
+                          Manage billing
+                          <ExternalLink className="ml-1.5 h-4 w-4" aria-hidden />
                         </button>
                         {billingHasCurrentPlan ? (
                           <button
@@ -2538,20 +2554,24 @@ export function AccountSettingsPage({
                           </button>
                         ) : null}
                       </div>
-                      {billingHasCurrentPlan ? (
-                        <p
-                          className={`max-w-sm text-xs leading-5 lg:text-right ${
-                            pricingIsDelinquent
-                              ? "text-rose-600 dark:text-rose-300"
-                              : "text-gray-500 dark:text-zinc-400"
-                          }`}
-                        >
-                          <span className="text-rose-500" aria-hidden="true">*</span>{" "}
-                          {pricingIsDelinquent
-                            ? "Update your payment to restore billing."
-                            : "Your plan remains active until the end of your billing period."}
-                        </p>
-                      ) : null}
+                      <p
+                        className={`max-w-sm text-xs leading-5 lg:text-right ${
+                          pricingIsDelinquent
+                            ? "text-rose-600 dark:text-rose-300"
+                            : "text-gray-500 dark:text-zinc-400"
+                        }`}
+                      >
+                        {billingHasCurrentPlan ? (
+                          <>
+                            <span className="text-rose-500" aria-hidden="true">*</span>{" "}
+                            {pricingIsDelinquent
+                              ? "Update your payment in the billing portal. Invoices and receipts are available there."
+                              : "Manage your plan, payment methods, invoices, and receipts in the billing portal."}
+                          </>
+                        ) : (
+                          ""
+                        )}
+                      </p>
                     </div>
                   </>
                 )}

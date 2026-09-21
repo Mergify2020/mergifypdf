@@ -14,7 +14,6 @@ import type {
 } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
-import Link from "next/link";
 import QRCode from "react-qr-code";
 import type { PDFDocument as PDFDocumentType, PDFFont } from "pdf-lib";
 import { AnimatePresence, motion } from "framer-motion";
@@ -34,6 +33,7 @@ import {
 } from "@/lib/projectsSummaryCache";
 import {
   Highlighter,
+  Home,
   Minus,
   Plus,
   Trash2,
@@ -250,7 +250,8 @@ const STARTUP_OVERLAY_KEY = "mpdf:startup-overlay";
 const STARTUP_OVERLAY_CONTEXT_KEY = "mpdf:startup-overlay-context";
 const WORKSPACE_LAUNCH_OVERLAY_STORAGE_KEY = "mpdf:workspace-launch-overlay";
 const EXISTING_PROJECT_OVERLAY_STORAGE_KEY = "mpdf:existing-project-overlay";
-const WORKSPACE_EXIT_TRANSITION_MS = 200;
+const WORKSPACE_EXIT_TRANSITION_MS = 180;
+const STUDIO_RETURN_TRANSITION_KEY = "mpdf:studio-return-transition";
 const PREVIEW_CACHE_NEAR_RANGE = 1;
 const BACKGROUND_LOW_RES_BATCH = 1;
 const BACKGROUND_LOW_RES_PRIORITY = 5;
@@ -263,10 +264,21 @@ const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
 const WORKSPACE_SIGNATURES_KEY = "mpdf:signatures";
 const DEFAULT_ASPECT_RATIO = 792 / 612; // fallback letter portrait
 const SOFT_EASE: [number, number, number, number] = [0.4, 0, 0.2, 1];
-const ZOOM_MIN_PERCENT = 50;
-const ZOOM_MAX_PERCENT = 300;
-const ZOOM_STEP_PERCENT = 25;
+const ZOOM_LEVELS = [25, 32, 40, 50, 63, 80, 100, 125, 160, 200, 250, 300] as const;
+const ZOOM_MIN_PERCENT = ZOOM_LEVELS[0];
+const ZOOM_MAX_PERCENT = ZOOM_LEVELS[ZOOM_LEVELS.length - 1];
 const MAX_ZOOM_MULTIPLIER = ZOOM_MAX_PERCENT / 100;
+
+function getFitZoomLevel(percent: number) {
+  const clampedPercent = clamp(percent, ZOOM_MIN_PERCENT, ZOOM_MAX_PERCENT);
+  return [...ZOOM_LEVELS].reverse().find((level) => level <= clampedPercent) ?? ZOOM_MIN_PERCENT;
+}
+
+function getNextZoomLevel(currentPercent: number, direction: 1 | -1) {
+  const currentIndex = ZOOM_LEVELS.findIndex((level) => level >= currentPercent);
+  const resolvedIndex = currentIndex === -1 ? ZOOM_LEVELS.length - 1 : currentIndex;
+  return ZOOM_LEVELS[clamp(resolvedIndex + direction, 0, ZOOM_LEVELS.length - 1)];
+}
 const VIEW_TRANSITION = { duration: 0.2, ease: SOFT_EASE };
 const LARGE_DOC_PAGE_THRESHOLD = 80;
 const LARGE_DOC_INITIAL_RENDER_COUNT = 4;
@@ -1747,6 +1759,14 @@ function WorkspaceClient() {
   }, [projectParam]);
 
 
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !projectParam) return;
+    const frameId = window.requestAnimationFrame(() => {
+      window.dispatchEvent(new Event("workspace-studio-shell-ready"));
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [projectParam]);
 
   const shouldShowStartupOverlay = showStartupOverlay && !hasPersistentHandoffOverlay && !hasWorkspaceOpenInProgress && !projectParam;
 
@@ -5894,19 +5914,20 @@ const timer =
     setPageNumberDraft(String(idx + 1));
   }, [activePageIndexState, pages.length]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!showPageOrderPanel) return;
     if (!activePageId) return;
     const container = thumbsScrollRef.current;
     const node = thumbNodeMapRef.current.get(activePageId);
     if (!container || !node) return;
 
-    const containerTop = container.scrollTop;
-    const containerBottom = containerTop + container.clientHeight;
+    const edgePadding = Math.min(72, Math.max(28, container.clientHeight * 0.16));
+    const safeTop = container.scrollTop + edgePadding;
+    const safeBottom = container.scrollTop + container.clientHeight - edgePadding;
     const nodeTop = node.offsetTop;
     const nodeBottom = nodeTop + node.offsetHeight;
 
-    if (nodeTop >= containerTop && nodeBottom <= containerBottom) return;
+    if (nodeTop >= safeTop && nodeBottom <= safeBottom) return;
 
     const centeredTop = nodeTop - (container.clientHeight - node.offsetHeight) / 2;
     const maxTop = Math.max(0, container.scrollHeight - container.clientHeight);
@@ -6057,11 +6078,13 @@ const timer =
       if (Date.now() < navigationLock.until) return;
       pageNavigationLockRef.current = null;
     }
-    const viewCenter = container.scrollTop + container.clientHeight / 2;
+    // Treat the upper third as the reader's current position so the active
+    // thumbnail changes as the next page enters view, not after it reaches center.
+    const readPoint = container.scrollTop + container.clientHeight * 0.32;
     let closestIndex = 0;
     let closestDistance = Infinity;
     for (let i = 0; i < layout.centers.length; i += 1) {
-      const distance = Math.abs(layout.centers[i] - viewCenter);
+      const distance = Math.abs(layout.centers[i] - readPoint);
       if (distance < closestDistance) {
         closestDistance = distance;
         closestIndex = i;
@@ -10678,10 +10701,8 @@ const timer =
 		    const fitHeightScale = Math.max(0.2, (availableHeight / baseHeight) * fitPadding);
 		    // Default zoom: fit the page within the visible workspace, not just to width.
 		    const fitScale = Math.min(fitWidthScale, fitHeightScale);
-		    const desiredZoomPercent = clamp(
+		    const desiredZoomPercent = getFitZoomLevel(
 		      Math.round((fitScale / documentScale) * 100),
-		      ZOOM_MIN_PERCENT,
-		      ZOOM_MAX_PERCENT,
 		    );
 
 		    if (!userAdjustedZoom) {
@@ -10753,9 +10774,9 @@ const timer =
     []
   );
   const zoomByStep = useCallback(
-    (delta: number) => {
+    (direction: 1 | -1) => {
       setShouldCenterOnChange(true);
-      setZoomWithScrollPreserved(zoomPercent + delta);
+      setZoomWithScrollPreserved(getNextZoomLevel(zoomPercent, direction));
     },
     [setZoomWithScrollPreserved, zoomPercent]
   );
@@ -10778,7 +10799,7 @@ const timer =
 
       event.preventDefault();
       setShouldCenterOnChange(true);
-      setZoomWithScrollPreserved(zoomPercent + (isZoomIn ? ZOOM_STEP_PERCENT : -ZOOM_STEP_PERCENT));
+      setZoomWithScrollPreserved(getNextZoomLevel(zoomPercent, isZoomIn ? 1 : -1));
     };
 
     window.addEventListener("keydown", handleZoomShortcut, { passive: false });
@@ -12538,11 +12559,19 @@ const timer =
       if (workspaceExiting) return;
 
       cancelWorkspaceOpenHandoff();
-      setWorkspaceExiting(true);
       const reduceMotion =
         window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+      if (!reduceMotion) {
+        try {
+          window.sessionStorage.setItem(STUDIO_RETURN_TRANSITION_KEY, "1");
+        } catch {
+          // The in-memory event below still coordinates the transition.
+        }
+        window.dispatchEvent(new Event("workspace-studio-return"));
+      }
+      setWorkspaceExiting(true);
       workspaceExitTimerRef.current = window.setTimeout(() => {
-        router.push("/");
+        router.push("/projects/all");
         workspaceExitTimerRef.current = null;
       }, reduceMotion ? 0 : WORKSPACE_EXIT_TRANSITION_MS);
     },
@@ -13343,39 +13372,36 @@ const timer =
         {/* Top row */}
         <div className="w-full border-b border-slate-100 bg-white dark:border-[#4A4A4A]/60 dark:bg-[#323232]">
           <div className="relative flex h-14 w-full items-center justify-between gap-4 pl-4 pr-0 lg:pl-6 lg:pr-0">
-            <div className="relative z-10 flex shrink-0 items-center gap-1">
+            <div className="relative z-10 flex shrink-0 items-center gap-3">
               <button
-              type="button"
-              className="relative z-10 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF] dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white"
-              aria-label="Back to projects"
-              onClick={handleLogoNavigate}
-              disabled={workspaceExiting}
-            >
-              <ChevronLeft className="h-5 w-5" aria-hidden />
+                type="button"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF] disabled:pointer-events-none disabled:opacity-55 dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white"
+                aria-label="Back to projects"
+                title="Back to projects"
+                onClick={handleLogoNavigate}
+                disabled={workspaceExiting}
+              >
+                <Home className="h-[18px] w-[18px]" aria-hidden />
               </button>
-              <Link
-              href="/"
-              className="relative z-10 -ml-2 inline-flex shrink-0 items-center gap-2"
-              aria-label="Back to workspace"
-              onClick={handleLogoNavigate}
-            >
-              <Image
-                src="/logos/home-expanded-sidebar-logo-light-v6.svg"
-                alt="MergifyPDF"
-                width={170}
-                height={40}
-                priority
-                className="block dark:hidden"
-              />
-              <Image
-                src="/logos/home-expanded-sidebar-logo-dark-v6.svg"
-                alt="MergifyPDF"
-                width={170}
-                height={40}
-                priority
-                className="hidden dark:block"
-              />
-              </Link>
+              <span className="h-5 w-px bg-slate-200 dark:bg-[#4A4A4A]" aria-hidden />
+              <div className="inline-flex shrink-0 items-center">
+                <Image
+                  src="/logos/home-expanded-sidebar-logo-light-v6.svg"
+                  alt="MergifyPDF"
+                  width={170}
+                  height={40}
+                  priority
+                  className="block dark:hidden"
+                />
+                <Image
+                  src="/logos/home-expanded-sidebar-logo-dark-v6.svg"
+                  alt="MergifyPDF"
+                  width={170}
+                  height={40}
+                  priority
+                  className="hidden dark:block"
+                />
+              </div>
             </div>
 
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-56">
@@ -15503,7 +15529,7 @@ const timer =
                                     className={viewerRailButtonClass}
                                     onMouseEnter={(event) => showToolbarTooltip("Zoom in (Ctrl +)", event.currentTarget, "left")}
                                     onMouseLeave={hideToolbarTooltip}
-                                    onClick={() => zoomByStep(ZOOM_STEP_PERCENT)}
+                                    onClick={() => zoomByStep(1)}
                                     disabled={pages.length === 0 || zoomPercent >= ZOOM_MAX_PERCENT}
                                   >
                                     <ZoomIn className="h-5 w-5" aria-hidden />
@@ -15514,7 +15540,7 @@ const timer =
                                     className={viewerRailButtonClass}
                                     onMouseEnter={(event) => showToolbarTooltip("Zoom out (Ctrl -)", event.currentTarget, "left")}
                                     onMouseLeave={hideToolbarTooltip}
-                                    onClick={() => zoomByStep(-ZOOM_STEP_PERCENT)}
+                                    onClick={() => zoomByStep(-1)}
                                     disabled={pages.length === 0 || zoomPercent <= ZOOM_MIN_PERCENT}
                                   >
                                     <ZoomOut className="h-5 w-5" aria-hidden />

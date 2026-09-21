@@ -58,6 +58,8 @@ export default function ProjectEntryLoadingHost() {
   const [state, setState] = useState<ProjectEntryHostState | null>(() => routeState);
   const [consumedRouteKey, setConsumedRouteKey] = useState<string | null>(null);
   const [exiting, setExiting] = useState(false);
+  const [existingLaunchMinimumElapsed, setExistingLaunchMinimumElapsed] = useState(false);
+  const [studioShellReady, setStudioShellReady] = useState(false);
   const autoDismissTimerRef = useRef<number | null>(null);
   const exitTimerRef = useRef<number | null>(null);
   const entryStartedAtRef = useRef<number | null>(null);
@@ -65,7 +67,8 @@ export default function ProjectEntryLoadingHost() {
 
   const activeState = state ?? (routeState && routeState.routeKey !== consumedRouteKey ? routeState : null);
   const loadingCopy = activeState ? getProjectEntryLoadingCopy(activeState.context, activeState.files.length) : null;
-
+  const activeEntryContext = activeState?.context;
+  const hasActiveEntry = Boolean(activeState);
   const dismissEntry = useCallback(() => {
     if (exiting) return;
     setExiting(true);
@@ -82,6 +85,18 @@ export default function ProjectEntryLoadingHost() {
       exitTimerRef.current = null;
     }, PROJECT_ENTRY_EXIT_MS);
   }, [exiting, routeKey]);
+
+  useEffect(() => {
+    if (!hasActiveEntry || activeEntryContext === "new-project") return;
+    const timer = window.setTimeout(() => setExistingLaunchMinimumElapsed(true), 480);
+    return () => window.clearTimeout(timer);
+  }, [activeEntryContext, hasActiveEntry, routeKey]);
+
+  useEffect(() => {
+    if (!hasActiveEntry || activeEntryContext === "new-project" || !existingLaunchMinimumElapsed || !studioShellReady || exiting) return;
+    const frameId = window.requestAnimationFrame(() => dismissEntry());
+    return () => window.cancelAnimationFrame(frameId);
+  }, [activeEntryContext, dismissEntry, existingLaunchMinimumElapsed, exiting, hasActiveEntry, studioShellReady]);
 
   useEffect(() => {
     if (autoDismissTimerRef.current !== null) {
@@ -117,6 +132,8 @@ export default function ProjectEntryLoadingHost() {
       debugProjectEntry("show", { context: "new-project", source: "event" });
       prepareForEntry();
       setConsumedRouteKey(null);
+      setExistingLaunchMinimumElapsed(false);
+      setStudioShellReady(false);
       setState({
         context: "new-project",
         files: Array.isArray(detail?.files) ? detail.files : [],
@@ -134,6 +151,8 @@ export default function ProjectEntryLoadingHost() {
       debugProjectEntry("show", { context: "existing-project", source: "event" });
       prepareForEntry();
       setConsumedRouteKey(null);
+      setExistingLaunchMinimumElapsed(false);
+      setStudioShellReady(false);
       setState({
         context: "existing-project",
         files: [],
@@ -145,7 +164,12 @@ export default function ProjectEntryLoadingHost() {
       });
     };
 
+    const handleShellReady = () => {
+      setStudioShellReady(true);
+    };
+
     const handleReady = () => {
+      setStudioShellReady(true);
       const startedAt = entryStartedAtRef.current;
       debugProjectEntry("ready", {
         elapsedMs: startedAt !== null ? Math.round((typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt) : null,
@@ -171,12 +195,14 @@ export default function ProjectEntryLoadingHost() {
 
     window.addEventListener("workspace-launch-overlay-show", handleLaunch as EventListener);
     window.addEventListener("workspace-existing-overlay-show", handleExisting as EventListener);
+    window.addEventListener("workspace-studio-shell-ready", handleShellReady);
     window.addEventListener("workspace-content-ready", handleReady);
     window.addEventListener("workspace-launch-overlay-hide", handleHide);
 
     return () => {
       window.removeEventListener("workspace-launch-overlay-show", handleLaunch as EventListener);
       window.removeEventListener("workspace-existing-overlay-show", handleExisting as EventListener);
+      window.removeEventListener("workspace-studio-shell-ready", handleShellReady);
       window.removeEventListener("workspace-content-ready", handleReady);
       window.removeEventListener("workspace-launch-overlay-hide", handleHide);
     };
@@ -214,8 +240,8 @@ export default function ProjectEntryLoadingHost() {
 
   return (
     <div
-      className={`fixed inset-0 z-[1295] transition-opacity ease-out motion-reduce:transition-none ${
-        exiting ? "opacity-0" : "opacity-100"
+      className={`fixed inset-0 z-[1295] transition-[opacity,transform,filter] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+        exiting ? "pointer-events-none scale-[1.008] opacity-0 blur-[1px]" : "scale-100 opacity-100 blur-0"
       }`}
       style={{ transitionDuration: `${PROJECT_ENTRY_EXIT_MS}ms` }}
     >
