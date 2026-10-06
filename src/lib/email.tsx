@@ -8,6 +8,7 @@ import { SignupCodeEmail } from "@/emails/SignupCodeEmail";
 import { SignatureRequestEmail } from "@/emails/SignatureRequestEmail";
 import { TwoFactorCodeEmail } from "@/emails/TwoFactorCodeEmail";
 import { TwoFactorSignInEmail } from "@/emails/TwoFactorSignInEmail";
+import { MobileSigningLinkEmail } from "@/emails/MobileSigningLinkEmail";
 
 type SendArgs = { to: string; code: string };
 const EMAIL_APP_BASE_URL = (
@@ -552,5 +553,43 @@ export async function sendTwoFactorLoginEmail({
       console.error("[email] sendTwoFactorLoginEmail fatal:", err2);
       return { ok: false, error: String(err2) };
     }
+  }
+}
+
+
+export type MobileSigningLinkEmailArgs = {
+  to: string;
+  signingUrl: string;
+};
+
+export async function sendMobileSigningLinkEmail({
+  to,
+  signingUrl,
+}: MobileSigningLinkEmailArgs): Promise<{ ok: true; id?: string | null } | { ok: false; error: string }> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.error("[email] Missing RESEND_API_KEY");
+    return { ok: false, error: "Email is not configured." };
+  }
+  if (!emailDeliveryAllowed()) {
+    return { ok: false, error: "Email delivery is disabled for this environment." };
+  }
+
+  try {
+    const resend = new Resend(apiKey);
+    const { data, error } = await resend.emails.send({
+      from: process.env.FROM_EMAIL || "MergifyPDF <onboarding@resend.dev>",
+      to,
+      subject: "Your MergifyPDF signing link",
+      react: <MobileSigningLinkEmail signingUrl={signingUrl} />,
+    });
+    if (error) {
+      console.error("[email] Mobile signing link error:", error);
+      return { ok: false, error: "Unable to send the signing link." };
+    }
+    return { ok: true, id: data?.id };
+  } catch (error) {
+    console.error("[email] Mobile signing link fatal:", error);
+    return { ok: false, error: "Unable to send the signing link." };
   }
 }

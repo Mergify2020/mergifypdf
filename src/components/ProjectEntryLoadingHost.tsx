@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import WorkspaceLaunchLoadingState from "@/components/WorkspaceLaunchLoadingState";
 import type { PendingWorkspaceFile } from "@/components/useWorkspaceFilePreloader";
@@ -31,32 +31,14 @@ type ProjectEntryHostState = {
   routeKey: string | null;
 };
 
-function readRouteEntryState(
-  pathname: string | null,
-  searchParams: { get(name: string): string | null; toString(): string } | null,
-) {
-  if (!pathname?.startsWith("/studio")) return null;
-  const projectId = searchParams?.get("project") ?? null;
-  if (!projectId) return null;
-  return {
-    context: "studio" as const,
-    files: [],
-    startedAtMs: null,
-    initialProgress: null,
-    complete: false,
-    source: "route" as const,
-    routeKey: pathname + "?" + (searchParams?.toString() ?? ""),
-  };
-}
-
 export default function ProjectEntryLoadingHost() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const routeState = useMemo(() => readRouteEntryState(pathname, searchParams), [pathname, searchParams]);
-  const routeKey = routeState?.routeKey ?? null;
-  const [state, setState] = useState<ProjectEntryHostState | null>(() => routeState);
-  const [consumedRouteKey, setConsumedRouteKey] = useState<string | null>(null);
+  const routeKey = pathname?.startsWith("/studio")
+    ? pathname + "?" + (searchParams?.toString() ?? "")
+    : null;
+  const [state, setState] = useState<ProjectEntryHostState | null>(null);
   const [exiting, setExiting] = useState(false);
   const [existingLaunchMinimumElapsed, setExistingLaunchMinimumElapsed] = useState(false);
   const [studioShellReady, setStudioShellReady] = useState(false);
@@ -65,7 +47,7 @@ export default function ProjectEntryLoadingHost() {
   const entryStartedAtRef = useRef<number | null>(null);
   const hasEnteredStudioRef = useRef(pathname?.startsWith("/studio") ?? false);
 
-  const activeState = state ?? (routeState && routeState.routeKey !== consumedRouteKey ? routeState : null);
+  const activeState = state;
   const loadingCopy = activeState ? getProjectEntryLoadingCopy(activeState.context, activeState.files.length) : null;
   const activeEntryContext = activeState?.context;
   const hasActiveEntry = Boolean(activeState);
@@ -79,12 +61,11 @@ export default function ProjectEntryLoadingHost() {
         exitTimerRef.current = null;
       }
       clearProjectEntrySessionState();
-      setConsumedRouteKey(routeKey);
       setState(null);
       setExiting(false);
       exitTimerRef.current = null;
     }, PROJECT_ENTRY_EXIT_MS);
-  }, [exiting, routeKey]);
+  }, [exiting]);
 
   useEffect(() => {
     if (!hasActiveEntry || activeEntryContext === "new-project") return;
@@ -98,24 +79,37 @@ export default function ProjectEntryLoadingHost() {
     return () => window.cancelAnimationFrame(frameId);
   }, [activeEntryContext, dismissEntry, existingLaunchMinimumElapsed, exiting, hasActiveEntry, studioShellReady]);
 
+  // A new document does not need to wait behind a second loading screen.
+  // Once the studio shell exists, reveal it immediately and let its native page
+  // placeholders handle the short remaining render work.
+  useEffect(() => {
+    if (!hasActiveEntry || activeEntryContext !== "new-project" || !studioShellReady || exiting) return;
+    const frameId = window.requestAnimationFrame(() => dismissEntry());
+    return () => window.cancelAnimationFrame(frameId);
+  }, [activeEntryContext, dismissEntry, exiting, hasActiveEntry, studioShellReady]);
+
   useEffect(() => {
     if (autoDismissTimerRef.current !== null) {
       window.clearTimeout(autoDismissTimerRef.current);
       autoDismissTimerRef.current = null;
     }
     if (!activeState || activeState.complete || exiting) return;
+    const maxHoldMs =
+      activeEntryContext === "existing-project" || activeEntryContext === "studio"
+        ? 900
+        : PROJECT_ENTRY_LOADING_MAX_HOLD_MS;
     autoDismissTimerRef.current = window.setTimeout(() => {
-      debugProjectEntry("timeout", { routeKey, maxHoldMs: PROJECT_ENTRY_LOADING_MAX_HOLD_MS });
+      debugProjectEntry("timeout", { routeKey, maxHoldMs });
       dismissEntry();
       autoDismissTimerRef.current = null;
-    }, PROJECT_ENTRY_LOADING_MAX_HOLD_MS);
+    }, maxHoldMs);
     return () => {
       if (autoDismissTimerRef.current !== null) {
         window.clearTimeout(autoDismissTimerRef.current);
         autoDismissTimerRef.current = null;
       }
     };
-  }, [activeState, dismissEntry, exiting, routeKey]);
+  }, [activeEntryContext, activeState, dismissEntry, exiting, routeKey]);
 
   useEffect(() => {
     const prepareForEntry = () => {
@@ -131,7 +125,6 @@ export default function ProjectEntryLoadingHost() {
       entryStartedAtRef.current = typeof performance !== "undefined" ? performance.now() : Date.now();
       debugProjectEntry("show", { context: "new-project", source: "event" });
       prepareForEntry();
-      setConsumedRouteKey(null);
       setExistingLaunchMinimumElapsed(false);
       setStudioShellReady(false);
       setState({
@@ -150,7 +143,6 @@ export default function ProjectEntryLoadingHost() {
       entryStartedAtRef.current = typeof performance !== "undefined" ? performance.now() : Date.now();
       debugProjectEntry("show", { context: "existing-project", source: "event" });
       prepareForEntry();
-      setConsumedRouteKey(null);
       setExistingLaunchMinimumElapsed(false);
       setStudioShellReady(false);
       setState({
@@ -177,7 +169,7 @@ export default function ProjectEntryLoadingHost() {
       });
       setState((current) => {
         if (current) return { ...current, complete: true };
-        return routeState ? { ...routeState, complete: true } : null;
+        return null;
       });
     };
 
@@ -188,7 +180,6 @@ export default function ProjectEntryLoadingHost() {
         routeKey,
       });
       clearProjectEntrySessionState();
-      setConsumedRouteKey(routeKey);
       setState(null);
       setExiting(false);
     };
@@ -206,7 +197,7 @@ export default function ProjectEntryLoadingHost() {
       window.removeEventListener("workspace-content-ready", handleReady);
       window.removeEventListener("workspace-launch-overlay-hide", handleHide);
     };
-  }, [routeKey, routeState]);
+  }, [routeKey]);
 
   useEffect(() => {
     const isStudioRoute = pathname?.startsWith("/studio") ?? false;
@@ -223,7 +214,6 @@ export default function ProjectEntryLoadingHost() {
         exitTimerRef.current = null;
       }
       clearProjectEntrySessionState();
-      setConsumedRouteKey(null);
       setState(null);
       setExiting(false);
     });
@@ -254,7 +244,7 @@ export default function ProjectEntryLoadingHost() {
           initialProgress={activeState.initialProgress}
           title={loadingCopy.title}
           subtitle={loadingCopy.subtitle}
-          presentation={activeState.context === "new-project" ? "progress" : "spinner"}
+          presentation="spinner"
           onCompleteVisualReady={dismissEntry}
         />
       </div>

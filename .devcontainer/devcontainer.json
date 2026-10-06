@@ -1,6 +1,6 @@
 {
   "name": "MergifyPDF",
-  "image": "mcr.microsoft.com/devcontainers/javascript-node:20-bookworm",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:24-bookworm",
   "hostRequirements": {
     "cpus": 4,
     "memory": "16gb",
@@ -13,11 +13,14 @@
       "onAutoForward": "notify"
     }
   },
-  "onCreateCommand": "corepack enable && corepack prepare pnpm@9.15.4 --activate",
+  "onCreateCommand": "sudo corepack enable && corepack prepare pnpm@9.15.4 --activate",
   "updateContentCommand": "corepack pnpm install --frozen-lockfile",
   "postCreateCommand": "corepack pnpm prisma generate",
   "customizations": {
     "vscode": {
+      "extensions": [
+        "openai.chatgpt"
+      ],
       "settings": {
         "npm.packageManager": "pnpm",
         "typescript.tsdk": "node_modules/typescript/lib",

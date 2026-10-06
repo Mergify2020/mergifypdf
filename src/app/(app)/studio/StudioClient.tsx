@@ -82,9 +82,12 @@ import {
   Unlock,
 	  Signature as SignatureIcon,
 	  UploadCloud,
+	  Upload,
   X,
   Mail,
   Download,
+  FileText,
+  ShieldCheck,
   Printer,
 } from "lucide-react";
 import {
@@ -109,13 +112,15 @@ import { CSS } from "@dnd-kit/utilities";
 import WorkspaceSettingsMenu from "@/components/WorkspaceSettingsMenu";
 import { GUEST_PROJECT_STORAGE_KEY, type GuestProject } from "@/lib/guestProject";
 import { PROJECT_NAME_STORAGE_KEY, projectNameToFile, sanitizeProjectName } from "@/lib/projectName";
+import { createStoredZip } from "@/lib/browserZip";
+import { formatFileSize } from "@/lib/formatFileSize";
 import { PENDING_UPLOAD_STORAGE_KEY } from "@/lib/pendingUpload";
 import { logDevTiming } from "@/lib/devTiming";
 import { extractProjectRotationFromData, getProjectCoverPreview } from "./studioProjectData";
 import { MemoSortableThumb, SortableOrganizeTile } from "./StudioPageTiles";
 import StudioHmrProbe from "./StudioHmrProbe";
 import { TEXT_FONT_OPTIONS, type FontOption, type StandardFontName } from "./studioFonts";
-import { calculateBoundedRenderDimensions, selectPageWorkingSet } from "./studioPerformance";
+import { calculateBoundedRenderDimensions } from "./studioPerformance";
 import type {
   CloudProject,
   DraftHighlight,
@@ -142,9 +147,13 @@ import {
   getLocalStorage,
   getSessionStorage,
   persistSourceMetadata,
+  persistWorkspacePreviewCacheToDb,
+  persistPagePreviewToDb,
   readFileBlob,
   readStoredSourceIds,
   readWorkspacePreviewCache,
+  readWorkspacePreviewCacheFromDb,
+  readPagePreviewFromDb,
   storeFileBlob,
   workspaceFilesKey,
   workspacePreviewCacheKey,
@@ -224,9 +233,12 @@ type HighlightColorKey = keyof typeof HIGHLIGHT_COLORS;
 // previews stay razor sharp even when downscaled
 // into small project cards and slideshows.
 const PREVIEW_BASE_SCALE = 4;
+const HIGH_PREVIEW_SCALE = 2;
 const MAX_DEVICE_PIXEL_RATIO = 4;
 const COVER_PREVIEW_SCALE = 3;
 const COVER_PREVIEW_QUALITY = 0.86;
+const COVER_PREVIEW_MAX_PIXELS = 4_000_000;
+const COVER_PREVIEW_MAX_DIMENSION = 4096;
 const TEXT_PLACEHOLDER = "Type here";
 const TEXT_DEFAULT_WIDTH_PX = 360;
 const TEXT_DEFAULT_HEIGHT_PX = 48;
@@ -234,14 +246,35 @@ const PX_TO_PT = 72 / 96;
 const DEFAULT_TEXT_SIZE_PT = 11;
 const DEFAULT_TEXT_SIZE_PX = DEFAULT_TEXT_SIZE_PT * PT_TO_PX;
 const DEFAULT_TEXT_LINE_SPACING = 1.0;
-const LOW_RES_PREVIEW_SCALE = PREVIEW_BASE_SCALE * 0.5;
-const MAX_PARALLEL_PREVIEW_RENDERS = 3;
-const MAX_PARALLEL_LOW_PREVIEW_RENDERS = 1;
-const MAX_PARALLEL_THUMB_RENDERS = 2;
-const HIGH_PREVIEW_MAX_PIXELS = 12_000_000;
+const LOW_RES_PREVIEW_SCALE = 0.75;
+const MAX_PARALLEL_PREVIEW_RENDERS = 2;
+const FOREGROUND_RENDER_PRIORITY = 5_000;
+const MAX_PARALLEL_LOW_PREVIEW_RENDERS = 2;
+const MAX_PARALLEL_THUMB_RENDERS = 1;
+const THUMB_RENDER_PIXEL_RATIO = 1;
+const HIGH_PREVIEW_MAX_PIXELS = 6_000_000;
+const HIGH_PREVIEW_ZOOM_BUCKETS = [1, 1.5, 2, 3] as const;
+const HIGH_ZOOM_TILE_THRESHOLD = 50;
+const MAX_HIGH_ZOOM_VIEWPORT_CACHE_ENTRIES = 4;
+const HIGH_ZOOM_VIEWPORT_MAX_PIXELS = 6_000_000;
+const HIGH_ZOOM_VIEWPORT_OVERSCAN = 0.65;
+
+type HighZoomPreviewTile = {
+  id: string;
+  src: string;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+};
+
+function getHighPreviewZoomBucket(zoomPercent: number) {
+  const requested = Math.max(1, zoomPercent / 100);
+  return HIGH_PREVIEW_ZOOM_BUCKETS.find((bucket) => bucket >= requested) ?? HIGH_PREVIEW_ZOOM_BUCKETS.at(-1)!;
+}
 const HIGH_PREVIEW_MAX_DIMENSION = 8192;
-const LOW_PREVIEW_MAX_PIXELS = 4_000_000;
-const LOW_PREVIEW_MAX_DIMENSION = 4096;
+const LOW_PREVIEW_MAX_PIXELS = 1_000_000;
+const LOW_PREVIEW_MAX_DIMENSION = 2048;
 const THUMB_MAX_PIXELS = 1_000_000;
 const THUMB_MAX_DIMENSION = 2048;
 const MIN_STARTUP_OVERLAY_MS = 1200;
@@ -257,7 +290,7 @@ const BACKGROUND_LOW_RES_BATCH = 1;
 const BACKGROUND_LOW_RES_PRIORITY = 5;
 const BACKGROUND_LOW_RES_IDLE_TIMEOUT = 500;
 const THUMB_MAX_WIDTH = 240;
-const PREVIEW_IMAGE_QUALITY = 0.98;
+const PREVIEW_IMAGE_QUALITY = 0.92;
 const TRANSPARENT_PIXEL =
   "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=";
 const WORKSPACE_HIGHLIGHTS_KEY = "mpdf:highlights";
@@ -301,7 +334,7 @@ function applyTextTransform(value: string, transform: "none" | "uppercase") {
 
 function getInitialPreviewRenderCount(pageCount: number) {
   if (pageCount <= 0) return 0;
-  return Math.min(1, pageCount);
+  return Math.min(3, pageCount);
 }
 
 function cancelIdleOrTimeout(timerId: ReturnType<typeof setTimeout> | number | null, usesIdleCallback = false) {
@@ -334,18 +367,22 @@ function toCardPreviewDataUrl(canvas: HTMLCanvasElement) {
   try {
     const webp = canvas.toDataURL("image/webp", PREVIEW_IMAGE_QUALITY);
     if (webp.startsWith("data:image/webp")) return webp;
+    return canvas.toDataURL("image/png", PREVIEW_IMAGE_QUALITY);
   } catch {
+    // Cross-origin images can taint a canvas. Keep the existing preview rather
+    // than letting a best-effort thumbnail export take down the workspace.
+    return "";
   }
-  return canvas.toDataURL("image/png", PREVIEW_IMAGE_QUALITY);
 }
 
 function toCoverPreviewDataUrl(canvas: HTMLCanvasElement) {
   try {
     const webp = canvas.toDataURL("image/webp", COVER_PREVIEW_QUALITY);
     if (webp.startsWith("data:image/webp")) return webp;
+    return canvas.toDataURL("image/png", COVER_PREVIEW_QUALITY);
   } catch {
+    return "";
   }
-  return canvas.toDataURL("image/png", COVER_PREVIEW_QUALITY);
 }
 
 function readProjectPageString(page: unknown, field: string) {
@@ -420,8 +457,12 @@ function destroyPdfDocuments(cache: Map<number, any>) {
   cache.clear();
 }
 
-function buildPreviewCachePages(pages: PageItem[], activePageId: string | null) {
-  const previewIds = new Set<string>();
+function buildPreviewCachePages(
+  pages: PageItem[],
+  activePageId: string | null,
+  retainedPreviewIds: Iterable<string> = [],
+) {
+  const previewIds = new Set<string>(retainedPreviewIds);
   const initialCount = getInitialPreviewRenderCount(pages.length);
   for (let i = 0; i < initialCount; i += 1) {
     previewIds.add(pages[i].id);
@@ -456,20 +497,20 @@ function persistWorkspacePreviewCache(
   sourceIds: string[],
   pages: PageItem[],
   activePageId: string | null,
+  retainedPreviewIds: Iterable<string> = [],
 ) {
-  const storage = getSessionStorage();
-  if (!storage) return;
-  if (sourceIds.length === 0) return;
+  if (sourceIds.length === 0) return null;
   const payload: WorkspacePreviewCache = {
     version: PREVIEW_CACHE_VERSION,
     sourceIds,
-    pages: buildPreviewCachePages(pages, activePageId),
+    pages: buildPreviewCachePages(pages, activePageId, retainedPreviewIds),
   };
+  const storage = getSessionStorage();
   try {
-    storage.setItem(workspacePreviewCacheKey(projectKey), JSON.stringify(payload));
+    storage?.setItem(workspacePreviewCacheKey(projectKey), JSON.stringify(payload));
   } catch {
-    // ignore storage failures (quota or access issues)
   }
+  return payload;
 }
 
 function dataURLToBlob(dataUrl: string): Blob {
@@ -503,8 +544,7 @@ function getDevicePixelRatio() {
 
 
 function getThumbTargetWidth() {
-  const pixelRatio = Math.min(2, getDevicePixelRatio());
-  return Math.max(1, Math.floor(THUMB_MAX_WIDTH * pixelRatio));
+  return Math.max(1, Math.floor(THUMB_MAX_WIDTH * THUMB_RENDER_PIXEL_RATIO));
 }
 
 function resolveCaretColor(element: HTMLElement, range: Range, fallback: string) {
@@ -606,6 +646,8 @@ function useProjects(ownerKey: string | null, enabled = true) {
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(initialProjectId);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [savingProject, setSavingProject] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -626,7 +668,7 @@ function useProjects(ownerKey: string | null, enabled = true) {
           setProjects(data.projects);
         }
       } catch {
-        // ignore network errors
+        setSaveError("Couldn’t save changes.");
       } finally {
         if (!cancelled) {
           setLoadingProjects(false);
@@ -648,6 +690,7 @@ function useProjects(ownerKey: string | null, enabled = true) {
       const trimmedName = name.trim();
       if (!trimmedName) return null;
       setSavingProject(true);
+      setSaveError(null);
       try {
         const payload =
           typeof previewUrl === "string" && previewUrl.length > 0
@@ -659,7 +702,10 @@ function useProjects(ownerKey: string | null, enabled = true) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
           });
-          if (!res.ok) return null;
+          if (!res.ok) {
+            setSaveError("Couldn’t save changes.");
+            return null;
+          }
           const json = (await res.json().catch(() => null)) as { project?: CloudProject } | null;
           const updated =
             json?.project ??
@@ -692,6 +738,7 @@ function useProjects(ownerKey: string | null, enabled = true) {
           setProjects((prev) =>
             prev.map((project) => (project.id === updated.id ? { ...project, ...updated } : project))
           );
+          setLastSavedAt(Date.now());
           return updated;
         } else {
           const res = await fetch("/api/projects", {
@@ -699,7 +746,10 @@ function useProjects(ownerKey: string | null, enabled = true) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
           });
-          if (!res.ok) return null;
+          if (!res.ok) {
+            setSaveError("Couldn’t save changes.");
+            return null;
+          }
           const json = (await res.json().catch(() => null)) as { project?: CloudProject } | null;
           const created =
             json?.project ??
@@ -732,6 +782,7 @@ function useProjects(ownerKey: string | null, enabled = true) {
           }
           setProjects((prev) => [created, ...prev]);
           setCurrentProjectId(created.id);
+          setLastSavedAt(Date.now());
           router.replace(buildStudioProjectHref(created.id));
           return created;
         }
@@ -750,6 +801,8 @@ function useProjects(ownerKey: string | null, enabled = true) {
     currentProjectId,
     loadingProjects,
     savingProject,
+    saveError,
+    lastSavedAt,
     saveProject,
     setCurrentProjectId,
   };
@@ -1567,7 +1620,7 @@ function WorkspaceClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const studioOwnerKey = authSession?.user?.id ?? authSession?.user?.email ?? null;
-  const { saveProject, savingProject, currentProjectId } = useProjects(studioOwnerKey, Boolean(authSession?.user));
+  const { saveProject, savingProject, saveError, lastSavedAt, currentProjectId } = useProjects(studioOwnerKey, Boolean(authSession?.user));
   const projectParam = getStudioProjectIdFromSearchParams(searchParams);
   const projectKey = projectParam ?? currentProjectId ?? "local";
   const isDevEnvironment = process.env.NODE_ENV !== "production";
@@ -1583,13 +1636,25 @@ function WorkspaceClient() {
   const [authBusy, setAuthBusy] = useState(false);
   const [pendingExportAfterAuth, setPendingExportAfterAuth] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportFormat, setExportFormat] = useState<"pdf" | "compressed-pdf" | "png" | "jpg">("pdf");
+  const [compressionLevel, setCompressionLevel] = useState<"high" | "medium" | "low">("medium");
+  const [compressionMenuOpen, setCompressionMenuOpen] = useState(false);
+  const [imageFormatMenuOpen, setImageFormatMenuOpen] = useState(false);
+  const [exportProgress, setExportProgress] = useState<string | null>(null);
+  const [helpMenuOpen, setHelpMenuOpen] = useState(false);
   const [guestProject, setGuestProject] = useState<GuestProject | null>(null);
   const [sources, setSources] = useState<SourceRef[]>([]);
   const [pages, setPages] = useState<PageItem[]>([]);
+  const [exportPdfSizeBytes, setExportPdfSizeBytes] = useState<number | null>(null);
+  const fullPdfSizeLabel = formatFileSize(exportPdfSizeBytes);
+  const compressedPdfSizeLabel = exportPdfSizeBytes === null ? null : formatFileSize(Math.round(exportPdfSizeBytes * (compressionLevel === "high" ? 0.32 : compressionLevel === "medium" ? 0.58 : 0.76)));
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewRetryKey, setPreviewRetryKey] = useState(0);
+  const [previewRenderFailures, setPreviewRenderFailures] = useState<Record<string, number>>({});
+  const [pdfRenderReadyEpoch, setPdfRenderReadyEpoch] = useState(0);
   const [thumbDragState, setThumbDragState] = useState<{ activeId: string; overId: string } | null>(null);
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
   const [activePageId, setActivePageId] = useState<string | null>(null);
@@ -1618,7 +1683,7 @@ function WorkspaceClient() {
   const restoreScrollOnNextZoomRef = useRef(false);
   const pageChangeScrollBehaviorRef = useRef<ScrollBehavior>("smooth");
   const fullscreenWheelLockRef = useRef<number>(0);
-  const pageLayoutRef = useRef<{ ids: string[]; centers: number[] }>({ ids: [], centers: [] });
+  const pageLayoutRef = useRef<{ ids: string[]; tops: number[]; bottoms: number[] }>({ ids: [], tops: [], bottoms: [] });
   const pageLayoutRafRef = useRef<number | null>(null);
   const activePageIdRef = useRef<string | null>(null);
   const activePageIndexRef = useRef(0);
@@ -1631,13 +1696,19 @@ function WorkspaceClient() {
   const secureReadManagerRef = useRef<Map<string, SecurePdfReadAccessManager>>(new Map());
   const activePdfRenderTasksRef = useRef<Map<string, { cancel: () => void }>>(new Map());
   const renderQueueRef = useRef<
-    Array<{ pageId: string; srcIdx: number; pageIdx: number; quality: "low" | "high"; priority: number }>
+    Array<{ pageId: string; srcIdx: number; pageIdx: number; quality: "low" | "high"; priority: number; zoomBucket?: number; requestToken?: number }>
   >([]);
   const renderQueueKeyRef = useRef<Set<string>>(new Set());
   const renderQueueRafRef = useRef<number | null>(null);
   const activeRenderCountRef = useRef(0);
   const renderGenerationRef = useRef(0);
   const pageRenderStatusRef = useRef<Map<string, "low" | "high" | "rendering-low" | "rendering-high">>(new Map());
+  const highRenderRequestTokenRef = useRef<Map<string, number>>(new Map());
+  const previewRenderRetryCountRef = useRef<Map<string, number>>(new Map());
+  const previewRenderRetryTimersRef = useRef<Map<string, number>>(new Map());
+  const highPreviewZoomBucketByPageRef = useRef<Map<string, number>>(new Map());
+  const recentHighPreviewIdsRef = useRef<Map<string, true>>(new Map());
+  const persistedPreviewValuesRef = useRef<Map<string, string>>(new Map());
   const thumbRenderQueueRef = useRef<Array<{ pageId: string; srcIdx: number; pageIdx: number; priority: number }>>([]);
   const thumbRenderQueueKeyRef = useRef<Set<string>>(new Set());
   const thumbRenderRafRef = useRef<number | null>(null);
@@ -1712,6 +1783,8 @@ function WorkspaceClient() {
   const workspaceReadySentRef = useRef(false);
   const [workspaceExiting, setWorkspaceExiting] = useState(false);
   const workspaceExitTimerRef = useRef<number | null>(null);
+  const signatureHubCloseTimerRef = useRef<number | null>(null);
+  const renameDialogCloseTimerRef = useRef<number | null>(null);
   const [loadedPreviewIds, setLoadedPreviewIds] = useState<Set<string>>(() => new Set());
   const [loadedThumbIds, setLoadedThumbIds] = useState<Set<string>>(() => new Set());
   const INSERT_BEFORE_FIRST_ID = "__before_first__";
@@ -1822,6 +1895,13 @@ function WorkspaceClient() {
   const [textMode, setTextMode] = useState(false);
   const [signaturePanelMode, setSignaturePanelMode] = useState<SignaturePanelMode>("none");
   const [savedSignatures, setSavedSignatures] = useState<SavedSignature[]>([]);
+  const [selectedSignatureId, setSelectedSignatureId] = useState<string | null>(null);
+  const [newSignatureId, setNewSignatureId] = useState<string | null>(null);
+  const [renameSignatureId, setRenameSignatureId] = useState<string | null>(null);
+  const [renameSignatureValue, setRenameSignatureValue] = useState("");
+  const [renameSignatureError, setRenameSignatureError] = useState<string | null>(null);
+  const [isRenameDialogClosing, setIsRenameDialogClosing] = useState(false);
+  const [signatureHubGalleryMode, setSignatureHubGalleryMode] = useState<"library" | "create">("library");
   const [signatureNameError, setSignatureNameError] = useState<string | null>(null);
   const [pendingSignatureForPlacement, setPendingSignatureForPlacement] = useState<SavedSignature | null>(null);
   const [signaturePlacements, setSignaturePlacements] = useState<Record<string, SignaturePlacement[]>>({});
@@ -1850,6 +1930,7 @@ function WorkspaceClient() {
     baseRotation: number;
   } | null>(null);
   const [showSignatureHub, setShowSignatureHub] = useState(false);
+  const [isSignatureHubClosing, setIsSignatureHubClosing] = useState(false);
   const [signatureHubStep, setSignatureHubStep] = useState<"gallery" | "type" | "draw" | "upload" | "qr" | "email">(
     "gallery"
   );
@@ -1860,9 +1941,11 @@ function WorkspaceClient() {
   const [typedSignaturePreview, setTypedSignaturePreview] = useState<string | null>(null);
   const [typedSignatureError, setTypedSignatureError] = useState<string | null>(null);
   const [mobileEmail, setMobileEmail] = useState("");
+  const [isMobileEmailSending, setIsMobileEmailSending] = useState(false);
+  const [mobileEmailMessage, setMobileEmailMessage] = useState<string | null>(null);
   const [mobileSessionId, setMobileSessionId] = useState<string | null>(null);
   const [mobileSessionUrl, setMobileSessionUrl] = useState<string | null>(null);
-  const [mobileSessionStatus, setMobileSessionStatus] = useState<"idle" | "waiting" | "received" | "error">("idle");
+  const [mobileSessionStatus, setMobileSessionStatus] = useState<"idle" | "waiting" | "transferring" | "error">("idle");
   const [showDrawModal, setShowDrawModal] = useState(false);
   const [drawStep, setDrawStep] = useState<"canvas" | "name">("canvas");
   const drawCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -3920,6 +4003,15 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   const [projectNameError, setProjectNameError] = useState<string | null>(null);
   const [organizeMode, setOrganizeMode] = useState(false);
   const [viewerViewportWidth, setViewerViewportWidth] = useState(0);
+  const [settledZoomPercent, setSettledZoomPercent] = useState(50);
+  const [highZoomViewportPreviews, setHighZoomViewportPreviews] = useState<Record<string, HighZoomPreviewTile>>({});
+  const [tileViewportTick, setTileViewportTick] = useState(0);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSettledZoomPercent(zoomPercent), 180);
+    return () => window.clearTimeout(timer);
+  }, [zoomPercent]);
+
 
   const addInputRef = useRef<HTMLInputElement>(null);
   const renderedSourcesRef = useRef(0);
@@ -3942,6 +4034,11 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const searchPanelRef = useRef<HTMLDivElement | null>(null);
   const previewNodeMap = useRef<Map<string, HTMLDivElement>>(new Map());
+  const highZoomTileGenerationRef = useRef(0);
+  const highZoomTileCacheRef = useRef<Map<string, HighZoomPreviewTile>>(new Map());
+  const highZoomTileViewportRafRef = useRef<number | null>(null);
+  const highZoomTileViewportTimerRef = useRef<number | null>(null);
+  const highZoomTileViewportPositionRef = useRef({ left: -1, top: -1 });
   const pagesRef = useRef<PageItem[]>([]);
   const searchPageTextCacheRef = useRef<Map<string, string>>(new Map());
   const searchDocumentCacheRef = useRef<Map<number, any>>(new Map());
@@ -3972,6 +4069,8 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   const pendingInsertedSourceRef = useRef<{ afterId: string; sourceIds: string[] } | null>(null);
   const pendingCloudSaveRef = useRef(false);
   const hasUnsavedWorkspaceChangesRef = useRef(false);
+  const workspaceRevisionRef = useRef(0);
+  const [workspaceRevision, setWorkspaceRevision] = useState(0);
   const [hasUnsavedWorkspaceChanges, setHasUnsavedWorkspaceChanges] = useState(false);
   const savedPageOrderRef = useRef<Array<{ srcIdx: number; pageIdx: number; id?: string }>>([]);
   const lastProjectKeyRef = useRef<string | null>(null);
@@ -3984,7 +4083,7 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
   const coverPreviewRotationRef = useRef<number | null>(null);
   const scheduleBackgroundLowResRef = useRef<() => void>(() => {});
   const enqueueRenderRef = useRef<
-    (task: { pageId: string; srcIdx: number; pageIdx: number; quality: "low" | "high"; priority: number }) => void
+    (task: { pageId: string; srcIdx: number; pageIdx: number; quality: "low" | "high"; priority: number; zoomBucket?: number; requestToken?: number }) => void
   >(() => {});
   const nearPageIdsRef = useRef<Set<string>>(new Set());
   const [nearPageIds, setNearPageIds] = useState<string[]>([]);
@@ -4036,6 +4135,8 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
     session?.removeItem(workspacePreviewCacheKey("local"));
   }, []);
   function markWorkspaceDirty() {
+    workspaceRevisionRef.current += 1;
+    setWorkspaceRevision(workspaceRevisionRef.current);
     if (hasUnsavedWorkspaceChangesRef.current) return;
     hasUnsavedWorkspaceChangesRef.current = true;
     setHasUnsavedWorkspaceChanges(true);
@@ -4092,8 +4193,8 @@ const [highlightHistory, setHighlightHistory] = useState<HighlightHistoryEntry[]
         pageWidth: unscaledViewport.width,
         pageHeight: unscaledViewport.height,
         desiredScale: COVER_PREVIEW_SCALE,
-        maximumPixels: LOW_PREVIEW_MAX_PIXELS,
-        maximumDimension: LOW_PREVIEW_MAX_DIMENSION,
+        maximumPixels: COVER_PREVIEW_MAX_PIXELS,
+        maximumDimension: COVER_PREVIEW_MAX_DIMENSION,
       });
       const baseViewport = pdfPage.getViewport({ scale: coverDimensions.scale, rotation: firstRotation });
         const targetWidth = Math.floor(baseViewport.width);
@@ -4153,7 +4254,6 @@ const timer =
       backgroundLowResIndexRef.current = 0;
       return;
     }
-    scheduleBackgroundLowResRef.current();
     return () => {
       if (backgroundLowResTimerRef.current !== null) {
         cancelIdleOrTimeout(backgroundLowResTimerRef.current, backgroundLowResUsesIdleRef.current);
@@ -4189,12 +4289,21 @@ const timer =
     renderGenerationRef.current += 1;
     activePdfRenderTasksRef.current.forEach((task) => task.cancel());
     activePdfRenderTasksRef.current.clear();
+    previewRenderRetryTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+    previewRenderRetryTimersRef.current.clear();
     destroyPdfDocuments(pdfDocumentCacheRef.current);
     secureReadManagerRef.current.forEach((manager) => { void manager.close(); });
     secureReadManagerRef.current.clear();
     renderQueueRef.current = [];
     renderQueueKeyRef.current.clear();
     pageRenderStatusRef.current.clear();
+      highRenderRequestTokenRef.current.clear();
+      previewRenderRetryCountRef.current.clear();
+      previewRenderRetryTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+      previewRenderRetryTimersRef.current.clear();
+      setPreviewRenderFailures({});
+      highPreviewZoomBucketByPageRef.current.clear();
+      recentHighPreviewIdsRef.current.clear();
     activeRenderCountRef.current = 0;
     thumbRenderQueueRef.current = [];
     thumbRenderQueueKeyRef.current.clear();
@@ -4264,7 +4373,7 @@ const timer =
   const toolbarLoading = loading;
   const searchPopupRightOffset = showPageOrderPanel ? 40 : -232;
   const controlButtonClass =
-    "flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,0.08)] transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-40 dark:border-[#2A2A31] dark:bg-[#1C1C1F] dark:text-zinc-200 dark:hover:border-[#4A4A4A] dark:hover:text-white";
+    "flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,0.08)] transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-40 dark:border-[#2A2A31] dark:bg-[#1C1C1F] dark:text-zinc-200 dark:hover:border-[#4A4A4A] dark:hover:text-white";
   const bottomBarButtonClass =
     "flex h-9 w-9 items-center justify-center rounded-full border border-[#1f2937] bg-[#1f2937] text-white shadow-[0_8px_18px_rgba(15,23,42,0.16)] transition hover:bg-[#111827] hover:shadow-[0_12px_24px_rgba(15,23,42,0.20)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1f2937]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f3f6fb] dark:border-[#4A4A4A] dark:bg-[#2A2A31] dark:hover:bg-[#34343C] dark:focus-visible:ring-zinc-500/40 dark:focus-visible:ring-offset-[#222224]";
   const signatureTabBase =
@@ -4692,7 +4801,10 @@ const timer =
       const storedSourceIds = readStoredSourceIds(storageProjectId);
       if (storedSourceIds && storedSourceIds.length > 0 && pagesRef.current.length === 0) {
         setProjectHasSources(true);
-        const cachedPages = readWorkspacePreviewCache(projectKey, storedSourceIds);
+        let cachedPages = readWorkspacePreviewCache(projectKey, storedSourceIds);
+        if (!cachedPages) {
+          cachedPages = await readWorkspacePreviewCacheFromDb(projectKey, storedSourceIds).catch(() => null);
+        }
         if (cachedPages && cachedPages.length > 0) {
           restoringPreviewCacheRef.current = true;
           setPages(cachedPages);
@@ -4928,7 +5040,16 @@ const timer =
             const id = (entry as StoredSourceMeta).id ?? (entry as { storageId?: string }).storageId;
             if (!id) return null;
             try {
-              const stored = await readFileBlob(id);
+              let stored = await readFileBlob(id);
+              // A new-project handoff writes its metadata before IndexedDB has
+              // finished persisting a large file. Wait briefly for that write
+              // rather than replacing the incoming file with the empty state.
+              if (!stored?.blob && hasWorkspaceOpenInProgress) {
+                for (let attempt = 0; attempt < 30 && !stored?.blob; attempt += 1) {
+                  await new Promise<void>((resolve) => window.setTimeout(resolve, 100));
+                  stored = await readFileBlob(id);
+                }
+              }
               const blobRecord = stored?.blob instanceof Blob ? stored.blob : null;
               if (!blobRecord) return null;
               const objectUrl = URL.createObjectURL(blobRecord);
@@ -4998,12 +5119,16 @@ const timer =
       clearTimeout(previewCacheWriteTimerRef.current);
     }
     previewCacheWriteTimerRef.current = setTimeout(() => {
-      persistWorkspacePreviewCache(
+      const cache = persistWorkspacePreviewCache(
         projectKey,
         sources.map((source) => source.storageId),
         pages,
         activePageId,
+        recentHighPreviewIdsRef.current.keys(),
       );
+      if (cache) {
+        void persistWorkspacePreviewCacheToDb(projectKey, cache).catch(() => undefined);
+      }
     }, 600);
     return () => {
       if (previewCacheWriteTimerRef.current !== null) {
@@ -5379,7 +5504,12 @@ const timer =
         if (status === "rendering-low") activeLow += 1;
       });
       queue.sort((a, b) => b.priority - a.priority);
-      while (activeRenderCountRef.current < MAX_PARALLEL_PREVIEW_RENDERS && queue.length > 0) {
+      // Keep the document responsive while building a full high-quality cache.
+      // Visible/current sheets may use both workers; once only background work
+      // remains, yield a frame between one expensive rasterization at a time.
+      const hasForegroundWork = queue.some((task) => task.priority >= FOREGROUND_RENDER_PRIORITY);
+      const renderConcurrency = hasForegroundWork ? MAX_PARALLEL_PREVIEW_RENDERS : 1;
+      while (activeRenderCountRef.current < renderConcurrency && queue.length > 0) {
         const nextIndex = queue.findIndex(
           (task) => task.quality === "high" || activeLow < MAX_PARALLEL_LOW_PREVIEW_RENDERS
         );
@@ -5408,6 +5538,10 @@ const timer =
           activeLow += 1;
         }
         const renderGeneration = renderGenerationRef.current;
+        const requestToken = next.requestToken ?? 0;
+        if (next.quality === "high") {
+          debugStudioLoad("preview-render-started", { pageId: next.pageId, requestToken, zoomBucket: next.zoomBucket ?? 1 });
+        }
         (async () => {
           const pdf = pdfDocumentCacheRef.current.get(next.srcIdx);
           if (!pdf) {
@@ -5423,8 +5557,9 @@ const timer =
           try {
             const page = await pdf.getPage(next.pageIdx + 1);
             const baseViewport = page.getViewport({ scale: 1 });
-            const desiredScale = (next.quality === "high" ? PREVIEW_BASE_SCALE : LOW_RES_PREVIEW_SCALE) *
-              (next.quality === "high" ? getDevicePixelRatio() : 1);
+            const zoomBucket = next.quality === "high" ? next.zoomBucket ?? 1 : 1;
+            const desiredScale = (next.quality === "high" ? HIGH_PREVIEW_SCALE : LOW_RES_PREVIEW_SCALE) *
+              (next.quality === "high" ? getDevicePixelRatio() * zoomBucket : 1);
             const dimensions = calculateBoundedRenderDimensions({
               pageWidth: baseViewport.width,
               pageHeight: baseViewport.height,
@@ -5451,10 +5586,33 @@ const timer =
             page.cleanup?.();
             canvas.width = 1;
             canvas.height = 1;
+            if (next.quality === "high" && requestToken !== highRenderRequestTokenRef.current.get(next.pageId)) {
+              debugStudioLoad("preview-render-superseded", { pageId: next.pageId, requestToken });
+              return;
+            }
             const status = pageRenderStatusRef.current.get(next.pageId);
             if (next.quality === "low" && status === "high") {
               // skip low-res overwrite if high-res already finished
             } else {
+              // Mark the render complete before the React update. The full-document
+              // scheduler observes page changes, so this prevents it from queuing
+              // the same sheet again during the state commit.
+              if (!(next.quality === "low" && status === "rendering-high")) {
+                pageRenderStatusRef.current.set(next.pageId, next.quality);
+                if (next.quality === "high") {
+                  highPreviewZoomBucketByPageRef.current.set(next.pageId, zoomBucket);
+                  recentHighPreviewIdsRef.current.delete(next.pageId);
+                  recentHighPreviewIdsRef.current.set(next.pageId, true);
+                  previewRenderRetryCountRef.current.delete(next.pageId);
+                  setPreviewRenderFailures((current) => {
+                    if (!(next.pageId in current)) return current;
+                    const nextFailures = { ...current };
+                    delete nextFailures[next.pageId];
+                    return nextFailures;
+                  });
+                  debugStudioLoad("preview-render-complete", { pageId: next.pageId, requestToken, zoomBucket });
+                }
+              }
               setPages((current) => {
                 let changed = false;
                 const nextPages = current.map((item) => {
@@ -5465,15 +5623,49 @@ const timer =
                 });
                 return changed ? nextPages : current;
               });
-              if (!(next.quality === "low" && status === "rendering-high")) {
-                pageRenderStatusRef.current.set(next.pageId, next.quality);
-              }
             }
           } catch (err) {
             if (renderGeneration === renderGenerationRef.current) {
-              if (!isPdfRenderCancellation(err)) console.error("Failed to render preview", err);
+              const cancelled = isPdfRenderCancellation(err);
+              if (!cancelled) console.error("Failed to render preview", err);
               if (pageRenderStatusRef.current.get(next.pageId) === renderingStatus) {
                 pageRenderStatusRef.current.delete(next.pageId);
+              }
+
+              if (next.quality === "high") {
+                debugStudioLoad(cancelled ? "preview-render-cancelled" : "preview-render-failed", {
+                  pageId: next.pageId,
+                  requestToken,
+                  error: cancelled ? null : err instanceof Error ? err.message : String(err),
+                });
+                if (!cancelled) {
+                  const attempt = (previewRenderRetryCountRef.current.get(next.pageId) ?? 0) + 1;
+                  previewRenderRetryCountRef.current.set(next.pageId, attempt);
+                  if (attempt <= 2) {
+                    const delay = attempt * 300;
+                    const retryTimer = window.setTimeout(() => {
+                      previewRenderRetryTimersRef.current.delete(next.pageId);
+                      if (renderGeneration !== renderGenerationRef.current) return;
+                      const pageToRetry = pagesByIdRef.current.get(next.pageId);
+                      if (!pageToRetry) return;
+                      pageRenderStatusRef.current.delete(next.pageId);
+                      debugStudioLoad("preview-render-retry", { pageId: next.pageId, attempt });
+                      enqueueRenderRef.current({
+                        pageId: pageToRetry.id,
+                        srcIdx: pageToRetry.srcIdx,
+                        pageIdx: pageToRetry.pageIdx,
+                        quality: "high",
+                        priority: FOREGROUND_RENDER_PRIORITY + 5_000,
+                        zoomBucket: next.zoomBucket,
+                      });
+                    }, delay);
+                    previewRenderRetryTimersRef.current.set(next.pageId, retryTimer);
+                  } else {
+                    setPreviewRenderFailures((current) =>
+                      current[next.pageId] === attempt ? current : { ...current, [next.pageId]: attempt },
+                    );
+                  }
+                }
               }
             }
           } finally {
@@ -5488,12 +5680,20 @@ const timer =
   }, []);
 
   const enqueueRender = useCallback(
-    (task: { pageId: string; srcIdx: number; pageIdx: number; quality: "low" | "high"; priority: number }) => {
+    (task: { pageId: string; srcIdx: number; pageIdx: number; quality: "low" | "high"; priority: number; zoomBucket?: number; requestToken?: number }) => {
       const existingPage = pagesByIdRef.current.get(task.pageId);
       if (existingPage?.preview && !pageRenderStatusRef.current.has(task.pageId)) {
         pageRenderStatusRef.current.set(task.pageId, "low");
       }
-      const status = pageRenderStatusRef.current.get(task.pageId);
+
+      let status = pageRenderStatusRef.current.get(task.pageId);
+      if (task.quality === "high" && status === "rendering-low") {
+        // A visible sheet must never wait behind its disposable low-resolution job.
+        activePdfRenderTasksRef.current.get(task.pageId + ":low")?.cancel();
+        pageRenderStatusRef.current.delete(task.pageId);
+        status = undefined;
+        debugStudioLoad("preview-render-low-preempted", { pageId: task.pageId });
+      }
       if (
         task.quality === "low" &&
         (status === "low" || status === "high" || status === "rendering-low" || status === "rendering-high")
@@ -5501,25 +5701,68 @@ const timer =
         return;
       }
       if (task.quality === "high" && (status === "high" || status === "rendering-high")) return;
+
       const key = `${task.pageId}:${task.quality}`;
-      if (renderQueueKeyRef.current.has(key)) {
-        const queue = renderQueueRef.current;
-        const existingIndex = queue.findIndex(
-          (item) => item.pageId === task.pageId && item.quality === task.quality
-        );
-        if (existingIndex !== -1 && queue[existingIndex].priority < task.priority) {
-          queue[existingIndex] = { ...queue[existingIndex], priority: task.priority };
-          scheduleRenderQueue();
+      const queue = renderQueueRef.current;
+      const existingIndex = renderQueueKeyRef.current.has(key)
+        ? queue.findIndex((item) => item.pageId === task.pageId && item.quality === task.quality)
+        : -1;
+      const shouldReplaceQueuedTask =
+        existingIndex !== -1 &&
+        (queue[existingIndex].priority < task.priority ||
+          (task.zoomBucket ?? 1) > (queue[existingIndex].zoomBucket ?? 1));
+      if (existingIndex !== -1 && !shouldReplaceQueuedTask) return;
+
+      const requestToken =
+        task.quality === "high"
+          ? (highRenderRequestTokenRef.current.get(task.pageId) ?? 0) + 1
+          : task.requestToken ?? 0;
+      if (task.quality === "high") highRenderRequestTokenRef.current.set(task.pageId, requestToken);
+      const nextTask = { ...task, requestToken };
+
+      if (shouldReplaceQueuedTask) {
+        queue[existingIndex] = nextTask;
+        debugStudioLoad("preview-render-promoted", { pageId: task.pageId, priority: task.priority, requestToken });
+      } else {
+        queue.push(nextTask);
+        renderQueueKeyRef.current.add(key);
+        if (task.quality === "high") {
+          debugStudioLoad("preview-render-queued", { pageId: task.pageId, priority: task.priority, requestToken, zoomBucket: task.zoomBucket ?? 1 });
         }
-        return;
       }
-      renderQueueRef.current.push(task);
-      renderQueueKeyRef.current.add(key);
       scheduleRenderQueue();
     },
     [scheduleRenderQueue]
   );
   enqueueRenderRef.current = enqueueRender;
+
+  const retryHighPreview = useCallback(
+    (pageId: string) => {
+      const page = pagesByIdRef.current.get(pageId);
+      if (!page) return;
+      const retryTimer = previewRenderRetryTimersRef.current.get(pageId);
+      if (retryTimer) window.clearTimeout(retryTimer);
+      previewRenderRetryTimersRef.current.delete(pageId);
+      previewRenderRetryCountRef.current.delete(pageId);
+      pageRenderStatusRef.current.delete(pageId);
+      setPreviewRenderFailures((current) => {
+        if (!(pageId in current)) return current;
+        const nextFailures = { ...current };
+        delete nextFailures[pageId];
+        return nextFailures;
+      });
+      debugStudioLoad("preview-render-manual-retry", { pageId });
+      enqueueRender({
+        pageId: page.id,
+        srcIdx: page.srcIdx,
+        pageIdx: page.pageIdx,
+        quality: "high",
+        priority: FOREGROUND_RENDER_PRIORITY + 5_000,
+        zoomBucket: getHighPreviewZoomBucket(settledZoomPercent),
+      });
+    },
+    [enqueueRender, settledZoomPercent],
+  );
 
   const scheduleThumbRenderQueue = useCallback(() => {
     if (thumbRenderRafRef.current !== null) return;
@@ -5562,7 +5805,7 @@ const timer =
           try {
             const page = await pdf.getPage(next.pageIdx + 1);
             const baseViewport = page.getViewport({ scale: 1 });
-            const pixelRatio = Math.min(2, getDevicePixelRatio());
+            const pixelRatio = THUMB_RENDER_PIXEL_RATIO;
             const dimensions = calculateBoundedRenderDimensions({
               pageWidth: baseViewport.width,
               pageHeight: baseViewport.height,
@@ -5653,19 +5896,79 @@ const timer =
     [scheduleThumbRenderQueue]
   );
 
+  // A user can drag the thumbnail rail directly to a distant sheet. Promote the
+  // cards in that viewport above the background document-order thumbnail queue.
+  useEffect(() => {
+    const container = thumbsScrollRef.current;
+    if (!container || pages.length === 0) return;
+
+    let frameId: number | null = null;
+    const promoteVisibleThumbnails = () => {
+      frameId = null;
+      const containerRect = container.getBoundingClientRect();
+      const overscan = Math.max(360, container.clientHeight);
+      pagesRef.current.forEach((page) => {
+        const node = thumbNodeMapRef.current.get(page.id);
+        if (!node) return;
+        const rect = node.getBoundingClientRect();
+        if (rect.bottom < containerRect.top - overscan || rect.top > containerRect.bottom + overscan) return;
+        const distance = Math.abs((rect.top + rect.bottom) / 2 - (containerRect.top + containerRect.bottom) / 2);
+        enqueueThumbRender({
+          pageId: page.id,
+          srcIdx: page.srcIdx,
+          pageIdx: page.pageIdx,
+          priority: 10_000 - Math.min(5_000, Math.round(distance)),
+        });
+      });
+    };
+    const onScroll = () => {
+      if (frameId !== null) return;
+      frameId = window.requestAnimationFrame(promoteVisibleThumbnails);
+    };
+
+    promoteVisibleThumbnails();
+    container.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      container.removeEventListener("scroll", onScroll);
+      if (frameId !== null) window.cancelAnimationFrame(frameId);
+    };
+  }, [enqueueThumbRender, pages.length]);
+
   useEffect(() => {
     if (pages.length === 0) return;
     if (renderedSourcesRef.current === 0) return;
     if (pendingInitialRenderRef.current.length === 0) return;
     const initialPages = pendingInitialRenderRef.current;
     pendingInitialRenderRef.current = [];
-    window.requestAnimationFrame(() => {
-      initialPages.forEach((page) => {
-        enqueueRender({ pageId: page.id, srcIdx: page.srcIdx, pageIdx: page.pageIdx, quality: "low", priority: 90 });
-        enqueueRender({ pageId: page.id, srcIdx: page.srcIdx, pageIdx: page.pageIdx, quality: "high", priority: 80 });
+    const initialActivePageId = activePageId ?? initialPages[activePageIndexState]?.id;
+    const prioritizedPages = [...initialPages].sort((a, b) => {
+      if (a.id === initialActivePageId) return -1;
+      if (b.id === initialActivePageId) return 1;
+      return 0;
+    });
+    const initialThumbPages = largeDocMode ? prioritizedPages.slice(0, 8) : prioritizedPages;
+    const frameId = window.requestAnimationFrame(() => {
+      initialThumbPages.forEach((page, index) => {
+        enqueueThumbRender({
+          pageId: page.id,
+          srcIdx: page.srcIdx,
+          pageIdx: page.pageIdx,
+          priority: 1_000 - index,
+        });
+        enqueueRender({
+          pageId: page.id,
+          srcIdx: page.srcIdx,
+          pageIdx: page.pageIdx,
+          quality: "high",
+          priority: FOREGROUND_RENDER_PRIORITY + 5_000 - index,
+          zoomBucket: getHighPreviewZoomBucket(settledZoomPercent),
+        });
       });
     });
-  }, [enqueueRender, pages.length]);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [activePageId, activePageIndexState, enqueueRender, enqueueThumbRender, largeDocMode, pages.length, settledZoomPercent]);
 
   /** Build page shells once per load and enqueue initial renders */
   useEffect(() => {
@@ -5679,6 +5982,12 @@ const timer =
       renderQueueRef.current = [];
       renderQueueKeyRef.current.clear();
       pageRenderStatusRef.current.clear();
+      highRenderRequestTokenRef.current.clear();
+      previewRenderRetryCountRef.current.clear();
+      previewRenderRetryTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+      previewRenderRetryTimersRef.current.clear();
+      setPreviewRenderFailures({});
+      highPreviewZoomBucketByPageRef.current.clear();
       activeRenderCountRef.current = 0;
       if (renderQueueRafRef.current !== null) {
         window.cancelAnimationFrame(renderQueueRafRef.current);
@@ -5748,14 +6057,28 @@ const timer =
             window.clearTimeout(timeoutId);
           }
         };
-        const bytes = blob
-          ? new Uint8Array(await blob.arrayBuffer())
-          : new Uint8Array(await fetchPdfBytes());
-        try {
-          pdf = await pdfjsLib.getDocument({ data: bytes } as any).promise;
-        } catch (error) {
-          console.warn("pdfjs getDocument failed, retrying without worker", error);
-          pdf = await pdfjsLib.getDocument({ data: bytes, disableWorker: true } as any).promise;
+        if (!blob) {
+          try {
+            pdf = await pdfjsLib.getDocument({
+              url: src.url,
+              rangeChunkSize: 64 * 1024,
+              disableRange: false,
+              disableStream: false,
+            } as any).promise;
+          } catch (error) {
+            console.warn("PDF URL loading failed, falling back to a full download", error);
+          }
+        }
+        if (!pdf) {
+          const bytes = blob
+            ? new Uint8Array(await blob.arrayBuffer())
+            : new Uint8Array(await fetchPdfBytes());
+          try {
+            pdf = await pdfjsLib.getDocument({ data: bytes } as any).promise;
+          } catch (error) {
+            console.warn("pdfjs getDocument failed, retrying without worker", error);
+            pdf = await pdfjsLib.getDocument({ data: bytes, disableWorker: true } as any).promise;
+          }
         }
       }
       if (!pdf) {
@@ -5793,6 +6116,7 @@ const timer =
         const makePages = (result: NonNullable<Awaited<ReturnType<typeof loadPdfSource>>>) => {
           const pagesForSource: PageItem[] = [];
           pdfDocumentCacheRef.current.set(result.srcIdx, result.pdf);
+          setPdfRenderReadyEpoch((current) => current + 1);
           for (let pageIdx = 0; pageIdx < result.pageCount; pageIdx += 1) {
             pagesForSource.push({
               id: buildPageId(result.storageId, pageIdx),
@@ -6078,25 +6402,26 @@ const timer =
       if (Date.now() < navigationLock.until) return;
       pageNavigationLockRef.current = null;
     }
-    // Treat the upper third as the reader's current position so the active
-    // thumbnail changes as the next page enters view, not after it reaches center.
-    const readPoint = container.scrollTop + container.clientHeight * 0.32;
-    let closestIndex = 0;
-    let closestDistance = Infinity;
-    for (let i = 0; i < layout.centers.length; i += 1) {
-      const distance = Math.abs(layout.centers[i] - readPoint);
-      if (distance < closestDistance) {
-        closestDistance = distance;
-        closestIndex = i;
+    // Use a reading line near the top of the viewport and each page's actual
+    // bounds. The old centre-to-centre calculation lagged a whole visual beat
+    // when moving between tall pages.
+    const readPoint = container.scrollTop + container.clientHeight * 0.18;
+    let nextIndex = layout.ids.length - 1;
+    for (let index = 0; index < layout.bottoms.length; index += 1) {
+      if (readPoint < layout.bottoms[index]) {
+        nextIndex = index;
+        break;
       }
     }
-    const nextId = layout.ids[closestIndex];
+    const nextId = layout.ids[nextIndex];
     if (!nextId) return;
-    if (activePageIdRef.current !== nextId || activePageIndexRef.current !== closestIndex) {
+    if (activePageIdRef.current !== nextId || activePageIndexRef.current !== nextIndex) {
       activePageIdRef.current = nextId;
-      activePageIndexRef.current = closestIndex;
+      activePageIndexRef.current = nextIndex;
+      // Scroll handlers can run while React is committing preview updates, so
+      // let React batch this transition instead of forcing a synchronous commit.
       setActivePageId(nextId);
-      setActivePageIndex(closestIndex);
+      setActivePageIndex(nextIndex);
     }
   }, [setActivePageId, setActivePageIndex]);
 
@@ -6107,14 +6432,16 @@ const timer =
     if (!container || pageList.length === 0) return;
     const containerRect = container.getBoundingClientRect();
     const ids: string[] = [];
-    const centers: number[] = [];
+    const tops: number[] = [];
+    const bottoms: number[] = [];
     pageList.forEach((page) => {
       const node = previewNodeMap.current.get(page.id);
       if (!node) return;
       const rect = node.getBoundingClientRect();
       const top = rect.top - containerRect.top + container.scrollTop;
       ids.push(page.id);
-      centers.push(top + rect.height / 2);
+      tops.push(top);
+      bottoms.push(top + rect.height);
     });
     if (ids.length !== pageList.length) {
       if (pageLayoutRafRef.current !== null) {
@@ -6123,13 +6450,13 @@ const timer =
       pageLayoutRafRef.current = window.requestAnimationFrame(refreshPageLayout);
       return;
     }
-    pageLayoutRef.current = { ids, centers };
+    pageLayoutRef.current = { ids, tops, bottoms };
     updateActivePageFromScroll();
   }, [pageIdSignature, updateActivePageFromScroll]);
 
   useEffect(() => {
     if (pages.length === 0) {
-      pageLayoutRef.current = { ids: [], centers: [] };
+      pageLayoutRef.current = { ids: [], tops: [], bottoms: [] };
       return;
     }
     if (pageLayoutRafRef.current !== null) {
@@ -6151,13 +6478,35 @@ const timer =
     if (!container || pages.length === 0) return;
     const handleScroll = () => {
       updateActivePageFromScroll();
+      const previousPosition = highZoomTileViewportPositionRef.current;
+      const movedEnough =
+        Math.abs(container.scrollLeft - previousPosition.left) > 48 ||
+        Math.abs(container.scrollTop - previousPosition.top) > 48;
+      if (zoomPercent >= HIGH_ZOOM_TILE_THRESHOLD && movedEnough) {
+        highZoomTileViewportPositionRef.current = { left: container.scrollLeft, top: container.scrollTop };
+        if (highZoomTileViewportTimerRef.current !== null) {
+          window.clearTimeout(highZoomTileViewportTimerRef.current);
+        }
+        highZoomTileViewportTimerRef.current = window.setTimeout(() => {
+          highZoomTileViewportTimerRef.current = null;
+          setTileViewportTick((current) => current + 1);
+        }, 180);
+      }
     };
     container.addEventListener("scroll", handleScroll, { passive: true });
     handleScroll();
     return () => {
       container.removeEventListener("scroll", handleScroll);
+      if (highZoomTileViewportRafRef.current !== null) {
+        window.cancelAnimationFrame(highZoomTileViewportRafRef.current);
+        highZoomTileViewportRafRef.current = null;
+      }
+      if (highZoomTileViewportTimerRef.current !== null) {
+        window.clearTimeout(highZoomTileViewportTimerRef.current);
+        highZoomTileViewportTimerRef.current = null;
+      }
     };
-  }, [pages.length, updateActivePageFromScroll]);
+  }, [pages.length, updateActivePageFromScroll, zoomPercent]);
 
   useEffect(() => {
     const container = previewContainerRef.current;
@@ -6225,53 +6574,198 @@ const timer =
 
   useEffect(() => {
     if (pages.length === 0) return;
-    if (renderedSourcesRef.current === 0) return;
-    const candidates = new Set<string>();
-    nearPageIds.forEach((id) => candidates.add(id));
-    candidates.forEach((id) => {
-      const page = pagesByIdRef.current.get(id);
-      if (!page) return;
-      enqueueRender({ pageId: page.id, srcIdx: page.srcIdx, pageIdx: page.pageIdx, quality: "low", priority: 180 });
-    });
-  }, [enqueueRender, nearPageIds, pages.length]);
-
-  useEffect(() => {
-    if (pages.length === 0) return;
-    if (renderedSourcesRef.current === 0) return;
+    if (pdfDocumentCacheRef.current.size === 0) return;
+    // Render only the current reading area on open. Completed high-quality
+    // previews remain session-persistent, but preloading hundreds of large
+    // bitmap sheets blocks the browser before the workspace can become usable.
     const candidates = new Set<string>(visiblePageIds);
     const activeIndex =
       activePageIndexState >= 0 && activePageIndexState < pages.length ? activePageIndexState : 0;
     for (let offset = -2; offset <= 2; offset += 1) {
-      const idx = activeIndex + offset;
-      if (idx >= 0 && idx < pages.length) {
-        candidates.add(pages[idx].id);
-      }
+      const index = activeIndex + offset;
+      if (index >= 0 && index < pages.length) candidates.add(pages[index].id);
     }
+    const zoomBucket = getHighPreviewZoomBucket(settledZoomPercent);
     candidates.forEach((id) => {
       const page = pagesByIdRef.current.get(id);
       if (!page) return;
-      enqueueRender({ pageId: page.id, srcIdx: page.srcIdx, pageIdx: page.pageIdx, quality: "high", priority: 260 });
+      const status = pageRenderStatusRef.current.get(page.id);
+      const renderedBucket = highPreviewZoomBucketByPageRef.current.get(page.id) ?? 0;
+
+      if (status === "rendering-high") return;
+      if (status === "high" && renderedBucket >= zoomBucket) return;
+      if (status === "high") pageRenderStatusRef.current.set(page.id, "low");
+
+      enqueueRender({
+        pageId: page.id,
+        srcIdx: page.srcIdx,
+        pageIdx: page.pageIdx,
+        quality: "high",
+        priority: (() => {
+          const index = pages.findIndex((candidate) => candidate.id === page.id);
+          if (page.id === pages[activeIndex]?.id) return 10_000;
+          if (visiblePageIds.includes(page.id)) return 9_000;
+          return 1_000 - Math.min(900, Math.abs(index - activeIndex));
+        })(),
+        zoomBucket,
+      });
     });
-  }, [activePageIndexState, enqueueRender, pages, visiblePageIds]);
+  }, [activePageIndexState, enqueueRender, pages, pdfRenderReadyEpoch, settledZoomPercent, visiblePageIds]);
+
+  useEffect(() => {
+    const sourceIds = sources.map((source) => source.storageId);
+    if (sourceIds.length === 0 || pages.length === 0) return;
+    pages.forEach((page) => {
+      if (!page.preview || persistedPreviewValuesRef.current.get(page.id) === page.preview) return;
+      persistedPreviewValuesRef.current.set(page.id, page.preview);
+      void persistPagePreviewToDb(projectKey, page.id, sourceIds, page.preview).catch(() => undefined);
+    });
+    const activeIndex = Math.max(0, Math.min(activePageIndexState, pages.length - 1));
+    const missing = pages.slice(Math.max(0, activeIndex - 2), activeIndex + 3).filter((page) => !page.preview);
+    if (missing.length === 0) return;
+    void Promise.all(missing.map(async (page) => ({ id: page.id, preview: await readPagePreviewFromDb(projectKey, page.id, sourceIds).catch(() => null) }))).then((cached) => {
+      setPages((current) => current.map((page) => {
+        const hit = cached.find((entry) => entry.id === page.id)?.preview;
+        return hit && !page.preview ? { ...page, preview: hit } : page;
+      }));
+    });
+  }, [activePageIndexState, pages, projectKey, sources]);
+
+  useEffect(() => {
+    const generation = highZoomTileGenerationRef.current + 1;
+    highZoomTileGenerationRef.current = generation;
+
+    if (zoomPercent !== settledZoomPercent || settledZoomPercent < HIGH_ZOOM_TILE_THRESHOLD || !activePageId) {
+      setHighZoomViewportPreviews({});
+      activePdfRenderTasksRef.current.forEach((task, key) => {
+        if (key.includes(":viewport:")) task.cancel();
+      });
+      return;
+    }
+
+    const activePage = pages.find((page) => page.id === activePageId);
+    const container = previewContainerRef.current;
+    const pageNode = activePage ? previewNodeMap.current.get(activePage.id) : null;
+    if (!activePage || !container || !pageNode || normalizeRotation(activePage.rotation) % 180 !== 0) return;
+
+    const pdf = pdfDocumentCacheRef.current.get(activePage.srcIdx);
+    if (!pdf) return;
+
+    let cancelled = false;
+    const activeTaskPrefix = activePage.id + ":viewport:";
+    activePdfRenderTasksRef.current.forEach((task, key) => {
+      if (key.startsWith(activeTaskPrefix)) task.cancel();
+    });
+
+    void (async () => {
+      try {
+        const pdfPage = await pdf.getPage(activePage.pageIdx + 1);
+        const renderScale = baseScale * Math.max(1, settledZoomPercent / 100) * getDevicePixelRatio();
+        const viewport = pdfPage.getViewport({ scale: renderScale });
+        const pageRect = pageNode.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        const leftRatio = clamp((containerRect.left - pageRect.left) / pageRect.width, 0, 1);
+        const topRatio = clamp((containerRect.top - pageRect.top) / pageRect.height, 0, 1);
+        const rightRatio = clamp((containerRect.right - pageRect.left) / pageRect.width, 0, 1);
+        const bottomRatio = clamp((containerRect.bottom - pageRect.top) / pageRect.height, 0, 1);
+        const visibleWidth = Math.max(1, Math.ceil((rightRatio - leftRatio) * viewport.width));
+        const visibleHeight = Math.max(1, Math.ceil((bottomRatio - topRatio) * viewport.height));
+        const maximumAreaMultiplier = Math.max(
+          1,
+          Math.min(
+            1 + HIGH_ZOOM_VIEWPORT_OVERSCAN * 2,
+            Math.sqrt(HIGH_ZOOM_VIEWPORT_MAX_PIXELS / (visibleWidth * visibleHeight)),
+          ),
+        );
+        const paddingX = Math.floor((visibleWidth * (maximumAreaMultiplier - 1)) / 2);
+        const paddingY = Math.floor((visibleHeight * (maximumAreaMultiplier - 1)) / 2);
+        const x = Math.max(0, Math.floor(leftRatio * viewport.width) - paddingX - 2);
+        const y = Math.max(0, Math.floor(topRatio * viewport.height) - paddingY - 2);
+        const width = Math.min(viewport.width - x, visibleWidth + paddingX * 2 + 4);
+        const height = Math.min(viewport.height - y, visibleHeight + paddingY * 2 + 4);
+        const cacheKey = activePage.id + ":" + normalizeRotation(activePage.rotation) + ":" + Math.round(renderScale * 100) + ":" + x + ":" + y + ":" + width + ":" + height;
+        const cachedPreview = highZoomTileCacheRef.current.get(cacheKey);
+        if (cachedPreview) {
+          setHighZoomViewportPreviews((current) =>
+            Object.keys(current).length === 1 && current[activePage.id] === cachedPreview
+              ? current
+              : { [activePage.id]: cachedPreview },
+          );
+          pdfPage.cleanup?.();
+          return;
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.ceil(width));
+        canvas.height = Math.max(1, Math.ceil(height));
+        const context = canvas.getContext("2d");
+        if (!context) {
+          pdfPage.cleanup?.();
+          return;
+        }
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = "high";
+        const taskKey = activeTaskPrefix + generation;
+        const renderTask = pdfPage.render({
+          canvasContext: context,
+          viewport,
+          transform: [1, 0, 0, 1, -x, -y],
+        });
+        activePdfRenderTasksRef.current.set(taskKey, renderTask);
+        try {
+          await renderTask.promise;
+          if (cancelled || highZoomTileGenerationRef.current !== generation) return;
+          const preview: HighZoomPreviewTile = {
+            id: cacheKey,
+            src: canvas.toDataURL("image/png"),
+            left: (x / viewport.width) * 100,
+            top: (y / viewport.height) * 100,
+            width: (width / viewport.width) * 100,
+            height: (height / viewport.height) * 100,
+          };
+          highZoomTileCacheRef.current.set(cacheKey, preview);
+          while (highZoomTileCacheRef.current.size > MAX_HIGH_ZOOM_VIEWPORT_CACHE_ENTRIES) {
+            const oldestKey = highZoomTileCacheRef.current.keys().next().value;
+            if (!oldestKey) break;
+            highZoomTileCacheRef.current.delete(oldestKey);
+          }
+          setHighZoomViewportPreviews((current) =>
+            Object.keys(current).length === 1 && current[activePage.id] === preview
+              ? current
+              : { [activePage.id]: preview },
+          );
+        } catch (renderError) {
+          if (!isPdfRenderCancellation(renderError)) console.error("Failed to render high zoom preview", renderError);
+        } finally {
+          activePdfRenderTasksRef.current.delete(taskKey);
+          pdfPage.cleanup?.();
+          canvas.width = 1;
+          canvas.height = 1;
+        }
+      } catch (renderError) {
+        if (!isPdfRenderCancellation(renderError)) console.error("Failed to prepare high zoom preview", renderError);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      activePdfRenderTasksRef.current.forEach((task, key) => {
+        if (key.startsWith(activeTaskPrefix)) task.cancel();
+      });
+    };
+  }, [activePageId, baseScale, pages, settledZoomPercent, tileViewportTick, zoomPercent]);
 
   useEffect(() => {
     if (!largeDocMode || pages.length === 0) return;
     const pageIds = pages.map((page) => page.id);
-    const previewWorkingSet = selectPageWorkingSet({
-      pageIds,
-      activeIndex: activePageIndexState,
-      visiblePageIds,
-      nearPageIds,
-      activeRadius: 4,
-    });
-    const thumbnailWorkingSet = selectPageWorkingSet({
-      pageIds,
-      activeIndex: activePageIndexState,
-      visiblePageIds,
-      nearPageIds,
-      activeRadius: 25,
-    });
-    if (pageIds[0]) thumbnailWorkingSet.add(pageIds[0]);
+    // High-quality sheets are session-persistent, including ones still waiting
+    // in the background queue. This prevents a large-document cleanup pass from
+    // cancelling work simply because the user scrolled elsewhere.
+    const previewWorkingSet = new Set(pageIds);
+
+    // Sidebar thumbnails are intentionally session-persistent. A full thumbnail rail is
+    // lightweight compared with page previews and prevents blank cards while scrolling.
+    const thumbnailWorkingSet = new Set(pageIds);
 
     renderQueueRef.current = renderQueueRef.current.filter((task) => previewWorkingSet.has(task.pageId));
     renderQueueKeyRef.current = new Set(
@@ -6332,9 +6826,11 @@ const timer =
         const page = pageList[idx];
         addThumbId(page?.id);
       }
+      // Small documents can fill the rail in the background. Large documents
+      // remain viewport-driven; the sidebar scroll prefetcher promotes a distant
+      // area as soon as the user reaches it.
       if (!largeDocMode) {
-        const limit = pageList.length;
-        for (let index = 0; index < pageList.length && orderedThumbIds.length < limit; index += 1) {
+        for (let index = 0; index < pageList.length; index += 1) {
           addThumbId(pageList[index]?.id);
         }
       }
@@ -7098,6 +7594,8 @@ const timer =
     const pageShapes = shapesByPage[page.id] ?? [];
     const pageTexts = textAnnotations[page.id] ?? [];
     const pageSignatures = signaturePlacements[page.id] ?? [];
+    const displayPreview = pageRenderStatusRef.current.get(page.id) === "high" ? page.preview : "";
+    const previewFailureCount = previewRenderFailures[page.id] ?? 0;
     const rotationDegrees = normalizeRotation(page.rotation);
     const naturalWidth = page.width || 612;
     const naturalHeight = page.height || naturalWidth * DEFAULT_ASPECT_RATIO;
@@ -7136,7 +7634,7 @@ const timer =
 	                  void handleAddBlankPageBefore(page.id);
 	                }}
 	              >
-                <Plus className="h-6 w-6" />
+                <Plus className="h-5 w-5" />
                 <span className="sr-only">Add blank page</span>
               </button>
               <div
@@ -7155,13 +7653,14 @@ const timer =
             <button
               type="button"
               aria-label="Page actions"
+              title="Page actions"
               className="inline-flex items-center justify-center rounded-xl p-2 text-slate-600 transition hover:bg-white hover:shadow-sm hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 dark:text-white dark:hover:bg-[#34343C] dark:hover:text-white dark:focus-visible:ring-zinc-500/50"
               onClick={(event) => {
                 event.stopPropagation();
                 setPageActionMenuId((current) => (current === page.id ? null : page.id));
               }}
             >
-              <MoreHorizontal className="h-6 w-6" />
+              <MoreHorizontal className="h-7 w-7" />
             </button>
             {pageActionMenuId === page.id ? (
               <div className="absolute right-0 top-11 z-40 w-52 rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_18px_45px_rgba(15,23,42,0.20)]">
@@ -7212,7 +7711,7 @@ const timer =
                 </button>
               </div>
             ) : null}
-          </div>
+            </div>
         </div>
         <div className="mx-auto w-fit overflow-visible">
           <div
@@ -7239,7 +7738,7 @@ const timer =
               style={{ width: "100%", height: "100%" }}
             >
               <div
-	                className="absolute left-0 top-0 bg-[#EEF2F7] dark:bg-[#222224]"
+	                className="absolute left-0 top-0 bg-white"
 	                style={{
 	                  width: contentWidth,
 	                  height: contentHeight,
@@ -7274,13 +7773,13 @@ const timer =
                   handleMarkupPointerUp(page.id);
                 }}
               >
-              <div className="absolute inset-0 bg-[#EEF2F7] dark:bg-[#222224]" aria-hidden />
+              <div className="absolute inset-0 bg-white" aria-hidden />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={page.preview || TRANSPARENT_PIXEL}
+                src={displayPreview || TRANSPARENT_PIXEL}
                 alt={`Page ${idx + 1}`}
                 className={`absolute inset-0 h-full w-full object-contain transition-opacity duration-200 ${
-                  page.preview ? "opacity-100" : "opacity-0"
+                  displayPreview ? "opacity-100" : "opacity-0"
                 }`}
                 draggable={false}
                 onLoad={() => {
@@ -7293,6 +7792,40 @@ const timer =
                   });
                 }}
               />
+              {previewFailureCount > 0 && !displayPreview ? (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/95 px-6 text-center dark:bg-[#222224]/95">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-700 dark:text-zinc-100">Preview could not load</p>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        retryHighPreview(page.id);
+                      }}
+                      className="mt-3 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-[#024d7c] shadow-sm transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c]/30 dark:border-[#4A4A4A] dark:bg-[#323232] dark:text-sky-300 dark:hover:bg-[#3A3A3A]"
+                    >
+                      Retry preview
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+              {highZoomViewportPreviews[page.id] ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={highZoomViewportPreviews[page.id].id}
+                  src={highZoomViewportPreviews[page.id].src}
+                  alt=""
+                  aria-hidden
+                  draggable={false}
+                  className="pointer-events-none absolute block"
+                  style={{
+                    left: highZoomViewportPreviews[page.id].left + "%",
+                    top: highZoomViewportPreviews[page.id].top + "%",
+                    width: highZoomViewportPreviews[page.id].width + "%",
+                    height: highZoomViewportPreviews[page.id].height + "%",
+                  }}
+                />
+              ) : null}
               <svg
                 className="absolute inset-0 h-full w-full"
                 style={{ pointerEvents: deleteMode ? "auto" : "none" }}
@@ -7575,7 +8108,7 @@ const timer =
                           ref={registerShapeIndicatorNode(shape.id)}
                           style={{ left: `${leftPercent}%`, top: `${topPercent}%`, transform: "translate(-50%, -2.5rem)" }}
                         >
-                          <span className="flex h-6 w-6 items-center justify-center rounded bg-slate-200/80">
+                          <span className="flex h-7 w-7 items-center justify-center rounded bg-slate-200/80">
                             <Move className="h-4 w-4" />
                           </span>
                         </div>
@@ -8665,7 +9198,7 @@ const timer =
                   void handleAddBlankPageAfter(page.id);
                 }}
               >
-                <Plus className="h-6 w-6" />
+                <Plus className="h-7 w-7" />
                 <span className="sr-only">Add blank page</span>
               </button>
               <div
@@ -8756,6 +9289,64 @@ const timer =
       }),
     []
   );
+
+  const trimSignatureDataUrl = useCallback((dataUrl: string) => new Promise<string>((resolve) => {
+    if (typeof window === "undefined") {
+      resolve(dataUrl);
+      return;
+    }
+    const image = new window.Image();
+    image.onload = () => {
+      try {
+        const width = image.naturalWidth || 1;
+        const height = image.naturalHeight || 1;
+        const source = document.createElement("canvas");
+        source.width = width;
+        source.height = height;
+        const sourceContext = source.getContext("2d", { willReadFrequently: true });
+        if (!sourceContext) {
+          resolve(dataUrl);
+          return;
+        }
+        sourceContext.drawImage(image, 0, 0);
+        const pixels = sourceContext.getImageData(0, 0, width, height).data;
+        let left = width;
+        let top = height;
+        let right = -1;
+        let bottom = -1;
+        for (let y = 0; y < height; y += 1) {
+          for (let x = 0; x < width; x += 1) {
+            const offset = (y * width + x) * 4;
+            const alpha = pixels[offset + 3];
+            const isInk = alpha > 18 && (pixels[offset] < 245 || pixels[offset + 1] < 245 || pixels[offset + 2] < 245);
+            if (!isInk) continue;
+            left = Math.min(left, x);
+            top = Math.min(top, y);
+            right = Math.max(right, x);
+            bottom = Math.max(bottom, y);
+          }
+        }
+        if (right < left || bottom < top) {
+          resolve(dataUrl);
+          return;
+        }
+        const padding = Math.max(10, Math.round(Math.max(right - left, bottom - top) * 0.08));
+        left = Math.max(0, left - padding);
+        top = Math.max(0, top - padding);
+        right = Math.min(width - 1, right + padding);
+        bottom = Math.min(height - 1, bottom + padding);
+        const cropped = document.createElement("canvas");
+        cropped.width = right - left + 1;
+        cropped.height = bottom - top + 1;
+        cropped.getContext("2d")?.drawImage(source, left, top, cropped.width, cropped.height, 0, 0, cropped.width, cropped.height);
+        resolve(cropped.toDataURL("image/png"));
+      } catch {
+        resolve(dataUrl);
+      }
+    };
+    image.onerror = () => resolve(dataUrl);
+    image.src = dataUrl;
+  }), []);
 
   const compositeThumbTimersRef = useRef<Map<string, number>>(new Map());
 
@@ -9040,6 +9631,10 @@ const timer =
 
       const targetThumbWidth = getThumbTargetWidth();
       const thumbData = createThumbnailDataUrl(canvas, targetThumbWidth);
+      if (!thumbData) {
+        thumbRenderStatusRef.current.set(pageId, "ready");
+        return;
+      }
       const thumbWidth = canvas.width <= targetThumbWidth ? canvas.width : targetThumbWidth;
       const thumbHeight =
         canvas.width <= targetThumbWidth
@@ -9104,8 +9699,8 @@ const timer =
         pageWidth: unscaledViewport.width,
         pageHeight: unscaledViewport.height,
         desiredScale: COVER_PREVIEW_SCALE,
-        maximumPixels: LOW_PREVIEW_MAX_PIXELS,
-        maximumDimension: LOW_PREVIEW_MAX_DIMENSION,
+        maximumPixels: COVER_PREVIEW_MAX_PIXELS,
+        maximumDimension: COVER_PREVIEW_MAX_DIMENSION,
       });
       const baseViewport = pdfPage.getViewport({ scale: coverDimensions.scale, rotation: firstRotation });
       const canvas = document.createElement("canvas");
@@ -9249,36 +9844,79 @@ const timer =
           return null;
         }
       }
-      const { width, height } = await loadImageDimensions(dataUrl);
+      const trimmedDataUrl = await trimSignatureDataUrl(dataUrl);
+      const { width, height } = await loadImageDimensions(trimmedDataUrl);
       const entry: SavedSignature = {
         id: createUniqueId("shape"),
         name: finalName,
-        dataUrl,
+        dataUrl: trimmedDataUrl,
         naturalWidth: width,
         naturalHeight: height,
         createdAt: Date.now(),
       };
       markWorkspaceDirty();
       setSavedSignatures((prev) => [...prev, entry]);
+      setNewSignatureId(entry.id);
+      setSignatureHubGalleryMode("library");
       setSignatureNameError(null);
       return entry;
     },
-    [loadImageDimensions, markWorkspaceDirty, savedSignatures]
+    [loadImageDimensions, markWorkspaceDirty, savedSignatures, trimSignatureDataUrl]
   );
 
-  const closeSignatureHub = useCallback(() => {
-    setShowSignatureHub(false);
+  const closeRenameDialog = useCallback(() => {
+    if (!renameSignatureId || isRenameDialogClosing) return;
+    setIsRenameDialogClosing(true);
+    renameDialogCloseTimerRef.current = window.setTimeout(() => {
+      renameDialogCloseTimerRef.current = null;
+      setRenameSignatureId(null);
+      setRenameSignatureValue("");
+      setRenameSignatureError(null);
+      setIsRenameDialogClosing(false);
+    }, 220);
+  }, [isRenameDialogClosing, renameSignatureId]);
+
+  const openSignatureHub = useCallback(() => {
+    if (signatureHubCloseTimerRef.current !== null) {
+      window.clearTimeout(signatureHubCloseTimerRef.current);
+      signatureHubCloseTimerRef.current = null;
+    }
+    setIsSignatureHubClosing(false);
     setSignatureHubStep("gallery");
-    setTypeSignatureText("");
-    setTypedSignaturePreview(null);
-    setTypedSignatureError(null);
-    setSignatureNameError(null);
-    setSignaturePanelMode("none");
-    setShowDrawModal(false);
-    setShowUploadModal(false);
-    setMobileSessionId(null);
-    setMobileSessionUrl(null);
-    setMobileSessionStatus("idle");
+    setSelectedSignatureId(null);
+    setSignatureHubGalleryMode(savedSignatures.length > 0 ? "library" : "create");
+    setShowSignatureHub(true);
+  }, [savedSignatures.length]);
+
+  const closeSignatureHub = useCallback(() => {
+    if (isSignatureHubClosing) return;
+
+    setIsSignatureHubClosing(true);
+    signatureHubCloseTimerRef.current = window.setTimeout(() => {
+      signatureHubCloseTimerRef.current = null;
+      setShowSignatureHub(false);
+      setIsSignatureHubClosing(false);
+      setSignatureHubStep("gallery");
+      setTypeSignatureText("");
+      setTypedSignaturePreview(null);
+      setTypedSignatureError(null);
+      setSignatureNameError(null);
+      setSignaturePanelMode("none");
+      setShowDrawModal(false);
+      setShowUploadModal(false);
+      setMobileSessionId(null);
+      setMobileSessionUrl(null);
+      setMobileSessionStatus("idle");
+    }, 160);
+  }, [isSignatureHubClosing]);
+
+  useEffect(() => () => {
+    if (signatureHubCloseTimerRef.current !== null) {
+      window.clearTimeout(signatureHubCloseTimerRef.current);
+    }
+    if (renameDialogCloseTimerRef.current !== null) {
+      window.clearTimeout(renameDialogCloseTimerRef.current);
+    }
   }, []);
 
   const beginSignaturePlacement = useCallback((signature: SavedSignature) => {
@@ -9875,10 +10513,6 @@ const timer =
   const selectActive = selectButtonOn && !deleteMode;
   const textActive = textButtonOn && !deleteMode;
   const activeListType = focusedTextId ? listType ?? defaultListType : defaultListType;
-  const mobileCaptureLink = useMemo(
-    () => (typeof window !== "undefined" ? `${window.location.origin}/sign-on-mobile` : "https://mergifypdf.com/sign-on-mobile"),
-    []
-  );
 	  const shapeButtonOn = shapeMode && !highlightButtonDisabled;
 	  const shapeActive = shapeButtonOn && !deleteMode;
 	  const drawButtonOn = penMode && !highlightButtonDisabled && !deleteMode;
@@ -10647,12 +11281,15 @@ const timer =
 
     let cancelled = false;
     const timer = setTimeout(() => {
+      const revisionAtSave = workspaceRevisionRef.current;
       const projectData = buildCloudProjectData();
       if (!projectData || cancelled) return;
       void resolveProjectCoverPreview().then((previewUrl) => {
         if (cancelled) return;
         void saveProject(projectName, projectData, previewUrl).then((saved) => {
-          if (!saved || cancelled) return;
+          if (!saved || cancelled || workspaceRevisionRef.current !== revisionAtSave) return;
+          hasUnsavedWorkspaceChangesRef.current = false;
+          setHasUnsavedWorkspaceChanges(false);
         });
       });
     }, 1500);
@@ -10673,6 +11310,7 @@ const timer =
       draftHighlight,
       hasUnsavedWorkspaceChanges,
       resolveProjectCoverPreview,
+      workspaceRevision,
     ]);
 
   const computeBaseScale = useCallback(() => {
@@ -10779,6 +11417,28 @@ const timer =
       setZoomWithScrollPreserved(getNextZoomLevel(zoomPercent, direction));
     },
     [setZoomWithScrollPreserved, zoomPercent]
+  );
+
+  const fitZoomToViewport = useCallback(
+    (mode: "page" | "width") => {
+      const container = previewContainerRef.current;
+      const page = pages[activePageIndexRef.current] ?? pages[0];
+      if (!container || !page) return;
+
+      const pageWidth = page.width || 612;
+      const pageHeight = page.height || pageWidth * DEFAULT_ASPECT_RATIO;
+      const availableWidth = Math.max(container.clientWidth - 120, 200);
+      const availableHeight = Math.max(container.clientHeight - 96, 200);
+      const widthScale = (availableWidth / pageWidth) * 0.9;
+      const heightScale = (availableHeight / pageHeight) * 0.9;
+      const nextScale = mode === "page" ? Math.min(widthScale, heightScale) : widthScale;
+
+      setShouldCenterOnChange(true);
+      setZoomWithScrollPreserved(
+        getFitZoomLevel(Math.round((Math.max(0.2, nextScale) / PT_TO_PX) * 100))
+      );
+    },
+    [pages, setZoomWithScrollPreserved]
   );
 
   useEffect(() => {
@@ -11481,14 +12141,14 @@ const timer =
 
   const handleCloseDrawModal = useCallback(() => {
     setShowDrawModal(false);
-    setShowSignatureHub(true);
+    openSignatureHub();
     setDrawStep("canvas");
     setDrawSignatureName("");
     setSignatureNameError(null);
     setDrawSignatureError(null);
     setDrawnSignatureData(null);
     setSignaturePanelMode("saved");
-  }, []);
+  }, [openSignatureHub]);
 
   const handleSaveUploadedSignature = useCallback(async () => {
     if (!uploadPreview) {
@@ -11547,13 +12207,13 @@ const timer =
 
   const handleCloseUploadModal = useCallback(() => {
     setShowUploadModal(false);
-    setShowSignatureHub(true);
+    openSignatureHub();
     setUploadName("");
     setUploadPreview(null);
     setUploadError(null);
     setSignatureNameError(null);
     setSignaturePanelMode("saved");
-  }, []);
+  }, [openSignatureHub]);
 
   const handleCloseImageUploadModal = useCallback(() => {
     setShowImageUploadModal(false);
@@ -11587,15 +12247,6 @@ const timer =
     typeSignatureText,
   ]);
 
-  const handleCopyMobileLink = useCallback(async () => {
-    try {
-      const link = mobileSessionUrl ?? mobileCaptureLink;
-      await navigator.clipboard?.writeText(link);
-    } catch {
-      // ignore copy failures
-    }
-  }, [mobileCaptureLink, mobileSessionUrl]);
-
   const startMobileSession = useCallback(async () => {
     if (typeof window === "undefined") return;
     setMobileSessionStatus("waiting");
@@ -11617,14 +12268,18 @@ const timer =
   }, []);
 
   useEffect(() => {
-    if (signatureHubStep === "qr" || signatureHubStep === "email") {
-      startMobileSession();
-    } else {
+    if (!showSignatureHub) {
       setMobileSessionId(null);
       setMobileSessionUrl(null);
       setMobileSessionStatus("idle");
+      return;
     }
-  }, [signatureHubStep, startMobileSession]);
+
+    const usesMobileFlow = signatureHubStep === "qr" || signatureHubStep === "email";
+    if (usesMobileFlow && mobileSessionStatus === "idle" && !mobileSessionUrl) {
+      startMobileSession();
+    }
+  }, [mobileSessionStatus, mobileSessionUrl, showSignatureHub, signatureHubStep, startMobileSession]);
 
   useEffect(() => {
     if (!mobileSessionId || (signatureHubStep !== "qr" && signatureHubStep !== "email")) return;
@@ -11636,20 +12291,32 @@ const timer =
       try {
         const res = await fetch(`/api/sign-session/${mobileSessionId}`, { cache: "no-store" });
         if (!res.ok) {
-          if (res.status >= 500) setMobileSessionStatus("error");
+          if (cancelled || handled) return;
+          if (res.status === 404) {
+            // The short-lived QR session expired or was cleared. Resetting to idle
+            // lets the mobile-flow effect immediately issue a fresh session and code.
+            setMobileSessionId(null);
+            setMobileSessionUrl(null);
+            setMobileSessionStatus("idle");
+          } else if (res.status >= 500) {
+            setMobileSessionStatus("error");
+          }
           return;
         }
         const data = (await res.json()) as { id: string; signatureDataUrl: string | null; name: string | null };
         if (cancelled) return;
         if (data.signatureDataUrl) {
           handled = true;
-          setMobileSessionStatus("received");
+          setMobileSessionStatus("transferring");
+          await new Promise<void>((resolve) => window.setTimeout(resolve, 1200));
+          if (cancelled) return;
           const uniqueName = data.name?.trim()
             ? data.name
             : `Mobile signature ${data.id.slice(0, 6)}-${Date.now().toString().slice(-4)}`;
           const entry = await saveSignatureEntry(uniqueName, data.signatureDataUrl, { autoResolveName: true });
           if (entry) {
             applySignatureToActivePage(entry);
+            void fetch(`/api/sign-session/${data.id}`, { method: "DELETE", cache: "no-store" }).catch(() => {});
           }
           setSignaturePanelMode("saved");
           setSignatureHubStep("gallery");
@@ -12215,6 +12882,34 @@ const timer =
     return new Blob([view], { type: "application/pdf" });
   }
 
+  useEffect(() => {
+    setExportPdfSizeBytes(null);
+  }, [pages, sources, highlights, shapesByPage, textAnnotations, signaturePlacements]);
+
+  useEffect(() => {
+    if (!showExportModal || pages.length === 0) return;
+    let cancelled = false;
+    setExportPdfSizeBytes(null);
+    const activeSourceIndexes = [...new Set(pages.map((page) => page.srcIdx))];
+    void Promise.all(activeSourceIndexes.map(async (sourceIndex) => {
+      const source = sources[sourceIndex];
+      if (!source) return 0;
+      if (source.size > 0) return source.size;
+      const response = await fetch(source.url, { headers: { Range: "bytes=0-0" } });
+      const contentRange = response.headers.get("content-range");
+      const totalFromRange = contentRange ? Number(contentRange.split("/").pop()) : 0;
+      const contentLength = Number(response.headers.get("content-length"));
+      return Number.isFinite(totalFromRange) && totalFromRange > 0
+        ? totalFromRange
+        : Number.isFinite(contentLength) && contentLength > 0
+          ? contentLength
+          : 0;
+    }))
+      .then((sizes) => { if (!cancelled) setExportPdfSizeBytes(sizes.reduce((total, size) => total + size, 0) || null); })
+      .catch(() => { if (!cancelled) setExportPdfSizeBytes(null); });
+    return () => { cancelled = true; };
+  }, [showExportModal, pages, sources, highlights, shapesByPage, textAnnotations, signaturePlacements]);
+
   /** Build final PDF respecting order + keep flags */
   async function handlePrint() {
     if (isGuest) {
@@ -12253,15 +12948,104 @@ const timer =
     }
   }
 
-  async function handleDownload() {
+  const triggerExportDownload = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  };
+
+  const canvasToBlob = (canvas: HTMLCanvasElement, type: string, quality?: number) =>
+    new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (blob) resolve(blob);
+        else reject(new Error("Unable to encode page image."));
+      }, type, quality);
+    });
+
+  async function renderExportImages(pdfBlob: Blob, format: "png" | "jpg") {
+    const pdfjsLib = await loadPdfJs();
+    const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(await pdfBlob.arrayBuffer()) } as never).promise;
+    const extension = format === "png" ? "png" : "jpg";
+    const mime = format === "png" ? "image/png" : "image/jpeg";
+    const entries: Array<{ name: string; bytes: Uint8Array }> = [];
+    const baseName = projectNameToFile(projectName).replace(/\.pdf$/i, "");
+    for (let index = 1; index <= pdf.numPages; index += 1) {
+      setExportProgress(`Rendering page ${index} of ${pdf.numPages}`);
+      const pdfPage = await pdf.getPage(index);
+      const naturalViewport = pdfPage.getViewport({ scale: 1 });
+      const maxDimension = format === "png" ? 2200 : 1800;
+      const scale = Math.min(1.5, maxDimension / Math.max(naturalViewport.width, naturalViewport.height));
+      const viewport = pdfPage.getViewport({ scale: Math.max(0.5, scale) });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(viewport.width));
+      canvas.height = Math.max(1, Math.round(viewport.height));
+      const context = canvas.getContext("2d", { alpha: format === "png" });
+      if (!context) throw new Error("Unable to prepare page image.");
+      if (format === "jpg") {
+        context.fillStyle = "#ffffff";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+      }
+      await pdfPage.render({ canvasContext: context, viewport }).promise;
+      const imageBlob = await canvasToBlob(canvas, mime, format === "jpg" ? 0.86 : undefined);
+      entries.push({
+        name: `${baseName}-page-${String(index).padStart(3, "0")}.${extension}`,
+        bytes: new Uint8Array(await imageBlob.arrayBuffer()),
+      });
+      pdfPage.cleanup();
+      canvas.width = 1;
+      canvas.height = 1;
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+    }
+    await pdf.destroy();
+    return createStoredZip(entries);
+  }
+
+  async function buildCompressedPdfBlob(pdfBlob: Blob, level: "high" | "medium" | "low") {
+    const settings = level === "high" ? { maxDimension: 1400, maxScale: 0.9, jpegQuality: 0.58 } : level === "low" ? { maxDimension: 2200, maxScale: 1.35, jpegQuality: 0.85 } : { maxDimension: 1800, maxScale: 1.1, jpegQuality: 0.72 };
+    const pdfjsLib = await loadPdfJs();
+    const source = await pdfjsLib.getDocument({ data: new Uint8Array(await pdfBlob.arrayBuffer()) } as never).promise;
+    const { PDFDocument } = await loadPdfLib();
+    const output = await PDFDocument.create();
+    for (let index = 1; index <= source.numPages; index += 1) {
+      setExportProgress(`Compressing page ${index} of ${source.numPages}`);
+      const pdfPage = await source.getPage(index);
+      const originalViewport = pdfPage.getViewport({ scale: 1 });
+      const scale = Math.min(settings.maxScale, settings.maxDimension / Math.max(originalViewport.width, originalViewport.height));
+      const viewport = pdfPage.getViewport({ scale: Math.max(0.5, scale) });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(viewport.width));
+      canvas.height = Math.max(1, Math.round(viewport.height));
+      const context = canvas.getContext("2d", { alpha: false });
+      if (!context) throw new Error("Unable to prepare compressed page.");
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      await pdfPage.render({ canvasContext: context, viewport }).promise;
+      const jpgBlob = await canvasToBlob(canvas, "image/jpeg", settings.jpegQuality);
+      const image = await output.embedJpg(await jpgBlob.arrayBuffer());
+      const page = output.addPage([originalViewport.width, originalViewport.height]);
+      page.drawImage(image, { x: 0, y: 0, width: originalViewport.width, height: originalViewport.height });
+      pdfPage.cleanup();
+      canvas.width = 1;
+      canvas.height = 1;
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+    }
+    await source.destroy();
+    const bytes = await output.save({ useObjectStreams: true });
+    return new Blob([new Uint8Array(bytes).buffer], { type: "application/pdf" });
+  }
+
+  async function handleDownload(format = exportFormat) {
     if (pages.length === 0) {
       setError("Add at least one page first.");
       return;
     }
     if (isGuest) {
-      if (!guestProject?.id) {
-        ensureGuestProjectMetadata();
-      }
+      if (!guestProject?.id) ensureGuestProjectMetadata();
       setPendingExportAfterAuth(true);
       resetAuthState("login");
       setShowAuthGate(true);
@@ -12270,32 +13054,31 @@ const timer =
     if (authSession?.user) {
       const projectData = buildCloudProjectData();
       if (projectData) {
-        const ownerId = authSession.user.id ?? authSession.user.email ?? null;
-        void resolveProjectCoverPreview().then((previewUrl) => {
-          void saveProject(projectName, projectData, previewUrl).then((saved) => {
-            if (saved && ownerId) {
-            }
-          });
-        });
+        void resolveProjectCoverPreview().then((previewUrl) => void saveProject(projectName, projectData, previewUrl));
       }
     }
     try {
       setBusy(true);
       setError(null);
-      const blob = await buildExportPdfBlob({ preservePageRotation: true });
-
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = projectNameToFile(projectName);
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      setExportProgress("Preparing your PDF");
+      const pdfBlob = await buildExportPdfBlob({ preservePageRotation: true });
+      const baseName = projectNameToFile(projectName).replace(/\.pdf$/i, "");
+      if (format === "pdf") {
+        triggerExportDownload(pdfBlob, `${baseName}.pdf`);
+      } else if (format === "compressed-pdf") {
+        const compressed = await buildCompressedPdfBlob(pdfBlob, compressionLevel);
+        const exportBlob = compressed.size < pdfBlob.size ? compressed : pdfBlob;
+        triggerExportDownload(exportBlob, `-compressed.pdf`);
+      } else {
+        const imagesZip = await renderExportImages(pdfBlob, format);
+        triggerExportDownload(imagesZip, `${baseName}-${format}-pages.zip`);
+      }
+      setShowExportModal(false);
     } catch (e) {
       console.error(e);
-      setError("Failed to build the PDF. Try smaller or non-encrypted files.");
+      setError("Export failed. Try a smaller PDF or fewer pages.");
     } finally {
+      setExportProgress(null);
       setBusy(false);
     }
   }
@@ -12558,7 +13341,40 @@ const timer =
       event.stopPropagation();
       if (workspaceExiting) return;
 
+      // Do this before changing routes. Otherwise PDF.js can continue rendering
+      // pages and thumbnails throughout the route transition, making the
+      // projects screen feel frozen.
+      renderGenerationRef.current += 1;
+      activePdfRenderTasksRef.current.forEach((task) => task.cancel());
+      activePdfRenderTasksRef.current.clear();
+      renderQueueRef.current = [];
+      renderQueueKeyRef.current.clear();
+      thumbRenderQueueRef.current = [];
+      thumbRenderQueueKeyRef.current.clear();
+      if (renderQueueRafRef.current !== null) {
+        window.cancelAnimationFrame(renderQueueRafRef.current);
+        renderQueueRafRef.current = null;
+      }
+      if (thumbRenderRafRef.current !== null) {
+        window.cancelAnimationFrame(thumbRenderRafRef.current);
+        thumbRenderRafRef.current = null;
+      }
+      if (backgroundLowResTimerRef.current !== null) {
+        cancelIdleOrTimeout(backgroundLowResTimerRef.current, backgroundLowResUsesIdleRef.current);
+        backgroundLowResTimerRef.current = null;
+      }
+
+      // A pending upload is meaningful only while opening a new workspace. It
+      // must not survive a manual exit and start that flow again during unmount.
+      try {
+        window.localStorage.removeItem(PENDING_UPLOAD_STORAGE_KEY);
+      } catch {
+        // Storage cleanup is best-effort.
+      }
+      setShowStartupOverlay(false);
+      startupOverlayActiveRef.current = false;
       cancelWorkspaceOpenHandoff();
+
       const reduceMotion =
         window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
       if (!reduceMotion) {
@@ -12570,16 +13386,15 @@ const timer =
         window.dispatchEvent(new Event("workspace-studio-return"));
       }
       setWorkspaceExiting(true);
-      workspaceExitTimerRef.current = window.setTimeout(() => {
-        router.push("/projects/all");
-        workspaceExitTimerRef.current = null;
-      }, reduceMotion ? 0 : WORKSPACE_EXIT_TRANSITION_MS);
+      router.push("/projects/all");
     },
     [router, workspaceExiting]
   );
 
   useEffect(() => {
-    router.prefetch("/");
+    // The back button lands on the all-projects view, so warm that route—not
+    // just the home route—while a document is open.
+    router.prefetch("/projects/all");
     return () => {
       if (workspaceExitTimerRef.current !== null) {
         window.clearTimeout(workspaceExitTimerRef.current);
@@ -12669,7 +13484,7 @@ const timer =
     if (typeof window === "undefined") return;
     if (!hasWorkspaceData) return;
     if (!hasUnsavedWorkspaceChanges) return;
-    if (!savingProject) return;
+    if (savingProject) return;
     const handler = (event: BeforeUnloadEvent) => {
       event.preventDefault();
       event.returnValue = "";
@@ -13453,6 +14268,33 @@ const timer =
                   </button>
                 )}
               </div>
+              {authSession?.user ? (
+                <div className="pointer-events-auto hidden shrink-0 items-center md:flex">
+                  {savingProject ? (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-zinc-400">
+                      <span className="h-2 w-2 animate-pulse rounded-full bg-[#6C47FF]" aria-hidden />
+                      Saving
+                    </span>
+                  ) : saveError ? (
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-600 transition hover:text-rose-700 dark:text-rose-400"
+                      onClick={() => saveWorkspaceNow()}
+                      title="Retry saving changes"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" aria-hidden />
+                      Retry save
+                    </button>
+                  ) : lastSavedAt ? (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400" title="Changes are saved">
+                      <Check className="h-3.5 w-3.5" aria-hidden />
+                      Saved
+                    </span>
+                  ) : (
+                    <span className="text-xs font-medium text-slate-400 dark:text-zinc-500">Autosave on</span>
+                  )}
+                </div>
+              ) : null}
             </div>
 
             <div className="relative z-10 flex shrink-0 items-center gap-2">
@@ -13471,7 +14313,7 @@ const timer =
                   title="Search document"
                   aria-pressed={searchOpen}
                 >
-                  <Search className="h-5 w-5" aria-hidden />
+                  <Search className="h-4 w-4" aria-hidden />
                 </button>
                 {searchOpen ? (
                   <div
@@ -13564,31 +14406,44 @@ const timer =
                 title={isBrowserFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
               >
                 {isBrowserFullscreen ? (
-                  <Minimize2 className="h-5 w-5" aria-hidden />
+                  <Minimize2 className="h-4 w-4" aria-hidden />
                 ) : (
-                  <Maximize2 className="h-5 w-5" aria-hidden />
+                  <Maximize2 className="h-4 w-4" aria-hidden />
                 )}
               </button>
-              <button
-                type="button"
-                className={studioChromeIconButtonClass}
-                onClick={() => void handlePrint()}
-                disabled={printDisabled}
-                aria-label={isPrinting ? "Opening printable PDF" : "Print pages"}
-                title={isPrinting ? "Opening printable PDF" : "Print pages"}
-              >
-                <Printer className="h-5 w-5" aria-hidden />
-              </button>
-              <button
-                type="button"
-                className={studioChromeIconButtonClass}
-                onClick={() => handleDownload()}
-                disabled={downloadDisabled}
-                aria-label={busy ? "Building PDF" : "Download pages"}
-                title={busy ? "Building PDF" : "Download pages"}
-              >
-                <Download className="h-5 w-5" aria-hidden />
-              </button>
+              <div className="relative">
+                <button
+                  type="button"
+                  className={studioChromeIconButtonClass}
+                  onClick={() => setHelpMenuOpen((open) => !open)}
+                  aria-label="Studio help"
+                  title="Studio help"
+                  aria-expanded={helpMenuOpen}
+                >
+                  <span className="text-base font-bold leading-none" aria-hidden>?</span>
+                </button>
+                {helpMenuOpen ? (
+                  <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-72 rounded-xl border border-slate-200 bg-white p-3 shadow-[0_16px_36px_rgba(15,23,42,0.16)] dark:border-[#4A4A4A] dark:bg-[#323232]">
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white">Studio shortcuts</p>
+                    <div className="mt-2 space-y-1.5 text-xs text-slate-600 dark:text-zinc-300">
+                      <p><kbd className="rounded border border-slate-200 px-1 py-0.5 font-semibold dark:border-[#4A4A4A]">Ctrl/Cmd +</kbd> Zoom in</p>
+                      <p><kbd className="rounded border border-slate-200 px-1 py-0.5 font-semibold dark:border-[#4A4A4A]">Ctrl/Cmd -</kbd> Zoom out</p>
+                      <p>Use <strong>Fit</strong> for a full page or <strong>Width</strong> for detailed work.</p>
+                      <p>Select a page, then use <strong>...</strong> to rotate, duplicate, delete, or rearrange it.</p>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+              <div className="flex items-center gap-1">
+                <button type="button" className="inline-flex h-10 items-center gap-1.5 rounded-lg px-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 disabled:cursor-not-allowed disabled:opacity-40 dark:text-zinc-200 dark:hover:bg-white/10 dark:hover:text-white" onClick={() => setShowExportModal(true)} disabled={downloadDisabled} aria-label="Download document" title="Download document">
+                  <Download className="h-4 w-4" aria-hidden />
+                  <span className="hidden xl:inline">Download</span>
+                </button>
+                <button type="button" className="inline-flex h-10 items-center gap-1.5 rounded-lg px-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/60 disabled:cursor-not-allowed disabled:opacity-40 dark:text-zinc-200 dark:hover:bg-white/10 dark:hover:text-white" onClick={() => void handlePrint()} disabled={printDisabled} aria-label="Print document" title="Print document">
+                  <Printer className="h-4 w-4" aria-hidden />
+                  <span className="hidden xl:inline">Print</span>
+                </button>
+              </div>
               <div className="flex w-12 items-center justify-center border-l border-slate-200 dark:border-[#4A4A4A]">
                 <WorkspaceSettingsMenu triggerClassName="cursor-pointer border-transparent bg-transparent text-slate-600 transition-colors duration-200 hover:bg-transparent hover:text-slate-900 focus-visible:ring-0 focus-visible:ring-offset-0 dark:text-zinc-300 dark:hover:text-white" />
               </div>
@@ -13879,7 +14734,7 @@ const timer =
 	                      setPenMode(false);
 	                      setShapeMode(false);
 	                      setDraftShape(null);
-	                      setShowSignatureHub(true);
+	                      openSignatureHub();
 	                      setSignatureHubStep("gallery");
 	                      setSignaturePanelMode("none");
 	                      setPendingSignatureForPlacement(null);
@@ -13998,7 +14853,7 @@ const timer =
                   </motion.div>
                 ) : null}
 
-	                {!organizeMode && (pages.length > 0 || loading ) ? (
+	                {!organizeMode && (pages.length > 0 || loading || (sourcesHydrated && !shouldShowStartupOverlay && (!projectParam || projectHasSources === false))) ? (
 	                  <motion.div
 	                    key="preview-view"
 	                    initial={{ opacity: 0.95, scale: 0.97 }}
@@ -14390,7 +15245,7 @@ const timer =
                                                   key={colorKey}
                                                   type="button"
                                                   onClick={() => applyHighlightColor(colorKey)}
-                                                  className={`relative h-6 w-6 rounded-full border transition ${
+                                                  className={`relative h-7 w-7 rounded-full border transition ${
                                                     highlightColor === colorKey
                                                       ? "border-[#024d7c] ring-2 ring-[#024d7c]/30"
                                                       : "border-slate-200 hover:border-slate-300"
@@ -14412,7 +15267,7 @@ const timer =
                                               <button
                                                 type="button"
                                                 onClick={() => setHighlightCustomOpen((prev) => !prev)}
-                                                className={`relative h-6 w-6 rounded-full border transition ${
+                                                className={`relative h-7 w-7 rounded-full border transition ${
                                                   highlightCustomOpen
                                                     ? "border-[#024d7c] ring-2 ring-[#024d7c]/30"
                                                     : "border-slate-200 hover:border-slate-300"
@@ -15289,7 +16144,7 @@ const timer =
                                           setPenMode(false);
                                           setShapeMode(false);
                                           setDraftShape(null);
-                                          setShowSignatureHub(true);
+                                          openSignatureHub();
                                           setSignatureHubStep("gallery");
                                           setSignaturePanelMode("none");
                                           setPendingSignatureForPlacement(null);
@@ -15323,8 +16178,52 @@ const timer =
 				                            {null}
 				                            <div className="relative w-full min-w-0 px-4 pt-12 text-center">
 				                              <div id="pdf-viewport" className="inline-flex origin-top flex-col gap-8">
-				                                {pages.map((page, index) => renderPreviewPage(page, index))}
-				                                <div className="h-8" aria-hidden />
+				                                {pages.length === 0 && Boolean(projectParam) && (loading || !sourcesHydrated || projectHasSources !== false) ? (
+                                  <div className="flex min-h-[calc(100vh-260px)] w-full items-center justify-center px-6 py-12">
+                                    <div className="flex items-center gap-3 text-sm font-medium text-slate-500 dark:text-zinc-400" role="status">
+                                      <span className="h-5 w-5 animate-spin rounded-full border-2 border-slate-200 border-t-[#7357E8] dark:border-zinc-600 dark:border-t-violet-400" aria-hidden />
+                                      Opening document…
+                                    </div>
+                                  </div>
+                                ) : pages.length === 0 ? (
+                                  <div className="flex min-h-[calc(100vh-260px)] w-full items-center justify-center px-6 py-12">
+                                    <section className="flex w-full max-w-md flex-col items-center text-center">
+                                      <Image
+                                        src="/illustrations/undraw_folder-files_5www.svg"
+                                        alt=""
+                                        width={405}
+                                        height={405}
+                                        className="mb-7 h-[clamp(150px,24dvh,245px)] w-auto opacity-90"
+                                        priority
+                                      />
+                                      <h2 className="text-xl font-semibold tracking-[-0.02em] text-slate-900 dark:text-zinc-100">Your workspace is empty</h2>
+                                      <p className="mt-2 max-w-sm text-sm leading-6 text-slate-500 dark:text-zinc-400">Start with a blank page or bring in a PDF from your device.</p>
+                                      <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+                                        <button
+                                          type="button"
+                                          onClick={handleAddClick}
+                                          className="inline-flex items-center gap-2 rounded-lg bg-[#024d7c] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#013d63] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c]/35"
+                                        >
+                                          <UploadCloud className="h-4 w-4" aria-hidden />
+                                          Insert PDF from device
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => void handleAddBlankPageAfter("")}
+                                          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 dark:border-[#4A4A4A] dark:bg-[#323232] dark:text-zinc-100 dark:hover:bg-[#3A3A3A]"
+                                        >
+                                          <Plus className="h-4 w-4" aria-hidden />
+                                          Start blank page
+                                        </button>
+                                      </div>
+                                    </section>
+                                  </div>
+                                ) : (
+                                  <>
+                                    {pages.map((page, index) => renderPreviewPage(page, index))}
+                                    <div className="h-8" aria-hidden />
+                                  </>
+                                )}
 				                              </div>
 				                            </div>
 				                          </div>
@@ -15515,14 +16414,14 @@ const timer =
 				                                  aria-label={showPageOrderPanel ? "Close sidebar" : "Open sidebar"}
 				                                >
 				                                  {showPageOrderPanel ? (
-				                                    <PanelRightClose className="h-6 w-6" aria-hidden />
+				                                    <PanelRightClose className="h-7 w-7" aria-hidden />
 				                                  ) : (
-				                                    <PanelRightOpen className="h-6 w-6" aria-hidden />
+				                                    <PanelRightOpen className="h-7 w-7" aria-hidden />
 				                                  )}
 				                                </button>
 				                              </div>
 				                            </div>
-                                <div className="flex flex-col items-center gap-2 px-1 py-3">
+                                <div className="flex flex-col items-center gap-1 px-1 py-3">
                                   <button
                                     type="button"
                                     aria-label="Zoom in"
@@ -15532,8 +16431,11 @@ const timer =
                                     onClick={() => zoomByStep(1)}
                                     disabled={pages.length === 0 || zoomPercent >= ZOOM_MAX_PERCENT}
                                   >
-                                    <ZoomIn className="h-5 w-5" aria-hidden />
+                                    <ZoomIn className="h-4 w-4" aria-hidden />
                                   </button>
+                                  <span className="w-full text-center text-[10px] font-semibold tabular-nums text-slate-500 dark:text-zinc-400" aria-label="Current zoom">
+                                    {zoomPercent}%
+                                  </span>
                                   <button
                                     type="button"
                                     aria-label="Zoom out"
@@ -15543,7 +16445,29 @@ const timer =
                                     onClick={() => zoomByStep(-1)}
                                     disabled={pages.length === 0 || zoomPercent <= ZOOM_MIN_PERCENT}
                                   >
-                                    <ZoomOut className="h-5 w-5" aria-hidden />
+                                    <ZoomOut className="h-4 w-4" aria-hidden />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    aria-label="Fit page"
+                                    className={viewerRailButtonClass}
+                                    onMouseEnter={(event) => showToolbarTooltip("Fit page", event.currentTarget, "left")}
+                                    onMouseLeave={hideToolbarTooltip}
+                                    onClick={() => fitZoomToViewport("page")}
+                                    disabled={pages.length === 0}
+                                  >
+                                    <span className="text-[10px] font-bold">Fit</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    aria-label="Fit width"
+                                    className={viewerRailButtonClass}
+                                    onMouseEnter={(event) => showToolbarTooltip("Fit width", event.currentTarget, "left")}
+                                    onMouseLeave={hideToolbarTooltip}
+                                    onClick={() => fitZoomToViewport("width")}
+                                    disabled={pages.length === 0}
+                                  >
+                                    <span className="text-[10px] font-bold">Width</span>
                                   </button>
                                 </div>
                                 <div className="mx-auto h-px w-7 bg-slate-200 dark:bg-[#2A2A31]" aria-hidden />
@@ -15557,7 +16481,7 @@ const timer =
                                     onClick={() => handlePageStep(-1)}
                                     disabled={activePageIndex <= 0}
                                   >
-                                    <ChevronUp className="h-5 w-5" aria-hidden />
+                                    <ChevronUp className="h-4 w-4" aria-hidden />
                                   </button>
                                   <input
                                     value={pageNumberDraft}
@@ -15601,7 +16525,7 @@ const timer =
                                     onClick={() => handlePageStep(1)}
                                     disabled={activePageIndex === pages.length - 1 || pages.length === 0}
                                   >
-                                    <ChevronDown className="h-5 w-5" aria-hidden />
+                                    <ChevronDown className="h-4 w-4" aria-hidden />
                                   </button>
                                 </div>
 				                          </aside>
@@ -15610,172 +16534,210 @@ const timer =
 		                  </motion.div>
 		                ) : null}
               </AnimatePresence>
-
-	              {!loading &&
-                  !shouldShowStartupOverlay &&
-                  sourcesHydrated &&
-                  pages.length === 0 &&
-                  (!projectParam || projectHasSources === false) && (
-	                <div className="rounded-3xl border border-dashed border-slate-200 bg-white/80 p-12 text-center shadow-sm dark:border-[#2A2A31] dark:bg-[#1C1C1F]/80">
-	                  <p className="text-base font-semibold text-gray-800 dark:text-zinc-100">No pages yet</p>
-	                  <p className="mt-2 text-sm text-gray-500 dark:text-zinc-400">
-	                    Bring your PDFs into the workspace — we&apos;ll show a live preview as soon as they finish uploading.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleAddClick}
-                    className="mx-auto mt-6 inline-flex items-center gap-2 rounded-full bg-[#024d7c] px-6 py-2 text-sm font-semibold text-white shadow-lg shadow-[#012a44]/20 transition hover:bg-[#013d63] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#024d7c]"
-                  >
-                    Upload PDFs
-                    <svg
-                      className="h-4 w-4"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <path d="M12 5v14" strokeLinecap="round" strokeLinejoin="round" />
-                      <path d="M5 12h14" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </button>
-                  <p className="mt-6 text-xs uppercase tracking-[0.4em] text-gray-400">Workspace ready</p>
-                </div>
-              )}
             </div>
           </div>
         </div>
       {showSignatureHub ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeSignatureHub} />
-          <div className="relative z-10 w-full max-w-4xl rounded-2xl bg-white p-5 shadow-[0_32px_90px_rgba(5,10,30,0.45)] dark:bg-[#1C1C1F] dark:shadow-[0_36px_110px_rgba(0,0,0,0.6)]">
+          <div
+            aria-hidden="true"
+            className={isSignatureHubClosing ? "absolute inset-0 bg-black/60 backdrop-blur-sm animate-[signature-hub-backdrop-out_160ms_ease-in_both]" : "absolute inset-0 bg-black/60 backdrop-blur-sm animate-[signature-hub-backdrop-in_240ms_cubic-bezier(0.16,1,0.3,1)_both]"}
+          />
+          <div
+            className={`relative z-10 w-full ${signatureHubStep === "qr" ? "max-w-3xl" : signatureHubStep === "email" ? "max-w-xl" : "max-w-4xl"} rounded-2xl bg-white p-5 shadow-[0_32px_90px_rgba(5,10,30,0.45)] dark:bg-[#1C1C1F] dark:shadow-[0_36px_110px_rgba(0,0,0,0.6)] ${isSignatureHubClosing ? "pointer-events-none animate-[signature-hub-dialog-out_160ms_cubic-bezier(0.4,0,1,1)_both]" : "animate-[signature-hub-dialog-in_260ms_cubic-bezier(0.16,1,0.3,1)_both]"}`}
+          >
+            {renameSignatureId ? (
+              <div className={isRenameDialogClosing ? "pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-slate-950/20 p-5 backdrop-blur-[1px] animate-[signature-hub-rename-backdrop-out_200ms_cubic-bezier(0.4,0,1,1)_both] dark:bg-black/45" : "absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-slate-950/20 p-5 backdrop-blur-[1px] animate-[signature-hub-rename-backdrop-in_200ms_cubic-bezier(0.16,1,0.3,1)_both] dark:bg-black/45"}>
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    const nextName = renameSignatureValue.trim();
+                    if (!nextName) {
+                      setRenameSignatureError("Enter a signature name.");
+                      return;
+                    }
+                    if (savedSignatures.some((signature) => signature.id !== renameSignatureId && signature.name.toLowerCase() === nextName.toLowerCase())) {
+                      setRenameSignatureError("That name is already in use.");
+                      return;
+                    }
+                    setSavedSignatures((previous) => previous.map((signature) => signature.id === renameSignatureId ? { ...signature, name: nextName } : signature));
+                    closeRenameDialog();
+                  }}
+                  className={isRenameDialogClosing ? "pointer-events-none w-full max-w-sm rounded-xl border border-slate-200 bg-white p-5 shadow-2xl shadow-slate-950/20 animate-[signature-hub-rename-dialog-out_200ms_cubic-bezier(0.4,0,1,1)_both] dark:border-[#3A3A42] dark:bg-[#242429]" : "w-full max-w-sm rounded-xl border border-slate-200 bg-white p-5 shadow-2xl shadow-slate-950/20 animate-[signature-hub-rename-dialog-in_220ms_cubic-bezier(0.16,1,0.3,1)_both] dark:border-[#3A3A42] dark:bg-[#242429]"}
+                >
+                  <h4 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">Rename signature</h4>
+                  <label className="mt-4 block">
+                    <span className="sr-only">Signature name</span>
+                    <input
+                      autoFocus
+                      aria-label="Signature name"
+                      value={renameSignatureValue}
+                      onChange={(event) => {
+                        setRenameSignatureValue(event.target.value);
+                        setRenameSignatureError(null);
+                      }}
+                      className="mt-1.5 h-10 w-full rounded-lg border border-transparent bg-slate-100/90 px-3 text-sm font-medium text-slate-900 outline-none transition-[background-color,border-color,box-shadow] duration-150 placeholder:text-slate-400 focus:border-slate-300 focus:bg-white focus:ring-4 focus:ring-violet-500/10 dark:bg-white/[0.06] dark:text-zinc-100 dark:placeholder:text-zinc-500 dark:focus:border-[#51515b] dark:focus:bg-[#1C1C1F] dark:focus:ring-violet-400/10"
+                    />
+                  </label>
+                  {renameSignatureError ? <p className="mt-2 text-xs font-medium text-rose-600 dark:text-rose-300">{renameSignatureError}</p> : null}
+                  <div className="mt-5 flex justify-end gap-2">
+                    <button type="button" onClick={closeRenameDialog} className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white">Cancel</button>
+                    <button type="submit" className="rounded-lg bg-[#5B35D5] px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-violet-500/20 transition hover:bg-[#4324B5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2">Save</button>
+                  </div>
+                </form>
+              </div>
+            ) : null}
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-xl font-semibold text-slate-900 dark:text-zinc-100">
                   {signatureHubStep === "gallery"
-                    ? "Sign"
+                    ? savedSignatures.length > 0 && signatureHubGalleryMode === "library"
+                      ? "Signature library"
+                      : "Add signature"
                     : signatureHubStep === "type"
                     ? "Type signature"
                     : signatureHubStep === "qr"
-                    ? "Add signature via QR code"
+                    ? "Sign on another device"
                     : signatureHubStep === "email"
-                    ? "Add signature via email"
+                    ? "Send a signing link"
                     : signatureHubStep === "draw"
                     ? "Draw signature"
                     : "Upload signature"}
                 </h3>
-                <p className="text-sm text-slate-600 dark:text-zinc-300">
-                  {signatureHubStep === "gallery"
-                    ? "Pick an existing signature or create a new one."
-                    : "Save it to drop onto your document instantly."}
-                </p>
+                {signatureHubStep !== "gallery" && signatureHubStep !== "qr" && signatureHubStep !== "email" ? (
+                  <p className="text-sm text-slate-600 dark:text-zinc-300">Save it to drop onto your document instantly.</p>
+                ) : null}
               </div>
-              <button
-                type="button"
-                onClick={closeSignatureHub}
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-900 dark:border-[#2A2A31] dark:text-zinc-300 dark:hover:border-slate-500 dark:hover:text-white"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-2">
+                {signatureHubStep === "gallery" && savedSignatures.length > 0 && signatureHubGalleryMode === "library" ? (
+                  <button
+                    type="button"
+                    onClick={() => setSignatureHubGalleryMode("create")}
+                    className="inline-flex h-9 items-center justify-center rounded-full bg-[#5B35D5] px-4 text-sm font-semibold text-white shadow-sm shadow-violet-500/20 transition hover:bg-[#4324B5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#1C1C1F]"
+                  >
+                    <Plus className="h-4 w-4" aria-hidden />
+                    Add signature
+                  </button>
+                ) : null}
+                {signatureHubStep === "gallery" && savedSignatures.length > 0 && signatureHubGalleryMode === "create" ? (
+                  <button
+                    type="button"
+                    onClick={() => setSignatureHubGalleryMode("library")}
+                    className="inline-flex h-9 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 dark:border-[#3A3A42] dark:bg-[#242429] dark:text-zinc-200 dark:hover:border-[#51515b] dark:hover:bg-[#2D2D33] dark:hover:text-white"
+                  >
+                    Back
+                  </button>
+                ) : null}
+                {signatureHubStep === "qr" || signatureHubStep === "email" ? (
+                  <button
+                    type="button"
+                    onClick={() => setSignatureHubStep("gallery")}
+                    className="inline-flex h-9 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 dark:border-[#3A3A42] dark:bg-[#242429] dark:text-zinc-200 dark:hover:border-[#51515b] dark:hover:bg-[#2D2D33] dark:hover:text-white"
+                  >
+                    Back
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={closeSignatureHub}
+                  className="inline-flex h-9 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 dark:border-[#3A3A42] dark:bg-[#242429] dark:text-zinc-200 dark:hover:border-[#51515b] dark:hover:bg-[#2D2D33] dark:hover:text-white"
+                >
+                  Close
+                </button>
+              </div>
             </div>
 
+            <div
+              key={`${signatureHubStep}:${signatureHubGalleryMode}:${mobileSessionStatus === "transferring" ? "transferring" : "ready"}`}
+              className="animate-[signature-hub-panel-in_240ms_cubic-bezier(0.16,1,0.3,1)_both] motion-reduce:animate-none"
+            >
             {signatureHubStep === "gallery" ? (
               <div className="mt-4 space-y-4">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSignatureHubStep("type");
-                      setTypeSignatureText("");
-                      setTypedSignatureError(null);
-                    }}
-                    className="flex min-h-[120px] items-center justify-center gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-[#024d7c]/50 hover:bg-white dark:border-[#2A2A31] dark:bg-[#2A2A31] dark:text-zinc-200 dark:hover:bg-[#34343C]"
-                  >
-                    <div className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm dark:border-[#2A2A31] dark:bg-[#1C1C1F]">
-                      <Plus className="h-5 w-5 text-[#024d7c]" />
-                    </div>
-                    <div className="text-left">
-                      <div className="text-base font-semibold text-slate-900 dark:text-zinc-100">Add signature</div>
-                      <div className="text-xs text-slate-600 dark:text-zinc-400">Type, draw, or upload a new signature.</div>
-                    </div>
-                  </button>
-                  {savedSignatures.length === 0 ? (
-                    <div className="flex min-h-[120px] items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm dark:border-[#2A2A31] dark:bg-[#1C1C1F] dark:text-zinc-300">
-                      No saved signatures yet. Add one to get started.
-                    </div>
-                  ) : null}
-                  {savedSignatures.map((sig) => {
-                    const isRecent = Date.now() - sig.createdAt <= 10 * 60 * 1000;
-                    return (
-                    <div
-                      key={sig.id}
-                      className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-[0_6px_18px_rgba(15,23,42,0.08)] dark:border-[#2A2A31] dark:bg-[#1C1C1F]"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="text-sm font-semibold text-slate-800 dark:text-zinc-100">{sig.name}</div>
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[0.65rem] font-semibold text-slate-500 dark:bg-[#2A2A31] dark:text-zinc-300">
-                          {isRecent ? "Recently added" : "Saved"}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={sig.dataUrl}
-                          alt={sig.name}
-                          className="h-16 w-32 rounded-lg border border-slate-100 object-contain bg-white dark:border-[#2A2A31]"
-                        />
-                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                <div className={savedSignatures.length > 0 && signatureHubGalleryMode === "library" ? "" : "hidden"}>
+                  <p className="mb-2 px-0.5 text-sm font-semibold text-slate-900 dark:text-zinc-100">Saved signatures <span className="font-medium text-slate-400 dark:text-zinc-500">· {savedSignatures.length}</span></p>
+                  <div className={savedSignatures.length > 4 ? "max-h-[408px] overflow-y-auto pr-1" : "pr-1"}>
+                    <div className="space-y-2">
+                    {savedSignatures.map((sig, index) => {
+                      const isNew = newSignatureId === sig.id;
+                      const displayName = /^Mobile signature(?: \([0-9]+\))?$/.test(sig.name) ? `Signature ${index + 1}` : sig.name;
+                      const isSelected = selectedSignatureId === sig.id;
+                      return (
+                        <div key={sig.id} className={`group relative flex min-h-[90px] items-center gap-2 rounded-xl border bg-white p-2 transition-[border-color,background-color,box-shadow] duration-150 dark:bg-[#1C1C1F] ${isSelected ? "border-[#5B35D5] bg-violet-50/60 ring-1 ring-[#5B35D5] dark:border-violet-400 dark:bg-violet-400/[0.08] dark:ring-violet-400" : "border-slate-200 hover:border-slate-400 hover:bg-slate-50 dark:border-[#2A2A31] dark:hover:border-[#51515b] dark:hover:bg-white/[0.035]"}`} >
+                          {isNew ? (
+                            <span className="absolute left-3 top-3 rounded-full bg-violet-100 px-2 py-0.5 text-[0.65rem] font-semibold text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">New</span>
+                          ) : null}
                           <button
                             type="button"
-                            className="rounded-full bg-[#024d7c] px-3 py-1 text-xs font-semibold text-white shadow-sm transition hover:bg-[#013d63]"
-                            onClick={() => {
-                              applySignatureToActivePage(sig);
-                              closeSignatureHub();
-                            }}
+                            onClick={() => setSelectedSignatureId(sig.id)}
+                            aria-label={`Select ${displayName}`}
+                            className="flex h-[72px] w-56 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-50 px-2 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 dark:bg-white/[0.035] dark:hover:bg-white/[0.07] dark:focus-visible:ring-offset-[#1C1C1F]"
                           >
-                            Use
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={sig.dataUrl} alt={displayName} className="h-full w-full object-contain" />
                           </button>
+                          <div className="flex min-w-0 flex-1 items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedSignatureId(sig.id)}
+                              className="min-w-0 flex-1 rounded-lg px-1 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#1C1C1F]"
+                            >
+                              <span className="block truncate text-sm font-semibold text-slate-900 dark:text-zinc-100">{displayName}</span>
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={`Rename ${displayName}`}
+                              title="Rename signature"
+                              onClick={() => {
+                                setRenameSignatureId(sig.id);
+                                setRenameSignatureValue(displayName);
+                                setRenameSignatureError(null);
+                                setIsRenameDialogClosing(false);
+                              }}
+                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 dark:text-zinc-500 dark:hover:bg-white/10 dark:hover:text-white"
+                            >
+                              <Pencil className="h-4 w-4" aria-hidden />
+                            </button>
+                          </div>
                           <button
                             type="button"
-                            className="text-slate-500 transition hover:text-[#024d7c] hover:underline"
+                            aria-label={`Delete ${displayName}`}
+                            title="Delete signature"
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 dark:text-zinc-500 dark:hover:bg-rose-500/10 dark:hover:text-rose-300"
                             onClick={() => {
-                              const nextName = prompt("Rename signature", sig.name)?.trim();
-                              if (!nextName) return;
-                              if (
-                                savedSignatures.some(
-                                  (existing) =>
-                                    existing.id !== sig.id && existing.name.toLowerCase() === nextName.toLowerCase()
-                                )
-                              ) {
-                                setSignatureNameError("Choose a unique name.");
-                                return;
-                              }
-                              setSavedSignatures((prev) =>
-                                prev.map((item) => (item.id === sig.id ? { ...item, name: nextName } : item))
-                              );
+                              if (!window.confirm("Delete this signature? This can’t be undone.")) return;
+                              setSavedSignatures((previous) => previous.filter((item) => item.id !== sig.id));
+                              setSelectedSignatureId((current) => current === sig.id ? null : current);
                             }}
                           >
-                            Rename
-                          </button>
-                          <button
-                            type="button"
-                            className="text-rose-500 transition hover:text-rose-600 hover:underline"
-                            onClick={() => {
-                              const confirmed = window.confirm(
-                                "Are you sure you want to delete this signature? You can't go back."
-                              );
-                              if (!confirmed) return;
-                              setSavedSignatures((prev) => prev.filter((item) => item.id !== sig.id));
-                            }}
-                          >
-                            Delete
+                            <Trash2 className="h-4 w-4" aria-hidden />
                           </button>
                         </div>
-                      </div>
+                      );
+                    })}
                     </div>
-                  );
-                  })}
+                  </div>
+                  <div className="mt-3 flex items-center justify-end border-t border-slate-100 pt-3 dark:border-white/10">
+                    <button
+                      type="button"
+                      disabled={!selectedSignatureId}
+                      onClick={() => {
+                        const selected = savedSignatures.find((signature) => signature.id === selectedSignatureId);
+                        if (!selected) return;
+                        applySignatureToActivePage(selected);
+                        closeSignatureHub();
+                      }}
+                      className="inline-flex h-10 items-center justify-center rounded-lg bg-[#5B35D5] px-4 text-sm font-semibold text-white shadow-sm shadow-violet-500/20 transition hover:bg-[#4324B5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:shadow-none dark:disabled:bg-white/10 dark:disabled:text-zinc-500"
+                    >
+                      Add to document
+                    </button>
+                  </div>
                 </div>
-                <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                {savedSignatures.length === 0 || signatureHubGalleryMode === "create" ? (
+                <div className="mt-2">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Create a signature</p>
+                  </div>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-3">
                   <button
                     type="button"
                     onClick={() => {
@@ -15783,77 +16745,91 @@ const timer =
                       setTypeSignatureText("");
                       setTypedSignatureError(null);
                     }}
-                    className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-[#024d7c]/60 hover:shadow-md dark:border-[#2A2A31] dark:bg-[#1C1C1F] dark:text-zinc-200"
+                    className="group flex min-h-[156px] flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-[#6C47FF]/55 hover:shadow-md active:translate-y-0 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF] focus-visible:ring-offset-2 dark:border-[#2A2A31] dark:bg-[#1C1C1F] dark:focus-visible:ring-offset-[#1C1C1F]"
                   >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 text-slate-700 dark:bg-[#2A2A31] dark:text-zinc-200">
-                      <SignatureIcon className="h-5 w-5" />
+                    <div className="flex h-16 w-full items-center rounded-xl bg-violet-50/70 px-3 text-[#5B35D5] transition group-hover:bg-violet-50 dark:bg-violet-500/10 dark:text-violet-300">
+                      <span
+                        className="text-3xl leading-none"
+                        style={{
+                          fontFamily: "Brush Script MT, Segoe Script, Lucida Handwriting, URW Chancery L, cursive",
+                          fontStyle: "italic",
+                          fontWeight: 500,
+                          letterSpacing: "0.02em",
+                        }}
+                      >
+                        John Doe
+                      </span>
                     </div>
-                    <div>
-                      <div className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Type signature</div>
-                      <div className="text-xs text-slate-500 dark:text-zinc-400">Turn your name into a styled signature.</div>
-                    </div>
+                    <span className="flex flex-col gap-0.5">
+                      <span className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Type signature</span>
+                      <span className="text-xs text-slate-500 dark:text-zinc-400">Turn your name into a signature.</span>
+                    </span>
                   </button>
                   <button
                     type="button"
                     onClick={handleOpenDrawFromHub}
-                    className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-[#024d7c]/60 hover:shadow-md dark:border-[#2A2A31] dark:bg-[#1C1C1F] dark:text-zinc-200"
+                    className="group flex min-h-[156px] flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-[#6C47FF]/55 hover:shadow-md active:translate-y-0 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF] focus-visible:ring-offset-2 dark:border-[#2A2A31] dark:bg-[#1C1C1F] dark:focus-visible:ring-offset-[#1C1C1F]"
                   >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 text-slate-700 dark:bg-[#2A2A31] dark:text-zinc-200">
-                      <Pencil className="h-5 w-5" />
+                    <div className="flex h-16 w-full items-center rounded-xl bg-sky-50/70 px-3 text-[#245B92] transition group-hover:bg-sky-50 dark:bg-sky-500/10 dark:text-sky-300">
+                      <svg viewBox="0 0 180 56" className="h-12 w-full" fill="none" aria-hidden>
+                        <path d="M8 36c18 5 20-25 31-17 9 7-5 22 5 18 14-7 19-28 28-22 8 5-5 23 5 21 13-2 13-21 24-20 10 1 2 20 13 20 12 0 17-16 25-13 7 3 0 13 10 14 14 2 20-8 29-17 9-9 18-8 22 2" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M14 45h150" stroke="currentColor" strokeOpacity=".18" strokeWidth="1.5" strokeLinecap="round" />
+                      </svg>
                     </div>
-                    <div>
-                      <div className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Draw signature</div>
-                      <div className="text-xs text-slate-500 dark:text-zinc-400">Use your mouse or trackpad to draw.</div>
-                    </div>
+                    <span className="flex flex-col gap-0.5">
+                      <span className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Draw signature</span>
+                      <span className="text-xs text-slate-500 dark:text-zinc-400">Use your mouse or trackpad.</span>
+                    </span>
                   </button>
                   <button
                     type="button"
                     onClick={handleOpenUploadFromHub}
-                    className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-[#024d7c]/60 hover:shadow-md dark:border-[#2A2A31] dark:bg-[#1C1C1F] dark:text-zinc-200"
+                    className="group flex min-h-[156px] flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-[#6C47FF]/55 hover:shadow-md active:translate-y-0 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF] focus-visible:ring-offset-2 dark:border-[#2A2A31] dark:bg-[#1C1C1F] dark:focus-visible:ring-offset-[#1C1C1F]"
                   >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 text-slate-700 dark:bg-[#2A2A31] dark:text-zinc-200">
-                      <UploadCloud className="h-5 w-5" />
+                    <div className="flex h-16 w-full items-center justify-center rounded-xl border border-dashed border-violet-200/80 bg-violet-50/70 text-[#5B35D5] transition group-hover:border-[#6C47FF]/60 group-hover:bg-violet-50 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-300">
+                      <Upload className="h-4 w-4" aria-hidden />
                     </div>
-                    <div>
-                      <div className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Upload signature</div>
-                      <div className="text-xs text-slate-500 dark:text-zinc-400">Upload a scanned signature image.</div>
-                    </div>
+                    <span className="flex flex-col gap-0.5">
+                      <span className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Upload signature</span>
+                      <span className="text-xs text-slate-500 dark:text-zinc-400">Use a scanned signature image.</span>
+                    </span>
+                  </button>
+                  </div>
+                  <div className="mt-4 rounded-xl border border-slate-200/80 bg-slate-50/70 p-3 dark:border-[#2A2A31] dark:bg-white/[0.025]">
+                    <p className="px-1 text-sm font-semibold text-slate-800 dark:text-zinc-100">Continue on another device</p>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (mobileSessionStatus === "idle") startMobileSession();
+                      setSignatureHubStep("qr");
+                    }}
+                    className="flex h-16 items-center gap-3 rounded-xl border border-slate-200 bg-white/90 px-4 text-left text-sm text-slate-700 shadow-sm transition duration-200 hover:-translate-y-px hover:border-[#6C47FF]/50 hover:bg-white hover:shadow-md hover:text-slate-900 active:translate-y-0 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF] focus-visible:ring-offset-2 dark:border-[#2A2A31] dark:bg-[#1C1C1F] dark:text-zinc-200 dark:hover:bg-violet-500/10 dark:hover:text-white dark:focus-visible:ring-offset-[#1C1C1F]"
+                  >
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-[#6C47FF] dark:bg-violet-500/10">
+                      <svg viewBox="0 0 30 30" className="h-7 w-7" fill="currentColor" aria-hidden>
+                        <path d="M2 2h8v8H2V2Zm2 2v4h4V4H4Zm12-2h8v8h-8V2Zm2 2v4h4V4h-4ZM2 16h8v8H2v-8Zm2 2v4h4v-4H4Zm9-2h3v3h-3v-3Zm5 0h2v2h-2v-2Zm4 0h2v5h-2v-5Zm-9 5h2v3h-2v-3Zm4-1h5v2h-5v-2Zm4 4h3v2h-3v-2Zm-8 0h5v2h-5v-2Z" />
+                      </svg>
+                    </span>
+                    <span className="font-semibold text-slate-900 dark:text-zinc-100">QR code</span>
                   </button>
                   <button
                     type="button"
-                    onClick={() => setSignatureHubStep("qr")}
-                    className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-[#024d7c]/60 hover:shadow-md dark:border-[#2A2A31] dark:bg-[#1C1C1F] dark:text-zinc-200"
+                    onClick={() => {
+                      if (mobileSessionStatus === "idle") startMobileSession();
+                      setSignatureHubStep("email");
+                    }}
+                    className="flex h-16 items-center gap-3 rounded-xl border border-slate-200 bg-white/90 px-4 text-left text-sm text-slate-700 shadow-sm transition duration-200 hover:-translate-y-px hover:border-[#6C47FF]/50 hover:bg-white hover:shadow-md hover:text-slate-900 active:translate-y-0 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF] focus-visible:ring-offset-2 dark:border-[#2A2A31] dark:bg-[#1C1C1F] dark:text-zinc-200 dark:hover:bg-violet-500/10 dark:hover:text-white dark:focus-visible:ring-offset-[#1C1C1F]"
                   >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 text-slate-700 dark:bg-[#2A2A31] dark:text-zinc-200">
-                      {/* simple QR-like icon using squares */}
-                      <div className="grid h-5 w-5 grid-cols-2 gap-[2px]">
-                        <span className="h-full w-full rounded-sm bg-slate-700 dark:bg-slate-200" />
-                        <span className="h-full w-full rounded-sm border border-slate-400 dark:border-[#4A4A55]" />
-                        <span className="h-full w-full rounded-sm border border-slate-400 dark:border-[#4A4A55]" />
-                        <span className="h-full w-full rounded-sm bg-slate-700 dark:bg-slate-200" />
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-slate-900 dark:text-zinc-100">QR code</div>
-                      <div className="text-xs text-slate-500 dark:text-zinc-400">Scan to sign on your phone.</div>
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSignatureHubStep("email")}
-                    className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-[#024d7c]/60 hover:shadow-md sm:col-span-2 dark:border-[#2A2A31] dark:bg-[#1C1C1F] dark:text-zinc-200"
-                  >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 text-slate-700 dark:bg-[#2A2A31] dark:text-zinc-200">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-[#35639A] dark:bg-sky-500/10 dark:text-sky-300">
                       <Mail className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Email link</div>
-                      <div className="text-xs text-slate-500 dark:text-zinc-400">
-                        Email yourself a link to sign on another device.
-                      </div>
-                    </div>
+                    </span>
+                    <span className="font-semibold text-slate-900 dark:text-zinc-100">Email link</span>
                   </button>
+                    </div>
+                  </div>
                 </div>
+                ) : null}
               </div>
             ) : null}
 
@@ -15899,7 +16875,7 @@ const timer =
                 </div>
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 dark:border-[#2A2A31] dark:bg-[#2A2A31]">
                   <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-zinc-400">Preview</div>
-                  <div className="mt-2 flex min-h-[140px] items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white px-3 py-2 dark:border-[#2A2A31] dark:bg-[#1C1C1F]">
+                  <div className="mt-2 flex min-h-[190px] items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white px-3 py-2 dark:border-[#2A2A31] dark:bg-[#1C1C1F]">
                     {typedSignaturePreview ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -15947,216 +16923,125 @@ const timer =
             ) : null}
 
             {signatureHubStep === "qr" ? (
-              <div className="mt-4 space-y-4">
-                <p className="text-sm text-slate-600">
-                  Scan with your phone to open a signing link and draw in landscape mode. Copy the link if your camera can&apos;t read the QR.
-                </p>
-                <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
-                  <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-6">
-                    <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-white px-4 py-4 shadow-inner">
-                      {mobileSessionUrl ? (
-                        <QRCode value={mobileSessionUrl} size={160} className="h-40 w-40" />
-                      ) : (
-                        <div className="flex h-40 w-40 items-center justify-center text-sm text-slate-500">Preparing QR…</div>
-                      )}
+              <div className="mt-5 space-y-5">
+                {mobileSessionStatus === "transferring" ? (
+                  <div className="flex min-h-[286px] flex-col items-center justify-center rounded-2xl border border-violet-100 bg-gradient-to-b from-violet-50/80 to-white px-6 text-center dark:border-violet-500/20 dark:from-violet-500/10 dark:to-[#1C1C1F]">
+                    <span className="h-10 w-10 animate-spin rounded-full border-[3px] border-violet-200 border-t-[#6C47FF] dark:border-violet-500/30 dark:border-t-violet-300" aria-hidden />
+                    <p className="mt-5 text-base font-semibold text-slate-900 dark:text-zinc-100">Adding your signature</p>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-zinc-400">It will be ready in a moment.</p>
+                  </div>
+                ) : (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 dark:border-[#2A2A31] dark:bg-white/[0.025]">
+                  <div className="grid gap-6 sm:grid-cols-[190px_minmax(0,1fr)] sm:items-center">
+                    <div className="flex flex-col items-center rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[#3A3A42] dark:bg-[#242429]">
+                      <div className="rounded-xl bg-white p-2 dark:bg-white">
+                        {mobileSessionUrl ? (
+                          <QRCode value={mobileSessionUrl} size={160} className="h-40 w-40" />
+                        ) : (
+                          <div className="flex h-40 w-40 items-center justify-center text-sm text-slate-500">Preparing QR…</div>
+                        )}
+                      </div>
                       <button
                         type="button"
-                        className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300"
+                        className="mt-3 inline-flex h-7 items-center gap-1.5 rounded-lg px-2 text-xs font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-zinc-100"
                         onClick={startMobileSession}
                       >
-                        Generate new QR
+                        <RotateCw className="h-3.5 w-3.5" /> Get a new code
                       </button>
-                      {mobileSessionStatus === "received" ? (
-                        <div className="text-xs font-semibold text-emerald-600">Signature received!</div>
-                      ) : mobileSessionStatus === "error" ? (
-                        <div className="text-xs font-semibold text-rose-600">Connection error. Regenerate.</div>
-                      ) : (
-                        <div className="text-xs text-slate-500">Waiting for your phone…</div>
-                      )}
-                    </div>
-                    <div className="space-y-2 text-sm text-slate-700">
-                      <div className="font-semibold text-slate-900">How it works</div>
-                      <ol className="list-decimal space-y-1 pl-4">
-                        <li>Scan the QR with your phone.</li>
-                        <li>Draw your signature on the mobile page.</li>
-                        <li>We&apos;ll drop it into this project automatically.</li>
-                      </ol>
-                      <div className="flex flex-wrap items-center gap-2 text-xs">
-                        <span className="rounded-full bg-white px-2 py-1 font-semibold text-slate-600">Link</span>
-                        <code className="rounded bg-white px-2 py-1 text-[0.7rem] text-slate-700">
-                          {mobileSessionUrl ?? mobileCaptureLink}
-                        </code>
-                        <button
-                          type="button"
-                          className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300"
-                          onClick={handleCopyMobileLink}
-                          disabled={!mobileSessionUrl}
+                      {mobileSessionUrl ? (
+                        <a
+                          href={mobileSessionUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-1 text-center text-xs font-semibold text-violet-600 underline underline-offset-2 transition hover:text-violet-800 dark:text-violet-300 dark:hover:text-violet-200"
                         >
-                          Copy link
-                        </button>
+                          Open signing page on this computer
+                        </a>
+                      ) : null}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-base font-semibold text-slate-900 dark:text-zinc-100">Scan to sign</p>
+                      <div className="mt-4 space-y-2.5">
+                        <div className="flex items-start gap-3">
+                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">1</span>
+                          <p className="pt-0.5 text-sm text-slate-600 dark:text-zinc-300">Scan the QR code with your phone or tablet.</p>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">2</span>
+                          <p className="pt-0.5 text-sm text-slate-600 dark:text-zinc-300">Draw your signature on the page that opens.</p>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">3</span>
+                          <p className="pt-0.5 text-sm text-slate-600 dark:text-zinc-300">Your signature will appear here automatically.</p>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300"
-                    onClick={() => setSignatureHubStep("gallery")}
-                  >
-                    Back
-                  </button>
-                </div>
+                )}
               </div>
             ) : null}
 
             {signatureHubStep === "email" ? (
-              <div className="mt-4 space-y-4">
-                <p className="text-sm text-slate-600">
-                  Send yourself a link to draw a signature on your phone. We&apos;ll open your mail client so you keep control of your inbox.
-                </p>
-                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 shadow-inner">
-                  <label className="text-sm font-semibold text-slate-800">Email for mobile signing link</label>
-                  <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="mx-auto mt-6 max-w-lg">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-6 dark:border-[#2A2A31] dark:bg-white/[0.025]">
+                  <div className="flex flex-col items-center text-center">
+                    <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-sky-50 text-[#35639A] dark:bg-sky-500/10 dark:text-sky-300">
+                      <Mail className="h-7 w-7" aria-hidden />
+                    </span>
+                    <p className="mt-3 text-base font-semibold text-slate-900 dark:text-zinc-100">Email the link to yourself</p>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-zinc-400">We’ll send a secure signing link to your inbox.</p>
+                  </div>
+                  <label className="mt-6 block">
+                    <span className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-zinc-200">Email address</span>
                     <input
                       type="email"
                       value={mobileEmail}
-                      onChange={(event) => setMobileEmail(event.target.value)}
-                      placeholder="you@example.com"
-                      className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-900 shadow-inner outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200/70"
-                    />
-                    <button
-                      type="button"
-                      className="rounded-full bg-[#024d7c] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 disabled:opacity-50"
-                      onClick={() => {
-                        if (!mobileEmail.trim()) return;
-                        const link = mobileSessionUrl ?? mobileCaptureLink;
-                        const mailto = `mailto:${mobileEmail}?subject=Sign%20on%20your%20phone&body=${encodeURIComponent(
-                          `Open this link on your phone to draw your signature: ${link}`
-                        )}`;
-                        window.open(mailto, "_blank");
+                      onChange={(event) => {
+                        setMobileEmail(event.target.value);
+                        setMobileEmailMessage(null);
                       }}
-                      disabled={!mobileEmail.trim()}
-                    >
-                      Open email app
-                    </button>
-                  </div>
-                  <p className="mt-2 text-xs text-slate-600">
-                    The link is{" "}
-                    <code className="rounded bg-white px-2 py-1 text-[0.7rem] text-slate-700">
-                      {mobileSessionUrl ?? mobileCaptureLink}
-                    </code>
-                    . Save it if you prefer to share manually.
-                  </p>
-                </div>
-                <div className="flex items-center justify-end gap-2">
+                      placeholder="you@example.com"
+                      className="h-11 w-full rounded-lg border border-transparent bg-white px-3 text-sm font-medium text-slate-900 shadow-sm outline-none transition-[background-color,border-color,box-shadow] duration-150 placeholder:text-slate-400 focus:border-slate-300 focus:ring-4 focus:ring-violet-500/10 dark:bg-white/[0.06] dark:text-zinc-100 dark:placeholder:text-zinc-500 dark:focus:border-[#51515b]"
+                    />
+                  </label>
                   <button
                     type="button"
-                    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300"
-                    onClick={() => setSignatureHubStep("gallery")}
-                  >
-                    Back
-                  </button>
-                </div>
-              </div>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
-
-      {showDrawModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleCloseDrawModal} />
-          <div className="relative z-10 w-full max-w-3xl rounded-2xl bg-white p-6 shadow-[0_40px_120px_rgba(5,10,30,0.45)]">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-xl font-semibold text-slate-900">Draw signature</h3>
-                <p className="text-sm text-slate-600">Use your mouse or trackpad. Clear if you want to restart.</p>
-              </div>
-              <button
-                type="button"
-                onClick={handleCloseDrawModal}
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
-              <canvas
-                ref={drawCanvasRef}
-                className="h-[220px] w-full bg-white"
-                onPointerDown={handleDrawPointerDown}
-                onPointerMove={handleDrawPointerMove}
-                onPointerUp={handleDrawPointerUp}
-                onPointerLeave={handleDrawPointerUp}
-              />
-            </div>
-            <div className="mt-3 flex items-center justify-between">
-              <button
-                type="button"
-                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300"
-                onClick={clearDrawCanvas}
-              >
-                Clear
-              </button>
-              {drawStep === "name" ? null : (
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300"
-                    onClick={handleCloseDrawModal}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-full bg-[#024d7c] px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-[#012a44]/30 transition hover:-translate-y-0.5"
-                    onClick={handleDrawContinue}
-                  >
-                    Continue
-                  </button>
-                </div>
-              )}
-            </div>
-            {drawStep === "name" ? (
-              <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
-                <div className="flex flex-col gap-2">
-                  <label className="text-sm font-semibold text-slate-800">Name this signature</label>
-                  <input
-                    type="text"
-                    value={drawSignatureName}
-                    onChange={(event) => {
-                      setDrawSignatureName(event.target.value);
-                      setSignatureNameError(null);
-                      setDrawSignatureError(null);
+                    className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-lg bg-[#5B35D5] px-4 text-sm font-semibold text-white shadow-sm shadow-violet-500/20 transition hover:bg-[#4324B5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:shadow-none dark:disabled:bg-white/10 dark:disabled:text-zinc-500 dark:focus-visible:ring-offset-[#1C1C1F]"
+                    onClick={async () => {
+                      if (!mobileSessionId || !mobileEmail.trim() || isMobileEmailSending) return;
+                      setIsMobileEmailSending(true);
+                      setMobileEmailMessage(null);
+                      try {
+                        const response = await fetch("/api/sign-session/" + mobileSessionId + "/email", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ email: mobileEmail }),
+                        });
+                        const result = (await response.json().catch(() => null)) as { error?: string } | null;
+                        if (!response.ok) throw new Error(result?.error || "Unable to send the signing link.");
+                        setMobileEmailMessage("Signing link sent. Check your inbox.");
+                      } catch (error) {
+                        setMobileEmailMessage(error instanceof Error ? error.message : "Unable to send the signing link.");
+                      } finally {
+                        setIsMobileEmailSending(false);
+                      }
                     }}
-                    placeholder="Alan – full signature"
-                    className="h-10 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-900 shadow-inner outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200/70"
-                  />
-                  {(drawSignatureError || signatureNameError) && (
-                    <p className="text-xs font-semibold text-rose-600">
-                      {drawSignatureError || signatureNameError}
+                    disabled={!mobileSessionId || !mobileEmail.trim() || isMobileEmailSending}
+                  >
+                    {isMobileEmailSending ? "Sending…" : "Send link"}
+                  </button>
+                  {mobileEmailMessage ? (
+                    <p className={"mt-3 text-center text-xs font-medium " + (mobileEmailMessage === "Signing link sent. Check your inbox." ? "text-emerald-700 dark:text-emerald-300" : "text-rose-600 dark:text-rose-300")}>
+                      {mobileEmailMessage}
                     </p>
+                  ) : (
+                    <p className="mt-4 text-center text-xs text-slate-500 dark:text-zinc-400">Open the email link on the device you want to sign with. Your signature will appear here automatically.</p>
                   )}
                 </div>
-                <div className="flex items-center gap-2 justify-end">
-                  <button
-                    type="button"
-                    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300"
-                    onClick={() => setDrawStep("canvas")}
-                  >
-                    Back
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-full bg-[#024d7c] px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-[#012a44]/30 transition hover:-translate-y-0.5"
-                    onClick={handleSaveDrawnSignature}
-                  >
-                    Save &amp; Use
-                  </button>
-                </div>
               </div>
             ) : null}
+            </div>
           </div>
         </div>
       ) : null}
@@ -16304,6 +17189,137 @@ const timer =
           </div>
         </div>
       ) : null}
+
+      <AnimatePresence>
+        {showExportModal ? (
+          <motion.div className="fixed inset-0 z-[120] flex items-center justify-center p-4 sm:p-6" initial="initial" animate="open" exit="exit">
+            <motion.button type="button" aria-label="Close export dialog" className="absolute inset-0 cursor-default bg-[#17233A]/35 backdrop-blur-md backdrop-saturate-50" onClick={() => !busy && setShowExportModal(false)} variants={{ initial: { opacity: 0 }, open: { opacity: 1 }, exit: { opacity: 0 } }} transition={{ duration: 0.2 }} />
+            <motion.section role="dialog" aria-modal="true" aria-labelledby="export-dialog-title" className="relative z-10 w-full max-w-[530px] overflow-hidden rounded-[20px] border border-white/80 bg-white text-slate-900 shadow-[0_30px_90px_rgba(21,33,62,0.25)]" variants={{ initial: { opacity: 0, y: 8, scale: 0.99 }, open: { opacity: 1, y: 0, scale: 1 }, exit: { opacity: 0, y: 4, scale: 0.99 } }} transition={{ duration: 0.18, ease: "easeOut" }}>              <div className="flex items-start justify-between border-b border-slate-100 px-6 pb-4 pt-5">
+                <div className="min-w-0"><h2 id="export-dialog-title" className="text-[19px] font-semibold tracking-[-0.02em] text-slate-900">Download</h2><p className="mt-0.5 truncate text-sm text-slate-500" title={projectNameToFile(projectName)}>{projectNameToFile(projectName)}</p></div>
+                <button type="button" aria-label="Close download dialog" onClick={() => setShowExportModal(false)} disabled={busy} className="rounded-md p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40"><X className="h-5 w-5" aria-hidden /></button>
+              </div>
+              <div className="px-6 py-5">
+                <p className="mb-2.5 text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">Export format</p>
+                <div className="space-y-2">
+                  <button type="button" role="radio" aria-checked={exportFormat === "pdf"} disabled={busy} onClick={() => setExportFormat("pdf")} className={exportFormat === "pdf" ? "flex h-11 w-full items-center gap-3 rounded-lg border-2 border-[#7357E8] bg-white px-3 text-left" : "flex h-11 w-full items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 text-left transition hover:border-slate-300"}>
+                    <span className={exportFormat === "pdf" ? "h-4 w-4 shrink-0 rounded-full border-2 border-[#7357E8] bg-[#7357E8] shadow-[inset_0_0_0_3px_white]" : "h-4 w-4 shrink-0 rounded-full border-2 border-slate-300"} aria-hidden />
+                    <span className="text-sm font-semibold text-slate-900">This PDF</span>
+                    {fullPdfSizeLabel ? <span className="text-sm font-semibold text-slate-900">({fullPdfSizeLabel})</span> : <span role="status" className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500"><span aria-hidden className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-200 border-t-[#7357E8]" />Calculating size…</span>}
+                  </button>
+                  <div className={exportFormat === "compressed-pdf" ? "flex h-11 items-center gap-3 rounded-lg border-2 border-[#7357E8] bg-white px-3" : "flex h-11 items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 transition hover:border-slate-300"}>
+                    <button type="button" role="radio" aria-checked={exportFormat === "compressed-pdf"} disabled={busy} onClick={() => setExportFormat("compressed-pdf")} className="flex min-w-0 items-center gap-3 text-left">
+                      <span className={exportFormat === "compressed-pdf" ? "h-4 w-4 shrink-0 rounded-full border-2 border-[#7357E8] bg-[#7357E8] shadow-[inset_0_0_0_3px_white]" : "h-4 w-4 shrink-0 rounded-full border-2 border-slate-300"} aria-hidden />
+                      <span className="text-sm font-semibold text-slate-900">Compressed PDF</span>
+                      {compressedPdfSizeLabel ? <span className="shrink-0 text-sm font-semibold text-slate-900">({compressedPdfSizeLabel})</span> : <span role="status" className="inline-flex shrink-0 items-center gap-1.5 text-xs font-medium text-slate-500"><span aria-hidden className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-200 border-t-[#7357E8]" />Calculating size…</span>}
+                    </button>
+                    <div className="relative ml-auto shrink-0">
+                      <button
+                        type="button"
+                        aria-haspopup="listbox"
+                        aria-expanded={compressionMenuOpen}
+                        disabled={busy}
+                        onClick={() => {
+                          setCompressionMenuOpen((open) => !open);
+                          setImageFormatMenuOpen(false);
+                        }}
+                        className={compressionMenuOpen ? "inline-flex h-8 items-center gap-1 rounded-md bg-[#F3F0FF] px-2.5 text-[11px] font-bold uppercase tracking-wide text-[#6547E8] transition-colors" : "inline-flex h-8 items-center gap-1 rounded-md px-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"}
+                      >
+                        <span>{compressionLevel}</span>
+                        <ChevronDown className={compressionMenuOpen ? "h-3.5 w-3.5 rotate-180 transition-transform" : "h-3.5 w-3.5 transition-transform"} aria-hidden />
+                      </button>
+                      <AnimatePresence>
+                        {compressionMenuOpen ? (
+                          <motion.div
+                            role="listbox"
+                            aria-label="Compression level"
+                            initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                            transition={{ duration: 0.14, ease: "easeOut" }}
+                            className="absolute right-0 top-[calc(100%+6px)] z-30 w-32 origin-top-right rounded-lg border border-slate-200 bg-white p-1 shadow-[0_12px_28px_rgba(15,23,42,0.18)]"
+                          >
+                            {(["high", "medium", "low"] as const).map((level) => (
+                              <button
+                                key={level}
+                                type="button"
+                                role="option"
+                                aria-selected={exportFormat === "compressed-pdf" && compressionLevel === level}
+                                onClick={() => {
+                                  setCompressionLevel(level);
+                                  setExportFormat("compressed-pdf");
+                                  setCompressionMenuOpen(false);
+                                }}
+                                className={exportFormat === "compressed-pdf" && compressionLevel === level ? "flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-xs font-semibold text-slate-900" : "flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100"}
+                              >
+                                <span className="capitalize">{level}</span>
+                                {exportFormat === "compressed-pdf" && compressionLevel === level ? <Check className="h-3.5 w-3.5 text-[#6547E8]" aria-hidden /> : null}
+                              </button>
+                            ))}
+                          </motion.div>
+                        ) : null}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+                <div className={exportFormat === "png" || exportFormat === "jpg" ? "flex h-11 items-center gap-3 rounded-lg border-2 border-[#7357E8] bg-white px-3" : "flex h-11 items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 transition hover:border-slate-300"}>
+                  <button type="button" role="radio" aria-checked={exportFormat === "png" || exportFormat === "jpg"} disabled={busy} onClick={() => setExportFormat("png")} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                    <span className={exportFormat === "png" || exportFormat === "jpg" ? "h-4 w-4 shrink-0 rounded-full border-2 border-[#7357E8] bg-[#7357E8] shadow-[inset_0_0_0_3px_white]" : "h-4 w-4 shrink-0 rounded-full border-2 border-slate-300"} aria-hidden />
+                    <span className="text-sm font-semibold text-slate-900">Image format</span>
+                  </button>
+                  <div className="relative shrink-0">
+                    <button
+                      type="button"
+                      aria-haspopup="listbox"
+                      aria-expanded={imageFormatMenuOpen}
+                      disabled={busy}
+                      onClick={() => {
+                        setImageFormatMenuOpen((open) => !open);
+                        setCompressionMenuOpen(false);
+                      }}
+                      className={imageFormatMenuOpen ? "inline-flex h-8 items-center gap-1 rounded-md bg-[#F3F0FF] px-2.5 text-[11px] font-bold uppercase tracking-wide text-[#6547E8] transition-colors" : "inline-flex h-8 items-center gap-1 rounded-md px-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"}
+                    >
+                      <span>{exportFormat === "jpg" ? "JPG" : "PNG"}</span>
+                      <ChevronDown className={imageFormatMenuOpen ? "h-3.5 w-3.5 rotate-180 transition-transform" : "h-3.5 w-3.5 transition-transform"} aria-hidden />
+                    </button>
+                    <AnimatePresence>
+                      {imageFormatMenuOpen ? (
+                        <motion.div
+                          role="listbox"
+                          aria-label="Image format"
+                          initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                          transition={{ duration: 0.14, ease: "easeOut" }}
+                          className="absolute right-0 top-[calc(100%+6px)] z-30 w-28 origin-top-right rounded-lg border border-slate-200 bg-white p-1 shadow-[0_12px_28px_rgba(15,23,42,0.18)]"
+                        >
+                          {(["png", "jpg"] as const).map((format) => (
+                            <button
+                              key={format}
+                              type="button"
+                              role="option"
+                              aria-selected={(exportFormat === "png" || exportFormat === "jpg") && exportFormat === format}
+                              onClick={() => {
+                                setExportFormat(format);
+                                setImageFormatMenuOpen(false);
+                              }}
+                              className={(exportFormat === "png" || exportFormat === "jpg") && exportFormat === format ? "flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-xs font-semibold text-slate-900" : "flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100"}
+                            >
+                              <span className="uppercase">{format}</span>
+                              {(exportFormat === "png" || exportFormat === "jpg") && exportFormat === format ? <Check className="h-3.5 w-3.5 text-[#6547E8]" aria-hidden /> : null}
+                            </button>
+                          ))}
+                        </motion.div>
+                      ) : null}
+                    </AnimatePresence>
+                  </div>
+                </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/70 px-6 py-3.5"><button type="button" onClick={() => setShowExportModal(false)} disabled={busy} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-40">Cancel</button><button type="button" onClick={() => void handleDownload()} disabled={busy || downloadDisabled} className="inline-flex min-w-[142px] items-center justify-center gap-2 rounded-xl bg-[#6042DA] px-4 py-2.5 text-sm font-bold text-white shadow-[0_9px_18px_rgba(96,66,218,0.25)] transition hover:-translate-y-0.5 hover:bg-[#5335CC] disabled:cursor-not-allowed disabled:opacity-50"><Download className="h-4 w-4" aria-hidden />{busy ? "Preparing…" : exportFormat === "compressed-pdf" ? "Download compressed PDF" : exportFormat === "png" ? "Download as PNG" : exportFormat === "jpg" ? "Download as JPG" : "Download PDF"}</button></div>
+            </motion.section>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
       {showAuthGate ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -16511,7 +17527,7 @@ const timer =
                   <div key={`row-${rowIndex}`} className="flex items-center gap-[2px]">
                     {row.map((value, valueIndex) => {
                       if (!value) {
-                        return <span key={`empty-${rowIndex}-${valueIndex}`} className="h-6 w-6" aria-hidden />;
+                        return <span key={`empty-${rowIndex}-${valueIndex}`} className="h-7 w-7" aria-hidden />;
                       }
                       const selectedValue = isTextColorPicker
                         ? (pickerSelectedColor ?? colorPickerDraft.toLowerCase())
@@ -16528,7 +17544,7 @@ const timer =
                         <button
                           key={`${value}-${valueIndex}`}
                           type="button"
-                          className={`flex h-6 w-6 items-center justify-center rounded-full border transition-transform duration-150 hover:scale-105 ${
+                          className={`flex h-7 w-7 items-center justify-center rounded-full border transition-transform duration-150 hover:scale-105 ${
                             isSelected ? "border-slate-300" : "border-slate-200 hover:border-slate-300"
                           }`}
                           style={{ backgroundColor: value }}
@@ -16619,7 +17635,7 @@ const timer =
                       <button
                         key={value}
                         type="button"
-                        className={`flex h-6 w-6 items-center justify-center rounded-full border transition hover:border-slate-300 ${
+                        className={`flex h-7 w-7 items-center justify-center rounded-full border transition hover:border-slate-300 ${
                           isSelected ? "border-slate-300" : "border-slate-200"
                         }`}
                         style={{ backgroundColor: value }}
@@ -17021,6 +18037,46 @@ const timer =
             opacity: 1;
             transform: scale(1);
           }
+        }
+        @keyframes signature-hub-backdrop-in {
+          from { opacity: 0; backdrop-filter: blur(0); }
+          to { opacity: 1; backdrop-filter: blur(4px); }
+        }
+        @keyframes signature-hub-dialog-in {
+          from { opacity: 0; transform: translateY(8px) scale(0.985); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes signature-hub-backdrop-out {
+          from { opacity: 1; backdrop-filter: blur(4px); }
+          to { opacity: 0; backdrop-filter: blur(0); }
+        }
+        @keyframes signature-hub-dialog-out {
+          from { opacity: 1; transform: translateY(0) scale(1); }
+          to { opacity: 0; transform: translateY(4px) scale(0.99); }
+        }
+        @keyframes signature-hub-panel-in {
+          from { opacity: 0; transform: translateY(6px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes signature-hub-rename-backdrop-in {
+          from { opacity: 0; backdrop-filter: blur(0); }
+          to { opacity: 1; backdrop-filter: blur(2px); }
+        }
+        @keyframes signature-hub-rename-backdrop-out {
+          from { opacity: 1; backdrop-filter: blur(2px); }
+          to { opacity: 0; backdrop-filter: blur(0); }
+        }
+        @keyframes signature-hub-rename-dialog-in {
+          from { opacity: 0; transform: translateY(8px) scale(0.975); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes signature-hub-rename-dialog-out {
+          from { opacity: 1; transform: translateY(0) scale(1); }
+          to { opacity: 0; transform: translateY(1px) scale(0.975); }
+        }
+        @keyframes studio-sharp-preview-fade {
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
         @keyframes mpdf-startup-overlay-fade {
           from {

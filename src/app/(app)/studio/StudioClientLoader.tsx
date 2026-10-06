@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useEffect } from "react";
 
 const StudioClient = dynamic(() => import("./StudioClient"), {
   ssr: false,
@@ -8,5 +9,12 @@ const StudioClient = dynamic(() => import("./StudioClient"), {
 });
 
 export default function StudioClientLoader() {
+  useEffect(() => {
+    const frameId = window.requestAnimationFrame(() => {
+      window.dispatchEvent(new Event("workspace-studio-shell-ready"));
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, []);
+
   return <StudioClient />;
 }

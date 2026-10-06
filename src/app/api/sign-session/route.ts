@@ -14,5 +14,5 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
   const session = await createSignSession();
-  return NextResponse.json({ id: session.id });
+  return NextResponse.json({ id: session.id }, { headers: { "Cache-Control": "no-store" } });
 }

@@ -67,8 +67,11 @@ function SortableThumb({
   const thumbMaxWidth = Math.round(frameWidth * thumbScale);
   const innerStageWidth = isQuarterTurn && frameWidth > 0 ? `${(frameHeight / frameWidth) * 100}%` : "100%";
   const innerStageHeight = isQuarterTurn && frameHeight > 0 ? `${(frameWidth / frameHeight) * 100}%` : "100%";
-  const thumbSrc = item.thumb || TRANSPARENT_PIXEL;
-  const thumbVisible = Boolean(item.thumb);
+  // A rendered sheet is a valid immediate sidebar fallback while its smaller
+  // dedicated thumbnail is still being produced. This avoids blank cards on
+  // very large documents without waiting for a second PDF raster pass.
+  const thumbSrc = item.thumb || item.preview || TRANSPARENT_PIXEL;
+  const thumbVisible = Boolean(item.thumb || item.preview);
 
   return (
     <li
@@ -77,7 +80,11 @@ function SortableThumb({
         registerThumbNode(item.id)(node);
       }}
       data-thumb-id={item.id}
-      style={deferRender ? { ...style, contentVisibility: "auto", containIntrinsicSize: "320px" } : style}
+      // Keep the card frame and loading skeleton in the scroll rail at all times.
+      // `content-visibility: auto` leaves a white gap until the browser decides
+      // to paint an off-screen item, which feels broken when someone drags the
+      // sidebar scrollbar to a distant page.
+      style={deferRender ? { ...style, containIntrinsicSize: "320px" } : style}
       className="group relative flex w-full justify-center"
       {...attributes}
     >
@@ -97,14 +104,14 @@ function SortableThumb({
       >
         <div className="relative w-full" style={{ paddingBottom: getAspectPadding(frameWidth, frameHeight) }}>
           <div
-            className={`absolute inset-0 flex items-center justify-center overflow-hidden rounded-none border bg-[#EEF2F7] transition-colors duration-100 ease-out dark:border-[#4A4A4A] dark:bg-[#222224] ${
+            className={`absolute inset-0 flex items-center justify-center overflow-hidden rounded-none border-2 bg-[#EEF2F7] transition-none dark:bg-[#222224] ${
               selected
-                ? "border-2 border-[#6C47FF] dark:border-[#8B6CFF]"
-                : "border-2 border-slate-300 hover:border-slate-400 group-hover:border-slate-400 dark:border-[#4A4A4A] dark:hover:border-[#5B5B65] dark:group-hover:border-[#5B5B65]"
+                ? "border-[#6C47FF] dark:border-[#8B6CFF]"
+                : "border-slate-300 hover:border-slate-400 group-hover:border-slate-400 dark:border-[#4A4A4A] dark:hover:border-[#5B5B65] dark:group-hover:border-[#5B5B65]"
             }`}
           >
             <span
-              className={`absolute left-0 top-0 z-10 flex h-7 w-7 items-center justify-center rounded-none text-xs font-semibold tabular-nums transition-colors duration-100 ease-out ${
+              className={`absolute left-0 top-0 z-10 flex h-7 w-7 items-center justify-center rounded-none text-xs font-semibold tabular-nums transition-none ${
                 selected
                   ? "bg-[#6C47FF] text-white dark:bg-[#8B6CFF]"
                   : "bg-slate-200 text-slate-700 group-hover:bg-slate-400 group-hover:text-white dark:bg-[#4A4A4A] dark:text-zinc-200 dark:group-hover:bg-[#52525B]"
@@ -112,6 +119,11 @@ function SortableThumb({
             >
               {index + 1}
             </span>
+            {!thumbVisible ? (
+              <div className="studio-thumb-skeleton absolute inset-0" aria-label="Loading page thumbnail" role="status">
+                <span className="sr-only">Loading page thumbnail</span>
+              </div>
+            ) : null}
             <div
               className="relative z-0 flex h-full w-full items-center justify-center"
               style={{

@@ -2,6 +2,8 @@ const WORKSPACE_SESSION_KEY = "mpdf:files";
 const WORKSPACE_PREVIEW_CACHE_KEY = "mpdf:preview-cache";
 const WORKSPACE_DB_NAME = "mpdf-file-store";
 const WORKSPACE_DB_STORE = "files";
+const WORKSPACE_PREVIEW_DB_STORE = "previews";
+const WORKSPACE_PREVIEW_PAGE_DB_STORE = "preview-pages";
 
 export const PREVIEW_CACHE_VERSION = 2;
 
@@ -44,11 +46,17 @@ function getFileStore(): Promise<IDBDatabase> {
   }
   if (!fileStorePromise) {
     fileStorePromise = new Promise((resolve, reject) => {
-      const request = indexedDB.open(WORKSPACE_DB_NAME, 1);
+      const request = indexedDB.open(WORKSPACE_DB_NAME, 3);
       request.onupgradeneeded = () => {
         const db = request.result;
         if (!db.objectStoreNames.contains(WORKSPACE_DB_STORE)) {
           db.createObjectStore(WORKSPACE_DB_STORE);
+        }
+        if (!db.objectStoreNames.contains(WORKSPACE_PREVIEW_DB_STORE)) {
+          db.createObjectStore(WORKSPACE_PREVIEW_DB_STORE);
+        }
+        if (!db.objectStoreNames.contains(WORKSPACE_PREVIEW_PAGE_DB_STORE)) {
+          db.createObjectStore(WORKSPACE_PREVIEW_PAGE_DB_STORE);
         }
       };
       request.onsuccess = () => resolve(request.result);
@@ -156,6 +164,70 @@ export function readWorkspacePreviewCache(projectKey: string, expectedSourceIds:
   } catch {
     return null;
   }
+}
+
+export async function persistWorkspacePreviewCacheToDb(projectKey: string, cache: WorkspacePreviewCache) {
+  const db = await getFileStore();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(WORKSPACE_PREVIEW_DB_STORE, "readwrite");
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error ?? new Error("IndexedDB preview write failed"));
+    tx.objectStore(WORKSPACE_PREVIEW_DB_STORE).put(cache, projectKey);
+  });
+}
+
+export async function readWorkspacePreviewCacheFromDb(projectKey: string, expectedSourceIds: string[] | null) {
+  const db = await getFileStore();
+  const cache = await new Promise<WorkspacePreviewCache | null>((resolve, reject) => {
+    const tx = db.transaction(WORKSPACE_PREVIEW_DB_STORE, "readonly");
+    const request = tx.objectStore(WORKSPACE_PREVIEW_DB_STORE).get(projectKey);
+    request.onsuccess = () => resolve((request.result as WorkspacePreviewCache | undefined) ?? null);
+    request.onerror = () => reject(request.error ?? new Error("IndexedDB preview read failed"));
+  });
+  if (!cache || cache.version !== PREVIEW_CACHE_VERSION || !Array.isArray(cache.pages) || !Array.isArray(cache.sourceIds)) {
+    return null;
+  }
+  if (expectedSourceIds?.length && !arraysEqual(cache.sourceIds, expectedSourceIds)) return null;
+  return cache.pages
+    .filter((page) => page && typeof page.id === "string")
+    .map((page) => ({
+      id: page.id,
+      srcIdx: typeof page.srcIdx === "number" ? page.srcIdx : 0,
+      pageIdx: typeof page.pageIdx === "number" ? page.pageIdx : 0,
+      rotation: typeof page.rotation === "number" ? page.rotation : 0,
+      width: typeof page.width === "number" ? page.width : 0,
+      height: typeof page.height === "number" ? page.height : 0,
+      thumb: typeof page.thumb === "string" ? page.thumb : "",
+      thumbWidth: typeof page.thumbWidth === "number" ? page.thumbWidth : 0,
+      thumbHeight: typeof page.thumbHeight === "number" ? page.thumbHeight : 0,
+      preview: typeof page.preview === "string" ? page.preview : "",
+    }));
+}
+
+export type PersistentPagePreview = { sourceIds: string[]; preview: string };
+
+export async function persistPagePreviewToDb(projectKey: string, pageId: string, sourceIds: string[], preview: string) {
+  if (!preview) return;
+  const db = await getFileStore();
+  const key = `:`;
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(WORKSPACE_PREVIEW_PAGE_DB_STORE, "readwrite");
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error ?? new Error("IndexedDB page preview write failed"));
+    tx.objectStore(WORKSPACE_PREVIEW_PAGE_DB_STORE).put({ sourceIds, preview }, key);
+  });
+}
+
+export async function readPagePreviewFromDb(projectKey: string, pageId: string, sourceIds: string[]) {
+  const db = await getFileStore();
+  const key = `:`;
+  const entry = await new Promise<PersistentPagePreview | null>((resolve, reject) => {
+    const tx = db.transaction(WORKSPACE_PREVIEW_PAGE_DB_STORE, "readonly");
+    const request = tx.objectStore(WORKSPACE_PREVIEW_PAGE_DB_STORE).get(key);
+    request.onsuccess = () => resolve((request.result as PersistentPagePreview | undefined) ?? null);
+    request.onerror = () => reject(request.error ?? new Error("IndexedDB page preview read failed"));
+  });
+  return entry && arraysEqual(entry.sourceIds, sourceIds) && typeof entry.preview === "string" ? entry.preview : null;
 }
 
 export function persistSourceMetadata(

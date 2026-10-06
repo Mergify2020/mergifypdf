@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { getSignSession, updateSignSession } from "@/lib/signSessionStore";
+import { deleteSignSession, getSignSession, updateSignSession } from "@/lib/signSessionStore";
 import { isSameOrigin } from "@/lib/requestGuards";
 import { rateLimit } from "@/lib/rateLimit";
 
@@ -34,12 +34,15 @@ export async function GET(request: NextRequest, context: RouteContext) {
   if (!session) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  return NextResponse.json({
-    id: session.id,
-    signatureDataUrl: session.signatureDataUrl ?? null,
-    name: session.name ?? null,
-    updatedAt: session.updatedAt,
-  });
+  return NextResponse.json(
+    {
+      id: session.id,
+      signatureDataUrl: session.signatureDataUrl ?? null,
+      name: session.name ?? null,
+      updatedAt: session.updatedAt,
+    },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }
 
 export async function PUT(request: NextRequest, context: RouteContext) {
@@ -53,6 +56,13 @@ export async function PUT(request: NextRequest, context: RouteContext) {
   const sessionId = await resolveSessionId(request, context);
   if (!sessionId) {
     return NextResponse.json({ error: "Missing id" }, { status: 400 });
+  }
+  const existingSession = await getSignSession(sessionId);
+  if (!existingSession) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  if (existingSession.signatureDataUrl) {
+    return NextResponse.json({ error: "Signature already submitted" }, { status: 409 });
   }
   const body = await request.json().catch(() => null);
   if (!body || typeof body.dataUrl !== "string") {
@@ -71,5 +81,20 @@ export async function PUT(request: NextRequest, context: RouteContext) {
   if (!session) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
+}
+
+export async function DELETE(request: NextRequest, context: RouteContext) {
+  if (!isSameOrigin(request)) {
+    return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
+  }
+  const sessionId = await resolveSessionId(request, context);
+  if (!sessionId) {
+    return NextResponse.json({ error: "Missing id" }, { status: 400 });
+  }
+  const deleted = await deleteSignSession(sessionId);
+  if (!deleted) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  return new NextResponse(null, { status: 204, headers: { "Cache-Control": "no-store" } });
 }

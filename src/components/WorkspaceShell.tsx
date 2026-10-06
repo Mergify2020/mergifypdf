@@ -680,12 +680,13 @@ export default function WorkspaceShell({
         return;
       }
       void uploadProjectPreviewFromFile(createPendingFiles[0]?.file, id);
-      if (createPendingFiles.length === 1) {
-        void uploadProjectPdfFromFile(createPendingFiles[0]?.file, id).catch(() => {
-          // fall back to studio-side sync if immediate cloud upload fails
-        });
-      }
       queuePreload(createPendingFiles, id);
+      if (createPendingFiles.length === 1) {
+        await uploadProjectPdfFromFile(createPendingFiles[0]?.file, id).catch(() => false);
+      }
+      // The shell persists across the studio route. Unmount the organizer now
+      // so it cannot reappear when the user later returns to Projects.
+      setCreateOpen(false);
       router.push(buildStudioProjectHref(id));
     } catch {
       setCreateError("Could not create that project. Please try again.");
