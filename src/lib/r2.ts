@@ -101,6 +101,32 @@ export async function getR2ObjectSize(config: R2Config, key: string) {
   return typeof response.ContentLength === "number" ? response.ContentLength : null;
 }
 
+export async function getR2ObjectRange(config: R2Config, key: string, range: string) {
+  const response = await config.client.send(
+    new GetObjectCommand({
+      Bucket: config.bucket,
+      Key: key,
+      Range: range,
+    })
+  );
+
+  const body = response.Body;
+  if (!body) {
+    throw new Error("R2 object body is empty.");
+  }
+
+  const chunks: Buffer[] = [];
+  for await (const chunk of body as AsyncIterable<Uint8Array | Buffer | string>) {
+    chunks.push(Buffer.from(chunk));
+  }
+
+  return {
+    buffer: Buffer.concat(chunks),
+    contentRange: response.ContentRange ?? null,
+    contentLength: typeof response.ContentLength === "number" ? response.ContentLength : null,
+  };
+}
+
 export async function getR2ObjectBuffer(config: R2Config, key: string) {
   const response = await config.client.send(
     new GetObjectCommand({

@@ -18,10 +18,6 @@ export async function issueSignupVerificationCode(userId: string, email: string)
     },
   });
 
-  if (process.env.NODE_ENV !== "production") {
-    console.log(`[signup] Verification code for ${email}: ${code}`);
-  }
-
   const result = await sendSignupCodeEmail({ to: email, code });
   if (!result.ok) {
     console.error("[signup] Failed to send verification code", result.error);

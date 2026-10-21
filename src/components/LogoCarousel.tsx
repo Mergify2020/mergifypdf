@@ -1,5 +1,6 @@
 "use client";
 
+import NextImage from "next/image";
 import { useEffect, useState } from "react";
 type Logo = {
   name: string;
@@ -66,10 +67,12 @@ export default function LogoCarousel() {
           <div className="logo-marquee">
             <div className={`logo-marquee-track ${ready ? "logo-marquee-track--ready" : "logo-marquee-track--idle"}`}>
               {[...logos, ...logos].map((logo, index) => (
-                <img
+                <NextImage
                   key={`${logo.name}-${index}`}
                   src={logo.url}
                   alt={`${logo.name} logo`}
+                  width={144}
+                  height={44}
                   className="h-9 w-28 flex-shrink-0 object-contain opacity-90 brightness-0 invert contrast-100 drop-shadow-[0_0_12px_rgba(255,255,255,0.08)] md:h-10 md:w-32 lg:h-11 lg:w-36"
                   loading="eager"
                   decoding="async"

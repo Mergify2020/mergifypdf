@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
-import { createSignedR2Url, getR2Config, getR2ObjectBuffer, uploadR2Object } from "@/lib/r2";
+import { createSignedR2Url, getR2Config, getR2ObjectBuffer, getR2ObjectRange, uploadR2Object } from "@/lib/r2";
 import { isSameOrigin } from "@/lib/requestGuards";
+import { logDevTiming } from "@/lib/devTiming";
 import { createWatermarkedPdf } from "@/lib/pdfWatermark";
 
 async function ensureDbConnection() {
@@ -69,7 +70,7 @@ export async function POST(
       where: { id: project.id, userId },
       data: { pdfKey },
     });
-    console.info("Confirmed PDF upload key.", { projectId: id, env: process.env.NODE_ENV });
+    logDevTiming("project-pdf", "upload-confirmed");
     return NextResponse.json({ success: true });
   }
 
@@ -119,7 +120,7 @@ export async function POST(
     data: { pdfKey: objectKey },
   });
 
-  console.info("Uploaded PDF via server route.", { projectId: id, env: process.env.NODE_ENV });
+  logDevTiming("project-pdf", "server-upload-complete");
   return NextResponse.json({ success: true });
 }
 
@@ -160,6 +161,21 @@ export async function GET(
 
   if (mode === "editor") {
     try {
+      const range = req.headers.get("range");
+      if (range) {
+        const source = await getR2ObjectRange(r2Config, project.pdfKey, range);
+        return new NextResponse(Buffer.from(source.buffer), {
+          status: 206,
+          headers: {
+            "Content-Type": "application/pdf",
+            "Content-Disposition": `inline; filename="${id}.pdf"`,
+            "Cache-Control": "no-store",
+            "Accept-Ranges": "bytes",
+            ...(source.contentRange ? { "Content-Range": source.contentRange } : {}),
+            ...(source.contentLength !== null ? { "Content-Length": String(source.contentLength) } : {}),
+          },
+        });
+      }
       const source = await getR2ObjectBuffer(r2Config, project.pdfKey);
       return new NextResponse(Buffer.from(source), {
         status: 200,
@@ -167,6 +183,7 @@ export async function GET(
           "Content-Type": "application/pdf",
           "Content-Disposition": `inline; filename="${id}.pdf"`,
           "Cache-Control": "no-store",
+          "Accept-Ranges": "bytes",
         },
       });
     } catch (error) {

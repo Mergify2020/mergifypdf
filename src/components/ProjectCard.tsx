@@ -13,6 +13,8 @@ import {
   shouldHandleWorkspaceOpenClick,
 } from "@/lib/workspaceOpenHandoff";
 import { buildStudioProjectHref } from "@/lib/studioRoute";
+import { warmStudioClient } from "@/lib/studioWarmup";
+import { logDevTiming } from "@/lib/devTiming";
 
 type PreviewCacheEntry = {
   url: string;
@@ -36,8 +38,7 @@ const previewFetchQueue: Array<() => void> = [];
 let activePreviewFetches = 0;
 
 function debugProjectPreview(event: string, detail: Record<string, unknown>) {
-  if (process.env.NODE_ENV === "production") return;
-  console.info(`[project-preview:${event}]`, detail);
+  logDevTiming("project-preview", event, detail);
 }
 
 function runQueuedPreviewFetch<T>(task: () => Promise<T>, signal?: AbortSignal) {
@@ -244,7 +245,13 @@ export default function ProjectCard({
     : project.updated;
   const mobileMenuWidth = 224;
 
+  const warmProjectOpen = (projectId: string) => {
+    warmStudioClient();
+    void router.prefetch(buildStudioProjectHref(projectId));
+  };
+
   const openProject = (projectId: string) => {
+    warmStudioClient();
     beginExistingWorkspaceOpenHandoff(projectId);
     router.push(buildStudioProjectHref(projectId));
   };
@@ -1230,6 +1237,9 @@ export default function ProjectCard({
             href={buildStudioProjectHref(project.id)}
             className="absolute inset-0"
             aria-label={`Open ${project.title}`}
+            onFocus={() => warmProjectOpen(project.id)}
+            onMouseEnter={() => warmProjectOpen(project.id)}
+            onTouchStart={() => warmProjectOpen(project.id)}
             onClick={(event) => {
               if (renaming) {
                 event.preventDefault();
@@ -1252,6 +1262,7 @@ export default function ProjectCard({
           />
           <div className="flex h-full w-full items-center justify-center p-3 sm:p-4">
             {previewUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- authenticated project preview
               <img
                 ref={previewImageRef}
                 src={previewUrl}

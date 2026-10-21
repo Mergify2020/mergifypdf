@@ -4,8 +4,6 @@ import { prisma } from "@/lib/prisma";
 import StudioClientLoader from "./StudioClientLoader";
 import { getStudioProjectIdFromSearchParams } from "@/lib/studioRoute";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 type StudioSearchParams = Record<string, string | string[] | undefined>;
 
@@ -18,7 +16,7 @@ export default async function StudioPage({
   const projectId = getStudioProjectIdFromSearchParams(resolved);
 
   if (projectId) {
-    const session = await getServerSessionSafe(250);
+    const session = await getServerSessionSafe();
     if (session?.user) {
       try {
         const owned = await prisma.project.findFirst({

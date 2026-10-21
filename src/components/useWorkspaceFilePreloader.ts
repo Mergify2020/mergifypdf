@@ -15,7 +15,10 @@ type PreloadRequest = {
 };
 
 const WORKSPACE_DB_NAME = "mpdf-file-store";
+const WORKSPACE_DB_VERSION = 3;
 const WORKSPACE_DB_STORE = "files";
+const WORKSPACE_PREVIEW_DB_STORE = "previews";
+const WORKSPACE_PREVIEW_PAGE_DB_STORE = "preview-pages";
 const WORKSPACE_META_KEY = "mpdf:files";
 
 function workspaceFilesKey(projectId: string | null) {
@@ -27,6 +30,23 @@ export function useWorkspaceFilePreloader() {
 
   const queuePreload = useCallback((files: PendingWorkspaceFile[], projectId: string) => {
     if (!files.length) return;
+    // Publish the handoff metadata synchronously. The IndexedDB write below may
+    // take a moment for large PDFs, but Studio can now recognise that a source
+    // is on its way instead of incorrectly treating a just-created project as
+    // empty while that write is in flight.
+    if (typeof window !== "undefined") {
+      const payload: StoredSourceMeta[] = files.map(({ id, file }) => ({
+        id,
+        name: file.name,
+        size: file.size,
+        updatedAt: Date.now(),
+      }));
+      try {
+        window.sessionStorage?.setItem(workspaceFilesKey(projectId), JSON.stringify(payload));
+      } catch (err) {
+        console.error("Failed to stage workspace metadata for Studio", err);
+      }
+    }
     setQueue((prev) => [...prev, { files, projectId }]);
   }, []);
 
@@ -41,11 +61,17 @@ export function useWorkspaceFilePreloader() {
 
       const getDb = (): Promise<IDBDatabase> => {
         return new Promise((resolve, reject) => {
-          const request = window.indexedDB.open(WORKSPACE_DB_NAME, 1);
+          const request = window.indexedDB.open(WORKSPACE_DB_NAME, WORKSPACE_DB_VERSION);
           request.onupgradeneeded = () => {
             const db = request.result;
             if (!db.objectStoreNames.contains(WORKSPACE_DB_STORE)) {
               db.createObjectStore(WORKSPACE_DB_STORE);
+            }
+            if (!db.objectStoreNames.contains(WORKSPACE_PREVIEW_DB_STORE)) {
+              db.createObjectStore(WORKSPACE_PREVIEW_DB_STORE);
+            }
+            if (!db.objectStoreNames.contains(WORKSPACE_PREVIEW_PAGE_DB_STORE)) {
+              db.createObjectStore(WORKSPACE_PREVIEW_PAGE_DB_STORE);
             }
           };
           request.onsuccess = () => resolve(request.result);

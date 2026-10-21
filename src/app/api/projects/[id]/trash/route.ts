@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
 import { isSameOrigin } from "@/lib/requestGuards";
+import { toSafeProjectDto } from "@/lib/projectDto";
 export async function POST(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -37,7 +38,7 @@ export async function POST(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ project: updated });
+  return NextResponse.json({ project: toSafeProjectDto(updated) });
 }
 
 export async function DELETE(
@@ -74,5 +75,5 @@ export async function DELETE(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ project: updated });
+  return NextResponse.json({ project: toSafeProjectDto(updated) });
 }

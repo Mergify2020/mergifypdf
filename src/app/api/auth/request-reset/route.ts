@@ -141,7 +141,7 @@ export async function POST(req: Request) {
       code: "REQUESTED",
       message: "If an account exists for that email, a reset code has been sent.",
     });
-  } catch (error) {
+  } catch {
     return ok({
       code: "REQUESTED",
       message: "If an account exists for that email, a reset code has been sent.",

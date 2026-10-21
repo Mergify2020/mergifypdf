@@ -26,10 +26,6 @@ export async function issueTwoFactorSetupCode(
     },
   });
 
-  if (process.env.NODE_ENV !== "production") {
-    console.log(`[2fa] Verification code for ${email ?? "unknown"}: ${code}`);
-  }
-
   if (!email) {
     console.error("[2fa] Cannot send 2FA email without an address.");
     return { ok: false, error: "EMAIL_MISSING" };
@@ -60,10 +56,6 @@ export async function issueTwoFactorDisableCode(
       expires,
     },
   });
-
-  if (process.env.NODE_ENV !== "production") {
-    console.log(`[2fa] Verification code for ${email ?? "unknown"}: ${code}`);
-  }
 
   if (!email) {
     console.error("[2fa] Cannot send 2FA email without an address.");

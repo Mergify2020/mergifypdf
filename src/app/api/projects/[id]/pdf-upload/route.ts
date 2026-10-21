@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
 import { createSignedR2UploadUrl, getR2Config } from "@/lib/r2";
 import { isSameOrigin } from "@/lib/requestGuards";
+import { logDevTiming } from "@/lib/devTiming";
 
 async function ensureDbConnection() {
   for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -73,6 +74,6 @@ export async function POST(
 
   const objectKey = `${id}.pdf`;
   const url = await createSignedR2UploadUrl(r2Config, objectKey, "application/pdf");
-  console.info("Issued signed PDF upload URL.", { projectId: id, env: process.env.NODE_ENV });
+  logDevTiming("project-pdf", "signed-upload-issued");
   return NextResponse.json({ url, key: objectKey });
 }

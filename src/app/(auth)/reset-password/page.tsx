@@ -89,14 +89,14 @@ function ResetPasswordInner() {
           <div className="auth-card-animate h-auto w-full max-w-lg rounded-[5px] border border-white/25 bg-white px-7 py-12 shadow-[0_1px_4px_rgba(15,23,42,0.16)] sm:min-h-[620px] sm:px-9 sm:py-14 sm:shadow-[0_30px_90px_rgba(15,23,42,0.22)]">
             <div className="mb-4 flex items-center">
               <Image
-                src="/logos/home-expanded-sidebar-logo-light-v6.svg"
+                src="/logos/logo-icontext-dark-v4.svg"
                 alt="MergifyPDF"
                 width={164}
-                height={47}
+                height={32}
                 priority
                 loading="eager"
                 className="block"
-                style={{ width: 164, height: 47 }}
+                style={{ width: 164, height: 32 }}
               />
             </div>
             <h1 className="text-3xl font-semibold text-slate-900">Create a new password</h1>

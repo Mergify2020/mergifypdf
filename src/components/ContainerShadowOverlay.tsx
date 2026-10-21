@@ -23,15 +23,10 @@ export default function ContainerShadowOverlay({
 }) {
   const [active, setActive] = useState(false);
   const [rect, setRect] = useState<Rect | null>(null);
-  const [mounted, setMounted] = useState(false);
 
   const media = useMemo(() => {
     if (typeof window === "undefined") return null;
     return window.matchMedia("(max-width: 1399px)");
-  }, []);
-
-  useEffect(() => {
-    setMounted(true);
   }, []);
 
   useEffect(() => {
@@ -91,7 +86,7 @@ export default function ContainerShadowOverlay({
     };
   }, [media, targetId]);
 
-  if (!mounted || !active || !rect) return null;
+  if (!active || !rect || typeof document === "undefined") return null;
 
   return createPortal(
     <div

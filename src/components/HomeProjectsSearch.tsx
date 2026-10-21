@@ -162,7 +162,9 @@ export default function HomeProjectsSearch({
   const query = queryBridge?.query ?? "";
   const [projectsState, setProjectsState] = useState<SummaryProject[]>(projects);
   const [projectsLoading, setProjectsLoading] = useState(() => projects.length === 0);
-  const [showInitialProjectsSkeleton, setShowInitialProjectsSkeleton] = useState(showAllProjects);
+  // Route-level loading handles a genuine slow response. Do not add a second,
+  // artificial skeleton once project data has already arrived.
+  const [showInitialProjectsSkeleton, setShowInitialProjectsSkeleton] = useState(false);
   const initialProjects = useMemo(() => projectsState, [projectsState]);
   const accountInitials = useMemo(() => {
     const parts = accountName.trim().split(/\s+/).filter(Boolean);

@@ -232,14 +232,14 @@ export default function ForgotPasswordPage() {
             <div key={step} className="auth-card-animate">
             <div className="mb-4 flex items-center justify-between">
               <Image
-                src="/logos/home-expanded-sidebar-logo-light-v6.svg"
+                src="/logos/logo-icontext-dark-v4.svg"
                 alt="MergifyPDF"
                 width={164}
-                height={47}
+                height={32}
                 priority
                 loading="eager"
                 className="block"
-                style={{ width: 164, height: 47 }}
+                style={{ width: 164, height: 32 }}
               />
               <div aria-hidden="true" />
             </div>
@@ -332,7 +332,7 @@ export default function ForgotPasswordPage() {
                   aria-disabled={actionBusy}
                   className="flex w-full items-center justify-center gap-3 rounded-md border-2 border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 transition hover:-translate-y-[1px] hover:border-slate-400 hover:shadow-md active:scale-[0.985] active:brightness-95 active:transition active:duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent disabled:opacity-60"
                 >
-                  <img src="/google.svg" alt="Google logo" className="h-5 w-5" />
+                  <Image src="/google.svg" alt="Google logo" width={20} height={20} className="h-5 w-5" />
                   <span>{googleBusy ? "Signing in with Google…" : "Continue with Google"}</span>
                   {googleBusy && (
                     <svg

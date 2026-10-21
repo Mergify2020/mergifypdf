@@ -4,8 +4,6 @@ import { prisma } from "@/lib/prisma";
 import AllProjectsGrid from "@/components/AllProjectsGrid";
 import { formatProjectLastEdited } from "@/lib/formatProjectLastEdited";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 export default async function StarredProjectsPage() {
   const session = await getServerSessionSafe();

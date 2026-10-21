@@ -1,4 +1,5 @@
 import { prisma, isPrismaDatabaseUnavailableError } from "@/lib/prisma";
+import { resolveDataEnvironment } from "@/lib/runtimeEnvironment";
 
 export type AppSafetyCode =
   | "OK"
@@ -53,7 +54,7 @@ function getExpectedAppName() {
 }
 
 function getExpectedEnvironment() {
-  return process.env.APP_RUNTIME_ENV?.trim() || process.env.NODE_ENV || "development";
+  return resolveDataEnvironment();
 }
 
 function getExpectedDatabaseLabel() {

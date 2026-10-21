@@ -1,4 +1,4 @@
-/* eslint-disable no-console */
+ 
 const { PrismaClient } = require("@prisma/client");
 
 async function main() {

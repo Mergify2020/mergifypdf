@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { createSignedR2Url, deleteR2Objects, getR2Config, uploadR2Object } from "@/lib/r2";
 import { Prisma } from "@prisma/client";
 import { isSameOrigin } from "@/lib/requestGuards";
+import { logDevTiming } from "@/lib/devTiming";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -107,9 +108,44 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  const secureStorageEnabled = process.env.STORAGE_MODEL_V2_ENABLED === "true";
+  const [secureSourceAsset, latestSecureUpload] = secureStorageEnabled
+    ? await Promise.all([
+        prisma.projectAsset.findFirst({
+          where: {
+            projectId: project.id,
+            role: "SOURCE",
+            deletedAt: null,
+            storageObject: { ownerId: userId, status: "READY", deletedAt: null },
+          },
+          orderBy: { revision: "desc" },
+          select: {
+            id: true,
+            storageObject: { select: { byteLength: true, sha256: true } },
+          },
+        }),
+        prisma.uploadSession.findFirst({
+          where: { projectId: project.id, ownerId: userId },
+          orderBy: { createdAt: "desc" },
+          select: { status: true, safeErrorCode: true },
+        }),
+      ])
+    : [null, null];
+  const secureStorageFields = {
+    secureStorageEnabled,
+    secureSourceAvailable: Boolean(secureSourceAsset),
+    sourceAssetId: secureSourceAsset?.id ?? null,
+    sourceByteLength: secureSourceAsset?.storageObject.byteLength
+      ? Number(secureSourceAsset.storageObject.byteLength)
+      : null,
+    sourceSha256: secureSourceAsset?.storageObject.sha256 ?? null,
+    secureUploadStatus: latestSecureUpload?.status ?? null,
+    secureUploadErrorCode: latestSecureUpload?.safeErrorCode ?? null,
+  };
+
   let signedPdfUrl: string | null = null;
   let previewUrl: string | null = null;
-  if (project.pdfKey || project.previewKey) {
+  if ((project.pdfKey && !secureSourceAsset) || project.previewKey) {
     let r2Config;
     try {
       r2Config = getR2Config();
@@ -124,7 +160,7 @@ export async function GET(
         { status: 500 }
       );
     }
-    if (project.pdfKey) {
+    if (project.pdfKey && !secureSourceAsset) {
       signedPdfUrl = await createSignedR2Url(r2Config, project.pdfKey);
     }
     if (project.previewKey) {
@@ -151,10 +187,11 @@ export async function GET(
         {
           project: {
             ...rest,
-            hasPdf: !!updated.pdfKey,
+            hasPdf: !!updated.pdfKey || Boolean(secureSourceAsset),
             hasPreview: !!updated.previewKey,
             pdfUrl: signedPdfUrl,
             previewUrl,
+            ...secureStorageFields,
           },
         },
         {
@@ -171,10 +208,11 @@ export async function GET(
     {
       project: {
         ...rest,
-        hasPdf: !!project.pdfKey,
+        hasPdf: !!project.pdfKey || Boolean(secureSourceAsset),
         hasPreview: !!project.previewKey,
         pdfUrl: signedPdfUrl,
         previewUrl,
+        ...secureStorageFields,
       },
     },
     {
@@ -257,7 +295,7 @@ export async function PUT(
           { status: 502 }
         );
       }
-      console.info("Uploaded preview image to R2.", { projectId: id, env: process.env.NODE_ENV });
+      logDevTiming("project-preview", "upload-complete");
     } else {
       return NextResponse.json({ error: "Invalid preview payload" }, { status: 400 });
     }

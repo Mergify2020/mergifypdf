@@ -26,7 +26,7 @@ export default function PageLoadingSkeleton() {
         <div className="grid gap-4 md:grid-cols-2">
           {[0, 1, 2, 3].map((item) => (
             <div
-              // eslint-disable-next-line react/no-array-index-key
+               
               key={item}
               className="h-28 rounded-2xl bg-slate-50 skeleton-shimmer"
             />

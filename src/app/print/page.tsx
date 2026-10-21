@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { loadPdfJs } from "@/lib/pdfjsClient";
 
 type RenderedPage = {
   height: number;
@@ -10,7 +11,7 @@ type RenderedPage = {
   width: number;
 };
 
-export default function PrintPage() {
+function PrintContent() {
   const searchParams = useSearchParams();
   const src = searchParams.get("src") ?? "";
   const title = searchParams.get("title") ?? "Document";
@@ -40,14 +41,7 @@ export default function PrintPage() {
 
     const render = async () => {
       try {
-        const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf");
-        const workerSrc = new URL(
-          "pdfjs-dist/legacy/build/pdf.worker.js",
-          import.meta.url
-        ).toString();
-        if (pdfjsLib.GlobalWorkerOptions.workerSrc !== workerSrc) {
-          pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
-        }
+        const pdfjsLib = await loadPdfJs();
 
         const response = await fetch(src, { cache: "no-store" });
         if (!response.ok) {
@@ -245,5 +239,13 @@ export default function PrintPage() {
           : null}
       </div>
     </main>
+  );
+}
+
+export default function PrintPage() {
+  return (
+    <Suspense fallback={null}>
+      <PrintContent />
+    </Suspense>
   );
 }

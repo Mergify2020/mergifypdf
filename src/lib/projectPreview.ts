@@ -1,25 +1,20 @@
 "use client";
 
+import { loadPdfJs } from "@/lib/pdfjsClient";
+
 const PREVIEW_MAX_WIDTH = 240;
 const PREVIEW_MAX_HEIGHT = 320;
 
 async function renderPreviewDataUrl(file: File) {
-  const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf");
-  const workerSrc = new URL(
-    "pdfjs-dist/legacy/build/pdf.worker.js",
-    import.meta.url,
-  ).toString();
-  if (pdfjsLib.GlobalWorkerOptions.workerSrc !== workerSrc) {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
-  }
+  const pdfjsLib = await loadPdfJs();
 
   const bytes = await file.arrayBuffer();
-  let doc: any | null = null;
+  let doc: Awaited<ReturnType<typeof pdfjsLib.getDocument>["promise"]> | null = null;
   try {
-    doc = await pdfjsLib.getDocument({ data: bytes } as any).promise;
+    doc = await pdfjsLib.getDocument({ data: bytes } as never).promise;
   } catch {
     try {
-      doc = await pdfjsLib.getDocument({ data: bytes, disableWorker: true } as any).promise;
+      doc = await pdfjsLib.getDocument({ data: bytes, disableWorker: true } as never).promise;
     } catch {
       return null;
     }

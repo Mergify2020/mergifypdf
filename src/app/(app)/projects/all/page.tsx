@@ -9,8 +9,6 @@ import {
 } from "@/lib/prisma";
 import HomeProjectsSearch from "@/components/HomeProjectsSearch";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 function extractFileSizeFromData(data: unknown): number | null {
   if (!data || typeof data !== "object") return null;

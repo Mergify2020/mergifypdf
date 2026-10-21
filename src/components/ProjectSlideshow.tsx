@@ -32,6 +32,7 @@ export default function ProjectSlideshow({ thumbs, title, pagesCount }: Slidesho
 
   return (
     <div className="relative h-full w-full px-3 pt-4 pb-0">
+      {/* eslint-disable-next-line @next/next/no-img-element -- generated slideshow frame */}
       <img
         src={src}
         alt={title}

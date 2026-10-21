@@ -249,12 +249,13 @@ export default function StartProjectButton({
         return;
       }
       void uploadProjectPreviewFromFile(pendingFiles[0]?.file, id);
-      if (pendingFiles.length === 1) {
-        void uploadProjectPdfFromFile(pendingFiles[0]?.file, id).catch(() => {
-          // fall back to studio-side sync if immediate cloud upload fails
-        });
-      }
       queuePreload(pendingFiles, id);
+      if (pendingFiles.length === 1) {
+        await uploadProjectPdfFromFile(pendingFiles[0]?.file, id).catch(() => false);
+      }
+      // This dialog can outlive a route transition in a shared layout.
+      // Close it before entering the editor so it cannot flash on return.
+      setOpen(false);
       router.push(buildStudioProjectHref(id));
     } catch {
       setError("Could not create that project. Please try again.");

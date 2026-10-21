@@ -7,7 +7,8 @@ function expectedAppName() {
 }
 
 function expectedEnvironment() {
-  return process.env.APP_RUNTIME_ENV?.trim() || process.env.NODE_ENV || "development";
+  const runtime = process.env.APP_RUNTIME_ENV?.trim() || process.env.NODE_ENV || "development";
+  return process.env.APP_DATA_ENV?.trim() || (runtime === "production" ? "production" : "test");
 }
 
 function requireUsers() {

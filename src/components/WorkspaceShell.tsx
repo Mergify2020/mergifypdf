@@ -246,11 +246,15 @@ export default function WorkspaceShell({
   const [createShowValidation, setCreateShowValidation] = useState(false);
   const [contentSwapOut, setContentSwapOut] = useState(false);
   const [contentSwapIn, setContentSwapIn] = useState(false);
+  const [accountOpening, setAccountOpening] = useState(false);
+  const [studioReturnTransition, setStudioReturnTransition] = useState(false);
   const [homeProjectsQuery, setHomeProjectsQuery] = useState("");
   const [mobileSearchExpanded, setMobileSearchExpanded] = useState(false);
   const contentSwapTimerRef = useRef<number | null>(null);
   const contentSettleTimerRef = useRef<number | null>(null);
   const contentSwapSafetyRef = useRef<number | null>(null);
+  const accountNavigationTimerRef = useRef<number | null>(null);
+  const studioReturnTimerRef = useRef<number | null>(null);
   const pendingContentSwapPathRef = useRef<string | null>(null);
   const [billingPortalLoading, setBillingPortalLoading] = useState(false);
 
@@ -288,6 +292,43 @@ export default function WorkspaceShell({
   const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const clearReturnTimer = () => {
+      if (studioReturnTimerRef.current !== null) {
+        window.clearTimeout(studioReturnTimerRef.current);
+        studioReturnTimerRef.current = null;
+      }
+    };
+    const startStudioReturn = () => {
+      try {
+        window.sessionStorage.removeItem("mpdf:studio-return-transition");
+      } catch {
+        // Session storage is only a fallback for a remounted shell.
+      }
+      clearReturnTimer();
+      setStudioReturnTransition(true);
+      studioReturnTimerRef.current = window.setTimeout(() => {
+        setStudioReturnTransition(false);
+        studioReturnTimerRef.current = null;
+      }, 320);
+    };
+
+    try {
+      if (window.sessionStorage.getItem("mpdf:studio-return-transition")) {
+        startStudioReturn();
+      }
+    } catch {
+      // Continue without the optional return animation.
+    }
+    window.addEventListener("workspace-studio-return", startStudioReturn);
+    return () => {
+      window.removeEventListener("workspace-studio-return", startStudioReturn);
+      clearReturnTimer();
+    };
+  }, []);
+
+  useEffect(() => {
     applyThemePreference(initialTheme);
   }, [initialTheme]);
   const [logoutConfirmArmed, setLogoutConfirmArmed] = useState(false);
@@ -311,12 +352,29 @@ export default function WorkspaceShell({
   );
 
   const openAccountPanel = useCallback(() => {
-    router.push("/account");
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+    if (reduceMotion) {
+      router.push("/account");
+      return;
+    }
+
+    router.prefetch("/account");
+    setAccountOpening(true);
+    if (accountNavigationTimerRef.current !== null) {
+      window.clearTimeout(accountNavigationTimerRef.current);
+    }
+    accountNavigationTimerRef.current = window.setTimeout(() => {
+      router.push("/account");
+      accountNavigationTimerRef.current = null;
+    }, 80);
   }, [router]);
 
   const closeAccountPanel = useCallback(() => {
     setAccountPanelOpen(false);
-  }, [router]);
+  }, []);
 
   useEffect(() => {
     setAvatarLoadFailed(false);
@@ -622,17 +680,50 @@ export default function WorkspaceShell({
         return;
       }
       void uploadProjectPreviewFromFile(createPendingFiles[0]?.file, id);
-      if (createPendingFiles.length === 1) {
-        void uploadProjectPdfFromFile(createPendingFiles[0]?.file, id).catch(() => {
-          // fall back to studio-side sync if immediate cloud upload fails
-        });
-      }
       queuePreload(createPendingFiles, id);
+      if (createPendingFiles.length === 1) {
+        await uploadProjectPdfFromFile(createPendingFiles[0]?.file, id).catch(() => false);
+      }
+      // The shell persists across the studio route. Unmount the organizer now
+      // so it cannot reappear when the user later returns to Projects.
+      setCreateOpen(false);
       router.push(buildStudioProjectHref(id));
     } catch {
       setCreateError("Could not create that project. Please try again.");
       setCreateBusy(false);
       resetCreateLaunchTransition();
+      cancelWorkspaceOpenHandoff();
+    }
+  }
+
+  async function handleCreateBlankProject() {
+    if (createBusy) return;
+    const startedAt = Date.now();
+    const name = "Untitled document";
+    try {
+      window.localStorage?.setItem(PROJECT_NAME_STORAGE_KEY, name);
+    } catch {
+      // ignore storage failures
+    }
+    setCreateError(null);
+    setCreateBusy(true);
+    await resetWorkspaceStorage();
+    beginWorkspaceOpenHandoff([], startedAt);
+    try {
+      const res = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, data: { pages: [], sources: [], pagesCount: 0 } }),
+      });
+      if (!res.ok) throw new Error("Could not create blank project.");
+      const json = (await res.json().catch(() => null)) as { project?: { id?: string } } | null;
+      const id = json?.project?.id;
+      if (!id) throw new Error("Blank project did not return an id.");
+      setCreateOpen(false);
+      router.push(`${buildStudioProjectHref(id)}&startBlank=1`);
+    } catch {
+      setCreateError("Could not create a blank document. Please try again.");
+      setCreateBusy(false);
       cancelWorkspaceOpenHandoff();
     }
   }
@@ -670,7 +761,7 @@ export default function WorkspaceShell({
     pathname === "/" ||
     (pathname?.startsWith("/projects") ?? false) ||
     (pathname?.startsWith("/signature-center") ?? false);
-  const workspaceBackgroundClass = pathname === "/projects/all"
+  const workspaceBackgroundClass = pathname === "/projects/all" || pathname?.startsWith("/signature-center")
     ? "bg-white"
     : useUnifiedWorkspaceBackground
       ? "bg-[var(--app-surface)]"
@@ -700,11 +791,14 @@ export default function WorkspaceShell({
   const homeBillingModalBody = "Please update your payment method to restore access.";
   const isHomeProjectsPath = (value?: string | null) =>
     value === "/" || (value?.startsWith("/projects") ?? false);
-  const showPersistentWorkspaceTopBar =
-    (pathname === "/" || pathname === "/projects/all") ? false : (pathname?.startsWith("/signature-center") ?? false);
+  const isPrimaryWorkspacePath = (value?: string | null) =>
+    isHomeProjectsPath(value) || (value?.startsWith("/signature-center") ?? false);
+  const showPersistentWorkspaceTopBar = false;
   const isAllProjectsRoute = pathname === "/" || pathname === "/projects/all";
   const showDesktopAllProjectsTopBar = pathname === "/projects/all" && !phoneViewport;
-  const useFlatAllProjectsShell = showDesktopAllProjectsTopBar;
+  // Keep navigation integrated with the workspace frame. The former floating
+  // sidebar card added an unnecessary gap and shadow on non-project routes.
+  const useFlatAllProjectsShell = true;
   const fallbackProjectCardCount = fallbackProjectCountReady
     ? (isAllProjectsRoute ? Math.min(homeRecentProjects.length, 60) : Math.min(homeRecentProjects.length, 9))
     : isAllProjectsRoute
@@ -717,7 +811,7 @@ export default function WorkspaceShell({
       if (closeMobile) setMobileOpen(false);
       return false;
     }
-    const shouldAnimateSwap = isHomeProjectsPath(currentPath) && isHomeProjectsPath(nextPath);
+    const shouldAnimateSwap = isPrimaryWorkspacePath(currentPath) && isPrimaryWorkspacePath(nextPath);
     const reduceMotion =
       typeof window !== "undefined" &&
       window.matchMedia &&
@@ -749,7 +843,7 @@ export default function WorkspaceShell({
     contentSwapTimerRef.current = window.setTimeout(() => {
       router.push(nextPath);
       contentSwapTimerRef.current = null;
-    }, 24);
+    }, 80);
     contentSwapSafetyRef.current = window.setTimeout(() => {
       setContentSwapOut(false);
       contentSwapSafetyRef.current = null;
@@ -766,20 +860,10 @@ export default function WorkspaceShell({
           : BookOpen;
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const routes = ["/", "/projects/all", "/signature-center", "/templates", "/projects/trash"];
-    const prefetch = () => {
-      routes.forEach((route) => {
-        router.prefetch(route);
-      });
-    };
-    if ("requestIdleCallback" in globalThis) {
-      const handle = (globalThis as Window & typeof globalThis).requestIdleCallback(prefetch, { timeout: 1200 });
-      return () => (globalThis as Window & typeof globalThis).cancelIdleCallback(handle);
+    if (isAccountRoute) {
+      setAccountOpening(false);
     }
-    const timer = setTimeout(prefetch, 200);
-    return () => clearTimeout(timer);
-  }, [router]);
+  }, [isAccountRoute]);
 
   useEffect(() => {
     if (!accountPanelOpen) return;
@@ -821,6 +905,9 @@ export default function WorkspaceShell({
       }
       if (contentSwapSafetyRef.current !== null) {
         window.clearTimeout(contentSwapSafetyRef.current);
+      }
+      if (accountNavigationTimerRef.current !== null) {
+        window.clearTimeout(accountNavigationTimerRef.current);
       }
     };
   }, []);
@@ -1396,7 +1483,7 @@ export default function WorkspaceShell({
 
       if (!res.ok) {
         setBillingPortalLoading(false);
-        // eslint-disable-next-line no-console
+         
         console.error("Failed to load portal");
         return;
       }
@@ -1409,7 +1496,7 @@ export default function WorkspaceShell({
       setBillingPortalLoading(false);
     } catch {
       setBillingPortalLoading(false);
-      // eslint-disable-next-line no-console
+       
       console.error("Unexpected error loading billing portal");
     } finally {
       setProfileOpen(false);
@@ -1716,7 +1803,7 @@ export default function WorkspaceShell({
       />
     ) : null}
     <div
-      className={`workspace-shell-root ${useFlatAllProjectsShell ? "projects-all-workspace" : ""} relative z-10 flex h-[calc(var(--workspace-vh,100dvh)-var(--home-banner-offset,0px))] overflow-hidden pt-0 ${homeBillingBannerExiting ? "transition-[padding-top,min-height] duration-300 ease-out" : "transition-none"} md:pt-[var(--home-banner-offset)] ${workspaceBackgroundClass} ${sidebarCompact ? "sidebar-collapsed" : ""} ${expanded ? "" : "sidebar-minimized"} dark:bg-[#252525] `}
+      className={`workspace-shell-root ${useFlatAllProjectsShell ? "projects-all-workspace" : ""} ${studioReturnTransition ? "workspace-studio-return-in" : ""} relative z-10 flex h-[calc(var(--workspace-vh,100dvh)-var(--home-banner-offset,0px))] overflow-hidden pt-0 ${homeBillingBannerExiting ? "transition-[padding-top,min-height] duration-300 ease-out" : "transition-none"} md:pt-[var(--home-banner-offset)] ${workspaceBackgroundClass} ${sidebarCompact ? "sidebar-collapsed" : ""} ${expanded ? "" : "sidebar-minimized"} dark:bg-[#252525] `}
       style={
         {
           height: "calc(var(--workspace-vh, 100dvh) - var(--home-banner-offset, 0px))",
@@ -1816,21 +1903,22 @@ export default function WorkspaceShell({
           >
             <div className="flex flex-1 flex-col gap-2.5 overflow-y-auto overflow-x-hidden px-0 py-2.5">
               <div
-                className={`flex h-10 w-full items-center border-b border-slate-200 px-1 pb-3 dark:border-[#3A3A3A] ${
+                className={`flex h-12 w-full items-center border-b border-slate-200 px-1 pb-2 dark:border-[#3A3A3A] ${
                   expanded ? "justify-between" : "justify-center"
                 } ${useFlatAllProjectsShell ? "pb-3" : ""}`}
               >
                 {expanded ? (
                   <>
                     <AppHeaderBrand
+                      variant="sidebarNav"
                       logoLightSrc={
                         isHomePanel || isSignaturesPanel
-                          ? "/logos/home-expanded-sidebar-logo-light-v6.svg"
+                          ? "/logos/logo-icontext-dark-v4.svg"
                           : undefined
                       }
                       logoDarkSrc={
                         isHomePanel || isSignaturesPanel
-                          ? "/logos/home-expanded-sidebar-logo-dark-v6.svg"
+                          ? "/logos/logo-icontext-v4-dark.svg"
                           : undefined
                       }
                     />
@@ -1871,16 +1959,16 @@ export default function WorkspaceShell({
                     onMouseDown={() => {
                       clearSidebarTooltip();
                     }}
-                    className="group relative flex h-11 w-full items-center justify-center rounded-lg bg-transparent p-0 transition"
+                    className="group relative flex h-10 w-full items-center justify-center rounded-lg bg-transparent p-0 transition"
                     aria-label="Expand sidebar"
                   >
                     <Image
-                      src="/logos/home-collapsed-sidebar-logo-light-dark.svg"
+                      src="/logos/new-logo-icon-v4.svg"
                       alt="MergifyPDF"
-                      width={56}
-                      height={56}
+                      width={30}
+                      height={36}
                       priority
-                      className="h-14 w-14 max-w-none transition-opacity duration-200 group-hover:opacity-0 group-focus-visible:opacity-0"
+                      className="h-9 w-auto max-w-none transition-opacity duration-200 group-hover:opacity-0 group-focus-visible:opacity-0"
                     />
                     <span className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100">
                       <PanelRightClose className="h-6 w-6 text-slate-800 dark:text-zinc-100" aria-hidden />
@@ -2221,12 +2309,12 @@ export default function WorkspaceShell({
                   variant="sidebarPanel"
                   logoLightSrc={
                     isHomePanel || isSignaturesPanel
-                      ? "/logos/home-expanded-sidebar-logo-light-v6.svg"
+                      ? "/logos/logo-icontext-dark-v4.svg"
                       : undefined
                   }
                   logoDarkSrc={
                     isHomePanel || isSignaturesPanel
-                      ? "/logos/home-expanded-sidebar-logo-dark-v6.svg"
+                      ? "/logos/logo-icontext-v4-dark.svg"
                       : undefined
                   }
                 />
@@ -2680,7 +2768,7 @@ export default function WorkspaceShell({
             <main className="relative z-0 flex min-h-0 flex-1 flex-col lg:z-40">
               <div className={`flex min-h-0 w-full flex-1 flex-col `}>
                 <div
-                  className="workspace-content-shell flex h-full min-h-0 w-full flex-1 flex-col transition-none 2xl:transition-[max-width] 2xl:duration-300 2xl:ease-[cubic-bezier(0.22,1,0.36,1)]"
+                  className={["workspace-content-shell flex h-full min-h-0 w-full flex-1 flex-col transition-none 2xl:transition-[max-width] 2xl:duration-300 2xl:ease-[cubic-bezier(0.22,1,0.36,1)]", accountOpening ? "workspace-account-opening-out pointer-events-none" : "", contentSwapOut ? "workspace-content-swap-out pointer-events-none" : "", contentSwapIn ? "workspace-content-swap-in" : ""].join(" ")}
                   style={{ maxWidth: showDesktopAllProjectsTopBar ? "none" : "var(--shell-content-width)", width: "100%" }}
                 >
                   {children}
@@ -2828,7 +2916,21 @@ export default function WorkspaceShell({
                                   )}
                                 </p>
                                 {!createDragActive ? (
-                                  <p className="mt-2 text-sm text-[#4B5563] dark:text-zinc-400">Add up to 12 PDF files.</p>
+                                  <>
+                                    <p className="mt-2 text-sm text-[#4B5563] dark:text-zinc-400">Add up to 12 PDF files.</p>
+                                    <div className="mt-5 flex flex-col items-center">
+                                      <span className="text-xs font-medium text-slate-400 dark:text-zinc-500">or</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => void handleCreateBlankProject()}
+                                        disabled={createBusy}
+                                        className="mt-2 inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-violet-200 hover:bg-violet-50/60 hover:text-[#5B35D5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60 dark:border-[#4A4A4A] dark:bg-[#323232] dark:text-zinc-100 dark:hover:border-violet-400/45 dark:hover:bg-violet-400/[0.08] dark:hover:text-violet-200"
+                                      >
+                                        <FileText className="h-4 w-4 text-[#6C47FF]" aria-hidden />
+                                        Start with a blank document
+                                      </button>
+                                    </div>
+                                  </>
                                 ) : null}
                               </div>
                             ) : (
@@ -2888,22 +2990,6 @@ export default function WorkspaceShell({
           )
         : null}
 
-      {billingPortalLoading ? (
-        <div className="pointer-events-none fixed inset-0 z-[1200]">
-          <div className="absolute inset-0 bg-[var(--app-surface)]" />
-          <div className="relative flex min-h-screen items-center justify-center px-6 py-10">
-            <div className="pointer-events-none flex flex-col items-center text-center">
-              <div
-                className="h-14 w-14 animate-spin rounded-full border-[5px] border-[#D9CCFF] border-t-[#6C47FF] dark:border-[#3F3F3F] dark:border-t-[#8B6CFF]"
-                aria-hidden
-              />
-              <p className="mt-5 text-[24px] font-semibold tracking-tight text-slate-900 dark:text-[#F5F5F5] sm:text-[28px]">
-                Opening Billing Portal...
-              </p>
-            </div>
-          </div>
-        </div>
-      ) : null}
       {sidebarTooltip && document.body.dataset.modalOpen !== "true"
         ? createPortal(
           <div
@@ -2928,8 +3014,8 @@ export default function WorkspaceShell({
         <div className="mx-auto flex h-[76px] w-full max-w-7xl items-center justify-between px-4 lg:px-6">
           <div className="flex items-center gap-3">
             <AppHeaderBrand
-              logoLightSrc="/logos/home-expanded-sidebar-logo-light-v6.svg"
-              logoDarkSrc="/logos/home-expanded-sidebar-logo-dark-v6.svg"
+              logoLightSrc="/logos/logo-icontext-dark-v4.svg"
+              logoDarkSrc="/logos/logo-icontext-v4-dark.svg"
             />
           </div>
           <div className="flex items-center gap-3">
@@ -2965,9 +3051,7 @@ export default function WorkspaceShell({
       : null;
 
   const primaryShell = isStudioRoute ? (
-    <Suspense
-      fallback={null}
-    >
+    <Suspense fallback={null}>
       <main>{children}</main>
     </Suspense>
   ) : isPricingRoute ? (

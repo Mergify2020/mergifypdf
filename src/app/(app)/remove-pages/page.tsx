@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { PDFDocument } from "pdf-lib";
+import { loadPdfJs } from "@/lib/pdfjsClient";
 
 type PageItem = { index: number; thumb?: string; selected: boolean };
 
@@ -28,9 +29,7 @@ function RemovePagesClient() {
 
       try {
         // Import pdf.js ONLY in the browser
-        const pdfjsLib = await import("pdfjs-dist");
-        pdfjsLib.GlobalWorkerOptions.workerSrc =
-          "https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+        const pdfjsLib = await loadPdfJs();
 
         const buf = await file.arrayBuffer();
         const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
@@ -186,8 +185,9 @@ function RemovePagesClient() {
                   />
                   <div className="text-xs">
                     <div className="text-gray-700 font-medium mb-1">Page {p.index + 1}</div>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    { }
                     {p.thumb ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- generated PDF thumbnail
                       <img
                         src={p.thumb}
                         alt={`Thumbnail of page ${p.index + 1}`}

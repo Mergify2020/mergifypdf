@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf";
+import { loadPdfJs } from "@/lib/pdfjsClient";
 
 const PREVIEW_MAX_WIDTH = 240;
 const PREVIEW_MAX_HEIGHT = 320;
@@ -37,16 +37,9 @@ export default function HomePdfPreview({
       return;
     }
 
-    const workerSrc = new URL(
-      "pdfjs-dist/legacy/build/pdf.worker.js",
-      import.meta.url
-    ).toString();
-    if (pdfjsLib.GlobalWorkerOptions.workerSrc !== workerSrc) {
-      pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
-    }
-
     (async () => {
       try {
+        const pdfjsLib = await loadPdfJs();
         const doc = await pdfjsLib.getDocument({ url: pdfUrl }).promise;
         const page = await doc.getPage(1);
         const normalizedRotation = ((rotation % 360) + 360) % 360;

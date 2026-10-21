@@ -10,7 +10,7 @@ export const PROJECT_ENTRY_PROGRESS_TAIL_MAX = 0.12;
 export const PROJECT_ENTRY_PROGRESS_COMPLETE_EASE_MS = 360;
 export const PROJECT_ENTRY_LOADING_MAX_HOLD_MS = 12000;
 export const PROJECT_ENTRY_MIN_VISIBLE_MS = 320;
-export const PROJECT_ENTRY_EXIT_MS = 160;
+export const PROJECT_ENTRY_EXIT_MS = 240;
 
 export type ProjectEntryLoadingContext = "studio" | "existing-project" | "new-project";
 
@@ -30,8 +30,8 @@ export function getProjectEntryLoadingCopy(context: ProjectEntryLoadingContext, 
     case "studio":
     default:
       return {
-        title: "Opening project",
-        subtitle: "Loading editor...",
+        title: "Getting your project ready",
+        subtitle: "Preparing document pages.",
       };
   }
 }

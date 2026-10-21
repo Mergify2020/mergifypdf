@@ -1,14 +1,17 @@
 import type { NextConfig } from "next";
+import createBundleAnalyzer from "@next/bundle-analyzer";
+import { assertRuntimeEnvironmentSafe } from "./src/lib/runtimeEnvironment";
+
+assertRuntimeEnvironmentSafe(process.env);
 
 const shouldLimitCpus = process.env.CI === "1" || process.env.CI === "true";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  experimental: shouldLimitCpus
-    ? {
-        cpus: 1,
-      }
-    : {},
+  experimental: {
+    webpackMemoryOptimizations: true,
+    ...(shouldLimitCpus ? { cpus: 1, webpackBuildWorker: true } : {}),
+  },
   turbopack: {
     resolveAlias: {
       canvas: "./src/lib/emptyModule.ts",
@@ -46,14 +49,16 @@ const nextConfig: NextConfig = {
     ];
 
     return [
-      { source: "/favicon2080.svg", headers: noCacheHeaders },
-      { source: "/favicon-32-2080.png", headers: noCacheHeaders },
-      { source: "/favicon-16-2080.png", headers: noCacheHeaders },
-      { source: "/apple-touch-icon-2080.png", headers: noCacheHeaders },
-      { source: "/safari-pinned-tab-2080.svg", headers: noCacheHeaders },
+      { source: "/logos/new-logo-icon-v4.svg", headers: noCacheHeaders },
+      { source: "/favicons/favicon-48x48.png", headers: noCacheHeaders },
+      { source: "/favicons/favicon-32x32.png", headers: noCacheHeaders },
+      { source: "/favicons/favicon-16x16.png", headers: noCacheHeaders },
+      { source: "/favicons/apple-touch-icon.png", headers: noCacheHeaders },
     ];
   },
 
 };
 
-export default nextConfig;
+const withBundleAnalyzer = createBundleAnalyzer({ enabled: process.env.ANALYZE === "true" });
+
+export default withBundleAnalyzer(nextConfig);

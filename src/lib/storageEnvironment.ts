@@ -1,0 +1,1 @@
+export { validateStorageEnvironment } from "./runtimeEnvironment";

@@ -4,6 +4,7 @@ import { ChevronDown, ChevronUp, GripVertical, Trash2 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import UiTooltip from "@/components/UiTooltip";
 import type { PendingWorkspaceFile } from "@/components/useWorkspaceFilePreloader";
+import { loadPdfJs } from "@/lib/pdfjsClient";
 
 type Props = {
   files: PendingWorkspaceFile[];
@@ -224,17 +225,13 @@ export default function PendingFilesReorderList({
 
     const loadPageCount = async (file: File) => {
       try {
-        const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf");
-        const workerSrc = new URL("pdfjs-dist/legacy/build/pdf.worker.js", import.meta.url).toString();
-        if (pdfjsLib.GlobalWorkerOptions.workerSrc !== workerSrc) {
-          pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
-        }
+        const pdfjsLib = await loadPdfJs();
         const bytes = await file.arrayBuffer();
         const doc = await pdfjsLib.getDocument({ data: bytes } as never).promise;
         return doc.numPages;
       } catch (err) {
         try {
-          const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf");
+          const pdfjsLib = await loadPdfJs();
           const bytes = await file.arrayBuffer();
           const doc = await pdfjsLib.getDocument({ data: bytes, disableWorker: true } as never).promise;
           return doc.numPages;

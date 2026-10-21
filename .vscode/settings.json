@@ -3,11 +3,27 @@
     "**/node_modules/**": true,
     "**/.next/**": true,
     "**/.vercel/**": true,
-    "**/dist/**": true
+    "**/dist/**": true,
+    "**/src/generated/**": true,
+    "**/storage/**": true,
+    "**/public/previews/**": true,
+    "**/public/pdfs/**": true,
+    "**/coverage/**": true,
+    "**/playwright-report/**": true,
+    "**/test-results/**": true
   },
   "search.exclude": {
     "**/node_modules/**": true,
-    "**/.next/**": true
+    "**/.next/**": true,
+    "**/.vercel/**": true,
+    "**/dist/**": true,
+    "**/src/generated/**": true,
+    "**/storage/**": true,
+    "**/public/previews/**": true,
+    "**/public/pdfs/**": true,
+    "**/coverage/**": true,
+    "**/playwright-report/**": true,
+    "**/test-results/**": true
   },
   "chatgpt.openOnStartup": false,
   "chatgpt.runCodexInWindowsSubsystemForLinux": false

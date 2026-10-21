@@ -1,13 +1,19 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { CreditCard, ShieldCheck, Sparkles } from "lucide-react";
 import RevealOnScroll from "@/components/RevealOnScroll";
 import { BILLING_PRICE_IDS, type BillingPlanTier } from "@/lib/billingPlans";
 import PricingTierCards from "@/components/PricingTierCards";
 
+const PRICE_IDS: Record<BillingPlanTier, { monthly: string; annual: string }> = {
+  essential_plus: BILLING_PRICE_IDS.essential_plus,
+  signature_pro: BILLING_PRICE_IDS.signature_pro,
+};
+
 export default function PricingPlans() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const autoCheckoutStartedRef = useRef(false);
   const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("monthly");
@@ -18,11 +24,6 @@ export default function PricingPlans() {
   const [toggleHighlight, setToggleHighlight] = useState({ left: 0, width: 0 });
   const [shouldAnimateToggle, setShouldAnimateToggle] = useState(false);
   const toggleMeasured = toggleHighlight.width > 0;
-
-  const PRICE_IDS: Record<BillingPlanTier, { monthly: string; annual: string }> = {
-    essential_plus: BILLING_PRICE_IDS.essential_plus,
-    signature_pro: BILLING_PRICE_IDS.signature_pro,
-  };
 
   function getPlanTierFromName(tierName: string): BillingPlanTier | null {
     if (tierName === "Essential Plus") return "essential_plus";
@@ -42,7 +43,7 @@ export default function PricingPlans() {
   }
 
   function handleSelectPlan(tierName: string) {
-    window.location.href = getRegisterUrl(tierName);
+    router.push(getRegisterUrl(tierName));
   }
 
   function handleBillingPeriodChange(nextPeriod: "monthly" | "annual") {
@@ -124,7 +125,7 @@ export default function PricingPlans() {
 
       if (res.status === 401) {
         const callbackUrl = "/pricing?checkout=" + validPlan + "&billing=" + validBilling;
-        window.location.href = "/login?callbackUrl=" + encodeURIComponent(callbackUrl);
+        router.push("/login?callbackUrl=" + encodeURIComponent(callbackUrl));
         return;
       }
 
@@ -140,7 +141,7 @@ export default function PricingPlans() {
     }
 
     void startSelectedCheckout();
-  }, [searchParams]);
+  }, [router, searchParams]);
 
 
   return (

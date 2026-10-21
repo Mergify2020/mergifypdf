@@ -1,8 +1,10 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import PricingTierCards from '@/components/PricingTierCards';
 
 export default function LandingPricingCards() {
+  const router = useRouter();
   const billingPeriod = 'monthly' as const;
 
   function canUseTrialForPlan() {
@@ -18,11 +20,11 @@ export default function LandingPricingCards() {
   function handleSelectPlan(tierName: string) {
     const planTier = getPlanTierFromName(tierName);
     if (!planTier) {
-      window.location.href = '/register';
+      router.push('/register');
       return;
     }
     const params = new URLSearchParams({ plan: planTier, billing: billingPeriod });
-    window.location.href = '/register?' + params.toString();
+    router.push('/register?' + params.toString());
   }
 
   return (

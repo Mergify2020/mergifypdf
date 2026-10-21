@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 type Props = {
-  variant?: "default" | "sidebarPanel";
+  variant?: "default" | "sidebarNav" | "sidebarPanel";
   href?: string;
   logoLightSrc?: string;
   logoDarkSrc?: string;
@@ -18,9 +18,7 @@ export default function AppHeaderBrand({
   logoDarkSrc,
 }: Props) {
   const pathname = usePathname();
-  const isStudio = pathname?.startsWith("/studio") ?? false;
   const isAccountSettings = pathname?.startsWith("/account") ?? false;
-  const useHardNav = process.env.NODE_ENV === "development" && isStudio;
 
   const handleBrandClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
     if (pathname === href) {
@@ -29,44 +27,19 @@ export default function AppHeaderBrand({
     }
   };
 
-  const baseWidth = 168;
-  const baseHeight = 42;
-  const autoScale = isAccountSettings ? 1.35 : 1.12;
-  const scale = variant === "sidebarPanel" ? 1 : autoScale;
+  // The supplied wordmark is deliberately wide. Keep its native proportions
+  // rather than fitting it into the old, taller logo frame.
+  const isSidebarNav = variant === "sidebarNav";
+  const baseWidth = isSidebarNav ? 187 : 154;
+  const baseHeight = isSidebarNav ? 36 : 30;
+  const autoScale = isAccountSettings ? 1.15 : 1;
+  const scale = variant === "sidebarNav" || variant === "sidebarPanel" ? 1 : autoScale;
   const logoWidth = Math.round(baseWidth * scale);
   const logoHeight = Math.round(baseHeight * scale);
-  const lightLogo = logoLightSrc ?? "/logo-wording.2026.2.svg";
-  const darkLogo = logoDarkSrc ?? "/Merg.dark-logo.2026.svg";
+  const lightLogo = logoLightSrc ?? "/logos/logo-icontext-dark-v4.svg";
+  const darkLogo = logoDarkSrc ?? "/logos/logo-icontext-v4-dark.svg";
 
-  return useHardNav ? (
-    <a
-      href={href}
-      className="inline-flex items-center gap-2"
-      aria-label={href === "/" ? "Back to home" : "Back to dashboard"}
-      onClick={handleBrandClick}
-    >
-      <Image
-        src={lightLogo}
-        alt="MergifyPDF"
-        width={logoWidth}
-        height={logoHeight}
-        priority
-        loading="eager"
-        className="app-brand-light block dark:hidden"
-        style={{ width: logoWidth, height: logoHeight }}
-      />
-      <Image
-        src={darkLogo}
-        alt="MergifyPDF"
-        width={logoWidth}
-        height={logoHeight}
-        priority
-        loading="eager"
-        className="app-brand-dark hidden dark:block"
-        style={{ width: logoWidth, height: logoHeight }}
-      />
-    </a>
-  ) : (
+  return (
     <Link
       href={href}
       className="inline-flex items-center gap-2"

@@ -1,33 +1,49 @@
-import AppGuestShell from "@/components/AppGuestShell";
-import WorkspaceShell from "@/components/WorkspaceShell";
-import { getServerSessionSafe } from "@/lib/serverSession";
 import { cookies } from "next/headers";
-
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+import AppGuestShell from "@/components/AppGuestShell";
+import AppMaintenanceScreen from "@/components/AppMaintenanceScreen";
+import WorkspaceShell from "@/components/WorkspaceShell";
+import { getServerSessionState } from "@/lib/serverSession";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const session = await getServerSessionSafe();
-  const cookieStore = await cookies();
+  const [sessionState, cookieStore] = await Promise.all([
+    getServerSessionState(),
+    cookies(),
+  ]);
+
+  if (sessionState.status === "unavailable") {
+    return (
+      <AppMaintenanceScreen
+        status={{
+          ok: false,
+          code: "DB_UNAVAILABLE",
+          message: "Authentication is temporarily unavailable.",
+          checkedAt: new Date().toISOString(),
+          strict: true,
+        }}
+      />
+    );
+  }
+
+  const session = sessionState.session;
   const sidebarExpandedCookie = cookieStore.get("mpdf_sidebar_expanded")?.value;
-  const initialSidebarExpanded = sidebarExpandedCookie === "0" ? false : true;
+  const initialSidebarExpanded = sidebarExpandedCookie !== "0";
   const themeCookie = cookieStore.get("theme")?.value;
   const initialTheme = themeCookie === "dark" ? "dark" : "light";
   const googleManagedAccount =
     !!session?.user?.providers?.includes("google") && !session.user.providers.includes("credentials");
   const lockedByTwoFactor =
     !googleManagedAccount && !!session?.user?.twoFactorEnabled && session.user.twoFactorPassed !== true;
-  const authedWorkspace = session?.user && !lockedByTwoFactor;
+  const authedUser = session?.user && !lockedByTwoFactor ? session.user : null;
 
-  return authedWorkspace ? (
+  return authedUser ? (
     <WorkspaceShell
-      key={session?.user?.id ?? "guest"}
+      key={authedUser.id ?? "guest"}
       initialSidebarExpanded={initialSidebarExpanded}
       initialTheme={initialTheme}
       initialProfile={{
-        id: session?.user?.id ?? null,
-        name: session?.user?.name ?? null,
-        email: session?.user?.email ?? null,
+        id: authedUser.id ?? null,
+        name: authedUser.name ?? null,
+        email: authedUser.email ?? null,
       }}
     >
       {children}

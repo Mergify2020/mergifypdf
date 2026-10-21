@@ -16,6 +16,7 @@ import {
   shouldHandleWorkspaceOpenClick,
 } from "@/lib/workspaceOpenHandoff";
 import { buildStudioProjectHref } from "@/lib/studioRoute";
+import { warmStudioClient } from "@/lib/studioWarmup";
 
 type SummaryProject = {
   id: string;
@@ -194,12 +195,14 @@ export default function RecentProjectsRow({
   };
 
   const openProject = (projectId: string) => {
+    warmStudioClient();
     beginExistingWorkspaceOpenHandoff(projectId);
     void router.prefetch(buildStudioProjectHref(projectId));
     router.push(buildStudioProjectHref(projectId));
   };
 
   const warmProjectOpen = (projectId: string) => {
+    warmStudioClient();
     if (workspaceWarmupStartedRef.current.has(projectId)) return;
     workspaceWarmupStartedRef.current.add(projectId);
     void router.prefetch(buildStudioProjectHref(projectId));

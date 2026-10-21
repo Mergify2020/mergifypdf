@@ -1,19 +1,32 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import AppHeaderBrand from "@/components/AppHeaderBrand";
+import AppMaintenanceScreen from "@/components/AppMaintenanceScreen";
 import HeaderAuthButtons from "@/components/HeaderAuthButtons";
 import HeroHeader from "@/components/HeroHeader";
 import HeaderFeaturesLink from "@/components/HeaderFeaturesLink";
 import HeaderUploadLink from "@/components/HeaderUploadLink";
 import HeaderSupportLink from "@/components/HeaderSupportLink";
-import { getServerSessionSafe } from "@/lib/serverSession";
+import { getServerSessionState } from "@/lib/serverSession";
 import AuthFooter from "./AuthFooter";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
 export default async function AuthLayout({ children }: { children: React.ReactNode }) {
-  const session = await getServerSessionSafe();
+  const sessionState = await getServerSessionState();
+  if (sessionState.status === "unavailable") {
+    return (
+      <AppMaintenanceScreen
+        status={{
+          ok: false,
+          code: "DB_UNAVAILABLE",
+          message: "Authentication is temporarily unavailable.",
+          checkedAt: new Date().toISOString(),
+          strict: true,
+        }}
+      />
+    );
+  }
+  const session = sessionState.session;
   const googleManagedAccount =
     !!session?.user?.providers?.includes("google") && !session.user.providers.includes("credentials");
   const lockedByTwoFactor =
@@ -30,8 +43,8 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
           <div className="flex items-center gap-3">
             <AppHeaderBrand
               href="/"
-              logoLightSrc="/logos/home-expanded-sidebar-logo-light-v6.svg"
-              logoDarkSrc="/logos/home-expanded-sidebar-logo-dark-v6.svg"
+              logoLightSrc="/logos/logo-icontext-dark-v4.svg"
+              logoDarkSrc="/logos/logo-icontext-v4-dark.svg"
             />
           </div>
           <div className="hidden items-center justify-center gap-4 text-base font-semibold text-slate-700 min-[810px]:flex min-[810px]:gap-6">
@@ -63,7 +76,9 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
           </div>
         </div>
       </HeroHeader>
-      <main className="page-fade-in flex min-h-0 flex-1 flex-col">{children}</main>
+      <main className="page-fade-in flex min-h-0 flex-1 flex-col">
+        <Suspense fallback={null}>{children}</Suspense>
+      </main>
       <AuthFooter />
     </div>
   );

@@ -154,14 +154,14 @@ export default function LoginPage() {
             <div className="auth-card-animate relative h-auto w-full max-w-lg rounded-[5px] border border-white/25 bg-white px-7 py-12 shadow-[0_1px_4px_rgba(15,23,42,0.16)] sm:min-h-[620px] sm:px-9 sm:py-14 sm:shadow-[0_30px_90px_rgba(15,23,42,0.22)]">
               <div className="mb-4 flex items-center">
                 <Image
-                  src="/logos/home-expanded-sidebar-logo-light-v6.svg"
+                  src="/logos/logo-icontext-dark-v4.svg"
                   alt="MergifyPDF"
                   width={164}
-                  height={47}
+                  height={32}
                   priority
                   loading="eager"
                   className="block"
-                  style={{ width: 164, height: 47 }}
+                  style={{ width: 164, height: 32 }}
                 />
               </div>
               <h1 className="text-3xl font-semibold text-slate-900">
@@ -324,7 +324,7 @@ export default function LoginPage() {
                     className="flex w-full items-center justify-center gap-3 rounded-md border-2 border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 transition hover:-translate-y-[1px] hover:border-slate-400 hover:shadow-md active:scale-[0.985] active:brightness-95 active:transition active:duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#024d7c]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
                     aria-label="Continue with Google"
                   >
-                    <img src="/google.svg" alt="Google logo" className="h-5 w-5" />
+                    <Image src="/google.svg" alt="Google logo" width={20} height={20} className="h-5 w-5" />
                     <span>{googleBusy ? "Signing in with Google…" : "Continue with Google"}</span>
                     {googleBusy && (
                       <svg

@@ -1,12 +1,14 @@
 "use client";
 
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Check, CreditCard, ShieldCheck, Download, Lock } from "lucide-react";
 import RevealOnScroll from "@/components/RevealOnScroll";
 import PricingTierCards from "@/components/PricingTierCards";
 
 export default function PricingPlans() {
+  const router = useRouter();
   const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("monthly");
   const [billingPreferenceReady, setBillingPreferenceReady] = useState(false);
   const toggleRef = useRef<HTMLDivElement | null>(null);
@@ -29,11 +31,11 @@ export default function PricingPlans() {
   function handleSelectPlan(tierName: string) {
     const planTier = getPlanTierFromName(tierName);
     if (!planTier) {
-      window.location.href = "/register";
+      router.push("/register");
       return;
     }
     const params = new URLSearchParams({ plan: planTier, billing: billingPeriod });
-    window.location.href = "/register?" + params.toString();
+    router.push("/register?" + params.toString());
   }
 
   function handleBillingPeriodChange(nextPeriod: "monthly" | "annual") {

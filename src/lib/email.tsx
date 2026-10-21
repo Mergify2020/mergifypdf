@@ -1,12 +1,14 @@
 ﻿// src/lib/email.tsx — REPLACE EVERYTHING
 import React from "react";
 import { Resend } from "resend";
+import { emailDeliveryAllowed } from "@/lib/runtimeEnvironment";
 import { ResetPasswordCodeEmail } from "@/emails/ResetPasswordCodeEmail";
 import { EmailChangeCodeEmail } from "@/emails/EmailChangeCodeEmail";
 import { SignupCodeEmail } from "@/emails/SignupCodeEmail";
 import { SignatureRequestEmail } from "@/emails/SignatureRequestEmail";
 import { TwoFactorCodeEmail } from "@/emails/TwoFactorCodeEmail";
 import { TwoFactorSignInEmail } from "@/emails/TwoFactorSignInEmail";
+import { MobileSigningLinkEmail } from "@/emails/MobileSigningLinkEmail";
 
 type SendArgs = { to: string; code: string };
 const EMAIL_APP_BASE_URL = (
@@ -27,6 +29,10 @@ export async function sendResetEmail({ to, code }: SendArgs): Promise<ResetEmail
     return { ok: false, error: "Missing RESEND_API_KEY" };
   }
 
+  if (!emailDeliveryAllowed()) {
+    return { ok: false, error: "Email delivery is disabled for this environment." };
+  }
+
   const resend = new Resend(apiKey);
   const from = process.env.FROM_EMAIL || "MergifyPDF <onboarding@resend.dev>";
 
@@ -43,7 +49,7 @@ export async function sendResetEmail({ to, code }: SendArgs): Promise<ResetEmail
       throw error;
     }
     return { ok: true, id: data?.id };
-  } catch (err) {
+  } catch {
     try {
       const { data, error } = await resend.emails.send({
         from,
@@ -113,6 +119,10 @@ export async function sendEmailChangeCodeEmail({ to, code }: SendArgs): Promise<
     return { ok: false, error: "Missing RESEND_API_KEY" };
   }
 
+  if (!emailDeliveryAllowed()) {
+    return { ok: false, error: "Email delivery is disabled for this environment." };
+  }
+
   const resend = new Resend(apiKey);
   const from =
     process.env.EMAIL_CHANGE_FROM_EMAIL ||
@@ -132,7 +142,7 @@ export async function sendEmailChangeCodeEmail({ to, code }: SendArgs): Promise<
       throw error;
     }
     return { ok: true, id: data?.id };
-  } catch (err) {
+  } catch {
     try {
       const { data, error } = await resend.emails.send({
         from,
@@ -201,6 +211,10 @@ export async function sendSignupCodeEmail({ to, code }: SignupArgs) {
     return { ok: false, error: "Missing RESEND_API_KEY" };
   }
 
+  if (!emailDeliveryAllowed()) {
+    return { ok: false, error: "Email delivery is disabled for this environment." };
+  }
+
   const resend = new Resend(apiKey);
   const from =
     process.env.SIGNUP_FROM_EMAIL ||
@@ -220,7 +234,7 @@ export async function sendSignupCodeEmail({ to, code }: SignupArgs) {
       throw error;
     }
     return { ok: true, id: data?.id };
-    } catch (err) {
+    } catch {
       try {
         const { data, error } = await resend.emails.send({
           from,
@@ -306,6 +320,10 @@ export async function sendSignatureRequestEmail({
     return { ok: false, error: "Missing RESEND_API_KEY" };
   }
 
+  if (!emailDeliveryAllowed()) {
+    return { ok: false, error: "Email delivery is disabled for this environment." };
+  }
+
   const resend = new Resend(apiKey);
   const from = `Mergify Sign <sign@mergifypdf.com>`;
   const subject = "Your signature is requested — Mergify Sign";
@@ -353,6 +371,10 @@ export async function sendTwoFactorSetupEmail({
     return { ok: false, error: "Missing RESEND_API_KEY" };
   }
 
+  if (!emailDeliveryAllowed()) {
+    return { ok: false, error: "Email delivery is disabled for this environment." };
+  }
+
   const resend = new Resend(apiKey);
   const from =
     process.env.SECURITY_FROM_EMAIL ||
@@ -375,7 +397,7 @@ export async function sendTwoFactorSetupEmail({
       throw error;
     }
     return { ok: true, id: data?.id };
-  } catch (err) {
+  } catch {
     try {
       const { data, error } = await resend.emails.send({
         from,
@@ -453,6 +475,10 @@ export async function sendTwoFactorLoginEmail({
     return { ok: false, error: "Missing RESEND_API_KEY" };
   }
 
+  if (!emailDeliveryAllowed()) {
+    return { ok: false, error: "Email delivery is disabled for this environment." };
+  }
+
   const resend = new Resend(apiKey);
   const from =
     process.env.SECURITY_FROM_EMAIL ||
@@ -472,7 +498,7 @@ export async function sendTwoFactorLoginEmail({
       throw error;
     }
     return { ok: true, id: data?.id };
-  } catch (err) {
+  } catch {
     try {
       const { data, error } = await resend.emails.send({
         from,
@@ -527,5 +553,49 @@ export async function sendTwoFactorLoginEmail({
       console.error("[email] sendTwoFactorLoginEmail fatal:", err2);
       return { ok: false, error: String(err2) };
     }
+  }
+}
+
+
+export type MobileSigningLinkEmailArgs = {
+  to: string;
+  signingUrl: string;
+};
+
+export async function sendMobileSigningLinkEmail({
+  to,
+  signingUrl,
+}: MobileSigningLinkEmailArgs): Promise<{ ok: true; id?: string | null } | { ok: false; error: string }> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.error("[email] Missing RESEND_API_KEY");
+    return { ok: false, error: "Email is not configured." };
+  }
+  if (!emailDeliveryAllowed()) {
+    return { ok: false, error: "Email delivery is disabled for this environment." };
+  }
+
+  try {
+    const resend = new Resend(apiKey);
+    // Resend only accepts its onboarding sender in sandbox mode unless a
+    // domain has been verified. Production retains the configured sender.
+    const from =
+      process.env.EMAIL_DELIVERY_MODE === "sandbox"
+        ? process.env.RESEND_SANDBOX_FROM_EMAIL || "MergifyPDF <onboarding@resend.dev>"
+        : process.env.FROM_EMAIL || "MergifyPDF <onboarding@resend.dev>";
+    const { data, error } = await resend.emails.send({
+      from,
+      to,
+      subject: "Your MergifyPDF signing link",
+      react: <MobileSigningLinkEmail signingUrl={signingUrl} />,
+    });
+    if (error) {
+      console.error("[email] Mobile signing link error:", error);
+      return { ok: false, error: "Unable to send the signing link." };
+    }
+    return { ok: true, id: data?.id };
+  } catch (error) {
+    console.error("[email] Mobile signing link fatal:", error);
+    return { ok: false, error: "Unable to send the signing link." };
   }
 }
