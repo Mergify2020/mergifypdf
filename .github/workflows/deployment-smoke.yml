@@ -22,8 +22,8 @@ jobs:
     env:
       DEPLOYMENT_URL: ${{ inputs.deployment_url || github.event.deployment_status.environment_url }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
       - run: node scripts/post-deploy-smoke.mjs
