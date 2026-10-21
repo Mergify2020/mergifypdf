@@ -3,6 +3,12 @@ import * as React from "react";
 export function ResetPasswordEmail({ resetUrl }: { resetUrl: string }) {
   return (
     <div style={{ fontFamily: "Inter, Arial, sans-serif", lineHeight: 1.6 }}>
+      <img
+        src="https://mergifypdf.com/.well-known/email-logo-expanded-v2.png"
+        alt="MergifyPDF"
+        width={160}
+        style={{ display: "block", height: "auto", marginBottom: 20 }}
+      />
       <h2 style={{ margin: "0 0 12px" }}>Reset your MergifyPDF password</h2>
       <p>We received a request to reset your password. Click the button below:</p>
       <p>

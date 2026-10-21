@@ -577,8 +577,14 @@ export async function sendMobileSigningLinkEmail({
 
   try {
     const resend = new Resend(apiKey);
+    // Resend only accepts its onboarding sender in sandbox mode unless a
+    // domain has been verified. Production retains the configured sender.
+    const from =
+      process.env.EMAIL_DELIVERY_MODE === "sandbox"
+        ? process.env.RESEND_SANDBOX_FROM_EMAIL || "MergifyPDF <onboarding@resend.dev>"
+        : process.env.FROM_EMAIL || "MergifyPDF <onboarding@resend.dev>";
     const { data, error } = await resend.emails.send({
-      from: process.env.FROM_EMAIL || "MergifyPDF <onboarding@resend.dev>",
+      from,
       to,
       subject: "Your MergifyPDF signing link",
       react: <MobileSigningLinkEmail signingUrl={signingUrl} />,

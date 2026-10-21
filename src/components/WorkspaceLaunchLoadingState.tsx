@@ -184,15 +184,15 @@ export default function WorkspaceLaunchLoadingState({
           <div className="flex flex-col items-center text-center">
             {/* eslint-disable-next-line @next/next/no-img-element -- brand asset is already loaded by the workspace */}
             <img
-              src="/logos/home-expanded-sidebar-logo-light-v6.svg"
+              src="/logos/logo-icontext-dark-v4.svg"
               alt="MergifyPDF"
-              className="h-14 w-auto dark:hidden"
+              className="h-10 w-auto dark:hidden"
             />
             {/* eslint-disable-next-line @next/next/no-img-element -- dark-mode brand asset */}
             <img
-              src="/logos/home-expanded-sidebar-logo-dark-v6.svg"
+              src="/logos/logo-icontext-v4-dark.svg"
               alt="MergifyPDF"
-              className="hidden h-14 w-auto dark:block"
+              className="hidden h-10 w-auto dark:block"
             />
           </div>
         </div>

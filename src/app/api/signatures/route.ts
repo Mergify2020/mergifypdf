@@ -66,8 +66,15 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const signatures = await loadUserSignatures(session.user.id);
-  return NextResponse.json({ signatures });
+  try {
+    const signatures = await loadUserSignatures(session.user.id);
+    return NextResponse.json({ signatures });
+  } catch {
+    return NextResponse.json(
+      { error: "Signature library is temporarily unavailable" },
+      { status: 503 },
+    );
+  }
 }
 
 export async function PUT(request: Request) {
@@ -85,7 +92,13 @@ export async function PUT(request: Request) {
   }
 
   const sanitized = sanitizeSignatures((body as { signatures?: unknown }).signatures);
-  await saveUserSignatures(session.user.id, sanitized);
-
-  return NextResponse.json({ ok: true });
+  try {
+    await saveUserSignatures(session.user.id, sanitized);
+    return NextResponse.json({ ok: true });
+  } catch {
+    return NextResponse.json(
+      { error: "Signature library could not be saved" },
+      { status: 503 },
+    );
+  }
 }

@@ -17,8 +17,8 @@ export default function LogoMerge({ size = 80 }: { size?: number }) {
       aria-hidden
     >
       <Image
-        src="/logo5.svg"
-        width={size}
+        src="/logos/new-logo-icon-v4.svg"
+        width={Math.round(size * 0.82)}
         height={size}
         alt="MergifyPDF logo"
         className="block h-full w-full select-none"

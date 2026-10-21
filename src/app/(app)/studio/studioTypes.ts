@@ -131,6 +131,8 @@ export type SavedSignature = {
   naturalWidth: number;
   naturalHeight: number;
   createdAt: number;
+  typedText?: string;
+  typedStyleId?: string;
 };
 export type SignaturePlacement = {
   id: string;
@@ -145,6 +147,9 @@ export type SignaturePlacement = {
   height: number;
   rotation?: number;
   status: "draft" | "placed";
+  locked?: boolean;
+  typedText?: string;
+  typedStyleId?: string;
 };
 
 export type CloudProject = {

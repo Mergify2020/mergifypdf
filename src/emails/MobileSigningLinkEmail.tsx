@@ -7,7 +7,12 @@ export function MobileSigningLinkEmail({ signingUrl }: { signingUrl: string }) {
         <tbody>
           <tr>
             <td style={{ padding: "24px 0", textAlign: "left" }}>
-              <span style={{ fontSize: 14, fontWeight: 600, color: "#5B35D5" }}>MergifyPDF</span>
+              <img
+                src="https://mergifypdf.com/.well-known/email-logo-expanded-v2.png"
+                alt="MergifyPDF"
+                width={160}
+                style={{ display: "block", height: "auto" }}
+              />
             </td>
           </tr>
           <tr>

@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="1.500 -1.167 97.000 118.667" role="img" aria-label="MergifyPDF icon" width="38" height="46.49"><defs>
+<linearGradient id="left" x1="0" y1="0" x2="1" y2="1" gradientUnits="objectBoundingBox"><stop stop-color="#E1C8FF" /><stop offset=".5" stop-color="#B78BFA" /><stop offset="1" stop-color="#7544EB" /></linearGradient>
+<linearGradient id="right" x1="0" y1="0" x2=".9" y2="1" gradientUnits="objectBoundingBox"><stop stop-color="#8844FF" /><stop offset=".55" stop-color="#5420E8" /><stop offset="1" stop-color="#2710C5" /></linearGradient>
+<linearGradient id="fold" x1="0" y1="0" x2="1" y2="1" gradientUnits="objectBoundingBox"><stop stop-color="#F7EEFF" /><stop offset="1" stop-color="#D6BBFF" /></linearGradient>
+</defs>
+<g transform="translate(-14 -5) scale(.25)">
+<path d="M73 169 Q73 144 97 128 L251 32 Q270 20 287 33 Q300 43 300 62 L300 164 Q300 193 274 210 L210 251 Q179 271 179 310 L179 420 Q179 430 170 425 L96 379 Q73 365 73 339 Z" fill="url(#left)" />
+<path d="M179 420 L179 310 Q179 271 210 251 L274 210 Q300 193 300 164 L300 107 L334 127 L334 196 Q334 229 306 249 L245 288 Q218 306 218 341 L218 444 Z" fill="url(#fold)" />
+<path d="M334 127 Q334 119 342 124 L419 171 Q440 184 440 210 L440 353 Q440 381 416 394 L243 475 Q218 488 218 458 L218 341 Q218 306 245 288 L306 249 Q334 229 334 196 Z" fill="url(#right)" />
+</g>
+</svg>

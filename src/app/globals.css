@@ -101,6 +101,55 @@
   font-display: swap;
 }
 
+/* Dedicated signature fonts are self-hosted so typed signatures do not vary by browser. */
+@font-face {
+  font-family: "Great Vibes";
+  src: url("/fonts/GreatVibes-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Alex Brush";
+  src: url("/fonts/AlexBrush-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Allura";
+  src: url("/fonts/Allura-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Caveat";
+  src: url("/fonts/Caveat-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Parisienne";
+  src: url("/fonts/Parisienne-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Sacramento";
+  src: url("/fonts/Sacramento-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -1355,15 +1404,19 @@ html.theme-scroll-reveal:not(.dark) ::-webkit-scrollbar-thumb {
 }
 
 .route-loading-deferred {
-  animation: route-loading-reveal 140ms ease-out 220ms both;
+  /* Keep the content area populated from the first paint. A delayed opacity
+     animation exposed an empty pane while the workspace sidebar was ready. */
+  animation: route-loading-reveal 160ms ease-out both;
 }
 
 @keyframes route-loading-reveal {
   from {
-    opacity: 0;
+    opacity: 0.72;
+    transform: translateY(2px);
   }
   to {
     opacity: 1;
+    transform: translateY(0);
   }
 }
 
@@ -1904,3 +1957,14 @@ body.dark .projects-all-workspace .workspace-desktop-sidebar > div > div {
     transform: translateX(18%);
   }
 }
+
+@keyframes signature-style-shimmer {
+  from {
+    transform: translateX(-120%);
+  }
+
+  to {
+    transform: translateX(120%);
+  }
+}
+

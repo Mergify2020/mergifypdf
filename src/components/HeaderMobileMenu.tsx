@@ -95,7 +95,7 @@ export default function HeaderMobileMenu() {
                   <Link href="/" onClick={handleCloseMenu} className="inline-flex items-center">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src="/logos/home-expanded-sidebar-logo-dark-v6.svg"
+                      src="/logos/logo-icontext-v4-dark.svg"
                       alt="MergifyPDF"
                       className="h-[47px] w-auto"
                     />

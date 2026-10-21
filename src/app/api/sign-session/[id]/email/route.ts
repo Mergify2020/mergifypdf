@@ -1,10 +1,12 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
 
+import { authOptions } from "@/lib/authOptions";
 import { sendMobileSigningLinkEmail } from "@/lib/email";
 import { isSameOrigin } from "@/lib/requestGuards";
 import { rateLimit } from "@/lib/rateLimit";
-import { getSignSession } from "@/lib/signSessionStore";
+import { getMobileSignSession, getOwnedSignSession } from "@/lib/signSessionStore";
 
 export const dynamic = "force-dynamic";
 
@@ -16,9 +18,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
   if (!isSameOrigin(request)) {
     return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
   }
+  const authSession = await getServerSession(authOptions);
+  if (!authSession?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const limit = await rateLimit(request, {
-    keyPrefix: "sign-session-email",
+    keyPrefix: `sign-session-email:${authSession.user.id}`,
     windowMs: 60_000,
     max: 5,
   });
@@ -31,18 +35,23 @@ export async function POST(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: "Missing signing session." }, { status: 400 });
   }
 
-  const session = await getSignSession(id);
-  if (!session || session.signatureDataUrl) {
+  const session = await getOwnedSignSession(id, authSession.user.id);
+  if (!session || session.status !== "pending") {
     return NextResponse.json({ error: "This signing link is no longer available." }, { status: 404 });
   }
 
   const body = await request.json().catch(() => null);
   const to = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
+  const signingToken = typeof body?.signingToken === "string" ? body.signingToken : "";
   if (!EMAIL_RE.test(to) || to.length > 254) {
     return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
   }
+  const mobileSession = signingToken ? await getMobileSignSession(signingToken) : null;
+  if (!mobileSession || mobileSession.id !== session.id || mobileSession.status !== "pending") {
+    return NextResponse.json({ error: "This signing link is no longer available." }, { status: 404 });
+  }
 
-  const signingUrl = new URL("/sign-on-mobile/" + id, request.nextUrl.origin).toString();
+  const signingUrl = new URL("/sign-on-mobile/" + signingToken, request.nextUrl.origin).toString();
   const result = await sendMobileSigningLinkEmail({ to, signingUrl });
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 502 });

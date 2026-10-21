@@ -35,11 +35,21 @@ model User {
   uploadSessions           UploadSession[]
   exportJobs               ExportJob[]
   storageReadSessions      StorageReadSession[]
+  signatureLibrary         SignatureLibrary?
   twoFactorEnabled         Boolean              @default(false)
   twoFactorMethod          String?
   twoFactorPhone           String?
   createdAt                DateTime             @default(now())
   projects                 Project[]
+}
+
+model SignatureLibrary {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  signatures Json    @default("[]")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model AccountDeletionRecord {

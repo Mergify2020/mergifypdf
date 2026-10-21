@@ -696,6 +696,38 @@ export default function WorkspaceShell({
     }
   }
 
+  async function handleCreateBlankProject() {
+    if (createBusy) return;
+    const startedAt = Date.now();
+    const name = "Untitled document";
+    try {
+      window.localStorage?.setItem(PROJECT_NAME_STORAGE_KEY, name);
+    } catch {
+      // ignore storage failures
+    }
+    setCreateError(null);
+    setCreateBusy(true);
+    await resetWorkspaceStorage();
+    beginWorkspaceOpenHandoff([], startedAt);
+    try {
+      const res = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, data: { pages: [], sources: [], pagesCount: 0 } }),
+      });
+      if (!res.ok) throw new Error("Could not create blank project.");
+      const json = (await res.json().catch(() => null)) as { project?: { id?: string } } | null;
+      const id = json?.project?.id;
+      if (!id) throw new Error("Blank project did not return an id.");
+      setCreateOpen(false);
+      router.push(`${buildStudioProjectHref(id)}&startBlank=1`);
+    } catch {
+      setCreateError("Could not create a blank document. Please try again.");
+      setCreateBusy(false);
+      cancelWorkspaceOpenHandoff();
+    }
+  }
+
   const [activeProjectsFilter, setActiveProjectsFilter] = useState("all");
   const itemLabelClasses = "opacity-100 translate-x-0 max-w-full";
   const isTrashRoute = pathname?.startsWith("/projects/trash") ?? false;
@@ -764,7 +796,9 @@ export default function WorkspaceShell({
   const showPersistentWorkspaceTopBar = false;
   const isAllProjectsRoute = pathname === "/" || pathname === "/projects/all";
   const showDesktopAllProjectsTopBar = pathname === "/projects/all" && !phoneViewport;
-  const useFlatAllProjectsShell = showDesktopAllProjectsTopBar || isSignaturesPanel;
+  // Keep navigation integrated with the workspace frame. The former floating
+  // sidebar card added an unnecessary gap and shadow on non-project routes.
+  const useFlatAllProjectsShell = true;
   const fallbackProjectCardCount = fallbackProjectCountReady
     ? (isAllProjectsRoute ? Math.min(homeRecentProjects.length, 60) : Math.min(homeRecentProjects.length, 9))
     : isAllProjectsRoute
@@ -1869,21 +1903,22 @@ export default function WorkspaceShell({
           >
             <div className="flex flex-1 flex-col gap-2.5 overflow-y-auto overflow-x-hidden px-0 py-2.5">
               <div
-                className={`flex h-10 w-full items-center border-b border-slate-200 px-1 pb-3 dark:border-[#3A3A3A] ${
+                className={`flex h-12 w-full items-center border-b border-slate-200 px-1 pb-2 dark:border-[#3A3A3A] ${
                   expanded ? "justify-between" : "justify-center"
                 } ${useFlatAllProjectsShell ? "pb-3" : ""}`}
               >
                 {expanded ? (
                   <>
                     <AppHeaderBrand
+                      variant="sidebarNav"
                       logoLightSrc={
                         isHomePanel || isSignaturesPanel
-                          ? "/logos/home-expanded-sidebar-logo-light-v6.svg"
+                          ? "/logos/logo-icontext-dark-v4.svg"
                           : undefined
                       }
                       logoDarkSrc={
                         isHomePanel || isSignaturesPanel
-                          ? "/logos/home-expanded-sidebar-logo-dark-v6.svg"
+                          ? "/logos/logo-icontext-v4-dark.svg"
                           : undefined
                       }
                     />
@@ -1924,16 +1959,16 @@ export default function WorkspaceShell({
                     onMouseDown={() => {
                       clearSidebarTooltip();
                     }}
-                    className="group relative flex h-11 w-full items-center justify-center rounded-lg bg-transparent p-0 transition"
+                    className="group relative flex h-10 w-full items-center justify-center rounded-lg bg-transparent p-0 transition"
                     aria-label="Expand sidebar"
                   >
                     <Image
-                      src="/logos/home-collapsed-sidebar-logo-light-dark.svg"
+                      src="/logos/new-logo-icon-v4.svg"
                       alt="MergifyPDF"
-                      width={56}
-                      height={56}
+                      width={30}
+                      height={36}
                       priority
-                      className="h-14 w-14 max-w-none transition-opacity duration-200 group-hover:opacity-0 group-focus-visible:opacity-0"
+                      className="h-9 w-auto max-w-none transition-opacity duration-200 group-hover:opacity-0 group-focus-visible:opacity-0"
                     />
                     <span className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100">
                       <PanelRightClose className="h-6 w-6 text-slate-800 dark:text-zinc-100" aria-hidden />
@@ -2274,12 +2309,12 @@ export default function WorkspaceShell({
                   variant="sidebarPanel"
                   logoLightSrc={
                     isHomePanel || isSignaturesPanel
-                      ? "/logos/home-expanded-sidebar-logo-light-v6.svg"
+                      ? "/logos/logo-icontext-dark-v4.svg"
                       : undefined
                   }
                   logoDarkSrc={
                     isHomePanel || isSignaturesPanel
-                      ? "/logos/home-expanded-sidebar-logo-dark-v6.svg"
+                      ? "/logos/logo-icontext-v4-dark.svg"
                       : undefined
                   }
                 />
@@ -2881,7 +2916,21 @@ export default function WorkspaceShell({
                                   )}
                                 </p>
                                 {!createDragActive ? (
-                                  <p className="mt-2 text-sm text-[#4B5563] dark:text-zinc-400">Add up to 12 PDF files.</p>
+                                  <>
+                                    <p className="mt-2 text-sm text-[#4B5563] dark:text-zinc-400">Add up to 12 PDF files.</p>
+                                    <div className="mt-5 flex flex-col items-center">
+                                      <span className="text-xs font-medium text-slate-400 dark:text-zinc-500">or</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => void handleCreateBlankProject()}
+                                        disabled={createBusy}
+                                        className="mt-2 inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-violet-200 hover:bg-violet-50/60 hover:text-[#5B35D5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60 dark:border-[#4A4A4A] dark:bg-[#323232] dark:text-zinc-100 dark:hover:border-violet-400/45 dark:hover:bg-violet-400/[0.08] dark:hover:text-violet-200"
+                                      >
+                                        <FileText className="h-4 w-4 text-[#6C47FF]" aria-hidden />
+                                        Start with a blank document
+                                      </button>
+                                    </div>
+                                  </>
                                 ) : null}
                               </div>
                             ) : (
@@ -2965,8 +3014,8 @@ export default function WorkspaceShell({
         <div className="mx-auto flex h-[76px] w-full max-w-7xl items-center justify-between px-4 lg:px-6">
           <div className="flex items-center gap-3">
             <AppHeaderBrand
-              logoLightSrc="/logos/home-expanded-sidebar-logo-light-v6.svg"
-              logoDarkSrc="/logos/home-expanded-sidebar-logo-dark-v6.svg"
+              logoLightSrc="/logos/logo-icontext-dark-v4.svg"
+              logoDarkSrc="/logos/logo-icontext-v4-dark.svg"
             />
           </div>
           <div className="flex items-center gap-3">
@@ -3002,9 +3051,7 @@ export default function WorkspaceShell({
       : null;
 
   const primaryShell = isStudioRoute ? (
-    <Suspense
-      fallback={null}
-    >
+    <Suspense fallback={null}>
       <main>{children}</main>
     </Suspense>
   ) : isPricingRoute ? (

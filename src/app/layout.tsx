@@ -10,13 +10,13 @@ export const metadata: Metadata = {
   description: "Fast, simple PDF tools — all in your browser.",
   icons: {
     icon: [
-      { url: "/favicons/favicon.svg", type: "image/svg+xml" },
+      { url: "/logos/new-logo-icon-v4.svg", type: "image/svg+xml" },
       { url: "/favicons/favicon-48x48.png", sizes: "48x48", type: "image/png" },
       { url: "/favicons/favicon-32x32.png", sizes: "32x32", type: "image/png" },
       { url: "/favicons/favicon-16x16.png", sizes: "16x16", type: "image/png" },
     ],
     apple: [{ url: "/favicons/apple-touch-icon.png", sizes: "180x180" }],
-    other: [{ rel: "mask-icon", url: "/favicons/safari-pinned-tab.svg", color: "#024d7c" }],
+    other: [{ rel: "mask-icon", url: "/logos/new-logo-icon-v4.svg", color: "#5B35D5" }],
   },
   manifest: "/favicons/site.webmanifest",
 };
@@ -67,12 +67,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
         {/* Explicit links (helps stubborn Safari/iOS) */}
         <link rel="icon" href="/favicons/favicon.ico" sizes="any" />
-        <link rel="icon" type="image/svg+xml" href="/favicons/favicon.svg" />
+        <link rel="icon" type="image/svg+xml" href="/logos/new-logo-icon-v4.svg" />
         <link rel="icon" type="image/png" sizes="48x48" href="/favicons/favicon-48x48.png" />
         <link rel="icon" type="image/png" sizes="32x32" href="/favicons/favicon-32x32.png" />
         <link rel="icon" type="image/png" sizes="16x16" href="/favicons/favicon-16x16.png" />
         <link rel="apple-touch-icon" sizes="180x180" href="/favicons/apple-touch-icon.png" />
-        <link rel="mask-icon" href="/favicons/safari-pinned-tab.svg" color="#024d7c" />
+        <link rel="mask-icon" href="/logos/new-logo-icon-v4.svg" color="#5B35D5" />
         <link rel="manifest" href="/favicons/site.webmanifest" />
 
         {externalServicesEnabled ? (

@@ -232,14 +232,14 @@ export default function ForgotPasswordPage() {
             <div key={step} className="auth-card-animate">
             <div className="mb-4 flex items-center justify-between">
               <Image
-                src="/logos/home-expanded-sidebar-logo-light-v6.svg"
+                src="/logos/logo-icontext-dark-v4.svg"
                 alt="MergifyPDF"
                 width={164}
-                height={47}
+                height={32}
                 priority
                 loading="eager"
                 className="block"
-                style={{ width: 164, height: 47 }}
+                style={{ width: 164, height: 32 }}
               />
               <div aria-hidden="true" />
             </div>
