@@ -36,7 +36,7 @@ jobs:
       APP_RUNTIME_ENV: development
       APP_DATA_ENV: test
       APP_RUNTIME_NAME: mergifypdf
-      APP_RUNTIME_DB_LABEL: mergifypdf-ci
+      APP_RUNTIME_DB_LABEL: mergifypdf-ci-test
       APP_RUNTIME_GUARD_STRICT: "true"
       APP_RUNTIME_REQUIRE_USERS: "false"
       EMAIL_DELIVERY_MODE: disabled
