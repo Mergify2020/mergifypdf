@@ -24,6 +24,7 @@ import {
 import { buildStudioProjectHref, getStudioProjectIdFromSearchParams } from "@/lib/studioRoute";
 import { loadPdfJs, type PdfJsModule } from "@/lib/pdfjsClient";
 import { loadPdfLib } from "@/lib/pdfLibClient";
+import { nextSignatureName } from "@/lib/signatureNames";
 import { SecurePdfReadAccessManager } from "@/lib/securePdfReadClient";
 import { uploadPdfSecurely } from "@/lib/secureUploadClient";
 import {
@@ -85,7 +86,6 @@ import {
 	  UploadCloud,
 	  Upload,
   X,
-  Mail,
   Download,
   FileText,
   ShieldCheck,
@@ -1901,6 +1901,9 @@ function WorkspaceClient() {
   const [signaturePanelMode, setSignaturePanelMode] = useState<SignaturePanelMode>("none");
   const [savedSignatures, setSavedSignatures] = useState<SavedSignature[]>([]);
   const [isSignatureLibraryHydrated, setIsSignatureLibraryHydrated] = useState(false);
+  const [signatureLibraryError, setSignatureLibraryError] = useState(false);
+  const [signatureSyncError, setSignatureSyncError] = useState(false);
+  const [signatureLibraryRetry, setSignatureLibraryRetry] = useState(0);
   const [legacyProjectSignatures, setLegacyProjectSignatures] = useState<SavedSignature[]>([]);
   const [selectedSignatureId, setSelectedSignatureId] = useState<string | null>(null);
   const [newSignatureId, setNewSignatureId] = useState<string | null>(null);
@@ -1912,6 +1915,10 @@ function WorkspaceClient() {
   const [signatureNameError, setSignatureNameError] = useState<string | null>(null);
   const [isSavingSignature, setIsSavingSignature] = useState(false);
   const isSavingSignatureRef = useRef(false);
+  const signatureSyncVersionRef = useRef(0);
+  const signatureRefreshPendingRef = useRef(false);
+  const signatureRefreshRef = useRef<() => void>(() => {});
+  const signatureChannelRef = useRef<BroadcastChannel | null>(null);
   const [pendingSignatureForPlacement, setPendingSignatureForPlacement] = useState<SavedSignature | null>(null);
   const [signaturePlacements, setSignaturePlacements] = useState<Record<string, SignaturePlacement[]>>({});
   const normalizedTypedSignatureFramesRef = useRef<Set<string>>(new Set());
@@ -1946,7 +1953,7 @@ function WorkspaceClient() {
   } | null>(null);
   const [showSignatureHub, setShowSignatureHub] = useState(false);
   const [isSignatureHubClosing, setIsSignatureHubClosing] = useState(false);
-  const [signatureHubStep, setSignatureHubStep] = useState<"empty-project" | "gallery" | "type" | "draw" | "upload" | "qr" | "email">(
+  const [signatureHubStep, setSignatureHubStep] = useState<"empty-project" | "gallery" | "type" | "draw" | "upload" | "qr">(
     "gallery"
   );
   const [isCreatingBlankSigningPage, setIsCreatingBlankSigningPage] = useState(false);
@@ -1957,16 +1964,14 @@ function WorkspaceClient() {
   const [areTypedSignatureFontsReady, setAreTypedSignatureFontsReady] = useState(false);
   const [typedSignaturePreview, setTypedSignaturePreview] = useState<string | null>(null);
   const [typedSignatureError, setTypedSignatureError] = useState<string | null>(null);
-  const [mobileEmail, setMobileEmail] = useState("");
-  const [isMobileEmailSending, setIsMobileEmailSending] = useState(false);
-  const [mobileEmailMessage, setMobileEmailMessage] = useState<string | null>(null);
   const [mobileSessionId, setMobileSessionId] = useState<string | null>(null);
   const [mobileSessionUrl, setMobileSessionUrl] = useState<string | null>(null);
-  const [mobileSigningToken, setMobileSigningToken] = useState<string | null>(null);
   const [mobileSessionStatus, setMobileSessionStatus] = useState<"idle" | "waiting" | "transferring" | "error">("idle");
+  const [mobileTransferRetry, setMobileTransferRetry] = useState(0);
   const [isRefreshingMobileCode, setIsRefreshingMobileCode] = useState(false);
   const [isMobileCodeRefreshCoolingDown, setIsMobileCodeRefreshCoolingDown] = useState(false);
   const mobileSessionRequestRef = useRef(false);
+  const mobileTransferPollRef = useRef<{ sessionId: string } | null>(null);
   const mobileCodeRefreshCooldownRef = useRef(0);
   const mobileCodeRefreshTimerRef = useRef<number | null>(null);
   const [showDrawModal, setShowDrawModal] = useState(false);
@@ -5284,6 +5289,7 @@ const timer =
       hydratedSignatureAccountIdRef.current === userId
     ) return;
     setIsSignatureLibraryHydrated(false);
+    setSignatureLibraryError(false);
     let cancelled = false;
     let loaded = false;
     const hydrate = async () => {
@@ -5308,13 +5314,16 @@ const timer =
               const accountIds = new Set(accountSignatures.map((signature) => signature.id));
               const additions = localSignatures.filter((signature) => !accountIds.has(signature.id));
               if (additions.length > 0) {
-                signatures = [...accountSignatures, ...additions];
-                const migrationResponse = await fetch("/api/signatures", {
-                  method: "PUT",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ signatures }),
-                });
-                if (!migrationResponse.ok) throw new Error("Could not migrate saved signatures.");
+                for (const signature of additions) {
+                  const migrationResponse = await fetch("/api/signatures", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ type: "add", signature }),
+                  });
+                  if (!migrationResponse.ok) throw new Error("Could not migrate saved signatures.");
+                  const migrated = (await migrationResponse.json()) as { signatures: SavedSignature[] };
+                  signatures = migrated.signatures;
+                }
               }
               local?.removeItem(WORKSPACE_SIGNATURES_KEY);
             }
@@ -5329,6 +5338,7 @@ const timer =
       } catch {
         // Do not mark the account library ready: an empty client state must
         // never overwrite a library that could not be loaded.
+        if (!cancelled) setSignatureLibraryError(true);
         return;
       } finally {
         if (!cancelled && loaded) {
@@ -5341,35 +5351,45 @@ const timer =
     return () => {
       cancelled = true;
     };
-  }, [authSession?.user?.id, authStatus]);
+  }, [authSession?.user?.id, authStatus, signatureLibraryRetry]);
 
   /** Migrate libraries saved by older project-scoped versions without letting projects overwrite an account library. */
   useEffect(() => {
     if (!isSignatureLibraryHydrated || savedSignatures.length > 0 || legacyProjectSignatures.length === 0) return;
-    setSavedSignatures((current) => current.length > 0 ? current : legacyProjectSignatures);
-    setLegacyProjectSignatures([]);
-  }, [isSignatureLibraryHydrated, legacyProjectSignatures, savedSignatures.length]);
+    if (!authSession?.user?.id) {
+      setSavedSignatures((current) => current.length > 0 ? current : legacyProjectSignatures);
+      setLegacyProjectSignatures([]);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      let signatures: SavedSignature[] = [];
+      try {
+        for (const signature of legacyProjectSignatures) {
+          const response = await fetch("/api/signatures", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ type: "add", signature }),
+          });
+          if (!response.ok) throw new Error("Could not migrate saved signatures.");
+          signatures = ((await response.json()) as { signatures: SavedSignature[] }).signatures;
+        }
+        if (!cancelled) {
+          setSavedSignatures(signatures);
+          setLegacyProjectSignatures([]);
+        }
+      } catch {
+        // Keep the original project signatures so migration can be retried.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [authSession?.user?.id, isSignatureLibraryHydrated, legacyProjectSignatures, savedSignatures.length]);
 
   /** Persist saved signatures */
   useEffect(() => {
     if (!isSignatureLibraryHydrated) return;
-    // Signed-in users: sync to API so signatures follow the account across devices.
+    // Account changes are saved individually before updating the UI.
     if (authSession?.user?.id) {
-      if (hydratedSignatureAccountIdRef.current !== authSession.user.id) return;
-      const persist = async () => {
-        try {
-          const response = await fetch("/api/signatures", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ signatures: savedSignatures }),
-          });
-          if (!response.ok) throw new Error("Could not save signatures.");
-        } catch {
-          // Saving a newly created signature also performs an awaited write below.
-          // This keeps edits responsive while avoiding cancelled requests on navigation.
-        }
-      };
-      void persist();
       return;
     }
     // Guests: keep using localStorage, scoped to this browser only.
@@ -5380,6 +5400,82 @@ const timer =
       console.error("Failed to persist signatures", err);
     }
   }, [authSession?.user?.id, isSignatureLibraryHydrated, savedSignatures]);
+
+  // Other tabs only receive an invalidation signal, never signature data.
+  useEffect(() => {
+    const userId = authSession?.user?.id;
+    if (!userId || !isSignatureLibraryHydrated) return;
+    let disposed = false;
+    let requestId = 0;
+    const refresh = async () => {
+      if (disposed) return;
+      if (isSavingSignatureRef.current) {
+        signatureRefreshPendingRef.current = true;
+        return;
+      }
+      signatureRefreshPendingRef.current = false;
+      const version = signatureSyncVersionRef.current;
+      const request = ++requestId;
+      try {
+        const response = await fetch("/api/signatures", { cache: "no-store" });
+        if (!response.ok) throw new Error("Could not refresh signatures.");
+        const data = (await response.json()) as { signatures?: SavedSignature[] };
+        if (!Array.isArray(data.signatures)) throw new Error("Invalid signature library.");
+        if (disposed || request !== requestId) return;
+        if (isSavingSignatureRef.current || version !== signatureSyncVersionRef.current) {
+          signatureRefreshPendingRef.current = true;
+          if (!isSavingSignatureRef.current) void refresh();
+          return;
+        }
+        setSavedSignatures(data.signatures);
+        setSignatureSyncError(false);
+        setSelectedSignatureId((current) => current && !data.signatures!.some((signature) => signature.id === current) ? null : current);
+      } catch {
+        // Keep the last known library; the next focus/open/change will retry.
+        if (!disposed && request === requestId) setSignatureSyncError(true);
+      }
+    };
+    signatureRefreshRef.current = () => { void refresh(); };
+    let channel: BroadcastChannel | null = null;
+    try {
+      if (typeof BroadcastChannel !== "undefined") channel = new BroadcastChannel("mpdf:signature-library");
+    } catch {
+      // Focus and hub-open refreshes still work if browser messaging is unavailable.
+    }
+    signatureChannelRef.current = channel;
+    if (channel) channel.onmessage = (event) => {
+      if (event.data?.userId === userId && event.data?.type === "changed") void refresh();
+    };
+    const onFocus = () => { if (document.visibilityState === "visible") void refresh(); };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      disposed = true;
+      requestId += 1;
+      signatureRefreshRef.current = () => {};
+      if (signatureChannelRef.current === channel) signatureChannelRef.current = null;
+      channel?.close();
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, [authSession?.user?.id, isSignatureLibraryHydrated]);
+
+  const notifySignatureLibraryChanged = useCallback(() => {
+    signatureSyncVersionRef.current += 1;
+    if (authSession?.user?.id) {
+      try {
+        signatureChannelRef.current?.postMessage({ type: "changed", userId: authSession.user.id });
+      } catch {
+        // A notification failure must not turn a successful save into an error.
+      }
+    }
+  }, [authSession?.user?.id]);
+
+  const finishSignatureSave = useCallback(() => {
+    isSavingSignatureRef.current = false;
+    setIsSavingSignature(false);
+    if (signatureRefreshPendingRef.current) signatureRefreshRef.current();
+  }, []);
 
   const registerThumbNode = useCallback(
     (id: string) => (node: HTMLLIElement | null) => {
@@ -10090,11 +10186,15 @@ const timer =
     async (
       name: string,
       dataUrl: string,
-      options?: { typedSignature?: { text: string; styleId: string } }
+      options?: { typedSignature?: { text: string; styleId: string }; autoName?: boolean; onSaved?: (entry: SavedSignature) => void }
     ) => {
       const trimmed = name.trim();
       if (!trimmed) {
         setSignatureNameError("Name your signature.");
+        return null;
+      }
+      if (authSession?.user?.id && !isSignatureLibraryHydrated) {
+        setSignatureNameError("Your signature library is still loading. Please try again.");
         return null;
       }
       if (isSavingSignatureRef.current) return null;
@@ -10104,7 +10204,7 @@ const timer =
       try {
         const trimmedDataUrl = await trimSignatureDataUrl(dataUrl);
         const { width, height } = await loadImageDimensions(trimmedDataUrl);
-        const entry: SavedSignature = {
+        let entry: SavedSignature = {
           id: createUniqueId("shape"),
           name: finalName,
           dataUrl: trimmedDataUrl,
@@ -10118,36 +10218,36 @@ const timer =
         // Account libraries must be durable before this dialog reports success.
         if (authSession?.user?.id) {
           const response = await fetch("/api/signatures", {
-            method: "PUT",
+            method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ signatures: [entry, ...savedSignatures] }),
+            body: JSON.stringify({ type: "add", signature: entry, autoName: options?.autoName === true }),
           });
           if (!response.ok) throw new Error("Could not save signature.");
+          const result = (await response.json()) as { signatures?: SavedSignature[] };
+          const savedEntry = result.signatures?.find((signature) => signature.id === entry.id);
+          if (!savedEntry) throw new Error("Could not confirm signature was saved.");
+          entry = savedEntry;
         }
         markWorkspaceDirty();
         setSavedSignatures((prev) => [entry, ...prev]);
         setNewSignatureId(entry.id);
         setSignatureHubGalleryMode("library");
         setSignatureNameError(null);
+        notifySignatureLibraryChanged();
+        options?.onSaved?.(entry);
         return entry;
       } catch {
         setSignatureNameError("Couldn’t save this signature. Please try again.");
         return null;
       } finally {
-        isSavingSignatureRef.current = false;
-        setIsSavingSignature(false);
+        finishSignatureSave();
       }
     },
-    [authSession?.user?.id, loadImageDimensions, markWorkspaceDirty, savedSignatures, trimSignatureDataUrl]
+    [authSession?.user?.id, finishSignatureSave, isSignatureLibraryHydrated, loadImageDimensions, markWorkspaceDirty, notifySignatureLibraryChanged, trimSignatureDataUrl]
   );
 
   const getNextSignatureName = useCallback(() => {
-    const existingNames = new Set(savedSignatures.map((signature) => signature.name.trim().toLowerCase()));
-    let sequence = savedSignatures.length + 1;
-    while (existingNames.has(`signature ${sequence}`.toLowerCase())) {
-      sequence += 1;
-    }
-    return `Signature ${sequence}`;
+    return nextSignatureName(savedSignatures);
   }, [savedSignatures]);
 
   const closeRenameDialog = useCallback(() => {
@@ -10170,9 +10270,12 @@ const timer =
     setIsSignatureHubClosing(false);
     setSignatureHubStep(pages.length > 0 && sources.length > 0 ? "gallery" : "empty-project");
     setSelectedSignatureId(null);
-    setSignatureHubGalleryMode(savedSignatures.length > 0 ? "library" : "create");
+    // The gallery already shows creation options when the library is empty.
+    // Keep library mode while signatures load so they appear as soon as they arrive.
+    setSignatureHubGalleryMode("library");
     setShowSignatureHub(true);
-  }, [pages.length, savedSignatures.length, sources.length]);
+    signatureRefreshRef.current();
+  }, [pages.length, sources.length]);
 
   const closeSignatureHub = useCallback(() => {
     if (isSignatureHubClosing) return;
@@ -10205,7 +10308,7 @@ const timer =
     }
     if (signatureHubStep === "empty-project" && pages.length > 0 && sources.length > 0) {
       setSignatureHubStep("gallery");
-      setSignatureHubGalleryMode(savedSignatures.length > 0 ? "library" : "create");
+      setSignatureHubGalleryMode("library");
     }
   }, [pages.length, savedSignatures.length, showSignatureHub, signatureHubStep, sources.length]);
 
@@ -12682,7 +12785,6 @@ const timer =
       const data = (await res.json()) as { id: string; signingToken: string };
       const origin = window.location.origin;
       setMobileSessionId(data.id);
-      setMobileSigningToken(data.signingToken);
       setMobileSessionUrl(`${origin}/sign-on-mobile/${data.signingToken}`);
       setMobileSessionStatus("waiting");
     } catch {
@@ -12707,7 +12809,6 @@ const timer =
     if (!showSignatureHub) {
       setMobileSessionId(null);
       setMobileSessionUrl(null);
-      setMobileSigningToken(null);
       setMobileSessionStatus("idle");
       setIsRefreshingMobileCode(false);
       setIsMobileCodeRefreshCoolingDown(false);
@@ -12720,19 +12821,23 @@ const timer =
       return;
     }
 
-    const usesMobileFlow = signatureHubStep === "qr" || signatureHubStep === "email";
+    const usesMobileFlow = signatureHubStep === "qr";
     if (usesMobileFlow && mobileSessionStatus === "idle" && !mobileSessionUrl) {
       startMobileSession();
     }
   }, [mobileSessionStatus, mobileSessionUrl, showSignatureHub, signatureHubStep, startMobileSession]);
 
   useEffect(() => {
-    if (!mobileSessionId || (signatureHubStep !== "qr" && signatureHubStep !== "email")) return;
+    if (!mobileSessionId || signatureHubStep !== "qr") return;
     let cancelled = false;
     let handled = false;
+    let polling = false;
 
     const poll = async () => {
-      if (handled) return;
+      if (handled || polling || mobileTransferPollRef.current?.sessionId === mobileSessionId) return;
+      polling = true;
+      const activePoll = { sessionId: mobileSessionId };
+      mobileTransferPollRef.current = activePoll;
       try {
         const res = await fetch(`/api/sign-session/${mobileSessionId}`, { cache: "no-store" });
         if (!res.ok) {
@@ -12744,35 +12849,44 @@ const timer =
             setMobileSessionUrl(null);
             setMobileSessionStatus("idle");
           } else if (res.status >= 500) {
+            handled = true;
             setMobileSessionStatus("error");
           }
           return;
         }
         const data = (await res.json()) as { id: string; signatureDataUrl: string | null; name: string | null };
-        if (cancelled) return;
+        if (cancelled || handled) return;
         if (data.signatureDataUrl) {
           handled = true;
           setMobileSessionStatus("transferring");
           await new Promise<void>((resolve) => window.setTimeout(resolve, 1200));
           if (cancelled) return;
-          const signatureName = data.name?.trim() ? data.name : getNextSignatureName();
-          const entry = await saveSignatureEntry(signatureName, data.signatureDataUrl);
+          const signatureName = getNextSignatureName();
+          const entry = await saveSignatureEntry(signatureName, data.signatureDataUrl, {
+            autoName: true,
+            onSaved: (saved) => {
+              setSelectedSignatureId(saved.id);
+              setSignaturePanelMode("saved");
+              setSignatureHubStep("gallery");
+              setMobileSessionId(null);
+              setMobileSessionUrl(null);
+              setMobileSessionStatus("idle");
+            },
+          });
           if (entry) {
-            setSelectedSignatureId(entry.id);
-            setSignatureHubGalleryMode("library");
             void fetch(`/api/sign-session/${data.id}`, { method: "DELETE", cache: "no-store" }).catch(() => {});
+          } else if (!cancelled) {
+            setMobileSessionStatus("error");
           }
-          setSignaturePanelMode("saved");
-          setSignatureHubStep("gallery");
-          setMobileSessionId(null);
-          setMobileSessionUrl(null);
-          setMobileSigningToken(null);
-          setMobileSessionStatus("idle");
         }
       } catch (err) {
         if (!cancelled) {
+          handled = true;
           setMobileSessionStatus("error");
         }
+      } finally {
+        polling = false;
+        if (mobileTransferPollRef.current === activePoll) mobileTransferPollRef.current = null;
       }
     };
     const interval = setInterval(poll, 2500);
@@ -12783,6 +12897,7 @@ const timer =
     };
   }, [
     mobileSessionId,
+    mobileTransferRetry,
     getNextSignatureName,
     saveSignatureEntry,
     setSignatureHubStep,
@@ -16996,20 +17111,38 @@ const timer =
             className={isSignatureHubClosing ? "absolute inset-0 bg-black/60 backdrop-blur-sm animate-[signature-hub-backdrop-out_160ms_ease-in_both]" : "absolute inset-0 bg-black/60 backdrop-blur-sm animate-[signature-hub-backdrop-in_240ms_cubic-bezier(0.16,1,0.3,1)_both]"}
           />
           <div
-            className={`relative z-10 w-full ${signatureHubStep === "qr" ? "max-w-3xl" : signatureHubStep === "email" ? "max-w-xl" : "max-w-4xl"} rounded-2xl bg-white p-5 shadow-[0_32px_90px_rgba(5,10,30,0.45)] dark:bg-[#1C1C1F] dark:shadow-[0_36px_110px_rgba(0,0,0,0.6)] ${isSignatureHubClosing ? "pointer-events-none animate-[signature-hub-dialog-out_160ms_cubic-bezier(0.4,0,1,1)_both]" : "animate-[signature-hub-dialog-in_260ms_cubic-bezier(0.16,1,0.3,1)_both]"}`}
+            className={`relative z-10 w-full ${signatureHubStep === "qr" ? "max-w-3xl" : "max-w-4xl"} rounded-2xl bg-white p-5 shadow-[0_32px_90px_rgba(5,10,30,0.45)] dark:bg-[#1C1C1F] dark:shadow-[0_36px_110px_rgba(0,0,0,0.6)] ${isSignatureHubClosing ? "pointer-events-none animate-[signature-hub-dialog-out_160ms_cubic-bezier(0.4,0,1,1)_both]" : "animate-[signature-hub-dialog-in_260ms_cubic-bezier(0.16,1,0.3,1)_both]"}`}
           >
             {renameSignatureId ? (
               <div className={isRenameDialogClosing ? "pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-slate-950/20 p-5 backdrop-blur-[1px] animate-[signature-hub-rename-backdrop-out_200ms_cubic-bezier(0.4,0,1,1)_both] dark:bg-black/45" : "absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-slate-950/20 p-5 backdrop-blur-[1px] animate-[signature-hub-rename-backdrop-in_200ms_cubic-bezier(0.16,1,0.3,1)_both] dark:bg-black/45"}>
                 <form
-                  onSubmit={(event) => {
+                  onSubmit={async (event) => {
                     event.preventDefault();
+                    if (isSavingSignatureRef.current) return;
                     const nextName = renameSignatureValue.trim();
                     if (!nextName) {
                       setRenameSignatureError("Enter a signature name.");
                       return;
                     }
-                    setSavedSignatures((previous) => previous.map((signature) => signature.id === renameSignatureId ? { ...signature, name: nextName } : signature));
-                    closeRenameDialog();
+                    isSavingSignatureRef.current = true;
+                    setIsSavingSignature(true);
+                    try {
+                      if (authSession?.user?.id) {
+                        const response = await fetch("/api/signatures", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ type: "rename", id: renameSignatureId, name: nextName }),
+                        });
+                        if (!response.ok) throw new Error("Could not rename signature.");
+                      }
+                      setSavedSignatures((previous) => previous.map((signature) => signature.id === renameSignatureId ? { ...signature, name: nextName } : signature));
+                      notifySignatureLibraryChanged();
+                      closeRenameDialog();
+                    } catch {
+                      setRenameSignatureError("Couldn’t rename this signature. Please try again.");
+                    } finally {
+                      finishSignatureSave();
+                    }
                   }}
                   className={isRenameDialogClosing ? "pointer-events-none w-full max-w-sm rounded-xl border border-slate-200 bg-white p-5 shadow-2xl shadow-slate-950/20 animate-[signature-hub-rename-dialog-out_200ms_cubic-bezier(0.4,0,1,1)_both] dark:border-[#3A3A42] dark:bg-[#242429]" : "w-full max-w-sm rounded-xl border border-slate-200 bg-white p-5 shadow-2xl shadow-slate-950/20 animate-[signature-hub-rename-dialog-in_220ms_cubic-bezier(0.16,1,0.3,1)_both] dark:border-[#3A3A42] dark:bg-[#242429]"}
                 >
@@ -17030,7 +17163,7 @@ const timer =
                   {renameSignatureError ? <p className="mt-2 text-xs font-medium text-rose-600 dark:text-rose-300">{renameSignatureError}</p> : null}
                   <div className="mt-5 flex justify-end gap-2">
                     <button type="button" onClick={closeRenameDialog} className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white">Cancel</button>
-                    <button type="submit" className="rounded-lg bg-[#5B35D5] px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-violet-500/20 transition hover:bg-[#4324B5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2">Save</button>
+                    <button type="submit" disabled={isSavingSignature} className="rounded-lg bg-[#5B35D5] px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-violet-500/20 transition hover:bg-[#4324B5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 disabled:opacity-60">{isSavingSignature ? "Saving…" : "Save"}</button>
                   </div>
                 </form>
               </div>
@@ -17048,8 +17181,6 @@ const timer =
                     ? "Type signature"
                     : signatureHubStep === "qr"
                     ? "Sign on another device"
-                    : signatureHubStep === "email"
-                    ? "Send a signing link"
                     : signatureHubStep === "draw"
                     ? "Draw signature"
                     : "Upload signature"}
@@ -17075,7 +17206,7 @@ const timer =
                     Back
                   </button>
                 ) : null}
-                {signatureHubStep === "qr" || signatureHubStep === "email" || signatureHubStep === "draw" || signatureHubStep === "upload" ? (
+                {signatureHubStep === "qr" || signatureHubStep === "draw" || signatureHubStep === "upload" ? (
                   <button
                     type="button"
                     onClick={() => setSignatureHubStep("gallery")}
@@ -17137,7 +17268,20 @@ const timer =
             ) : null}
             {signatureHubStep === "gallery" ? (
               <div className="mt-4 space-y-4">
-                <div className={savedSignatures.length > 0 && signatureHubGalleryMode === "library" ? "" : "hidden"}>
+                {isSignatureLibraryHydrated && signatureSyncError ? (
+                  <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700/50 dark:bg-amber-500/10 dark:text-amber-200">
+                    Couldn’t refresh signatures. Showing the last loaded library. {" "}
+                    <button type="button" onClick={() => signatureRefreshRef.current()} className="font-semibold underline">Try again</button>
+                  </div>
+                ) : null}
+                {!isSignatureLibraryHydrated ? (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-600 dark:border-[#2A2A31] dark:bg-white/[0.025] dark:text-zinc-300" role="status">
+                    {signatureLibraryError ? (
+                      <><p>Couldn’t load your signatures.</p><button type="button" onClick={() => setSignatureLibraryRetry((retry) => retry + 1)} className="mt-3 rounded-lg bg-[#5B35D5] px-4 py-2 font-semibold text-white">Try again</button></>
+                    ) : "Loading signatures…"}
+                  </div>
+                ) : null}
+                <div className={isSignatureLibraryHydrated && savedSignatures.length > 0 && signatureHubGalleryMode === "library" ? "" : "hidden"}>
                   <p className="px-0.5 text-sm font-semibold text-slate-900 dark:text-zinc-100">Saved signatures</p>
                   <p className="mb-3 mt-1 px-0.5 text-xs text-slate-500 dark:text-zinc-400">Select a signature to add it to your document.</p>
                   <div className={savedSignatures.length > 4 ? "max-h-[408px] overflow-y-auto pr-1" : "pr-1"}>
@@ -17201,10 +17345,28 @@ const timer =
                             aria-label={`Delete ${displayName}`}
                             title="Delete signature"
                             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 dark:text-zinc-500 dark:hover:bg-rose-500/10 dark:hover:text-rose-300"
-                            onClick={() => {
+                            onClick={async () => {
                               if (!window.confirm("Delete this signature? This can’t be undone.")) return;
-                              setSavedSignatures((previous) => previous.filter((item) => item.id !== sig.id));
-                              setSelectedSignatureId((current) => current === sig.id ? null : current);
+                              if (isSavingSignatureRef.current) return;
+                              isSavingSignatureRef.current = true;
+                              setIsSavingSignature(true);
+                              try {
+                                if (authSession?.user?.id) {
+                                  const response = await fetch("/api/signatures", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ type: "delete", id: sig.id }),
+                                  });
+                                  if (!response.ok) throw new Error("Could not delete signature.");
+                                }
+                                setSavedSignatures((previous) => previous.filter((item) => item.id !== sig.id));
+                                setSelectedSignatureId((current) => current === sig.id ? null : current);
+                                notifySignatureLibraryChanged();
+                              } catch {
+                                window.alert("Couldn’t delete this signature. Please try again.");
+                              } finally {
+                                finishSignatureSave();
+                              }
                             }}
                           >
                             <Trash2 className="h-4 w-4" aria-hidden />
@@ -17230,7 +17392,7 @@ const timer =
                     </button>
                   </div>
                 </div>
-                {savedSignatures.length === 0 || signatureHubGalleryMode === "create" ? (
+                {isSignatureLibraryHydrated && (savedSignatures.length === 0 || signatureHubGalleryMode === "create") ? (
                 <div className="mt-2">
                   <div>
                     <p className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Create a signature</p>
@@ -17295,7 +17457,7 @@ const timer =
                   </div>
                   <div className="mt-4 rounded-xl border border-slate-200/80 bg-slate-50/70 p-3 dark:border-[#2A2A31] dark:bg-white/[0.025]">
                     <p className="px-1 text-sm font-semibold text-slate-800 dark:text-zinc-100">Continue on another device</p>
-                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    <div className="mt-2 grid gap-2">
                   <button
                     type="button"
                     onClick={() => {
@@ -17310,20 +17472,6 @@ const timer =
                       </svg>
                     </span>
                     <span className="font-semibold text-slate-900 dark:text-zinc-100">QR code</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (mobileSessionStatus === "idle") startMobileSession();
-                      setMobileEmailMessage(null);
-                      setSignatureHubStep("email");
-                    }}
-                    className="flex h-16 items-center gap-3 rounded-xl border border-slate-200 bg-white/90 px-4 text-left text-sm text-slate-700 shadow-sm transition duration-200 hover:-translate-y-px hover:border-[#6C47FF]/50 hover:bg-white hover:shadow-md hover:text-slate-900 active:translate-y-0 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C47FF] focus-visible:ring-offset-2 dark:border-[#2A2A31] dark:bg-[#1C1C1F] dark:text-zinc-200 dark:hover:bg-violet-500/10 dark:hover:text-white dark:focus-visible:ring-offset-[#1C1C1F]"
-                  >
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-[#35639A] dark:bg-sky-500/10 dark:text-sky-300">
-                      <Mail className="h-5 w-5" />
-                    </span>
-                    <span className="font-semibold text-slate-900 dark:text-zinc-100">Email link</span>
                   </button>
                     </div>
                   </div>
@@ -17583,7 +17731,13 @@ const timer =
 
             {signatureHubStep === "qr" ? (
               <div className="mt-5 space-y-5">
-                {mobileSessionStatus === "transferring" ? (
+                {mobileSessionStatus === "error" && mobileSessionId ? (
+                  <div className="flex min-h-[286px] flex-col items-center justify-center px-6 text-center">
+                    <p role="alert" className="text-base font-semibold text-slate-900 dark:text-zinc-100">Couldn’t add your signature</p>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-zinc-400">Please try again.</p>
+                    <button type="button" onClick={() => { setMobileSessionStatus("waiting"); setMobileTransferRetry((retry) => retry + 1); }} className="mt-4 rounded-lg bg-[#5B35D5] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4324B5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500">Try again</button>
+                  </div>
+                ) : mobileSessionStatus === "transferring" ? (
                   <div className="flex min-h-[286px] flex-col items-center justify-center px-6 text-center">
                     <span className="size-10 animate-spin rounded-full border-[3px] border-violet-200 border-t-[#6C47FF] dark:border-violet-500/30 dark:border-t-violet-300" aria-hidden />
                     <p className="mt-4 text-base font-semibold text-slate-900 dark:text-zinc-100">Adding your signature</p>
@@ -17638,93 +17792,6 @@ const timer =
               </div>
             ) : null}
 
-            {signatureHubStep === "email" ? (
-              <div className="mx-auto mt-5 max-w-xl space-y-5">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 dark:border-[#2A2A31] dark:bg-white/[0.025]">
-                  <div className="flex items-start gap-4">
-                    <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-sky-50 text-[#35639A] dark:bg-sky-500/10 dark:text-sky-300">
-                      <Mail className="size-5" aria-hidden />
-                    </span>
-                    <div className="min-w-0 pt-0.5">
-                      <p className="text-base font-semibold text-slate-900 dark:text-zinc-100">Email a signing link</p>
-                      <p className="mt-1 text-sm text-slate-500 dark:text-zinc-400">Send a secure link to the device you want to use for signing.</p>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 space-y-2.5 border-t border-slate-200 pt-5 dark:border-white/10">
-                    {[
-                      "Open the signing link from your email on the device you want to use.",
-                      "Draw your signature on the page that opens.",
-                      "Your signature will be saved to your library automatically.",
-                    ].map((step, index) => (
-                      <div key={step} className="flex items-start gap-3">
-                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">{index + 1}</span>
-                        <p className="pt-0.5 text-sm text-slate-600 dark:text-zinc-300">{step}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <form
-                  className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-[#2A2A31] dark:bg-[#1C1C1F]"
-                  onSubmit={async (event) => {
-                    event.preventDefault();
-                    if (!mobileSessionId || !mobileSigningToken || !mobileEmail.trim() || isMobileEmailSending) return;
-                    setIsMobileEmailSending(true);
-                    setMobileEmailMessage(null);
-                    try {
-                      const response = await fetch("/api/sign-session/" + mobileSessionId + "/email", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ email: mobileEmail, signingToken: mobileSigningToken }),
-                      });
-                      const result = (await response.json().catch(() => null)) as { error?: string } | null;
-                      if (!response.ok) throw new Error(result?.error || "Unable to send the signing link.");
-                      setMobileEmailMessage("Signing link sent. Check your inbox.");
-                    } catch (error) {
-                      setMobileEmailMessage(error instanceof Error ? error.message : "Unable to send the signing link.");
-                    } finally {
-                      setIsMobileEmailSending(false);
-                    }
-                  }}
-                >
-                  <label className="block">
-                    <span className="mb-2 block text-sm font-semibold text-slate-800 dark:text-zinc-200">Email address</span>
-                    <input
-                      type="email"
-                      value={mobileEmail}
-                      onChange={(event) => {
-                        setMobileEmail(event.target.value);
-                        setMobileEmailMessage(null);
-                      }}
-                      placeholder="you@example.com"
-                      autoComplete="email"
-                      className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#6C47FF] focus:ring-0 dark:border-[#2A2A31] dark:bg-[#1C1C1F] dark:text-zinc-100 dark:focus:border-violet-400"
-                    />
-                  </label>
-                  {!mobileSessionId || !mobileSigningToken ? (
-                    <p className="mt-3 flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-zinc-400">
-                      <span className="size-3.5 animate-spin rounded-full border-2 border-violet-200 border-t-[#6C47FF] dark:border-violet-500/30 dark:border-t-violet-300" aria-hidden />
-                      Preparing your secure signing link…
-                    </p>
-                  ) : null}
-                  {mobileEmailMessage ? (
-                    <p role="status" className={"mt-3 text-sm font-medium " + (mobileEmailMessage === "Signing link sent. Check your inbox." ? "text-emerald-700 dark:text-emerald-300" : "text-rose-600 dark:text-rose-300")}>
-                      {mobileEmailMessage}
-                    </p>
-                  ) : null}
-                  <div className="mt-5 flex justify-end border-t border-slate-100 pt-4 dark:border-white/10">
-                    <button
-                      type="submit"
-                      className="inline-flex h-10 items-center justify-center rounded-lg bg-[#5B35D5] px-4 text-sm font-semibold text-white shadow-sm shadow-violet-500/20 transition hover:bg-[#4324B5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:shadow-none dark:disabled:bg-white/10 dark:disabled:text-zinc-500 dark:focus-visible:ring-offset-[#1C1C1F]"
-                      disabled={!mobileSessionId || !mobileSigningToken || !mobileEmail.trim() || isMobileEmailSending}
-                    >
-                      {isMobileEmailSending ? "Sending…" : "Send signing link"}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            ) : null}
             </div>
           </div>
         </div>

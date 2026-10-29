@@ -2,6 +2,7 @@ import { Redis } from "@upstash/redis";
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { nextSignatureName } from "@/lib/signatureNames";
 
 export type StoredSignature = {
   id: string;
@@ -10,6 +11,8 @@ export type StoredSignature = {
   naturalWidth: number;
   naturalHeight: number;
   createdAt: number;
+  typedText?: string;
+  typedStyleId?: string;
 };
 
 const globalStore = globalThis as typeof globalThis & {
@@ -142,9 +145,15 @@ export async function loadUserSignatures(
       const value = await redis.get<StoredSignature[]>(key);
       if (Array.isArray(value)) {
         // Preserve libraries created by the previous Redis-only implementation.
-        await saveDatabaseLibrary(userId, value);
-        setMemory(userId, value);
-        return value;
+        await prisma.$executeRaw(Prisma.sql`
+          INSERT INTO "SignatureLibrary" ("id", "userId", "signatures", "createdAt", "updatedAt")
+          VALUES (${randomUUID()}, ${userId}, ${JSON.stringify(value)}::jsonb, NOW(), NOW())
+          ON CONFLICT ("userId") DO NOTHING
+        `);
+        const migrated = await loadDatabaseLibrary(userId);
+        if (!migrated) throw new Error("Signature library migration failed");
+        setMemory(userId, migrated);
+        return migrated;
       }
     }
   } catch {
@@ -167,5 +176,37 @@ export async function saveUserSignatures(
   } catch {
     // ignore redis errors; memory already updated
   }
+}
+
+/** Change one entry under a database row lock so concurrent tabs cannot replace each other's libraries. */
+export async function mutateUserSignatures(
+  userId: string,
+  mutation: { type: "add"; signature: StoredSignature; autoName?: boolean } | { type: "rename"; id: string; name: string } | { type: "delete"; id: string },
+): Promise<StoredSignature[]> {
+  // Import a legacy Redis library before creating the database row, if needed.
+  await loadUserSignatures(userId);
+  const signatures = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw(Prisma.sql`
+      INSERT INTO "SignatureLibrary" ("id", "userId", "signatures", "createdAt", "updatedAt")
+      VALUES (${randomUUID()}, ${userId}, '[]'::jsonb, NOW(), NOW())
+      ON CONFLICT ("userId") DO NOTHING
+    `);
+    const rows = await tx.$queryRaw<Array<{ signatures: unknown }>>(Prisma.sql`
+      SELECT "signatures" FROM "SignatureLibrary" WHERE "userId" = ${userId} FOR UPDATE
+    `);
+    const current = asStoredSignatures(rows[0]?.signatures);
+    const next = mutation.type === "add"
+      ? [{ ...mutation.signature, name: mutation.autoName ? nextSignatureName(current) : mutation.signature.name }, ...current.filter((item) => item.id !== mutation.signature.id)]
+      : mutation.type === "rename"
+        ? current.map((item) => item.id === mutation.id ? { ...item, name: mutation.name } : item)
+        : current.filter((item) => item.id !== mutation.id);
+    await tx.$executeRaw(Prisma.sql`
+      UPDATE "SignatureLibrary" SET "signatures" = ${JSON.stringify(next)}::jsonb, "updatedAt" = NOW()
+      WHERE "userId" = ${userId}
+    `);
+    return next;
+  });
+  setMemory(userId, signatures);
+  return signatures;
 }
 

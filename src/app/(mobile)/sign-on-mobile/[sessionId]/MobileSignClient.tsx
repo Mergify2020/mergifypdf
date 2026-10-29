@@ -270,7 +270,7 @@ export default function MobileSignClient({ sessionId }: { sessionId: string }) {
       const res = await fetch(`/api/sign-session/mobile/${sessionId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dataUrl, name: "Mobile signature" }),
+        body: JSON.stringify({ dataUrl }),
         cache: "no-store",
       });
       if (res.status === 409) {
