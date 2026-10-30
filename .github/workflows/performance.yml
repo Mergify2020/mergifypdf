@@ -38,8 +38,8 @@ jobs:
       R2_BUCKET_ENVIRONMENT: test
       REDIS_ENVIRONMENT: test
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
@@ -74,7 +74,7 @@ jobs:
           exit 1
       - run: pnpm analyze
       - run: pnpm bundles:report > artifacts/bundle-report.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: development-performance-${{ github.run_id }}
           path: |
